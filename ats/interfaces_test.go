@@ -3,7 +3,7 @@ package ats_test
 import (
 	"testing"
 
-	"github.com/sbvh/qntx/ats"
+	"github.com/teranos/QNTX/ats"
 )
 
 // TestNoOpQueryExpander_LiteralMatching verifies the default no-op expander

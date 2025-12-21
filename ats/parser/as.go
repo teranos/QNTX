@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sbvh/qntx/ats"
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // ParserOptions provides optional configuration for the AS command parser

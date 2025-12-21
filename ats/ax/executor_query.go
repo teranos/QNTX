@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // sanitizeLikePattern escapes SQL LIKE pattern metacharacters to prevent injection

@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/pterm/pterm"
-	"github.com/sbvh/qntx/ats"
-	"github.com/sbvh/qntx/ats/alias"
-	"github.com/sbvh/qntx/ats/parser"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/alias"
+	"github.com/teranos/QNTX/ats/parser"
 )
 
 // ExecutionHelper provides shared execution utilities for IX processors

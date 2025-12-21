@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sbvh/qntx/ats"
-	"github.com/sbvh/qntx/ats/alias"
-	"github.com/sbvh/qntx/ats/ax/classification"
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/alias"
+	"github.com/teranos/QNTX/ats/ax/classification"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // AxExecutor executes ask queries against attestation storage

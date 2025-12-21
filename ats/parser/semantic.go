@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"github.com/sbvh/qntx/ats/symbols"
+	"github.com/teranos/QNTX/ats/symbols"
 )
 
 // SemanticTokenType classifies tokens by grammatical role in ATS queries

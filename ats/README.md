@@ -61,7 +61,7 @@ if !exists {
 ### Alias System Integration
 
 ```go
-import "github.com/sbvh/qntx/ats/alias"
+import "github.com/teranos/QNTX/ats/alias"
 
 aliasResolver := alias.NewResolver(db)
 // Alias creation is handled by ats/alias

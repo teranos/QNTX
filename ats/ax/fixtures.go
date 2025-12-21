@@ -3,7 +3,7 @@ package ax
 import (
 	"time"
 
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestFixtures provides predictable test data for Ask System testing

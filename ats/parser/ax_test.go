@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

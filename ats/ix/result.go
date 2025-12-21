@@ -3,7 +3,7 @@ package ix
 import (
 	"sort"
 
-	"github.com/sbvh/qntx/ats/ingestion"
+	"github.com/teranos/QNTX/ats/ingestion"
 )
 
 const (

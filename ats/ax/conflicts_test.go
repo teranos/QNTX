@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sbvh/qntx/ats"
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/stretchr/testify/assert"
 )
 

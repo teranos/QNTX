@@ -3,7 +3,7 @@ package classification
 import (
 	"time"
 
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // SmartClassifier performs advanced conflict classification and resolution

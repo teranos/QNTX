@@ -125,8 +125,8 @@ type AxResult struct {
 
 ```go
 import (
-    "github.com/sbvh/qntx/ats/ax"
-    "github.com/sbvh/qntx/ats/parser"
+    "github.com/teranos/QNTX/ats/ax"
+    "github.com/teranos/QNTX/ats/parser"
 )
 
 // Parse natural language into structured query

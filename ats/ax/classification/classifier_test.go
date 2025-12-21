@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // The Attestation Chronicles: Testing smart classification in the transition

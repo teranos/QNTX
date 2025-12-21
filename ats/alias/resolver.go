@@ -3,7 +3,7 @@ package alias
 import (
 	"context"
 
-	"github.com/sbvh/qntx/ats"
+	"github.com/teranos/QNTX/ats"
 )
 
 // Resolver provides a high-level interface for alias resolution operations

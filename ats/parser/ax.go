@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/pterm/pterm"
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // ErrorContext indicates the environment where parser errors will be displayed

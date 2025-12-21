@@ -7,8 +7,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/sbvh/qntx/ats/ingestion"
-	"github.com/sbvh/qntx/ats/types"
+	"github.com/teranos/QNTX/ats/ingestion"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // AttestationItem represents an item that can be converted to an attestation.

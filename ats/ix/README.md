@@ -17,7 +17,7 @@ This package provides utilities for:
 Generates attestations from structured data:
 
 ```go
-import "github.com/sbvh/qntx/ats/ix"
+import "github.com/teranos/QNTX/ats/ix"
 
 generator := ix.NewAttestationGenerator("source-name")
 ```

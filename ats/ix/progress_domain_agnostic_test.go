@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/sbvh/qntx/ats/ix"
+	"github.com/teranos/QNTX/ats/ix"
 )
 
 // TestProgressEmitter_GenericAttestationProcessing demonstrates that
