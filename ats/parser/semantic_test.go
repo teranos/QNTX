@@ -88,9 +88,9 @@ func TestPreprocessAskTokensWithPositions(t *testing.T) {
 				startChar int
 				endChar   int
 			}{
-				{"teacher", false, 1, 0, 8},
-				{"is", false, 1, 9, 11},
-				{"experienced", false, 1, 12, 23},
+				{"teacher", false, 1, 0, 7},
+				{"is", false, 1, 8, 10},
+				{"experienced", false, 1, 11, 22},
 			},
 		},
 		{
@@ -103,9 +103,9 @@ func TestPreprocessAskTokensWithPositions(t *testing.T) {
 				startChar int
 				endChar   int
 			}{
-				{"research scientist", true, 1, 0, 19},
-				{"is", false, 1, 20, 22},
-				{"skilled", false, 1, 23, 30},
+				{"research scientist", true, 1, 0, 20},
+				{"is", false, 1, 21, 23},
+				{"skilled", false, 1, 24, 31},
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestPreprocessAskTokensWithPositions(t *testing.T) {
 				startChar int
 				endChar   int
 			}{
-				{"teacher", false, 1, 0, 8},
+				{"teacher", false, 1, 0, 7},
 				{"is", false, 2, 0, 2},
 				{"experienced", false, 3, 0, 11},
 			},
