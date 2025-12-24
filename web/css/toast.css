@@ -1,0 +1,193 @@
+/**
+ * Toast Notification Styling
+ *
+ * Cyberpunk-style error notifications with fade-in animation
+ */
+
+#toast-container {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+    min-width: 500px;
+    max-width: 600px;
+}
+
+.toast {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    background: rgba(10, 10, 10, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(51, 51, 51, 0.5);
+    box-shadow:
+        0 0 20px rgba(0, 0, 0, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    opacity: 0;
+    transition: opacity 0.12s cubic-bezier(0.4, 0, 1, 1); /* Fast fade in */
+    pointer-events: auto;
+    position: relative;
+    font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.toast-visible {
+    opacity: 1;
+}
+
+.toast-dismissing {
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Slow fade out */
+}
+
+/* Toast header with icon and message */
+.toast-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.toast-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #e0e0e0;
+    letter-spacing: 0.01em;
+}
+
+/* Build info section */
+.toast-build-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid #222;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+
+.toast-build-label {
+    text-transform: uppercase;
+    color: #666;
+    font-weight: 600;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+}
+
+.toast-build-value {
+    color: #999;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 11px;
+}
+
+/* Close button */
+.toast-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #333;
+    color: #666;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.toast-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ccc;
+    border-color: #555;
+}
+
+/* Toast types - cyberpunk styling */
+.toast-error {
+    border-left: 3px solid #ff0033;
+    box-shadow:
+        0 0 30px rgba(255, 0, 51, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.toast-error .toast-icon {
+    color: #ff0033;
+    text-shadow: 0 0 10px rgba(255, 0, 51, 0.5);
+}
+
+.toast-error .toast-build-info {
+    border-color: #ff003310;
+    background: rgba(255, 0, 51, 0.03);
+}
+
+.toast-warning {
+    border-left: 3px solid #ffaa00;
+    box-shadow:
+        0 0 30px rgba(255, 170, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.toast-warning .toast-icon {
+    color: #ffaa00;
+}
+
+.toast-success {
+    border-left: 3px solid #00ff88;
+    box-shadow:
+        0 0 30px rgba(0, 255, 136, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.toast-success .toast-icon {
+    color: #00ff88;
+}
+
+.toast-info {
+    border-left: 3px solid #00ccff;
+    box-shadow:
+        0 0 30px rgba(0, 204, 255, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.toast-info .toast-icon {
+    color: #00ccff;
+}
+
+/* Light theme */
+[data-theme="light"] .toast {
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-left-width: 3px;
+}
+
+[data-theme="light"] .toast-message {
+    color: #1a1a1a;
+}
+
+[data-theme="light"] .toast-build-info {
+    color: #666;
+    border-top-color: #e0e0e0;
+}
+
+[data-theme="light"] .toast-close {
+    color: #666;
+}
+
+[data-theme="light"] .toast-close:hover {
+    color: #1a1a1a;
+}
