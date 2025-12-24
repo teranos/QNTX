@@ -39,6 +39,14 @@ class ProsePanel {
             }
         });
 
+        // TODO(issue #11): Implement Layout rendering modes for DocBlock views
+        // Support list, cluster, timeline, and radial layout modes
+        // Render views based on Layout field in DocBlock YAML headers
+
+        // TODO(issue #12): Connect view DocBlocks to live ATS data via API
+        // When view DocBlocks are implemented, fetch data from /api/view/render
+        // Replace placeholder rendering with live attestation data
+
         this.initialize();
     }
 

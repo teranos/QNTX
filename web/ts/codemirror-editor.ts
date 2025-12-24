@@ -48,7 +48,7 @@ let parseTimeout: ReturnType<typeof setTimeout> | null = null;
 let currentDiagnostics: Diagnostic[] = [];
 
 // Syntax highlighting via LSP semantic tokens
-// TODO(issue #132): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
+// TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
 // For now, we manually request them from LSP server
 
 const updateSyntaxDecorations = StateEffect.define();
@@ -155,6 +155,9 @@ export function initCodeMirrorEditor(): EditorView | null {
             syntaxDecorationsField, // ATS semantic token highlighting (manual LSP request)
             // linter(createAtsLinter()), // ATS parse error diagnostics - TODO: enable when linter is available
             // LSP features: completions, hover, diagnostics (async connection)
+            // TODO(issue #9): Interactive hover with related attestations
+            // Enhance hover to show clickable related entities (subjects, contexts, predicates)
+            // Allow users to explore connections and refine queries by clicking
             languageServer({
                 serverUri: serverUri,
                 rootUri: 'file:///',
@@ -248,7 +251,7 @@ export function updateDiagnosticsDisplay(diagnostics: Diagnostic[]): void {
 
 /**
  * Apply syntax highlighting from parse response tokens
- * TODO(issue #132): Request semantic tokens from LSP instead of parse_response
+ * TODO(issue #13): Request semantic tokens from LSP instead of parse_response
  * For now using old parse_response until codemirror-languageserver adds semantic token support
  */
 export function applySyntaxHighlighting(tokens: SemanticToken[]): void {

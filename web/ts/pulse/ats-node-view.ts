@@ -41,6 +41,10 @@ export class ATSNodeView implements NodeView {
     `;
     this.dom.appendChild(header);
 
+    // TODO(issue #8): Add real-time execution state indicators
+    // Show block execution state (idle/running/completed/failed) via color changes
+    // Subscribe to WebSocket events: pulse_execution_started, pulse_execution_completed, pulse_execution_failed
+
     // Create content container for CodeMirror
     this.contentDOM = document.createElement("div");
     this.contentDOM.className = "ats-code-block-content";
