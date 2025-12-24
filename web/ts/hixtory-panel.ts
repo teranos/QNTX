@@ -274,12 +274,23 @@ class JobListPanel {
         if (!content) return;
 
         if (this.jobs.size === 0) {
-            content.innerHTML = `
-                <div class="job-list-empty">
-                    <p>No IX operations yet</p>
-                    <p class="job-list-hint">Run an IX command to start</p>
-                </div>
-            `;
+            // Build empty state using DOM API
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'job-list-empty';
+
+            const p1 = document.createElement('p');
+            p1.textContent = 'No IX operations yet';
+
+            const p2 = document.createElement('p');
+            p2.className = 'job-list-hint';
+            p2.textContent = 'Run an IX command to start';
+
+            emptyDiv.appendChild(p1);
+            emptyDiv.appendChild(p2);
+
+            content.innerHTML = '';
+            content.appendChild(emptyDiv);
+
             if (countSpan) countSpan.textContent = '0';
             return;
         }
@@ -293,12 +304,13 @@ class JobListPanel {
             countSpan.textContent = allJobs.length.toString();
         }
 
-        // Render compact hixtory items
-        const hixtoryHTML = allJobs
-            .map(job => this.renderHistoryItem(job))
-            .join('');
+        // Build hixtory items using DOM API for security
+        content.innerHTML = '';
 
-        content.innerHTML = hixtoryHTML;
+        allJobs.forEach(job => {
+            const item = this.renderHistoryItem(job);
+            content.appendChild(item);
+        });
 
         // Attach click handlers
         this.attachHistoryItemListeners();
@@ -307,20 +319,37 @@ class JobListPanel {
     /**
      * Render a single hixtory item (compact format)
      */
-    private renderHistoryItem(job: Job): string {
+    private renderHistoryItem(job: Job): HTMLElement {
         const statusClass = this.getStatusClass(job.status);
         const timeAgo = this.formatRelativeTime(job.created_at);
         const command = this.getJobCommand(job);
 
-        return `
-            <div class="hixtory-item" data-job-id="${job.id}">
-                <div class="hixtory-command">${this.escapeHtml(command)}</div>
-                <div class="hixtory-meta">
-                    <span class="hixtory-status ${statusClass}">${job.status}</span>
-                    <span class="hixtory-time">${timeAgo}</span>
-                </div>
-            </div>
-        `;
+        const item = document.createElement('div');
+        item.className = 'hixtory-item';
+        item.dataset.jobId = job.id;
+
+        const commandDiv = document.createElement('div');
+        commandDiv.className = 'hixtory-command';
+        commandDiv.textContent = command;
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'hixtory-meta';
+
+        const statusSpan = document.createElement('span');
+        statusSpan.className = `hixtory-status ${statusClass}`;
+        statusSpan.textContent = job.status;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'hixtory-time';
+        timeSpan.textContent = timeAgo;
+
+        metaDiv.appendChild(statusSpan);
+        metaDiv.appendChild(timeSpan);
+
+        item.appendChild(commandDiv);
+        item.appendChild(metaDiv);
+
+        return item;
     }
 
     /**

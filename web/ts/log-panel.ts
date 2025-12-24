@@ -46,19 +46,30 @@ function appendLog(msg: LogMessage): void {
         fractionalSecondDigits: 3
     } as Intl.DateTimeFormatOptions);
 
-    // Build log line
-    let content = '';
-    content += '<span class="log-timestamp">' + timestamp + '</span>';
-    content += '<span class="log-logger">[' + msg.logger + ']</span>';
-    content += '<span class="log-message">' + msg.message + '</span>';
+    // Build log line safely using DOM API
+    const timestampEl = document.createElement('span');
+    timestampEl.className = 'log-timestamp';
+    timestampEl.textContent = timestamp;
+
+    const loggerEl = document.createElement('span');
+    loggerEl.className = 'log-logger';
+    loggerEl.textContent = `[${msg.logger}]`;
+
+    const messageEl = document.createElement('span');
+    messageEl.className = 'log-message';
+    messageEl.textContent = msg.message;  // Safe - auto-escapes HTML
+
+    logLine.appendChild(timestampEl);
+    logLine.appendChild(loggerEl);
+    logLine.appendChild(messageEl);
 
     // Add fields if present
     if (msg.fields && Object.keys(msg.fields).length > 0) {
-        const fieldsStr = JSON.stringify(msg.fields);
-        content += '<span class="log-fields">' + fieldsStr + '</span>';
+        const fieldsEl = document.createElement('span');
+        fieldsEl.className = 'log-fields';
+        fieldsEl.textContent = JSON.stringify(msg.fields);
+        logLine.appendChild(fieldsEl);
     }
-
-    logLine.innerHTML = content;
 
     // Add to buffer
     state.logBuffer.push(logLine);

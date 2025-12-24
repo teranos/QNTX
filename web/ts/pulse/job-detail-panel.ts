@@ -143,7 +143,7 @@ class JobDetailPanel {
           </div>
           <div class="job-info-row">
             <span class="job-info-label">State:</span>
-            <span class="job-info-value job-state-${this.currentJob.state}">${this.currentJob.state}</span>
+            <span class="job-info-value job-state-${this.escapeHtml(this.currentJob.state)}">${this.escapeHtml(this.currentJob.state)}</span>
           </div>
           <div class="job-info-actions">
             <button class="force-trigger-btn" onclick="window.jobDetailPanel.handleForceTrigger()">
@@ -292,7 +292,7 @@ class JobDetailPanel {
       <div class="execution-card ${statusClass} ${isExpanded ? 'expanded' : ''}" data-execution-id="${exec.id}">
         <div class="execution-header" data-action="toggle-expand">
           <span class="execution-expand-icon">${isExpanded ? '▼' : '▶'}</span>
-          <span class="execution-status execution-status-${exec.status}">${exec.status}</span>
+          <span class="execution-status execution-status-${this.escapeHtml(exec.status)}">${this.escapeHtml(exec.status)}</span>
           <span class="execution-time">${timeAgo}</span>
           <span class="execution-duration">${duration}</span>
         </div>
@@ -312,7 +312,7 @@ class JobDetailPanel {
         ${exec.async_job_id ? `
           <div class="execution-meta">
             <span class="execution-meta-label">Async Job:</span>
-            <code class="execution-job-id">${exec.async_job_id.substring(0, 12)}...</code>
+            <code class="execution-job-id">${this.escapeHtml(exec.async_job_id.substring(0, 12))}...</code>
           </div>
         ` : ''}
 
@@ -385,14 +385,14 @@ class JobDetailPanel {
 
           return `
             <div class="execution-child ${isExpanded ? 'expanded' : ''}" data-child-id="${child.id}">
-              <div class="child-header" onclick="window.jobDetailPanel.handleChildClick('${child.id}')">
+              <div class="child-header" onclick="window.jobDetailPanel.handleChildClick('${this.escapeHtml(child.id)}')">
                 <span class="child-expand-icon">${isExpanded ? '▼' : '▶'}</span>
                 <span class="child-handler">${this.escapeHtml(child.handler_name)}</span>
-                <span class="child-status child-status-${child.status}">${child.status}</span>
+                <span class="child-status child-status-${this.escapeHtml(child.status)}">${this.escapeHtml(child.status)}</span>
                 <span class="child-progress">${Math.round(child.progress_pct)}%</span>
               </div>
               <div class="child-meta">
-                <span class="child-id">${child.id.substring(0, 16)}...</span>
+                <span class="child-id">${this.escapeHtml(child.id.substring(0, 16))}...</span>
                 <span class="child-source">${this.escapeHtml(child.source.substring(0, 50))}...</span>
               </div>
               ${child.error ? `
@@ -480,9 +480,9 @@ class JobDetailPanel {
           const levelBadge = this.getLevelBadge(log.level);
 
           return `
-            <div class="task-log-entry task-log-${log.level}">
+            <div class="task-log-entry task-log-${this.escapeHtml(log.level)}">
               <span class="task-log-timestamp">${formattedTime}</span>
-              <span class="task-log-level ${levelBadge}">${log.level.toUpperCase()}</span>
+              <span class="task-log-level ${levelBadge}">${this.escapeHtml(log.level.toUpperCase())}</span>
               <span class="task-log-message">${this.escapeHtml(log.message)}</span>
             </div>
           `;
@@ -558,19 +558,40 @@ class JobDetailPanel {
   private renderError(message: string): void {
     if (!this.panel) return;
 
-    this.panel.innerHTML = `
-      <div class="job-detail-header">
-        <button class="job-detail-back" onclick="window.jobDetailPanel.hide()">← Back</button>
-        <h3>Job History</h3>
-        <button class="panel-close" onclick="window.jobDetailPanel.hide()">✕</button>
-      </div>
+    // Build error display using DOM API for security
+    this.panel.innerHTML = '';
 
-      <div class="job-detail-content">
-        <div class="job-detail-error">
-          ${this.escapeHtml(message)}
-        </div>
-      </div>
-    `;
+    const header = document.createElement('div');
+    header.className = 'job-detail-header';
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'job-detail-back';
+    backBtn.textContent = '← Back';
+    backBtn.onclick = () => this.hide();
+
+    const title = document.createElement('h3');
+    title.textContent = 'Job History';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'panel-close';
+    closeBtn.textContent = '✕';
+    closeBtn.onclick = () => this.hide();
+
+    header.appendChild(backBtn);
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    const content = document.createElement('div');
+    content.className = 'job-detail-content';
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'job-detail-error';
+    errorDiv.textContent = message;
+
+    content.appendChild(errorDiv);
+
+    this.panel.appendChild(header);
+    this.panel.appendChild(content);
   }
 
   private renderPagination(hasPrev: boolean, hasMore: boolean): string {

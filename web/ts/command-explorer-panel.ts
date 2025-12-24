@@ -133,22 +133,32 @@ class CommandExplorerPanel {
             title.textContent = '+ Query History';
         }
 
-        const html = `
-            <div class="filter-items">
-                ${mockQueryHistory.map(query => `
-                    <div class="filter-item" data-mode="as">
-                        <div class="filter-item-query">${query.query}</div>
-                        <div class="filter-item-meta">
-                            ${query.timestamp} · ${query.results} results
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+        if (!content) return;
 
-        if (content) {
-            content.innerHTML = html;
-        }
+        // Build history items using DOM API for security
+        const filterItems = document.createElement('div');
+        filterItems.className = 'filter-items';
+
+        mockQueryHistory.forEach(query => {
+            const item = document.createElement('div');
+            item.className = 'filter-item';
+            item.dataset.mode = 'as';
+
+            const queryDiv = document.createElement('div');
+            queryDiv.className = 'filter-item-query';
+            queryDiv.textContent = query.query;
+
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'filter-item-meta';
+            metaDiv.textContent = `${query.timestamp} · ${query.results} results`;
+
+            item.appendChild(queryDiv);
+            item.appendChild(metaDiv);
+            filterItems.appendChild(item);
+        });
+
+        content.innerHTML = '';
+        content.appendChild(filterItems);
     }
 
     renderAxFilters(): void {
@@ -161,28 +171,65 @@ class CommandExplorerPanel {
             title.textContent = '⋈ ax Statements';
         }
 
-        // TODO: Sort by chronological order (most recent first) with frequency-based ranking boost
-        const html = `
-            <div class="filter-items">
-                ${mockAxStatements.map(stmt => `
-                    <div class="filter-item" data-type="${stmt.type}" data-mode="ax">
-                        <div class="filter-item-header">
-                            <span class="filter-item-type">${stmt.type}</span>
-                            <span class="filter-item-count">${stmt.count}</span>
-                        </div>
-                        <div class="filter-item-label">${stmt.label}</div>
-                        <div class="filter-item-description">${stmt.description}</div>
-                        <div class="filter-item-examples">
-                            ${stmt.examples.slice(0, 3).map(ex => `<code>${ex}</code>`).join('')}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
+        if (!content) return;
 
-        if (content) {
-            content.innerHTML = html;
-        }
+        // TODO: Sort by chronological order (most recent first) with frequency-based ranking boost
+
+        // Build statement items using DOM API for security
+        const filterItems = document.createElement('div');
+        filterItems.className = 'filter-items';
+
+        mockAxStatements.forEach(stmt => {
+            const item = document.createElement('div');
+            item.className = 'filter-item';
+            item.dataset.type = stmt.type;
+            item.dataset.mode = 'ax';
+
+            // Header with type and count
+            const header = document.createElement('div');
+            header.className = 'filter-item-header';
+
+            const typeSpan = document.createElement('span');
+            typeSpan.className = 'filter-item-type';
+            typeSpan.textContent = stmt.type;
+
+            const countSpan = document.createElement('span');
+            countSpan.className = 'filter-item-count';
+            countSpan.textContent = String(stmt.count);
+
+            header.appendChild(typeSpan);
+            header.appendChild(countSpan);
+
+            // Label
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'filter-item-label';
+            labelDiv.textContent = stmt.label;
+
+            // Description
+            const descDiv = document.createElement('div');
+            descDiv.className = 'filter-item-description';
+            descDiv.textContent = stmt.description;
+
+            // Examples
+            const examplesDiv = document.createElement('div');
+            examplesDiv.className = 'filter-item-examples';
+
+            stmt.examples.slice(0, 3).forEach(ex => {
+                const code = document.createElement('code');
+                code.textContent = ex;
+                examplesDiv.appendChild(code);
+            });
+
+            item.appendChild(header);
+            item.appendChild(labelDiv);
+            item.appendChild(descDiv);
+            item.appendChild(examplesDiv);
+
+            filterItems.appendChild(item);
+        });
+
+        content.innerHTML = '';
+        content.appendChild(filterItems);
     }
 
     setupEventListeners(): void {

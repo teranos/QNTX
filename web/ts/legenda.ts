@@ -143,7 +143,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
     // Use node types from backend (includes counts, colors, and labels)
     const typesToRender: NodeTypeInfo[] = graphData.meta.node_types;
 
-    // Build legenda items from backend data
+    // Build legenda items from backend data using DOM API for security
     typesToRender.forEach((type: NodeTypeInfo) => {
         const item = document.createElement('div');
         item.className = 'legenda-item';
@@ -153,12 +153,30 @@ export function buildLegenda(graphData: GraphData | null = null): void {
         // Phase 2: Store the actual type value (not label) for backend matching
         item.setAttribute('data-node-type', type.type);
 
-        item.innerHTML = `
-            <div class="legenda-color" style="background: ${type.color};"></div>
-            <span class="reveal-related" title="${UI_TEXT.REVEAL_TOOLTIP(type.label)}">⨁</span>
-            <span class="legenda-type-name">${type.label}</span>
-            ${type.count ? `<span class="legenda-count">${type.count}</span>` : ''}
-        `;
+        // Build item contents using DOM API for security
+        const colorDiv = document.createElement('div');
+        colorDiv.className = 'legenda-color';
+        colorDiv.style.background = type.color;
+
+        const revealSpan = document.createElement('span');
+        revealSpan.className = 'reveal-related';
+        revealSpan.title = UI_TEXT.REVEAL_TOOLTIP(type.label);
+        revealSpan.textContent = '⨁';
+
+        const typeNameSpan = document.createElement('span');
+        typeNameSpan.className = 'legenda-type-name';
+        typeNameSpan.textContent = type.label;
+
+        item.appendChild(colorDiv);
+        item.appendChild(revealSpan);
+        item.appendChild(typeNameSpan);
+
+        if (type.count) {
+            const countSpan = document.createElement('span');
+            countSpan.className = 'legenda-count';
+            countSpan.textContent = String(type.count);
+            item.appendChild(countSpan);
+        }
 
         legendaContainer.appendChild(item);
     });

@@ -72,7 +72,21 @@ function handleVersion(data: VersionInfo): void {
             buildTimeText = ` · ${dateStr} ${timeStr}`;
         }
 
-        buildHash.innerHTML = `${versionText} · <a href="https://github.com/sbvh-nl/expgraph/commit/${data.commit}" target="_blank" style="color: inherit; text-decoration: none;">${commitShort}</a>${buildTimeText}`;
+        // Build version info using DOM API for security
+        buildHash.textContent = `${versionText} · `;
+
+        const commitLink = document.createElement('a');
+        commitLink.href = `https://github.com/sbvh-nl/expgraph/commit/${data.commit}`;
+        commitLink.target = '_blank';
+        commitLink.style.color = 'inherit';
+        commitLink.style.textDecoration = 'none';
+        commitLink.textContent = commitShort;
+
+        buildHash.appendChild(commitLink);
+
+        if (buildTimeText) {
+            buildHash.appendChild(document.createTextNode(buildTimeText));
+        }
     }
 
     // Also add subtle version to log panel

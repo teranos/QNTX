@@ -82,38 +82,73 @@ function renderExistingJobControls(
   const job = options.existingJob!;
   const isActive = job.state === "active";
 
-  container.innerHTML = `
-    <div class="pulse-controls-row">
-      <div class="pulse-schedule-badge ${job.state}">
-        <span class="pulse-icon">꩜</span>
-        <span class="pulse-interval">${formatInterval(job.interval_seconds)}</span>
-        <span class="pulse-state">${job.state}</span>
-      </div>
-      <div class="pulse-schedule-actions">
-        <button class="pulse-btn-pause" title="${isActive ? "Pause job" : "Resume job"}">
-          ${isActive ? "Pause" : "Resume"}
-        </button>
-        <select class="pulse-interval-select">
-          ${INTERVAL_PRESETS.map(
-            (preset) => `
-            <option value="${preset.seconds}" ${preset.seconds === job.interval_seconds ? "selected" : ""}>
-              ${preset.label}
-            </option>
-          `
-          ).join("")}
-          <option value="custom">Custom...</option>
-        </select>
-        <button class="pulse-btn-delete" title="Remove schedule">Delete</button>
-      </div>
-    </div>
-  `;
+  // Build controls using DOM API for security
+  container.innerHTML = '';
 
-  // Attach event listeners
-  const pauseBtn = container.querySelector(".pulse-btn-pause") as HTMLButtonElement;
-  const intervalSelect = container.querySelector(
-    ".pulse-interval-select"
-  ) as HTMLSelectElement;
-  const deleteBtn = container.querySelector(".pulse-btn-delete") as HTMLButtonElement;
+  const row = document.createElement('div');
+  row.className = 'pulse-controls-row';
+
+  // Schedule badge
+  const badge = document.createElement('div');
+  badge.className = `pulse-schedule-badge ${job.state}`;
+
+  const icon = document.createElement('span');
+  icon.className = 'pulse-icon';
+  icon.textContent = '꩜';
+
+  const interval = document.createElement('span');
+  interval.className = 'pulse-interval';
+  interval.textContent = formatInterval(job.interval_seconds);
+
+  const state = document.createElement('span');
+  state.className = 'pulse-state';
+  state.textContent = job.state;
+
+  badge.appendChild(icon);
+  badge.appendChild(interval);
+  badge.appendChild(state);
+
+  // Actions
+  const actions = document.createElement('div');
+  actions.className = 'pulse-schedule-actions';
+
+  const pauseBtn = document.createElement('button');
+  pauseBtn.className = 'pulse-btn-pause';
+  pauseBtn.title = isActive ? "Pause job" : "Resume job";
+  pauseBtn.textContent = isActive ? "Pause" : "Resume";
+
+  const intervalSelect = document.createElement('select');
+  intervalSelect.className = 'pulse-interval-select';
+
+  INTERVAL_PRESETS.forEach(preset => {
+    const option = document.createElement('option');
+    option.value = String(preset.seconds);
+    option.textContent = preset.label;
+    if (preset.seconds === job.interval_seconds) {
+      option.selected = true;
+    }
+    intervalSelect.appendChild(option);
+  });
+
+  const customOption = document.createElement('option');
+  customOption.value = 'custom';
+  customOption.textContent = 'Custom...';
+  intervalSelect.appendChild(customOption);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'pulse-btn-delete';
+  deleteBtn.title = 'Remove schedule';
+  deleteBtn.textContent = 'Delete';
+
+  actions.appendChild(pauseBtn);
+  actions.appendChild(intervalSelect);
+  actions.appendChild(deleteBtn);
+
+  row.appendChild(badge);
+  row.appendChild(actions);
+  container.appendChild(row);
+
+  // Attach event listeners (using already-created elements)
 
   pauseBtn.addEventListener("click", async () => {
     try {
@@ -192,16 +227,24 @@ function renderAddScheduleButton(
   const atsCode = resolveAtsCode(options.atsCode);
   const isEmpty = !atsCode || atsCode.trim() === '';
 
-  container.innerHTML = `
-    <button class="pulse-btn-add-schedule" ${isEmpty ? 'disabled' : ''} ${isEmpty ? 'title="Add ATS code to enable scheduling"' : ''}>
-      <span class="pulse-icon">꩜</span>
-      Add Schedule
-    </button>
-  `;
+  // Build button using DOM API for security
+  container.innerHTML = '';
 
-  const addBtn = container.querySelector(
-    ".pulse-btn-add-schedule"
-  ) as HTMLButtonElement;
+  const addBtn = document.createElement('button');
+  addBtn.className = 'pulse-btn-add-schedule';
+  if (isEmpty) {
+    addBtn.disabled = true;
+    addBtn.title = 'Add ATS code to enable scheduling';
+  }
+
+  const icon = document.createElement('span');
+  icon.className = 'pulse-icon';
+  icon.textContent = '꩜';
+
+  addBtn.appendChild(icon);
+  addBtn.appendChild(document.createTextNode(' Add Schedule'));
+
+  container.appendChild(addBtn);
 
   addBtn.addEventListener("click", () => {
     // Double-check ATS code isn't empty (button should be disabled, but validate anyway)
@@ -222,27 +265,45 @@ function renderIntervalSelection(
   container: HTMLElement,
   options: SchedulingControlsOptions
 ): void {
-  container.innerHTML = `
-    <div class="pulse-interval-picker">
-      <span class="pulse-label">Run every:</span>
-      <select class="pulse-interval-select">
-        ${INTERVAL_PRESETS.map(
-          (preset) => `
-          <option value="${preset.seconds}">${preset.label}</option>
-        `
-        ).join("")}
-        <option value="custom">Custom...</option>
-      </select>
-      <button class="pulse-btn-confirm">✓</button>
-      <button class="pulse-btn-cancel">✗</button>
-    </div>
-  `;
+  // Build interval picker using DOM API for security
+  container.innerHTML = '';
 
-  const intervalSelect = container.querySelector(
-    ".pulse-interval-select"
-  ) as HTMLSelectElement;
-  const confirmBtn = container.querySelector(".pulse-btn-confirm") as HTMLButtonElement;
-  const cancelBtn = container.querySelector(".pulse-btn-cancel") as HTMLButtonElement;
+  const picker = document.createElement('div');
+  picker.className = 'pulse-interval-picker';
+
+  const label = document.createElement('span');
+  label.className = 'pulse-label';
+  label.textContent = 'Run every:';
+
+  const intervalSelect = document.createElement('select');
+  intervalSelect.className = 'pulse-interval-select';
+
+  INTERVAL_PRESETS.forEach(preset => {
+    const option = document.createElement('option');
+    option.value = String(preset.seconds);
+    option.textContent = preset.label;
+    intervalSelect.appendChild(option);
+  });
+
+  const customOption = document.createElement('option');
+  customOption.value = 'custom';
+  customOption.textContent = 'Custom...';
+  intervalSelect.appendChild(customOption);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'pulse-btn-confirm';
+  confirmBtn.textContent = '✓';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'pulse-btn-cancel';
+  cancelBtn.textContent = '✗';
+
+  picker.appendChild(label);
+  picker.appendChild(intervalSelect);
+  picker.appendChild(confirmBtn);
+  picker.appendChild(cancelBtn);
+
+  container.appendChild(picker);
 
   confirmBtn.addEventListener("click", async () => {
     const value = intervalSelect.value;
