@@ -17,15 +17,15 @@ new_branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$new_branch" = "main" ]; then
     # Check for uncommitted changes
     if ! git diff-index --quiet HEAD --; then
-        echo "⚠️  Skipping auto-pull: uncommitted changes detected"
-        echo "   Commit or stash your changes, then pull manually"
+        echo "Skipping auto-pull: uncommitted changes detected"
+        echo "Commit or stash your changes, then pull manually"
         exit 0
     fi
 
-    echo "🔄 Auto-pulling main branch..."
+    echo "Auto-pulling main branch..."
     if ! git pull; then
-        echo "⚠️  Warning: Failed to pull latest changes for main branch"
-        echo "   Please resolve any issues and pull manually"
+        echo "Warning: Failed to pull latest changes for main branch"
+        echo "Please resolve any issues and pull manually"
         exit 0
     fi
 fi
