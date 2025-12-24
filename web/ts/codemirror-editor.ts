@@ -38,7 +38,7 @@ import {
 
 // DISABLED: LSP WebSocket transport conflicts with main WebSocket
 // import { createLSPClient } from './lsp-websocket-transport.js';
-import { sendMessage } from './websocket.ts';
+import { sendMessage, validateBackendURL } from './websocket.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 
@@ -124,8 +124,16 @@ export function initCodeMirrorEditor(): EditorView | null {
     }
 
     // LSP configuration (async connection, won't block page load)
-    // Use backend URL from injected global
-    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    // Use backend URL from injected global with validation
+    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    const validatedUrl = validateBackendURL(rawUrl);
+
+    if (!validatedUrl) {
+        console.error('[LSP] Invalid backend URL:', rawUrl);
+        console.log('[LSP] Falling back to same-origin');
+    }
+
+    const backendUrl = validatedUrl || window.location.origin;
     const backendHost = backendUrl.replace(/^https?:\/\//, '');
     const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
     const serverUri = `${protocol}//${backendHost}/lsp`;
