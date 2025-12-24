@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Get the branch we just checked out to
+new_branch=$(git rev-parse --abbrev-ref HEAD)
+
+# If we checked out to main, automatically pull
+if [ "$new_branch" = "main" ]; then
+    echo "🔄 Auto-pulling main branch..."
+    git pull
+fi
