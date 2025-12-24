@@ -9,6 +9,7 @@ bun.lock
 
 # Build artifacts
 dist/
+internal/server/dist/
 *.log
 
 # IDE
