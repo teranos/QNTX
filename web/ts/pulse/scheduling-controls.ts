@@ -176,7 +176,7 @@ function renderExistingJobControls(
         intervalSelect.value = job.interval_seconds.toString();
         return;
       }
-      // TODO: Parse custom interval
+      // TODO(#30): Parse custom interval
       return;
     }
 
@@ -308,7 +308,7 @@ function renderIntervalSelection(
   confirmBtn.addEventListener("click", async () => {
     const value = intervalSelect.value;
     if (value === "custom") {
-      // TODO: Show custom interval input
+      // TODO(#30): Show custom interval input
       return;
     }
 

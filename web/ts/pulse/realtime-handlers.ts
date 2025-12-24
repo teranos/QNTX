@@ -11,7 +11,7 @@
  * - Pulse panel inline execution view (when job is expanded)
  * - Job detail panel full history (when viewing specific job)
  *
- * TODO: Future real-time improvements:
+ * TODO(#30): Future real-time improvements:
  * - Add execution progress updates (percentage completion)
  * - Add live resource usage metrics (CPU, memory for running jobs)
  * - Add execution cancellation via WebSocket
