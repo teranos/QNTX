@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>qntx graph</title>
+    <link rel="icon" type="image/jpeg" href="/qntx.jpg">
+    <link rel="stylesheet" href="/css/core.css">
+    <link rel="stylesheet" href="/css/codemirror.css">
+    <link rel="stylesheet" href="/css/ats-language-client.css">
+    <link rel="stylesheet" href="/css/graph.css">
+    <link rel="stylesheet" href="/css/feedback.css">
+    <link rel="stylesheet" href="/css/symbol-palette.css">
+    <link rel="stylesheet" href="/css/command-explorer-panel.css">
+    <link rel="stylesheet" href="/css/usage-badge.css">
+    <link rel="stylesheet" href="/css/config.css">
+    <link rel="stylesheet" href="/css/left-panel.css">
+    <link rel="stylesheet" href="/css/config-panel.css">
+    <link rel="stylesheet" href="/css/ai-provider-panel.css">
+    <link rel="stylesheet" href="/css/prose-panel.css">
+    <link rel="stylesheet" href="/css/ats-code-block.css">
+    <link rel="stylesheet" href="/css/pulse-scheduling.css">
+    <link rel="stylesheet" href="/css/pulse-panel.css">
+    <link rel="stylesheet" href="/css/job-detail-panel.css">
+    <link rel="stylesheet" href="/css/toast.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/job-list-panel.css">
+</head>
+<body class="disconnected" data-theme="dark">
+    <!-- Loading screen - shows immediately before any scripts run -->
+    <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; color: #888; animation: fadeInLoader 300ms ease-out;">
+        <!-- qntx Logo -->
+        <img src="/qntx.jpg" alt="qntx" style="width: 80px; height: 80px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); opacity: 0.6; filter: brightness(0.7);">
+
+        <!-- Status text -->
+        <div style="font-size: 14px; margin-bottom: 12px;">Loading</div>
+
+        <!-- Progress bar -->
+        <div style="width: 200px; height: 2px; background: #333; border-radius: 1px; overflow: hidden; margin-bottom: 12px;">
+            <div id="loading-bar" style="height: 100%; background: #666; width: 0%; transition: width 0.3s;"></div>
+        </div>
+
+        <!-- Status details -->
+        <div id="loading-status" style="font-size: 11px; color: #666; margin-bottom: 16px;">Initializing...</div>
+
+        <!-- Log panel - shows initialization steps -->
+        <div id="loader-logs" style="width: 300px; max-height: 120px; overflow-y: auto; background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 10px; font-family: 'Monaco', 'Courier New', monospace; font-size: 10px; color: #666; line-height: 1.6; margin-bottom: 16px;">
+            <div style="color: #888;">Starting initialization...</div>
+        </div>
+
+        <!-- MetaMask warning -->
+        <div id="metamask-warning" style="display: none; padding: 12px 16px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; max-width: 400px; text-align: center;">
+            <div style="font-size: 12px; color: #f59e0b; margin-bottom: 6px;">⚠️ MetaMask detected</div>
+            <div style="font-size: 11px; color: #888; line-height: 1.4;">
+                MetaMask's security features can slow page loading by 30+ seconds.
+                <br>
+                For best performance, use a browser profile without MetaMask.
+            </div>
+        </div>
+    </div>
+
+    <!-- CSS animations for loader -->
+    <style>
+        @keyframes fadeInLoader {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeOutLoader {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.98); }
+        }
+
+        #loading-screen.fade-out {
+            animation: fadeOutLoader 500ms ease-out forwards;
+        }
+
+        /* Log scrollbar styling */
+        #loader-logs::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #loader-logs::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        #loader-logs::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 2px;
+        }
+
+        #loader-logs::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+    </style>
+
+    <!-- Inline loading progress script - runs immediately, not blocked by extensions -->
+    <script>
+    (function() {
+        const bar = document.getElementById('loading-bar');
+        const status = document.getElementById('loading-status');
+        const warning = document.getElementById('metamask-warning');
+        const logPanel = document.getElementById('loader-logs');
+        let progress = 0;
+        let startTime = Date.now();
+        let metaMaskDetected = false;
+        let logEntries = [];
+        const MAX_LOG_ENTRIES = 10;
+
+        // TIMING: Log when inline script starts
+        console.log('[TIMING] Inline script start:', Date.now() - performance.timing.navigationStart, 'ms');
+
+        /**
+         * Log a step in the initialization process
+         * @param {string} message - The message to log
+         * @param {boolean} isError - Whether this is an error (dark red) or success (gray)
+         * @param {boolean} isInProgress - Whether this is an in-progress step (medium gray)
+         */
+        window.logLoaderStep = function(message, isError = false, isInProgress = false) {
+            const timestamp = new Date().toLocaleTimeString('en-US', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            let icon = '✓';
+            let color = '#999'; // light gray
+
+            if (isError) {
+                icon = '✗';
+                color = '#cc4444'; // dark red for errors
+            } else if (isInProgress) {
+                icon = '→';
+                color = '#888'; // medium gray for in-progress
+            }
+
+            const entry = {
+                timestamp,
+                icon,
+                message,
+                color
+            };
+
+            logEntries.push(entry);
+
+            // Keep only last MAX_LOG_ENTRIES
+            if (logEntries.length > MAX_LOG_ENTRIES) {
+                logEntries.shift();
+            }
+
+            // Rebuild log panel HTML
+            let html = '';
+            logEntries.forEach(e => {
+                html += `<div style="color: ${e.color}; margin-bottom: 2px; word-break: break-word;"><span style="opacity: 0.6;">[${e.timestamp}]</span> ${e.icon} ${e.message}</div>`;
+            });
+            logPanel.innerHTML = html;
+
+            // Auto-scroll to bottom
+            logPanel.scrollTop = logPanel.scrollHeight;
+
+            // Also log to browser console
+            console.log(`[LOADER] ${icon} ${message}`);
+        };
+
+        // Initial log entry
+        window.logLoaderStep('Starting initialization...');
+
+        // Check for MetaMask after a short delay (give it time to inject)
+        setTimeout(() => {
+            if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
+                metaMaskDetected = true;
+                window.logLoaderStep('MetaMask detected', false, true);
+            }
+        }, 100);
+
+        // Capture JavaScript errors and module loading errors
+        window.addEventListener('error', (event) => {
+            if (event.error) {
+                const message = event.message || event.error.toString();
+                window.logLoaderStep(`Error: ${message}`, true);
+            }
+        });
+
+        // Capture module loading errors (import/require failures)
+        window.addEventListener('unhandledrejection', (event) => {
+            if (event.reason) {
+                const message = event.reason.message || event.reason.toString();
+                window.logLoaderStep(`Module error: ${message}`, true);
+            }
+        });
+
+        // Simulate loading progress while waiting for scripts
+        const interval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90; // Stop at 90% until real init
+            bar.style.width = progress + '%';
+
+            const elapsed = (Date.now() - startTime) / 1000;
+
+            if (progress > 30 && !status.textContent.includes('Loading scripts')) {
+                status.textContent = 'Loading scripts...';
+                if (logEntries.length === 1) {
+                    window.logLoaderStep('Loading scripts...');
+                }
+            }
+            if (progress > 60 && !status.textContent.includes('Waiting for initialization')) {
+                status.textContent = 'Waiting for initialization...';
+                if (!logEntries.some(e => e.message.includes('Parsing'))) {
+                    window.logLoaderStep('Parsing modules...', false, true);
+                }
+            }
+
+            // Show MetaMask warning after 5 seconds if detected
+            if (elapsed > 5 && metaMaskDetected && warning.style.display === 'none') {
+                warning.style.display = 'block';
+                status.textContent = 'Waiting for MetaMask security checks...';
+                window.logLoaderStep('MetaMask security checks...', false, true);
+            }
+        }, 300);
+
+        // Remove loading screen when app is ready
+        window.hideLoadingScreen = function() {
+            clearInterval(interval);
+            bar.style.width = '100%';
+            status.textContent = 'Ready!';
+            window.logLoaderStep('Application ready');
+
+            // Fade out after a brief delay to show "Ready!" message
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loading-screen');
+                loadingScreen.classList.add('fade-out');
+
+                // Actually hide after fade completes
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+            }, 300);
+        };
+
+        // TIMING: Log key events
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[TIMING] DOMContentLoaded fired:', Date.now() - performance.timing.navigationStart, 'ms');
+            window.logLoaderStep('DOM content loaded');
+        });
+
+        window.addEventListener('load', () => {
+            console.log('[TIMING] window.load fired:', Date.now() - performance.timing.navigationStart, 'ms');
+            window.logLoaderStep('Window load event fired');
+        });
+    })();
+    </script>
+
+    <div id="container">
+        <div id="left-panel">
+            <!-- Virtue #4: Semantic HTML - Use <header> for page header -->
+            <header id="header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;">
+                <div style="display: block; width: 24px; height: 24px; transition: all 0.2s ease; flex-shrink: 0;" onmouseover="this.style.filter='invert(1)'" onmouseout="this.style.filter='none'">
+                    <img src="/qntx.jpg" alt="QNTX" style="width: 100%; height: 100%; display: block;">
+                </div>
+                <div style="font-size: 11px; color: #888; white-space: nowrap;">
+                    <span id="build-hash"></span>
+                </div>
+            </header>
+
+            <div id="query-container">
+                <!-- Symbol Palette - SEG Symbol Interface -->
+                <!-- Virtue #4: Semantic HTML - Use <nav> for symbol palette navigation -->
+                <nav id="symbolPalette" class="symbol-palette">
+                    <div class="palette-cell" data-cmd="i" data-label="i — self">⍟</div>
+                    <div class="palette-cell" data-cmd="am" data-label="am — structure">≡</div>
+                    <div class="palette-cell" data-cmd="ix" data-label="ix — ingest">⨳</div>
+                    <div class="palette-cell" data-cmd="ax" data-label="ax — expand">⋈</div>
+                    <div class="palette-cell" data-cmd="as" data-label="as — assert">+</div>
+                    <div class="palette-cell" data-cmd="is" data-label="is — identity">==</div>
+                    <div class="palette-cell" data-cmd="of" data-label="of — membership">∈</div>
+                    <div class="palette-cell" data-cmd="by" data-label="by — actor">⌬</div>
+                    <div class="palette-cell" data-cmd="at" data-label="at — event">✦</div>
+                    <div class="palette-cell" data-cmd="so" data-label="so — therefore">⟶</div>
+                    <div class="palette-cell" data-cmd="pulse" data-label="pulse — scheduled jobs">꩜</div>
+                    <div class="palette-cell" data-cmd="prose" data-label="prose — documentation">▣</div>
+                </nav>
+
+                <div id="query-drop-zone">
+                    <!-- CodeMirror 6 Editor Container -->
+                    <div id="codemirror-container"></div>
+
+                    <div id="drop-indicator" style="display: none;">
+                        <div class="drop-icon">📄</div>
+                        <div class="drop-text">Drop to create ix command</div>
+                    </div>
+                </div>
+                <button id="run-ix-button" style="display: none;">
+                    <span class="button-icon">▶</span>
+                    <span class="button-text">Run</span>
+                </button>
+            </div>
+            <div id="stats">
+                <div class="stat-item">Nodes: <span class="stat-value" id="node-count">0</span></div>
+                <div class="stat-item">Links: <span class="stat-value" id="link-count">0</span></div>
+                <div class="stat-item">
+                    Limit:
+                    <select id="graph-limit" class="stat-value" style="background: #1e2021; color: #d3c6aa; border: 1px solid #475258; padding: 2px 6px; border-radius: 3px; font-size: 13px;">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000" selected>1000</option>
+                        <option value="5000">5000</option>
+                        <option value="10000">10k</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="graph-container">
+            <!-- Virtue #4: Semantic HTML - Use <nav> for graph controls -->
+            <nav id="controls">
+                <!-- Legenda and isolated toggle built dynamically by legenda.js -->
+                <div class="legenda"></div>
+            </nav>
+            <!-- Attestation feed overlay (behind graph) -->
+            <div id="attestation-feed"></div>
+            <svg id="graph"></svg>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Pulse Configuration Panel (Daily + Monthly Budget) -->
+    <div id="pulse-config-overlay" class="pulse-config-overlay" style="display: none;">
+        <div id="pulse-config-panel" class="pulse-config-panel">
+            <div class="pulse-config-header">
+                <h2>Pulse Budget</h2>
+                <button id="pulse-config-close" class="pulse-config-close">×</button>
+            </div>
+            <div class="pulse-config-body">
+                <form id="pulse-config-form">
+                    <div class="config-field">
+                        <label for="daily-budget">Daily Budget (USD)</label>
+                        <input type="number" id="daily-budget" step="0.01" min="0" required>
+                    </div>
+                    <div class="config-field">
+                        <label for="monthly-budget">Monthly Budget (USD)</label>
+                        <input type="number" id="monthly-budget" step="0.01" min="0" required>
+                    </div>
+                    <div class="config-actions">
+                        <button type="submit">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Combined Log Panel (Server + ix Progress side by side) -->
+    <div id="log-panel">
+        <div id="log-header">
+            <h3>Logs</h3>
+            <span id="log-version" style="font-size: 9px; color: #555; margin-left: 8px;"></span>
+            <div id="connection-status">
+                <span id="status-text">Connected</span>
+            </div>
+            <div class="controls">
+                <select id="verbosity-select">
+                    <option value="0">User</option>
+                    <option value="1">Info (-v)</option>
+                    <option value="2" selected>Debug (-vv)</option>
+                    <option value="3">Trace (-vvv)</option>
+                    <option value="4">All (-vvvv)</option>
+                </select>
+                <button id="download-logs" title="Download log file (verbosity >= 2)">Download</button>
+                <button id="clear-logs">Clear All</button>
+                <button id="toggle-logs">▲</button>
+            </div>
+        </div>
+        <div id="log-panels-container">
+            <div class="log-column">
+                <div class="log-column-header">
+                    Server <span id="log-count" class="count">(0)</span>
+                </div>
+                <div id="log-content" class="log-column-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load D3.js locally (bundled) - Virtue #2: Minimize external dependencies -->
+
+    <!-- async instead of defer: Don't block DOMContentLoaded, load independently -->
+    <script async src="/js/vendor/d3.v7.min.js" onload="console.log('[TIMING] D3.js loaded:', Date.now() - performance.timing.navigationStart, 'ms')"></script>
+
+    <!-- Load app after DOM is ready (type="module" defers automatically) -->
+    <script type="module" src="/ts/main.ts"></script>
+
+    <!-- TIMING: Track module script execution -->
+    <script>
+    console.log('[TIMING] HTML parsing complete:', Date.now() - performance.timing.navigationStart, 'ms');
+    </script>
+
+    <!-- Graph limit control -->
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const limitSelect = document.getElementById('graph-limit');
+        if (limitSelect) {
+            limitSelect.addEventListener('change', (e) => {
+                const limit = parseInt(e.target.value, 10);
+                if (window.ws && window.ws.readyState === WebSocket.OPEN) {
+                    window.ws.send(JSON.stringify({
+                        type: 'set_graph_limit',
+                        graph_limit: limit
+                    }));
+                    console.log(`[GRAPH LIMIT] Changed to ${limit}`);
+                }
+            });
+        }
+    });
+    </script>
+</body>
+</html>
