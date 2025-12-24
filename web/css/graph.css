@@ -1,0 +1,247 @@
+/* Graph Styles - Visualization, Nodes, Links, Controls, Legend */
+
+/* CSS Custom Properties (named constants) */
+/* Virtue #6: Functional Color - All colors serve a purpose, not decoration */
+:root {
+    /* Node styles - white stroke for contrast against colored nodes */
+    --node-stroke-color: #fff;
+    --node-stroke-width: 2px;
+    --node-text-size: 10px;
+    --node-text-color: #000;  /* Black for maximum readability */
+
+    /* Link styles - neutral gray to not compete with nodes */
+    --link-color: #ddd;
+    --link-opacity: 0.6;  /* Semi-transparent to reduce visual weight */
+
+    /* Tooltip styles - high contrast for readability */
+    --tooltip-padding: 8px 10px;
+    --tooltip-bg: #000;  /* Black background for clear overlay */
+    --tooltip-color: #fff;  /* White text for maximum contrast */
+    --tooltip-font-size: 11px;
+
+    /* Layout spacing */
+    --control-offset: 16px;
+    --legend-margin-top: 12px;
+    --legend-padding-top: 12px;
+
+    /* Controls - subtle grays to minimize UI chrome */
+    --control-padding: 8px;
+    --control-bg: #f8f8f8;  /* Near-white to recede visually */
+    --control-border: #ddd;  /* Subtle border for definition */
+
+    /* Meta overlay - gray for secondary information */
+    --meta-max-width: 300px;
+    --meta-font-size: 11px;
+    --meta-color: #666;  /* Mid-gray for de-emphasized text */
+}
+
+/* Graph Container */
+#graph-container {
+    flex: 1;
+    position: relative;
+    background: #fff;
+}
+
+#graph {
+    width: 100%;
+    height: 100%;
+}
+
+/* Meta Overlay */
+#meta-overlay {
+    position: absolute;
+    top: var(--control-offset);
+    right: var(--control-offset);
+    background: var(--control-bg);
+    padding: var(--legend-padding-top);
+    border: 1px solid var(--control-border);
+    max-width: var(--meta-max-width);
+    font-size: var(--meta-font-size);
+    color: var(--meta-color);
+}
+
+#meta-overlay h3 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000;
+}
+
+/* Nodes and Links */
+.node {
+    cursor: pointer;
+}
+
+.node circle {
+    stroke: var(--node-stroke-color);
+    stroke-width: var(--node-stroke-width);
+}
+
+.node text {
+    font-size: var(--node-text-size);
+    font-weight: 500;
+    pointer-events: none;
+    text-anchor: middle;
+    fill: var(--node-text-color);
+}
+
+.link {
+    stroke: var(--link-color);
+    stroke-opacity: var(--link-opacity);
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    padding: var(--tooltip-padding);
+    background: var(--tooltip-bg);
+    color: var(--tooltip-color);
+    font-size: var(--tooltip-font-size);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 1000;
+}
+
+.tooltip strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.tooltip .meta-item {
+    margin: 2px 0;
+}
+
+.tooltip .meta-label {
+    font-weight: 600;
+}
+
+/* Controls */
+#controls {
+    position: absolute;
+    top: var(--control-offset);
+    left: var(--control-offset);
+    background: rgba(248, 248, 248, 0.85);  /* Semi-transparent background */
+    padding: var(--control-padding);
+    border: 1px solid rgba(221, 221, 221, 0.8);
+    backdrop-filter: blur(8px);  /* Blur background for better readability */
+}
+
+#controls button {
+    display: block;
+    width: 100%;
+    margin: 0 0 4px 0;
+    padding: 6px 12px;
+    border: 1px solid var(--control-border);
+    background: #fff;
+    color: #000;
+    cursor: pointer;
+    font-size: var(--meta-font-size);
+    font-weight: 500;
+}
+
+#controls button:hover {
+    background: var(--control-bg);
+}
+
+#controls button:active {
+    background: #eee;
+}
+
+/* Connection Status (in log header) */
+#connection-status {
+    padding: 4px 10px;
+    background: rgba(46, 204, 113, 0.15);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(46, 204, 113, 0.9); /* Subtle green */
+    transition: all 0.4s ease-out;
+    margin-left: auto;
+    margin-right: 12px;
+}
+
+/* Disconnected state - subtle red */
+body.disconnected #connection-status {
+    border-color: rgba(220, 53, 69, 0.4);
+    color: rgba(220, 53, 69, 0.9); /* Subtle red */
+    background: rgba(220, 53, 69, 0.15);
+}
+
+/* Legenda (Legend) */
+.legenda {
+    margin-top: var(--legend-margin-top);
+    padding-top: var(--legend-padding-top);
+    border-top: 1px solid var(--control-border);
+}
+
+.legenda-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    color: #000;
+}
+
+.legenda-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+    font-size: 10px;
+    user-select: none; /* Prevent text selection on clickable items */
+}
+
+.legenda-color {
+    width: 10px;
+    height: 10px;
+    border: 1px solid #ddd;
+}
+
+.reveal-related {
+    font-size: 12px;
+    cursor: pointer;
+    color: #888;
+    transition: color 0.2s ease;
+    padding: 0 2px;
+}
+
+.reveal-related:hover {
+    color: #000;
+}
+
+.reveal-related.active {
+    color: #000;
+    font-weight: 600;
+}
+
+.legenda-type-name {
+    cursor: pointer;
+    flex: 1;
+}
+
+.legenda-count {
+    font-size: 9px;
+    color: #888;
+    margin-left: auto;
+    padding: 1px 4px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+#isolated-toggle {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px;
+    cursor: pointer;
+    background: rgba(0,0,0,0.3);
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+#isolated-toggle input {
+    cursor: pointer;
+}

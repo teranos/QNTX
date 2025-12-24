@@ -1,0 +1,120 @@
+/* Usage Badge - Real-time AI usage tracking */
+
+.usage-badge {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    font-size: 11px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.usage-badge:hover {
+    background: rgba(0, 0, 0, 0.7);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Usage Detail Box - Floating transparent panel */
+
+.usage-detail-box {
+    display: none; /* Hidden by default */
+    position: fixed;
+    top: 12px;
+    right: 45px; /* Position to left of badge */
+    background: rgba(20, 20, 20, 0.6); /* 60% opacity */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    padding: 8px;
+    width: 320px;
+    height: 180px;
+    color: #fff;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 999; /* Below badge so badge stays on top */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none; /* Allow mouse to pass through when fading */
+}
+
+.usage-detail-box.visible {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.usage-detail-box.fading {
+    opacity: 0;
+}
+
+.usage-detail-box.expanded {
+    /* Full width expansion for month view */
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    transition: all 0.3s ease, opacity 0.3s ease;
+}
+
+/* Chart container */
+.usage-chart-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.usage-chart-svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Chart axes */
+.usage-chart-axis path,
+.usage-chart-axis line {
+    stroke: rgba(255, 255, 255, 0.2);
+    shape-rendering: crispEdges;
+}
+
+.usage-chart-axis text {
+    fill: rgba(255, 255, 255, 0.6);
+    font-size: 9px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+/* Chart area (cost) */
+.usage-cost-area {
+    fill: rgba(100, 200, 255, 0.3);
+    stroke: rgba(100, 200, 255, 0.8);
+    stroke-width: 1.5px;
+}
+
+/* Chart line (requests) */
+.usage-requests-line {
+    fill: none;
+    stroke: rgba(255, 200, 100, 0.8);
+    stroke-width: 1.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .usage-badge {
+        top: 8px;
+        right: 8px;
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+
+    .usage-detail-box {
+        right: 70px;
+        min-width: 240px;
+        padding: 10px 12px;
+        font-size: 10px;
+    }
+}

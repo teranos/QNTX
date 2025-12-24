@@ -1,0 +1,23 @@
+# Go
+*.db
+*.db-shm
+*.db-wal
+
+# Node/Bun
+node_modules/
+bun.lock
+
+# Build artifacts
+dist/
+internal/server/dist/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store

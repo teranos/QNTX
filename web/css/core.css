@@ -1,0 +1,171 @@
+/* Core Styles - Foundation, Layout, Shared Components */
+
+/* Base */
+body {
+    /* Virtue #5: System Fonts - "Leverage OS defaults for performance and familiarity" */
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+}
+
+/* Main Container */
+#container {
+    display: flex;
+    height: 100vh;
+    transition: filter 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Disconnected state - desaturate and dim to indicate inactive state */
+body.disconnected #container {
+    filter: saturate(0.3);
+    opacity: 0.7;
+}
+
+/* Attestation Feed - Matrix style background */
+#attestation-feed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+    padding: 20px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.4;
+    color: rgba(100, 255, 100, 0.15);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.attestation-line {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-in forwards;
+    display: inline;
+}
+
+.attestation-line:not(:last-child)::after {
+    content: ' | ';
+    color: rgba(170, 170, 170, 0.15);
+}
+
+.attestation-line .entity {
+    color: rgba(126, 179, 255, 0.2);
+}
+
+.attestation-line .relation {
+    color: rgba(170, 170, 170, 0.15);
+    font-style: italic;
+}
+
+.attestation-line .value {
+    color: rgba(136, 201, 153, 0.2);
+}
+
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+/* Left Panel Structure */
+#left-panel {
+    width: 360px;
+    background: #f8f8f8;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+#header {
+    padding: 16px;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
+}
+
+#header h1 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #000;
+}
+
+#header .subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+/* Stats */
+#stats {
+    padding: 12px 16px;
+    margin-bottom: 32px; /* Space for fixed log panel at bottom */
+    background: #fff;
+    border-top: 1px solid #ddd;
+    font-size: 11px;
+    color: #666;
+}
+
+#stats .stat-item {
+    display: inline-block;
+    margin-right: 16px;
+}
+
+#stats .stat-value {
+    color: #000;
+    font-weight: 600;
+}
+
+
+/* LLM Streaming Styles */
+.progress-event.llm-stream {
+    background: #1e1e1e;
+    border-left: 3px solid #4ade80;
+}
+
+.llm-stream-content {
+    font-family: Courier New, monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 8px;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.llm-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: #4ade80;
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+.llm-model, .llm-stage {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.llm-model {
+    background: #2a2a4a;
+    color: #a5b4fc;
+}
+
+.llm-stage {
+    background: #2a4a2a;
+    color: #86efac;
+}
+

@@ -1,0 +1,119 @@
+/**
+ * Shared Panel Styles
+ * Used by config-panel and pulse-panel for consistent slide-in UX
+ */
+
+/* Base panel structure - slide in from left */
+.panel-slide-left {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  background: #fff;
+  border-right: 1px solid #ddd;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  overflow: hidden;
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.panel-slide-left.visible {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Overlay - darken right side when panel is open */
+.panel-overlay {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.panel-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Panel header */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fafafa;
+  border-bottom: 2px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #000;
+  letter-spacing: 0.3px;
+}
+
+.panel-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.panel-close:hover {
+  background: #e0e0e0;
+  color: #000;
+  transform: scale(1.1);
+}
+
+/* Panel content */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 20px;
+  background: #f5f5f5;
+}
+
+/* Loading and empty states */
+.panel-loading,
+.panel-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Error display */
+.panel-error {
+  padding: 16px;
+  background: rgba(255, 0, 51, 0.1);
+  border-left: 3px solid #ff0033;
+  border-radius: 4px;
+  color: #ff0033;
+  font-size: 12px;
+  margin-bottom: 12px;
+}

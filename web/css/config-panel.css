@@ -1,0 +1,256 @@
+/**
+ * Config Panel Styling - Configuration introspection display
+ * Uses left-panel.css for base panel structure
+ */
+
+/* Search */
+.config-panel-search {
+    padding: 12px 20px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.config-search-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    outline: none;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.config-search-input:focus {
+    border-color: #000;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+.config-search-input::placeholder {
+    color: #999;
+}
+
+/* Config-specific content styling (layout handled by .panel-content) */
+
+.config-loading,
+.config-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: #666;
+    font-size: 12px;
+}
+
+/* Config File Info */
+.config-file-info {
+    padding: 12px 16px;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.config-file-info strong {
+    color: #000;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.config-file-hint {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Config Groups (simple grouping by top-level key) */
+.config-group {
+    margin-bottom: 24px;
+}
+
+.config-group-title {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #000;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 6px;
+}
+
+/* Individual Setting - Compact table-like row */
+.config-setting {
+    display: grid;
+    grid-template-columns: minmax(200px, 2fr) minmax(100px, 3fr) auto auto;
+    gap: 12px;
+    padding: 2px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 11px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    align-items: center;
+    transition: background 0.1s ease;
+}
+
+.config-setting:hover {
+    background: #fafafa;
+}
+
+.config-setting:last-child {
+    border-bottom: none;
+}
+
+.config-setting-key {
+    color: #000;
+    font-weight: 500;
+}
+
+.config-setting-value {
+    color: #333;
+    word-break: break-word;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+.config-setting-sources {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    align-items: center;
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.source-active {
+    color: #000;
+    font-weight: 600;
+}
+
+.source-inactive {
+    color: #999;
+    opacity: 0.6;
+}
+
+.source-undefined {
+    color: #ddd;
+    opacity: 0.3;
+}
+
+.source-clickable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: transparent;
+    transition: all 0.15s ease;
+}
+
+.source-clickable:hover {
+    text-decoration-color: currentColor;
+}
+
+.config-edit-btn {
+    background: transparent;
+    color: #666;
+    border: none;
+    padding: 2px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color 0.1s ease;
+}
+
+.config-edit-btn:hover {
+    color: #000;
+}
+
+/* Value type styling */
+.config-value-null {
+    color: #999;
+    font-style: italic;
+}
+
+.config-value-bool {
+    color: #9C27B0;
+    font-weight: 600;
+}
+
+.config-value-number {
+    color: #F57C00;
+}
+
+.config-value-string {
+    color: #333;
+}
+
+.config-value-object {
+    color: #1976D2;
+    font-size: 10px;
+}
+
+.config-value-secret {
+    color: #E53935;
+    font-weight: 600;
+}
+
+/* Scrollbar styling */
+.config-panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.config-panel-content::-webkit-scrollbar-track {
+    background: #f0f0f0;
+}
+
+.config-panel-content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.config-panel-content::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .config-panel {
+        width: 60%;
+    }
+
+    .config-panel-overlay {
+        left: 60%;
+        width: 40%;
+    }
+}
+
+@media (max-width: 768px) {
+    .config-panel {
+        width: 100%;
+    }
+
+    .config-panel-overlay {
+        display: none;
+    }
+
+    .config-setting {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .config-setting-actions {
+        justify-content: flex-start;
+    }
+
+    .config-toggle-control {
+        grid-template-columns: 1fr;
+    }
+
+    .config-source-title {
+        font-size: 12px;
+    }
+
+    .config-source-subtitle {
+        font-size: 9px;
+    }
+}
