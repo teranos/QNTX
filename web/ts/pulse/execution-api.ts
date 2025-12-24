@@ -24,6 +24,24 @@ function getBaseUrl(): string {
 }
 
 /**
+ * Wrapper for fetch with consistent error handling
+ * @param url - URL to fetch
+ * @param options - Fetch options
+ * @returns Response object
+ * @throws Error with user-friendly message on network or HTTP errors
+ */
+async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(url, options);
+    return response;
+  } catch (error) {
+    // Network error (connection refused, DNS failure, etc.)
+    debugError("[Execution API] Network error:", error);
+    throw new Error('Network error: Unable to connect to server. Please check your connection.');
+  }
+}
+
+/**
  * List executions for a scheduled job
  *
  * @param jobId - Scheduled job ID
@@ -48,7 +66,7 @@ export async function listExecutions(
   const url = `${getBaseUrl()}/jobs/${jobId}/executions?${searchParams}`;
   debugLog("[Execution API] Listing executions:", { jobId, params, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     const error = `Failed to list executions: ${response.statusText}`;
@@ -78,7 +96,7 @@ export async function getExecution(
   const url = `${getBaseUrl()}/executions/${executionId}`;
   debugLog("[Execution API] Getting execution:", { executionId, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -111,7 +129,7 @@ export async function getExecutionLogs(
   const url = `${getBaseUrl()}/executions/${executionId}/logs`;
   debugLog("[Execution API] Getting logs:", { executionId, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -204,7 +222,7 @@ export async function getJobStages(jobId: string): Promise<JobStagesResponse> {
   const url = `${getBaseUrl()}/jobs/${jobId}/stages`;
   debugLog("[Execution API] Getting job stages:", { jobId, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -236,7 +254,7 @@ export async function getTaskLogs(taskId: string): Promise<TaskLogsResponse> {
   const url = `${getBaseUrl()}/tasks/${taskId}/logs`;
   debugLog("[Execution API] Getting task logs:", { taskId, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -270,7 +288,7 @@ export async function getTaskLogsForJob(
   const url = `${getBaseUrl()}/jobs/${jobId}/tasks/${taskId}/logs`;
   debugLog("[Execution API] Getting task logs for job:", { jobId, taskId, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -303,7 +321,7 @@ export async function getJobChildren(
   const url = `${getBaseUrl()}/jobs/${jobId}/children`;
   debugLog("[Execution API] Getting child jobs:", { jobId, url });
 
-  const response = await fetch(url);
+  const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
