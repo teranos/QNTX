@@ -1,10 +1,31 @@
 #!/bin/bash
 
+# post-checkout hook receives 3 parameters:
+# $1: ref of previous HEAD
+# $2: ref of new HEAD
+# $3: flag - 1 for branch checkout, 0 for file checkout
+
+# Only proceed if this is a branch checkout (not file checkout)
+if [ "$3" != "1" ]; then
+    exit 0
+fi
+
 # Get the branch we just checked out to
 new_branch=$(git rev-parse --abbrev-ref HEAD)
 
 # If we checked out to main, automatically pull
 if [ "$new_branch" = "main" ]; then
+    # Check for uncommitted changes
+    if ! git diff-index --quiet HEAD --; then
+        echo "⚠️  Skipping auto-pull: uncommitted changes detected"
+        echo "   Commit or stash your changes, then pull manually"
+        exit 0
+    fi
+
     echo "🔄 Auto-pulling main branch..."
-    git pull
+    if ! git pull; then
+        echo "⚠️  Warning: Failed to pull latest changes for main branch"
+        echo "   Please resolve any issues and pull manually"
+        exit 0
+    fi
 fi
