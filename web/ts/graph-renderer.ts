@@ -260,31 +260,28 @@ function renderGraph(data: GraphData): void {
     const d3Links = visibleLinks as D3Link[];
 
     // Create force simulation with filtered data
+    // TODO(issue #7): Domain leakage - git-specific logic should be moved to type metadata
     simulation = d3.forceSimulation(d3Nodes)
         .force("link", d3.forceLink(d3Links)
             .id((d: D3Node) => d.id)
             .distance((d: D3Link) => {
-                // Shorter distance for git parent-child relationships to create tight commit chains
-                if (d.type === 'is_child_of') return 50;
-                // Shorter distance for branch pointers
-                if (d.type === 'points_to') return 60;
-                // Default distance for other relationships
+                // TODO(issue #7): This hardcodes git domain knowledge - should query type metadata
+                if (d.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_DISTANCE;
+                if (d.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_DISTANCE;
                 return GRAPH_PHYSICS.LINK_DISTANCE;
             })
             .strength((d: D3Link) => {
-                // Weaker strength for more flexible, elastic links
-                // Git relationships still get some priority but not rigid
-                if (d.type === 'is_child_of') return 0.3;
-                if (d.type === 'points_to') return 0.2;
-                // Very flexible default - links can stretch/compress freely
-                return 0.1;
+                // TODO(issue #7): This hardcodes git domain knowledge - should query type metadata
+                if (d.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_STRENGTH;
+                if (d.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_STRENGTH;
+                return GRAPH_PHYSICS.DEFAULT_LINK_STRENGTH;
             }))
         .force("charge", d3.forceManyBody()
-            .strength(-2000)  // Strong repulsion for tiles to spread them out
+            .strength(GRAPH_PHYSICS.TILE_CHARGE_STRENGTH)
             .distanceMax(GRAPH_PHYSICS.CHARGE_MAX_DISTANCE))
-        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.05))  // Weak centering - just prevent drift
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(GRAPH_PHYSICS.CENTER_STRENGTH))
         .force("collision", d3.forceCollide()
-            .radius(120)  // Larger buffer around tiles to prevent overlap
+            .radius(GRAPH_PHYSICS.COLLISION_RADIUS)
             .strength(1));
 
     // Create links

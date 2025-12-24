@@ -43,6 +43,15 @@ export const GRAPH_PHYSICS: GraphPhysics & {
     ZOOM_MAX: number;
     CENTER_SCALE: number;
     ANIMATION_DURATION: number;
+    // Domain-specific physics (TODO: issue #7 - move to type metadata)
+    GIT_CHILD_LINK_DISTANCE: number;
+    GIT_BRANCH_LINK_DISTANCE: number;
+    GIT_CHILD_LINK_STRENGTH: number;
+    GIT_BRANCH_LINK_STRENGTH: number;
+    DEFAULT_LINK_STRENGTH: number;
+    TILE_CHARGE_STRENGTH: number;
+    CENTER_STRENGTH: number;
+    COLLISION_RADIUS: number;
 } = {
     LINK_DISTANCE: 100,
     CHARGE_STRENGTH: -300,
@@ -55,7 +64,16 @@ export const GRAPH_PHYSICS: GraphPhysics & {
     ANIMATION_DURATION: 750,
     // Additional properties for interface compliance
     FORCE_ALPHA_TARGET: 0,
-    FORCE_VELOCITY_DECAY: 0.4
+    FORCE_VELOCITY_DECAY: 0.4,
+    // Domain-specific physics (TODO: issue #7 - move to type metadata)
+    GIT_CHILD_LINK_DISTANCE: 50,      // Shorter distance for git parent-child to create tight commit chains
+    GIT_BRANCH_LINK_DISTANCE: 60,     // Shorter distance for branch pointers
+    GIT_CHILD_LINK_STRENGTH: 0.3,     // Weaker strength for flexible git child links
+    GIT_BRANCH_LINK_STRENGTH: 0.2,    // Weaker strength for branch pointer links
+    DEFAULT_LINK_STRENGTH: 0.1,       // Very flexible default - links can stretch/compress freely
+    TILE_CHARGE_STRENGTH: -2000,      // Strong repulsion for tiles to spread them out
+    CENTER_STRENGTH: 0.05,             // Weak centering - just prevent drift
+    COLLISION_RADIUS: 120              // Larger buffer around tiles to prevent overlap
 };
 
 // Graph visual styling constants
