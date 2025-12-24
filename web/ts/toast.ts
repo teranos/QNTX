@@ -57,12 +57,21 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         info: 'ℹ'
     };
 
-    let content = `
-        <div class="toast-header">
-            <div class="toast-icon">${icons[type]}</div>
-            <div class="toast-message">${message}</div>
-        </div>
-    `;
+    // Build toast structure safely using createElement
+    const header = document.createElement('div');
+    header.className = 'toast-header';
+
+    const iconEl = document.createElement('div');
+    iconEl.className = 'toast-icon';
+    iconEl.textContent = icons[type];
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'toast-message';
+    messageEl.textContent = message;  // Safe - auto-escapes HTML
+
+    header.appendChild(iconEl);
+    header.appendChild(messageEl);
+    toast.appendChild(header);
 
     // Add build info if requested and available
     if (showBuildInfo && cachedBuildInfo) {
@@ -98,18 +107,28 @@ export function showToast(message: string, options: ToastOptions = {}): void {
             }
         }
 
-        content += `
-            <div class="toast-build-info">
-                <span class="toast-build-label">SERVER BUILD</span>
-                <span class="toast-build-value">${commitShort} · ${buildTime}</span>
-            </div>
-        `;
+        const buildInfo = document.createElement('div');
+        buildInfo.className = 'toast-build-info';
+
+        const buildLabel = document.createElement('span');
+        buildLabel.className = 'toast-build-label';
+        buildLabel.textContent = 'SERVER BUILD';
+
+        const buildValue = document.createElement('span');
+        buildValue.className = 'toast-build-value';
+        buildValue.textContent = `${commitShort} · ${buildTime}`;
+
+        buildInfo.appendChild(buildLabel);
+        buildInfo.appendChild(buildValue);
+        toast.appendChild(buildInfo);
     }
 
     // Add close button
-    content += `<button class="toast-close">×</button>`;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.textContent = '×';
+    toast.appendChild(closeBtn);
 
-    toast.innerHTML = content;
     container.appendChild(toast);
 
     // Trigger animation
@@ -125,8 +144,7 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     const timeoutId = setTimeout(dismissToast, duration);
 
     // Manual dismiss on close button
-    const closeBtn = toast.querySelector('.toast-close');
-    closeBtn?.addEventListener('click', () => {
+    closeBtn.addEventListener('click', () => {
         clearTimeout(timeoutId);
         dismissToast();
     });

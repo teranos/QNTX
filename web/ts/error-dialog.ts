@@ -38,30 +38,68 @@ export function showErrorDialog(title: string, message: string): void {
         })
         : 'unknown';
 
-    dialog.innerHTML = `
-        <div class="error-dialog">
-            <div class="error-dialog-header">
-                <span class="error-dialog-icon">⚠</span>
-                <h3>${title}</h3>
-            </div>
-            <div class="error-dialog-body">
-                <p>${message}</p>
-            </div>
-            <div class="error-dialog-footer">
-                <div class="error-dialog-build-info">
-                    <span class="build-info-label">Server:</span>
-                    <span class="build-info-value">${commitShort} · ${buildTime}</span>
-                </div>
-                <button class="error-dialog-btn-ok">OK</button>
-            </div>
-        </div>
-    `;
+    // Build dialog structure safely using createElement
+    const errorDialog = document.createElement('div');
+    errorDialog.className = 'error-dialog';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'error-dialog-header';
+
+    const icon = document.createElement('span');
+    icon.className = 'error-dialog-icon';
+    icon.textContent = '⚠';
+
+    const titleEl = document.createElement('h3');
+    titleEl.textContent = title;  // Safe - auto-escapes HTML
+
+    header.appendChild(icon);
+    header.appendChild(titleEl);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'error-dialog-body';
+
+    const messageEl = document.createElement('p');
+    messageEl.textContent = message;  // Safe - auto-escapes HTML
+
+    body.appendChild(messageEl);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = 'error-dialog-footer';
+
+    const buildInfo = document.createElement('div');
+    buildInfo.className = 'error-dialog-build-info';
+
+    const buildLabel = document.createElement('span');
+    buildLabel.className = 'build-info-label';
+    buildLabel.textContent = 'Server:';
+
+    const buildValue = document.createElement('span');
+    buildValue.className = 'build-info-value';
+    buildValue.textContent = `${commitShort} · ${buildTime}`;
+
+    buildInfo.appendChild(buildLabel);
+    buildInfo.appendChild(buildValue);
+
+    const okBtn = document.createElement('button');
+    okBtn.className = 'error-dialog-btn-ok';
+    okBtn.textContent = 'OK';
+
+    footer.appendChild(buildInfo);
+    footer.appendChild(okBtn);
+
+    // Assemble dialog
+    errorDialog.appendChild(header);
+    errorDialog.appendChild(body);
+    errorDialog.appendChild(footer);
+    dialog.appendChild(errorDialog);
 
     document.body.appendChild(dialog);
 
     // Close on button click
-    const okBtn = dialog.querySelector('.error-dialog-btn-ok');
-    okBtn?.addEventListener('click', () => {
+    okBtn.addEventListener('click', () => {
         dialog.remove();
     });
 
