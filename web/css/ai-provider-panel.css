@@ -1,0 +1,198 @@
+/* AI Provider Panel - Actor/Agent Configuration */
+
+.ai-provider-panel {
+    position: relative;
+    width: 100%;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.ai-provider-panel.hidden {
+    display: none;
+}
+
+.ai-provider-panel.visible {
+    display: flex;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header */
+.ai-provider-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+}
+
+.ai-provider-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #000;
+}
+
+.ai-provider-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: all 0.15s ease;
+}
+
+.ai-provider-close:hover {
+    background: #e0e0e0;
+    color: #000;
+}
+
+/* Content */
+.ai-provider-content {
+    padding: 16px 20px;
+    background: #fff;
+}
+
+.config-toggle-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.config-toggle-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.config-toggle-status {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+
+.config-toggle-status.status-success {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.config-toggle-status.status-error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.config-toggle-status.status-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.config-toggle-control {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.provider-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 12px;
+    background: #fff;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.provider-btn:hover {
+    border-color: #999;
+    background: #f8f8f8;
+}
+
+.provider-btn.active {
+    border-color: #000;
+    background: #000;
+    color: #fff;
+}
+
+.provider-icon {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.provider-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.provider-detail {
+    font-size: 10px;
+    color: #666;
+}
+
+.provider-btn.active .provider-detail {
+    color: #aaa;
+}
+
+.ollama-model-selector {
+    padding: 10px 14px;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+}
+
+.ollama-model-selector.hidden {
+    display: none;
+}
+
+.ollama-model-selector label {
+    font-weight: 600;
+    color: #333;
+}
+
+#ollama-model-select {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 11px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
