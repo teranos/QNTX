@@ -734,6 +734,8 @@ class JobDetailPanel {
 }
 
 // Create global instance
+// TODO(issue #16): Refactor global window pollution
+// Replace with event delegation and custom events for cross-panel communication
 const jobDetailPanel = new JobDetailPanel();
 (window as any).jobDetailPanel = jobDetailPanel;
 

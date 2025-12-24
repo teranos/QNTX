@@ -8,7 +8,7 @@
  * The languageServer() extension connects directly to the /lsp WebSocket endpoint
  * for LSP features (completions, hover, diagnostics).
  *
- * TODO(issue #132): Accepted parse_response fallback as permanent (codemirror-languageserver won't support semantic tokens)
+ * TODO(issue #13): Accepted parse_response fallback as permanent (codemirror-languageserver won't support semantic tokens)
  */
 
 import { sendMessage } from './websocket.ts';
@@ -16,7 +16,7 @@ import { applySyntaxHighlighting, updateDiagnosticsDisplay } from './codemirror-
 import type { ParseResponse, ParseRequest, SemanticToken, Diagnostic } from '../types/lsp';
 
 // Debounce timings
-// TODO(issue #111): Tune these values based on actual latency metrics
+// TODO(issue #14): Tune these values based on actual latency metrics
 const PARSE_DEBOUNCE_MS: number = 150;      // Fast feedback for highlighting
 
 // State
