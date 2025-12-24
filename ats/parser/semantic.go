@@ -124,7 +124,7 @@ func isCommand(s string) bool {
 }
 
 // isKeyword checks if value is an ATS grammatical keyword
-// TODO(issue #111): Refactor to use map for O(1) lookup instead of O(n) linear search
+// TODO(issue #3): Refactor to use map for O(1) lookup instead of O(n) linear search
 func isKeyword(s string) bool {
 	lower := strings.ToLower(s)
 	keywords := append(GrammaticalConnectors, ContextTransitionKeywords...)
