@@ -17,14 +17,42 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let messageHandlers: MessageHandlers = {};
 
 /**
+ * Validate and sanitize backend URL
+ * @param url - URL to validate
+ * @returns Validated URL origin or null if invalid
+ */
+export function validateBackendURL(url: string): string | null {
+    try {
+        const parsed = new URL(url, window.location.origin);
+
+        // Only allow http/https protocols (will be converted to ws/wss)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return null;
+        }
+
+        return parsed.origin;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
  * Initialize WebSocket connection
  * @param handlers - Map of message type to handler functions
  */
 export function connectWebSocket(handlers: MessageHandlers): void {
     messageHandlers = handlers || {};
 
-    // Use backend URL from injected global
-    const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    // Use backend URL from injected global with validation
+    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    const validatedUrl = validateBackendURL(rawUrl);
+
+    if (!validatedUrl) {
+        console.error('Invalid backend URL:', rawUrl);
+        console.log('Falling back to same-origin');
+    }
+
+    const backendUrl = validatedUrl || window.location.origin;
     const backendHost = backendUrl.replace(/^https?:\/\//, '');
     const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${backendHost}/ws`;
