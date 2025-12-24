@@ -124,11 +124,14 @@ class PulsePanel {
             this.render();
         } catch (error) {
             console.error('[Pulse Panel] Failed to load jobs:', error);
-            content.innerHTML = `
-                <div class="panel-error pulse-error">
-                    Failed to load scheduled jobs: ${(error as Error).message}
-                </div>
-            `;
+
+            // Build error display using DOM API for security
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'panel-error pulse-error';
+            errorDiv.textContent = `Failed to load scheduled jobs: ${(error as Error).message}`;
+
+            content.innerHTML = '';
+            content.appendChild(errorDiv);
         }
     }
 
