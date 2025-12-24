@@ -121,6 +121,11 @@ function renderGraph(data: GraphData): void {
         return;
     }
 
+    // TODO(issue #10): Attestation-based in-tile documentation
+    // Add documentation sections to tiles showing attestation-based docs
+    // Support expandable/collapsible sections with markdown rendering
+    // Query documentation attestations when tiles are selected
+
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
         console.error('Graph container not found');

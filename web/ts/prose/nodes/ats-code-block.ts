@@ -33,8 +33,7 @@ export class ATSCodeBlockNodeView {
         // Create CodeMirror instance (simple, no line numbers)
         const initialContent = this.node.textContent;
 
-        // TODO: Cursor visibility issue - cursor is too thin/faint
-        // See: https://github.com/sbvh-nl/qntx/issues/149
+        // TODO(issue #15): Cursor visibility issue - cursor is too thin/faint
         // The cursor should be thicker and more visible (currently appears very faint)
         // Tried: CSS !important, caretColor, borderLeftWidth - none seem to work reliably
         // May need to investigate CodeMirror's cursor rendering more deeply
