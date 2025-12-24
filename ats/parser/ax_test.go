@@ -668,7 +668,7 @@ func TestEnhancedNaturalLanguagePatterns(t *testing.T) {
 				Format:   "table",
 			},
 		},
-		// TODO: Fix single word parsing without 'is' keyword - see issue #34
+		// TODO: Fix single word parsing without 'is' keyword - see issue #2
 		{
 			name:  "profession with explicit subject",
 			query: []string{"ALICE", "is", "analyst"},
@@ -788,7 +788,7 @@ func TestNaturalLanguageDetection(t *testing.T) {
 				Format:     "table",
 			},
 		},
-		// TODO: Fix single word parsing without 'is' keyword - see issue #34
+		// TODO: Fix single word parsing without 'is' keyword - see issue #2
 		// TODO: Add back quoted string handling later
 		// {
 		//   name:  "no splitting for quoted strings",
