@@ -1,0 +1,544 @@
+/**
+ * Pulse Panel Styling - Scheduled Jobs Dashboard
+ * Uses shared-panel.css for base panel structure
+ */
+
+/* Pulse-specific empty state */
+.pulse-empty p {
+  margin: 8px 0;
+}
+
+.pulse-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.pulse-panel-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Jobs List */
+.pulse-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Job Card */
+.pulse-job-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 14px 16px;
+  transition: box-shadow 0.15s ease;
+}
+
+.pulse-job-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Job Header */
+.pulse-job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pulse-job-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pulse-badge-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.pulse-badge-paused {
+  background: #f5f5f5;
+  color: #757575;
+}
+
+.pulse-badge-stopping,
+.pulse-badge-inactive {
+  background: #fce4ec;
+  color: #c2185b;
+}
+
+.pulse-job-interval {
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+}
+
+/* Job Code */
+.pulse-job-code {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.pulse-job-code code {
+  color: #000;
+}
+
+/* Job Meta */
+.pulse-job-meta {
+  margin: 8px 0;
+  font-size: 12px;
+}
+
+.pulse-meta-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  color: #666;
+}
+
+.pulse-meta-label {
+  font-weight: 500;
+}
+
+.pulse-meta-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Prose location link */
+.pulse-prose-link {
+  color: #7b1fa2;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  transition: color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pulse-prose-link:hover {
+  color: #6a1b9a;
+  text-decoration: underline;
+}
+
+/* Job Actions */
+.pulse-job-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.pulse-btn {
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.pulse-btn:hover {
+  background: #f5f5f5;
+}
+
+.pulse-btn-pause:hover,
+.pulse-btn-resume:hover {
+  background: #f3e5f5;
+  border-color: #7b1fa2;
+}
+
+.pulse-btn-delete:hover {
+  background: #ffebee;
+  border-color: #c62828;
+}
+
+/* Dark theme removed - handled by left-panel.css base styles */
+
+/* =============================================================================
+   Child Jobs Display
+   ============================================================================= */
+
+.execution-children {
+  margin-top: 12px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.children-header {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.execution-child {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+}
+
+.execution-child.expanded {
+  border-color: #7b1fa2;
+}
+
+.child-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.child-header:hover {
+  background: #f5f5f5;
+  border-radius: 2px;
+}
+
+.child-expand-icon {
+  font-size: 10px;
+  color: #666;
+  width: 12px;
+  display: inline-block;
+}
+
+.child-handler {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.child-status {
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.child-status-running {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.child-status-completed {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.child-status-failed {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.child-status-queued,
+.child-status-paused {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.child-progress {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.child-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #666;
+}
+
+.child-id {
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.child-source {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.child-error {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: #ffebee;
+  border-left: 3px solid #c62828;
+  font-size: 12px;
+  color: #c62828;
+}
+
+.child-stages-container {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Direct log display under stages */
+.stage-logs-direct {
+  margin-top: 8px;
+}
+
+.task-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.task-log-entry {
+  padding: 6px 8px;
+  background: #fafafa;
+  border-radius: 3px;
+}
+
+.task-log-timestamp {
+  color: #999;
+  font-size: 11px;
+  margin-right: 12px;
+}
+
+.task-log-level {
+  font-weight: 600;
+  font-size: 11px;
+  margin-right: 12px;
+}
+
+.task-log-message {
+  color: #333;
+}
+
+.task-logs-loading {
+  padding: 12px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+}
+
+/* ========================================================================
+   Inline Execution View Styles
+
+   TODO: Future styling improvements:
+   - Add loading skeleton for execution cards (better than just "Loading...")
+   - Add animations for new execution cards appearing (real-time updates)
+   - Add status transition animations (running → completed/failed)
+   - Improve mobile responsiveness for execution cards
+   - Add dark mode support (currently only light mode)
+   ======================================================================== */
+
+/* Expand/collapse toggle button */
+.pulse-expand-toggle {
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    margin-right: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    transition: color 0.2s;
+}
+
+.pulse-expand-toggle:hover {
+    color: #333;
+}
+
+/* Force Trigger button styling */
+.pulse-btn-force {
+    background: #ff6b00;
+    color: white;
+    border: 1px solid #e66000;
+}
+
+.pulse-btn-force:hover {
+    background: #e66000;
+}
+
+/* Execution history section */
+.pulse-execution-history {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e5e5;
+}
+
+.pulse-execution-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.pulse-execution-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.pulse-detailed-link {
+    font-size: 13px;
+    color: #007aff;
+    text-decoration: none;
+}
+
+.pulse-detailed-link:hover {
+    text-decoration: underline;
+}
+
+.pulse-execution-loading,
+.pulse-execution-empty {
+    padding: 24px;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.pulse-execution-error {
+    padding: 16px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    color: #856404;
+    margin-bottom: 12px;
+}
+
+.pulse-execution-error strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #664d03;
+}
+
+.pulse-retry-button {
+    margin-top: 12px;
+    padding: 6px 12px;
+    background: #ffc107;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.pulse-retry-button:hover {
+    background: #ffb300;
+}
+
+.pulse-execution-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Individual execution card */
+.pulse-execution-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    background: #f8f8f8;
+    border-radius: 6px;
+    border-left: 3px solid #ccc;
+}
+
+.pulse-execution-card.pulse-exec-success {
+    border-left-color: #34c759;
+}
+
+.pulse-execution-card.pulse-exec-error {
+    border-left-color: #ff3b30;
+    background: #fff5f5;
+}
+
+.pulse-execution-card.pulse-exec-running {
+    border-left-color: #007aff;
+}
+
+.pulse-exec-status {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pulse-exec-success .pulse-exec-status {
+    color: #34c759;
+}
+
+.pulse-exec-error .pulse-exec-status {
+    color: #ff3b30;
+}
+
+.pulse-exec-running .pulse-exec-status {
+    color: #007aff;
+}
+
+.pulse-exec-time {
+    font-size: 13px;
+    color: #666;
+}
+
+.pulse-exec-duration {
+    font-size: 13px;
+    color: #999;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.pulse-exec-summary {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.pulse-exec-error {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: #ff3b30;
+    margin-top: 4px;
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+/* Load more button */
+.pulse-load-more {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #007aff;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pulse-load-more:hover {
+    background: #e5e5e5;
+}
+
+/* Expanded state */
+.pulse-job-card.expanded {
+    padding-bottom: 16px;
+}

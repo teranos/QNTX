@@ -1,0 +1,89 @@
+/* Symbol Palette - Single horizontal row of 10 SEG symbols */
+
+/* Main Container - Single row grid inside query area */
+.symbol-palette {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 2px;
+    width: 100%;
+    padding: 6px 8px;
+    background: #fff;
+    font-family: 'Courier New', monospace;
+    user-select: none;
+    margin-bottom: 4px;
+}
+
+/* Symbol Cell - Symbol-first design */
+.palette-cell {
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px;
+    color: #000;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+    font-weight: 400;
+}
+
+/* Tooltip on hover - shows text label */
+.palette-cell::after {
+    content: attr(data-label);
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+}
+
+/* Hover State - reveals tooltip */
+.palette-cell:hover {
+    background: #e8e8e8;
+    border-color: #bbb;
+}
+
+.palette-cell:hover::after {
+    opacity: 1;
+}
+
+/* Active/Selected State - Color Inversion */
+.palette-cell.active {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+    font-weight: 600;
+}
+
+/* Click Feedback */
+.palette-cell:active {
+    transform: scale(0.98);
+}
+
+/* Responsive - Smaller screens */
+@media (max-width: 480px) {
+    .command-palette {
+        grid-template-columns: repeat(5, 1fr);
+        padding: 6px 10px;
+    }
+
+    .palette-cell {
+        padding: 6px 3px;
+        font-size: 14px;
+    }
+
+    /* Hide tooltip on small screens to avoid overflow */
+    .palette-cell::after {
+        display: none;
+    }
+}

@@ -1,0 +1,344 @@
+/**
+ * Job Detail Panel - Execution History Display
+ * Extends shared-panel.css for base panel structure
+ */
+
+/* Job detail header - with back button */
+.job-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fafafa;
+  border-bottom: 2px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.job-detail-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #000;
+  letter-spacing: 0.3px;
+}
+
+.job-detail-back {
+  background: none;
+  border: 1px solid #e0e0e0;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  transition: all 0.15s ease;
+}
+
+.job-detail-back:hover {
+  background: #f3e5f5;
+  border-color: #7b1fa2;
+  color: #7b1fa2;
+}
+
+/* Content area */
+.job-detail-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 20px;
+  background: #f5f5f5;
+}
+
+/* Job info card */
+.job-info-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.job-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.job-info-label {
+  font-weight: 500;
+  color: #666;
+}
+
+.job-info-value {
+  color: #000;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.job-state-active {
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.job-state-paused {
+  color: #757575;
+  font-weight: 500;
+}
+
+.job-state-stopping,
+.job-state-inactive {
+  color: #c2185b;
+  font-weight: 500;
+}
+
+/* Execution history section */
+.execution-history-section {
+  margin-top: 16px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 12px;
+}
+
+.section-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.execution-count {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Execution list */
+.execution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Execution cards */
+.execution-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.execution-card.expanded {
+  box-shadow: 0 2px 8px rgba(123, 31, 162, 0.15);
+  border-color: #7b1fa2;
+}
+
+/* Status color accents */
+.execution-card.status-running {
+  border-left: 3px solid #7b1fa2;
+}
+
+.execution-card.status-completed {
+  border-left: 3px solid #2e7d32;
+}
+
+.execution-card.status-failed {
+  border-left: 3px solid #c62828;
+}
+
+.execution-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.execution-header:hover {
+  opacity: 0.8;
+}
+
+.execution-expand-icon {
+  font-size: 10px;
+  color: #7b1fa2;
+  width: 16px;
+  transition: transform 0.2s ease;
+}
+
+.execution-status {
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.execution-status-running {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.execution-status-completed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.execution-status-failed {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.execution-time {
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+.execution-duration {
+  color: #666;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Execution summary and error */
+.execution-summary {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #f5f5f5;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #333;
+}
+
+.execution-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(198, 40, 40, 0.08);
+  border-radius: 3px;
+  font-size: 12px;
+  color: #c62828;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.execution-meta {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #666;
+}
+
+.execution-meta-label {
+  font-weight: 500;
+}
+
+.execution-job-id {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Execution logs */
+.execution-logs-container {
+  margin-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 12px;
+}
+
+.execution-logs {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+}
+
+.execution-logs-loading {
+  text-align: center;
+  padding: 20px;
+  color: #7b1fa2;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Empty state */
+.execution-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #666;
+}
+
+.execution-empty p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.execution-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Error state */
+.job-detail-error {
+  padding: 16px;
+  background: rgba(255, 0, 51, 0.1);
+  border-left: 3px solid #ff0033;
+  border-radius: 4px;
+  color: #ff0033;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+/* Pagination */
+.execution-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #e0e0e0;
+}
+
+.pagination-btn {
+  padding: 8px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  color: #333;
+}
+
+.pagination-btn:hover:not([disabled]) {
+  background: #f3e5f5;
+  border-color: #7b1fa2;
+  color: #7b1fa2;
+}
+
+.pagination-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

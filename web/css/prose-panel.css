@@ -1,0 +1,545 @@
+/* Prose Panel - Documentation Viewer/Editor Styles */
+
+/* Overlay backdrop */
+.prose-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999;
+    transition: opacity 0.3s ease;
+}
+
+.prose-overlay.hidden {
+    display: none;
+}
+
+.prose-overlay.visible {
+    display: block;
+}
+
+/* Main panel */
+.prose-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 100%;
+    background: #1e1e1e;
+    border-left: 1px solid #333;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+.prose-panel.hidden {
+    pointer-events: none;
+    transform: translateX(100%);
+}
+
+.prose-panel.visible {
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* Header */
+.prose-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #333;
+    background: #2a2a2a;
+}
+
+.prose-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 16px;
+    color: #e0e0e0;
+}
+
+.prose-icon {
+    font-size: 20px;
+}
+
+.prose-name {
+    font-weight: 600;
+}
+
+.prose-breadcrumb {
+    color: #888;
+    font-size: 14px;
+}
+
+.prose-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: color 0.2s;
+}
+
+.prose-close:hover {
+    color: #e0e0e0;
+}
+
+/* Body layout */
+.prose-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Sidebar */
+.prose-sidebar {
+    width: 250px;
+    border-right: 1px solid #333;
+    background: #252525;
+    display: flex;
+    flex-direction: column;
+}
+
+.prose-sidebar-header {
+    padding: 12px;
+    border-bottom: 1px solid #333;
+}
+
+.prose-search {
+    width: 100%;
+    padding: 8px 12px;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 13px;
+    outline: none;
+}
+
+.prose-search:focus {
+    border-color: #666;
+}
+
+/* Recent docs section */
+.prose-recent {
+    padding: 12px;
+    border-bottom: 1px solid #333;
+}
+
+.prose-recent-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.prose-recent-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.prose-recent-item {
+    margin: 2px 0;
+}
+
+.prose-recent-label {
+    display: block;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #aaa;
+    font-size: 12px;
+    border-radius: 3px;
+    transition: all 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.prose-recent-label:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+/* File tree */
+.prose-tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.prose-tree-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Nested lists (inside tree items) are hidden by default */
+.prose-tree-item > .prose-tree-list {
+    display: none;
+    margin-left: 16px;
+}
+
+/* Show nested lists when expanded */
+.prose-tree-item > .prose-tree-list.expanded {
+    display: block;
+}
+
+/* Root list is always visible */
+.prose-tree > .prose-tree-list {
+    display: block !important;
+}
+
+.prose-tree-item {
+    margin: 2px 0;
+    user-select: none;
+}
+
+.prose-tree-toggle {
+    display: inline-block;
+    width: 16px;
+    cursor: pointer;
+    color: #888;
+    font-size: 12px;
+    transition: color 0.2s;
+}
+
+.prose-tree-toggle:hover {
+    color: #e0e0e0;
+}
+
+.prose-tree-label {
+    display: inline-block;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 13px;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.prose-tree-label:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.prose-tree-file {
+    margin-left: 16px;
+}
+
+.prose-tree-dir {
+    font-weight: 500;
+}
+
+/* Content area */
+.prose-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #1e1e1e;
+}
+
+.prose-editor-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+}
+
+/* ProseMirror editor styles */
+#prose-editor {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#prose-editor .ProseMirror {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #e0e0e0;
+    outline: none;
+    /* Ensure text is properly rendered */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Disable browser spell check styling that might interfere */
+    spellcheck: false;
+}
+
+/* Ensure all text elements are visible */
+#prose-editor .ProseMirror * {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Fix for underline/decoration issues */
+#prose-editor .ProseMirror .ProseMirror-widget {
+    display: inline;
+    vertical-align: baseline;
+}
+
+/* Ensure text decorations don't hide text */
+#prose-editor .ProseMirror u,
+#prose-editor .ProseMirror [style*="text-decoration"],
+#prose-editor .ProseMirror span {
+    position: relative;
+    display: inline;
+    text-decoration-skip-ink: none;
+}
+
+/* Disable any spell-check or grammar-check decorations */
+#prose-editor .ProseMirror [spellcheck],
+#prose-editor .ProseMirror [data-gramm] {
+    text-decoration: none !important;
+    border-bottom: none !important;
+    background: none !important;
+}
+
+/* Fix for potential text clipping issues */
+#prose-editor .ProseMirror p,
+#prose-editor .ProseMirror li,
+#prose-editor .ProseMirror h1,
+#prose-editor .ProseMirror h2,
+#prose-editor .ProseMirror h3 {
+    overflow: visible;
+    text-overflow: clip;
+}
+
+#prose-editor .ProseMirror h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 24px 0 16px;
+    color: #fff;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+#prose-editor .ProseMirror h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 20px 0 12px;
+    color: #fff;
+}
+
+#prose-editor .ProseMirror h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 16px 0 8px;
+    color: #fff;
+}
+
+#prose-editor .ProseMirror p {
+    margin: 12px 0;
+}
+
+#prose-editor .ProseMirror ul,
+#prose-editor .ProseMirror ol {
+    margin: 12px 0;
+    padding-left: 24px;
+}
+
+#prose-editor .ProseMirror li {
+    margin: 4px 0;
+}
+
+#prose-editor .ProseMirror code {
+    background: #2a2a2a;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+}
+
+#prose-editor .ProseMirror pre {
+    background: #2a2a2a;
+    padding: 12px 16px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 12px 0;
+}
+
+#prose-editor .ProseMirror pre code {
+    background: none;
+    padding: 0;
+}
+
+#prose-editor .ProseMirror blockquote {
+    margin: 12px 0;
+    padding-left: 16px;
+    border-left: 3px solid #444;
+    color: #aaa;
+}
+
+#prose-editor .ProseMirror a {
+    color: #66b3ff;
+    text-decoration: none;
+}
+
+#prose-editor .ProseMirror a:hover {
+    text-decoration: underline;
+}
+
+#prose-editor .ProseMirror strong {
+    font-weight: 600;
+    color: #fff;
+}
+
+#prose-editor .ProseMirror em {
+    font-style: italic;
+}
+
+#prose-editor .ProseMirror hr {
+    border: none;
+    border-top: 1px solid #444;
+    margin: 20px 0;
+}
+
+/* Table styles for ProseMirror */
+#prose-editor .ProseMirror table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100%;
+    margin: 16px 0;
+    overflow: hidden;
+}
+
+#prose-editor .ProseMirror td,
+#prose-editor .ProseMirror th {
+    vertical-align: top;
+    box-sizing: border-box;
+    position: relative;
+    border: 1px solid #444;
+    padding: 8px 12px;
+    min-width: 100px;
+}
+
+#prose-editor .ProseMirror th {
+    background: #2a2a2a;
+    font-weight: 600;
+    text-align: left;
+}
+
+#prose-editor .ProseMirror td {
+    background: #1e1e1e;
+}
+
+#prose-editor .ProseMirror .selectedCell {
+    background: rgba(102, 179, 255, 0.2);
+}
+
+/* Column resize handle */
+#prose-editor .ProseMirror .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #66b3ff;
+    pointer-events: none;
+    cursor: col-resize;
+}
+
+#prose-editor .ProseMirror.resize-cursor {
+    cursor: col-resize;
+}
+
+/* Status bar */
+.prose-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 20px;
+    border-top: 1px solid #333;
+    background: #252525;
+    font-size: 12px;
+    color: #888;
+}
+
+.prose-status-text {
+    transition: color 0.2s;
+}
+
+.prose-status-text.error {
+    color: #ff6666;
+}
+
+.prose-save-indicator {
+    color: #ffcc00;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.prose-save-indicator.hidden {
+    display: none;
+}
+
+/* Scrollbar styling */
+.prose-tree::-webkit-scrollbar,
+.prose-editor-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.prose-tree::-webkit-scrollbar-track,
+.prose-editor-container::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.prose-tree::-webkit-scrollbar-thumb,
+.prose-editor-container::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.prose-tree::-webkit-scrollbar-thumb:hover,
+.prose-editor-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .prose-panel {
+        width: 60%;
+    }
+    .prose-overlay {
+        width: 40%;
+    }
+}
+
+@media (max-width: 900px) {
+    .prose-panel {
+        width: 75%;
+    }
+    .prose-overlay {
+        width: 25%;
+    }
+
+    .prose-sidebar {
+        width: 200px;
+    }
+}
+
+@media (max-width: 600px) {
+    .prose-panel {
+        width: 100%;
+    }
+    .prose-overlay {
+        display: none;
+    }
+
+    .prose-sidebar {
+        display: none;
+    }
+}
+
