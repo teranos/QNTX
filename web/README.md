@@ -184,7 +184,7 @@ web/
 2. **Custom Protocol** (`/ws`) - Graph updates, logs, custom parse tokens
    - Query responses (graph data)
    - Semantic tokens for syntax highlighting
-   - Handl by `internal/server/handlers.go`
+   - Handled by `internal/server/handlers.go`
 
 ## Troubleshooting
 
