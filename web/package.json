@@ -30,7 +30,7 @@
     "prosemirror-model": "1.24.0",
     "prosemirror-schema-basic": "1.2.3",
     "prosemirror-schema-list": "1.4.1",
-    "prosemirror-state": "1.4.3",
+    "prosemirror-state": "1.4.4",
     "prosemirror-tables": "1.6.1",
     "prosemirror-view": "1.38.1",
     "typescript": "5.7.2"
