@@ -262,8 +262,8 @@ func colorizeMessage(msg string) string {
 // colorizeSymbols replaces Pulse symbols with colorized versions
 func colorizeSymbols(text string, symbolColor string) string {
 	text = strings.ReplaceAll(text, sym.Pulse, symbolColor+sym.Pulse+colorReset)
-	text = strings.ReplaceAll(text, "✿", symbolColor+"✿"+colorReset)
-	text = strings.ReplaceAll(text, "❀", symbolColor+"❀"+colorReset)
+	text = strings.ReplaceAll(text, sym.PulseOpen, symbolColor+sym.PulseOpen+colorReset)
+	text = strings.ReplaceAll(text, sym.PulseClose, symbolColor+sym.PulseClose+colorReset)
 	return text
 }
 
