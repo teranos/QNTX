@@ -26,3 +26,7 @@ Global logger instance with dual output modes:
 Built on uber-go/zap. Uses global singleton pattern for simplicity in CLI contexts. Lambda initialization auto-detects production vs development environment.
 
 See `logger.go` and `minimal_encoder.go` for implementation details.
+
+## See Also
+
+- [Verbosity Levels](../docs/development/verbosity.md) - CLI verbosity pattern and logger integration
