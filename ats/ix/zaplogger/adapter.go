@@ -1,4 +1,4 @@
-package logger
+package zaplogger
 
 import (
 	"github.com/teranos/QNTX/ats/ix"

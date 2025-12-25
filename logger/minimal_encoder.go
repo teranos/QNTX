@@ -5,10 +5,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/symbols"
 	"go.uber.org/zap"
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
+)
+
+// Symbol constants (duplicated from ats/symbols to avoid circular dependency)
+const (
+	symPulse = "꩜" // Pulse symbol for async operations
 )
 
 // TODO(Brandon): This minimal encoder implementation is half-assed and I don't like it
@@ -283,7 +287,7 @@ func colorizeMessage(msg string) string {
 
 // colorizeSymbols replaces Pulse symbols with colorized versions
 func colorizeSymbols(text string, symbolColor string) string {
-	text = strings.ReplaceAll(text, symbols.SymPulse, symbolColor+symbols.SymPulse+colorReset)
+	text = strings.ReplaceAll(text, symPulse, symbolColor+symPulse+colorReset)
 	text = strings.ReplaceAll(text, "✿", symbolColor+"✿"+colorReset)
 	text = strings.ReplaceAll(text, "❀", symbolColor+"❀"+colorReset)
 	return text
