@@ -11,6 +11,7 @@ import (
 )
 
 // Symbol constants (duplicated from ats/symbols to avoid circular dependency)
+// TODO(#33): Extract symbols to standalone package to eliminate duplication
 const (
 	symPulse = "꩜" // Pulse symbol for async operations
 )
