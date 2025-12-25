@@ -8,13 +8,9 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// TODO(future): ServerLogger improvements
-// Current state: Functional but could be enhanced for better UX
-// Potential improvements:
-// - Better field formatting (less verbose key-value pairs)
-// - Smarter colorization (context-aware, error highlighting)
-// - Configurable verbosity levels per package
-// - Log aggregation and filtering in web UI
+// TODO(#35): ServerLogger UX improvements
+// Current state: Functional but could be enhanced
+// See: https://github.com/teranos/QNTX/issues/35
 // Defer until: Have time and appetite for significant logger refactoring
 
 var (
@@ -64,19 +60,14 @@ func Initialize(jsonOutput bool) error {
 	return nil
 }
 
-// loadThemeFromConfig attempts to load log theme from config file
+// loadThemeFromConfig attempts to load log theme from environment.
+// TODO(#34): After config package extraction, read from config file instead.
+// Currently only supports QNTX_LOG_THEME env var.
+// Default theme is set in minimal_encoder.go (currentTheme = "everforest").
 func loadThemeFromConfig() {
-	// Try to load config - don't fail if unavailable
-	// We import config package, so we can use it here
-	// This is a soft dependency - logging should work even without config
 	if theme := os.Getenv("QNTX_LOG_THEME"); theme != "" {
 		SetTheme(theme)
-		return
 	}
-
-	// Config loading will be done by main() before logger init,
-	// so we can read from the environment or a global if needed
-	// For now, default to gruvbox
 }
 
 // InitializeForLambda sets up the global logger for Lambda functions with environment-based configuration

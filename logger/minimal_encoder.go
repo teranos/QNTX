@@ -16,40 +16,18 @@ const (
 	symPulse = "꩜" // Pulse symbol for async operations
 )
 
-// TODO(Brandon): This minimal encoder implementation is half-assed and I don't like it
+// TODO(#36): Encoder architecture - caller-controlled formatting
 //
-// FUNDAMENTAL PROBLEM: Callers have no flexibility in how their logs are presented
+// FUNDAMENTAL PROBLEM: Callers have no flexibility in how their logs are presented.
+// Zap forces rigid key-value flattening, which mangles complex data structures
+// and prevents progress bars, tables, or custom layouts.
 //
-// Current limitations:
-// 1. RIGID KEY-VALUE FLATTENING
-//    - Zap forces everything into flat key-value pairs
-//    - Complex data structures (objects, arrays, nested data) get mangled
-//    - No way to preserve semantic structure of what you're logging
+// WHAT I WANT: "Logging as a service" where callers control presentation,
+// with granular verbosity beyond 3 levels and intelligent structured data handling.
 //
-// 2. NO CUSTOM FORMATTING PER CALLER
-//    - Executor wants to show progress bars? Too bad, you get key-value pairs
-//    - Handler wants to display a table? Nope, key-value pairs
-//    - Worker wants custom layout for job status? Key-value pairs again
-//    - The encoder dictates EVERYTHING, callers have zero control
+// See: https://github.com/teranos/QNTX/issues/36
 //
-// 3. LIMITED VERBOSITY CONTROL
-//    - Only INFO/WARN/ERROR levels available
-//    - No way for callers to mark logs with custom importance/priority
-//    - Can't do "this is detailed debug info" vs "this is summary info"
-//
-// 4. GENERAL INFLEXIBILITY
-//    - Zap's encoder architecture is too opinionated
-//    - Built for structured logging to aggregators (Datadog, Splunk)
-//    - NOT built for rich console presentation to developers
-//
-// WHAT I WANT:
-// - Callers should be able to specify HOW their logs appear
-// - System should handle structured data intelligently (not flatten everything)
-// - More granular control over verbosity/importance beyond 3 levels
-// - Presentation layer separate from logging infrastructure
-// - Think: "logging as a service" where callers request display formats
-//
-// DEFER UNTIL: Have time and strong appetite for significant logging redesign
+// DEFER UNTIL: Have time and strong appetite for significant logging redesign.
 // This works well enough for now, but it's not the system I actually want.
 
 // Color palettes for different themes
