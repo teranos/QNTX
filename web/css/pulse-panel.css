@@ -339,7 +339,7 @@
 /* ========================================================================
    Inline Execution View Styles
 
-   TODO: Future styling improvements:
+   TODO(#30): Future styling improvements:
    - Add loading skeleton for execution cards (better than just "Loading...")
    - Add animations for new execution cards appearing (real-time updates)
    - Add status transition animations (running → completed/failed)
