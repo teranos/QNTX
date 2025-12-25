@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"github.com/teranos/QNTX/ats/symbols"
+	"github.com/teranos/QNTX/sym"
 )
 
 // SemanticTokenType classifies tokens by grammatical role in ATS queries
@@ -142,7 +142,7 @@ func isKeyword(s string) bool {
 // isSymbol checks if value is a SEG symbol
 func isSymbol(s string) bool {
 	// Check against canonical symbols
-	_, ok := symbols.SymbolToCommand[s]
+	_, ok := sym.SymbolToCommand[s]
 	return ok
 }
 
