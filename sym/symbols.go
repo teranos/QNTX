@@ -17,7 +17,9 @@ const (
 	SO = "⟶" // therefore / consequent action / trigger
 
 	// System symbols (not SEG operators)
-	Pulse = "꩜" // Pulse system: async jobs, rate limiting, budget management
+	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management
+	PulseOpen  = "✿" // Graceful start
+	PulseClose = "❀" // Graceful shutdown
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
