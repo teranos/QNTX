@@ -1,66 +1,66 @@
-package symbols
+package sym
 
 // Canonical symbols for QNTX SEG operations.
 // These should stay stable across UI, CLI and docs.
 const (
-	SymI  = "⍟" // self / operator vantage point
-	SymAM = "≡" // AM structure / internal interpretation
-	SymIX = "⨳" // ingest / import
-	SymAX = "⋈" // expand / contextual surfacing
-	SymAS = "+" // assert / emit .ats
-	SymIS = "=" // identity / equivalence
-	SymOF = "∈" // membership / element-of / belonging
-	SymBY = "⌬" // actor / catalyst / origin of action
-	SymAT = "✦" // event / temporal marker
-	SymSO = "⟶" // therefore / consequent action / trigger
+	I  = "⍟" // self / operator vantage point
+	AM = "≡" // AM structure / internal interpretation
+	IX = "⨳" // ingest / import
+	AX = "⋈" // expand / contextual surfacing
+	AS = "+" // assert / emit .ats
+	IS = "=" // identity / equivalence
+	OF = "∈" // membership / element-of / belonging
+	BY = "⌬" // actor / catalyst / origin of action
+	AT = "✦" // event / temporal marker
+	SO = "⟶" // therefore / consequent action / trigger
 
 	// System symbols (not SEG operators)
-	SymPulse = "꩜" // Pulse system: async jobs, rate limiting, budget management
+	Pulse = "꩜" // Pulse system: async jobs, rate limiting, budget management
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
 // shortcuts, selection bars, etc.
 var PaletteOrder = []string{
-	SymI,
-	SymAM,
-	SymIX,
-	SymAX,
-	SymAS,
-	SymIS,
-	SymOF,
-	SymBY,
-	SymAT,
-	SymSO,
+	I,
+	AM,
+	IX,
+	AX,
+	AS,
+	IS,
+	OF,
+	BY,
+	AT,
+	SO,
 }
 
 // SymbolToCommand maps symbols to their text command equivalents
 // for dual-mode acceptance (backwards compatibility)
 var SymbolToCommand = map[string]string{
-	SymI:  "i",
-	SymAM: "am",
-	SymIX: "ix",
-	SymAX: "ax",
-	SymAS: "as",
-	SymIS: "is",
-	SymOF: "of",
-	SymBY: "by",
-	SymAT: "at",
-	SymSO: "so",
+	I:  "i",
+	AM: "am",
+	IX: "ix",
+	AX: "ax",
+	AS: "as",
+	IS: "is",
+	OF: "of",
+	BY: "by",
+	AT: "at",
+	SO: "so",
 }
 
 // CommandToSymbol maps text commands to their canonical symbols
 // for normalization and display purposes
 var CommandToSymbol = map[string]string{
-	"i":  SymI,
-	"am": SymAM,
-	"ix": SymIX,
-	"ax": SymAX,
-	"as": SymAS,
-	"is": SymIS,
-	"of": SymOF,
-	"by": SymBY,
-	"at": SymAT,
-	"so": SymSO,
+	"i":  I,
+	"am": AM,
+	"ix": IX,
+	"ax": AX,
+	"as": AS,
+	"is": IS,
+	"of": OF,
+	"by": BY,
+	"at": AT,
+	"so": SO,
 }
 
 // CommandDescriptions provides human-readable explanations
