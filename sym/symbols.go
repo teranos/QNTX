@@ -1,3 +1,5 @@
+// Package sym defines canonical symbols for QNTX SEG operations and system markers.
+// These symbols are stable across UI, CLI, and documentation.
 package sym
 
 // Canonical symbols for QNTX SEG operations.
