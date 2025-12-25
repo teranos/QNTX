@@ -18,6 +18,8 @@ QNTX uses segments across the project:
 - **⨳** (Ingestion) - ix Data ingestion operations
 - **⋈** (Join/Merge) - ax Entity merging and relationship operations
 
+**Note:** These symbols are defined in the `sym` package for consistent use across QNTX.
+
 **For Claude**: Use these segments consistently when referencing system components.
 
 ## Go Development Standards
