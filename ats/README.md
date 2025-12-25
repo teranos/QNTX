@@ -41,6 +41,7 @@ type AttestationFields struct {
 - **`ax/` ⋈** - Query and retrieval operations ([see ax/README.md](ax/README.md))
 - **`parser/`** - Command parsing ([see parser/README.md](parser/README.md))
 - **`alias/`** - Identity resolution system
+- **`../sym/`** - Canonical symbol definitions (SEG operators and Pulse)
 
 ```go
 // Check if attestation already exists
