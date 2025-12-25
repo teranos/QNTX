@@ -158,11 +158,14 @@ func getLogLevel() string {
 	return "INFO+"
 }
 
-// Cleanup flushes any buffered log entries
-func Cleanup() {
+// Cleanup flushes any buffered log entries.
+// Returns an error if the flush fails, though errors are often ignorable
+// for stdout/stderr (especially on macOS/Linux where Sync returns EINVAL).
+func Cleanup() error {
 	if Logger != nil {
-		Logger.Sync()
+		return Logger.Sync()
 	}
+	return nil
 }
 
 // Info logs an info message
