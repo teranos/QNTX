@@ -13,6 +13,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ax"
+	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/types"
 )
@@ -93,27 +94,16 @@ func normalizePredicate(pred string) string {
 	}
 }
 
-// setupDomainTestDB creates a test database with recruiting-domain attestations
+// setupDomainTestDB creates a test database with recruiting-domain attestations.
+// Uses real migrations to ensure test schema matches production schema.
 func setupDomainTestDB(t *testing.T) *sql.DB {
 	// Create in-memory test database
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 
-	// Create attestations table
-	createTableSQL := `
-	CREATE TABLE attestations (
-		id TEXT PRIMARY KEY,
-		subjects JSON NOT NULL,
-		predicates JSON NOT NULL,
-		contexts JSON NOT NULL,
-		actors JSON NOT NULL,
-		timestamp DATETIME NOT NULL,
-		source TEXT NOT NULL,
-		attributes JSON,
-		created_at DATETIME NOT NULL
-	)`
-	_, err = db.Exec(createTableSQL)
-	require.NoError(t, err)
+	// Apply real migrations (ensures test schema = production schema)
+	err = db.Migrate(testDB, nil)
+	require.NoError(t, err, "Failed to run migrations")
 
 	// Create test attestations with predicate-context pairs
 	testTime := time.Now()
@@ -326,13 +316,13 @@ func setupDomainTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert attestations
-	store := NewSQLStore(db, nil)
+	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
 		err = store.CreateAttestation(attestation)
 		require.NoError(t, err)
 	}
 
-	return db
+	return testDB
 }
 
 // TestNaturalLanguageQueries tests the natural language query enhancements
@@ -579,25 +569,13 @@ func TestPredicateContextMatching(t *testing.T) {
 // This test showcases how context queries now work regardless of casing differences
 func TestCaseInsensitiveContextMatching(t *testing.T) {
 	// Create test database with mixed case data to demonstrate case-insensitive matching
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
-	defer db.Close()
+	defer testDB.Close()
 
-	// Create attestations table
-	createTableSQL := `
-	CREATE TABLE attestations (
-		id TEXT PRIMARY KEY,
-		subjects JSON NOT NULL,
-		predicates JSON NOT NULL,
-		contexts JSON NOT NULL,
-		actors JSON NOT NULL,
-		timestamp DATETIME NOT NULL,
-		source TEXT NOT NULL,
-		attributes JSON,
-		created_at DATETIME NOT NULL
-	)`
-	_, err = db.Exec(createTableSQL)
-	require.NoError(t, err)
+	// Apply real migrations (ensures test schema = production schema)
+	err = db.Migrate(testDB, nil)
+	require.NoError(t, err, "Failed to run migrations")
 
 	// Insert test data with intentionally mixed casing
 	testTime := time.Now()
@@ -632,7 +610,7 @@ func TestCaseInsensitiveContextMatching(t *testing.T) {
 	}
 
 	// Insert all test attestations
-	store := NewSQLStore(db, nil)
+	store := NewSQLStore(testDB, nil)
 	for _, att := range testAttestations {
 		err = store.CreateAttestation(att)
 		require.NoError(t, err)
@@ -640,7 +618,7 @@ func TestCaseInsensitiveContextMatching(t *testing.T) {
 
 	// Create executor with query expander for semantic expansion
 	expander := &testDomainExpander{}
-	executor := NewExecutorWithOptions(db, ax.AxExecutorOptions{
+	executor := NewExecutorWithOptions(testDB, ax.AxExecutorOptions{
 		QueryExpander: expander,
 	})
 
