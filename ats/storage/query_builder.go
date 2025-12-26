@@ -28,8 +28,8 @@ func (qb *queryBuilder) buildSubjectFilter(subjects []string) {
 
 	var subjectClauses []string
 	for _, subject := range subjects {
-		subjectClauses = append(subjectClauses, "subjects LIKE ?")
-		qb.args = append(qb.args, "%\""+subject+"\"%")
+		subjectClauses = append(subjectClauses, "subjects LIKE ? ESCAPE '\\'")
+		qb.args = append(qb.args, "%\""+escapeLikePattern(subject)+"\"%")
 	}
 	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(subjectClauses, " OR ")+")")
 }
@@ -42,8 +42,8 @@ func (qb *queryBuilder) buildPredicateFilter(predicates []string) {
 
 	var predicateClauses []string
 	for _, predicate := range predicates {
-		predicateClauses = append(predicateClauses, "predicates LIKE ?")
-		qb.args = append(qb.args, "%\""+predicate+"\"%")
+		predicateClauses = append(predicateClauses, "predicates LIKE ? ESCAPE '\\'")
+		qb.args = append(qb.args, "%\""+escapeLikePattern(predicate)+"\"%")
 	}
 	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(predicateClauses, " OR ")+")")
 }
@@ -56,8 +56,8 @@ func (qb *queryBuilder) buildContextFilter(contexts []string) {
 
 	var contextClauses []string
 	for _, context := range contexts {
-		contextClauses = append(contextClauses, "contexts LIKE ?")
-		qb.args = append(qb.args, "%\""+context+"\"%")
+		contextClauses = append(contextClauses, "contexts LIKE ? ESCAPE '\\'")
+		qb.args = append(qb.args, "%\""+escapeLikePattern(context)+"\"%")
 	}
 	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(contextClauses, " OR ")+")")
 }
@@ -70,8 +70,8 @@ func (qb *queryBuilder) buildActorFilter(actors []string) {
 
 	var actorClauses []string
 	for _, actor := range actors {
-		actorClauses = append(actorClauses, "actors LIKE ?")
-		qb.args = append(qb.args, "%\""+actor+"\"%")
+		actorClauses = append(actorClauses, "actors LIKE ? ESCAPE '\\'")
+		qb.args = append(qb.args, "%\""+escapeLikePattern(actor)+"\"%")
 	}
 	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(actorClauses, " OR ")+")")
 }
