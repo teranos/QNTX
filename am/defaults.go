@@ -50,6 +50,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("repl.history.channel_buffer", 100) // Channel buffer size
 
 	// Server configuration defaults
+	v.SetDefault("server.port", DefaultGraphPort)
 	v.SetDefault("server.allowed_origins", []string{
 		"http://localhost",
 		"https://localhost",
@@ -73,10 +74,14 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
 }
 
-// GetGraphPort returns the QNTX server port (default: 877, fallback: 7878)
+// GetGraphPort returns the configured QNTX server port
+// Returns server.port from config, or DefaultGraphPort (877) if not configured
 func GetGraphPort() int {
-	// TODO: Read from config when available
-	return DefaultGraphPort
+	cfg, err := Load()
+	if err != nil || cfg.Server.Port == 0 {
+		return DefaultGraphPort
+	}
+	return cfg.Server.Port
 }
 
 // GetGraphEventPort returns the event viewer port

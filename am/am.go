@@ -18,6 +18,7 @@ type DatabaseConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
+	Port           int      `mapstructure:"port"`             // Server port (default: 877)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
 }
