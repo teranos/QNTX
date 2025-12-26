@@ -6,30 +6,21 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+
+	"github.com/teranos/QNTX/db"
 )
 
-// SetupTestDB creates an in-memory SQLite database for testing
-// Exported for use by external tests (e.g., integration tests)
+// SetupTestDB creates an in-memory SQLite database for testing.
+// Uses real migrations to ensure test schema matches production schema.
 func SetupTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 
-	_, err = db.Exec(`
-		CREATE TABLE attestations (
-			id TEXT PRIMARY KEY,
-			subjects JSON NOT NULL,
-			predicates JSON NOT NULL,
-			contexts JSON NOT NULL,
-			actors JSON NOT NULL,
-			timestamp DATETIME NOT NULL,
-			source TEXT NOT NULL,
-			attributes JSON,
-			created_at DATETIME NOT NULL
-		)
-	`)
-	require.NoError(t, err)
+	// Apply real migrations (ensures test schema = production schema)
+	err = db.Migrate(testDB, nil)
+	require.NoError(t, err, "Failed to run migrations")
 
-	return db
+	return testDB
 }
 
 // SetupEmptyDB creates an in-memory SQLite database WITHOUT the attestations table

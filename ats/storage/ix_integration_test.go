@@ -26,6 +26,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/ix"
+	"github.com/teranos/QNTX/db"
 	"github.com/sbvh-nl/expgraph/internal/ats"
 )
 
@@ -63,33 +64,20 @@ func (m *mockEmitter) EmitAttestations(count int, entities []ix.AttestationEntit
 	// Not tracked in mock for now
 }
 
-// setupTestDBForIx creates an in-memory database with task_logs table
+// setupTestDBForIx creates an in-memory database with real migrations.
+// Uses db.Migrate() to ensure test schema matches production schema.
 func setupTestDBForIx(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
 
-	// Create task_logs table
-	schema := `
-	CREATE TABLE task_logs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		job_id TEXT NOT NULL,
-		stage TEXT,
-		task_id TEXT,
-		timestamp DATETIME NOT NULL,
-		level TEXT NOT NULL,
-		message TEXT NOT NULL,
-		metadata TEXT
-	);
-	CREATE INDEX idx_task_logs_job_id ON task_logs(job_id);
-	`
-
-	if _, err := db.Exec(schema); err != nil {
-		t.Fatalf("Failed to create schema: %v", err)
+	// Apply real migrations (includes task_logs from migration 008)
+	if err := db.Migrate(testDB, nil); err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	return db
+	return testDB
 }
 
 // TestLogCapturingEmitter_EmitInfo verifies info logs are captured
