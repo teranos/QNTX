@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/pelletier/go-toml/v2"
@@ -77,13 +78,13 @@ func runAmShow(cmd *cobra.Command, args []string) error {
 	// Marshal to requested format
 	switch configFormat {
 	case "json":
-		// Simple JSON output
-		fmt.Printf("{\n")
-		fmt.Printf("  \"database\": {\"path\": %q},\n", cfg.Database.Path)
-		fmt.Printf("  \"server\": {\"log_theme\": %q, \"allowed_origins\": %v},\n", cfg.Server.LogTheme, cfg.Server.AllowedOrigins)
-		fmt.Printf("  \"pulse\": {\"workers\": %d, \"ticker_interval_seconds\": %d}\n", cfg.Pulse.Workers, cfg.Pulse.TickerIntervalSeconds)
-		// ... add more fields as needed
-		fmt.Printf("}\n")
+		// TODO: Extract display package to QNTX for proper output formatting
+		// See: https://github.com/teranos/QNTX/issues/41
+		data, err := json.MarshalIndent(cfg, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal config to JSON: %w", err)
+		}
+		fmt.Println(string(data))
 
 	case "yaml":
 		data, err := yaml.Marshal(cfg)
@@ -108,20 +109,15 @@ func runAmShow(cmd *cobra.Command, args []string) error {
 
 func runAmGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
-	value := am.GetString(key)
 
-	if value == "" {
-		// Try other types
-		if intVal := am.GetInt(key); intVal != 0 {
-			fmt.Println(intVal)
-			return nil
-		}
-		if boolVal := am.GetBool(key); boolVal {
-			fmt.Println(boolVal)
-			return nil
-		}
+	// Check if key exists in configuration
+	v := am.GetViper()
+	if !v.IsSet(key) {
+		return fmt.Errorf("configuration key %q not found", key)
 	}
 
+	// Get the value as interface{} to preserve type
+	value := am.Get(key)
 	fmt.Println(value)
 	return nil
 }

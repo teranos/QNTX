@@ -336,7 +336,7 @@ func DetectLocalTimezone() (string, error) {
 		return tz, nil
 	}
 
-	return "", errors.New("could not detect local timezone")
+	return "", errors.New("could not detect local timezone: tried TZ env var, time.Now().Location(), /etc/timezone, /etc/localtime, /var/db/timezone/zoneinfo/localtime")
 }
 
 func readZoneinfoSymlink(path string) (string, error) {
@@ -354,7 +354,7 @@ func readZoneinfoSymlink(path string) (string, error) {
 	if isValidTimezone(candidate) {
 		return candidate, nil
 	}
-	return "", errors.New("invalid timezone")
+	return "", fmt.Errorf("invalid timezone: %q (from %s)", candidate, path)
 }
 
 func sanitizeTimezone(tz string) string {
