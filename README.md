@@ -18,12 +18,14 @@ QNTX provides a **domain-agnostic foundation** for building knowledge systems. A
 - **⌬** of - actors/agents
 - **⨳** ix - ingest
 - **⋈** ax - ask/query
+- **⊔** db - database/storage (material retention substrate)
 
 ## Configuration
 
 **QNTX works out of the box without configuration.** Sensible defaults are provided for all settings - you can start using QNTX immediately without creating any config files.
 
 Configuration is managed by the `am` package, which provides:
+
 - Multi-source config loading (system, user, project, environment variables)
 - Backward compatibility with existing `config.toml` files
 - Preference for `am.toml` (new format) over `config.toml`

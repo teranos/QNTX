@@ -4,20 +4,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'am/**/*.go'
-      - 'ats/**/*.go'
-      - 'cmd/**/*.go'
-      - 'logger/**/*.go'
+      - '**/*.go'
       - 'go.mod'
       - 'go.sum'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
     paths:
-      - 'am/**/*.go'
-      - 'ats/**/*.go'
-      - 'cmd/**/*.go'
-      - 'logger/**/*.go'
+      - '**/*.go'
       - 'go.mod'
       - 'go.sum'
   workflow_dispatch:
