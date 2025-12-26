@@ -21,3 +21,4 @@ internal/server/dist/
 
 # OS
 .DS_Store
+bin/
