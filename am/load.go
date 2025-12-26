@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -162,8 +163,15 @@ func mergeConfigFiles(v *viper.Viper) {
 
 			if err := tempViper.ReadInConfig(); err == nil {
 				// Merge this config into the main viper instance
-				for key, value := range tempViper.AllSettings() {
-					v.Set(key, value)
+				// Sort keys for deterministic config loading
+				allSettings := tempViper.AllSettings()
+				keys := make([]string, 0, len(allSettings))
+				for key := range allSettings {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+				for _, key := range keys {
+					v.Set(key, allSettings[key])
 				}
 			}
 		}
