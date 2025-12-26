@@ -1,4 +1,4 @@
-# ꩜  ⌬   [≡](am/README.md)  ⨳  ⋈  +  =  ✦  ⟶
+# ꩜  ⌬   [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  +  =  ✦  ⟶
 
 **QNTX** = A modular Continuous Intelligence Platform operated as a graph of attestations. It automates data ingestion, enrichment, and reasoning to create a continuously self-improving knowledge graph.
 
