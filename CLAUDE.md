@@ -17,6 +17,7 @@ QNTX uses segments across the project:
 - **≡** (Configuration) - am Configuration and system settings
 - **⨳** (Ingestion) - ix Data ingestion operations
 - **⋈** (Join/Merge) - ax Entity merging and relationship operations
+- **⊔** (Square Cup) - Database/storage; material retention substrate
 
 **Note:** These symbols are defined in the `sym` package for consistent use across QNTX.
 
