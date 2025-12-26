@@ -143,9 +143,9 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		// Combined query: Use subquery to find subjects with numeric values >= threshold
 		predicateConditions := make([]string, len(numericPredicates))
 		for i, pred := range numericPredicates {
-			// Escape single quotes in predicate for SQL
-			escapedPred := strings.ReplaceAll(pred, "'", "''")
-			predicateConditions[i] = fmt.Sprintf("json_extract(predicates, '$[0]') = '%s'", escapedPred)
+			// Use parameterized query to prevent SQL injection
+			predicateConditions[i] = "json_extract(predicates, '$[0]') = ?"
+			qb.args = append(qb.args, pred)
 		}
 
 		numericSubquery := fmt.Sprintf(`
@@ -163,9 +163,9 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		// Pure OVER query: Filter directly by numeric predicates
 		predicateConditions := make([]string, len(numericPredicates))
 		for i, pred := range numericPredicates {
-			// Escape single quotes in predicate for SQL
-			escapedPred := strings.ReplaceAll(pred, "'", "''")
-			predicateConditions[i] = fmt.Sprintf("(json_extract(predicates, '$[0]') = '%s' AND CAST(json_extract(contexts, '$[0]') AS REAL) >= ?)", escapedPred)
+			// Use parameterized query to prevent SQL injection
+			predicateConditions[i] = "(json_extract(predicates, '$[0]') = ? AND CAST(json_extract(contexts, '$[0]') AS REAL) >= ?)"
+			qb.args = append(qb.args, pred)
 			qb.args = append(qb.args, threshold)
 		}
 		qb.whereClauses = append(qb.whereClauses, "("+strings.Join(predicateConditions, " OR ")+")")
