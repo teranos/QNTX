@@ -20,6 +20,7 @@ const (
 	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management
 	PulseOpen  = "✿" // Graceful start
 	PulseClose = "❀" // Graceful shutdown
+	DB         = "⊔" // Database: material retention substrate (square cup)
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
