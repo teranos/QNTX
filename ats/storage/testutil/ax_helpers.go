@@ -8,54 +8,24 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/ax"
+	"github.com/teranos/QNTX/db"
 )
 
-// SetupInMemoryDB creates a clean in-memory database for testing
+// SetupInMemoryDB creates a clean in-memory database for testing.
+// Uses real migrations to ensure test schema matches production schema.
 func SetupInMemoryDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to create in-memory database: %v", err)
 	}
 
-	// Apply schema (simplified migration for testing)
-	schema := `
-		CREATE TABLE attestations (
-			id TEXT PRIMARY KEY,
-			subjects JSON NOT NULL,
-			predicates JSON NOT NULL,
-			contexts JSON NOT NULL,
-			actors JSON NOT NULL,
-			timestamp DATETIME NOT NULL,
-			source TEXT NOT NULL,
-			attributes JSON,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			deleted_at DATETIME NULL
-		);
-
-		CREATE INDEX idx_subjects ON attestations(subjects);
-		CREATE INDEX idx_predicates ON attestations(predicates);
-		CREATE INDEX idx_contexts ON attestations(contexts);
-		CREATE INDEX idx_actors ON attestations(actors);
-		CREATE INDEX idx_timestamp ON attestations(timestamp);
-
-		CREATE TABLE aliases (
-			alias TEXT NOT NULL,
-			target TEXT NOT NULL,
-			created_by TEXT NOT NULL DEFAULT 'system',
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (alias, target)
-		);
-
-		CREATE INDEX idx_aliases_alias ON aliases(alias);
-		CREATE INDEX idx_aliases_target ON aliases(target);
-	`
-
-	_, err = db.Exec(schema)
+	// Apply real migrations (ensures test schema = production schema)
+	err = db.Migrate(testDB, nil)
 	if err != nil {
-		t.Fatalf("Failed to apply test schema: %v", err)
+		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	return db
+	return testDB
 }
 
 // LoadFixtures inserts test fixtures into the database
