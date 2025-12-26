@@ -43,13 +43,13 @@ CREATE TABLE IF NOT EXISTS task_logs (
 );
 
 -- Index for retrieving all logs for a specific job (most common query)
-CREATE INDEX idx_task_logs_job_id ON task_logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_task_logs_job_id ON task_logs(job_id);
 
 -- Index for filtering logs by task (e.g., "show me logs for candidate X")
-CREATE INDEX idx_task_logs_task_id ON task_logs(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_logs_task_id ON task_logs(task_id);
 
 -- Index for time-based queries and TTL cleanup
-CREATE INDEX idx_task_logs_timestamp ON task_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_task_logs_timestamp ON task_logs(timestamp DESC);
 
 -- Composite index for stage-filtered queries (e.g., "show me all score_candidates stage logs")
-CREATE INDEX idx_task_logs_job_stage ON task_logs(job_id, stage);
+CREATE INDEX IF NOT EXISTS idx_task_logs_job_stage ON task_logs(job_id, stage);

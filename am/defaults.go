@@ -10,6 +10,9 @@ import (
 func SetDefaults(v *viper.Viper) {
 	// Database defaults
 	v.SetDefault("database.path", "qntx.db")
+	v.SetDefault("database.bounded_storage.actor_context_limit", 16)  // 16 attestations per (actor, context)
+	v.SetDefault("database.bounded_storage.actor_contexts_limit", 64) // 64 contexts per actor
+	v.SetDefault("database.bounded_storage.entity_actors_limit", 64)  // 64 actors per entity
 
 	// Code defaults
 	v.SetDefault("code.gopls.enabled", true)

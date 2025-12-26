@@ -25,7 +25,7 @@ func NewExecutionHelper(dryRun bool, actor string) *ExecutionHelper {
 
 // ExecuteAttestations processes a list of attestation strings
 // Each attestation is self-certifying: the generated ASID is used as its own actor
-// This avoids bounded storage limits (64 actors per entity) - see Issue #115
+// This avoids bounded storage limits (configurable, default 64 actors per entity)
 func (h *ExecutionHelper) ExecuteAttestations(store ats.AttestationStore, attestations []string, showDetails bool) error {
 	for _, attestationText := range attestations {
 		if h.dryRun && showDetails {
