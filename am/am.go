@@ -1,0 +1,133 @@
+package am
+
+// Config represents the core QNTX configuration
+type Config struct {
+	Database       DatabaseConfig       `mapstructure:"database"`
+	Server         ServerConfig         `mapstructure:"server"`
+	Pulse          PulseConfig          `mapstructure:"pulse"`
+	REPL           REPLConfig           `mapstructure:"repl"`
+	Code           CodeConfig           `mapstructure:"code"`
+	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
+	Ax             AxConfig             `mapstructure:"ax"`
+}
+
+// DatabaseConfig configures the SQLite database
+type DatabaseConfig struct {
+	Path string `mapstructure:"path"`
+}
+
+// ServerConfig configures the QNTX web server
+type ServerConfig struct {
+	AllowedOrigins []string `mapstructure:"allowed_origins"`
+	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
+}
+
+// Server port constants
+const (
+	DefaultGraphPort      = 877  // Development port (easy to type, above privileged range)
+	DefaultGraphEventPort = 878  // Event viewer port
+	FallbackGraphPort     = 7878 // Production fallback port
+)
+
+// PulseConfig configures the Pulse async job system (core infrastructure)
+type PulseConfig struct {
+	// Worker concurrency configuration
+	Workers int `mapstructure:"workers"` // Number of concurrent job workers (default: 1)
+
+	// Ticker configuration for scheduled job execution
+	TickerIntervalSeconds int `mapstructure:"ticker_interval_seconds"` // How often to check for scheduled jobs (default: 1)
+
+	// HTTP rate limiting (prevents bot detection like LinkedIn HTTP 999)
+	// Default settings for sites without specific config
+	HTTPMaxRequestsPerMinute   int `mapstructure:"http_max_requests_per_minute"`
+	HTTPDelayBetweenRequestsMS int `mapstructure:"http_delay_between_requests_ms"`
+
+	// Per-domain rate limit overrides (key = domain like "linkedin.com")
+	HTTPDomainLimits map[string]HTTPDomainLimit `mapstructure:"http_domain_limits"`
+
+	// Note: Budget tracking (DailyBudgetUSD, CostPerScoreUSD, etc.) is domain-specific
+	// and should be handled by applications extending this core config.
+	// See: https://github.com/teranos/QNTX/issues/xyz for budget extension pattern
+}
+
+// HTTPDomainLimit configures per-domain HTTP rate limiting
+type HTTPDomainLimit struct {
+	MaxRequestsPerMinute   int `mapstructure:"max_requests_per_minute"`
+	DelayBetweenRequestsMS int `mapstructure:"delay_between_requests_ms"`
+}
+
+// REPLConfig configures the interactive REPL
+type REPLConfig struct {
+	Search   REPLSearchConfig   `mapstructure:"search"`
+	Display  REPLDisplayConfig  `mapstructure:"display"`
+	Timeouts REPLTimeoutsConfig `mapstructure:"timeouts"`
+	History  REPLHistoryConfig  `mapstructure:"history"`
+}
+
+// REPLSearchConfig configures REPL search behavior
+type REPLSearchConfig struct {
+	DebounceMs       int `mapstructure:"debounce_ms"`
+	ResultLimit      int `mapstructure:"result_limit"`
+	ExactMatchScore  int `mapstructure:"exact_match_score"`
+	PrefixMatchScore int `mapstructure:"prefix_match_score"`
+	ContainsScore    int `mapstructure:"contains_score"`
+	BaseResultScore  int `mapstructure:"base_result_score"`
+	LengthBonusScore int `mapstructure:"length_bonus_score"`
+}
+
+// REPLDisplayConfig configures REPL display settings
+type REPLDisplayConfig struct {
+	MaxLines    int `mapstructure:"max_lines"`
+	BufferLimit int `mapstructure:"buffer_limit"`
+	TargetFPS   int `mapstructure:"target_fps"`
+}
+
+// REPLTimeoutsConfig configures REPL timeout settings
+type REPLTimeoutsConfig struct {
+	CommandSeconds  int `mapstructure:"command_seconds"`
+	DatabaseSeconds int `mapstructure:"database_seconds"`
+}
+
+// REPLHistoryConfig configures REPL history behavior
+type REPLHistoryConfig struct {
+	ResultLimit   int `mapstructure:"result_limit"`
+	ChannelBuffer int `mapstructure:"channel_buffer"`
+}
+
+// CodeConfig configures the code review system
+type CodeConfig struct {
+	GitHub CodeGitHubConfig `mapstructure:"github"`
+	Gopls  CodeGoplsConfig  `mapstructure:"gopls"`
+}
+
+// CodeGitHubConfig configures GitHub integration for code review
+type CodeGitHubConfig struct {
+	Token string `mapstructure:"token"`
+}
+
+// CodeGoplsConfig configures gopls (Go language server) integration
+type CodeGoplsConfig struct {
+	WorkspaceRoot string `mapstructure:"workspace_root"` // Workspace root for gopls (default: project root)
+	Enabled       bool   `mapstructure:"enabled"`        // Enable gopls integration (default: true)
+}
+
+// LocalInferenceConfig configures local model inference (Ollama, LocalAI, etc.)
+type LocalInferenceConfig struct {
+	Enabled        bool   `mapstructure:"enabled"`         // Enable local inference instead of cloud APIs
+	BaseURL        string `mapstructure:"base_url"`        // e.g., "http://localhost:11434" for Ollama
+	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
+	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout (default: 120)
+	ContextSize    int    `mapstructure:"context_size"`    // Context window size (0 = model default, e.g., 16384, 32768)
+}
+
+// AxConfig configures the attestation query system
+type AxConfig struct {
+	DefaultActor string `mapstructure:"default_actor"`
+}
+
+// File system constants
+const (
+	DefaultDirPermissions  = 0755 // Standard directory permissions (rwxr-xr-x)
+	DefaultFilePermissions = 0644 // Standard file permissions (rw-r--r--)
+	ExecutablePermissions  = 0755 // Executable file permissions (rwxr-xr-x)
+)
