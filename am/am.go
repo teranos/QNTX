@@ -13,7 +13,15 @@ type Config struct {
 
 // DatabaseConfig configures the SQLite database
 type DatabaseConfig struct {
-	Path string `mapstructure:"path"`
+	Path           string                `mapstructure:"path"`
+	BoundedStorage BoundedStorageConfig  `mapstructure:"bounded_storage"`
+}
+
+// BoundedStorageConfig configures storage limits for attestations
+type BoundedStorageConfig struct {
+	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair
+	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor
+	EntityActorsLimit  int `mapstructure:"entity_actors_limit"`  // actors per entity
 }
 
 // ServerConfig configures the QNTX web server

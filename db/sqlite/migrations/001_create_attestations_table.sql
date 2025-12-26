@@ -1,4 +1,4 @@
-CREATE TABLE attestations (
+CREATE TABLE IF NOT EXISTS attestations (
     id TEXT PRIMARY KEY,
     subjects JSON NOT NULL,
     predicates JSON NOT NULL,
@@ -10,10 +10,10 @@ CREATE TABLE attestations (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_attestations_subjects ON attestations(json_extract(subjects, '$'));
-CREATE INDEX idx_attestations_predicates ON attestations(json_extract(predicates, '$'));
-CREATE INDEX idx_attestations_contexts ON attestations(json_extract(contexts, '$'));
-CREATE INDEX idx_attestations_timestamp ON attestations(timestamp DESC);
-CREATE INDEX idx_attestations_actors ON attestations(json_extract(actors, '$'));
-CREATE INDEX idx_attestations_actors_timestamp ON attestations(json_extract(actors, '$'), timestamp DESC);
-CREATE INDEX idx_attestations_actors_context_timestamp ON attestations(json_extract(actors, '$'), json_extract(contexts, '$'), timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_attestations_subjects ON attestations(json_extract(subjects, '$'));
+CREATE INDEX IF NOT EXISTS idx_attestations_predicates ON attestations(json_extract(predicates, '$'));
+CREATE INDEX IF NOT EXISTS idx_attestations_contexts ON attestations(json_extract(contexts, '$'));
+CREATE INDEX IF NOT EXISTS idx_attestations_timestamp ON attestations(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_attestations_actors ON attestations(json_extract(actors, '$'));
+CREATE INDEX IF NOT EXISTS idx_attestations_actors_timestamp ON attestations(json_extract(actors, '$'), timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_attestations_actors_context_timestamp ON attestations(json_extract(actors, '$'), json_extract(contexts, '$'), timestamp DESC);

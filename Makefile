@@ -1,4 +1,8 @@
-.PHONY: web run-web test-web test clean
+.PHONY: cli web run-web test-web test clean
+
+cli: ## Build QNTX CLI binary
+	@echo "Building QNTX CLI..."
+	@go build -o bin/qntx ./cmd/qntx
 
 web: ## Build web assets with Bun
 	@echo "Building web assets..."

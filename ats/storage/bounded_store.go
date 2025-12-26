@@ -1,11 +1,8 @@
 // Package storage provides attestation storage with bounded limits to prevent unbounded growth.
-// It implements the 16/64/64 storage strategy:
+// Default 16/64/64 storage strategy (configurable):
 // - 16 attestations per (actor, context) pair
 // - 64 contexts per actor
 // - 64 actors per entity (subject)
-//
-// TODO(#181): Make storage limits configurable instead of hardcoded.
-// See: https://github.com/sbvh-nl/qntx/issues/181
 package storage
 
 import (
@@ -19,28 +16,6 @@ import (
 )
 
 const (
-	// SQL query to get actor contexts with usage counts for limit enforcement
-	queryActorContexts = `
-		SELECT DISTINCT json_extract(contexts, '$') as context_array, COUNT(*) as usage_count
-		FROM attestations
-		WHERE EXISTS (
-			SELECT 1 FROM json_each(attestations.actors)
-			WHERE value = ?
-		)
-		GROUP BY context_array
-		ORDER BY usage_count ASC`
-
-	// SQL query to get entity actors with most recent timestamps for limit enforcement
-	queryEntityActors = `
-		SELECT value as actor, MAX(timestamp) as last_seen
-		FROM attestations, json_each(actors)
-		WHERE EXISTS (
-			SELECT 1 FROM json_each(attestations.subjects)
-			WHERE value = ?
-		)
-		GROUP BY actor
-		ORDER BY last_seen ASC`
-
 	// SQL query to get storage statistics (counts of attestations, actors, subjects, contexts)
 	queryStorageStats = `
 		SELECT
@@ -51,22 +26,30 @@ const (
 		FROM attestations`
 )
 
-// BoundedStore implements the 16/64/64 storage limits for attestations
-// - 16 attestations per (actor, context) pair
-// - 64 contexts per actor
-// - 64 actors per entity (subject)
+// BoundedStore implements configurable storage limits for attestations
 type BoundedStore struct {
 	db     *sql.DB
 	store  *SQLStore
 	logger *zap.SugaredLogger
+	config *BoundedStoreConfig
 }
 
-// NewBoundedStore creates a new bounded storage manager
+// NewBoundedStore creates a new bounded storage manager with default limits (16/64/64)
 func NewBoundedStore(db *sql.DB, logger *zap.SugaredLogger) *BoundedStore {
+	return NewBoundedStoreWithConfig(db, logger, nil)
+}
+
+// NewBoundedStoreWithConfig creates a bounded storage manager with custom limits
+// Pass nil config to use defaults (16/64/64)
+func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *BoundedStoreConfig) *BoundedStore {
+	if config == nil {
+		config = DefaultBoundedStoreConfig()
+	}
 	return &BoundedStore{
 		db:     db,
 		store:  NewSQLStore(db, logger),
 		logger: logger,
+		config: config,
 	}
 }
 
@@ -127,189 +110,4 @@ func (bs *BoundedStore) GetStorageStats() (*ats.StorageStats, error) {
 	}
 
 	return stats, nil
-}
-
-// enforceLimits applies the 16/64/64 storage limits
-func (bs *BoundedStore) enforceLimits(as *types.As) {
-	if as == nil {
-		if bs.logger != nil {
-			bs.logger.Warn("enforceLimits called with nil attestation")
-		}
-		return
-	}
-
-	// 1. Enforce 16 attestations per (actor, context) - remove oldest
-	for _, actor := range as.Actors {
-		for _, context := range as.Contexts {
-			if err := bs.enforceActorContextLimit(actor, context); err != nil {
-				// Log error but don't fail the operation
-				if bs.logger != nil {
-					bs.logger.Warnw("Failed to enforce actor-context limit",
-						"actor", actor,
-						"context", context,
-						"error", err,
-					)
-				}
-			}
-		}
-	}
-
-	// 2. Enforce 64 contexts per actor - remove least used
-	for _, actor := range as.Actors {
-		if err := bs.enforceActorContextsLimit(actor); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to enforce actor contexts limit",
-					"actor", actor,
-					"error", err,
-				)
-			}
-		}
-	}
-
-	// 3. Enforce 64 actors per entity - remove least recent
-	for _, subject := range as.Subjects {
-		if err := bs.enforceEntityActorsLimit(subject); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to enforce entity actors limit",
-					"subject", subject,
-					"error", err,
-				)
-			}
-		}
-	}
-}
-
-// enforceActorContextLimit keeps only 16 most recent attestations for this actor+context
-func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
-	// TODO(#181): Make this limit configurable (currently hardcoded to 16)
-	const limit = 16
-
-	// Count current attestations for this actor+context
-	var count int
-	err := bs.db.QueryRow(AttestationCountByActorContextQuery, actor, context).Scan(&count)
-	if err != nil {
-		return fmt.Errorf("failed to count attestations: %w", err)
-	}
-
-	// If over limit, delete oldest ones
-	if count > limit {
-		deleteCount := count - limit
-		_, err = bs.db.Exec(AttestationDeleteOldestByActorContextQuery, actor, context, deleteCount)
-		if err != nil {
-			return fmt.Errorf("failed to delete old attestations: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// enforceActorContextsLimit keeps only 64 most used contexts for this actor
-func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
-	// TODO(#181): Make this limit configurable (currently hardcoded to 64)
-	const limit = 64
-
-	// Get all contexts for this actor with usage counts
-	rows, err := bs.db.Query(queryActorContexts, actor)
-	if err != nil {
-		return fmt.Errorf("failed to query actor contexts: %w", err)
-	}
-	defer rows.Close()
-
-	type contextUsage struct {
-		contextArray string
-		usageCount   int
-	}
-
-	var contexts []contextUsage
-	for rows.Next() {
-		var cu contextUsage
-		err := rows.Scan(&cu.contextArray, &cu.usageCount)
-		if err != nil {
-			return fmt.Errorf("failed to scan context usage: %w", err)
-		}
-		contexts = append(contexts, cu)
-	}
-
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating over contexts: %w", err)
-	}
-
-	// If over limit, delete attestations for least used contexts
-	if len(contexts) > limit {
-		contextsToDelete := contexts[:len(contexts)-limit] // Keep most used (at end)
-
-		for _, cu := range contextsToDelete {
-			// Delete all attestations with this context array
-			_, err = bs.db.Exec(
-				`DELETE FROM attestations
-				WHERE EXISTS (
-					SELECT 1 FROM json_each(attestations.actors)
-					WHERE value = ?
-				) AND contexts = ?`,
-				actor, cu.contextArray,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to delete attestations for context %s: %w", cu.contextArray, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// enforceEntityActorsLimit keeps only 64 most recent actors for this entity
-func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
-	// TODO(#181): Make this limit configurable (currently hardcoded to 64)
-	const limit = 64
-
-	// Get all actors for this entity with most recent timestamps
-	rows, err := bs.db.Query(queryEntityActors, entity)
-	if err != nil {
-		return fmt.Errorf("failed to query entity actors: %w", err)
-	}
-	defer rows.Close()
-
-	type actorInfo struct {
-		actor    string
-		lastSeen string
-	}
-
-	var actors []actorInfo
-	for rows.Next() {
-		var ai actorInfo
-		err := rows.Scan(&ai.actor, &ai.lastSeen)
-		if err != nil {
-			return fmt.Errorf("failed to scan actor info: %w", err)
-		}
-		actors = append(actors, ai)
-	}
-
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating over actors: %w", err)
-	}
-
-	// If over limit, delete attestations for least recent actors
-	if len(actors) > limit {
-		actorsToDelete := actors[:len(actors)-limit] // Keep most recent (at end)
-
-		for _, ai := range actorsToDelete {
-			// Delete all attestations by this actor that mention this entity
-			_, err = bs.db.Exec(
-				`DELETE FROM attestations
-				WHERE EXISTS (
-					SELECT 1 FROM json_each(attestations.actors)
-					WHERE value = ?
-				) AND EXISTS (
-					SELECT 1 FROM json_each(attestations.subjects)
-					WHERE value = ?
-				)`,
-				ai.actor, entity,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to delete attestations for actor %s: %w", ai.actor, err)
-			}
-		}
-	}
-
-	return nil
 }

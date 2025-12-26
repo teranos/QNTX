@@ -1,4 +1,4 @@
-CREATE TABLE async_ix_jobs (
+CREATE TABLE IF NOT EXISTS async_ix_jobs (
     id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
     status TEXT NOT NULL,
@@ -18,6 +18,6 @@ CREATE TABLE async_ix_jobs (
     updated_at DATETIME NOT NULL
 );
 
-CREATE INDEX idx_async_ix_jobs_status ON async_ix_jobs(status);
-CREATE INDEX idx_async_ix_jobs_created ON async_ix_jobs(created_at DESC);
-CREATE INDEX idx_async_ix_jobs_parent ON async_ix_jobs(parent_job_id);
+CREATE INDEX IF NOT EXISTS idx_async_ix_jobs_status ON async_ix_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_async_ix_jobs_created ON async_ix_jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_async_ix_jobs_parent ON async_ix_jobs(parent_job_id);

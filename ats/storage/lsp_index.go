@@ -13,7 +13,7 @@ import (
 
 // SymbolIndex caches entities for fast autocomplete
 // Maintains counts of attestations for each symbol (subject/predicate/context/actor)
-// TODO(issue #143): Add methods for interactive hover exploration
+// TODO(QNTX #47): Add methods for interactive hover exploration
 // Needed: GetTopSubjectsForPredicate, GetTopContextsForPredicate, GetTopPredicatesForContext
 // These enable showing related attestations in hover tooltips
 type SymbolIndex struct {
@@ -62,7 +62,7 @@ func NewSymbolIndex(db *sql.DB) (*SymbolIndex, error) {
 }
 
 // Refresh reloads the index from database
-// TODO(issue #111): Add automatic refresh strategy (periodic or event-driven)
+// TODO(QNTX #46): Add automatic refresh strategy (periodic or event-driven)
 func (idx *SymbolIndex) Refresh() error {
 	ctx := context.Background()
 
@@ -103,7 +103,7 @@ func (idx *SymbolIndex) Refresh() error {
 
 // querySymbols extracts all values from a JSON array column
 func (idx *SymbolIndex) querySymbols(ctx context.Context, column string) (map[string]int, error) {
-	// TODO(issue #111): Extract magic number 1000 to named constant
+	// TODO(QNTX #46): Extract magic number 1000 to named constant
 	query := fmt.Sprintf(`
 		SELECT value, COUNT(*) as count
 		FROM attestations,
@@ -234,7 +234,7 @@ func (idx *SymbolIndex) getCompletions(prefix string, symbols map[string]int, ki
 		}
 	}
 
-	// TODO(issue #110): Implement proper sorting by frequency instead of truncation
+	// TODO(QNTX #45): Implement proper sorting by frequency instead of truncation
 	// Current behavior: truncates to first 10 matches (unsorted)
 	// Desired behavior: sort by count DESC, then alphabetically, then return top 10
 	// This requires sort.Slice() on items using SortText field
