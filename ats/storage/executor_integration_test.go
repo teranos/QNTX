@@ -1,6 +1,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 	// Create in-memory test database
-	testDB, err := sql.Open("sqlite3", ":memory:")
+	testDB := qntxtest.CreateTestDB(t)
 	require.NoError(t, err)
 
 	// Use migrations to create all tables (attestations from migration 025, aliases from migration 052)

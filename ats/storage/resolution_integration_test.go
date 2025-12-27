@@ -1,6 +1,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"testing"
@@ -18,7 +19,7 @@ import (
 // setupResolutionTestDB creates a test database with real schema and resolution-specific fixtures
 func setupResolutionTestDB(t *testing.T) *sql.DB {
 	// Create in-memory test database
-	testDB, err := sql.Open("sqlite3", ":memory:")
+	testDB := qntxtest.CreateTestDB(t)
 	require.NoError(t, err)
 
 	// Apply real migrations for production schema

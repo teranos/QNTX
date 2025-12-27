@@ -22,7 +22,7 @@ func (m *mockBroadcaster) BroadcastPulseExecutionFailed(scheduledJobID, executio
 }
 
 func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 
@@ -53,7 +53,7 @@ func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
 }
 
 func TestEnqueueAsyncJob_RequiresHandlerName(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 
@@ -76,7 +76,7 @@ func TestEnqueueAsyncJob_RequiresHandlerName(t *testing.T) {
 }
 
 func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 
@@ -121,7 +121,7 @@ func TestEnqueueAsyncJob_Deduplication(t *testing.T) {
 }
 
 func TestCheckJobs_Integration(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 
@@ -162,7 +162,7 @@ func TestCheckJobs_Integration(t *testing.T) {
 }
 
 func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 
@@ -196,7 +196,7 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 }
 
 func TestTickerStartStop(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 
@@ -225,7 +225,7 @@ func TestTickerStartStop(t *testing.T) {
 }
 
 func TestTickerWithContext_Cancellation(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	queue := async.NewQueue(db)
 

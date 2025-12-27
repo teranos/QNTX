@@ -1,6 +1,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"strings"
@@ -98,7 +99,7 @@ func normalizePredicate(pred string) string {
 // Uses real migrations to ensure test schema matches production schema.
 func setupDomainTestDB(t *testing.T) *sql.DB {
 	// Create in-memory test database
-	testDB, err := sql.Open("sqlite3", ":memory:")
+	testDB := qntxtest.CreateTestDB(t)
 	require.NoError(t, err)
 
 	// Apply real migrations (ensures test schema = production schema)
@@ -569,7 +570,7 @@ func TestPredicateContextMatching(t *testing.T) {
 // This test showcases how context queries now work regardless of casing differences
 func TestCaseInsensitiveContextMatching(t *testing.T) {
 	// Create test database with mixed case data to demonstrate case-insensitive matching
-	testDB, err := sql.Open("sqlite3", ":memory:")
+	testDB := qntxtest.CreateTestDB(t)
 	require.NoError(t, err)
 	defer testDB.Close()
 
