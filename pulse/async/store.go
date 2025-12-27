@@ -2,6 +2,7 @@ package async
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -71,7 +72,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 	targets := GetJobScanTargets(&job, args)
 
 	err := s.db.QueryRow(query, id).Scan(targets...)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("job not found: %s", id)
 	}
 	if err != nil {
@@ -155,20 +156,7 @@ func (s *Store) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
 	}
 	defer rows.Close()
 
-	jobs := make([]*Job, 0, limit)
-	for rows.Next() {
-		var job Job
-		if err := ScanJobFromRows(rows, &job); err != nil {
-			return nil, fmt.Errorf("failed to scan job: %w", err)
-		}
-		jobs = append(jobs, &job)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating jobs: %w", err)
-	}
-
-	return jobs, nil
+	return scanJobs(rows, "jobs")
 }
 
 // ListActiveJobs returns all jobs that are currently queued or running
@@ -185,6 +173,12 @@ func (s *Store) ListActiveJobs(limit int) ([]*Job, error) {
 	}
 	defer rows.Close()
 
+	return scanJobs(rows, "active jobs")
+}
+
+// scanJobs is a helper that scans multiple jobs from query rows
+// Reduces repetition across ListJobs, ListActiveJobs, ListTasksByParent
+func scanJobs(rows *sql.Rows, context string) ([]*Job, error) {
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
@@ -194,8 +188,8 @@ func (s *Store) ListActiveJobs(limit int) ([]*Job, error) {
 		jobs = append(jobs, &job)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating active jobs: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating %s: %w", context, err)
 	}
 
 	return jobs, nil
@@ -235,20 +229,7 @@ func (s *Store) ListTasksByParent(parentJobID string) ([]*Job, error) {
 	}
 	defer rows.Close()
 
-	var jobs []*Job
-	for rows.Next() {
-		var job Job
-		if err := ScanJobFromRows(rows, &job); err != nil {
-			return nil, fmt.Errorf("failed to scan job: %w", err)
-		}
-		jobs = append(jobs, &job)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating tasks: %w", err)
-	}
-
-	return jobs, nil
+	return scanJobs(rows, "tasks")
 }
 
 // CleanupOldJobs removes completed/failed jobs older than the specified duration
@@ -290,7 +271,7 @@ func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName strin
 	targets := GetJobScanTargets(&job, args)
 
 	err := s.db.QueryRow(query, source, handlerName).Scan(targets...)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No active job found - this is not an error
 	}
 	if err != nil {
@@ -325,7 +306,7 @@ func (s *Store) FindRecentJobBySourceAndHandler(source string, handlerName strin
 	targets := GetJobScanTargets(&job, args)
 
 	err := s.db.QueryRow(query, source, handlerName, cutoff).Scan(targets...)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // No recent job found - this is not an error
 	}
 	if err != nil {
