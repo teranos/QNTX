@@ -25,7 +25,7 @@ func TestTASBotEnqueuesJob(t *testing.T) {
 	t.Log("🎮 TAS Bot begins enqueuing jobs for the speedrun...")
 	t.Log("   'Placing job in queue with frame-perfect timing'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// TAS Bot creates a job
@@ -54,7 +54,7 @@ func TestYugiDequeuesJob(t *testing.T) {
 	t.Log("⭐ Yugi prepares to dequeue job from queue...")
 	t.Log("   'It's time to duel!' *prepares to draw from queue*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// First, TAS Bot enqueues a job for Yugi
@@ -95,7 +95,7 @@ func TestTASBotJobPriority(t *testing.T) {
 	t.Log("🎮 TAS Bot tests job priority ordering...")
 	t.Log("   'High-priority jobs must execute first for optimal speedrun'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// TAS Bot enqueues low-priority job
@@ -141,7 +141,7 @@ func TestYugiEmptyQueue(t *testing.T) {
 	t.Log("⭐ Yugi tries to dequeue from empty queue...")
 	t.Log("   'No cards in hand' *checks empty queue*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Yugi tries to dequeue from empty queue
@@ -163,7 +163,7 @@ func TestCronosPausedJob(t *testing.T) {
 	t.Log("⏰ Cronos pauses time for a job (paused job should not dequeue)...")
 	t.Log("   'Time stands still for this job'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// TAS Bot enqueues a job
@@ -208,7 +208,7 @@ func TestTASBotResumeJob(t *testing.T) {
 	t.Log("🎮 TAS Bot resumes a paused job (unpausing for continued speedrun)...")
 	t.Log("   'Resuming execution at optimal frame'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Create, dequeue, and pause a job
@@ -256,7 +256,7 @@ func TestYugiJobStateTransitions(t *testing.T) {
 	t.Log("⭐ Yugi tests job state transitions (card ability transformations)...")
 	t.Log("   'It's time to duel!' *transforming through job states*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// TAS Bot creates a job
@@ -297,7 +297,7 @@ func TestTASBotFailJob(t *testing.T) {
 	t.Log("🎮 TAS Bot handles job failure (speedrun death)...")
 	t.Log("   'Marking failed attempt for retry'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Create a job
@@ -327,7 +327,7 @@ func TestCronosScheduledJob(t *testing.T) {
 	t.Log("⏰ Cronos schedules a job for future execution...")
 	t.Log("   'This job shall execute in the future'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Cronos creates a job with scheduled status
@@ -361,7 +361,7 @@ func TestYugiAndTASBotQueueIntegration(t *testing.T) {
 	t.Log("   TAS Bot: 'Enqueuing jobs for optimal speedrun'")
 	t.Log("   Yugi: 'It's time to duel!' *ready to draw and play cards**")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// TAS Bot enqueues multiple jobs in sequence
@@ -418,7 +418,7 @@ func TestYugiCompletesJob(t *testing.T) {
 	t.Log("🃏 Yugi draws the final card to complete the duel...")
 	t.Log("   'I activate my trap card: Job.Complete()!'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// TAS Bot enqueues a job
@@ -471,7 +471,7 @@ func TestTASBotListsJobs(t *testing.T) {
 	t.Log("🎮 TAS Bot reviews the job queue for optimal routing...")
 	t.Log("   'Analyzing all job states for the perfect speedrun'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Create jobs with different statuses
@@ -543,7 +543,7 @@ func TestYugiFindsDuplicateCard(t *testing.T) {
 	t.Log("🃏 Yugi checks his deck for duplicate cards...")
 	t.Log("   'No duplicate monsters allowed in this duel!'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Enqueue first job
@@ -610,7 +610,7 @@ func TestAbrahamAndIsaac(t *testing.T) {
 	t.Log("📜 Abraham receives the divine command: 'Take your son, your only son Isaac...'")
 	t.Log("   The test of faith: delete the parent job, and what becomes of the children?")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Abraham creates parent job
@@ -727,7 +727,7 @@ func TestConcurrentDeletion(t *testing.T) {
 	t.Log("🏗️ Tower of Babel: Multiple workers attempting concurrent deletions...")
 	t.Log("   'Come, let us delete and cause confusion!'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Create parent jobs with children
@@ -838,7 +838,7 @@ func TestVacanciesScraperChildJobsContinue(t *testing.T) {
 	t.Log("🚢 Noah's Ark: Parent job completes, but the animals (children) must continue their journey...")
 	t.Log("   'The flood is over, Noah's work is done. Now the animals must populate the earth.'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	queue := NewQueue(db)
 
 	// Noah creates the parent job (building the ark = scraping vacancies page)

@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"testing"
 	"time"

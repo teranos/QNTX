@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 )
 
 func TestCreateJob(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	store := NewStore(db)
 
@@ -36,7 +37,7 @@ func TestCreateJob(t *testing.T) {
 }
 
 func TestListJobsDue(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	store := NewStore(db)
 	now := time.Now()
@@ -89,7 +90,7 @@ func TestListJobsDue(t *testing.T) {
 }
 
 func TestUpdateState(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	store := NewStore(db)
 
@@ -123,7 +124,7 @@ func TestUpdateState(t *testing.T) {
 }
 
 func TestUpdateJobAfterExecution(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	store := NewStore(db)
 	now := time.Now()
@@ -157,7 +158,7 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 
 func TestJobTimeDrift(t *testing.T) {
 	// Test that ticker handles time drift gracefully across restarts
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	store := NewStore(db)
 	now := time.Now()
@@ -191,7 +192,7 @@ func TestJobTimeDrift(t *testing.T) {
 }
 
 func TestCreateJobWithMetadata(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	store := NewStore(db)
 
@@ -215,7 +216,7 @@ func TestCreateJobWithMetadata(t *testing.T) {
 }
 
 func TestListAllScheduledJobs(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	now := time.Now()
 
@@ -280,7 +281,7 @@ func TestListAllScheduledJobs(t *testing.T) {
 }
 
 func TestUpdateJobInterval(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	now := time.Now()
 
@@ -312,7 +313,7 @@ func TestUpdateJobInterval(t *testing.T) {
 }
 
 func TestGetNextScheduledJob(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 	now := time.Now()
 

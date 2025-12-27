@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/db"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"go.uber.org/zap"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // ============================================================================
@@ -24,21 +22,6 @@ import (
 // Theme: TAS Bot coordinates the perfect speedrun while Kirby executes jobs
 // with copy abilities. Cronos ensures timing is frame-perfect.
 // ============================================================================
-
-// createTestDB creates an in-memory database for testing
-func createTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to create test database: %v", err)
-	}
-
-	// Run migrations to set up schema
-	if err := db.Migrate(database, nil); err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
-
-	return database
-}
 
 // createTestConfig creates a minimal config for testing
 func createTestConfig() *am.Config {
@@ -63,7 +46,7 @@ func TestTASBotInitializesWorkerPool(t *testing.T) {
 	t.Log("🎮 TAS Bot begins frame-perfect worker pool initialization...")
 	t.Log("   'Calculating optimal worker count for this speedrun'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// TAS Bot creates worker pool with specific worker count
@@ -89,7 +72,7 @@ func TestKirbyExecutesJobs(t *testing.T) {
 	t.Log("⭐ Kirby prepares to execute jobs with copy ability...")
 	t.Log("   'Poyo!' *inhales deeply*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Kirby creates a small worker pool
@@ -115,7 +98,7 @@ func TestTASBotGracefulShutdown(t *testing.T) {
 	t.Log("🎮 TAS Bot tests frame-perfect shutdown timing...")
 	t.Log("   'Shutdown must complete within 2 seconds for optimal speedrun time'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 3}
@@ -144,7 +127,7 @@ func TestCronosWorkerIntervals(t *testing.T) {
 	t.Log("⏰ Cronos, god of time, observes worker polling intervals...")
 	t.Log("   'Time flows differently during warmup and normal operation'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 1}
@@ -178,7 +161,7 @@ func TestKirbyContextCancellation(t *testing.T) {
 	t.Log("⭐ Kirby tests context cancellation (stop inhaling mid-job)...")
 	t.Log("   'Poyo?' *pauses mid-inhale*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 2}
@@ -215,7 +198,7 @@ func TestTASBotWorkerPoolStop(t *testing.T) {
 	t.Log("🎮 TAS Bot tests complete worker pool shutdown sequence...")
 	t.Log("   'Stop() must cancel context and wait for all workers'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 3}
@@ -254,7 +237,7 @@ func TestCronosShutdownTimeout(t *testing.T) {
 	t.Log("⏰ Cronos tests the 2-second shutdown timeout...")
 	t.Log("   'Workers must exit within 2 seconds, or timeout returns anyway'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 2}
@@ -290,7 +273,7 @@ func TestKirbyProcessNextJobContextCheck(t *testing.T) {
 	t.Log("⭐ Kirby tests context checking before job processing...")
 	t.Log("   'Poyo? *checks if should still be inhaling*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 1}
@@ -317,7 +300,7 @@ func TestTASBotMultipleWorkers(t *testing.T) {
 	t.Log("🎮 TAS Bot coordinates multiple workers in parallel...")
 	t.Log("   'Parallel execution must be frame-perfect'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	workerCount := 5
@@ -345,7 +328,7 @@ func TestKirbyAndTASBotIntegration(t *testing.T) {
 	t.Log("   TAS Bot: 'Frame-perfect coordination activated'")
 	t.Log("   Kirby: 'Poyo!' *ready to copy and execute*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// TAS Bot sets up the worker pool
@@ -376,7 +359,7 @@ func TestCronosRateLimitingEnforcement(t *testing.T) {
 	t.Log("⏰ Cronos tests rate limiting enforcement during job processing...")
 	t.Log("   'Jobs must respect the sacred flow of time - no more than N per minute'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Cronos sets a very low rate limit to make test deterministic
@@ -437,7 +420,7 @@ func TestCronosCheckRateLimitWithNilLimiter(t *testing.T) {
 	t.Log("⏰ Cronos tests rate limit with no limiter configured...")
 	t.Log("   'When there is no time constraint, all flows freely!'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 1}
@@ -471,7 +454,7 @@ func TestCronosCheckBudgetWithNilTracker(t *testing.T) {
 	t.Log("💰 Cronos tests budget enforcement with no tracker...")
 	t.Log("   'When there is no treasury, all spending is permitted!'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	poolCfg := WorkerPoolConfig{Workers: 1}
