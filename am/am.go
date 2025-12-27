@@ -54,9 +54,13 @@ type PulseConfig struct {
 	// Per-domain rate limit overrides (key = domain like "linkedin.com")
 	HTTPDomainLimits map[string]HTTPDomainLimit `mapstructure:"http_domain_limits"`
 
-	// Note: Budget tracking (DailyBudgetUSD, CostPerScoreUSD, etc.) is domain-specific
-	// and should be handled by applications extending this core config.
-	// See: https://github.com/teranos/QNTX/issues/xyz for budget extension pattern
+	// Budget tracking and rate limiting (core Pulse features)
+	DailyBudgetUSD        float64 `mapstructure:"daily_budget_usd"`         // Daily spending limit in USD
+	WeeklyBudgetUSD       float64 `mapstructure:"weekly_budget_usd"`        // Weekly spending limit in USD
+	MonthlyBudgetUSD      float64 `mapstructure:"monthly_budget_usd"`       // Monthly spending limit in USD
+	CostPerScoreUSD       float64 `mapstructure:"cost_per_score_usd"`       // Estimated cost per operation
+	MaxCallsPerMinute     int     `mapstructure:"max_calls_per_minute"`      // Rate limit for API calls
+	PauseOnBudgetExceeded bool    `mapstructure:"pause_on_budget_exceeded"` // Pause jobs when budget exceeded (vs fail them)
 }
 
 // HTTPDomainLimit configures per-domain HTTP rate limiting
