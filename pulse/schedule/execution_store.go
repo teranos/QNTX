@@ -3,6 +3,7 @@ package schedule
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 // ExecutionStore handles persistence of job execution history
@@ -301,12 +302,15 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 // This implements TTL cleanup to prevent unbounded growth of pulse_executions and task_logs tables.
 // Recommended retention: 90 days (3 months) for production use.
 func (s *ExecutionStore) CleanupOldExecutions(retentionDays int) (int, error) {
+	// Calculate cutoff time in Go for clarity and portability
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays).Format(time.RFC3339)
+
 	query := `
 		DELETE FROM pulse_executions
-		WHERE datetime(started_at) < datetime('now', '-' || ? || ' days')
+		WHERE started_at < ?
 	`
 
-	result, err := s.db.Exec(query, retentionDays)
+	result, err := s.db.Exec(query, cutoffTime)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup old executions: %w", err)
 	}
