@@ -1,6 +1,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"testing"
@@ -11,10 +12,7 @@ import (
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	testDB := qntxtest.CreateTestDB(t)
 
 	// Apply migrations (includes aliases table from migration 009)
 	if err := db.Migrate(testDB, nil); err != nil {
