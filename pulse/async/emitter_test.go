@@ -1,6 +1,7 @@
 package async
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"errors"
 	"testing"
 
