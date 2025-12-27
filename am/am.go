@@ -56,6 +56,7 @@ type PulseConfig struct {
 
 	// Budget tracking and rate limiting (core Pulse features)
 	DailyBudgetUSD        float64 `mapstructure:"daily_budget_usd"`         // Daily spending limit in USD
+	WeeklyBudgetUSD       float64 `mapstructure:"weekly_budget_usd"`        // Weekly spending limit in USD
 	MonthlyBudgetUSD      float64 `mapstructure:"monthly_budget_usd"`       // Monthly spending limit in USD
 	CostPerScoreUSD       float64 `mapstructure:"cost_per_score_usd"`       // Estimated cost per operation
 	MaxCallsPerMinute     int     `mapstructure:"max_calls_per_minute"`      // Rate limit for API calls
