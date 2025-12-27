@@ -270,6 +270,7 @@ import (
 //     BENEFIT: qntx protects itself from badly behaved neighbors while maintaining observability
 type BudgetConfig struct {
 	DailyBudgetUSD   float64
+	WeeklyBudgetUSD  float64
 	MonthlyBudgetUSD float64
 	CostPerScoreUSD  float64
 }
@@ -277,10 +278,13 @@ type BudgetConfig struct {
 // Status represents current budget state
 type Status struct {
 	DailySpend       float64
+	WeeklySpend      float64
 	MonthlySpend     float64
 	DailyRemaining   float64
+	WeeklyRemaining  float64
 	MonthlyRemaining float64
 	DailyOps         int
+	WeeklyOps        int
 	MonthlyOps       int
 }
 
@@ -307,6 +311,12 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 		return nil, fmt.Errorf("failed to get daily spend from usage: %w", err)
 	}
 
+	// Query actual weekly spend from ai_model_usage
+	weeklySpend, weeklyOps, err := bt.store.GetActualWeeklySpend()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get weekly spend from usage: %w", err)
+	}
+
 	// Query actual monthly spend from ai_model_usage
 	monthlySpend, monthlyOps, err := bt.store.GetActualMonthlySpend()
 	if err != nil {
@@ -315,24 +325,32 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 
 	bt.mu.RLock()
 	dailyBudget := bt.config.DailyBudgetUSD
+	weeklyBudget := bt.config.WeeklyBudgetUSD
 	monthlyBudget := bt.config.MonthlyBudgetUSD
 	bt.mu.RUnlock()
 
 	return &Status{
 		DailySpend:       dailySpend,
+		WeeklySpend:      weeklySpend,
 		MonthlySpend:     monthlySpend,
 		DailyRemaining:   dailyBudget - dailySpend,
+		WeeklyRemaining:  weeklyBudget - weeklySpend,
 		MonthlyRemaining: monthlyBudget - monthlySpend,
 		DailyOps:         dailyOps,
+		WeeklyOps:        weeklyOps,
 		MonthlyOps:       monthlyOps,
 	}, nil
 }
 
 // RecordOperation records a completed operation with its cost
 func (bt *Tracker) RecordOperation(costUSD float64) error {
-	// Record in both daily and monthly budgets
+	// Record in daily, weekly, and monthly budgets
 	if err := bt.store.RecordDailySpend(costUSD); err != nil {
 		return fmt.Errorf("failed to record daily spend: %w", err)
+	}
+
+	if err := bt.store.RecordWeeklySpend(costUSD); err != nil {
+		return fmt.Errorf("failed to record weekly spend: %w", err)
 	}
 
 	if err := bt.store.RecordMonthlySpend(costUSD); err != nil {
@@ -352,12 +370,18 @@ func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 
 	bt.mu.RLock()
 	dailyBudget := bt.config.DailyBudgetUSD
+	weeklyBudget := bt.config.WeeklyBudgetUSD
 	monthlyBudget := bt.config.MonthlyBudgetUSD
 	bt.mu.RUnlock()
 
 	if status.DailySpend+estimatedCostUSD > dailyBudget {
 		return fmt.Errorf("daily budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.DailySpend, estimatedCostUSD, dailyBudget)
+	}
+
+	if weeklyBudget > 0 && status.WeeklySpend+estimatedCostUSD > weeklyBudget {
+		return fmt.Errorf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+			status.WeeklySpend, estimatedCostUSD, weeklyBudget)
 	}
 
 	if status.MonthlySpend+estimatedCostUSD > monthlyBudget {

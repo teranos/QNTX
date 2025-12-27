@@ -169,6 +169,42 @@ func (s *Store) GetActualDailySpend() (totalCost float64, opCount int, err error
 	return totalCost, opCount, nil
 }
 
+// GetWeeklyBudget is a convenience method for getting current week's budget
+func (s *Store) GetWeeklyBudget() (*Record, error) {
+	// Use ISO 8601 week format (YYYY-Www)
+	currentWeek := time.Now().Format("2006-W01")
+	return s.GetBudget(currentWeek, "weekly")
+}
+
+// RecordWeeklySpend records spending to current week's budget
+func (s *Store) RecordWeeklySpend(costUSD float64) error {
+	// Use ISO 8601 week format (YYYY-Www)
+	currentWeek := time.Now().Format("2006-W01")
+	return s.RecordSpend(currentWeek, "weekly", costUSD)
+}
+
+// GetActualWeeklySpend queries ai_model_usage table for this week's actual spend
+// TODO(#198): Use sliding 7-day window instead of calendar week to prevent week-boundary gaming
+// Current: Resets on Monday (allows full budget on Sunday, then again on Monday)
+// Desired: WHERE request_timestamp >= datetime('now', '-7 days')
+func (s *Store) GetActualWeeklySpend() (totalCost float64, opCount int, err error) {
+	query := `
+		SELECT
+			COALESCE(SUM(cost), 0) as total_cost,
+			COUNT(*) as operation_count
+		FROM ai_model_usage
+		WHERE strftime('%Y-%W', request_timestamp) = strftime('%Y-%W', 'now')
+			AND success = 1
+	`
+
+	err = s.db.QueryRow(query).Scan(&totalCost, &opCount)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to query weekly spend: %w", err)
+	}
+
+	return totalCost, opCount, nil
+}
+
 // GetActualMonthlySpend queries ai_model_usage table for this month's actual spend
 // TODO(#198): Use sliding 30-day window instead of calendar month to prevent month-boundary gaming
 // Current: Resets on 1st of month (allows full budget on Jan 31, then again on Feb 1)
