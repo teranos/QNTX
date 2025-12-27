@@ -1,6 +1,6 @@
 # Pulse Multi-Process Resource Coordination
 
-**Status:** Design Proposal (Issue #117)
+**Status:** Design Proposal (Issue #50)
 **Related:** pulse/budget package, pulse/async worker pool
 
 ## Problem
