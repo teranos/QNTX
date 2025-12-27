@@ -22,5 +22,8 @@ CREATE TABLE IF NOT EXISTS ai_model_usage (
 CREATE INDEX IF NOT EXISTS idx_ai_model_usage_operation ON ai_model_usage(operation_type);
 CREATE INDEX IF NOT EXISTS idx_ai_model_usage_model ON ai_model_usage(model_name);
 CREATE INDEX IF NOT EXISTS idx_ai_model_usage_entity ON ai_model_usage(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_ai_model_usage_timestamp ON ai_model_usage(request_timestamp);
-CREATE INDEX IF NOT EXISTS idx_ai_model_usage_cost ON ai_model_usage(cost);
+
+-- Composite index for sliding window budget queries (success=1, recent timestamps)
+-- This optimizes: WHERE success = 1 AND request_timestamp >= datetime('now', '-N days')
+CREATE INDEX IF NOT EXISTS idx_ai_model_usage_budget_window
+ON ai_model_usage(success, request_timestamp) WHERE success = 1;

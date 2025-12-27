@@ -342,24 +342,6 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 	}, nil
 }
 
-// RecordOperation records a completed operation with its cost
-func (bt *Tracker) RecordOperation(costUSD float64) error {
-	// Record in daily, weekly, and monthly budgets
-	if err := bt.store.RecordDailySpend(costUSD); err != nil {
-		return fmt.Errorf("failed to record daily spend: %w", err)
-	}
-
-	if err := bt.store.RecordWeeklySpend(costUSD); err != nil {
-		return fmt.Errorf("failed to record weekly spend: %w", err)
-	}
-
-	if err := bt.store.RecordMonthlySpend(costUSD); err != nil {
-		return fmt.Errorf("failed to record monthly spend: %w", err)
-	}
-
-	return nil
-}
-
 // CheckBudget checks if we have budget available for an operation
 // Returns error if budget would be exceeded
 func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
