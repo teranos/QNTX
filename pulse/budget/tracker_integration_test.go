@@ -5,23 +5,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/db"
+
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/sbvh-nl/expgraph/internal/database"
 )
 
 // createTestDB creates a fresh in-memory database for testing
 func createTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
+	database, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 
 	// Run migrations to set up schema
-	err = database.RunMigrations(db, false)
+	err = db.Migrate(database, nil)
 	require.NoError(t, err)
 
-	return db
+	return database
 }
 
 // insertUsageRecord inserts a record into ai_model_usage table for testing

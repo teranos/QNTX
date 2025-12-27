@@ -369,17 +369,25 @@ func (q *Queue) GetStats() (*QueueStats, error) {
 }
 
 // GetJobCounts returns quick counts of queued and running jobs (for system metrics)
-func (q *Queue) GetJobCounts() (queued int, running int) {
+func (q *Queue) GetJobCounts() (queued int, running int, err error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
 	// Quick count without detailed stats - optimized for frequent polling
 	queuedStatus := JobStatusQueued
 	runningStatus := JobStatusRunning
-	queuedJobs, _ := q.store.ListJobs(&queuedStatus, MaxJobsLimit)
-	runningJobs, _ := q.store.ListJobs(&runningStatus, MaxJobsLimit)
 
-	return len(queuedJobs), len(runningJobs)
+	queuedJobs, err := q.store.ListJobs(&queuedStatus, MaxJobsLimit)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to count queued jobs: %w", err)
+	}
+
+	runningJobs, err := q.store.ListJobs(&runningStatus, MaxJobsLimit)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to count running jobs: %w", err)
+	}
+
+	return len(queuedJobs), len(runningJobs), nil
 }
 
 // FindActiveJobBySourceAndHandler finds an active (queued, running, or paused) job by source URL and handler name.
