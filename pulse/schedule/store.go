@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+const (
+	// MaxDueJobsBatch limits the number of jobs returned by ListJobsDue to prevent
+	// overwhelming the worker pool with too many concurrent executions
+	MaxDueJobsBatch = 100
+
+	// MaxListAllJobs limits the number of jobs returned by ListAllScheduledJobs
+	// to prevent excessive memory usage when displaying in the UI
+	MaxListAllJobs = 1000
+)
+
 // Store handles persistence of scheduled jobs
 type Store struct {
 	db *sql.DB
@@ -180,10 +190,10 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 		FROM scheduled_pulse_jobs
 		WHERE state = ? AND next_run_at <= ?
 		ORDER BY next_run_at ASC
-		LIMIT 100
+		LIMIT ?
 	`
 
-	rows, err := s.db.Query(query, StateActive, now.Format(time.RFC3339))
+	rows, err := s.db.Query(query, StateActive, now.Format(time.RFC3339), MaxDueJobsBatch)
 	if err != nil {
 		return nil, err
 	}
@@ -277,10 +287,10 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 		FROM scheduled_pulse_jobs
 		WHERE state = ? AND next_run_at <= ?
 		ORDER BY next_run_at ASC
-		LIMIT 100
+		LIMIT ?
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, StateActive, now.Format(time.RFC3339))
+	rows, err := s.db.QueryContext(ctx, query, StateActive, now.Format(time.RFC3339), MaxDueJobsBatch)
 	if err != nil {
 		return nil, err
 	}
@@ -374,10 +384,10 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 		FROM scheduled_pulse_jobs
 		WHERE state != ?
 		ORDER BY created_at DESC
-		LIMIT 1000
+		LIMIT ?
 	`
 
-	rows, err := s.db.Query(query, StateDeleted)
+	rows, err := s.db.Query(query, StateDeleted, MaxListAllJobs)
 	if err != nil {
 		return nil, err
 	}
