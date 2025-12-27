@@ -48,7 +48,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 		PollInterval:  100 * time.Millisecond, // Fast polling for tests
 	}, zap.NewNop().Sugar())
 
-	// Register a mock handler for JD ingestion (avoids import cycle with role package)
+	// Register a mock handler for protein sequence analysis (generic bioinformatics job)
 	mockHandler := &GRACETestHandler{
 		taskDuration: 500 * time.Millisecond, // Simulate work
 		totalTasks:   5,
