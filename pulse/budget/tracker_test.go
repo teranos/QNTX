@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/db"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -172,36 +173,19 @@ func TestTracker_MultipleJobsCounted(t *testing.T) {
 func setupTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	// Create in-memory database with migrations
+	database, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 
-	// Create the ai_model_usage table
-	createTableSQL := `
-	CREATE TABLE ai_model_usage (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		operation_type TEXT NOT NULL,
-		entity_type TEXT NOT NULL,
-		entity_id TEXT NOT NULL,
-		model_name TEXT NOT NULL,
-		model_provider TEXT NOT NULL,
-		model_config TEXT,
-		request_timestamp DATETIME NOT NULL,
-		response_timestamp DATETIME,
-		tokens_used INTEGER,
-		cost REAL,
-		success BOOLEAN NOT NULL,
-		error_message TEXT,
-		metadata TEXT,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	)`
-
-	if _, err := db.Exec(createTableSQL); err != nil {
-		t.Fatalf("Failed to create test table: %v", err)
+	// Run migrations to create tables (including ai_model_usage)
+	err = db.Migrate(database, nil)
+	if err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	return db
+	return database
 }
 
 func insertUsage(t *testing.T, db *sql.DB, timestamp time.Time, costUSD float64) {
