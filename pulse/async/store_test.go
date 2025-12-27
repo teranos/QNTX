@@ -29,7 +29,7 @@ func TestTASBotCreatesJob(t *testing.T) {
 	// TAS Bot creates a job save state
 	job := &Job{
 		ID:          "JOB_SAVE_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "speedrun_checkpoint.html",
 		Status:      "queued",
 
@@ -59,7 +59,7 @@ func TestKirbyRetrievesJob(t *testing.T) {
 	// TAS Bot creates a save state first
 	originalJob := &Job{
 		ID:          "JOB_LOAD_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "kirby_checkpoint.html",
 		Status:      "queued",
 
@@ -102,7 +102,7 @@ func TestTASBotUpdatesJob(t *testing.T) {
 	// Create initial save state
 	job := &Job{
 		ID:          "JOB_UPDATE_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "update_test.html",
 		Status:      "queued",
 
@@ -148,10 +148,10 @@ func TestKirbyListsJobs(t *testing.T) {
 
 	// TAS Bot creates multiple save states
 	jobs := []*Job{
-		{ID: "JOB_LIST_001", HandlerName: "test.jd-extraction", Source: "save1.html", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_LIST_002", HandlerName: "test.jd-extraction", Source: "save2.html", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_LIST_003", HandlerName: "test.jd-extraction", Source: "save3.html", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_LIST_004", HandlerName: "test.jd-extraction", Source: "save4.html", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_001", HandlerName: "test.weather-sensor", Source: "station-1.dat", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_002", HandlerName: "test.weather-sensor", Source: "station-2.dat", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_003", HandlerName: "test.weather-sensor", Source: "station-3.dat", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_LIST_004", HandlerName: "test.weather-sensor", Source: "station-4.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 
 	for _, job := range jobs {
@@ -183,10 +183,10 @@ func TestTASBotListsActiveJobs(t *testing.T) {
 
 	// Create various save states
 	jobs := []*Job{
-		{ID: "JOB_ACTIVE_001", HandlerName: "test.jd-extraction", Source: "a1.html", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_ACTIVE_002", HandlerName: "test.jd-extraction", Source: "a2.html", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_ACTIVE_003", HandlerName: "test.jd-extraction", Source: "a3.html", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		{ID: "JOB_ACTIVE_004", HandlerName: "test.jd-extraction", Source: "a4.html", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_001", HandlerName: "test.weather-sensor", Source: "sensor-1.dat", Status: "queued", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_002", HandlerName: "test.weather-sensor", Source: "sensor-2.dat", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_003", HandlerName: "test.weather-sensor", Source: "sensor-3.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "JOB_ACTIVE_004", HandlerName: "test.weather-sensor", Source: "sensor-4.dat", Status: "running", CostEstimate: 0.10, CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 
 	for _, job := range jobs {
@@ -219,7 +219,7 @@ func TestKirbyDeletesJob(t *testing.T) {
 	// Create a save state
 	job := &Job{
 		ID:          "JOB_DELETE_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "delete_me.html",
 		Status:      "failed",
 
@@ -256,7 +256,7 @@ func TestTASBotParentJobHierarchy(t *testing.T) {
 	// Create parent save state
 	parentJob := &Job{
 		ID:          "JOB_PARENT_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "parent.html",
 		Status:      "running",
 
@@ -304,9 +304,9 @@ func TestCronosCleanupOldJobs(t *testing.T) {
 	recentTime := time.Now().Add(-1 * time.Hour)
 
 	oldJobs := []*Job{
-		{ID: "JOB_OLD_001", HandlerName: "test.jd-extraction", Source: "old1.html", Status: "completed", CostEstimate: 0.10, CreatedAt: oldTime, UpdatedAt: oldTime},
-		{ID: "JOB_OLD_002", HandlerName: "test.jd-extraction", Source: "old2.html", Status: "failed", CostEstimate: 0.10, CreatedAt: oldTime, UpdatedAt: oldTime},
-		{ID: "JOB_RECENT_001", HandlerName: "test.jd-extraction", Source: "recent.html", Status: "completed", CostEstimate: 0.10, CreatedAt: recentTime, UpdatedAt: recentTime},
+		{ID: "JOB_OLD_001", HandlerName: "test.weather-sensor", Source: "archive-1.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: oldTime, UpdatedAt: oldTime},
+		{ID: "JOB_OLD_002", HandlerName: "test.weather-sensor", Source: "archive-2.dat", Status: "failed", CostEstimate: 0.10, CreatedAt: oldTime, UpdatedAt: oldTime},
+		{ID: "JOB_RECENT_001", HandlerName: "test.weather-sensor", Source: "recent.dat", Status: "completed", CostEstimate: 0.10, CreatedAt: recentTime, UpdatedAt: recentTime},
 	}
 
 	for _, job := range oldJobs {
@@ -354,7 +354,7 @@ func TestKirbyPulseStateStorage(t *testing.T) {
 
 	job := &Job{
 		ID:          "JOB_PULSE_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "pulse_test.html",
 		Status:      "running",
 
@@ -404,7 +404,7 @@ func TestTASBotAndKirbyStoreIntegration(t *testing.T) {
 	t.Log("  TAS Bot: Creating initial save state...")
 	job := &Job{
 		ID:          "JOB_INTEGRATION_001",
-		HandlerName: "test.jd-extraction",
+		HandlerName: "test.weather-sensor",
 		Source:      "integration_test.html",
 		Status:      "queued",
 
