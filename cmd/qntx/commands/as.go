@@ -125,7 +125,37 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Actors:     %v\n", as.Actors)
 	fmt.Printf("  Timestamp:  %s\n", as.Timestamp.Format("2006-01-02 15:04:05"))
 
+	// Check bounded storage status and warn if approaching limits
+	warnings := boundedStore.CheckStorageStatus(as)
+	for _, warning := range warnings {
+		displayStorageWarning(warning)
+	}
+
 	return nil
+}
+
+// displayStorageWarning formats and displays a storage warning to the user
+func displayStorageWarning(w *storage.StorageWarning) {
+	fmt.Printf("\n⚠️  Bounded storage approaching limit\n")
+	fmt.Printf("    Current: %d/%d attestations for (%s, %s)\n",
+		w.Current, w.Limit, w.Actor, w.Context)
+
+	// Show pattern if accelerating
+	if w.AccelerationFactor > 1.5 {
+		fmt.Printf("    Pattern: Creating %.1f attestations/hour (%.1fx normal rate)\n",
+			w.RatePerHour, w.AccelerationFactor)
+	}
+
+	// Show projection
+	hours := w.TimeUntilFull.Hours()
+	if hours < 24 {
+		fmt.Printf("    Projection: Will hit %d-attestation limit in ~%.1f hours at current rate\n",
+			w.Limit, hours)
+	} else {
+		days := hours / 24.0
+		fmt.Printf("    Projection: Will hit %d-attestation limit in ~%.1f days at current rate\n",
+			w.Limit, days)
+	}
 }
 
 // generateVanityASID generates a vanity ASID with collision detection
@@ -153,4 +183,97 @@ func generateVanityASID(cmd *types.AsCommand, database *sql.DB) (string, error) 
 
 	// Generate ASID with empty actor seed
 	return id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
+}
+
+// checkBoundedStorageStatus checks if bounded storage limits are being approached
+// and displays warnings when 50-90% full, based on current creation rate
+func checkBoundedStorageStatus(database *sql.DB, as *types.As, cfg *am.Config) {
+	// Only check for non-self-certifying attestations
+	// Self-certifying ASIDs bypass the 64-actor limit
+	if len(as.Actors) > 0 && as.Actors[0] == as.ID {
+		return // Self-certifying, no need to warn
+	}
+
+	limit := cfg.Database.BoundedStorage.ActorContextLimit
+
+	// Check each (actor, context) pair
+	for _, actor := range as.Actors {
+		for _, context := range as.Contexts {
+			checkActorContextStatus(database, actor, context, limit)
+		}
+	}
+}
+
+// checkActorContextStatus checks a specific (actor, context) pair and warns if approaching limit
+func checkActorContextStatus(database *sql.DB, actor, context string, limit int) {
+	// Count current attestations for this (actor, context) pair
+	var count int
+	err := database.QueryRow(`
+		SELECT COUNT(*)
+		FROM attestations,
+		json_each(actors) as a,
+		json_each(contexts) as c
+		WHERE a.value = ? AND c.value = ?
+	`, actor, context).Scan(&count)
+
+	if err != nil {
+		return // Silently skip on error
+	}
+
+	fillPercent := float64(count) / float64(limit)
+
+	// Only warn if 50-90% full (at 100% the enforcement message already shows)
+	if fillPercent < 0.5 || fillPercent >= 1.0 {
+		return
+	}
+
+	// Calculate creation rate from different time windows
+	var lastHour, lastDay, lastWeek int
+	database.QueryRow(`
+		SELECT
+			SUM(CASE WHEN timestamp > datetime('now', '-1 hour') THEN 1 ELSE 0 END),
+			SUM(CASE WHEN timestamp > datetime('now', '-1 day') THEN 1 ELSE 0 END),
+			SUM(CASE WHEN timestamp > datetime('now', '-7 days') THEN 1 ELSE 0 END)
+		FROM attestations,
+		json_each(actors) as a,
+		json_each(contexts) as c
+		WHERE a.value = ? AND c.value = ?
+	`, actor, context).Scan(&lastHour, &lastDay, &lastWeek)
+
+	// Use day rate for projection (most stable for short-term prediction)
+	ratePerHour := float64(lastDay) / 24.0
+	if ratePerHour < 0.01 {
+		return // Too slow to matter
+	}
+
+	// Calculate time until full
+	remaining := limit - count
+	hoursUntilFull := float64(remaining) / ratePerHour
+
+	// Calculate acceleration factor (compare day to week)
+	normalRatePerHour := float64(lastWeek) / (24.0 * 7.0)
+	var accelerationFactor float64
+	if normalRatePerHour > 0.01 {
+		accelerationFactor = ratePerHour / normalRatePerHour
+	}
+
+	// Display warning
+	fmt.Printf("\n⚠️  Bounded storage approaching limit\n")
+	fmt.Printf("    Current: %d/%d attestations for (%s, %s)\n", count, limit, actor, context)
+
+	// Show pattern if accelerating
+	if accelerationFactor > 1.5 {
+		fmt.Printf("    Pattern: Creating %.1f attestations/hour (%.1fx normal rate)\n",
+			ratePerHour, accelerationFactor)
+	}
+
+	// Show projection
+	if hoursUntilFull < 24 {
+		fmt.Printf("    Projection: Will hit %d-attestation limit in ~%.1f hours at current rate\n",
+			limit, hoursUntilFull)
+	} else {
+		days := hoursUntilFull / 24.0
+		fmt.Printf("    Projection: Will hit %d-attestation limit in ~%.1f days at current rate\n",
+			limit, days)
+	}
 }
