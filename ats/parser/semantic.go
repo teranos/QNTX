@@ -6,6 +6,23 @@ import (
 	"github.com/teranos/QNTX/sym"
 )
 
+// keywordLookupMap provides O(1) keyword detection for isKeyword()
+var keywordLookupMap map[string]bool
+
+func init() {
+	// Build comprehensive keyword map from existing slices + additional temporal/action keywords
+	allKeywords := make([]string, 0, 20)
+	allKeywords = append(allKeywords, GrammaticalConnectors...)
+	allKeywords = append(allKeywords, ContextTransitionKeywords...)
+	allKeywords = append(allKeywords, ActorTransitionKeywords...)
+	allKeywords = append(allKeywords, "since", "until", "on", "between", "over", "so", "therefore", "at")
+
+	keywordLookupMap = make(map[string]bool, len(allKeywords))
+	for _, kw := range allKeywords {
+		keywordLookupMap[kw] = true
+	}
+}
+
 // SemanticTokenType classifies tokens by grammatical role in ATS queries
 type SemanticTokenType string
 
@@ -123,20 +140,9 @@ func isCommand(s string) bool {
 	return false
 }
 
-// isKeyword checks if value is an ATS grammatical keyword
-// TODO(issue #3): Refactor to use map for O(1) lookup instead of O(n) linear search
+// isKeyword checks if value is an ATS grammatical keyword using O(1) map lookup
 func isKeyword(s string) bool {
-	lower := strings.ToLower(s)
-	keywords := append(GrammaticalConnectors, ContextTransitionKeywords...)
-	keywords = append(keywords, ActorTransitionKeywords...)
-	keywords = append(keywords, "since", "until", "on", "between", "over", "so", "therefore", "at")
-
-	for _, kw := range keywords {
-		if lower == kw {
-			return true
-		}
-	}
-	return false
+	return keywordLookupMap[strings.ToLower(s)]
 }
 
 // isSymbol checks if value is a SEG symbol

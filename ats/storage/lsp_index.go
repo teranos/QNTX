@@ -11,6 +11,12 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
+const (
+	// MaxSymbolQueryResults limits the number of symbols returned in autocomplete queries
+	// to prevent memory exhaustion and ensure fast UI response times
+	MaxSymbolQueryResults = 1000
+)
+
 // SymbolIndex caches entities for fast autocomplete
 // Maintains counts of attestations for each symbol (subject/predicate/context/actor)
 // TODO(QNTX #47): Add methods for interactive hover exploration
@@ -101,17 +107,23 @@ func (idx *SymbolIndex) Refresh() error {
 	return nil
 }
 
-// querySymbols extracts all values from a JSON array column
-func (idx *SymbolIndex) querySymbols(ctx context.Context, column string) (map[string]int, error) {
-	// TODO(QNTX #46): Extract magic number 1000 to named constant
+// queryJSONArrayColumn extracts values and counts from a JSON array column in attestations
+// filterEmpty controls whether to exclude NULL and empty string values
+func (idx *SymbolIndex) queryJSONArrayColumn(ctx context.Context, column string, filterEmpty bool) (map[string]int, error) {
+	whereClause := ""
+	if filterEmpty {
+		whereClause = "WHERE value IS NOT NULL AND value != ''"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT value, COUNT(*) as count
 		FROM attestations,
 		json_each(%s)
+		%s
 		GROUP BY value
 		ORDER BY count DESC
-		LIMIT 1000
-	`, column)
+		LIMIT %d
+	`, column, whereClause, MaxSymbolQueryResults)
 
 	rows, err := idx.db.QueryContext(ctx, query)
 	if err != nil {
@@ -119,48 +131,27 @@ func (idx *SymbolIndex) querySymbols(ctx context.Context, column string) (map[st
 	}
 	defer rows.Close()
 
-	symbols := make(map[string]int)
+	results := make(map[string]int)
 	for rows.Next() {
-		var symbol string
+		var value string
 		var count int
-		if err := rows.Scan(&symbol, &count); err != nil {
+		if err := rows.Scan(&value, &count); err != nil {
 			return nil, err
 		}
-		symbols[symbol] = count
+		results[value] = count
 	}
 
-	return symbols, rows.Err()
+	return results, rows.Err()
+}
+
+// querySymbols extracts all values from a JSON array column
+func (idx *SymbolIndex) querySymbols(ctx context.Context, column string) (map[string]int, error) {
+	return idx.queryJSONArrayColumn(ctx, column, false)
 }
 
 // queryActors extracts actors from JSON array in attestations
 func (idx *SymbolIndex) queryActors(ctx context.Context) (map[string]int, error) {
-	query := `
-		SELECT value, COUNT(*) as count
-		FROM attestations,
-		json_each(actors)
-		WHERE value IS NOT NULL AND value != ''
-		GROUP BY value
-		ORDER BY count DESC
-		LIMIT 1000
-	`
-
-	rows, err := idx.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	actors := make(map[string]int)
-	for rows.Next() {
-		var actor string
-		var count int
-		if err := rows.Scan(&actor, &count); err != nil {
-			return nil, err
-		}
-		actors[actor] = count
-	}
-
-	return actors, rows.Err()
+	return idx.queryJSONArrayColumn(ctx, "actors", true)
 }
 
 // GetAttestationCount returns count for a symbol
