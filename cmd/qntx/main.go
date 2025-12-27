@@ -20,15 +20,17 @@ Available commands:
   am    - Manage QNTX core configuration ("I am")
   as    - Create attestation assertions
   db    - Manage QNTX database operations
+  pulse - Manage Pulse daemon (async job processor + scheduler)
+  ix    - Manage async ingestion jobs
 
 Future commands:
   ax    - Query attestations
-  ix    - Ingest data and generate attestations
 
 Examples:
   qntx am show             # Show current configuration
-  qntx am validate         # Validate configuration
-  qntx db stats            # Show database statistics and storage telemetry`,
+  qntx pulse start         # Start Pulse daemon
+  qntx ix ls               # List async jobs
+  qntx db stats            # Show database statistics`,
 }
 
 func init() {
@@ -36,6 +38,8 @@ func init() {
 	rootCmd.AddCommand(commands.AmCmd)
 	rootCmd.AddCommand(commands.AsCmd)
 	rootCmd.AddCommand(commands.DbCmd)
+	rootCmd.AddCommand(commands.PulseCmd)
+	rootCmd.AddCommand(commands.IxCmd)
 }
 
 func main() {
