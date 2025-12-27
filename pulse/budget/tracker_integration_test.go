@@ -5,24 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/db"
-
-	_ "github.com/mattn/go-sqlite3"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// createTestDB creates a fresh in-memory database for testing
-func createTestDB(t *testing.T) *sql.DB {
-	database, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-
-	// Run migrations to set up schema
-	err = db.Migrate(database, nil)
-	require.NoError(t, err)
-
-	return database
-}
 
 // insertUsageRecord inserts a record into ai_model_usage table for testing
 func insertUsageRecord(t *testing.T, db *sql.DB, timestamp time.Time, cost float64, success bool) {
@@ -57,7 +43,7 @@ func insertUsageRecord(t *testing.T, db *sql.DB, timestamp time.Time, cost float
 // Note: Tests calendar-based windows (today, this month). See issue #198 for sliding window enhancement.
 func TestBudgetTracker_GetStatus(t *testing.T) {
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -91,7 +77,7 @@ func TestBudgetTracker_GetStatus(t *testing.T) {
 
 // TestBudgetTracker_GetStatus_NoUsage tests status with no prior usage
 func TestBudgetTracker_GetStatus_NoUsage(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -116,7 +102,7 @@ func TestBudgetTracker_GetStatus_NoUsage(t *testing.T) {
 
 // TestBudgetTracker_CheckBudget_WithinLimits tests budget check when within limits
 func TestBudgetTracker_CheckBudget_WithinLimits(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -141,7 +127,7 @@ func TestBudgetTracker_CheckBudget_WithinLimits(t *testing.T) {
 // Note: Tests calendar-based daily limit. See issue #198 for sliding window enhancement.
 func TestBudgetTracker_CheckBudget_ExceedsDailyLimit(t *testing.T) {
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -168,7 +154,7 @@ func TestBudgetTracker_CheckBudget_ExceedsDailyLimit(t *testing.T) {
 
 // TestBudgetTracker_CheckBudget_ExceedsMonthlyLimit tests monthly budget enforcement
 func TestBudgetTracker_CheckBudget_ExceedsMonthlyLimit(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -196,7 +182,7 @@ func TestBudgetTracker_CheckBudget_ExceedsMonthlyLimit(t *testing.T) {
 
 // TestBudgetTracker_CheckBudget_ExactLimit tests edge case at exact budget limit
 func TestBudgetTracker_CheckBudget_ExactLimit(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -222,7 +208,7 @@ func TestBudgetTracker_CheckBudget_ExactLimit(t *testing.T) {
 
 // TestBudgetTracker_EstimateOperationCost tests cost estimation
 func TestBudgetTracker_EstimateOperationCost(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -255,7 +241,7 @@ func TestBudgetTracker_EstimateOperationCost(t *testing.T) {
 
 // TestBudgetTracker_UpdateDailyBudget tests updating daily budget limits
 func TestBudgetTracker_UpdateDailyBudget(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -282,7 +268,7 @@ func TestBudgetTracker_UpdateDailyBudget(t *testing.T) {
 
 // TestBudgetTracker_UpdateMonthlyBudget tests updating monthly budget limits
 func TestBudgetTracker_UpdateMonthlyBudget(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -308,7 +294,7 @@ func TestBudgetTracker_UpdateMonthlyBudget(t *testing.T) {
 
 // TestBudgetTracker_UpdateBudget_NegativeValues tests validation of negative budgets
 func TestBudgetTracker_UpdateBudget_NegativeValues(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -337,7 +323,7 @@ func TestBudgetTracker_UpdateBudget_NegativeValues(t *testing.T) {
 
 // TestBudgetTracker_IgnoresFailedOperations tests that failed operations don't count toward budget
 func TestBudgetTracker_IgnoresFailedOperations(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -368,7 +354,7 @@ func TestBudgetTracker_IgnoresFailedOperations(t *testing.T) {
 
 // TestBudgetTracker_MultipleConcurrentOperations tests thread safety
 func TestBudgetTracker_MultipleConcurrentOperations(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -404,7 +390,7 @@ func TestBudgetTracker_MultipleConcurrentOperations(t *testing.T) {
 
 // TestBudgetTracker_ZeroBudget tests edge case with zero budget
 func TestBudgetTracker_ZeroBudget(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{
@@ -427,7 +413,7 @@ func TestBudgetTracker_ZeroBudget(t *testing.T) {
 
 // TestBudgetTracker_GetBudgetLimits tests retrieving current budget configuration
 func TestBudgetTracker_GetBudgetLimits(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	config := BudgetConfig{

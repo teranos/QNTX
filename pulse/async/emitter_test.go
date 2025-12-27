@@ -22,7 +22,7 @@ import (
 
 func TestEmitter_CoreFunctionality(t *testing.T) {
 	// Setup: Create test database and queue
-	testDB := createTestDB(t)
+	testDB := qntxtest.CreateTestDB(t)
 	queue := NewQueue(testDB)
 	logger := zaptest.NewLogger(t).Sugar()
 
