@@ -12,17 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db"
 )
 
 func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 	// Create in-memory test database
 	testDB := qntxtest.CreateTestDB(t)
-	require.NoError(t, err)
-
-	// Use migrations to create all tables (attestations from migration 025, aliases from migration 052)
-	err = db.Migrate(testDB, nil)
-	require.NoError(t, err)
 
 	// Create test attestations using the existing CreateAttestation function
 	testTime1, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
@@ -87,7 +81,7 @@ func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 	// Insert using the CreateAttestation function from storage package
 	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
-		err = store.CreateAttestation(attestation)
+		err := store.CreateAttestation(attestation)
 		require.NoError(t, err)
 	}
 
@@ -96,7 +90,6 @@ func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 
 func TestAxExecutorBasicQueries(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
@@ -193,7 +186,6 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 
 func TestAxExecutorTemporalFiltering(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
@@ -253,7 +245,6 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 /*
 func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
@@ -284,7 +275,6 @@ func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
 /*
 func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
@@ -315,7 +305,6 @@ func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
 
 func TestAxExecutorLimitHandling(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
@@ -389,8 +378,7 @@ func TestAxExecutorEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh database and executor for each subtest
 			db := setupTestDatabaseWithAttestations(t)
-			defer db.Close()
-			executor := NewExecutor(db)
+					executor := NewExecutor(db)
 
 			result, err := executor.ExecuteAsk(context.Background(), tt.filter)
 			require.NoError(t, err)
