@@ -20,7 +20,7 @@ const (
 	queryStorageStats = `
 		SELECT
 			COUNT(*) as total_attestations,
-			COUNT(DISTINCT actor) as unique_actors,
+			COUNT(DISTINCT json_extract(actors, '$[0]')) as unique_actors,
 			COUNT(DISTINCT json_extract(subjects, '$')) as unique_subjects,
 			COUNT(DISTINCT json_extract(contexts, '$')) as unique_contexts
 		FROM attestations`
@@ -45,6 +45,19 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 	if config == nil {
 		config = DefaultBoundedStoreConfig()
 	}
+
+	// Validate config: zero or negative limits are invalid for bounded storage
+	// Unlike am package where 0 can mean "disabled", bounded storage requires positive limits
+	if config.ActorContextLimit <= 0 {
+		config.ActorContextLimit = DefaultActorContextLimit
+	}
+	if config.ActorContextsLimit <= 0 {
+		config.ActorContextsLimit = DefaultActorContextsLimit
+	}
+	if config.EntityActorsLimit <= 0 {
+		config.EntityActorsLimit = DefaultEntityActorsLimit
+	}
+
 	return &BoundedStore{
 		db:     db,
 		store:  NewSQLStore(db, logger),
