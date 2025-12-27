@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
 
@@ -110,7 +111,7 @@ func RetryableError(queue *Queue, job *Job, operation string, err error, log *za
 				"error", updateErr,
 			)
 		} else {
-			log.Infow("꩜ Retry scheduled",
+			log.Infow(sym.Pulse+" Retry scheduled",
 				"retry_count", job.RetryCount,
 				"max_retries", MaxRetries,
 				"operation", operation,
@@ -118,7 +119,7 @@ func RetryableError(queue *Queue, job *Job, operation string, err error, log *za
 		}
 		return fmt.Errorf("retriable: %w", err)
 	}
-	log.Warnw("꩜ Max retries exceeded",
+	log.Warnw(sym.Pulse+" Max retries exceeded",
 		"max_retries", MaxRetries,
 		"operation", operation,
 	)

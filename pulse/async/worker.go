@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
 
@@ -567,7 +568,7 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 		}
 		// Log rate limit status for visibility
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
-		wp.logger.SugaredLogger.Infow(fmt.Sprintf("꩜ Rate limit reached - job paused | calls:%d/%d remaining:%d | job:%s",
+		wp.logger.SugaredLogger.Infow(fmt.Sprintf(sym.Pulse+" Rate limit reached - job paused | calls:%d/%d remaining:%d | job:%s",
 			callsInWindow, callsInWindow+callsRemaining, callsRemaining, job.ID[:12]),
 			"job_id", job.ID,
 			"calls_in_window", callsInWindow,
@@ -595,7 +596,7 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 			dailyLimit := status.DailySpend + status.DailyRemaining
 			monthlyLimit := status.MonthlySpend + status.MonthlyRemaining
 
-			wp.logger.SugaredLogger.Infow(fmt.Sprintf("꩜ Budget exceeded - job %s | daily:$%.2f/$%.2f monthly:$%.2f/$%.2f | job:%s",
+			wp.logger.SugaredLogger.Infow(fmt.Sprintf(sym.Pulse+" Budget exceeded - job %s | daily:$%.2f/$%.2f monthly:$%.2f/$%.2f | job:%s",
 				func() string {
 					if wp.poolConfig.PauseOnBudget {
 						return "paused"
