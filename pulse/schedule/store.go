@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -167,7 +168,9 @@ func (s *Store) GetJob(id string) (*Job, error) {
 	return &job, nil
 }
 
-// ListJobsDue returns scheduled jobs that are ready to run
+// ListJobsDue returns scheduled jobs that are ready to run.
+// Results are ordered by next_run_at ASC (oldest due jobs first) for deterministic execution.
+// Limited to 100 jobs per batch to prevent overwhelming the worker pool.
 func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 	query := `
 		SELECT id, ats_code, handler_name, payload, source_url,
@@ -261,8 +264,107 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 	return jobs, rows.Err()
 }
 
-// ListAllScheduledJobs returns all scheduled jobs (excludes deleted)
-// Used by the Pulse panel to show all jobs (active, paused, stopping, inactive)
+// ListJobsDueContext returns scheduled jobs that are ready to run with context support.
+// Allows graceful cancellation of long-running database queries during shutdown.
+// Results are ordered by next_run_at ASC (oldest due jobs first) for deterministic execution.
+// Limited to 100 jobs per batch to prevent overwhelming the worker pool.
+func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, error) {
+	query := `
+		SELECT id, ats_code, handler_name, payload, source_url,
+		       interval_seconds, next_run_at, last_run_at,
+		       last_execution_id, state, created_from_doc_id, metadata,
+		       created_at, updated_at
+		FROM scheduled_pulse_jobs
+		WHERE state = ? AND next_run_at <= ?
+		ORDER BY next_run_at ASC
+		LIMIT 100
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, StateActive, now.Format(time.RFC3339))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []*Job
+	for rows.Next() {
+		var job Job
+		var nextRunAt, createdAt, updatedAt string
+		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
+		var handlerName, payload, sourceURL sql.NullString
+
+		err := rows.Scan(
+			&job.ID,
+			&job.ATSCode,
+			&handlerName,
+			&payload,
+			&sourceURL,
+			&job.IntervalSeconds,
+			&nextRunAt,
+			&lastRunAt,
+			&lastExecutionID,
+			&job.State,
+			&createdFromDoc,
+			&metadata,
+			&createdAt,
+			&updatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
+		job.NextRunAt, err = time.Parse(time.RFC3339, nextRunAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse next_run_at for job %s: %w", job.ID, err)
+		}
+
+		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse created_at for job %s: %w", job.ID, err)
+		}
+
+		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse updated_at for job %s: %w", job.ID, err)
+		}
+
+		if lastRunAt.Valid {
+			t, err := time.Parse(time.RFC3339, lastRunAt.String)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse last_run_at for job %s: %w", job.ID, err)
+			}
+			job.LastRunAt = &t
+		}
+		if lastExecutionID.Valid {
+			job.LastExecutionID = lastExecutionID.String
+		}
+		if createdFromDoc.Valid {
+			job.CreatedFromDoc = createdFromDoc.String
+		}
+		if metadata.Valid {
+			job.Metadata = metadata.String
+		}
+		if handlerName.Valid {
+			job.HandlerName = handlerName.String
+		}
+		if payload.Valid {
+			job.Payload = []byte(payload.String)
+		}
+		if sourceURL.Valid {
+			job.SourceURL = sourceURL.String
+		}
+
+		jobs = append(jobs, &job)
+	}
+
+	return jobs, rows.Err()
+}
+
+// ListAllScheduledJobs returns all scheduled jobs (excludes deleted).
+// Results are ordered by created_at DESC (newest jobs first) for UI display.
+// Limited to 1000 jobs to prevent excessive memory usage.
+// Used by the Pulse panel to show all jobs (active, paused, stopping, inactive).
 func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 	query := `
 		SELECT id, ats_code, handler_name, payload, source_url,
