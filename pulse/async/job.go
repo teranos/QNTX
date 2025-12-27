@@ -50,12 +50,12 @@ func (p Progress) Percentage() float64 {
 //
 // ARCHITECTURE: Generic job system with handler-based execution
 // - Infrastructure (pulse/async) is domain-agnostic
-// - Domain packages (role, ix, etc.) provide handlers and payloads
+// - Domain packages provide handlers and payloads
 // - HandlerName identifies which handler executes the job
 // - Payload contains handler-specific data (domain logic controls structure)
 type Job struct {
 	ID           string          `json:"id"`
-	HandlerName  string          `json:"handler_name"`      // "role.vacancies-scraper", "role.jd-ingestion"
+	HandlerName  string          `json:"handler_name"`      // "data.batch-import", "bio.sequence-align"
 	Payload      json.RawMessage `json:"payload,omitempty"` // Handler-specific data (domain-owned)
 	Source       string          `json:"source"`            // For deduplication and logging
 	Status       JobStatus       `json:"status"`
