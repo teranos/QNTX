@@ -1,7 +1,6 @@
 package async
 
 import (
-	"database/sql"
 	"testing"
 	"time"
 
