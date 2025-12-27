@@ -67,7 +67,7 @@ func (bs *BoundedStore) checkActorContext(actor, context string) *StorageWarning
 
 	// Calculate creation rates
 	var lastHour, lastDay, lastWeek int
-	bs.db.QueryRow(`
+	err = bs.db.QueryRow(`
 		SELECT
 			SUM(CASE WHEN timestamp > datetime('now', '-1 hour') THEN 1 ELSE 0 END),
 			SUM(CASE WHEN timestamp > datetime('now', '-1 day') THEN 1 ELSE 0 END),
@@ -77,6 +77,10 @@ func (bs *BoundedStore) checkActorContext(actor, context string) *StorageWarning
 		json_each(contexts) as c
 		WHERE a.value = ? AND c.value = ?
 	`, actor, context).Scan(&lastHour, &lastDay, &lastWeek)
+
+	if err != nil {
+		return nil // Skip on error
+	}
 
 	// Use day rate for projection (most stable)
 	ratePerHour := float64(lastDay) / 24.0
