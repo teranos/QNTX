@@ -17,3 +17,4 @@ CREATE INDEX IF NOT EXISTS idx_storage_events_type ON storage_events(event_type)
 CREATE INDEX IF NOT EXISTS idx_storage_events_actor ON storage_events(actor);
 CREATE INDEX IF NOT EXISTS idx_storage_events_entity ON storage_events(entity);
 CREATE INDEX IF NOT EXISTS idx_storage_events_timestamp ON storage_events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_storage_events_created_at ON storage_events(created_at DESC);
