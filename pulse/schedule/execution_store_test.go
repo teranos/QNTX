@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"fmt"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestCreateExecution(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Create a scheduled job first
 	jobStore := NewStore(db)
@@ -53,7 +54,7 @@ func TestCreateExecution(t *testing.T) {
 }
 
 func TestUpdateExecution(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Setup job and execution
 	jobStore := NewStore(db)
@@ -106,7 +107,7 @@ func TestUpdateExecution(t *testing.T) {
 }
 
 func TestUpdateExecutionWithError(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Setup job and execution
 	jobStore := NewStore(db)
@@ -155,7 +156,7 @@ func TestUpdateExecutionWithError(t *testing.T) {
 }
 
 func TestListExecutions(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Setup job
 	jobStore := NewStore(db)
@@ -216,7 +217,7 @@ func TestListExecutions(t *testing.T) {
 }
 
 func TestListExecutionsWithPagination(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Setup job
 	jobStore := NewStore(db)
@@ -263,7 +264,7 @@ func TestListExecutionsWithPagination(t *testing.T) {
 }
 
 func TestListExecutionsWithStatusFilter(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Setup job
 	jobStore := NewStore(db)
@@ -321,7 +322,7 @@ func TestListExecutionsWithStatusFilter(t *testing.T) {
 }
 
 func TestGetExecutionNotFound(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	execStore := NewExecutionStore(db)
 
 	_, err := execStore.GetExecution("PEX_nonexistent")
@@ -330,7 +331,7 @@ func TestGetExecutionNotFound(t *testing.T) {
 }
 
 func TestUpdateExecutionNotFound(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	execStore := NewExecutionStore(db)
 
 	exec := &Execution{
@@ -345,7 +346,7 @@ func TestUpdateExecutionNotFound(t *testing.T) {
 }
 
 func TestCleanupOldExecutions(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Create a scheduled job first
 	jobStore := NewStore(db)
@@ -399,7 +400,7 @@ func TestCleanupOldExecutions(t *testing.T) {
 }
 
 func TestCleanupOldExecutions_NoneToDelete(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Create a scheduled job first
 	jobStore := NewStore(db)

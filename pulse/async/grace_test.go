@@ -26,7 +26,7 @@ func TestGRACEShutdownFlow(t *testing.T) {
 		t.Skip("Skipping slow integration test in -short mode")
 	}
 	// Create test database (use existing test helper)
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 
 	// Create test config
 	cfg := &am.Config{
@@ -142,7 +142,7 @@ WaitForRunning:
 
 // TestGRACECheckpointSaving tests that checkpoints are saved correctly
 func TestGRACECheckpointSaving(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	ctx := context.Background()
@@ -180,7 +180,7 @@ func TestGRACECheckpointSaving(t *testing.T) {
 
 // TestGRACEWorkerShutdownTimeout tests worker shutdown timeout behavior
 func TestGRACEWorkerShutdownTimeout(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -206,7 +206,7 @@ func TestGRACEWorkerShutdownTimeout(t *testing.T) {
 
 // TestGRACENoJobsRunning tests graceful start with no orphaned jobs
 func TestGRACENoJobsRunning(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Start with empty queue (no orphaned jobs)
@@ -225,7 +225,7 @@ func TestGRACENoJobsRunning(t *testing.T) {
 
 // TestGRACEGracefulStart tests recovery of orphaned jobs on worker start
 func TestGRACEGracefulStart(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Simulate crash: Create jobs in "running" state (orphaned)
@@ -285,7 +285,7 @@ func TestGRACEGracefulStart(t *testing.T) {
 
 // TestGRACEGracefulStartNoOrphans verifies clean start with no orphaned jobs
 func TestGRACEGracefulStartNoOrphans(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Create a completed job and a queued job (not orphaned)
@@ -350,7 +350,7 @@ func TestGRACEGradualRecovery(t *testing.T) {
 		t.Skip("Skipping slow timing test in -short mode")
 	}
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Simulate crash: Create 12 orphaned jobs
@@ -435,7 +435,7 @@ func TestGRACEGradualRecovery(t *testing.T) {
 
 // TestGRACECrashAndRestart simulates a full crash and restart cycle
 func TestGRACECrashAndRestart(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Phase 1: Start worker, enqueue job, simulate crash mid-execution
@@ -489,7 +489,7 @@ func TestGRACECrashAndRestart(t *testing.T) {
 // TestGRACEPhaseRecoveryNoChildTasks tests orphaned job recovery when no child tasks exist
 // Note: Phase-specific recovery logic has been removed (domain logic belongs in handlers)
 func TestGRACEPhaseRecoveryNoChildTasks(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	// Simulate crash scenario: Parent job was running with no child tasks
@@ -539,7 +539,7 @@ func TestGRACEPhaseRecoveryNoChildTasks(t *testing.T) {
 // TestGRACEPhaseRecoveryWithChildTasks tests orphaned parent job recovery with child tasks
 // Note: Phase-specific recovery logic has been removed (domain logic belongs in handlers)
 func TestGRACEPhaseRecoveryWithChildTasks(t *testing.T) {
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
 	queue := NewQueue(db)

@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/db"
-	_ "github.com/mattn/go-sqlite3"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // TestTracker_ReadsFromActualUsage verifies that Tracker reads actual spend from ai_model_usage
 func TestTracker_ReadsFromActualUsage(t *testing.T) {
-	db := setupTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	// Given: 3 API calls totaling $3.50 recorded in ai_model_usage
@@ -50,7 +49,7 @@ func TestTracker_ReadsFromActualUsage(t *testing.T) {
 
 // TestTracker_EnforcesDailyLimit verifies that budget enforcement blocks jobs when daily limit exceeded
 func TestTracker_EnforcesDailyLimit(t *testing.T) {
-	db := setupTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	// Given: $4.50 spent today in ai_model_usage
@@ -79,7 +78,7 @@ func TestTracker_EnforcesDailyLimit(t *testing.T) {
 
 // TestTracker_AllowsWithinLimits verifies that jobs are allowed when within budget
 func TestTracker_AllowsWithinLimits(t *testing.T) {
-	db := setupTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	// Given: $2.00 spent today
@@ -105,7 +104,7 @@ func TestTracker_AllowsWithinLimits(t *testing.T) {
 
 // TestTracker_EnforcesMonthlyLimit verifies that monthly budget limit is enforced
 func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
-	db := setupTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	// Given: $28 spent this month in ai_model_usage
@@ -139,7 +138,7 @@ func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
 
 // TestTracker_MultipleJobsCounted verifies that all jobs' usage is correctly summed
 func TestTracker_MultipleJobsCounted(t *testing.T) {
-	db := setupTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
 	// Given: Job A cost $2.50, Job B cost $1.50 (both today)
@@ -172,20 +171,7 @@ func TestTracker_MultipleJobsCounted(t *testing.T) {
 
 func setupTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	// Create in-memory database with migrations
-	database, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Run migrations to create tables (including ai_model_usage)
-	err = db.Migrate(database, nil)
-	if err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
-
-	return database
+	return qntxtest.CreateTestDB(t)
 }
 
 func insertUsage(t *testing.T, db *sql.DB, timestamp time.Time, costUSD float64) {
