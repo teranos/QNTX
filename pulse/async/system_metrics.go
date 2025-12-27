@@ -54,7 +54,11 @@ func (wp *WorkerPool) GetSystemMetrics() SystemMetrics {
 		memPercent = (memUsedGB / memTotalGB) * 100
 	}
 
-	queued, running := wp.queue.GetJobCounts()
+	queued, running, err := wp.queue.GetJobCounts()
+	// Gracefully handle database errors - return 0s if query fails
+	if err != nil {
+		queued, running = 0, 0
+	}
 
 	wp.mu.Lock()
 	activeWorkers := wp.activeWorkers
