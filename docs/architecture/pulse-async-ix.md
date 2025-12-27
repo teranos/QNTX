@@ -158,7 +158,7 @@ CREATE INDEX idx_async_ix_jobs_source_handler ON async_ix_jobs(source, handler_n
 
 ### Core Components
 
-#### Rate Limiter (`internal/pulse/budget/limiter.go`)
+#### Rate Limiter (`pulse/budget/limiter.go`)
 
 Sliding window rate limiter with configurable calls per minute:
 
@@ -211,9 +211,9 @@ func (b *Tracker) GetStatus() (*Status, error) {
 }
 ```
 
-**Package:** `internal/pulse/budget` - Separated from async to eliminate import cycles
+**Package:** `pulse/budget` - Separated from async to eliminate import cycles
 
-#### Job Queue (`internal/pulse/async/queue.go`)
+#### Job Queue (`pulse/async/queue.go`)
 
 Manages async job lifecycle:
 
@@ -241,7 +241,7 @@ func (q *Queue) CompleteJob(jobID string) error
 func (q *Queue) FailJob(jobID string, err error) error
 ```
 
-#### Worker Pool (`internal/pulse/async/worker.go`)
+#### Worker Pool (`pulse/async/worker.go`)
 
 Processes jobs with pulse integration:
 
@@ -286,13 +286,12 @@ func (wp *WorkerPool) processNextJob() error {
 - ✅ Budget checking before operations
 - ✅ Cost recording after operations
 - ✅ Database migrations
-- ✅ **Refactored (Dec 2025)**: Separated budget/rate limiting into `internal/pulse/budget` package
+- ✅ **Refactored (Dec 2025)**: Separated budget/rate limiting into `pulse/budget` package
 
 **Files:**
-- `internal/pulse/budget/limiter.go` - Rate limiter
-- `internal/pulse/budget/tracker.go` - Budget tracker
-- `internal/pulse/budget/store.go` - Budget persistence
-- `internal/pulse/store.go` - Scheduled jobs persistence
+- `pulse/budget/limiter.go` - Rate limiter
+- `pulse/budget/tracker.go` - Budget tracker
+- `pulse/budget/store.go` - Budget persistence
 
 **Architecture Benefits:**
 - Clean separation of concerns (budget tracking vs job execution)
@@ -310,13 +309,15 @@ func (wp *WorkerPool) processNextJob() error {
 - ✅ Rate limiting enforcement
 - ✅ Unit tests (41/41 passing)
 - ✅ **Refactored (Dec 2025)**: Generic handler-based architecture
+- ✅ **GRACE shutdown (Dec 2025)**: Graceful startup/shutdown with orphan recovery
 
 **Files:**
-- `internal/pulse/async/job.go` - Generic job model (handler-based)
-- `internal/pulse/async/handler.go` - JobHandler interface and registry
-- `internal/pulse/async/store.go` - Job persistence
-- `internal/pulse/async/queue.go` - Queue operations
-- `internal/pulse/async/worker.go` - Worker pool with budget integration
+- `pulse/async/job.go` - Generic job model (handler-based)
+- `pulse/async/handler.go` - JobHandler interface and registry
+- `pulse/async/store.go` - Job persistence
+- `pulse/async/queue.go` - Queue operations
+- `pulse/async/worker.go` - Worker pool with budget integration
+- `pulse/async/grace_test.go` - GRACE shutdown tests
 
 ## Testing Strategy
 
@@ -339,6 +340,7 @@ Full async workflow end-to-end:
 - Rate limiting enforcement
 - Pause/resume functionality
 - Worker pool lifecycle
+- Graceful shutdown (GRACE)
 
 ## Future Enhancements
 
@@ -379,8 +381,137 @@ Reduce API costs through intelligent caching:
 - Time-based cache expiration
 - Batch API calls (when supported)
 
+## Use Case Examples
+
+### Example 1: Batch Data Processing
+
+```go
+// Define payload type for your domain
+type BatchProcessPayload struct {
+    SourceURL string   `json:"source_url"`
+    RecordIDs []string `json:"record_ids"`
+    BatchType string   `json:"batch_type"`
+}
+
+// Implement handler
+type BatchProcessHandler struct {
+    dataService DataService
+    queue       *async.Queue
+    logger      *zap.Logger
+}
+
+func (h *BatchProcessHandler) Name() string {
+    return "data.batch-process"
+}
+
+func (h *BatchProcessHandler) Execute(ctx context.Context, job *async.Job) error {
+    var payload BatchProcessPayload
+    if err := json.Unmarshal(job.Payload, &payload); err != nil {
+        return fmt.Errorf("invalid payload: %w", err)
+    }
+
+    // Process with progress tracking and cost recording
+    for i, recordID := range payload.RecordIDs {
+        // Check for cancellation
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+
+        // Process record (with API call cost)
+        if err := h.dataService.ProcessRecord(ctx, recordID); err != nil {
+            return fmt.Errorf("failed to process record %s: %w", recordID, err)
+        }
+
+        // Update progress
+        job.Progress.Current = i + 1
+        job.CostActual += 0.001 // $0.001 per API call
+        if err := h.queue.UpdateJob(job); err != nil {
+            h.logger.Warn("Failed to update job progress", zap.Error(err))
+        }
+    }
+
+    return nil
+}
+
+// Register handler
+registry := async.NewHandlerRegistry()
+registry.Register(&BatchProcessHandler{
+    dataService: myDataService,
+    queue:       queue,
+    logger:      logger,
+})
+```
+
+### Example 2: ML Model Inference
+
+```go
+type InferencePayload struct {
+    ModelName  string   `json:"model_name"`
+    InputData  []string `json:"input_data"`
+    BatchSize  int      `json:"batch_size"`
+}
+
+type InferenceHandler struct {
+    mlService MLService
+    queue     *async.Queue
+}
+
+func (h *InferenceHandler) Name() string {
+    return "ml.inference"
+}
+
+func (h *InferenceHandler) Execute(ctx context.Context, job *async.Job) error {
+    var payload InferencePayload
+    if err := json.Unmarshal(job.Payload, &payload); err != nil {
+        return fmt.Errorf("invalid payload: %w", err)
+    }
+
+    // Run inference with cost tracking
+    results, cost, err := h.mlService.RunInference(ctx, payload.ModelName, payload.InputData)
+    if err != nil {
+        return err
+    }
+
+    job.CostActual += cost
+    return h.queue.UpdateJob(job)
+}
+```
+
+## Budget Exceeded Workflow
+
+When daily or monthly budget is exceeded, jobs are automatically paused:
+
+```
+User Operation:
+  → Pulse checks budget
+  → Daily budget exceeded: $5.02 / $5.00
+
+Response:
+  ✗ Daily budget exceeded: $5.02 / $5.00
+    Projected cost: $0.040 USD
+    Options:
+      1. Reduce batch size
+      2. Increase daily budget (config: pulse.daily_budget_usd)
+      3. Wait until tomorrow (budget resets at midnight UTC)
+```
+
+**Automatic Pause Behavior:**
+- Job transitions to `paused` status
+- `PulseState.IsPaused = true`
+- `PauseReason = "budget_exceeded"`
+- Workers skip paused jobs
+- User can manually resume after budget increase
+
+**Budget Reset:**
+- Daily budgets reset at midnight UTC
+- Monthly budgets reset on 1st of month
+- Paused jobs automatically resume on reset (if configured)
+
 ## Related Documentation
 
+- **GRACE Shutdown**: `docs/development/grace.md` - Graceful startup/shutdown system
 - **Handler Implementation**: Applications define domain-specific handlers implementing the JobHandler interface
-- **Configuration**: Applications configure pulse settings in their config.toml
-- **Integration Examples**: See application-specific documentation for integration patterns
+- **Configuration**: `docs/architecture/config-system.md` - Configuration system including Pulse settings
+- **Resource Coordination**: `docs/architecture/pulse-resource-coordination.md` - GPU and system resource management
