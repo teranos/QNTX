@@ -38,6 +38,6 @@ CREATE TABLE IF NOT EXISTS pulse_executions (
 );
 
 -- Indexes for common query patterns
-CREATE INDEX idx_pulse_executions_job ON pulse_executions(scheduled_job_id);      -- List executions for a job
-CREATE INDEX idx_pulse_executions_status ON pulse_executions(status);             -- Filter by status (running/failed)
-CREATE INDEX idx_pulse_executions_started ON pulse_executions(started_at DESC);   -- Sort by most recent first
+CREATE INDEX IF NOT EXISTS idx_pulse_executions_job ON pulse_executions(scheduled_job_id);      -- List executions for a job
+CREATE INDEX IF NOT EXISTS idx_pulse_executions_status ON pulse_executions(status);             -- Filter by status (running/failed)
+CREATE INDEX IF NOT EXISTS idx_pulse_executions_started ON pulse_executions(started_at DESC);   -- Sort by most recent first

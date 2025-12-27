@@ -1,0 +1,192 @@
+# QNTX Configuration Example
+# Copy this file to ~/.qntx/am.toml and customize as needed
+# All settings shown here are defaults - uncomment to override
+
+# ════════════════════════════════════════════════════════════════
+# Database Configuration
+# ════════════════════════════════════════════════════════════════
+
+[database]
+# SQLite database path (relative to working directory or absolute)
+# Default: "qntx.db"
+# Environment: QNTX_DATABASE_PATH
+path = "qntx.db"
+
+[database.bounded_storage]
+# Bounded storage limits prevent unbounded database growth
+# These limits are enforced via automatic deletion of oldest attestations
+# Deletions are logged to storage_events table for observability
+
+# Maximum attestations per (actor, context) pair
+# When exceeded, oldest attestations for this pair are deleted
+# Default: 16
+actor_context_limit = 16
+
+# Maximum contexts per actor
+# When exceeded, oldest context's attestations for this actor are deleted
+# Default: 64
+actor_contexts_limit = 64
+
+# Maximum actors per entity (subject)
+# When exceeded, oldest actor's attestations for this entity are deleted
+# Default: 64
+entity_actors_limit = 64
+
+# ════════════════════════════════════════════════════════════════
+# Server Configuration (Web UI)
+# ════════════════════════════════════════════════════════════════
+
+[server]
+# HTTP server port for QNTX web UI
+# Default: 877 (development), fallback 7878 (production)
+port = 877
+
+# Allowed CORS origins for web UI access
+# Default: localhost and 127.0.0.1 (HTTP and HTTPS)
+allowed_origins = [
+    "http://localhost",
+    "https://localhost",
+    "http://127.0.0.1",
+    "https://127.0.0.1"
+]
+
+# Log output color theme: "everforest" or "gruvbox"
+# Default: "everforest"
+log_theme = "everforest"
+
+# ════════════════════════════════════════════════════════════════
+# Pulse Configuration (Async Job System)
+# ════════════════════════════════════════════════════════════════
+
+[pulse]
+# Number of concurrent job workers
+# Default: 1 (sequential processing)
+workers = 1
+
+# How often to check for scheduled jobs (seconds)
+# Default: 1
+ticker_interval_seconds = 1
+
+# HTTP rate limiting (prevents bot detection like LinkedIn HTTP 999)
+# Maximum HTTP requests per minute (default rate limit)
+# Default: 10
+http_max_requests_per_minute = 10
+
+# Delay between HTTP requests in milliseconds (polite crawling)
+# Default: 2000 (2 seconds)
+http_delay_between_requests_ms = 2000
+
+# Per-domain rate limit overrides
+# [pulse.http_domain_limits.linkedin.com]
+# max_requests_per_minute = 5
+# delay_between_requests_ms = 5000
+
+# ════════════════════════════════════════════════════════════════
+# REPL Configuration (Interactive Shell)
+# ════════════════════════════════════════════════════════════════
+
+[repl.search]
+# Search debounce delay in milliseconds
+# Default: 50
+debounce_ms = 50
+
+# Maximum search results to show
+# Default: 10
+result_limit = 10
+
+# Search scoring
+exact_match_score = 100   # Score for exact matches
+prefix_match_score = 50   # Score for prefix matches
+contains_score = 25       # Score for substring matches
+base_result_score = 50    # Base score for results
+length_bonus_score = 50   # Maximum length bonus
+
+[repl.display]
+# Maximum lines in preview mode
+# Default: 10
+max_lines = 10
+
+# Maximum characters per result buffer
+# Default: 2000
+buffer_limit = 2000
+
+# Target FPS for rendering
+# Default: 60
+target_fps = 60
+
+[repl.timeouts]
+# Command execution timeout (seconds)
+# Default: 30
+command_seconds = 30
+
+# Database query timeout (seconds)
+# Default: 10
+database_seconds = 10
+
+[repl.history]
+# Maximum results in history
+# Default: 100
+result_limit = 100
+
+# Channel buffer size for history
+# Default: 100
+channel_buffer = 100
+
+# ════════════════════════════════════════════════════════════════
+# Code Configuration (GitHub & LSP Integration)
+# ════════════════════════════════════════════════════════════════
+
+[code.github]
+# GitHub personal access token for code review features
+# Required for: qntx code pr, qntx code FIX-N
+# Environment: QNTX_CODE_GITHUB_TOKEN
+# token = "ghp_..."
+
+[code.gopls]
+# Go language server integration
+# Workspace root for gopls (default: project root)
+# workspace_root = "/path/to/workspace"
+
+# Enable gopls integration
+# Default: true
+enabled = true
+
+# ════════════════════════════════════════════════════════════════
+# Local Inference Configuration (Ollama, LocalAI, etc.)
+# ════════════════════════════════════════════════════════════════
+
+[local_inference]
+# Enable local model inference instead of cloud APIs
+# Default: true
+# Environment: QNTX_LOCAL_INFERENCE_ENABLED
+enabled = true
+
+# Local inference server URL
+# Default: "http://localhost:11434" (Ollama default)
+# Environment: QNTX_LOCAL_INFERENCE_BASE_URL
+base_url = "http://localhost:11434"
+
+# Model to use for local inference
+# Examples: "llama3.2:3b", "mistral", "qwen2.5-coder:7b"
+# Default: "llama3.2:3b"
+# Environment: QNTX_LOCAL_INFERENCE_MODEL
+model = "llama3.2:3b"
+
+# Context window size (0 = model default)
+# Examples: 16384, 32768, 131072
+# Default: 16384
+context_size = 16384
+
+# Request timeout in seconds
+# Default: 3600 (1 hour)
+timeout_seconds = 3600
+
+# ════════════════════════════════════════════════════════════════
+# Ax Configuration (Attestation Query System)
+# ════════════════════════════════════════════════════════════════
+
+[ax]
+# Default actor for attestation queries
+# Used when no actor is explicitly specified
+# Default: "ax@user"
+default_actor = "ax@user"

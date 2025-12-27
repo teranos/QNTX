@@ -1,6 +1,6 @@
 -- Pulse budget tracking for rate limiting and budget control
 -- Supports both daily and monthly budget tracking
-CREATE TABLE pulse_budget (
+CREATE TABLE IF NOT EXISTS pulse_budget (
     date TEXT PRIMARY KEY,           -- "2025-11-23" for daily, "2025-11" for monthly
     type TEXT NOT NULL,              -- "daily" or "monthly"
     spend_usd REAL NOT NULL,         -- Current spend in USD
@@ -9,4 +9,4 @@ CREATE TABLE pulse_budget (
     updated_at DATETIME
 );
 
-CREATE INDEX idx_pulse_budget_type ON pulse_budget(type);
+CREATE INDEX IF NOT EXISTS idx_pulse_budget_type ON pulse_budget(type);
