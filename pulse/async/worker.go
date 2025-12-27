@@ -12,6 +12,12 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	// MaxOrphanedJobsToRecover limits how many orphaned jobs we'll attempt to recover
+	// on startup to prevent overwhelming the system after a crash
+	MaxOrphanedJobsToRecover = 1000
+)
+
 // BudgetTracker interface defines budget tracking operations
 type BudgetTracker interface {
 	CheckBudget(estimatedCost float64) error
@@ -207,7 +213,7 @@ func (wp *WorkerPool) Start() {
 func (wp *WorkerPool) recoverOrphanedJobs() error {
 	// Find all jobs that are still marked as "running"
 	runningStatus := JobStatusRunning
-	orphanedJobs, err := wp.queue.store.ListJobs(&runningStatus, 1000) // High limit
+	orphanedJobs, err := wp.queue.store.ListJobs(&runningStatus, MaxOrphanedJobsToRecover)
 	if err != nil {
 		return fmt.Errorf("failed to list running jobs: %w", err)
 	}
