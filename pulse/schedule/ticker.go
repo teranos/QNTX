@@ -195,8 +195,8 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 
 // checkScheduledJobs finds scheduled jobs ready to run and enqueues them
 func (t *Ticker) checkScheduledJobs(now time.Time) error {
-	// Query for active jobs that are due to run
-	jobs, err := t.store.ListJobsDue(now)
+	// Query for active jobs that are due to run (with context for graceful cancellation)
+	jobs, err := t.store.ListJobsDueContext(t.ctx, now)
 	if err != nil {
 		return fmt.Errorf("failed to list scheduled jobs: %w", err)
 	}
