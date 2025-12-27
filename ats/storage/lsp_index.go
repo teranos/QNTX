@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -44,7 +45,7 @@ func NewSymbolIndex(db *sql.DB) (*SymbolIndex, error) {
 		WHERE type='table' AND name='attestations'
 	`).Scan(&tableName)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("attestations table not found - database may not be initialized")
 	}
 	if err != nil {
