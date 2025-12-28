@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 )
 
 // writeJSON writes a JSON response with the given status code
@@ -53,23 +52,6 @@ func requireMethods(w http.ResponseWriter, r *http.Request, methods ...string) b
 	return false
 }
 
-// extractPathParts extracts path segments after removing a prefix
-func extractPathParts(urlPath, prefix string) []string {
-	return strings.Split(strings.TrimPrefix(urlPath, prefix), "/")
-}
-
-// isNotFoundError checks if an error is a "not found" error
-func isNotFoundError(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "not found")
-}
-
-// shortID truncates an ID to 8 characters for logging
-func shortID(id string) string {
-	if len(id) >= 8 {
-		return id[:8]
-	}
-	return id
-}
+// Note: extractPathParts() moved to util.go
+// Note: isNotFoundError() replaced with IsNotFoundError() in errors.go
+// Note: shortID() removed - we show full IDs, never truncate
