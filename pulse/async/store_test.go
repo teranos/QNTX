@@ -1,6 +1,7 @@
 package async
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 )
@@ -23,7 +24,7 @@ func TestTASBotCreatesJob(t *testing.T) {
 	t.Log("🎮 TAS Bot creates save state (persists job to database)...")
 	t.Log("   'Saving game state at optimal frame'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// TAS Bot creates a job save state
@@ -53,7 +54,7 @@ func TestKirbyRetrievesJob(t *testing.T) {
 	t.Log("⭐ Kirby loads save state (retrieves job from database)...")
 	t.Log("   'Poyo!' *loading game state*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// TAS Bot creates a save state first
@@ -96,7 +97,7 @@ func TestTASBotUpdatesJob(t *testing.T) {
 	t.Log("🎮 TAS Bot updates save state (modifies existing job)...")
 	t.Log("   'Updating save state with new progress'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// Create initial save state
@@ -143,7 +144,7 @@ func TestKirbyListsJobs(t *testing.T) {
 	t.Log("⭐ Kirby lists available save states (queries jobs by status)...")
 	t.Log("   'Poyo!' *browsing save files*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// TAS Bot creates multiple save states
@@ -178,7 +179,7 @@ func TestTASBotListsActiveJobs(t *testing.T) {
 	t.Log("🎮 TAS Bot lists active save states (running + queued jobs)...")
 	t.Log("   'Checking active speedrun attempts'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// Create various save states
@@ -213,7 +214,7 @@ func TestKirbyDeletesJob(t *testing.T) {
 	t.Log("⭐ Kirby deletes save state (removes job from database)...")
 	t.Log("   'Poyo!' *deleting old save file*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// Create a save state
@@ -250,7 +251,7 @@ func TestTASBotParentJobHierarchy(t *testing.T) {
 	t.Log("🎮 TAS Bot queries parent-child save state hierarchy...")
 	t.Log("   'Checking sub-tasks in speedrun strategy'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// Create parent save state
@@ -296,7 +297,7 @@ func TestCronosCleanupOldJobs(t *testing.T) {
 	t.Log("⏰ Cronos performs cleanup of ancient save states...")
 	t.Log("   'Removing saves lost to the passage of time'")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// Create old save states (simulate old timestamps)
@@ -338,7 +339,7 @@ func TestKirbyPulseStateStorage(t *testing.T) {
 	t.Log("⭐ Kirby tests Pulse state storage (save with metrics)...")
 	t.Log("   'Poyo!' *saving job with rate limit info*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// Kirby creates a job with Pulse state
@@ -397,7 +398,7 @@ func TestTASBotAndKirbyStoreIntegration(t *testing.T) {
 	t.Log("   TAS Bot: 'Managing save states for optimal speedrun'")
 	t.Log("   Kirby: 'Poyo!' *loading and updating saves*")
 
-	db := createTestDB(t)
+	db := qntxtest.CreateTestDB(t)
 	store := NewStore(db)
 
 	// TAS Bot creates initial save state
