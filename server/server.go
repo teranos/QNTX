@@ -139,21 +139,37 @@ func (s *QNTXServer) handleClientUnregister(client *Client) {
 	}
 }
 
+// removeSlowClient safely removes a client that can't keep up with broadcasts
+func (s *QNTXServer) removeSlowClient(client *Client) {
+	s.mu.Lock()
+	if _, ok := s.clients[client]; ok {
+		delete(s.clients, client)
+		s.mu.Unlock()
+		client.close()
+		s.logger.Warnw("Client send channel full, removing client",
+			"client_id", client.id,
+			"total_drops", s.broadcastDrops.Load(),
+		)
+	} else {
+		s.mu.Unlock()
+	}
+}
+
 // handleBroadcast sends a graph update to all connected clients
 func (s *QNTXServer) handleBroadcast(g *graph.Graph) {
-	// Cache graph for reconnecting clients
+	// Cache graph and snapshot clients atomically
 	s.mu.Lock()
 	s.lastGraph = g
-	clients := make(map[*Client]bool)
-	for k, v := range s.clients {
-		clients[k] = v
+	clients := make([]*Client, 0, len(s.clients))
+	for client := range s.clients {
+		clients = append(clients, client)
 	}
 	clientCount := len(clients)
 	s.mu.Unlock()
 
 	// Broadcast to all clients (without holding lock to avoid deadlock)
 	dropped := 0
-	for client := range clients {
+	for _, client := range clients {
 		select {
 		case client.send <- g:
 			// Success
@@ -161,19 +177,7 @@ func (s *QNTXServer) handleBroadcast(g *graph.Graph) {
 			// Track drops and remove slow client
 			dropped++
 			s.broadcastDrops.Add(1)
-
-			s.mu.Lock()
-			if _, ok := s.clients[client]; ok {
-				delete(s.clients, client)
-				s.mu.Unlock()
-				client.close()
-				s.logger.Warnw("Client send channel full, removing client",
-					"client_id", client.id,
-					"total_drops", s.broadcastDrops.Load(),
-				)
-			} else {
-				s.mu.Unlock()
-			}
+			s.removeSlowClient(client)
 		}
 	}
 

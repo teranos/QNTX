@@ -37,8 +37,9 @@ func (s *QNTXServer) startPulseExecutionPoller() {
 }
 
 // checkCompletedExecutions finds executions that completed since last check and broadcasts them
+// Optimized to use a single batch query instead of N+1 queries
 func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
-	// Get all jobs to check their executions
+	// Get all jobs for job metadata lookup
 	scheduleStore := schedule.NewStore(s.db)
 	jobs, err := scheduleStore.ListAllScheduledJobs()
 	if err != nil {
@@ -50,52 +51,56 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 		return // No jobs to check
 	}
 
-	// Check executions for each job
-	execStore := schedule.NewExecutionStore(s.db)
+	// Build job lookup map
+	jobMap := make(map[string]*schedule.Job)
 	for _, job := range jobs {
-		// Get recent executions (completed since last check)
-		executions, _, err := execStore.ListExecutions(job.ID, 10, 0, schedule.ExecutionStatusCompleted)
-		if err != nil {
-			s.logger.Debugw(fmt.Sprintf("%s Failed to list executions for polling", sym.Pulse),
-				"job_id", job.ID,
-				"error", err)
+		jobMap[job.ID] = job
+	}
+
+	// Get all recent completions in single query (avoids N+1)
+	execStore := schedule.NewExecutionStore(s.db)
+	executions, err := execStore.ListRecentCompletions(*lastCheckTime, 100)
+	if err != nil {
+		s.logger.Debugw(fmt.Sprintf("%s Failed to list recent completions", sym.Pulse), "error", err)
+		return
+	}
+
+	// Broadcast each completion
+	for _, execution := range executions {
+		// Safety: Check for nil before dereferencing
+		if execution.CompletedAt == nil {
 			continue
 		}
 
-		// Broadcast completions that happened since last check
-		for _, execution := range executions {
-			completedAt, err := time.Parse(time.RFC3339, *execution.CompletedAt)
-			if err != nil {
-				continue
-			}
-
-			// Only broadcast if completed after last check
-			if completedAt.After(*lastCheckTime) {
-				asyncJobID := ""
-				if execution.AsyncJobID != nil {
-					asyncJobID = *execution.AsyncJobID
-				}
-
-				resultSummary := ""
-				if execution.ResultSummary != nil {
-					resultSummary = *execution.ResultSummary
-				}
-
-				durationMs := 0
-				if execution.DurationMs != nil {
-					durationMs = *execution.DurationMs
-				}
-
-				s.BroadcastPulseExecutionCompleted(
-					job.ID,
-					execution.ID,
-					job.ATSCode,
-					asyncJobID,
-					resultSummary,
-					durationMs,
-				)
-			}
+		job, ok := jobMap[execution.ScheduledJobID]
+		if !ok {
+			// Job was deleted, skip this execution
+			continue
 		}
+
+		asyncJobID := ""
+		if execution.AsyncJobID != nil {
+			asyncJobID = *execution.AsyncJobID
+		}
+
+		resultSummary := ""
+		if execution.ResultSummary != nil {
+			resultSummary = *execution.ResultSummary
+		}
+
+		durationMs := 0
+		if execution.DurationMs != nil {
+			durationMs = *execution.DurationMs
+		}
+
+		s.BroadcastPulseExecutionCompleted(
+			job.ID,
+			execution.ID,
+			job.ATSCode,
+			asyncJobID,
+			resultSummary,
+			durationMs,
+		)
 	}
 
 	// Update last check time
