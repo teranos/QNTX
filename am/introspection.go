@@ -19,7 +19,6 @@ const (
 	SourceUserUI      ConfigSource = "user_ui"     // ~/.qntx/am_from_ui.toml
 	SourceProject     ConfigSource = "project"     // project am.toml
 	SourceEnvironment ConfigSource = "environment" // QNTX_* env vars
-	SourceUnknown     ConfigSource = "unknown"
 )
 
 // SettingInfo contains metadata about a configuration setting
@@ -58,10 +57,11 @@ func GetConfigIntrospection() (*ConfigIntrospection, error) {
 	return introspection, nil
 }
 
-// SourceInfo contains both the source type and its path
+// SourceInfo tracks where a configuration value originated
+// Used internally for building configuration introspection data
 type SourceInfo struct {
-	Source ConfigSource
-	Path   string
+	Source ConfigSource // The type of config source (default, system, user, etc.)
+	Path   string       // File path or environment variable name
 }
 
 // buildSourceMap reads each config file and builds a map of setting -> source info
