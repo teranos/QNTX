@@ -506,3 +506,213 @@ func getKeys(m map[string]interface{}) []string {
 	}
 	return keys
 }
+
+// Test broadcast to multiple clients
+func TestBroadcastToMultipleClients(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	srv, err := NewQNTXServer(db, ":memory:", 0)
+	if err != nil {
+		t.Fatalf("Failed to create QNTXServer: %v", err)
+	}
+
+	// Start hub
+	go srv.Run()
+
+	// Create and register multiple clients
+	numClients := 3
+	clients := make([]*Client, numClients)
+	for i := 0; i < numClients; i++ {
+		client := &Client{
+			server:  srv,
+			send:    make(chan *graph.Graph, 256),
+			sendLog: make(chan *wslogs.Batch, 256),
+			sendMsg: make(chan interface{}, 256),
+			id:      fmt.Sprintf("test_client_%d", i),
+		}
+		clients[i] = client
+		srv.register <- client
+	}
+
+	// Wait for registration
+	time.Sleep(50 * time.Millisecond)
+
+	// Create test graph
+	testGraph := &graph.Graph{
+		Nodes: []graph.Node{{ID: "test1", Label: "Test Node"}},
+		Links: []graph.Link{},
+		Meta:  graph.Meta{},
+	}
+
+	// Broadcast graph
+	srv.broadcast <- testGraph
+
+	// Verify all clients received the graph
+	time.Sleep(50 * time.Millisecond)
+	for i, client := range clients {
+		select {
+		case receivedGraph := <-client.send:
+			if len(receivedGraph.Nodes) != 1 || receivedGraph.Nodes[0].ID != "test1" {
+				t.Errorf("Client %d received incorrect graph", i)
+			}
+		case <-time.After(100 * time.Millisecond):
+			t.Errorf("Client %d did not receive broadcast", i)
+		}
+	}
+}
+
+// Test slow client removal during broadcast
+func TestSlowClientRemoval(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	srv, err := NewQNTXServer(db, ":memory:", 0)
+	if err != nil {
+		t.Fatalf("Failed to create QNTXServer: %v", err)
+	}
+
+	// Start hub
+	go srv.Run()
+
+	// Create a slow client with tiny buffer
+	slowClient := &Client{
+		server:  srv,
+		send:    make(chan *graph.Graph, 1), // Small buffer
+		sendLog: make(chan *wslogs.Batch, 1),
+		sendMsg: make(chan interface{}, 1),
+		id:      "slow_client",
+	}
+	srv.register <- slowClient
+	time.Sleep(10 * time.Millisecond)
+
+	// Create a normal client
+	fastClient := &Client{
+		server:  srv,
+		send:    make(chan *graph.Graph, 256),
+		sendLog: make(chan *wslogs.Batch, 256),
+		sendMsg: make(chan interface{}, 256),
+		id:      "fast_client",
+	}
+	srv.register <- fastClient
+	time.Sleep(10 * time.Millisecond)
+
+	// Verify both clients registered
+	srv.mu.RLock()
+	clientCount := len(srv.clients)
+	srv.mu.RUnlock()
+	if clientCount != 2 {
+		t.Fatalf("Expected 2 clients, got %d", clientCount)
+	}
+
+	// Send multiple graphs to overflow slow client's buffer
+	for i := 0; i < 10; i++ {
+		testGraph := &graph.Graph{
+			Nodes: []graph.Node{{ID: fmt.Sprintf("node%d", i), Label: "Test"}},
+			Links: []graph.Link{},
+			Meta:  graph.Meta{},
+		}
+		srv.broadcast <- testGraph
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Give time for slow client removal
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify slow client was removed but fast client remains
+	srv.mu.RLock()
+	clientCount = len(srv.clients)
+	_, slowExists := srv.clients[slowClient]
+	_, fastExists := srv.clients[fastClient]
+	srv.mu.RUnlock()
+
+	if slowExists {
+		t.Error("Slow client should have been removed")
+	}
+	if !fastExists {
+		t.Error("Fast client should still be connected")
+	}
+	if clientCount != 1 {
+		t.Errorf("Expected 1 client after slow client removal, got %d", clientCount)
+	}
+
+	// Verify broadcastDrops counter was incremented
+	drops := srv.broadcastDrops.Load()
+	if drops == 0 {
+		t.Error("Broadcast drops counter should be > 0")
+	}
+}
+
+// Test broadcast message helper
+func TestBroadcastMessage(t *testing.T) {
+	db := createTestDB(t)
+	defer db.Close()
+
+	srv, err := NewQNTXServer(db, ":memory:", 0)
+	if err != nil {
+		t.Fatalf("Failed to create QNTXServer: %v", err)
+	}
+
+	// Start hub
+	go srv.Run()
+
+	// Create clients
+	client1 := &Client{
+		server:  srv,
+		send:    make(chan *graph.Graph, 256),
+		sendLog: make(chan *wslogs.Batch, 256),
+		sendMsg: make(chan interface{}, 256),
+		id:      "client1",
+	}
+	client2 := &Client{
+		server:  srv,
+		send:    make(chan *graph.Graph, 256),
+		sendLog: make(chan *wslogs.Batch, 256),
+		sendMsg: make(chan interface{}, 256),
+		id:      "client2",
+	}
+
+	srv.register <- client1
+	srv.register <- client2
+	time.Sleep(20 * time.Millisecond)
+
+	// Send generic message
+	testMsg := map[string]interface{}{
+		"type":    "test",
+		"message": "hello",
+	}
+
+	sent := srv.broadcastMessage(testMsg)
+
+	// Verify message was sent to both clients
+	if sent != 2 {
+		t.Errorf("Expected message sent to 2 clients, got %d", sent)
+	}
+
+	// Verify clients received the message
+	select {
+	case msg := <-client1.sendMsg:
+		if msgMap, ok := msg.(map[string]interface{}); ok {
+			if msgMap["message"] != "hello" {
+				t.Error("Client1 received incorrect message")
+			}
+		} else {
+			t.Error("Client1 received non-map message")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Client1 did not receive message")
+	}
+
+	select {
+	case msg := <-client2.sendMsg:
+		if msgMap, ok := msg.(map[string]interface{}); ok {
+			if msgMap["message"] != "hello" {
+				t.Error("Client2 received incorrect message")
+			}
+		} else {
+			t.Error("Client2 received non-map message")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Client2 did not receive message")
+	}
+}
