@@ -17,20 +17,22 @@ QNTX provides core attestation system functionality, configuration management,
 and infrastructure tools for building knowledge-based applications.
 
 Available commands:
-  am    - Manage QNTX core configuration ("I am")
-  as    - Create attestation assertions
-  db    - Manage QNTX database operations
-  pulse - Manage Pulse daemon (async job processor + scheduler)
-  ix    - Manage async ingestion jobs
+  am     - Manage QNTX core configuration ("I am")
+  as     - Create attestation assertions
+  db     - Manage QNTX database operations
+  pulse  - Manage Pulse daemon (async job processor + scheduler)
+  ix     - Manage async ingestion jobs
+  server - Start WebSocket graph visualization server
 
 Future commands:
-  ax    - Query attestations
+  ax     - Query attestations
 
 Examples:
   qntx am show             # Show current configuration
   qntx pulse start         # Start Pulse daemon
   qntx ix ls               # List async jobs
-  qntx db stats            # Show database statistics`,
+  qntx db stats            # Show database statistics
+  qntx server              # Start graph visualization server`,
 }
 
 func init() {
@@ -40,6 +42,7 @@ func init() {
 	rootCmd.AddCommand(commands.DbCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.IxCmd)
+	rootCmd.AddCommand(commands.ServerCmd)
 }
 
 func main() {

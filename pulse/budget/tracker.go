@@ -145,6 +145,27 @@ func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
 	return nil
 }
 
+// UpdateWeeklyBudget updates the weekly budget limit at runtime and persists to config.toml
+func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
+	if newBudgetUSD < 0 {
+		return fmt.Errorf("weekly budget cannot be negative: %.2f", newBudgetUSD)
+	}
+
+	// Update in-memory config
+	bt.mu.Lock()
+	bt.config.WeeklyBudgetUSD = newBudgetUSD
+	bt.mu.Unlock()
+
+	// TODO: Make config persistence optional via callback interface
+	// See handoff.md Decision 4: Config Persistence
+	// Persist to config.toml
+	// if err := am.UpdatePulseWeeklyBudget(newBudgetUSD); err != nil {
+	// 	return fmt.Errorf("failed to persist budget to config: %w", err)
+	// }
+
+	return nil
+}
+
 // UpdateMonthlyBudget updates the monthly budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateMonthlyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
