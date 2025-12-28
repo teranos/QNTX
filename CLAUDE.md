@@ -53,3 +53,36 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 ### Error Handling
 
 - **Context in errors**: Errors should provide sufficient context for debugging
+
+### Testing
+
+**CRITICAL: Database Testing Pattern**
+
+NEVER create database schemas inline in tests. ALWAYS use the migration-based test helper.
+
+**Correct Pattern:**
+```go
+import qntxtest "github.com/teranos/QNTX/internal/testing"
+
+func TestSomething(t *testing.T) {
+    db := qntxtest.CreateTestDB(t)  // Uses real migrations
+    // ... test code
+}
+```
+
+**Why:**
+- `qntxtest.CreateTestDB(t)` runs actual migration files from `db/sqlite/migrations/`
+- Ensures tests use identical schema to production
+- Migrations are the single source of truth
+- Auto-cleanup via `t.Cleanup()`
+
+**NEVER do this:**
+```go
+// ❌ WRONG - Brittle, duplicates schema logic
+db.Exec("CREATE TABLE attestations ...")
+db.Exec("CREATE INDEX ...")
+```
+
+**Pattern used throughout:**
+- `ats/storage/*_test.go` - All tests use `qntxtest.CreateTestDB(t)`
+- `internal/testing/database.go` - Implementation using `db.Migrate()`
