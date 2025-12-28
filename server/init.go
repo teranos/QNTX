@@ -193,6 +193,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	// Create budget tracker for Pulse daemon monitoring
 	budgetTracker := budget.NewTracker(db, budget.BudgetConfig{
 		DailyBudgetUSD:   cfg.Pulse.DailyBudgetUSD,
+		WeeklyBudgetUSD:  cfg.Pulse.WeeklyBudgetUSD,
 		MonthlyBudgetUSD: cfg.Pulse.MonthlyBudgetUSD,
 		CostPerScoreUSD:  cfg.Pulse.CostPerScoreUSD,
 	})

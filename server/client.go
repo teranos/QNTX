@@ -481,16 +481,15 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 		// 		"error", err,
 		// 	)
 		// } else {
+		// 	c.server.logger.Infow("File upload processed successfully",
+		// 		"client_id", c.id,
+		// 		"filename", filename,
+		// 	)
+		// }
 		c.server.logger.Infow("File upload received but not processed (handler not implemented)",
 			"client_id", c.id,
 			"filename", filename,
 		)
-		if false {
-			c.server.logger.Infow("File upload processed successfully",
-				"client_id", c.id,
-				"filename", filename,
-			)
-		}
 	}()
 }
 
@@ -577,6 +576,7 @@ func (c *Client) handleDaemonControl(msg QueryMessage) {
 func (c *Client) handlePulseConfigUpdate(msg QueryMessage) {
 	c.server.logger.Infow("Pulse config update request",
 		"daily_budget", msg.DailyBudget,
+		"weekly_budget", msg.WeeklyBudget,
 		"monthly_budget", msg.MonthlyBudget,
 		"client_id", c.id,
 	)
@@ -585,6 +585,14 @@ func (c *Client) handlePulseConfigUpdate(msg QueryMessage) {
 	if msg.DailyBudget < 0 {
 		c.server.logger.Warnw("Invalid daily budget",
 			"daily_budget", msg.DailyBudget,
+			"client_id", c.id,
+		)
+		return
+	}
+
+	if msg.WeeklyBudget < 0 {
+		c.server.logger.Warnw("Invalid weekly budget",
+			"weekly_budget", msg.WeeklyBudget,
 			"client_id", c.id,
 		)
 		return
@@ -599,29 +607,47 @@ func (c *Client) handlePulseConfigUpdate(msg QueryMessage) {
 	}
 
 	// Update daily budget
-	err := c.server.budgetTracker.UpdateDailyBudget(msg.DailyBudget)
-	if err != nil {
-		c.server.logger.Errorw("Failed to update daily budget",
-			"daily_budget", msg.DailyBudget,
-			"error", err,
-			"client_id", c.id,
-		)
-		return
+	if msg.DailyBudget > 0 {
+		err := c.server.budgetTracker.UpdateDailyBudget(msg.DailyBudget)
+		if err != nil {
+			c.server.logger.Errorw("Failed to update daily budget",
+				"daily_budget", msg.DailyBudget,
+				"error", err,
+				"client_id", c.id,
+			)
+			return
+		}
+	}
+
+	// Update weekly budget
+	if msg.WeeklyBudget > 0 {
+		err := c.server.budgetTracker.UpdateWeeklyBudget(msg.WeeklyBudget)
+		if err != nil {
+			c.server.logger.Errorw("Failed to update weekly budget",
+				"weekly_budget", msg.WeeklyBudget,
+				"error", err,
+				"client_id", c.id,
+			)
+			return
+		}
 	}
 
 	// Update monthly budget
-	err = c.server.budgetTracker.UpdateMonthlyBudget(msg.MonthlyBudget)
-	if err != nil {
-		c.server.logger.Errorw("Failed to update monthly budget",
-			"monthly_budget", msg.MonthlyBudget,
-			"error", err,
-			"client_id", c.id,
-		)
-		return
+	if msg.MonthlyBudget > 0 {
+		err := c.server.budgetTracker.UpdateMonthlyBudget(msg.MonthlyBudget)
+		if err != nil {
+			c.server.logger.Errorw("Failed to update monthly budget",
+				"monthly_budget", msg.MonthlyBudget,
+				"error", err,
+				"client_id", c.id,
+			)
+			return
+		}
 	}
 
 	c.server.logger.Infow("Pulse budgets updated successfully",
 		"daily_budget", msg.DailyBudget,
+		"weekly_budget", msg.WeeklyBudget,
 		"monthly_budget", msg.MonthlyBudget,
 		"client_id", c.id,
 	)
