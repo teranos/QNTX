@@ -129,9 +129,9 @@ func runIxLs(statusFilter string, limit int) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	database, err := db.Open(cfg.Database.Path, logger.Logger)
+	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
 
@@ -140,6 +140,10 @@ func runIxLs(statusFilter string, limit int) error {
 	// Convert status filter to pointer (empty string = nil = all jobs)
 	var status *async.JobStatus
 	if statusFilter != "" {
+		// Validate status using async package
+		if !async.IsValidStatus(statusFilter) {
+			return fmt.Errorf("invalid status '%s': must be one of: queued, running, paused, completed, failed, cancelled", statusFilter)
+		}
 		s := async.JobStatus(statusFilter)
 		status = &s
 	}
@@ -182,9 +186,9 @@ func runIxStatus(jobID string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	database, err := db.Open(cfg.Database.Path, logger.Logger)
+	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
 
@@ -234,9 +238,9 @@ func runIxPause(jobID string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	database, err := db.Open(cfg.Database.Path, logger.Logger)
+	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
 
@@ -267,9 +271,9 @@ func runIxResume(jobID string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	database, err := db.Open(cfg.Database.Path, logger.Logger)
+	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
 
