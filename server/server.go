@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/version"
 	"github.com/teranos/QNTX/graph"
@@ -25,11 +26,11 @@ type QNTXServer struct {
 	builder       *graph.AxGraphBuilder
 	// langService   *lsp.Service          // TODO: Extract ats/lsp - Language service for ATS LSP features
 	// usageTracker  *tracker.UsageTracker // TODO: Extract ai/tracker - Cached usage tracker (eliminates 172k+ allocations/day)
-	budgetTracker *budget.Tracker   // Budget tracking for Pulse daemon
-	daemon        *async.WorkerPool // Background job processor (daemon)
-	ticker        *schedule.Ticker  // Pulse ticker for scheduled jobs
-	// configWatcher *appcfg.ConfigWatcher // TODO: Extract config watcher - watches config.toml for changes
-	clients map[*Client]bool
+	budgetTracker *budget.Tracker    // Budget tracking for Pulse daemon
+	daemon        *async.WorkerPool  // Background job processor (daemon)
+	ticker        *schedule.Ticker   // Pulse ticker for scheduled jobs
+	configWatcher *am.ConfigWatcher  // Config watcher for auto-reload on config changes
+	clients       map[*Client]bool
 	broadcast     chan *graph.Graph
 	register      chan *Client
 	unregister    chan *Client
