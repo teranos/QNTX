@@ -58,3 +58,20 @@ func Open(path string, logger *zap.SugaredLogger) (*sql.DB, error) {
 
 	return db, nil
 }
+
+// OpenWithMigrations opens a SQLite database and runs migrations.
+// This is a convenience function that combines Open() and Migrate().
+// Migrations are idempotent and have low overhead for SQLite.
+func OpenWithMigrations(path string, logger *zap.SugaredLogger) (*sql.DB, error) {
+	db, err := Open(path, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := Migrate(db, logger); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return db, nil
+}
