@@ -88,6 +88,18 @@ Users edit `~/.qntx/config.toml` directly:
 
 ## Source Tracking (Introspection)
 
+### Why Introspection?
+
+**SRE approach to configuration.** Multi-source config creates observability problems. When something doesn't work, you need to know *why*.
+
+**Debugging**: "Why isn't my config working?" User toggles Ollama in UI, nothing happens. Introspection shows project config is overriding user_ui. Now they know what to fix.
+
+**Trust/transparency**: Without visibility, UI changes feel broken. Introspection proves changes took effect (or shows what's overriding them).
+
+**Security audit**: See if environment vars are leaking into places they shouldn't. Know what's coming from where.
+
+### How It Works
+
 The introspection endpoint (`/api/config`) shows where each value comes from:
 
 ```json
