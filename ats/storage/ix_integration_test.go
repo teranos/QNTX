@@ -20,6 +20,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"database/sql"
 	"testing"
 	"time"
@@ -67,10 +68,7 @@ func (m *mockEmitter) EmitAttestations(count int, entities []ix.AttestationEntit
 // setupTestDBForIx creates an in-memory database with real migrations.
 // Uses db.Migrate() to ensure test schema matches production schema.
 func setupTestDBForIx(t *testing.T) *sql.DB {
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open in-memory database: %v", err)
-	}
+	testDB := qntxtest.CreateTestDB(t)
 
 	// Apply real migrations (includes task_logs from migration 008)
 	if err := db.Migrate(testDB, nil); err != nil {
@@ -217,10 +215,7 @@ func TestLogCapturingEmitter_MultipleStages(t *testing.T) {
 // TestLogCapturingEmitter_ErrorHandling verifies errors don't break job execution
 func TestLogCapturingEmitter_ErrorHandling(t *testing.T) {
 	// Use invalid database to force write errors
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
+	db := qntxtest.CreateTestDB(t)
 	db.Close() // Close immediately to make writes fail
 
 	mock := &mockEmitter{}

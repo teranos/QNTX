@@ -16,7 +16,6 @@ import (
 // are kept per actor/context pair
 func TestBoundedStorage_16PerActorContext(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
 
 	store := NewBoundedStore(db, nil)
 	actor := "test@bounded-storage"
@@ -54,7 +53,6 @@ func TestBoundedStorage_16PerActorContext(t *testing.T) {
 // for the SAME actor AND SAME context, oldest ones are pruned
 func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
 
 	store := NewBoundedStore(db, nil)
 	actor := "test@bounded-storage"
@@ -93,7 +91,6 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 // where multiple predicates exist for one subject with the same actor
 func TestBoundedStorage_DomainScenario(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
 
 	store := NewBoundedStore(db, nil)
 	actor := "test@domain-integration"

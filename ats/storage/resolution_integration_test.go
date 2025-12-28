@@ -1,6 +1,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"testing"
@@ -12,22 +13,16 @@ import (
 
 	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db"
 )
 
 // setupResolutionTestDB creates a test database with real schema and resolution-specific fixtures
 func setupResolutionTestDB(t *testing.T) *sql.DB {
 	// Create in-memory test database
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-
-	// Apply real migrations for production schema
-	err = db.Migrate(testDB, nil)
-	require.NoError(t, err, "Failed to run migrations")
+	testDB := qntxtest.CreateTestDB(t)
 
 	// Create test fixtures for resolution scenarios
 	// DOZER evolution scenario: manager (older) -> engineer -> senior engineer (newer)
-	_, err = testDB.Exec(`
+	_, err := testDB.Exec(`
 		INSERT INTO attestations (
 			id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		) VALUES
@@ -50,7 +45,6 @@ func setupResolutionTestDB(t *testing.T) *sql.DB {
 func TestAttestationResolution(t *testing.T) {
 	// Setup test database with fixtures
 	db := setupResolutionTestDB(t)
-	defer db.Close()
 
 	// Use executor factory for smart resolution
 	executor := NewExecutor(db)
@@ -166,7 +160,6 @@ func TestAttestationResolution(t *testing.T) {
 
 func TestResolutionPerformance(t *testing.T) {
 	db := setupResolutionTestDB(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
@@ -190,7 +183,6 @@ func TestResolutionPerformance(t *testing.T) {
 
 func TestResolutionWithAliases(t *testing.T) {
 	db := setupResolutionTestDB(t)
-	defer db.Close()
 
 	// Add an alias for testing
 	_, err := db.Exec(`
@@ -220,7 +212,6 @@ func TestResolutionWithAliases(t *testing.T) {
 
 func TestResolutionEdgeCases(t *testing.T) {
 	db := setupResolutionTestDB(t)
-	defer db.Close()
 
 	executor := NewExecutor(db)
 
