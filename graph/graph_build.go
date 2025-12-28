@@ -19,7 +19,6 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 		Links: []Link{},
 		Meta: Meta{
 			GeneratedAt: time.Now(),
-			EventTitle:  "Ax Graph Explorer",
 			Stats:       Stats{},
 			Config: map[string]string{
 				"query":       query,
