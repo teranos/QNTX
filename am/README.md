@@ -58,6 +58,8 @@ Configuration loads in order (lowest to highest priority):
 
 Sensitive values (API keys, tokens) should use environment variables.
 
+See [Configuration System Architecture](../docs/architecture/config-system.md) for rationale, introspection, and implementation details.
+
 ## Extending in Applications
 
 Applications extend `am.Config` for domain-specific needs through dual loading:
