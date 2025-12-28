@@ -221,3 +221,12 @@ func GetDatabasePath() (string, error) {
 	}
 	return config.Database.Path, nil
 }
+
+// GetServerConfig returns the server configuration
+func GetServerConfig() (*ServerConfig, error) {
+	config, err := Load()
+	if err != nil {
+		return nil, err
+	}
+	return &config.Server, nil
+}

@@ -1,56 +1,22 @@
 # ⨳ IX - Data Ingestion Utilities
 
-IX (⨳) provides reusable components for building data ixgesters that ingest from data sources and generate attestations.
+IX (⨳) provides reusable components for building data ingesters.
 
-## Overview
+## Why IX?
 
-This package provides utilities for:
+**Domain-agnostic ingestion.** QNTX needs to ingest from any data source - CSVs, APIs, LLMs, databases - without baking source-specific logic into core.
 
-- **Attestation generation** from structured data
-- **Execution management** with dry-run support
-- **Result types** for structured command output
+Generator pattern keeps ingestion infrastructure separate from domain knowledge.
 
-## Core Components
+## Why Dry-Run?
 
-### Attestation Generator
+**Avoid API costs during testing.** Some ingesters call LLM APIs. Dry-run lets you test ingestion logic without burning API credits every time.
 
-Generates attestations from structured data:
+## Components
 
-```go
-import "github.com/teranos/QNTX/ats/ix"
-
-generator := ix.NewAttestationGenerator("source-name")
-```
-
-### Execution Helper
-
-Manages attestation execution with dry-run support:
-
-```go
-executor := ix.NewExecutionHelper(dryRun, actor)
-
-// Execute attestations
-err := executor.ExecuteAttestations(db, attestations, showDetails)
-
-// Execute aliases
-err := executor.ExecuteAliases(aliasResolver, aliases, showDetails)
-```
-
-### Result Types
-
-Structured result types for command execution:
-
-```go
-// Create result for operation
-result := ix.NewResult("operation-name")
-
-// Add success/error information
-result.AddAttestation(attestation)
-result.AddError("stage", "code", "message")
-
-// Access results
-fmt.Printf("Attestations created: %d\n", result.Stats.AttestationCount)
-```
+- **AttestationGenerator** - Domain-agnostic attestation creation
+- **ExecutionHelper** - Manages execution with dry-run support
+- **Result types** - Structured feedback (evolving)
 
 ## Usage Patterns
 
