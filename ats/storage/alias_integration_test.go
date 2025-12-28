@@ -1,32 +1,15 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
-	"database/sql"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/alias"
-	"github.com/teranos/QNTX/db"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open database: %v", err)
-	}
-
-	// Apply migrations (includes aliases table from migration 009)
-	if err := db.Migrate(testDB, nil); err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
-
-	return testDB
-}
-
 func TestResolver_CreateAlias(t *testing.T) {
-	testDB := setupTestDB(t)
-	defer testDB.Close()
+	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
@@ -44,8 +27,7 @@ func TestResolver_CreateAlias(t *testing.T) {
 }
 
 func TestResolver_ResolveIdentifier(t *testing.T) {
-	testDB := setupTestDB(t)
-	defer testDB.Close()
+	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
@@ -90,8 +72,7 @@ func TestResolver_ResolveIdentifier(t *testing.T) {
 }
 
 func TestResolver_GetAliasesFor(t *testing.T) {
-	testDB := setupTestDB(t)
-	defer testDB.Close()
+	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
@@ -127,8 +108,7 @@ func TestResolver_GetAliasesFor(t *testing.T) {
 }
 
 func TestResolver_RemoveAlias(t *testing.T) {
-	testDB := setupTestDB(t)
-	defer testDB.Close()
+	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
@@ -164,8 +144,7 @@ func TestResolver_RemoveAlias(t *testing.T) {
 }
 
 func TestResolver_GetAllAliases(t *testing.T) {
-	testDB := setupTestDB(t)
-	defer testDB.Close()
+	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"strings"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/types"
 )
@@ -98,12 +98,7 @@ func normalizePredicate(pred string) string {
 // Uses real migrations to ensure test schema matches production schema.
 func setupDomainTestDB(t *testing.T) *sql.DB {
 	// Create in-memory test database
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-
-	// Apply real migrations (ensures test schema = production schema)
-	err = db.Migrate(testDB, nil)
-	require.NoError(t, err, "Failed to run migrations")
+	testDB := qntxtest.CreateTestDB(t)
 
 	// Create test attestations with predicate-context pairs
 	testTime := time.Now()
@@ -318,7 +313,7 @@ func setupDomainTestDB(t *testing.T) *sql.DB {
 	// Insert attestations
 	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
-		err = store.CreateAttestation(attestation)
+		err := store.CreateAttestation(attestation)
 		require.NoError(t, err)
 	}
 
@@ -328,7 +323,6 @@ func setupDomainTestDB(t *testing.T) *sql.DB {
 // TestNaturalLanguageQueries tests the natural language query enhancements
 func TestNaturalLanguageQueries(t *testing.T) {
 	db := setupDomainTestDB(t)
-	defer db.Close()
 
 	// Create executor with query expander for semantic expansion
 	expander := &testDomainExpander{}
@@ -522,7 +516,6 @@ func TestOverQueryParsing(t *testing.T) {
 // TestPredicateContextMatching tests the predicate+context matching logic
 func TestPredicateContextMatching(t *testing.T) {
 	db := setupDomainTestDB(t)
-	defer db.Close()
 
 	// Create executor with query expander for semantic expansion
 	expander := &testDomainExpander{}
@@ -569,13 +562,7 @@ func TestPredicateContextMatching(t *testing.T) {
 // This test showcases how context queries now work regardless of casing differences
 func TestCaseInsensitiveContextMatching(t *testing.T) {
 	// Create test database with mixed case data to demonstrate case-insensitive matching
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	defer testDB.Close()
-
-	// Apply real migrations (ensures test schema = production schema)
-	err = db.Migrate(testDB, nil)
-	require.NoError(t, err, "Failed to run migrations")
+	testDB := qntxtest.CreateTestDB(t)
 
 	// Insert test data with intentionally mixed casing
 	testTime := time.Now()
@@ -612,7 +599,7 @@ func TestCaseInsensitiveContextMatching(t *testing.T) {
 	// Insert all test attestations
 	store := NewSQLStore(testDB, nil)
 	for _, att := range testAttestations {
-		err = store.CreateAttestation(att)
+		err := store.CreateAttestation(att)
 		require.NoError(t, err)
 	}
 

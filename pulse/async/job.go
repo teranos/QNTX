@@ -21,6 +21,17 @@ const (
 	JobStatusCancelled JobStatus = "cancelled"
 )
 
+// IsValidStatus returns true if the status string is a valid JobStatus
+func IsValidStatus(s string) bool {
+	switch JobStatus(s) {
+	case JobStatusQueued, JobStatusRunning, JobStatusPaused,
+		JobStatusCompleted, JobStatusFailed, JobStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 // PulseState represents the pulse rate limiting and budget state for a job
 type PulseState struct {
 	CallsThisMinute int     `json:"calls_this_minute"`

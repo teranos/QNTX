@@ -1,6 +1,7 @@
 package async
 
 import (
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"errors"
 	"testing"
 
@@ -22,7 +23,7 @@ import (
 
 func TestEmitter_CoreFunctionality(t *testing.T) {
 	// Setup: Create test database and queue
-	testDB := createTestDB(t)
+	testDB := qntxtest.CreateTestDB(t)
 	queue := NewQueue(testDB)
 	logger := zaptest.NewLogger(t).Sugar()
 
