@@ -87,9 +87,10 @@ The daemon will:
 		// Create worker pool
 		pool := async.NewWorkerPoolWithContext(ctx, database, cfg, poolCfg, logger.Logger)
 
-		// Note: Applications should register their handlers here
-		// Example: myapp.RegisterHandlers(pool.Registry(), database, cfg, logger.Logger)
-		// For QNTX core, we provide the infrastructure but no domain-specific handlers
+		// Note: The Pulse daemon processes jobs created by the application.
+		// Jobs are self-contained with handler_name and payload fields.
+		// Applications are responsible for creating properly-formed jobs via the Queue API.
+		// See pulse/async package documentation for job creation examples.
 
 		pool.Start()
 
@@ -99,7 +100,7 @@ The daemon will:
 		ticker := schedule.NewTickerWithContext(ctx, scheduleStore, pool.GetQueue(), pool, nil, tickerCfg, logger.Logger)
 		ticker.Start()
 
-		fmt.Printf("✓ Pulse daemon started\n")
+		fmt.Printf("%s Pulse daemon started\n", sym.Pulse)
 		fmt.Printf("  Workers: %d\n", workers)
 		fmt.Printf("  Poll interval: %v\n", poolCfg.PollInterval)
 		fmt.Printf("  Daily budget: $%.2f\n", cfg.Pulse.DailyBudgetUSD)
@@ -113,12 +114,14 @@ The daemon will:
 		<-sigChan
 
 		fmt.Printf("\n%s Initiating GRACE shutdown...\n", sym.Pulse)
-		cancel() // Cancel context to trigger graceful shutdown
 
+		// Stop components in reverse order of startup (each manages its own context)
 		ticker.Stop()
 		pool.Stop()
 
-		fmt.Printf("✓ Pulse daemon stopped\n")
+		cancel() // Clean up parent context
+
+		fmt.Printf("%s Pulse daemon stopped\n", sym.Pulse)
 		return nil
 	},
 }
