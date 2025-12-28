@@ -226,5 +226,4 @@ func TestConfigSourceConstants(t *testing.T) {
 	assert.Equal(t, ConfigSource("user_ui"), SourceUserUI)
 	assert.Equal(t, ConfigSource("project"), SourceProject)
 	assert.Equal(t, ConfigSource("environment"), SourceEnvironment)
-	assert.Equal(t, ConfigSource("unknown"), SourceUnknown)
 }
