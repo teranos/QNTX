@@ -1,5 +1,7 @@
 # Verbosity Levels
 
+**Why progressive verbosity?** Developers want different levels of detail at different times. Simple mental model: more v's = more info. LLMs can use higher verbosity for better context.
+
 Progressive verbosity pattern for QNTX CLI commands using the `-v` flag.
 
 ## Pattern
