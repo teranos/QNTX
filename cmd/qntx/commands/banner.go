@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/QNTX/version"
 )
 
@@ -37,8 +38,8 @@ func printStartupBanner(verbosity int, dbPath string) {
 	fmt.Printf("   ║           %s%s%s██     ██  ██    %s                       ║\n", white, bold, bgBlack, reset+cyan+bold)
 	fmt.Printf("   ║           %s%s%s██    ██    ██   %s                       ║\n", white, bold, bgBlack, reset+cyan+bold)
 	fmt.Printf("   ║                                                   ║\n")
-	fmt.Printf("   ║   %s▣%s Attest  %s⟐%s View  %s⋈%s Graph  %s꩜%s Pulse            ║\n",
-		blue, reset+cyan+bold, yellow, reset+cyan+bold, green, reset+cyan+bold, magenta, reset+cyan+bold)
+	fmt.Printf("   ║   %s▣%s Attest  %s⟐%s View  %s%s%s Graph  %s%s%s Pulse            ║\n",
+		blue, reset+cyan+bold, yellow, reset+cyan+bold, green, sym.AX, reset+cyan+bold, magenta, sym.Pulse, reset+cyan+bold)
 	fmt.Printf("   ║                                                   ║\n")
 	fmt.Printf("   ╚═══════════════════════════════════════════════════╝%s\n\n", reset)
 
