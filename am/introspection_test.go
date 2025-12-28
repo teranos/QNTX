@@ -227,3 +227,58 @@ func TestConfigSourceConstants(t *testing.T) {
 	assert.Equal(t, ConfigSource("project"), SourceProject)
 	assert.Equal(t, ConfigSource("environment"), SourceEnvironment)
 }
+
+func TestGetConfigIntrospection(t *testing.T) {
+	t.Run("Integration test with env var override", func(t *testing.T) {
+		// Set environment variable to override a setting
+		oldEnv := os.Getenv("QNTX_PULSE_TICKER_INTERVAL_SECONDS")
+		defer os.Setenv("QNTX_PULSE_TICKER_INTERVAL_SECONDS", oldEnv)
+		os.Setenv("QNTX_PULSE_TICKER_INTERVAL_SECONDS", "99")
+
+		// Get introspection
+		introspection, err := GetConfigIntrospection()
+		require.NoError(t, err)
+		require.NotNil(t, introspection)
+
+		// Build map of settings for easier verification
+		settingsByKey := make(map[string]SettingInfo)
+		for _, setting := range introspection.Settings {
+			settingsByKey[setting.Key] = setting
+		}
+
+		// Verify environment variable override is detected
+		tickerSetting, ok := settingsByKey["pulse.ticker_interval_seconds"]
+		require.True(t, ok, "pulse.ticker_interval_seconds should be in introspection")
+		assert.Equal(t, SourceEnvironment, tickerSetting.Source)
+		assert.Equal(t, "QNTX_PULSE_TICKER_INTERVAL_SECONDS", tickerSetting.SourcePath)
+
+		// Verify introspection contains expected fields
+		// Config file may be empty in test environment (that's okay)
+		assert.NotNil(t, introspection)
+		assert.NotEmpty(t, introspection.Settings, "Settings should not be empty")
+
+		// Verify settings are in deterministic order (sorted keys)
+		lastKey := ""
+		for _, setting := range introspection.Settings {
+			if lastKey != "" {
+				assert.True(t, setting.Key >= lastKey,
+					"Settings should be in sorted order: %s should be >= %s", setting.Key, lastKey)
+			}
+			lastKey = setting.Key
+		}
+
+		// Verify all sources are recognized ConfigSource values
+		validSources := map[ConfigSource]bool{
+			SourceDefault:     true,
+			SourceSystem:      true,
+			SourceUser:        true,
+			SourceUserUI:      true,
+			SourceProject:     true,
+			SourceEnvironment: true,
+		}
+		for _, setting := range introspection.Settings {
+			assert.True(t, validSources[setting.Source],
+				"Setting %s has invalid source: %s", setting.Key, setting.Source)
+		}
+	})
+}
