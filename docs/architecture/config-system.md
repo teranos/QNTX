@@ -230,6 +230,7 @@ toml.Marshal(config)
 
 ## Related Documentation
 
+- **Package**: [`am/README.md`](../../am/README.md) - Configuration package overview and philosophy
 - **UI Design**: [`docs/development/config-panel.md`](../development/config-panel.md) - Config panel UI/UX specification and future vision
 - **User Guide**: How to configure QNTX (TBD)
 - **API**: `internal/config/config.go` (implementation)
