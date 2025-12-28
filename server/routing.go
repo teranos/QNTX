@@ -1,0 +1,59 @@
+package server
+
+import "net/http"
+
+// setupHTTPRoutes configures all HTTP handlers
+func (s *QNTXServer) setupHTTPRoutes() {
+	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket)) // Custom WebSocket protocol (graph updates, logs, etc.)
+	// TODO(#54): Extract ats/lsp and gopls service - LSP endpoints deferred
+	// http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket))    // ATS LSP protocol (completions, hover, semantic tokens)
+	// http.HandleFunc("/gopls", s.corsMiddleware(s.HandleGoplsWebSocket)) // gopls LSP protocol (Go code intelligence)
+	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
+	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
+	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))
+	http.HandleFunc("/api/config", s.corsMiddleware(s.HandleConfig))
+	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                      // Dev mode status
+	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                      // Prose content tree
+	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))              // Individual prose files
+	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution)) // Individual execution (GET) and logs (GET /logs)
+	// TODO: Remove ambiguous endpoint - use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead
+	// http.HandleFunc("/api/pulse/tasks/", s.corsMiddleware(s.HandlePulseTask))
+	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))   // Individual schedule (GET/PATCH/DELETE)
+	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))   // List/create schedules (GET/POST)
+	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))             // Individual async job and sub-resources (GET)
+	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))             // List async jobs (GET)
+	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
+}
+
+// corsMiddleware adds CORS headers to HTTP responses using configured allowed origins
+// Uses the same origin validation as WebSocket connections (server.allowed_origins config)
+func (s *QNTXServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		// If origin is present and allowed by config, set CORS headers
+		if origin != "" && checkOrigin(r) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		// Configure allowed methods based on environment
+		if s.isDevMode() {
+			// Dev mode: Allow all methods for rapid development
+			w.Header().Set("Access-Control-Allow-Methods", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+		} else {
+			// Production: Restrict to explicitly required methods
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		}
+
+		// Handle preflight requests
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next(w, r)
+	}
+}

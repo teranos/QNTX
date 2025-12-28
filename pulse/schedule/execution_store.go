@@ -295,6 +295,80 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 	return executions, total, nil
 }
 
+// ListRecentCompletions retrieves all completed executions across all jobs since a given time
+// This is optimized for polling use cases to avoid N+1 queries
+func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*Execution, error) {
+	query := `
+		SELECT id, scheduled_job_id, async_job_id, status,
+		       started_at, completed_at, duration_ms,
+		       logs, result_summary, error_message,
+		       created_at, updated_at
+		FROM pulse_executions
+		WHERE status = ? AND completed_at > ?
+		ORDER BY completed_at DESC
+		LIMIT ?
+	`
+
+	rows, err := s.db.Query(query, ExecutionStatusCompleted, since.Format(time.RFC3339), limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list recent completions: %w", err)
+	}
+	defer rows.Close()
+
+	var executions []*Execution
+	for rows.Next() {
+		var exec Execution
+		var asyncJobID, completedAt, logs, resultSummary, errorMessage sql.NullString
+		var durationMs sql.NullInt64
+
+		err := rows.Scan(
+			&exec.ID,
+			&exec.ScheduledJobID,
+			&asyncJobID,
+			&exec.Status,
+			&exec.StartedAt,
+			&completedAt,
+			&durationMs,
+			&logs,
+			&resultSummary,
+			&errorMessage,
+			&exec.CreatedAt,
+			&exec.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan execution: %w", err)
+		}
+
+		if asyncJobID.Valid {
+			exec.AsyncJobID = &asyncJobID.String
+		}
+		if completedAt.Valid {
+			exec.CompletedAt = &completedAt.String
+		}
+		if durationMs.Valid {
+			duration := int(durationMs.Int64)
+			exec.DurationMs = &duration
+		}
+		if logs.Valid {
+			exec.Logs = &logs.String
+		}
+		if resultSummary.Valid {
+			exec.ResultSummary = &resultSummary.String
+		}
+		if errorMessage.Valid {
+			exec.ErrorMessage = &errorMessage.String
+		}
+
+		executions = append(executions, &exec)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating executions: %w", err)
+	}
+
+	return executions, nil
+}
+
 // CleanupOldExecutions deletes execution records (and their associated task logs via CASCADE)
 // that are older than the specified retention period.
 // Returns the number of executions deleted.

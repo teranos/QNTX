@@ -1,8 +1,12 @@
-.PHONY: cli web run-web test-web test test-verbose clean
+.PHONY: cli web run-web test-web test test-verbose clean server
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
 	@go build -o bin/qntx ./cmd/qntx
+
+server: cli ## Start QNTX WebSocket server
+	@echo "Starting QNTX server..."
+	@./bin/qntx server
 
 web: ## Build web assets with Bun
 	@echo "Building web assets..."
