@@ -116,3 +116,8 @@ func createFileCore(path string, verbosity int) (zapcore.Core, error) {
 
 	return zapcore.NewCore(encoder, writer, logger.VerbosityToLevel(verbosity)), nil
 }
+
+// extractPathParts extracts path segments after removing a prefix
+func extractPathParts(urlPath, prefix string) []string {
+	return strings.Split(strings.TrimPrefix(urlPath, prefix), "/")
+}
