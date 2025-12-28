@@ -3,6 +3,7 @@ package am
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -64,9 +65,16 @@ type SourceInfo struct {
 }
 
 // buildSourceMap reads each config file and builds a map of setting -> source info
+// Precedence order (lowest to highest): System < User < User UI < Project < Environment
 func buildSourceMap() map[string]SourceInfo {
 	sourceMap := make(map[string]SourceInfo)
-	homeDir, _ := os.UserHomeDir()
+
+	// Get home directory for user config paths
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// If we can't get home directory, skip user/UI configs and use system/project only
+		homeDir = ""
+	}
 
 	// Define config files in precedence order (lowest to highest)
 	// Supports both am.toml (new) and config.toml (backward compat)
@@ -86,7 +94,7 @@ func buildSourceMap() map[string]SourceInfo {
 	// Read each config file and mark settings with their source
 	for _, cf := range configFiles {
 		if cf.path == "" {
-			continue // Skip if path not found (e.g., no project config)
+			continue // Skip if path not found (e.g., no project config or no home dir)
 		}
 
 		if data, err := os.ReadFile(cf.path); err == nil {
@@ -98,16 +106,8 @@ func buildSourceMap() map[string]SourceInfo {
 		}
 	}
 
-	// Check environment variables for all known settings
-	for key := range sourceMap {
-		envKey := "QNTX_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
-		if os.Getenv(envKey) != "" {
-			sourceMap[key] = SourceInfo{
-				Source: SourceEnvironment,
-				Path:   envKey, // Store env var name as path
-			}
-		}
-	}
+	// Note: Environment variable checks happen in flattenSettingsWithSources()
+	// to ensure they override all file-based sources
 
 	return sourceMap
 }
@@ -135,7 +135,15 @@ func markSettingsFromSource(settings map[string]interface{}, prefix string, sour
 
 // flattenSettingsWithSources flattens settings and assigns sources from sourceMap
 func flattenSettingsWithSources(settings map[string]interface{}, prefix string, introspection *ConfigIntrospection, sourceMap map[string]SourceInfo) {
-	for key, value := range settings {
+	// Sort keys for deterministic iteration
+	keys := make([]string, 0, len(settings))
+	for k := range settings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := settings[key]
 		fullKey := key
 		if prefix != "" {
 			fullKey = prefix + "." + key
@@ -190,11 +198,10 @@ func GetConfigSummary() map[string]interface{} {
 		return summary
 	}
 
+	sources := summary["sources"].(map[string]int)
 	for _, setting := range introspection.Settings {
 		sourceKey := string(setting.Source)
-		if count, ok := summary["sources"].(map[string]int)[sourceKey]; ok {
-			summary["sources"].(map[string]int)[sourceKey] = count + 1
-		}
+		sources[sourceKey]++ // Safe: initializes to 0 if not exists
 	}
 
 	return summary
