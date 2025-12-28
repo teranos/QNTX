@@ -219,15 +219,14 @@ func (s *QNTXServer) Stop() error {
 		)
 	}
 
-	// TODO(#57): Extract config watcher - deferred to future PR
-	// // Stop config watcher
-	// if s.configWatcher != nil {
-	// 	if err := s.configWatcher.Stop(); err != nil {
-	// 		s.logger.Warnw("Failed to stop config watcher", "error", err)
-	// 	} else {
-	// 		s.logger.Infow("Config watcher stopped")
-	// 	}
-	// }
+	// Stop config watcher
+	if s.configWatcher != nil {
+		if err := s.configWatcher.Stop(); err != nil {
+			s.logger.Warnw("Failed to stop config watcher", "error", err)
+		} else {
+			s.logger.Infow("Config watcher stopped")
+		}
+	}
 
 	// GRACE Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)
