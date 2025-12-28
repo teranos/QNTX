@@ -9,7 +9,7 @@ import (
 // TypeDefinition holds display metadata for a node type from attestations.
 // Type definitions use the reserved "type" predicate in typespace.
 type TypeDefinition struct {
-	TypeName     string  // e.g., "contact", "company"
+	TypeName     string  // e.g., "artist", "album", "genre"
 	DisplayColor string  // Hex color or rgba() string
 	DisplayLabel string  // Human-readable label
 	Deprecated   bool    // Whether this type is deprecated
@@ -40,14 +40,14 @@ func (b *AxGraphBuilder) extractNodeTypes(attestations []types.As) map[string]st
 //
 // Schema:
 //
-//	Subject: contact
+//	Subject: artist
 //	Predicate: type (reserved)
 //	Context: graph
-//	Actors: ["contact"] (self-certifying in typespace)
-//	Attributes: {"display_color": "#e74c3c", "display_label": "Contact", "deprecated": false}
+//	Actors: ["artist"] (self-certifying in typespace)
+//	Attributes: {"display_color": "#e74c3c", "display_label": "Artist", "deprecated": false}
 //
 // Type definitions exist in typespace (separate from ASID entity space) and are self-certifying.
-// Each ixgest processor creates type definitions for its domain (ix-jd, ix-contacts, ix-git, etc.)
+// Each ixgest processor creates type definitions for its domain (ix-music, ix-weather, ix-git, etc.)
 //
 // Returns map of type name -> TypeDefinition
 func (b *AxGraphBuilder) extractTypeDefinitions(attestations []types.As) map[string]TypeDefinition {

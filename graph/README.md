@@ -42,7 +42,6 @@ Graph output must be **scientifically valid** - same inputs always produce same 
 
 QNTX is a **platform**. Graph infrastructure must work for any domain without modification:
 
-- **No hardcoded types**: No `NodeTypeGroups`, no recruitment-specific logic
 - **Pure infrastructure**: Attestation expansion, type extraction, graph construction
 
 ## See Also

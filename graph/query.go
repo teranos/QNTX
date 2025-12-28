@@ -42,7 +42,6 @@ func (b *AxGraphBuilder) BuildFromQuery(ctx context.Context, query string, limit
 			Links: []Link{},
 			Meta: Meta{
 				GeneratedAt: time.Now(),
-				EventTitle:  "Ax Graph Explorer",
 				Stats: Stats{
 					TotalNodes: 0,
 					TotalEdges: 0,
@@ -103,7 +102,6 @@ func (b *AxGraphBuilder) BuildFromQuery(ctx context.Context, query string, limit
 			Links: []Link{},
 			Meta: Meta{
 				GeneratedAt: time.Now(),
-				EventTitle:  "Ax Graph Explorer - Error",
 				Stats: Stats{
 					TotalNodes: 0,
 					TotalEdges: 0,
@@ -141,7 +139,6 @@ func (b *AxGraphBuilder) BuildFromQuery(ctx context.Context, query string, limit
 			Links: []Link{},
 			Meta: Meta{
 				GeneratedAt: time.Now(),
-				EventTitle:  "Ax Graph Explorer - Error",
 				Stats: Stats{
 					TotalNodes: 0,
 					TotalEdges: 0,
