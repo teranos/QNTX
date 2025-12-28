@@ -16,7 +16,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                      // Prose content tree
 	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))              // Individual prose files
 	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution)) // Individual execution (GET) and logs (GET /logs)
-	http.HandleFunc("/api/pulse/tasks/", s.corsMiddleware(s.HandlePulseTask))           // Individual task logs (GET /logs)
+	// TODO: Remove ambiguous endpoint - use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead
+	// http.HandleFunc("/api/pulse/tasks/", s.corsMiddleware(s.HandlePulseTask))
 	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))   // Individual schedule (GET/PATCH/DELETE)
 	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))   // List/create schedules (GET/POST)
 	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))             // Individual async job and sub-resources (GET)

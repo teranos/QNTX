@@ -1,8 +1,6 @@
 package server
 
 import (
-	"encoding/json"
-	"net/http"
 	"time"
 
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -133,14 +131,4 @@ func toScheduledJobResponse(job *schedule.Job) ScheduledJobResponse {
 	return resp
 }
 
-// writeJSON writes a JSON response
-func writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-// writeError writes a JSON error response
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, ErrorResponse{Error: message})
-}
+// Note: writeJSON and writeError functions moved to response.go for DRY

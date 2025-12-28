@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,9 +16,9 @@ import (
 // ListExecutionsResponse represents the response for listing job executions
 type ListExecutionsResponse struct {
 	Executions []schedule.Execution `json:"executions"`
-	Count      int                     `json:"count"`
-	Total      int                     `json:"total"`
-	HasMore    bool                    `json:"has_more"`
+	Count      int                  `json:"count"`
+	Total      int                  `json:"total"`
+	HasMore    bool                 `json:"has_more"`
 }
 
 // =======================
@@ -32,7 +31,7 @@ type ListExecutionsResponse struct {
 func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request, jobID string) {
 	// Only support GET
 	if r.Method != http.MethodGet {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -49,7 +48,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 			schedule.ExecutionStatusFailed:    true,
 		}
 		if !validStatuses[statusFilter] {
-			respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid status: %s", statusFilter))
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid status: %s", statusFilter))
 			return
 		}
 	}
@@ -59,7 +58,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 	executions, total, err := execStore.ListExecutions(jobID, limit, offset, statusFilter)
 	if err != nil {
 		s.logger.Errorw("Failed to list executions", "error", err, "job_id", jobID)
-		respondError(w, http.StatusInternalServerError, "Failed to list executions")
+		writeError(w, http.StatusInternalServerError, "Failed to list executions")
 		return
 	}
 
@@ -76,7 +75,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 		HasMore:    offset+len(executions) < total,
 	}
 
-	respondJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, response)
 }
 
 // HandlePulseExecution handles requests for individual execution
@@ -85,7 +84,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request) {
 	// Only support GET
 	if r.Method != http.MethodGet {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -93,7 +92,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	path := strings.TrimPrefix(r.URL.Path, "/api/pulse/executions/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 {
-		respondError(w, http.StatusBadRequest, "Invalid path format")
+		writeError(w, http.StatusBadRequest, "Invalid path format")
 		return
 	}
 	executionID := parts[0]
@@ -106,18 +105,18 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	execution, err := execStore.GetExecution(executionID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			respondError(w, http.StatusNotFound, "Execution not found")
+			writeError(w, http.StatusNotFound, "Execution not found")
 			return
 		}
 		s.logger.Errorw("Failed to get execution", "error", err, "execution_id", executionID)
-		respondError(w, http.StatusInternalServerError, "Failed to get execution")
+		writeError(w, http.StatusInternalServerError, "Failed to get execution")
 		return
 	}
 
 	// Handle logs request
 	if isLogsRequest {
 		if execution.Logs == nil || *execution.Logs == "" {
-			respondError(w, http.StatusNotFound, "No logs available")
+			writeError(w, http.StatusNotFound, "No logs available")
 			return
 		}
 
@@ -128,7 +127,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	}
 
 	// Handle execution details request
-	respondJSON(w, http.StatusOK, execution)
+	writeJSON(w, http.StatusOK, execution)
 }
 
 // =======================
@@ -157,19 +156,7 @@ func parseIntQueryParam(r *http.Request, name string, defaultValue, min, max int
 	return value
 }
 
-// respondJSON sends a JSON response
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-// respondError sends a JSON error response
-func respondError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{Error: message})
-}
+// Note: writeJSON and writeError functions removed - use writeJSON/writeError from response.go
 
 // getExecutionStore returns the execution store (lazy init helper)
 func (s *QNTXServer) getExecutionStore() *schedule.ExecutionStore {

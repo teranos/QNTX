@@ -5,9 +5,11 @@ package server
 // This provides the "polling" part of the hybrid event/polling strategy for Phase 4
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/sym"
 )
 
 // startPulseExecutionPoller starts a background goroutine that polls for completed executions
@@ -31,7 +33,7 @@ func (s *QNTXServer) startPulseExecutionPoller() {
 		}
 	}()
 
-	s.logger.Debugw("꩜ Pulse execution poller started", "interval", "3s")
+	s.logger.Debugw(fmt.Sprintf("%s Pulse execution poller started", sym.Pulse), "interval", "3s")
 }
 
 // checkCompletedExecutions finds executions that completed since last check and broadcasts them
@@ -40,7 +42,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 	scheduleStore := schedule.NewStore(s.db)
 	jobs, err := scheduleStore.ListAllScheduledJobs()
 	if err != nil {
-		s.logger.Debugw("꩜ Failed to list jobs for completion polling", "error", err)
+		s.logger.Debugw(fmt.Sprintf("%s Failed to list jobs for completion polling", sym.Pulse), "error", err)
 		return
 	}
 
@@ -54,7 +56,7 @@ func (s *QNTXServer) checkCompletedExecutions(lastCheckTime *time.Time) {
 		// Get recent executions (completed since last check)
 		executions, _, err := execStore.ListExecutions(job.ID, 10, 0, schedule.ExecutionStatusCompleted)
 		if err != nil {
-			s.logger.Debugw("꩜ Failed to list executions for polling",
+			s.logger.Debugw(fmt.Sprintf("%s Failed to list executions for polling", sym.Pulse),
 				"job_id", job.ID,
 				"error", err)
 			continue
