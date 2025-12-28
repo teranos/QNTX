@@ -330,7 +330,7 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting
-// TODO: Research better time-series architecture - see GitHub issue for WebSocket streaming investigation
+// TODO(#17): Research better time-series architecture for usage charting
 func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
