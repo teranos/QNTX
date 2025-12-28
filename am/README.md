@@ -49,6 +49,8 @@ See `am.go` for complete type definitions.
 
 ## Configuration Precedence
 
+**Why this order?** Environment variables override everything (deployment flexibility). Project config overrides user (team settings). User overrides system (personal preferences).
+
 Configuration loads in order (lowest to highest priority):
 
 1. System config: `/etc/qntx/am.toml` (or `config.toml`)
