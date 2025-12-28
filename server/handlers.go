@@ -370,7 +370,6 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 // Supports GET (retrieve config) and POST/PATCH (update config)
 // Query parameters:
 //   - ?introspection=true - Returns detailed config with sources
-//   - ?pulse_only=true - Returns only Pulse config (legacy)
 func (s *QNTXServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -417,10 +416,13 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		"config_file": appcfg.GetViper().ConfigFileUsed(),
 		"pulse": map[string]interface{}{
 			"daily_budget_usd":   status.DailyRemaining + status.DailySpend,     // Total limit
+			"weekly_budget_usd":  status.WeeklyRemaining + status.WeeklySpend,   // Total limit
 			"monthly_budget_usd": status.MonthlyRemaining + status.MonthlySpend, // Total limit
 			"daily_spend":        status.DailySpend,
+			"weekly_spend":       status.WeeklySpend,
 			"monthly_spend":      status.MonthlySpend,
 			"daily_remaining":    status.DailyRemaining,
+			"weekly_remaining":   status.WeeklyRemaining,
 			"monthly_remaining":  status.MonthlyRemaining,
 		},
 	}
@@ -435,7 +437,9 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Pulse struct {
-			DailyBudgetUSD *float64 `json:"daily_budget_usd"`
+			DailyBudgetUSD   *float64 `json:"daily_budget_usd"`
+			WeeklyBudgetUSD  *float64 `json:"weekly_budget_usd"`
+			MonthlyBudgetUSD *float64 `json:"monthly_budget_usd"`
 		} `json:"pulse"`
 		Updates map[string]interface{} `json:"updates"`
 	}
@@ -503,7 +507,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		// }
 	}
 
-	// Handle legacy Pulse format
+	// Handle Pulse budget updates
 	if req.Pulse.DailyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateDailyBudget(*req.Pulse.DailyBudgetUSD); err != nil {
 			s.logger.Errorw("Failed to update daily budget",
@@ -516,6 +520,38 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 		s.logger.Infow("Config updated via REST API",
 			"daily_budget", *req.Pulse.DailyBudgetUSD,
+			"client", r.RemoteAddr,
+		)
+	}
+
+	if req.Pulse.WeeklyBudgetUSD != nil {
+		if err := s.budgetTracker.UpdateWeeklyBudget(*req.Pulse.WeeklyBudgetUSD); err != nil {
+			s.logger.Errorw("Failed to update weekly budget",
+				"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
+				"error", err,
+			)
+			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		s.logger.Infow("Config updated via REST API",
+			"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
+			"client", r.RemoteAddr,
+		)
+	}
+
+	if req.Pulse.MonthlyBudgetUSD != nil {
+		if err := s.budgetTracker.UpdateMonthlyBudget(*req.Pulse.MonthlyBudgetUSD); err != nil {
+			s.logger.Errorw("Failed to update monthly budget",
+				"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
+				"error", err,
+			)
+			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		s.logger.Infow("Config updated via REST API",
+			"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
 			"client", r.RemoteAddr,
 		)
 	}

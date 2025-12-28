@@ -42,6 +42,7 @@ type cachedDaemonStatus struct {
 	queuedJobs    int
 	loadPercent   float64
 	budgetDaily   float64
+	budgetWeekly  float64
 	budgetMonthly float64
 }
 
@@ -66,6 +67,7 @@ type QueryMessage struct {
 	Data          string  `json:"data"`           // For upload messages: base64 encoded file content
 	Action        string  `json:"action"`         // For daemon_control/job_control/visibility messages: "start", "stop", "pause", "resume", "details", "toggle_node_type", "toggle_isolated"
 	DailyBudget   float64 `json:"daily_budget"`   // For pulse_config_update messages
+	WeeklyBudget  float64 `json:"weekly_budget"`  // For pulse_config_update messages
 	MonthlyBudget float64 `json:"monthly_budget"` // For pulse_config_update messages
 	JobID         string  `json:"job_id"`         // For job_control messages
 	NodeType      string  `json:"node_type"`      // For visibility messages: node type to toggle
@@ -115,17 +117,19 @@ type JobUpdateMessage struct {
 
 // DaemonStatusMessage represents daemon status update
 type DaemonStatusMessage struct {
-	Type               string  `json:"type"`                 // "daemon_status"
-	Running            bool    `json:"running"`              // Is daemon running
-	ActiveJobs         int     `json:"active_jobs"`          // Number of active jobs
-	QueuedJobs         int     `json:"queued_jobs"`          // Number of queued jobs
-	LoadPercent        float64 `json:"load_percent"`         // CPU/processing load (0-100)
-	BudgetDaily        float64 `json:"budget_daily"`         // Daily budget spent
-	BudgetMonthly      float64 `json:"budget_monthly"`       // Monthly budget spent
-	BudgetDailyLimit   float64 `json:"budget_daily_limit"`   // Daily budget limit (config)
-	BudgetMonthlyLimit float64 `json:"budget_monthly_limit"` // Monthly budget limit (config)
-	ServerState        string  `json:"server_state"`         // GRACE Phase 4: "running", "draining", "stopped"
-	Timestamp          int64   `json:"timestamp"`            // Unix timestamp
+	Type                string  `json:"type"`                  // "daemon_status"
+	Running             bool    `json:"running"`               // Is daemon running
+	ActiveJobs          int     `json:"active_jobs"`           // Number of active jobs
+	QueuedJobs          int     `json:"queued_jobs"`           // Number of queued jobs
+	LoadPercent         float64 `json:"load_percent"`          // CPU/processing load (0-100)
+	BudgetDaily         float64 `json:"budget_daily"`          // Daily budget spent
+	BudgetWeekly        float64 `json:"budget_weekly"`         // Weekly budget spent
+	BudgetMonthly       float64 `json:"budget_monthly"`        // Monthly budget spent
+	BudgetDailyLimit    float64 `json:"budget_daily_limit"`    // Daily budget limit (config)
+	BudgetWeeklyLimit   float64 `json:"budget_weekly_limit"`   // Weekly budget limit (config)
+	BudgetMonthlyLimit  float64 `json:"budget_monthly_limit"`  // Monthly budget limit (config)
+	ServerState         string  `json:"server_state"`          // GRACE Phase 4: "running", "draining", "stopped"
+	Timestamp           int64   `json:"timestamp"`             // Unix timestamp
 }
 
 // LLMStreamMessage represents streaming LLM output

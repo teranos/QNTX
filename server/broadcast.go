@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/sym"
 )
 
 // broadcastMessage sends a message to all connected clients.
@@ -227,21 +228,23 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 	}
 
 	// Get actual budget spend from ai_model_usage table
-	var budgetDaily, budgetMonthly float64
+	var budgetDaily, budgetWeekly, budgetMonthly float64
 	budgetStatus, err := s.budgetTracker.GetStatus()
 	if err != nil {
 		s.logger.Debugw("Failed to get budget status", "error", err)
 		// Continue with zeros on error
 		budgetDaily = 0.0
+		budgetWeekly = 0.0
 		budgetMonthly = 0.0
 	} else {
 		budgetDaily = budgetStatus.DailySpend
+		budgetWeekly = budgetStatus.WeeklySpend
 		budgetMonthly = budgetStatus.MonthlySpend
 	}
 
 	// Check if status has changed meaningfully (with lock for lastStatus access)
 	s.mu.Lock()
-	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent, budgetDaily, budgetMonthly) {
+	if !s.statusHasChangedLocked(activeJobs, stats.Queued, loadPercent, budgetDaily, budgetWeekly, budgetMonthly) {
 		s.mu.Unlock()
 		return // Skip broadcast if nothing changed
 	}
@@ -252,6 +255,7 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 		queuedJobs:    stats.Queued,
 		loadPercent:   loadPercent,
 		budgetDaily:   budgetDaily,
+		budgetWeekly:  budgetWeekly,
 		budgetMonthly: budgetMonthly,
 	}
 	s.mu.Unlock()
@@ -266,8 +270,10 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 		QueuedJobs:         stats.Queued,
 		LoadPercent:        loadPercent,
 		BudgetDaily:        budgetDaily,
+		BudgetWeekly:       budgetWeekly,
 		BudgetMonthly:      budgetMonthly,
 		BudgetDailyLimit:   budgetLimits.DailyBudgetUSD,
+		BudgetWeeklyLimit:  budgetLimits.WeeklyBudgetUSD,
 		BudgetMonthlyLimit: budgetLimits.MonthlyBudgetUSD,
 		Timestamp:          time.Now().Unix(),
 	}
@@ -343,7 +349,7 @@ func (s *QNTXServer) usageHasChangedLocked(totalCost float64, requests, success 
 
 // statusHasChangedLocked checks if the daemon status has meaningfully changed since last broadcast.
 // REQUIRES: s.mu must be held by caller.
-func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent, budgetDaily, budgetMonthly float64) bool {
+func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPercent, budgetDaily, budgetWeekly, budgetMonthly float64) bool {
 	if s.lastStatus == nil {
 		return true // First broadcast always sends
 	}
@@ -353,6 +359,7 @@ func (s *QNTXServer) statusHasChangedLocked(activeJobs, queuedJobs int, loadPerc
 		s.lastStatus.queuedJobs != queuedJobs ||
 		absDiff(s.lastStatus.loadPercent, loadPercent) > 1.0 || // 1% tolerance
 		absDiff(s.lastStatus.budgetDaily, budgetDaily) > 0.01 ||
+		absDiff(s.lastStatus.budgetWeekly, budgetWeekly) > 0.01 ||
 		absDiff(s.lastStatus.budgetMonthly, budgetMonthly) > 0.01
 }
 
@@ -399,7 +406,7 @@ func (s *QNTXServer) startDaemon() error {
 	s.daemon.Start()
 	if s.ticker != nil {
 		s.ticker.Start()
-		s.logger.Infow("꩜ Pulse ticker started")
+		s.logger.Infow(fmt.Sprintf("%s Pulse ticker started", sym.Pulse))
 	}
 	if err := s.setDaemonState(true); err != nil {
 		s.logger.Warnw("Failed to persist daemon state", "error", err)
@@ -417,7 +424,7 @@ func (s *QNTXServer) stopDaemon() error {
 
 	if s.ticker != nil {
 		s.ticker.Stop()
-		s.logger.Infow("꩜ Pulse ticker stopped")
+		s.logger.Infow(fmt.Sprintf("%s Pulse ticker stopped", sym.Pulse))
 	}
 	s.daemon.Stop()
 	if err := s.setDaemonState(false); err != nil {
@@ -452,7 +459,7 @@ func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID,
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw("꩜ Broadcasted execution started",
+	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution started", sym.Pulse),
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"clients", sent,
@@ -472,7 +479,7 @@ func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, 
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw("꩜ Broadcasted execution failed",
+	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution failed", sym.Pulse),
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"error", errorMsg,
@@ -494,7 +501,7 @@ func (s *QNTXServer) BroadcastPulseExecutionCompleted(scheduledJobID, executionI
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw("꩜ Broadcasted execution completed",
+	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution completed", sym.Pulse),
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"async_job_id", asyncJobID,
@@ -513,7 +520,7 @@ func (s *QNTXServer) BroadcastPulseExecutionLogStream(scheduledJobID, executionI
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw("꩜ Broadcasted execution log chunk",
+	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution log chunk", sym.Pulse),
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"chunk_length", len(logChunk),
