@@ -35,18 +35,6 @@ Configuration is not mere settings - it defines the system's state of existence.
 
 The `am` package is domain-agnostic infrastructure. Applications extend it for their needs.
 
-## Configuration Sections
-
-- **`database`** - SQLite storage path and settings
-- **`server`** - Web UI ports, CORS origins, log themes
-- **`pulse`** - Async job workers, scheduling, HTTP rate limiting
-- **`repl`** - Interactive REPL search, display, timeouts, history
-- **`code`** - Code review system (GitHub, gopls integration)
-- **`local_inference`** - Local LLM support (Ollama, LocalAI)
-- **`ax`** - Attestation query defaults
-
-See `am.go` for complete type definitions.
-
 ## Configuration Precedence
 
 **Why this order?** Environment variables override everything (deployment flexibility). Project config overrides user (team settings). User overrides system (personal preferences).
@@ -62,6 +50,20 @@ Configuration loads in order (lowest to highest priority):
 Sensitive values (API keys, tokens) should use environment variables.
 
 See [Configuration System Architecture](../docs/architecture/config-system.md) for rationale, introspection, and implementation details.
+
+## Configuration Sections
+
+Infrastructure configured by `am`:
+
+- **`database`** - SQLite storage path and settings
+- **`server`** - Web UI ports, CORS origins, log themes
+- **`pulse`** - Async job workers, scheduling, HTTP rate limiting
+- **`repl`** - Interactive REPL search, display, timeouts, history
+- **`code`** - Code review system (GitHub, gopls integration)
+- **`local_inference`** - Local LLM support (Ollama, LocalAI)
+- **`ax`** - Attestation query defaults
+
+See `am.go` for complete type definitions.
 
 ## Extending in Applications
 
@@ -85,6 +87,6 @@ Works with existing `config.toml` files unchanged:
 - **[ats](../ats/)** - Attestation system (uses am for database config)
 - **[logger](../logger/)** - Structured logging (uses am for theme config)
 - **[sym](../sym/)** - Unicode symbols (am symbol: ≡)
-- **[am/geotime](./geotime/)** - Geographic/timezone utilities for configuration defaults
+- **[am/geotime](./geotime/)** - Geographic/timezone utilities
 
-**Note**: The `geotime` package provides timezone and location utilities for configuration. Geographic defaults (like "Europe/Amsterdam") belong in `am/geotime`, not hardcoded in core config - this maintains domain-agnostic design while providing geographic capabilities when needed.
+**Note on geotime:** Geographic defaults (like "Europe/Amsterdam") belong in `am/geotime`, not hardcoded in core config. This maintains domain-agnostic design while providing geographic capabilities when needed.
