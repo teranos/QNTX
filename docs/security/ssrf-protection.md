@@ -28,13 +28,12 @@ client.Get(userURL)
 - @ character in URLs (credential injection)
 - file://, ftp://, gopher:// schemes
 - Redirects to private IPs
+- **All IPv6 addresses** (disabled until comprehensively tested)
 
-**Claimed but not thoroughly tested:**
-- IPv6 private addresses (fc00::/7, ::1)
+**Not thoroughly tested:**
 - DNS rebinding attacks
-- IPv4-mapped IPv6 (::ffff:127.0.0.1)
 
-**If IPv6 or sophisticated attacks are in your threat model, add tests first.**
+**IPv6 Policy**: All IPv6 addresses are rejected until proper test coverage exists for edge cases like IPv4-mapped addresses (::ffff:127.0.0.1), zone IDs, and other IPv6-specific attack vectors. This is a conservative approach - legitimate IPv6 use cases will fail.
 
 ## Usage
 

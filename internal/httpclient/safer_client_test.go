@@ -195,7 +195,7 @@ func TestIsPrivateIP(t *testing.T) {
 		{"::1", "::1", true},                                    // Loopback
 		{"fe80::1", "fe80::1", true},                            // Link-local
 		{"fc00::1", "fc00::1", true},                            // ULA
-		{"2001:4860:4860::8888", "2001:4860:4860::8888", false}, // Google DNS
+		{"2001:4860:4860::8888", "2001:4860:4860::8888", true}, // Public IPv6 (Google DNS) - blocked
 	}
 
 	for _, tt := range tests {
