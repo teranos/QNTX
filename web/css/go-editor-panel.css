@@ -1,0 +1,78 @@
+/* Go Editor Panel Styles */
+
+/* Header icon styling */
+.go-editor-icon {
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Info bar */
+.go-editor-info {
+    padding: 10px;
+    background: #252526;
+    color: #cccccc;
+    font-size: 12px;
+    border-bottom: 1px solid #3e3e42;
+}
+
+.go-editor-info-status {
+    margin-left: 20px;
+}
+
+/* Status colors */
+.gopls-status-connecting {
+    color: #858585;
+}
+
+.gopls-status-ready {
+    color: #4ec9b0;
+}
+
+.gopls-status-error {
+    color: #f48771;
+}
+
+.gopls-status-unavailable {
+    color: #858585;
+}
+
+/* Editor container */
+.go-editor-container {
+    flex: 1;
+    overflow: auto;
+    background: #1e1e1e;
+}
+
+/* Panel body layout */
+.go-editor-body {
+    display: flex;
+}
+
+.go-editor-body > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Error message styling */
+.go-editor-error {
+    padding: 20px;
+    color: #ff6b6b;
+}
+
+.go-editor-error h3 {
+    margin-top: 0;
+}
+
+.go-editor-error-help {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+}
+
+.go-editor-error-help code {
+    background: #2a2a2a;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
