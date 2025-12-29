@@ -8,6 +8,8 @@ import (
 
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
@@ -21,7 +23,7 @@ import (
 // serverDependencies holds all dependencies created for QNTXServer
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	// langService   *lsp.Service    // TODO: Extract ats/lsp
+	langService   *lsp.Service // Language service for ATS LSP features
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
@@ -63,10 +65,9 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	if deps.builder == nil {
 		return nil, fmt.Errorf("graph builder creation failed")
 	}
-	// TODO(#54): Validate langService when extracted
-	// if deps.langService == nil {
-	// 	return nil, fmt.Errorf("language service creation failed")
-	// }
+	if deps.langService == nil {
+		return nil, fmt.Errorf("language service creation failed")
+	}
 	if deps.usageTracker == nil {
 		return nil, fmt.Errorf("usage tracker creation failed")
 	}
@@ -98,7 +99,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		db:            db,
 		dbPath:        dbPath,
 		builder:       deps.builder,
-		// langService:   deps.langService,  // TODO(#54): Extract ats/lsp
+		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon, // Use daemon with server context
@@ -169,14 +170,14 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	}
 	serverLogger.Debugw("Graph builder created", "duration_ms", time.Since(start).Milliseconds())
 
-	// TODO(#54): Extract ats/lsp - language service for LSP-like features deferred
-	// langStart := time.Now()
-	// symbolIndex, err := storage.NewSymbolIndex(db)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create symbol index: %w", err)
-	// }
-	// langService := lsp.NewService(symbolIndex)
-	// serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
+	// Create language service for ATS LSP features
+	langStart := time.Now()
+	symbolIndex, err := storage.NewSymbolIndex(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create symbol index: %w", err)
+	}
+	langService := lsp.NewService(symbolIndex)
+	serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
 
 	// Create usage tracker for AI model usage and cost monitoring
 	usageTracker := tracker.NewUsageTracker(db, verbosity)
@@ -209,7 +210,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 
 	return &serverDependencies{
 		builder:       builder,
-		// langService:   langService,  // TODO(#54): Extract ats/lsp
+		langService:   langService,
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,

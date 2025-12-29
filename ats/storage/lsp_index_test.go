@@ -188,15 +188,14 @@ func TestGetSubjectCompletions(t *testing.T) {
 		wantCount int
 		wantEmpty bool
 	}{
-		{"al", 0, true},          // Less than 3 chars
+		{"al", 3, false},         // Matches "alice", "alicia", "alex" (2-char minimum)
 		{"ali", 2, false},        // Matches "alice", "alicia"
 		{"alex", 1, false},       // Matches "alex"
 		{"bob", 1, false},        // Matches "bob"
 		{"bar", 1, false},        // Matches "barbara"
 		{"xyz", 0, false},        // No matches
 		{"", 0, true},            // Empty prefix
-		{"a", 0, true},           // Less than 3 chars
-		{"al", 0, true},          // Less than 3 chars (boundary test)
+		{"a", 0, true},           // Less than 2 chars
 	}
 
 	for _, tt := range tests {
