@@ -181,6 +181,11 @@ function handleSymbolClick(e: Event): void {
             console.log(`[Symbol Palette] prose - showing documentation`);
             showProsePanel();
             break;
+        case 'go':
+            // Go - show Go code editor with gopls integration
+            console.log(`[Symbol Palette] go - showing Go code editor`);
+            showGoEditor();
+            break;
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -242,6 +247,14 @@ async function showPulsePanel(): Promise<void> {
 async function showProsePanel(): Promise<void> {
     const { toggleProsePanel } = await import('./prose/panel.js');
     toggleProsePanel();
+}
+
+/**
+ * Show Go editor - displays Go code editor with gopls LSP integration
+ */
+async function showGoEditor(): Promise<void> {
+    const { toggleGoEditor } = await import('./go-editor-panel.js');
+    toggleGoEditor();
 }
 
 /**
