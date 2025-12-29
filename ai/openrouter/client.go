@@ -17,6 +17,12 @@ import (
 	"github.com/teranos/QNTX/internal/httpclient"
 )
 
+const (
+	// DefaultModel is the fallback model when none is specified
+	// Should match the default in am/defaults.go for consistency
+	DefaultModel = "openai/gpt-4o-mini"
+)
+
 // Client represents an OpenRouter.ai API client with QNTX-specific functionality
 type Client struct {
 	apiKey       string
@@ -43,7 +49,7 @@ type Config struct {
 // NewClient creates a new OpenRouter.ai client with QNTX-specific defaults
 func NewClient(config Config) *Client {
 	if config.Model == "" {
-		config.Model = "openai/gpt-4o-mini" // Default to cost-effective model via OpenRouter
+		config.Model = DefaultModel
 	}
 	if config.Temperature == 0 {
 		config.Temperature = 0.2 // Default to deterministic
