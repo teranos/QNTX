@@ -37,6 +37,25 @@ ws://localhost:877/lsp
 
 The LSP service uses the symbol index to provide completions based on actual attestations in the database.
 
+## Why GLSP?
+
+**GLSP** (github.com/tliron/glsp) was chosen for standard LSP support because:
+
+1. **WebSocket support** - Only major Go LSP library with built-in WebSocket transport (critical for browser compatibility)
+2. **Standard protocol** - LSP 3.16/3.17 compliant, enabling future editor integration (VS Code, Neovim)
+3. **Dual transport** - Supports both stdio (for editors) and WebSocket (for web UI) from single codebase
+4. **Future-proof** - Standard protocol compliance means LSP features come "for free" from library updates
+
+## Current Limitations
+
+**Dual protocol approach**: QNTX uses both GLSP (standard LSP) and a custom `parse_request`/`parse_response` WebSocket protocol.
+
+**Why custom protocol exists**: See **Issue #13** - `codemirror-languageserver` (as of v1.18.1) doesn't support LSP semantic tokens yet. Our custom protocol works today; when library adds support, we can migrate to standard `textDocument/semanticTokens/full`.
+
+The server provides both protocols:
+- `/lsp` - Standard GLSP endpoint (completions, hover, diagnostics)
+- `/ws` - Custom protocol for semantic tokens (`parse_request`/`parse_response`)
+
 ## Implementation Notes
 
 **Completion context awareness**:
