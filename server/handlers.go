@@ -442,62 +442,59 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// TODO(#58): Extract local inference config - deferred to future PR
 	// Handle key-value updates from UI (new format)
 	if len(req.Updates) > 0 {
-		http.Error(w, "Local inference config updates not yet implemented", http.StatusNotImplemented)
-		return
-		// for key, value := range req.Updates {
-		// 	switch key {
-		// 	case "local_inference.enabled":
-		// 		enabled, ok := value.(bool)
-		// 		if !ok {
-		// 			http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
-		// 			return
-		// 		}
-		// 		if err := appcfg.UpdateLocalInferenceEnabled(enabled); err != nil {
-		// 			s.logger.Errorw("Failed to update local_inference.enabled",
-		// 				"enabled", enabled,
-		// 				"error", err,
-		// 			)
-		// 			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
-		// 			return
-		// 		}
-		// 		s.logger.Infow("Config updated via REST API",
-		// 			"key", "local_inference.enabled",
-		// 			"value", enabled,
-		// 			"client", r.RemoteAddr,
-		// 		)
-		//
-		// 	case "local_inference.model":
-		// 		model, ok := value.(string)
-		// 		if !ok {
-		// 			http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
-		// 			return
-		// 		}
-		// 		if err := appcfg.UpdateLocalInferenceModel(model); err != nil {
-		// 			s.logger.Errorw("Failed to update local_inference.model",
-		// 				"model", model,
-		// 				"error", err,
-		// 			)
-		// 			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
-		// 			return
-		// 		}
-		// 		s.logger.Infow("Config updated via REST API",
-		// 			"key", "local_inference.model",
-		// 			"value", model,
-		// 			"client", r.RemoteAddr,
-		// 		)
-		//
-		// 	default:
-		// 		s.logger.Warnw("Unsupported config key in updates",
-		// 			"key", key,
-		// 			"client", r.RemoteAddr,
-		// 		)
-		// 		http.Error(w, fmt.Sprintf("Unsupported config key: %s", key), http.StatusBadRequest)
-		// 		return
-		// 	}
-		// }
+		for key, value := range req.Updates {
+			switch key {
+			case "local_inference.enabled":
+				enabled, ok := value.(bool)
+				if !ok {
+					http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
+					return
+				}
+				if err := appcfg.UpdateLocalInferenceEnabled(enabled); err != nil {
+					s.logger.Errorw("Failed to update local_inference.enabled",
+						"enabled", enabled,
+						"error", err,
+					)
+					http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
+					return
+				}
+				s.logger.Infow("Config updated via REST API",
+					"key", "local_inference.enabled",
+					"value", enabled,
+					"client", r.RemoteAddr,
+				)
+
+			case "local_inference.model":
+				model, ok := value.(string)
+				if !ok {
+					http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
+					return
+				}
+				if err := appcfg.UpdateLocalInferenceModel(model); err != nil {
+					s.logger.Errorw("Failed to update local_inference.model",
+						"model", model,
+						"error", err,
+					)
+					http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
+					return
+				}
+				s.logger.Infow("Config updated via REST API",
+					"key", "local_inference.model",
+					"value", model,
+					"client", r.RemoteAddr,
+				)
+
+			default:
+				s.logger.Warnw("Unsupported config key in updates",
+					"key", key,
+					"client", r.RemoteAddr,
+				)
+				http.Error(w, fmt.Sprintf("Unsupported config key: %s", key), http.StatusBadRequest)
+				return
+			}
+		}
 	}
 
 	// Handle Pulse budget updates
