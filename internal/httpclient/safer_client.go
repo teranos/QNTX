@@ -255,13 +255,10 @@ func isPrivateIP(ip net.IP) bool {
 		return false
 	}
 
-	// IPv6 special addresses
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return true
-	}
-
-	// IPv6 private addresses (fc00::/7 - Unique Local Addresses)
-	if len(ip) == net.IPv6len && (ip[0] == 0xfc || ip[0] == 0xfd) {
+	// Reject all IPv6 addresses until properly tested
+	// IPv6 has edge cases (IPv4-mapped, zone IDs, etc.) that aren't comprehensively tested
+	// See docs/security/ssrf-protection.md for rationale
+	if len(ip) == net.IPv6len {
 		return true
 	}
 
