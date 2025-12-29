@@ -3,6 +3,7 @@ package gopls
 import (
 	"container/list"
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/tliron/glsp"
@@ -277,7 +278,7 @@ func (h *GLSPHandler) TextDocumentHover(ctx *glsp.Context, params *protocol.Hove
 
 	hover, err := h.service.GetHover(context.Background(), uri, pos)
 	if err != nil {
-		h.logger.Errorw("GetHover failed", "error", err, "uri", uri)
+		h.logger.Errorw(fmt.Sprintf("GetHover failed: %v", err))
 		return nil, nil
 	}
 

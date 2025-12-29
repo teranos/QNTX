@@ -126,7 +126,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	}
 
 	addr := fmt.Sprintf(":%d", actualPort)
-	s.logger.Infow("HTTP server listening", "addr", addr)
+	s.logger.Infow(fmt.Sprintf("HTTP server listening on port %d", actualPort))
 	return http.ListenAndServe(addr, nil)
 }
 
