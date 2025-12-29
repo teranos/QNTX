@@ -69,7 +69,16 @@ The server provides both protocols:
 - Predicates/contexts/actors: 1 char (explicit context after keywords)
 
 **Symbol refresh**:
-Symbol index is built at server startup from attestations table. No automatic refresh yet (see `ats/storage/lsp_index.go` TODOs).
+Symbol index is built at server startup from attestations table. No automatic refresh yet (see Issue #46 and `ats/storage/lsp_index.go` TODOs).
+
+## Future Enhancements
+
+See open issues for planned improvements:
+- **Issue #45** - Completion sorting by frequency (currently truncates to first 10 matches)
+- **Issue #46** - Automatic symbol index refresh strategy
+- **Issue #47** - Interactive hover exploration (show related attestations)
+- **Issue #13** - Track codemirror-languageserver semantic token support
+- **Issue #3** - General LSP enhancements (caching, performance, features)
 
 ## Related
 

@@ -58,7 +58,7 @@ type Diagnostic struct {
 }
 
 // Parse analyzes a query and returns semantic tokens with diagnostics
-// TODO(issue #111): Consider caching parse results for identical queries
+// TODO(QNTX #3): Consider caching parse results for identical queries
 func (s *Service) Parse(ctx context.Context, query string, verbosity int) (*ParseResponse, error) {
 	// Tokenize with position tracking
 	sourceTokens := parser.PreprocessAskTokensWithPositions(query)
@@ -192,7 +192,7 @@ func (s *Service) classifyTokens(ctx context.Context, sourceTokens []parser.Sour
 }
 
 // getHoverInfo fetches hover information from database
-// TODO(issue #143): Enhance with interactive hover - show related attestations
+// TODO(QNTX #47): Enhance with interactive hover - show related attestations
 // Current: Simple format "predicate: engineer (5 attestations)"
 // Future: Two-column layout with clickable subjects/contexts for exploration
 func (s *Service) getHoverInfo(ctx context.Context, text string, tokenType parser.SemanticTokenType) string {
