@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -64,17 +63,12 @@ The daemon will:
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		// Open database
-		database, err := db.Open(cfg.Database.Path, logger.Logger)
+		// Open and migrate database
+		database, err := openDatabase("")
 		if err != nil {
-			return fmt.Errorf("failed to open database: %w", err)
+			return err
 		}
 		defer database.Close()
-
-		// Run migrations
-		if err := db.Migrate(database, logger.Logger); err != nil {
-			return fmt.Errorf("failed to run migrations: %w", err)
-		}
 
 		// Create worker pool config
 		poolCfg := async.DefaultWorkerPoolConfig()

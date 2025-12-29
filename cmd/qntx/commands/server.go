@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +11,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/server"
 )
 
@@ -31,6 +29,7 @@ var (
 	serverAtsQuery  string
 	serverNoBrowser bool
 	serverDevMode   bool
+	serverDBPath    string
 )
 
 func init() {
@@ -40,6 +39,7 @@ func init() {
 	ServerCmd.Flags().StringVar(&serverAtsQuery, "ats", "", "Pre-load graph with an Ax query (e.g., --ats 'role:developer')")
 	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", false, "Disable automatic browser opening (default: auto-open)")
 	ServerCmd.Flags().BoolVar(&serverDevMode, "dev", false, "Enable development mode")
+	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
@@ -49,42 +49,28 @@ func runServer(cmd *cobra.Command, args []string) error {
 		verbosity = 1
 	}
 
-	var database *sql.DB
-	var err error
-
-	// Open database - either test mode or normal mode
+	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
-	if serverTestMode {
-		pterm.Info.Println("Test mode enabled - creating fresh database")
-		// Create temporary database with schema migrations
+	if serverDBPath != "" {
+		dbPath = serverDBPath
+	} else if serverTestMode {
 		dbPath = "tmp/test-qntx.db"
-		database, err = db.Open(dbPath, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create test database: %w", err)
-		}
-		pterm.Info.Printf("Test database created at: %s\n", dbPath)
-	} else {
-		// Load configuration
-		cfg, err := am.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
+	}
+	// If dbPath still empty, openDatabase will use am.GetDatabasePath()
 
-		dbPath = cfg.Database.Path
-		if dbPath == "" {
-			dbPath = "qntx.db"
-		}
-
-		database, err = db.Open(dbPath, nil)
-		if err != nil {
-			return fmt.Errorf("failed to open database: %w", err)
-		}
+	// Open and migrate database
+	database, err := openDatabase(dbPath)
+	if err != nil {
+		return err
 	}
 	defer database.Close()
 
-	// Run migrations
-	if err := db.Migrate(database, nil); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
+	// Get actual path for banner (openDatabase resolved it)
+	dbPath, _ = am.GetDatabasePath()
+	if serverDBPath != "" {
+		dbPath = serverDBPath
+	} else if serverTestMode {
+		dbPath = "tmp/test-qntx.db"
 	}
 
 	// Print startup banner

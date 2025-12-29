@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -46,17 +45,12 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Open database
-	database, err := db.Open(cfg.Database.Path, nil)
+	// Open and migrate database
+	database, err := openDatabase("")
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
-
-	// Run migrations to ensure schema is up-to-date
-	if err := db.Migrate(database, nil); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
 
 	// Get basic storage statistics
 	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
