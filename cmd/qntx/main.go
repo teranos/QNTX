@@ -36,6 +36,9 @@ Examples:
 }
 
 func init() {
+	// Add global flags
+	rootCmd.PersistentFlags().CountP("verbose", "v", "Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
+
 	// Add commands
 	rootCmd.AddCommand(commands.AmCmd)
 	rootCmd.AddCommand(commands.AsCmd)
