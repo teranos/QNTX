@@ -330,10 +330,8 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		}
 
 		if err := c.usageTracker.TrackUsage(usage); err != nil {
-			// Log tracking error but don't fail the request
-			if c.config.Debug {
-				fmt.Printf("⚠️  Failed to track usage: %v\n", err)
-			}
+			// Always log tracking errors (budget system relies on this data)
+			fmt.Printf("⚠️  Failed to track usage: %v\n", err)
 		}
 	}
 
@@ -408,10 +406,8 @@ func (c *Client) trackFailedRequest(requestTime time.Time, model string, tempera
 	}
 
 	if trackErr := c.usageTracker.TrackUsage(usage); trackErr != nil {
-		// Log tracking error but don't fail the request
-		if c.config.Debug {
-			fmt.Printf("⚠️  Failed to track failed request: %v\n", trackErr)
-		}
+		// Always log tracking errors (budget system relies on this data)
+		fmt.Printf("⚠️  Failed to track failed request: %v\n", trackErr)
 	}
 }
 
