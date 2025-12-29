@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/graph"
@@ -20,8 +21,8 @@ import (
 // serverDependencies holds all dependencies created for QNTXServer
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	// langService   *lsp.Service          // TODO: Extract ats/lsp
-	// usageTracker  *tracker.UsageTracker // TODO: Extract ai/tracker
+	// langService   *lsp.Service    // TODO: Extract ats/lsp
+	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
 	config        *appcfg.Config // GRACE Phase 2 optimization: reuse for daemon recreation
@@ -62,13 +63,13 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	if deps.builder == nil {
 		return nil, fmt.Errorf("graph builder creation failed")
 	}
-	// TODO(#54,#56): Validate langService and usageTracker when extracted
+	// TODO(#54): Validate langService when extracted
 	// if deps.langService == nil {
 	// 	return nil, fmt.Errorf("language service creation failed")
 	// }
-	// if deps.usageTracker == nil {
-	// 	return nil, fmt.Errorf("usage tracker creation failed")
-	// }
+	if deps.usageTracker == nil {
+		return nil, fmt.Errorf("usage tracker creation failed")
+	}
 	if deps.budgetTracker == nil {
 		return nil, fmt.Errorf("budget tracker creation failed")
 	}
@@ -94,11 +95,11 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 
 	// Create server instance (before ticker so we can pass it as broadcaster)
 	server := &QNTXServer{
-		db:      db,
-		dbPath:  dbPath,
-		builder: deps.builder,
+		db:            db,
+		dbPath:        dbPath,
+		builder:       deps.builder,
 		// langService:   deps.langService,  // TODO(#54): Extract ats/lsp
-		// usageTracker:  deps.usageTracker, // TODO(#56): Extract ai/tracker
+		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon, // Use daemon with server context
 		ticker:        nil,    // Will be set below after passing server as broadcaster
@@ -177,8 +178,8 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	// langService := lsp.NewService(symbolIndex)
 	// serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
 
-	// TODO(#56): Extract ai/tracker - usage tracker deferred
-	// usageTracker := tracker.NewUsageTracker(db, verbosity)
+	// Create usage tracker for AI model usage and cost monitoring
+	usageTracker := tracker.NewUsageTracker(db, verbosity)
 
 	// Load configuration for daemon setup
 	cfgStart := time.Now()
@@ -209,7 +210,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	return &serverDependencies{
 		builder:       builder,
 		// langService:   langService,  // TODO(#54): Extract ats/lsp
-		// usageTracker:  usageTracker, // TODO(#56): Extract ai/tracker
+		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
 		config:        cfg, // GRACE Phase 2 optimization: save for reuse
