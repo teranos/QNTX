@@ -23,7 +23,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
 	set -m; \
-	./bin/qntx server --no-browser & \
+	./bin/qntx server --dev --no-browser -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
