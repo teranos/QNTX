@@ -1,8 +1,8 @@
 package gopls
 
 import (
+	"container/list"
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/tliron/glsp"
@@ -15,12 +15,19 @@ const (
 	maxDocumentsPerClient = 100
 )
 
+// documentEntry represents a cached document in the LRU cache
+type documentEntry struct {
+	uri     string
+	content string
+}
+
 // GLSPHandler implements LSP protocol handlers for gopls
 // Wraps the gopls Service with standard LSP protocol
 type GLSPHandler struct {
 	service   *Service
 	logger    *zap.SugaredLogger
-	documents map[string]string // URI → document content cache
+	documents map[string]*list.Element // URI → list element (LRU cache)
+	lruList   *list.List               // Doubly-linked list for LRU ordering
 	mu        sync.RWMutex
 }
 
@@ -29,7 +36,8 @@ func NewGLSPHandler(service *Service, logger *zap.SugaredLogger) *GLSPHandler {
 	return &GLSPHandler{
 		service:   service,
 		logger:    logger,
-		documents: make(map[string]string),
+		documents: make(map[string]*list.Element),
+		lruList:   list.New(),
 	}
 }
 
@@ -80,21 +88,40 @@ func (h *GLSPHandler) TextDocumentDidOpen(ctx *glsp.Context, params *protocol.Di
 
 	uri := string(params.TextDocument.URI)
 
-	// Enforce document cache bounds
-	if _, exists := h.documents[uri]; !exists {
-		if len(h.documents) >= maxDocumentsPerClient {
-			h.logger.Warnw("Document cache limit reached",
-				"uri", uri,
-				"current_count", len(h.documents),
-				"max_allowed", maxDocumentsPerClient,
+	// If document already exists, move to front (most recently used)
+	if elem, exists := h.documents[uri]; exists {
+		h.lruList.MoveToFront(elem)
+		entry := elem.Value.(*documentEntry)
+		entry.content = params.TextDocument.Text
+		h.logger.Debugw("Document reopened", "uri", uri, "length", len(params.TextDocument.Text))
+		return nil
+	}
+
+	// Enforce document cache bounds - evict LRU if needed
+	if len(h.documents) >= maxDocumentsPerClient {
+		// Evict least recently used document (back of list)
+		oldest := h.lruList.Back()
+		if oldest != nil {
+			evicted := oldest.Value.(*documentEntry)
+			h.lruList.Remove(oldest)
+			delete(h.documents, evicted.uri)
+			h.logger.Infow("Document cache limit reached, evicted oldest document",
+				"evicted_uri", evicted.uri,
+				"new_uri", uri,
+				"cache_size", len(h.documents),
 			)
-			return fmt.Errorf("document cache limit reached (%d documents open)", maxDocumentsPerClient)
 		}
 	}
 
-	h.documents[uri] = params.TextDocument.Text
-	h.logger.Debugw("Document opened", "uri", uri, "length", len(params.TextDocument.Text))
+	// Add new document to front (most recently used)
+	entry := &documentEntry{
+		uri:     uri,
+		content: params.TextDocument.Text,
+	}
+	elem := h.lruList.PushFront(entry)
+	h.documents[uri] = elem
 
+	h.logger.Debugw("Document opened", "uri", uri, "length", len(params.TextDocument.Text))
 	return nil
 }
 
@@ -108,7 +135,20 @@ func (h *GLSPHandler) TextDocumentDidChange(ctx *glsp.Context, params *protocol.
 	// Full document sync
 	for _, change := range params.ContentChanges {
 		if textChange, ok := change.(protocol.TextDocumentContentChangeEventWhole); ok {
-			h.documents[uri] = textChange.Text
+			// Update content and move to front (mark as recently used)
+			if elem, exists := h.documents[uri]; exists {
+				h.lruList.MoveToFront(elem)
+				entry := elem.Value.(*documentEntry)
+				entry.content = textChange.Text
+			} else {
+				// Document not in cache, add it (shouldn't normally happen)
+				entry := &documentEntry{
+					uri:     uri,
+					content: textChange.Text,
+				}
+				elem := h.lruList.PushFront(entry)
+				h.documents[uri] = elem
+			}
 		}
 	}
 
@@ -122,7 +162,12 @@ func (h *GLSPHandler) TextDocumentDidClose(ctx *glsp.Context, params *protocol.D
 	defer h.mu.Unlock()
 
 	uri := string(params.TextDocument.URI)
-	delete(h.documents, uri)
+
+	// Remove from both map and LRU list
+	if elem, exists := h.documents[uri]; exists {
+		h.lruList.Remove(elem)
+		delete(h.documents, uri)
+	}
 
 	h.logger.Debugw("Document closed", "uri", uri)
 	return nil
