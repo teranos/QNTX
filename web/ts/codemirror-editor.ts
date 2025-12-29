@@ -1,37 +1,14 @@
 /**
  * CodeMirror 6 Editor with LSP Integration
- *
- * Uses pre-built bundle from js/vendor/codemirror-bundle.js
- * See internal/server/web/README.md for architecture details
  */
 
-// Import from vendored bundle (like d3.v7.min.js pattern)
-import {
-    EditorView,
-    keymap,
-    lineNumbers,
-    highlightActiveLine,
-    highlightActiveLineGutter,
-    EditorState,
-    Compartment,
-    StateField,
-    StateEffect,
-    RangeSetBuilder,
-    Decoration,
-    ViewPlugin,
-    defaultKeymap,
-    history,
-    historyKeymap,
-    indentWithTab,
-    syntaxHighlighting,
-    defaultHighlightStyle,
-    bracketMatching,
-    autocompletion,
-    completionKeymap,
-    closeBrackets,
-    lintKeymap,
-    languageServer
-} from './vendor/codemirror-bundle.js';
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin } from '@codemirror/view';
+import { EditorState, Compartment, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+import { autocompletion, completionKeymap, closeBrackets } from '@codemirror/autocomplete';
+import { lintKeymap } from '@codemirror/lint';
+import { languageServer } from 'codemirror-languageserver';
 
 // Linter - TODO: enable once we have a proper way to import this
 // import { linter } from '@codemirror/lint';
