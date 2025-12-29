@@ -445,7 +445,7 @@ func (wp *WorkerPool) processNextJob() error {
 		return nil
 	}
 
-	// TODO(multi-process-coordination): Add system load check as third gate before job execution
+	// TODO(QNTX #70): Add system load check as third gate before job execution
 	// Current gates: (1) Rate limiting, (2) Budget checking
 	// Needed gate: (3) System resource availability
 	//
@@ -480,7 +480,7 @@ func (wp *WorkerPool) processNextJob() error {
 	// - Enables multi-tenant deployment (multiple users on same GPU server)
 	// - Prevents qntx from starving training jobs, inference services, etc.
 	//
-	// See internal/pulse/budget.go TODO(multi-process-coordination) for full design
+	// See QNTX #70 for full multi-process coordination design
 
 	// Check rate limit BEFORE budget check
 	// Rate limiting prevents API violations, budget prevents cost overruns

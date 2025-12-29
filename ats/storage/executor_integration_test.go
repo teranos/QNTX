@@ -241,7 +241,7 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 }
 
 // TestAxExecutorFuzzyPredicateExpansion is disabled because it tests unexported implementation details
-// TODO: Reimplement this test using public API when needed
+// TODO(QNTX #71): Reimplement this test using public API when needed
 /*
 func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
@@ -271,7 +271,7 @@ func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
 */
 
 // TestAxExecutorGetAllPredicatesFromDB is disabled because it tests unexported implementation details
-// TODO: Reimplement this test using public API when needed
+// TODO(QNTX #71): Reimplement this test using public API when needed
 /*
 func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
