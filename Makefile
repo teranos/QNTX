@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server
+.PHONY: cli web run-web test-web test test-verbose clean server dev
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
@@ -7,6 +7,26 @@ cli: ## Build QNTX CLI binary
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
 	@./bin/qntx server
+
+dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
+	@echo "🚀 Starting development environment..."
+	@echo "  Backend:  http://localhost:877"
+	@echo "  Frontend: http://localhost:8820 (with live reload)"
+	@echo ""
+	@trap 'echo "Shutting down dev servers..."; \
+		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
+		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
+		pkill -f "bun.*dev" 2>/dev/null || true; \
+		wait 2>/dev/null || true; \
+		echo "✓ Servers stopped cleanly"' INT; \
+	set -m; \
+	./bin/qntx server & \
+	BACKEND_PID=$$!; \
+	cd web && bun run dev & \
+	FRONTEND_PID=$$!; \
+	echo "✨ Development servers running"; \
+	echo "Press Ctrl+C to stop both servers"; \
+	wait
 
 web: ## Build web assets with Bun
 	@echo "Building web assets..."

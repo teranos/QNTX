@@ -216,52 +216,49 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	}, nil
 }
 
-// TODO(#57): Extract config watcher - auto-reload functionality deferred to future PR
 // setupConfigWatcher sets up config file watching with reload callbacks
 func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.SugaredLogger) {
-	// Config watching disabled - requires extraction of appcfg.ConfigWatcher
-	serverLogger.Debugw("Config watching disabled, manual restart required for config changes")
-	return
+	// Get the config file path from Viper
+	configPath := appcfg.GetViper().ConfigFileUsed()
+	if configPath == "" {
+		serverLogger.Warnw("Could not determine config file path, config watching disabled")
+		return
+	}
 
-	// // Watch the UI config file (where graph server config updates are written)
-	// configPath := appcfg.GetUIConfigPath()
-	// if configPath == "" {
-	// 	serverLogger.Warnw("Could not determine UI config path, config watching disabled")
-	// 	return
-	// }
-	//
-	// configWatcher, err := appcfg.NewConfigWatcher(configPath)
-	// if err != nil {
-	// 	serverLogger.Warnw("Failed to create config watcher, manual restart required for config changes", "error", err)
-	// 	return
-	// }
-	//
-	// server.configWatcher = configWatcher
-	//
-	// // Set global watcher for persist.go to prevent reload loops
-	// appcfg.SetGlobalWatcher(configWatcher)
-	//
-	// // Register callback to update BudgetTracker when config changes
-	// configWatcher.OnReload(func(newCfg *appcfg.Config) error {
-	// 	serverLogger.Infow("Config reloaded, updating budget tracker",
-	// 		"daily_budget", newCfg.Pulse.DailyBudgetUSD,
-	// 		"monthly_budget", newCfg.Pulse.MonthlyBudgetUSD,
-	// 	)
-	//
-	// 	// Update budget tracker with new limits
-	// 	server.budgetTracker = budget.NewTracker(db, budget.BudgetConfig{
-	// 		DailyBudgetUSD:   newCfg.Pulse.DailyBudgetUSD,
-	// 		MonthlyBudgetUSD: newCfg.Pulse.MonthlyBudgetUSD,
-	// 		CostPerScoreUSD:  newCfg.Pulse.CostPerScoreUSD,
-	// 	})
-	//
-	// 	// Broadcast updated daemon status to all clients (includes new budget limits)
-	// 	server.broadcastDaemonStatus()
-	//
-	// 	return nil
-	// })
-	//
-	// // Start watching for changes
-	// configWatcher.Start()
-	// serverLogger.Infow("Config watcher started", "path", configPath)
+	configWatcher, err := appcfg.NewConfigWatcher(configPath)
+	if err != nil {
+		serverLogger.Warnw("Failed to create config watcher, manual restart required for config changes", "error", err)
+		return
+	}
+
+	server.configWatcher = configWatcher
+
+	// Set global watcher to prevent reload loops
+	appcfg.SetGlobalWatcher(configWatcher)
+
+	// Register callback to update BudgetTracker when config changes
+	configWatcher.OnReload(func(newCfg *appcfg.Config) error {
+		serverLogger.Infow("Config reloaded, updating budget tracker",
+			"daily_budget", newCfg.Pulse.DailyBudgetUSD,
+			"weekly_budget", newCfg.Pulse.WeeklyBudgetUSD,
+			"monthly_budget", newCfg.Pulse.MonthlyBudgetUSD,
+		)
+
+		// Update budget tracker with new limits
+		server.budgetTracker = budget.NewTracker(db, budget.BudgetConfig{
+			DailyBudgetUSD:   newCfg.Pulse.DailyBudgetUSD,
+			WeeklyBudgetUSD:  newCfg.Pulse.WeeklyBudgetUSD,
+			MonthlyBudgetUSD: newCfg.Pulse.MonthlyBudgetUSD,
+			CostPerScoreUSD:  newCfg.Pulse.CostPerScoreUSD,
+		})
+
+		// Broadcast updated daemon status to all clients (includes new budget limits)
+		server.broadcastDaemonStatus()
+
+		return nil
+	})
+
+	// Start watching for changes
+	configWatcher.Start()
+	serverLogger.Infow("Config watcher started", "path", configPath)
 }
