@@ -37,43 +37,40 @@ func (s *QNTXServer) broadcastMessage(msg interface{}) int {
 }
 
 func (s *QNTXServer) broadcastUsageUpdate() {
-	// TODO(#56): Extract ai/tracker - usage tracking deferred
-	return
-
-	// since := time.Now().Add(-24 * time.Hour)
-	// stats, err := s.usageTracker.GetUsageStats(since)
-	// if err != nil {
-	// 	s.logger.Debugw("Failed to get usage stats",
-	// 		"error", err.Error(),
-	// 	)
-	// 	return // Silent failure for observability
-	// }
-	// // Check if usage has changed since last broadcast (with lock for lastUsage access)
-	// s.mu.Lock()
-	// if !s.usageHasChangedLocked(stats.TotalCost, stats.TotalRequests, stats.SuccessfulRequests, stats.TotalTokens, stats.UniqueModels) {
-	// 	s.mu.Unlock()
-	// 	return // Skip broadcast if nothing changed
-	// }
-	// // Update cached usage (still under lock)
-	// s.lastUsage = &cachedUsageStats{
-	// 	totalCost: stats.TotalCost,
-	// 	requests:  stats.TotalRequests,
-	// 	success:   stats.SuccessfulRequests,
-	// 	tokens:    stats.TotalTokens,
-	// 	models:    stats.UniqueModels,
-	// }
-	// s.mu.Unlock()
-	// msg := UsageUpdateMessage{
-	// 	Type:      "usage_update",
-	// 	TotalCost: stats.TotalCost,
-	// 	Requests:  stats.TotalRequests,
-	// 	Success:   stats.SuccessfulRequests,
-	// 	Tokens:    stats.TotalTokens,
-	// 	Models:    stats.UniqueModels,
-	// 	Since:     "24h",
-	// 	Timestamp: time.Now().Unix(),
-	// }
-	// s.broadcastMessage(msg)
+	since := time.Now().Add(-24 * time.Hour)
+	stats, err := s.usageTracker.GetUsageStats(since)
+	if err != nil {
+		s.logger.Debugw("Failed to get usage stats",
+			"error", err.Error(),
+		)
+		return // Silent failure for observability
+	}
+	// Check if usage has changed since last broadcast (with lock for lastUsage access)
+	s.mu.Lock()
+	if !s.usageHasChangedLocked(stats.TotalCost, stats.TotalRequests, stats.SuccessfulRequests, stats.TotalTokens, stats.UniqueModels) {
+		s.mu.Unlock()
+		return // Skip broadcast if nothing changed
+	}
+	// Update cached usage (still under lock)
+	s.lastUsage = &cachedUsageStats{
+		totalCost: stats.TotalCost,
+		requests:  stats.TotalRequests,
+		success:   stats.SuccessfulRequests,
+		tokens:    stats.TotalTokens,
+		models:    stats.UniqueModels,
+	}
+	s.mu.Unlock()
+	msg := UsageUpdateMessage{
+		Type:      "usage_update",
+		TotalCost: stats.TotalCost,
+		Requests:  stats.TotalRequests,
+		Success:   stats.SuccessfulRequests,
+		Tokens:    stats.TotalTokens,
+		Models:    stats.UniqueModels,
+		Since:     "24h",
+		Timestamp: time.Now().Unix(),
+	}
+	s.broadcastMessage(msg)
 }
 
 // startUsageUpdateTicker starts a periodic usage update broadcaster

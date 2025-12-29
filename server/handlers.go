@@ -347,23 +347,19 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// TODO(#56): Extract ai/tracker - usage tracker deferred
-	http.Error(w, "Usage tracking not yet implemented", http.StatusNotImplemented)
-	return
-
-	// data, err := s.usageTracker.GetTimeSeriesData(days)
-	// if err != nil {
-	// 	s.logger.Errorw("Failed to get time-series data",
-	// 		"error", err,
-	// 		"days", days,
-	// 	)
-	// 	http.Error(w, "Failed to fetch time-series data", http.StatusInternalServerError)
-	// 	return
-	// }
-	// if err := json.NewEncoder(w).Encode(data); err != nil {
-	// 	s.logger.Errorw("Failed to encode time-series response", "error", err)
-	// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
-	// }
+	data, err := s.usageTracker.GetTimeSeriesData(days)
+	if err != nil {
+		s.logger.Errorw("Failed to get time-series data",
+			"error", err,
+			"days", days,
+		)
+		http.Error(w, "Failed to fetch time-series data", http.StatusInternalServerError)
+		return
+	}
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		s.logger.Errorw("Failed to encode time-series response", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // HandleConfig serves configuration endpoint
