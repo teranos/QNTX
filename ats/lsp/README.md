@@ -62,10 +62,10 @@ The server provides both protocols:
 - After "is" keyword → suggest predicates
 - After "of" keyword → suggest contexts
 - After "by" keyword → suggest actors
-- Query start → suggest subjects (3-char minimum)
+- Query start → suggest subjects (2-char minimum)
 
 **Minimum prefix lengths**:
-- Subjects: 3 chars (ambiguous context, avoid premature completions)
+- Subjects: 2 chars (ambiguous context, avoid premature completions)
 - Predicates/contexts/actors: 1 char (explicit context after keywords)
 
 **Symbol refresh**:
