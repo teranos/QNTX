@@ -148,7 +148,7 @@ func (c *StdioClient) GoToDefinition(ctx context.Context, uri string, pos Positi
 
 	var result []Location
 	if err := c.call(ctx, "textDocument/definition", params, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("definition at %s:%d:%d: %w", uri, pos.Line, pos.Character, err)
 	}
 
 	return result, nil
@@ -168,7 +168,7 @@ func (c *StdioClient) FindReferences(ctx context.Context, uri string, pos Positi
 
 	var result []Location
 	if err := c.call(ctx, "textDocument/references", params, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("references at %s:%d:%d: %w", uri, pos.Line, pos.Character, err)
 	}
 
 	return result, nil
@@ -185,7 +185,7 @@ func (c *StdioClient) GetHover(ctx context.Context, uri string, pos Position) (*
 
 	var result Hover
 	if err := c.call(ctx, "textDocument/hover", params, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hover at %s:%d:%d: %w", uri, pos.Line, pos.Character, err)
 	}
 
 	return &result, nil
@@ -246,7 +246,7 @@ func (c *StdioClient) Rename(ctx context.Context, uri string, pos Position, newN
 
 	var result WorkspaceEdit
 	if err := c.call(ctx, "textDocument/rename", params, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("rename at %s:%d:%d to %q: %w", uri, pos.Line, pos.Character, newName, err)
 	}
 
 	return &result, nil
@@ -284,7 +284,7 @@ func (c *StdioClient) GetCodeActions(ctx context.Context, uri string, rng Range,
 
 	var result []CodeAction
 	if err := c.call(ctx, "textDocument/codeAction", params, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("code actions at %s:%d:%d-%d:%d: %w", uri, rng.Start.Line, rng.Start.Character, rng.End.Line, rng.End.Character, err)
 	}
 
 	return result, nil
