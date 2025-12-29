@@ -109,8 +109,8 @@ func (lca *LocalClientAdapter) Chat(ctx context.Context, req openrouter.ChatRequ
 	return &openrouter.ChatResponse{
 		Content: content,
 		Usage: openrouter.Usage{
-			PromptTokens:     0, // TODO: Estimate or get from provider
-			CompletionTokens: 0, // TODO: Estimate or get from provider
+			PromptTokens:     0, // TODO(QNTX #68): Estimate or get from provider
+			CompletionTokens: 0, // TODO(QNTX #68): Estimate or get from provider
 			TotalTokens:      0,
 		},
 	}, nil

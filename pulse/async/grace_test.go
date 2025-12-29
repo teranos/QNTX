@@ -139,7 +139,7 @@ WaitForRunning:
 // TestGRACEContextCancellation removed due to race condition in test setup
 // The test sets wp.executor after starting workers, causing flaky behavior.
 // Context cancellation is tested in TestGRACEShutdownFlow (integration test)
-// TODO: Reimplement with proper executor injection during WorkerPool creation
+// TODO(QNTX #71): Reimplement with proper executor injection during WorkerPool creation
 
 // TestGRACECheckpointSaving tests that checkpoints are saved correctly
 func TestGRACECheckpointSaving(t *testing.T) {
@@ -485,7 +485,7 @@ func TestGRACECrashAndRestart(t *testing.T) {
 // TestGRACETaskAtomicity removed due to race condition in test setup
 // The test sets wp.executor after starting workers, causing flaky behavior.
 // Task atomicity is verified in TestGRACEShutdownFlow (integration test)
-// TODO: Reimplement with proper executor injection during WorkerPool creation
+// TODO(QNTX #71): Reimplement with proper executor injection during WorkerPool creation
 
 // TestGRACEPhaseRecoveryNoChildTasks tests orphaned job recovery when no child tasks exist
 // Note: Phase-specific recovery logic has been removed (domain logic belongs in handlers)
