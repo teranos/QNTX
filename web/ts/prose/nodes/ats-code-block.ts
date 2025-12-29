@@ -3,7 +3,8 @@
  * Enhanced with Pulse scheduling controls
  */
 
-import { EditorView, EditorState } from '../../vendor/codemirror-bundle.js';
+import { EditorView } from '@codemirror/view';
+import { EditorState } from '@codemirror/state';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView as PMEditorView } from 'prosemirror-view';
 import { createSchedulingControls } from '../../pulse/scheduling-controls';
