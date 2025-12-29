@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
+	"github.com/teranos/QNTX/logger"
 )
 
 var rootCmd = &cobra.Command{
@@ -33,9 +34,22 @@ Examples:
   qntx ix ls               # List async jobs
   qntx db stats            # Show database statistics
   qntx server              # Start graph visualization server`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Initialize global logger before any command runs
+		// Skip for commands that don't need logging output (like 'am show')
+		if cmd.Name() != "show" {
+			if err := logger.Initialize(false); err != nil {
+				return fmt.Errorf("failed to initialize logger: %w", err)
+			}
+		}
+		return nil
+	},
 }
 
 func init() {
+	// Add global flags
+	rootCmd.PersistentFlags().CountP("verbose", "v", "Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
+
 	// Add commands
 	rootCmd.AddCommand(commands.AmCmd)
 	rootCmd.AddCommand(commands.AsCmd)

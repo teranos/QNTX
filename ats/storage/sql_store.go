@@ -16,8 +16,7 @@ import (
 
 // AttestationFields holds marshaled JSON fields for database operations
 //
-// TODO: Expand sqlmock testing for AS core operations
-// See: https://github.com/sbvh-nl/qntx/issues/38
+// TODO(QNTX #66): Expand sqlmock testing for AS core operations
 // Focus: 9-parameter INSERT validation, JSON marshaling edge cases, bulk operations
 type AttestationFields struct {
 	SubjectsJSON   string
@@ -119,8 +118,7 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 // CreateAttestation inserts a new attestation into the database
 // and enforces bounded storage limits (16/64/64 strategy)
 //
-// TODO: Add comprehensive tests for bounded storage enforcement
-// See: https://github.com/sbvh-nl/qntx/issues/106
+// TODO(QNTX #67): Add comprehensive tests for bounded storage enforcement
 // Focus: 16 attestations per actor/context, 64 contexts per actor, 64 actors per entity
 func (s *SQLStore) CreateAttestation(as *types.As) error {
 	fields, err := MarshalAttestationFields(as)

@@ -9,7 +9,6 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/db"
 	"github.com/teranos/QNTX/sym"
 	id "github.com/teranos/vanity-id"
 )
@@ -62,17 +61,12 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Initialize database
-	database, err := db.Open(cfg.Database.Path, nil)
+	// Open and migrate database
+	database, err := openDatabase("")
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
-
-	// Run migrations
-	if err := db.Migrate(database, nil); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
 
 	// Parse command arguments
 	asCommand, err := parser.ParseAsCommand(args)

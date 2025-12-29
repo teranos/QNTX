@@ -175,9 +175,9 @@ func (idx *SymbolIndex) GetAttestationCount(symbol, symbolType string) int {
 }
 
 // GetSubjectCompletions returns subject suggestions matching prefix
-// Uses 3-char minimum since subjects appear at query start (ambiguous context)
+// Uses 2-char minimum since subjects appear at query start (ambiguous context)
 func (idx *SymbolIndex) GetSubjectCompletions(prefix string) []types.CompletionItem {
-	return idx.getCompletions(prefix, idx.subjects, "subject", 3)
+	return idx.getCompletions(prefix, idx.subjects, "subject", 2)
 }
 
 // GetPredicateCompletions returns predicate suggestions
@@ -209,7 +209,7 @@ func (idx *SymbolIndex) getCompletions(prefix string, symbols map[string]int, ki
 
 	// Check minimum prefix length based on context
 	// Explicit context (after is/of/by): minLength=1
-	// Ambiguous context (subjects at start): minLength=3 (reserved for keywords)
+	// Ambiguous context (subjects at start): minLength=2
 	if len(prefix) < minLength {
 		return items
 	}
