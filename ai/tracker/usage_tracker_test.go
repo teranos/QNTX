@@ -7,45 +7,12 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/mattn/go-sqlite3"
+
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
-// setupTestDB creates an in-memory SQLite database for testing
-func setupTestDB(t *testing.T) *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to open test database: %v", err)
-	}
-
-	// Create the ai_model_usage table
-	createTableSQL := `
-	CREATE TABLE ai_model_usage (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		operation_type TEXT NOT NULL,
-		entity_type TEXT NOT NULL,
-		entity_id TEXT NOT NULL,
-		model_name TEXT NOT NULL,
-		model_provider TEXT NOT NULL,
-		model_config TEXT,
-		request_timestamp DATETIME NOT NULL,
-		response_timestamp DATETIME,
-		tokens_used INTEGER,
-		cost REAL,
-		success BOOLEAN NOT NULL,
-		error_message TEXT,
-		metadata TEXT,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	)`
-
-	if _, err := db.Exec(createTableSQL); err != nil {
-		t.Fatalf("Failed to create test table: %v", err)
-	}
-
-	return db
-}
-
 func TestNewUsageTracker(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := qntxtest.CreateTestDB(t)
 
 	tracker := NewUsageTracker(db, 1)
 
@@ -63,8 +30,7 @@ func TestNewUsageTracker(t *testing.T) {
 }
 
 func TestTrackUsage(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := qntxtest.CreateTestDB(t)
 
 	tracker := NewUsageTracker(db, 1)
 
@@ -74,8 +40,8 @@ func TestTrackUsage(t *testing.T) {
 	cost := 0.05
 
 	usage := &ModelUsage{
-		OperationType:     "persona-extraction",
-		EntityType:        "event",
+		OperationType:     "data-extraction",
+		EntityType:        "document",
 		EntityID:          "123",
 		ModelName:         "gpt-4o-mini",
 		ModelProvider:     "openrouter",
@@ -86,7 +52,7 @@ func TestTrackUsage(t *testing.T) {
 		Cost:              &cost,
 		Success:           true,
 		ErrorMessage:      nil,
-		Metadata:          NewUsageMetadata(UsageMetadata{OperationDetail: "Test event"}),
+		Metadata:          NewUsageMetadata(UsageMetadata{OperationDetail: "Test document"}),
 	}
 
 	err := tracker.TrackUsage(usage)
@@ -119,8 +85,8 @@ func TestTrackUsage(t *testing.T) {
 		t.Fatalf("Failed to retrieve stored usage: %v", err)
 	}
 
-	if storedUsage.OperationType != "persona-extraction" {
-		t.Errorf("Expected operation_type 'persona-extraction', got '%s'", storedUsage.OperationType)
+	if storedUsage.OperationType != "data-extraction" {
+		t.Errorf("Expected operation_type 'data-extraction', got '%s'", storedUsage.OperationType)
 	}
 	if storedUsage.ModelName != "gpt-4o-mini" {
 		t.Errorf("Expected model_name 'gpt-4o-mini', got '%s'", storedUsage.ModelName)
@@ -137,8 +103,7 @@ func TestTrackUsage(t *testing.T) {
 }
 
 func TestTrackUsageWithError(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := qntxtest.CreateTestDB(t)
 
 	tracker := NewUsageTracker(db, 1)
 
@@ -146,9 +111,9 @@ func TestTrackUsageWithError(t *testing.T) {
 	errorMsg := "API key invalid"
 
 	usage := &ModelUsage{
-		OperationType:    "contact-scoring",
-		EntityType:       "contact",
-		EntityID:         "contact-456",
+		OperationType:    "classification",
+		EntityType:       "record",
+		EntityID:         "record-456",
 		ModelName:        "claude-3-haiku",
 		ModelProvider:    "openrouter",
 		RequestTimestamp: now,
@@ -178,8 +143,7 @@ func TestTrackUsageWithError(t *testing.T) {
 }
 
 func TestGetUsageStats(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := qntxtest.CreateTestDB(t)
 
 	tracker := NewUsageTracker(db, 1)
 
@@ -189,7 +153,7 @@ func TestGetUsageStats(t *testing.T) {
 
 	testUsages := []*ModelUsage{
 		{
-			OperationType:    "persona-extraction",
+			OperationType:    "data-extraction",
 			EntityType:       "event",
 			EntityID:         "1",
 			ModelName:        "gpt-4o-mini",
@@ -200,8 +164,8 @@ func TestGetUsageStats(t *testing.T) {
 			Success:          true,
 		},
 		{
-			OperationType:    "contact-scoring",
-			EntityType:       "contact",
+			OperationType:    "classification",
+			EntityType:       "record",
 			EntityID:         "2",
 			ModelName:        "claude-3-haiku",
 			ModelProvider:    "openrouter",
@@ -211,8 +175,8 @@ func TestGetUsageStats(t *testing.T) {
 			Success:          true,
 		},
 		{
-			OperationType:    "contact-scoring",
-			EntityType:       "contact",
+			OperationType:    "classification",
+			EntityType:       "record",
 			EntityID:         "3",
 			ModelName:        "gpt-4o-mini",
 			ModelProvider:    "openrouter",
@@ -276,8 +240,7 @@ func TestGetUsageStats(t *testing.T) {
 }
 
 func TestGetModelBreakdown(t *testing.T) {
-	db := setupTestDB(t)
-	defer db.Close()
+	db := qntxtest.CreateTestDB(t)
 
 	tracker := NewUsageTracker(db, 1)
 
@@ -288,8 +251,8 @@ func TestGetModelBreakdown(t *testing.T) {
 
 	testUsages := []*ModelUsage{
 		{
-			OperationType:     "persona-extraction",
-			EntityType:        "event",
+			OperationType:     "data-extraction",
+			EntityType:        "document",
 			EntityID:          "1",
 			ModelName:         "gpt-4o-mini",
 			ModelProvider:     "openrouter",
@@ -300,8 +263,8 @@ func TestGetModelBreakdown(t *testing.T) {
 			Success:           true,
 		},
 		{
-			OperationType:     "persona-extraction",
-			EntityType:        "event",
+			OperationType:     "data-extraction",
+			EntityType:        "document",
 			EntityID:          "2",
 			ModelName:         "gpt-4o-mini",
 			ModelProvider:     "openrouter",
@@ -312,7 +275,7 @@ func TestGetModelBreakdown(t *testing.T) {
 			Success:           true,
 		},
 		{
-			OperationType:     "contact-scoring",
+			OperationType:     "classification",
 			EntityType:        "contact",
 			EntityID:          "3",
 			ModelName:         "claude-3-haiku",
@@ -543,8 +506,8 @@ func TestTrackUsageWithError_Sqlmock(t *testing.T) {
 	errorMsg := "API rate limit exceeded"
 
 	usage := &ModelUsage{
-		OperationType:    "contact-scoring",
-		EntityType:       "contact",
+		OperationType:    "classification",
+		EntityType:       "record",
 		EntityID:         "456",
 		ModelName:        "claude-3-haiku",
 		ModelProvider:    "openrouter",

@@ -152,25 +152,25 @@ func TestCalculateCost_RealWorldScenarios(t *testing.T) {
 		description      string
 	}{
 		{
-			name:             "Code fix analysis",
+			name:             "Text summarization",
 			model:            "x-ai/grok-code-fast-1",
-			promptTokens:     3500, // Moderate code context
-			completionTokens: 800,  // Fix suggestion
-			description:      "Typical qntx code fix operation",
+			promptTokens:     3500, // Long article
+			completionTokens: 800,  // Summary
+			description:      "Summarize long-form content",
 		},
 		{
-			name:             "JD skill extraction",
+			name:             "Structured data extraction",
 			model:            "openai/gpt-4o-mini",
-			promptTokens:     2000, // Job description
-			completionTokens: 300,  // Extracted skills JSON
-			description:      "JD ingestion skill extraction",
+			promptTokens:     2000, // Document content
+			completionTokens: 300,  // Extracted entities JSON
+			description:      "Extract structured data from documents",
 		},
 		{
-			name:             "Large code review",
+			name:             "Semantic analysis",
 			model:            "anthropic/claude-3.5-sonnet",
-			promptTokens:     15000, // Large PR diff
-			completionTokens: 5000,  // Detailed review
-			description:      "Full PR review with detailed suggestions",
+			promptTokens:     15000, // Large corpus
+			completionTokens: 5000,  // Detailed analysis
+			description:      "Deep semantic analysis with detailed output",
 		},
 	}
 
