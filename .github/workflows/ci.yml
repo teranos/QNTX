@@ -7,6 +7,8 @@ on:
       - '**/*.go'
       - 'go.mod'
       - 'go.sum'
+      - '**/*.ts'
+      - 'web/package.json'
       - '.github/workflows/ci.yml'
   push:
     branches: [main]
@@ -14,6 +16,8 @@ on:
       - '**/*.go'
       - 'go.mod'
       - 'go.sum'
+      - '**/*.ts'
+      - 'web/package.json'
   workflow_dispatch:
 
 jobs:
@@ -45,3 +49,24 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+  typescript:
+    name: TypeScript Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: cd web && bun install
+
+      - name: Type check
+        run: cd web && bun run typecheck
+
+      - name: Run tests
+        run: cd web && bun test
