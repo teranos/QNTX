@@ -495,27 +495,24 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 
 // handleParseRequest processes parse requests for semantic highlighting
 func (c *Client) handleParseRequest(msg QueryMessage) {
-	// TODO(#54): Extract ats/lsp - LSP features deferred
-	return
-
-	// ctx := c.server.ctx
-	// // Use language service to parse with semantic tokens
-	// resp, err := c.server.langService.Parse(ctx, msg.Query, int(c.server.verbosity.Load()))
-	// if err != nil {
-	// 	c.sendJSON(map[string]interface{}{
-	// 		"type":  "error",
-	// 		"error": err.Error(),
-	// 	})
-	// 	return
-	// }
-	// // Send parse response to client
-	// c.sendJSON(map[string]interface{}{
-	// 	"type":        "parse_response",
-	// 	"timestamp":   msg.Line, // Reuse Line field for timestamp correlation
-	// 	"tokens":      resp.Tokens,
-	// 	"diagnostics": resp.Diagnostics,
-	// 	"parse_state": resp.ParseState,
-	// })
+	ctx := c.server.ctx
+	// Use language service to parse with semantic tokens
+	resp, err := c.server.langService.Parse(ctx, msg.Query, int(c.server.verbosity.Load()))
+	if err != nil {
+		c.sendJSON(map[string]interface{}{
+			"type":  "error",
+			"error": err.Error(),
+		})
+		return
+	}
+	// Send parse response to client
+	c.sendJSON(map[string]interface{}{
+		"type":        "parse_response",
+		"timestamp":   msg.Line, // Reuse Line field for timestamp correlation
+		"tokens":      resp.Tokens,
+		"diagnostics": resp.Diagnostics,
+		"parse_state": resp.ParseState,
+	})
 }
 
 // handleCompletionRequest processes completion requests for autocomplete
