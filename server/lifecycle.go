@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -165,18 +166,17 @@ func (s *QNTXServer) Stop() error {
 		s.logger.Infow("Daemon stopped")
 	}
 
-	// TODO(#55): Extract gopls service - Go code LSP deferred to future PR
-	// // Stop gopls service
-	// if s.goplsService != nil {
-	// 	s.logger.Infow("Stopping gopls service")
-	// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	// 	defer cancel()
-	// 	if err := s.goplsService.Shutdown(ctx); err != nil {
-	// 		s.logger.Warnw("Failed to shutdown gopls cleanly", "error", err)
-	// 	} else {
-	// 		s.logger.Infow("gopls service stopped")
-	// 	}
-	// }
+	// Stop gopls service
+	if s.goplsService != nil {
+		s.logger.Infow("Stopping gopls service")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.goplsService.Shutdown(ctx); err != nil {
+			s.logger.Warnw("Failed to shutdown gopls cleanly", "error", err)
+		} else {
+			s.logger.Infow("gopls service stopped")
+		}
+	}
 
 	// Close all client connections BEFORE cancelling context
 	// This ensures readPump/writePump exit cleanly before context cancellation
