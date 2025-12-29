@@ -1,0 +1,290 @@
+/* Panel Base Styles - Shared components for all panels */
+
+/* Design System Tokens */
+:root {
+    /* Spacing */
+    --panel-padding-sm: 8px 12px;
+    --panel-padding-md: 12px 16px;
+    --panel-padding-lg: 16px 20px;
+
+    /* Borders */
+    --panel-border: 1px solid #ddd;
+    --panel-border-radius: 4px;
+
+    /* Colors */
+    --panel-bg: #fff;
+    --panel-bg-secondary: #f8f8f8;
+    --panel-border-color: #ddd;
+    --panel-text-primary: #333;
+    --panel-text-secondary: #666;
+    --panel-text-tertiary: #999;
+
+    /* Shadows */
+    --panel-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --panel-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --panel-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+
+    /* Transitions */
+    --panel-transition-fast: all 0.15s ease;
+    --panel-transition-normal: all 0.2s ease;
+
+    /* Status colors */
+    --status-pending-bg: #fff3e0;
+    --status-pending-text: #e65100;
+    --status-running-bg: #e3f2fd;
+    --status-running-text: #1976d2;
+    --status-completed-bg: #e8f5e9;
+    --status-completed-text: #388e3c;
+    --status-failed-bg: #ffebee;
+    --status-failed-text: #d32f2f;
+}
+
+/* === CARDS === */
+
+/* Base card component */
+.panel-card {
+    background: var(--panel-bg);
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    padding: var(--panel-padding-md);
+    transition: var(--panel-transition-fast);
+}
+
+.panel-card:hover {
+    box-shadow: var(--panel-shadow-md);
+}
+
+/* Card variants */
+.panel-card-compact {
+    padding: var(--panel-padding-sm);
+}
+
+.panel-card-spacious {
+    padding: var(--panel-padding-lg);
+}
+
+/* === BADGES === */
+
+/* Base badge component */
+.panel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+/* Status badge variants */
+.panel-badge-pending {
+    background: var(--status-pending-bg);
+    color: var(--status-pending-text);
+}
+
+.panel-badge-running {
+    background: var(--status-running-bg);
+    color: var(--status-running-text);
+}
+
+.panel-badge-completed {
+    background: var(--status-completed-bg);
+    color: var(--status-completed-text);
+}
+
+.panel-badge-failed {
+    background: var(--status-failed-bg);
+    color: var(--status-failed-text);
+}
+
+/* Badge with icon */
+.panel-badge-icon {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+}
+
+/* === EMPTY STATES === */
+
+.panel-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--panel-text-secondary);
+    font-size: 12px;
+}
+
+.panel-empty-icon {
+    font-size: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+}
+
+.panel-loading {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--panel-text-secondary);
+    font-size: 12px;
+}
+
+/* === LISTS === */
+
+.panel-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.panel-list-compact {
+    gap: 8px;
+}
+
+.panel-list-spacious {
+    gap: 16px;
+}
+
+/* === HEADERS === */
+
+.panel-section-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--panel-text-primary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+/* === METADATA / INFO ROWS === */
+
+.panel-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.panel-info-label {
+    color: var(--panel-text-secondary);
+}
+
+.panel-info-value {
+    color: var(--panel-text-primary);
+    font-weight: 500;
+}
+
+/* === BUTTONS === */
+
+.panel-btn {
+    background: none;
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--panel-transition-fast);
+}
+
+.panel-btn:hover {
+    background: var(--panel-bg-secondary);
+}
+
+.panel-btn-primary {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+}
+
+.panel-btn-primary:hover {
+    background: #333;
+}
+
+.panel-btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+/* === DIVIDERS === */
+
+.panel-divider {
+    height: 1px;
+    background: #eee;
+    margin: 16px 0;
+}
+
+/* === CODE/MONOSPACE TEXT === */
+
+.panel-code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    background: var(--panel-bg-secondary);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* === TIMESTAMPS === */
+
+.panel-timestamp {
+    font-size: 11px;
+    color: var(--panel-text-tertiary);
+}
+
+/* === PROGRESS INDICATORS === */
+
+.panel-progress {
+    font-size: 11px;
+    color: var(--panel-text-secondary);
+}
+
+.panel-progress-text {
+    margin-bottom: 4px;
+}
+
+.panel-progress-bar {
+    height: 4px;
+    background: #eee;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.panel-progress-fill {
+    height: 100%;
+    background: var(--status-running-text);
+    transition: width 0.3s ease;
+}
+
+/* === UTILITY CLASSES === */
+
+/* Flex layouts */
+.panel-flex {
+    display: flex;
+}
+
+.panel-flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-flex-center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Text utilities */
+.panel-text-muted {
+    color: var(--panel-text-secondary);
+}
+
+.panel-text-small {
+    font-size: 11px;
+}
+
+/* Truncation */
+.panel-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -83,19 +83,19 @@ export function renderJobCard(job: ScheduledJob, state: PulsePanelState): string
     const executionHistoryHtml = isExpanded ? renderExecutionHistory(job, state) : '';
 
     return `
-        <div class="pulse-job-card ${isExpanded ? 'expanded' : ''}" data-job-id="${job.id}">
-            <div class="pulse-job-header">
+        <div class="panel-card pulse-job-card ${isExpanded ? 'expanded' : ''}" data-job-id="${job.id}">
+            <div class="panel-flex-between pulse-job-header">
                 <button class="pulse-expand-toggle" data-action="toggle-expand" title="${isExpanded ? 'Collapse' : 'Expand'}">
                     ${expandIcon}
                 </button>
-                <div class="pulse-job-badge pulse-badge-${job.state}">
+                <div class="panel-badge-icon pulse-job-badge pulse-badge-${job.state}">
                     <span class="pulse-icon">꩜</span>
                     <span class="pulse-state">${job.state}</span>
                 </div>
                 <div class="pulse-job-interval">${formatInterval(job.interval_seconds)}</div>
             </div>
 
-            <div class="pulse-job-code">
+            <div class="panel-code pulse-job-code">
                 <code>${escapeHtml(job.ats_code)}</code>
             </div>
 
