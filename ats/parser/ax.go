@@ -61,40 +61,24 @@ var (
 	contextKeywordMap   map[string]bool
 )
 
+// toKeywordMap converts a slice of keywords to a map for O(1) lookup
+func toKeywordMap(keywords []string) map[string]bool {
+	m := make(map[string]bool, len(keywords))
+	for _, k := range keywords {
+		m[k] = true
+	}
+	return m
+}
+
 func init() {
 	// Initialize all keyword maps for O(1) lookup
-	grammaticalMap = make(map[string]bool, len(GrammaticalConnectors))
-	for _, k := range GrammaticalConnectors {
-		grammaticalMap[k] = true
-	}
-
-	contextTransitMap = make(map[string]bool, len(ContextTransitionKeywords))
-	for _, k := range ContextTransitionKeywords {
-		contextTransitMap[k] = true
-	}
-
-	actorTransitMap = make(map[string]bool, len(ActorTransitionKeywords))
-	for _, k := range ActorTransitionKeywords {
-		actorTransitMap[k] = true
-	}
-
-	temporalMap = map[string]bool{
-		"since": true, "until": true, "on": true, "between": true, "over": true,
-	}
-
-	soActionMap = map[string]bool{
-		"so": true, "therefore": true,
-	}
-
-	naturalPredicateMap = make(map[string]bool, len(NaturalPredicates))
-	for _, k := range NaturalPredicates {
-		naturalPredicateMap[k] = true
-	}
-
-	contextKeywordMap = make(map[string]bool, len(ContextKeywords))
-	for _, k := range ContextKeywords {
-		contextKeywordMap[k] = true
-	}
+	grammaticalMap = toKeywordMap(GrammaticalConnectors)
+	contextTransitMap = toKeywordMap(ContextTransitionKeywords)
+	actorTransitMap = toKeywordMap(ActorTransitionKeywords)
+	temporalMap = toKeywordMap([]string{"since", "until", "on", "between", "over"})
+	soActionMap = toKeywordMap([]string{"so", "therefore"})
+	naturalPredicateMap = toKeywordMap(NaturalPredicates)
+	contextKeywordMap = toKeywordMap(ContextKeywords)
 }
 
 // classifyKeyword returns the keyword type for a given token value (case-insensitive)
