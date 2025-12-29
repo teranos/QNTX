@@ -13,6 +13,9 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	@echo "  Backend:  http://localhost:877"
 	@echo "  Frontend: http://localhost:8820 (with live reload)"
 	@echo ""
+	@# Clean up any lingering processes on dev ports
+	@pkill -f "bun.*dev" 2>/dev/null || true
+	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
 		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
@@ -20,7 +23,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
 	set -m; \
-	./bin/qntx server & \
+	./bin/qntx server --no-browser & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
