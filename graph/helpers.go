@@ -21,7 +21,7 @@ func normalizeNodeID(id string) string {
 	return strings.ToLower(normalized)
 }
 
-// TODO(attestation-first): Replace literal value heuristics with attestation-based approach
+// TODO(QNTX #69): Replace literal value heuristics with attestation-based approach
 //
 // WHY: Current pattern-matching approach violates attestation-first design:
 //   - Fragile heuristics (email patterns, phone patterns, "years" detection)
