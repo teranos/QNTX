@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
@@ -195,10 +196,14 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	// Create gopls service for Go code intelligence (if enabled)
 	var goplsService *gopls.Service
 	if cfg.Code.Gopls.Enabled {
-		goplsStart := time.Now()
 		workspaceRoot := cfg.Code.Gopls.WorkspaceRoot
-		if workspaceRoot == "" {
-			workspaceRoot = "." // Default to current directory
+		if workspaceRoot == "" || workspaceRoot == "." {
+			// Convert to absolute path
+			if absPath, err := filepath.Abs("."); err == nil {
+				workspaceRoot = absPath
+			} else {
+				workspaceRoot = "."
+			}
 		}
 		goplsService, err = gopls.NewService(gopls.Config{
 			WorkspaceRoot: workspaceRoot,
@@ -215,7 +220,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 				serverLogger.Warnw("Failed to initialize gopls, Go code intelligence disabled", "error", err)
 				goplsService = nil
 			} else {
-				serverLogger.Debugw("gopls service created and initialized", "duration_ms", time.Since(goplsStart).Milliseconds(), "workspace", workspaceRoot)
+				serverLogger.Infow(fmt.Sprintf("gopls service initialized (workspace: %s)", workspaceRoot))
 			}
 		}
 	} else {
@@ -257,9 +262,11 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	// Get the config file path from Viper
 	configPath := appcfg.GetViper().ConfigFileUsed()
 	if configPath == "" {
-		serverLogger.Warnw("Could not determine config file path, config watching disabled")
+		serverLogger.Infow("No config file found, using defaults (config watching disabled)")
 		return
 	}
+
+	serverLogger.Infow(fmt.Sprintf("Using config file: %s", configPath))
 
 	configWatcher, err := appcfg.NewConfigWatcher(configPath)
 	if err != nil {

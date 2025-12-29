@@ -12,6 +12,13 @@ import (
 func (s *QNTXServer) HandleGoplsWebSocket(w http.ResponseWriter, r *http.Request) {
 	s.logger.Infow("gopls WebSocket connection request", "remote", r.RemoteAddr)
 
+	// Check if gopls service is available
+	if s.goplsService == nil {
+		s.logger.Warnw("gopls service not available (disabled or failed to initialize)")
+		http.Error(w, "gopls service not available", http.StatusServiceUnavailable)
+		return
+	}
+
 	// Upgrade HTTP to WebSocket
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
