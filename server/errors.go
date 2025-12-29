@@ -1,6 +1,9 @@
 package server
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // Sentinel errors for common cases
 var (
@@ -30,7 +33,7 @@ func IsNotFoundError(err error) bool {
 	// Backward compatibility: check error message
 	// This supports existing code that returns custom error strings
 	errMsg := err.Error()
-	return len(errMsg) >= 9 && (errMsg == "not found" ||
-		errMsg[len(errMsg)-9:] == "not found" ||
-		len(errMsg) > 10 && errMsg[:10] == "not found:")
+	return errMsg == "not found" ||
+		strings.HasSuffix(errMsg, "not found") ||
+		strings.HasPrefix(errMsg, "not found:")
 }

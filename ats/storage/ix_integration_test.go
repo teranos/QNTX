@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 // TODO: This test file depends on LogCapturingEmitter and TaskLogStore which are part of
 // the Pulse system (async job infrastructure). These components write to the task_logs table
@@ -20,15 +19,15 @@
 package storage
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"database/sql"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/sbvh-nl/expgraph/internal/ats"
 	"github.com/teranos/QNTX/ats/ix"
 	"github.com/teranos/QNTX/db"
-	"github.com/sbvh-nl/expgraph/internal/ats"
 )
 
 // mockEmitter implements ProgressEmitter for testing

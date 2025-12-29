@@ -17,6 +17,9 @@ const (
 	// MaxOrphanedJobsToRecover limits how many orphaned jobs we'll attempt to recover
 	// on startup to prevent overwhelming the system after a crash
 	MaxOrphanedJobsToRecover = 1000
+
+	// MaxRetries is the maximum number of retry attempts for failed jobs
+	MaxRetries = 2
 )
 
 // BudgetTracker interface defines budget tracking operations
@@ -66,9 +69,6 @@ func (l pulseLogger) Pulse(msg string, keysAndValues ...interface{}) {
 	l.Infow(msg, keysAndValues...)
 }
 
-// MaxRetries is the maximum number of retry attempts for failed jobs
-const MaxRetries = 2
-
 type JobExecutor interface {
 	Execute(ctx context.Context, job *Job) error
 }
@@ -76,13 +76,13 @@ type JobExecutor interface {
 // WorkerPool manages a pool of workers that process async IX jobs
 type WorkerPool struct {
 	queue         *Queue
-	budgetTracker BudgetTracker    // Budget tracking (optional - can be nil for tests)
-	rateLimiter   RateLimiter      // Rate limiting (optional - can be nil for tests)
+	budgetTracker BudgetTracker // Budget tracking (optional - can be nil for tests)
+	rateLimiter   RateLimiter   // Rate limiting (optional - can be nil for tests)
 	db            *sql.DB
 	config        *am.Config
 	poolConfig    WorkerPoolConfig // Store pool configuration for graceful start timing
 	workers       int
-	parentCtx     context.Context    // Parent context from which worker context is derived
+	parentCtx     context.Context // Parent context from which worker context is derived
 	ctx           context.Context
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
@@ -158,7 +158,7 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, 
 		config:        cfg,
 		poolConfig:    poolCfg, // Store for graceful start timing
 		workers:       poolCfg.Workers,
-		parentCtx:     ctx,      // Store parent context for context recreation
+		parentCtx:     ctx, // Store parent context for context recreation
 		ctx:           workerCtx,
 		cancel:        cancel,
 		executor:      executor,
