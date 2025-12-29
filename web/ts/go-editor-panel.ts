@@ -5,11 +5,23 @@
  * Provides basic code editing with autocomplete, hover, and diagnostics.
  */
 
+// Status type for gopls connection
+type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
+
+// Status configuration
+const STATUS_CONFIG: Record<GoplsStatus, { message: string; className: string }> = {
+    connecting: { message: 'connecting...', className: 'gopls-status-connecting' },
+    ready: { message: 'ready', className: 'gopls-status-ready' },
+    error: { message: 'error', className: 'gopls-status-error' },
+    unavailable: { message: 'unavailable', className: 'gopls-status-unavailable' }
+};
+
 class GoEditorPanel {
     private panel: HTMLElement | null = null;
     private overlay: HTMLElement | null = null;
     private isVisible: boolean = false;
     private editor: any | null = null; // CodeMirror editor instance
+    private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
 
     constructor() {
         this.initialize();
@@ -35,11 +47,12 @@ class GoEditorPanel {
         this.overlay.addEventListener('click', () => this.handleClose());
 
         // Escape key to close
-        document.addEventListener('keydown', (e: KeyboardEvent) => {
+        this.escapeHandler = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && this.isVisible) {
                 this.handleClose();
             }
-        });
+        };
+        document.addEventListener('keydown', this.escapeHandler);
 
         // Setup event listeners
         this.setupEventListeners();
@@ -49,19 +62,19 @@ class GoEditorPanel {
         return `
             <div class="prose-header">
                 <div class="prose-title">
-                    <span class="prose-icon" style="font-family: monospace; font-size: 14px; font-weight: bold;">go</span>
+                    <span class="prose-icon go-editor-icon">go</span>
                     <span class="prose-name">Go Editor</span>
                     <span class="prose-breadcrumb" id="go-editor-file">example.go</span>
                 </div>
                 <button class="prose-close go-editor-close" aria-label="Close">✕</button>
             </div>
-            <div class="prose-body" style="display: flex;">
-                <div style="flex: 1; display: flex; flex-direction: column;">
-                    <div class="go-editor-info" style="padding: 10px; background: #252526; color: #cccccc; font-size: 12px; border-bottom: 1px solid #3e3e42;">
+            <div class="prose-body go-editor-body">
+                <div>
+                    <div class="go-editor-info">
                         <span>💡 gopls LSP</span>
-                        <span style="margin-left: 20px;">Status: <span id="gopls-status" style="color: #858585;">connecting...</span></span>
+                        <span class="go-editor-info-status">Status: <span id="gopls-status" class="gopls-status-connecting">connecting...</span></span>
                     </div>
-                    <div id="go-editor-container" style="flex: 1; overflow: auto; background: #1e1e1e;">
+                    <div id="go-editor-container" class="go-editor-container">
                         <!-- CodeMirror will be initialized here -->
                     </div>
                 </div>
@@ -118,26 +131,20 @@ class GoEditorPanel {
      * @param status - Status state: 'connecting' | 'ready' | 'error' | 'unavailable'
      * @param message - Optional custom message to display
      */
-    updateStatus(status: 'connecting' | 'ready' | 'error' | 'unavailable', message?: string): void {
+    updateStatus(status: GoplsStatus, message?: string): void {
         const statusEl = this.panel?.querySelector('#gopls-status') as HTMLElement;
         if (!statusEl) return;
 
-        const statusColors = {
-            connecting: '#858585',
-            ready: '#4ec9b0',
-            error: '#f48771',
-            unavailable: '#858585'
-        };
+        const config = STATUS_CONFIG[status];
 
-        const statusMessages = {
-            connecting: 'connecting...',
-            ready: 'ready',
-            error: 'error',
-            unavailable: 'unavailable'
-        };
+        // Remove all status classes
+        Object.values(STATUS_CONFIG).forEach(cfg => {
+            statusEl.classList.remove(cfg.className);
+        });
 
-        statusEl.textContent = message || statusMessages[status];
-        statusEl.style.color = statusColors[status];
+        // Add current status class
+        statusEl.classList.add(config.className);
+        statusEl.textContent = message || config.message;
     }
 
     async initializeEditor(): Promise<void> {
@@ -166,7 +173,7 @@ class GoEditorPanel {
             const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
             const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
             const wsHost = backendUrl.replace(/^https?:\/\//, '');
-            const goplsUri = `${wsProtocol}//${wsHost}/gopls`;
+            const goplsUri = `${wsProtocol}//${wsHost}/gopls` as `ws://${string}` | `wss://${string}`;
 
             // Fetch gopls workspace configuration from backend
             let workspaceRoot = 'file:///tmp/qntx-workspace'; // Fallback
@@ -294,15 +301,13 @@ func main() {
                 const isGoplsDisabled = errorMsg.includes('disabled');
 
                 container.innerHTML = `
-                    <div style="padding: 20px; color: #ff6b6b;">
+                    <div class="go-editor-error">
                         <h3>Failed to load editor</h3>
                         <p>Error: ${errorMsg}</p>
                         ${isGoplsDisabled ? '' : `
-                            <p style="margin-top: 10px; font-size: 12px; color: #888;">
+                            <p class="go-editor-error-help">
                                 Make sure CodeMirror dependencies are installed:<br>
-                                <code style="background: #2a2a2a; padding: 2px 6px; border-radius: 3px;">
-                                    npm install codemirror @codemirror/lang-go @codemirror/state
-                                </code>
+                                <code>npm install codemirror @codemirror/lang-go @codemirror/state</code>
                             </p>
                         `}
                     </div>
@@ -319,6 +324,43 @@ func main() {
         } else {
             await this.show();
         }
+    }
+
+    /**
+     * Clean up and destroy the editor panel
+     * Removes event listeners, destroys editor, and removes DOM elements
+     */
+    destroy(): void {
+        console.log('[Go Editor] Destroying editor panel');
+
+        // Destroy CodeMirror editor
+        if (this.editor) {
+            try {
+                this.editor.destroy();
+            } catch (err) {
+                console.warn('[Go Editor] Error destroying editor:', err);
+            }
+            this.editor = null;
+        }
+
+        // Remove event listeners
+        if (this.escapeHandler) {
+            document.removeEventListener('keydown', this.escapeHandler);
+            this.escapeHandler = null;
+        }
+
+        // Remove DOM elements
+        if (this.panel) {
+            this.panel.remove();
+            this.panel = null;
+        }
+
+        if (this.overlay) {
+            this.overlay.remove();
+            this.overlay = null;
+        }
+
+        this.isVisible = false;
     }
 }
 
