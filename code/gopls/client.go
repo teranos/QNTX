@@ -314,16 +314,26 @@ func (c *StdioClient) ApplyEdit(ctx context.Context, edit *WorkspaceEdit) error 
 	}
 
 	// Apply changes from the Changes map
-	for uri, edits := range edit.Changes {
+	// Sort URIs for deterministic application order
+	uris := make([]string, 0, len(edit.Changes))
+	for uri := range edit.Changes {
+		uris = append(uris, uri)
+	}
+	sort.Strings(uris)
+
+	for _, uri := range uris {
+		edits := edit.Changes[uri]
+		fmt.Fprintf(os.Stderr, "[gopls] Applying %d edit(s) to %s\n", len(edits), uri)
 		if err := applyTextEdits(uri, edits); err != nil {
-			return fmt.Errorf("failed to apply edits to %s: %w", uri, err)
+			return fmt.Errorf("failed to apply %d edit(s) to %s: %w", len(edits), uri, err)
 		}
 	}
 
 	// Apply document changes
 	for _, docEdit := range edit.DocumentChanges {
+		fmt.Fprintf(os.Stderr, "[gopls] Applying %d document change(s) to %s\n", len(docEdit.Edits), docEdit.TextDocument.URI)
 		if err := applyTextEdits(docEdit.TextDocument.URI, docEdit.Edits); err != nil {
-			return fmt.Errorf("failed to apply edits to %s: %w", docEdit.TextDocument.URI, err)
+			return fmt.Errorf("failed to apply %d document change(s) to %s: %w", len(docEdit.Edits), docEdit.TextDocument.URI, err)
 		}
 	}
 
