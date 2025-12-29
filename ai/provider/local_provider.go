@@ -75,10 +75,8 @@ type ChatCompletionResponse struct {
 	} `json:"usage,omitempty"`
 }
 
-// GenerateText sends a prompt to local inference server
-func (lp *LocalProvider) GenerateText(systemPrompt, userPrompt string) (string, error) {
-	// Use background context with client timeout
-	ctx := context.Background()
+// GenerateText sends a prompt to local inference server with context support
+func (lp *LocalProvider) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	return lp.generateTextWithContext(ctx, systemPrompt, userPrompt)
 }
 

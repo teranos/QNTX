@@ -98,7 +98,7 @@ func (lca *LocalClientAdapter) Chat(ctx context.Context, req openrouter.ChatRequ
 
 	// For now, use simple system+user prompt pattern
 	// Future: Support multi-turn conversations if needed
-	content, err := lca.provider.GenerateText(req.SystemPrompt, req.UserPrompt)
+	content, err := lca.provider.GenerateText(ctx, req.SystemPrompt, req.UserPrompt)
 	if err != nil {
 		return nil, err
 	}
