@@ -8,6 +8,7 @@ type Config struct {
 	REPL           REPLConfig           `mapstructure:"repl"`
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
+	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
 }
 
@@ -131,6 +132,14 @@ type LocalInferenceConfig struct {
 	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
 	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout (default: 120)
 	ContextSize    int    `mapstructure:"context_size"`    // Context window size (0 = model default, e.g., 16384, 32768)
+}
+
+// OpenRouterConfig configures OpenRouter.ai API access
+type OpenRouterConfig struct {
+	APIKey      string  `mapstructure:"api_key"`      // OpenRouter API key
+	Model       string  `mapstructure:"model"`        // Default model (e.g., "openai/gpt-4o-mini")
+	Temperature float64 `mapstructure:"temperature"`  // Sampling temperature (default: 0.2)
+	MaxTokens   int     `mapstructure:"max_tokens"`   // Maximum tokens per request (default: 1000)
 }
 
 // AxConfig configures the attestation query system
