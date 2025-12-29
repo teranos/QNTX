@@ -29,7 +29,7 @@ export class ATSCodeBlockNodeView {
         this.documentPath = documentPath;
         // Create container
         this.dom = document.createElement('div');
-        this.dom.className = 'ats-code-block';
+        this.dom.className = 'code-block ats-code-block';
 
         // Create CodeMirror instance (simple, no line numbers)
         const initialContent = this.node.textContent;

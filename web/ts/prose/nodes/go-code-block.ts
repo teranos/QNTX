@@ -23,7 +23,7 @@ export class GoCodeBlockNodeView {
     ) {
         // Create container
         this.dom = document.createElement('div');
-        this.dom.className = 'go-code-block';
+        this.dom.className = 'code-block go-code-block';
 
         // Initialize editor asynchronously to load Go language support
         this.initializeEditor();
