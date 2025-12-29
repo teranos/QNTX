@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -348,7 +349,15 @@ func (s *MCPServer) handleRename(ctx context.Context, request mcp.CallToolReques
 	totalEdits := 0
 	filesChanged := make(map[string]bool)
 
-	for uri, edits := range workspaceEdit.Changes {
+	// Sort URIs for deterministic iteration
+	uris := make([]string, 0, len(workspaceEdit.Changes))
+	for uri := range workspaceEdit.Changes {
+		uris = append(uris, uri)
+	}
+	sort.Strings(uris)
+
+	for _, uri := range uris {
+		edits := workspaceEdit.Changes[uri]
 		totalEdits += len(edits)
 		filesChanged[s.uriToFile(uri)] = true
 	}
@@ -360,7 +369,15 @@ func (s *MCPServer) handleRename(ctx context.Context, request mcp.CallToolReques
 
 	result := fmt.Sprintf("Renamed symbol to '%s'\n", newName)
 	result += fmt.Sprintf("Modified %d file(s) with %d edit(s):\n", len(filesChanged), totalEdits)
+
+	// Sort files for deterministic output
+	sortedFiles := make([]string, 0, len(filesChanged))
 	for file := range filesChanged {
+		sortedFiles = append(sortedFiles, file)
+	}
+	sort.Strings(sortedFiles)
+
+	for _, file := range sortedFiles {
 		result += fmt.Sprintf("  - %s\n", file)
 	}
 
