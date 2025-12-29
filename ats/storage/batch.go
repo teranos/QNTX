@@ -20,10 +20,11 @@ type AttestationItem = ingestion.Item
 
 // BatchPersister handles batch attestation persistence with error tracking and statistics
 type BatchPersister struct {
-	db     *sql.DB
-	store  *SQLStore
-	actor  string
-	source string
+	db           *sql.DB
+	store        *SQLStore
+	boundedStore *BoundedStore // Optional: for predictive warnings
+	actor        string
+	source       string
 }
 
 // NewBatchPersister creates a new batch attestation persister
@@ -33,6 +34,17 @@ func NewBatchPersister(db *sql.DB, actor, source string) *BatchPersister {
 		store:  NewSQLStore(db, nil),
 		actor:  actor,
 		source: source,
+	}
+}
+
+// NewBatchPersisterWithWarnings creates a batch persister with predictive storage warnings
+func NewBatchPersisterWithWarnings(db *sql.DB, actor, source string, boundedStore *BoundedStore) *BatchPersister {
+	return &BatchPersister{
+		db:           db,
+		store:        NewSQLStore(db, nil),
+		boundedStore: boundedStore,
+		actor:        actor,
+		source:       source,
 	}
 }
 
@@ -73,7 +85,7 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 			Subjects:   []string{item.GetSubject()},
 			Predicates: []string{item.GetPredicate()}, // Predicate is the verb/relationship
 			Contexts:   []string{item.GetObject()},    // Context holds the value/object
-			Actors:     []string{actor},                // Self-certifying: ASID vouches for itself
+			Actors:     []string{actor},               // Self-certifying: ASID vouches for itself
 			Timestamp:  time.Now(),
 			Source:     bp.source,
 			Attributes: make(map[string]interface{}),
@@ -94,6 +106,11 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 				item.GetSubject(), item.GetPredicate(), item.GetObject(), err)
 			result.Errors = append(result.Errors, errorMsg)
 			continue
+		}
+
+		// Log predictive warnings if bounded store is configured
+		if bp.boundedStore != nil {
+			bp.boundedStore.logStorageWarnings(&attestation)
 		}
 
 		result.PersistedCount++

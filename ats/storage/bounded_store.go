@@ -75,6 +75,9 @@ func (bs *BoundedStore) CreateAttestation(as *types.As) error {
 	// Enforce bounded storage limits after insertion
 	bs.enforceLimits(as)
 
+	// Log predictive warnings if approaching limits
+	bs.logStorageWarnings(as)
+
 	return nil
 }
 
@@ -104,6 +107,9 @@ func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*type
 	// Then enforce limits synchronously to avoid database connection issues
 	bs.enforceLimits(as)
 
+	// Log predictive warnings if approaching limits
+	bs.logStorageWarnings(as)
+
 	return as, nil
 }
 
@@ -123,4 +129,24 @@ func (bs *BoundedStore) GetStorageStats() (*ats.StorageStats, error) {
 	}
 
 	return stats, nil
+}
+
+// logStorageWarnings checks storage status and logs warnings for approaching limits
+func (bs *BoundedStore) logStorageWarnings(as *types.As) {
+	if bs.logger == nil {
+		return
+	}
+
+	warnings := bs.CheckStorageStatus(as)
+	for _, w := range warnings {
+		bs.logger.Warnw("Bounded storage approaching limit",
+			"actor", w.Actor,
+			"context", w.Context,
+			"current", w.Current,
+			"limit", w.Limit,
+			"fill_percent", fmt.Sprintf("%.1f%%", w.FillPercent*100),
+			"rate_per_hour", fmt.Sprintf("%.2f", w.RatePerHour),
+			"time_until_full", w.TimeUntilFull.String(),
+		)
+	}
 }
