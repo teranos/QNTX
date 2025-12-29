@@ -88,6 +88,13 @@ class GoEditorPanel {
         // Initialize CodeMirror editor if not already done
         if (!this.editor) {
             await this.initializeEditor();
+
+            // Check if initialization succeeded
+            if (!this.editor) {
+                console.error('[Go Editor] Failed to initialize editor, closing panel');
+                this.updateStatus('error', 'Failed to initialize');
+                // Keep panel open so user can see the error message
+            }
         }
 
         console.log('[Go Editor] Panel shown');
@@ -106,7 +113,35 @@ class GoEditorPanel {
         this.hide();
     }
 
+    /**
+     * Update gopls connection status display
+     * @param status - Status state: 'connecting' | 'ready' | 'error' | 'unavailable'
+     * @param message - Optional custom message to display
+     */
+    updateStatus(status: 'connecting' | 'ready' | 'error' | 'unavailable', message?: string): void {
+        const statusEl = this.panel?.querySelector('#gopls-status') as HTMLElement;
+        if (!statusEl) return;
+
+        const statusColors = {
+            connecting: '#858585',
+            ready: '#4ec9b0',
+            error: '#f48771',
+            unavailable: '#858585'
+        };
+
+        const statusMessages = {
+            connecting: 'connecting...',
+            ready: 'ready',
+            error: 'error',
+            unavailable: 'unavailable'
+        };
+
+        statusEl.textContent = message || statusMessages[status];
+        statusEl.style.color = statusColors[status];
+    }
+
     async initializeEditor(): Promise<void> {
+        this.updateStatus('connecting');
         try {
             // Import CodeMirror modules (bundled by Bun)
             const { EditorView, keymap } = await import('@codemirror/view');
@@ -135,17 +170,31 @@ class GoEditorPanel {
 
             // Fetch gopls workspace configuration from backend
             let workspaceRoot = 'file:///tmp/qntx-workspace'; // Fallback
+            let goplsEnabled = false;
 
             try {
                 const configResponse = await fetch(`${backendUrl}/api/config`);
                 if (configResponse.ok) {
                     const config = await configResponse.json();
+
+                    // Check if gopls is enabled
+                    goplsEnabled = config.code?.gopls?.enabled ?? false;
+
+                    if (!goplsEnabled) {
+                        console.warn('[Go Editor] gopls is disabled in config');
+                        this.updateStatus('unavailable', 'gopls disabled');
+                        throw new Error('gopls service is disabled in configuration');
+                    }
+
                     // Use the gopls workspace root from backend config
                     if (config.code?.gopls?.workspace_root) {
                         workspaceRoot = `file://${config.code.gopls.workspace_root}`;
                     }
                 }
             } catch (e) {
+                if (e instanceof Error && e.message.includes('disabled')) {
+                    throw e; // Re-throw if gopls is disabled
+                }
                 console.warn('[Go Editor] Failed to fetch config, using fallback workspace:', e);
             }
 
@@ -233,67 +282,34 @@ func main() {
             });
 
             console.log('[Go Editor] CodeMirror initialized with LSP support');
+            this.updateStatus('ready');
 
         } catch (error) {
             console.error('[Go Editor] Failed to initialize editor:', error);
+            this.updateStatus('error');
+
             const container = this.panel?.querySelector('#go-editor-container');
             if (container) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                const isGoplsDisabled = errorMsg.includes('disabled');
+
                 container.innerHTML = `
                     <div style="padding: 20px; color: #ff6b6b;">
                         <h3>Failed to load editor</h3>
-                        <p>Error: ${error instanceof Error ? error.message : String(error)}</p>
-                        <p style="margin-top: 10px; font-size: 12px; color: #888;">
-                            Make sure CodeMirror dependencies are installed:<br>
-                            <code style="background: #2a2a2a; padding: 2px 6px; border-radius: 3px;">
-                                npm install codemirror @codemirror/lang-go @codemirror/state
-                            </code>
-                        </p>
+                        <p>Error: ${errorMsg}</p>
+                        ${isGoplsDisabled ? '' : `
+                            <p style="margin-top: 10px; font-size: 12px; color: #888;">
+                                Make sure CodeMirror dependencies are installed:<br>
+                                <code style="background: #2a2a2a; padding: 2px 6px; border-radius: 3px;">
+                                    npm install codemirror @codemirror/lang-go @codemirror/state
+                                </code>
+                            </p>
+                        `}
                     </div>
                 `;
             }
-        }
-    }
-
-    connectToGopls(): void {
-        const statusEl = this.panel?.querySelector('#gopls-status') as HTMLElement;
-        if (!statusEl) return;
-
-        try {
-            // Use backend URL in dev mode, otherwise use current host
-            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-            const wsUrl = backendUrl.replace(/^http/, 'ws') + '/gopls';
-
-            const ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                console.log('[Go Editor] Connected to gopls WebSocket');
-                statusEl.textContent = 'connected';
-                statusEl.style.color = '#4ec9b0';
-
-                // TODO: Send LSP initialize request
-                // TODO: Handle LSP responses for completion, hover, diagnostics
-            };
-
-            ws.onmessage = (event) => {
-                console.log('[Go Editor] Received from gopls:', event.data);
-                // TODO: Handle LSP messages
-            };
-
-            ws.onerror = (error) => {
-                console.error('[Go Editor] WebSocket error:', error);
-                statusEl.textContent = 'error';
-                statusEl.style.color = '#f48771';
-            };
-
-            ws.onclose = () => {
-                console.log('[Go Editor] Disconnected from gopls');
-                statusEl.textContent = 'disconnected';
-                statusEl.style.color = '#858585';
-            };
-        } catch (error) {
-            console.error('[Go Editor] Failed to connect to gopls:', error);
-            statusEl.textContent = 'unavailable';
-            statusEl.style.color = '#858585';
+            // Set this.editor to null to indicate failure
+            this.editor = null;
         }
     }
 
