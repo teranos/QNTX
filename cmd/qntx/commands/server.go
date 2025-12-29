@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,8 +11,6 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/db"
-	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/server"
 )
 
@@ -52,38 +49,28 @@ func runServer(cmd *cobra.Command, args []string) error {
 		verbosity = 1
 	}
 
-	var database *sql.DB
-	var err error
-
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
 	if serverDBPath != "" {
-		// Custom database path from CLI flag (highest priority)
 		dbPath = serverDBPath
 	} else if serverTestMode {
-		// Test mode database
 		dbPath = "tmp/test-qntx.db"
-	} else {
-		// Use am config resolution (handles DB_PATH env var and config precedence)
-		dbPath, err = am.GetDatabasePath()
-		if err != nil {
-			return fmt.Errorf("failed to get database path: %w", err)
-		}
-		if dbPath == "" {
-			dbPath = "qntx.db"
-		}
 	}
+	// If dbPath still empty, openDatabase will use am.GetDatabasePath()
 
-	// Open database
-	database, err = db.Open(dbPath, nil)
+	// Open and migrate database
+	database, err := openDatabase(dbPath)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return err
 	}
 	defer database.Close()
 
-	// Run migrations
-	if err := db.Migrate(database, nil); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
+	// Get actual path for banner (openDatabase resolved it)
+	dbPath, _ = am.GetDatabasePath()
+	if serverDBPath != "" {
+		dbPath = serverDBPath
+	} else if serverTestMode {
+		dbPath = "tmp/test-qntx.db"
 	}
 
 	// Print startup banner
@@ -96,11 +83,6 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Set dev mode environment variable if flag is set
 	if serverDevMode {
 		os.Setenv("DEV", "true")
-	}
-
-	// Initialize global logger for server (required for stdout output)
-	if err := logger.Initialize(false); err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
 	// Create server
