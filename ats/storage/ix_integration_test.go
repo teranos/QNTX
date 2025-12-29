@@ -1,31 +1,14 @@
-//go:build ignore
-
-// TODO: This test file depends on LogCapturingEmitter and TaskLogStore which are part of
-// the Pulse system (async job infrastructure). These components write to the task_logs table
-// and will be extracted to QNTX when Pulse code is migrated.
-//
-// Dependencies needed:
-// - LogCapturingEmitter (from ExpGraph internal/ats/log_capturing_emitter.go)
-// - LogStore interface
-// - TaskLogStore implementation (currently in storage/log_store.go)
-//
-// Once Pulse extraction is complete, remove the build ignore tags and update the import:
-//   "github.com/sbvh-nl/expgraph/internal/ats" → "github.com/teranos/QNTX/ats/pulse" (or similar)
-//
-// The tests themselves are valuable and should be preserved - they verify the
-// LogCapturingEmitter wrapper correctly logs to the database while passing through
-// to the underlying ProgressEmitter.
-
 package storage
 
 import (
 	"database/sql"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"strings"
 	"testing"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/sbvh-nl/expgraph/internal/ats"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
+
 	"github.com/teranos/QNTX/ats/ix"
 	"github.com/teranos/QNTX/db"
 )
@@ -79,12 +62,12 @@ func setupTestDBForIx(t *testing.T) *sql.DB {
 
 // TestLogCapturingEmitter_EmitInfo verifies info logs are captured
 func TestLogCapturingEmitter_EmitInfo(t *testing.T) {
-	db := setupTestDBForIx(t)
+	testDB := setupTestDBForIx(t)
 	defer testDB.Close()
 
 	mock := &mockEmitter{}
-	logStore := NewTaskLogStore(db)
-	emitter := ats.NewLogCapturingEmitter(mock, logStore, "JB_test123")
+	logStore := NewTaskLogStore(testDB)
+	emitter := ix.NewLogCapturingEmitter(mock, logStore, "JB_test123")
 
 	emitter.EmitInfo("Test info message")
 
@@ -98,7 +81,7 @@ func TestLogCapturingEmitter_EmitInfo(t *testing.T) {
 
 	// Verify log was written to database
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&count)
+	err := testDB.QueryRow("SELECT COUNT(*) FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to query task_logs: %v", err)
 	}
@@ -108,7 +91,7 @@ func TestLogCapturingEmitter_EmitInfo(t *testing.T) {
 
 	// Verify log content
 	var level, message string
-	err = db.QueryRow("SELECT level, message FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&level, &message)
+	err = testDB.QueryRow("SELECT level, message FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&level, &message)
 	if err != nil {
 		t.Fatalf("Failed to query log entry: %v", err)
 	}
@@ -122,12 +105,12 @@ func TestLogCapturingEmitter_EmitInfo(t *testing.T) {
 
 // TestLogCapturingEmitter_EmitStage verifies stage transitions are captured
 func TestLogCapturingEmitter_EmitStage(t *testing.T) {
-	db := setupTestDBForIx(t)
+	testDB := setupTestDBForIx(t)
 	defer testDB.Close()
 
 	mock := &mockEmitter{}
-	logStore := NewTaskLogStore(db)
-	emitter := ats.NewLogCapturingEmitter(mock, logStore, "JB_test123")
+	logStore := NewTaskLogStore(testDB)
+	emitter := ix.NewLogCapturingEmitter(mock, logStore, "JB_test123")
 
 	emitter.EmitStage("fetch_data", "Fetching data source")
 
@@ -139,12 +122,9 @@ func TestLogCapturingEmitter_EmitStage(t *testing.T) {
 		t.Errorf("Expected stage 'fetch_data', got '%s'", mock.stageCalls[0].stage)
 	}
 
-	// NOTE: Cannot verify internal emitter.stage field (unexported)
-	// The stage is verified via mock passthrough and database log entry instead
-
 	// Verify log was written with stage context
 	var stage sql.NullString
-	err := db.QueryRow("SELECT stage FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&stage)
+	err := testDB.QueryRow("SELECT stage FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&stage)
 	if err != nil {
 		t.Fatalf("Failed to query log entry: %v", err)
 	}
@@ -155,12 +135,12 @@ func TestLogCapturingEmitter_EmitStage(t *testing.T) {
 
 // TestLogCapturingEmitter_MultipleStages verifies logs track stage context changes
 func TestLogCapturingEmitter_MultipleStages(t *testing.T) {
-	db := setupTestDBForIx(t)
+	testDB := setupTestDBForIx(t)
 	defer testDB.Close()
 
 	mock := &mockEmitter{}
-	logStore := NewTaskLogStore(db)
-	emitter := ats.NewLogCapturingEmitter(mock, logStore, "JB_test123")
+	logStore := NewTaskLogStore(testDB)
+	emitter := ix.NewLogCapturingEmitter(mock, logStore, "JB_test123")
 
 	// Simulate multi-stage execution
 	emitter.EmitStage("fetch_data", "Fetching data")
@@ -171,7 +151,7 @@ func TestLogCapturingEmitter_MultipleStages(t *testing.T) {
 
 	// Verify 5 log entries (3 stage transitions + 2 info messages)
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&count)
+	err := testDB.QueryRow("SELECT COUNT(*) FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to count logs: %v", err)
 	}
@@ -180,7 +160,7 @@ func TestLogCapturingEmitter_MultipleStages(t *testing.T) {
 	}
 
 	// Verify stages are tracked correctly in order
-	rows, err := db.Query("SELECT stage FROM task_logs WHERE job_id = ? ORDER BY id", "JB_test123")
+	rows, err := testDB.Query("SELECT stage FROM task_logs WHERE job_id = ? ORDER BY id", "JB_test123")
 	if err != nil {
 		t.Fatalf("Failed to query stages: %v", err)
 	}
@@ -214,12 +194,12 @@ func TestLogCapturingEmitter_MultipleStages(t *testing.T) {
 // TestLogCapturingEmitter_ErrorHandling verifies errors don't break job execution
 func TestLogCapturingEmitter_ErrorHandling(t *testing.T) {
 	// Use invalid database to force write errors
-	db := qntxtest.CreateTestDB(t)
-	db.Close() // Close immediately to make writes fail
+	testDB := qntxtest.CreateTestDB(t)
+	testDB.Close() // Close immediately to make writes fail
 
 	mock := &mockEmitter{}
-	logStore := NewTaskLogStore(db)
-	emitter := ats.NewLogCapturingEmitter(mock, logStore, "JB_test123")
+	logStore := NewTaskLogStore(testDB)
+	emitter := ix.NewLogCapturingEmitter(mock, logStore, "JB_test123")
 
 	// This should not panic even though database writes will fail
 	emitter.EmitInfo("This should not crash")
@@ -231,7 +211,7 @@ func TestLogCapturingEmitter_ErrorHandling(t *testing.T) {
 	}
 
 	// Verify first call is the database error warning (emitted during writeLog)
-	if len(mock.infoCalls) > 0 && !containsSubstring(mock.infoCalls[0], "Failed to persist log to database") {
+	if len(mock.infoCalls) > 0 && !strings.Contains(mock.infoCalls[0], "Failed to persist log to database") {
 		t.Errorf("Expected first call to be database error warning, got: %s", mock.infoCalls[0])
 	}
 
@@ -243,12 +223,12 @@ func TestLogCapturingEmitter_ErrorHandling(t *testing.T) {
 
 // TestLogCapturingEmitter_Timestamps verifies timestamps are recorded
 func TestLogCapturingEmitter_Timestamps(t *testing.T) {
-	db := setupTestDBForIx(t)
+	testDB := setupTestDBForIx(t)
 	defer testDB.Close()
 
 	mock := &mockEmitter{}
-	logStore := NewTaskLogStore(db)
-	emitter := ats.NewLogCapturingEmitter(mock, logStore, "JB_test123")
+	logStore := NewTaskLogStore(testDB)
+	emitter := ix.NewLogCapturingEmitter(mock, logStore, "JB_test123")
 
 	before := time.Now().Add(-1 * time.Second) // 1 second tolerance
 	emitter.EmitInfo("Test message")
@@ -256,7 +236,7 @@ func TestLogCapturingEmitter_Timestamps(t *testing.T) {
 
 	// Query timestamp
 	var timestamp string
-	err := db.QueryRow("SELECT timestamp FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&timestamp)
+	err := testDB.QueryRow("SELECT timestamp FROM task_logs WHERE job_id = ?", "JB_test123").Scan(&timestamp)
 	if err != nil {
 		t.Fatalf("Failed to query timestamp: %v", err)
 	}
@@ -271,18 +251,4 @@ func TestLogCapturingEmitter_Timestamps(t *testing.T) {
 	if ts.Before(before) || ts.After(after) {
 		t.Errorf("Timestamp %s is outside expected range [%s, %s]", ts, before, after)
 	}
-}
-
-// Helper function
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
