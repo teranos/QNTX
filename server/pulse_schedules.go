@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/sym"
 )
 
 // HandlePulseSchedules handles requests to /api/pulse/schedules
@@ -22,7 +23,7 @@ func (s *QNTXServer) HandlePulseSchedules(w http.ResponseWriter, r *http.Request
 		endpoint = "create job"
 	}
 
-	s.logger.Infow(fmt.Sprintf("꩜ Pulse %s", endpoint),
+	s.logger.Infow(fmt.Sprintf("%s Pulse %s", sym.Pulse, endpoint),
 		"method", r.Method,
 		"path", r.URL.Path,
 		"remote", r.RemoteAddr)
@@ -53,7 +54,7 @@ func (s *QNTXServer) HandlePulseSchedule(w http.ResponseWriter, r *http.Request)
 
 	// Check if this is a request for executions (schedule execution history)
 	if len(pathParts) > 1 && pathParts[1] == "executions" {
-		s.logger.Infow(fmt.Sprintf("꩜ Pulse get executions | schedule:%s", jobID[:8]), "schedule_id", jobID)
+		s.logger.Infow(fmt.Sprintf("%s Pulse get executions | schedule:%s", sym.Pulse, jobID), "schedule_id", jobID)
 		s.HandleJobExecutions(w, r, jobID)
 		return
 	}
@@ -62,13 +63,13 @@ func (s *QNTXServer) HandlePulseSchedule(w http.ResponseWriter, r *http.Request)
 	endpoint := "unknown"
 	switch r.Method {
 	case http.MethodGet:
-		endpoint = fmt.Sprintf("get job | job:%s", jobID[:8])
+		endpoint = fmt.Sprintf("get job | job:%s", jobID)
 	case http.MethodPatch:
-		endpoint = fmt.Sprintf("update job | job:%s", jobID[:8])
+		endpoint = fmt.Sprintf("update job | job:%s", jobID)
 	case http.MethodDelete:
-		endpoint = fmt.Sprintf("delete job | job:%s", jobID[:8])
+		endpoint = fmt.Sprintf("delete job | job:%s", jobID)
 	}
-	s.logger.Infow(fmt.Sprintf("꩜ Pulse %s", endpoint), "job_id", jobID, "method", r.Method)
+	s.logger.Infow(fmt.Sprintf("%s Pulse %s", sym.Pulse, endpoint), "job_id", jobID, "method", r.Method)
 
 	switch r.Method {
 	case http.MethodGet:
@@ -108,14 +109,14 @@ func (s *QNTXServer) handleListSchedules(w http.ResponseWriter, r *http.Request)
 func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request) {
 	var req CreateScheduledJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.logger.Warnw("꩜ Pulse create job - invalid JSON",
+		s.logger.Warnw(fmt.Sprintf("%s Pulse create job - invalid JSON", sym.Pulse),
 			"error", err,
 			"remote", r.RemoteAddr)
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 
-	s.logger.Infow(fmt.Sprintf("꩜ Pulse create job request | ats:%s interval:%ds force:%v",
+	s.logger.Infow(fmt.Sprintf("%s Pulse create job request | ats:%s interval:%ds force:%v", sym.Pulse,
 		req.ATSCode, req.IntervalSeconds, req.Force),
 		"ats_code", req.ATSCode,
 		"interval_seconds", req.IntervalSeconds,
@@ -130,20 +131,20 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	/*
 	// Validate request
 	if req.ATSCode == "" {
-		s.logger.Warnw("꩜ Pulse create job - missing ats_code")
+		s.logger.Warnw(fmt.Sprintf("%s Pulse create job - missing ats_code", sym.Pulse))
 		writeError(w, http.StatusBadRequest, "ats_code is required")
 		return
 	}
 	// Allow interval_seconds = 0 for one-time force trigger executions
 	// Force flag indicates this is a one-time run that bypasses deduplication
 	if req.IntervalSeconds < 0 {
-		s.logger.Warnw("꩜ Pulse create job - invalid interval",
+		s.logger.Warnw(fmt.Sprintf("%s Pulse create job - invalid interval", sym.Pulse),
 			"interval_seconds", req.IntervalSeconds)
 		writeError(w, http.StatusBadRequest, "interval_seconds cannot be negative")
 		return
 	}
 	if req.IntervalSeconds == 0 && !req.Force {
-		s.logger.Warnw("꩜ Pulse create job - zero interval without force",
+		s.logger.Warnw(fmt.Sprintf("%s Pulse create job - zero interval without force", sym.Pulse),
 			"interval_seconds", req.IntervalSeconds,
 			"force", req.Force)
 		writeError(w, http.StatusBadRequest, "interval_seconds must be positive for recurring jobs (use force=true for one-time execution)")
@@ -154,7 +155,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	// Format: SP (Scheduled Pulse) + vanity components from ATS code, schedule predicate, pulse context
 	jobID, err := id.GenerateASIDWithPrefix("SP", req.ATSCode, "schedule", "pulse", "qntx")
 	if err != nil {
-		s.logger.Errorw(fmt.Sprintf("꩜ Pulse create job - ID generation failed | ats:%s error:%v", req.ATSCode, err),
+		s.logger.Errorw(fmt.Sprintf("%s Pulse create job - ID generation failed | ats:%s error:%v", sym.Pulse, req.ATSCode, err),
 			"error", err,
 			"ats_code", req.ATSCode)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to generate job ID: %v", err))
@@ -165,7 +166,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	// This validates the ATS code format and makes the ticker domain-agnostic
 	parsed, err := ParseATSCodeWithForce(req.ATSCode, jobID, req.Force)
 	if err != nil {
-		s.logger.Warnw(fmt.Sprintf("꩜ Pulse create job - invalid ATS code | job:%s ats:%s error:%v", jobID[:8], req.ATSCode, err),
+		s.logger.Warnw(fmt.Sprintf("%s Pulse create job - invalid ATS code | job:%s ats:%s error:%v", sym.Pulse, jobID, req.ATSCode, err),
 			"error", err,
 			"ats_code", req.ATSCode,
 			"job_id", jobID)
@@ -173,8 +174,8 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.logger.Infow(fmt.Sprintf("꩜ Pulse create job - parsed | job:%s handler:%s url:%s force:%v",
-		jobID[:8], parsed.HandlerName, parsed.SourceURL, req.Force),
+	s.logger.Infow(fmt.Sprintf("%s Pulse create job - parsed | job:%s handler:%s url:%s force:%v", sym.Pulse,
+		jobID, parsed.HandlerName, parsed.SourceURL, req.Force),
 		"job_id", jobID,
 		"handler_name", parsed.HandlerName,
 		"source_url", parsed.SourceURL,
@@ -184,8 +185,8 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 	// Force trigger: Enqueue async job directly instead of creating scheduled job
 	if req.Force && req.IntervalSeconds == 0 {
-		s.logger.Infow(fmt.Sprintf("꩜ Force trigger - preparing tracking and async job | job:%s handler:%s",
-			jobID[:8], parsed.HandlerName),
+		s.logger.Infow(fmt.Sprintf("%s Force trigger - preparing tracking and async job | job:%s handler:%s", sym.Pulse,
+			jobID, parsed.HandlerName),
 			"job_id", jobID,
 			"handler_name", parsed.HandlerName,
 			"source_url", parsed.SourceURL)
@@ -243,11 +244,11 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 					return
 				}
 
-				s.logger.Infow(fmt.Sprintf("꩜ Created temp scheduled job for force trigger | job:%s ats_code:%s",
-					scheduledJobID[:8], req.ATSCode))
+				s.logger.Infow(fmt.Sprintf("%s Created temp scheduled job for force trigger | job:%s ats_code:%s", sym.Pulse,
+					scheduledJobID, req.ATSCode))
 			} else {
-				s.logger.Infow(fmt.Sprintf("꩜ Reusing existing temp job for force trigger | job:%s ats_code:%s",
-					scheduledJobID[:8], req.ATSCode))
+				s.logger.Infow(fmt.Sprintf("%s Reusing existing temp job for force trigger | job:%s ats_code:%s", sym.Pulse,
+					scheduledJobID, req.ATSCode))
 			}
 		}
 
@@ -300,8 +301,8 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		s.logger.Infow(fmt.Sprintf("꩜ Created pulse_execution for force trigger | execution:%s async_job:%s scheduled_job:%s",
-			executionID[:12], asyncJob.ID[:12], scheduledJobID[:8]))
+		s.logger.Infow(fmt.Sprintf("%s Created pulse_execution for force trigger | execution:%s async_job:%s scheduled_job:%s", sym.Pulse,
+			executionID, asyncJob.ID, scheduledJobID))
 
 		// Step 4: NOW enqueue async job (all tracking is in place)
 		queue := s.daemon.GetQueue()
@@ -313,7 +314,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		s.logger.Infow(fmt.Sprintf("꩜ Force trigger enqueued | async_job:%s handler:%s", asyncJob.ID[:12], parsed.HandlerName),
+		s.logger.Infow(fmt.Sprintf("%s Force trigger enqueued | async_job:%s handler:%s", sym.Pulse, asyncJob.ID, parsed.HandlerName),
 			"async_job_id", asyncJob.ID,
 			"handler_name", parsed.HandlerName,
 			"source_url", parsed.SourceURL)
@@ -351,8 +352,8 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.logger.Infow(fmt.Sprintf("꩜ Created scheduled job | job:%s interval:%ds",
-		jobID[:8], req.IntervalSeconds),
+	s.logger.Infow(fmt.Sprintf("%s Created scheduled job | job:%s interval:%ds", sym.Pulse,
+		jobID, req.IntervalSeconds),
 		"job_id", jobID,
 		"ats_code", req.ATSCode,
 		"interval_seconds", req.IntervalSeconds)
@@ -408,7 +409,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		s.logger.Infow("꩜ Updated scheduled job state",
+		s.logger.Infow(fmt.Sprintf("%s Updated scheduled job state", sym.Pulse),
 			"job_id", jobID,
 			"new_state", *req.State)
 	}
@@ -426,7 +427,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		s.logger.Infow("꩜ Updated scheduled job interval",
+		s.logger.Infow(fmt.Sprintf("%s Updated scheduled job interval", sym.Pulse),
 			"job_id", jobID,
 			"new_interval", *req.IntervalSeconds)
 	}
@@ -470,7 +471,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 			s.logger.Warnw("Failed to cascade delete async job", "job_id", jobID, "async_job_id", asyncJobID, "error", err)
 			// Continue with scheduled job deletion even if cascade fails
 		} else {
-			s.logger.Infow(fmt.Sprintf("꩜ Cascade cancellation of job: %s", asyncJobID[:8]), "async_job_id", asyncJobID)
+			s.logger.Infow(fmt.Sprintf("%s Cascade cancellation of job: %s", sym.Pulse, asyncJobID), "async_job_id", asyncJobID)
 		}
 	}
 
@@ -482,7 +483,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s.logger.Infow(fmt.Sprintf("꩜ Deleted scheduled job: %s | job:%s", job.ATSCode, jobID[:8]),
+	s.logger.Infow(fmt.Sprintf("%s Deleted scheduled job: %s | job:%s", sym.Pulse, job.ATSCode, jobID),
 		"job_id", jobID,
 		"ats_code", job.ATSCode,
 		"interval_seconds", job.IntervalSeconds)

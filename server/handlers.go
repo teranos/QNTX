@@ -385,23 +385,20 @@ func (s *QNTXServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
 
 // handleGetConfig returns configuration based on query parameters
 func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
-	// TODO(#59): Extract config introspection - deferred to future PR
 	// Check if introspection is requested
 	if r.URL.Query().Get("introspection") == "true" {
-		http.Error(w, "Config introspection not yet implemented", http.StatusNotImplemented)
+		introspection, err := appcfg.GetConfigIntrospection()
+		if err != nil {
+			s.logger.Errorw("Failed to get config introspection", "error", err)
+			http.Error(w, "Failed to get config introspection", http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(introspection); err != nil {
+			s.logger.Errorw("Failed to encode introspection response", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 		return
-		// introspection, err := appcfg.GetConfigIntrospection()
-		// if err != nil {
-		// 	s.logger.Errorw("Failed to get config introspection", "error", err)
-		// 	http.Error(w, "Failed to get config introspection", http.StatusInternalServerError)
-		// 	return
-		// }
-		//
-		// if err := json.NewEncoder(w).Encode(introspection); err != nil {
-		// 	s.logger.Errorw("Failed to encode introspection response", "error", err)
-		// 	http.Error(w, "Internal server error", http.StatusInternalServerError)
-		// }
-		// return
 	}
 
 	// Default: Return Pulse config with budget status

@@ -130,7 +130,7 @@ actor_contexts_limit = 32
 entity_actors_limit = 32
 ```
 
-See [`am.example.toml`](../../am.example.toml) for full configuration template.
+See [`am.example.toml`](../../am.example.toml) for full configuration template. For configuration system details, see [am package](../../am/README.md).
 
 ### Validation
 
