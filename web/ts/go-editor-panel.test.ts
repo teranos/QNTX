@@ -15,7 +15,7 @@ describe('Go Editor Panel', () => {
         statusEl.style.color = '#4ec9b0';
 
         expect(statusEl.textContent).toBe('ready');
-        expect(statusEl.style.color).toBe('rgb(78, 201, 176)');
+        expect(statusEl.style.color).toBe('#4ec9b0'); // Green
     });
 
     test('status shows error when gopls is unavailable', () => {
@@ -30,7 +30,7 @@ describe('Go Editor Panel', () => {
         statusEl.style.color = '#858585';
 
         expect(statusEl.textContent).toBe('gopls disabled');
-        expect(statusEl.style.color).toBe('rgb(133, 133, 133)');
+        expect(statusEl.style.color).toBe('#858585'); // Gray
     });
 
     test('panel toggles between hidden and visible', () => {
