@@ -24,6 +24,11 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("local_inference.context_size", 16384)
 	v.SetDefault("local_inference.timeout_seconds", 3600)
 
+	// OpenRouter defaults
+	v.SetDefault("openrouter.model", "openai/gpt-4o-mini") // Cost-effective default
+	v.SetDefault("openrouter.temperature", 0.2)            // Deterministic
+	v.SetDefault("openrouter.max_tokens", 1000)            // Token limit
+
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")
 
