@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/teranos/QNTX/sym"
 )
 
 // GRACE Phase 4: Server state management
@@ -47,7 +49,7 @@ func (s *QNTXServer) startBackgroundServices() {
 			s.daemon.Start()
 			if s.ticker != nil {
 				s.ticker.Start()
-				s.logger.Infow("꩜ Pulse ticker started (from saved state)")
+				s.logger.Infow(fmt.Sprintf("%s Pulse ticker started (from saved state)", sym.Pulse))
 			}
 			s.logger.Infow("Daemon started (from saved state)", "workers", s.daemon.Workers())
 		} else {
@@ -217,15 +219,14 @@ func (s *QNTXServer) Stop() error {
 		)
 	}
 
-	// TODO(#57): Extract config watcher - deferred to future PR
-	// // Stop config watcher
-	// if s.configWatcher != nil {
-	// 	if err := s.configWatcher.Stop(); err != nil {
-	// 		s.logger.Warnw("Failed to stop config watcher", "error", err)
-	// 	} else {
-	// 		s.logger.Infow("Config watcher stopped")
-	// 	}
-	// }
+	// Stop config watcher
+	if s.configWatcher != nil {
+		if err := s.configWatcher.Stop(); err != nil {
+			s.logger.Warnw("Failed to stop config watcher", "error", err)
+		} else {
+			s.logger.Infow("Config watcher stopped")
+		}
+	}
 
 	// GRACE Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)
