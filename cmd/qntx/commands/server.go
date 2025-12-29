@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/server"
 )
 
@@ -31,6 +32,7 @@ var (
 	serverAtsQuery  string
 	serverNoBrowser bool
 	serverDevMode   bool
+	serverDBPath    string
 )
 
 func init() {
@@ -40,6 +42,7 @@ func init() {
 	ServerCmd.Flags().StringVar(&serverAtsQuery, "ats", "", "Pre-load graph with an Ax query (e.g., --ats 'role:developer')")
 	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", false, "Disable automatic browser opening (default: auto-open)")
 	ServerCmd.Flags().BoolVar(&serverDevMode, "dev", false, "Enable development mode")
+	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
@@ -52,33 +55,29 @@ func runServer(cmd *cobra.Command, args []string) error {
 	var database *sql.DB
 	var err error
 
-	// Open database - either test mode or normal mode
+	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
-	if serverTestMode {
-		pterm.Info.Println("Test mode enabled - creating fresh database")
-		// Create temporary database with schema migrations
+	if serverDBPath != "" {
+		// Custom database path from CLI flag (highest priority)
+		dbPath = serverDBPath
+	} else if serverTestMode {
+		// Test mode database
 		dbPath = "tmp/test-qntx.db"
-		database, err = db.Open(dbPath, nil)
-		if err != nil {
-			return fmt.Errorf("failed to create test database: %w", err)
-		}
-		pterm.Info.Printf("Test database created at: %s\n", dbPath)
 	} else {
-		// Load configuration
-		cfg, err := am.Load()
+		// Use am config resolution (handles DB_PATH env var and config precedence)
+		dbPath, err = am.GetDatabasePath()
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			return fmt.Errorf("failed to get database path: %w", err)
 		}
-
-		dbPath = cfg.Database.Path
 		if dbPath == "" {
 			dbPath = "qntx.db"
 		}
+	}
 
-		database, err = db.Open(dbPath, nil)
-		if err != nil {
-			return fmt.Errorf("failed to open database: %w", err)
-		}
+	// Open database
+	database, err = db.Open(dbPath, nil)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer database.Close()
 
@@ -97,6 +96,11 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Set dev mode environment variable if flag is set
 	if serverDevMode {
 		os.Setenv("DEV", "true")
+	}
+
+	// Initialize global logger for server (required for stdout output)
+	if err := logger.Initialize(false); err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 
 	// Create server
