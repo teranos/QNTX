@@ -113,6 +113,8 @@ class GoEditorPanel {
             const { EditorState } = await import('@codemirror/state');
             const { defaultKeymap } = await import('@codemirror/commands');
             const { syntaxHighlighting, defaultHighlightStyle } = await import('@codemirror/language');
+            const { autocompletion, completionKeymap } = await import('@codemirror/autocomplete');
+            const { languageServer } = await import('codemirror-languageserver');
 
             // Import Go language support
             let goExtension;
@@ -124,6 +126,33 @@ class GoEditorPanel {
                 console.error('[Go Editor] Failed to load Go language support:', err);
                 goExtension = []; // Fallback to no syntax highlighting
             }
+
+            // Get backend URL for LSP WebSocket connection
+            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+            const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
+            const wsHost = backendUrl.replace(/^https?:\/\//, '');
+            const goplsUri = `${wsProtocol}//${wsHost}/gopls`;
+
+            // Fetch gopls workspace configuration from backend
+            let workspaceRoot = 'file:///tmp/qntx-workspace'; // Fallback
+
+            try {
+                const configResponse = await fetch(`${backendUrl}/api/config`);
+                if (configResponse.ok) {
+                    const config = await configResponse.json();
+                    // Use the gopls workspace root from backend config
+                    if (config.code?.gopls?.workspace_root) {
+                        workspaceRoot = `file://${config.code.gopls.workspace_root}`;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Go Editor] Failed to fetch config, using fallback workspace:', e);
+            }
+
+            // Use a temp file for the sample code, not a real project file
+            const documentUri = 'file:///tmp/qntx-editor/example.go';
+
+            console.log('[Go Editor] Connecting to gopls at', goplsUri, 'workspace:', workspaceRoot);
 
             const container = this.panel?.querySelector('#go-editor-container');
             if (!container) {
@@ -176,14 +205,26 @@ func main() {
                 }
             });
 
-            // Create CodeMirror editor
+            // Create CodeMirror editor with gopls LSP support
             this.editor = new EditorView({
                 state: EditorState.create({
                     doc: sampleCode,
                     extensions: [
-                        keymap.of(defaultKeymap),
+                        keymap.of([...defaultKeymap, ...completionKeymap]),
                         goExtension, // Will be go() or [] if loading failed
                         syntaxHighlighting(defaultHighlightStyle), // Apply syntax highlighting theme
+                        autocompletion(),
+                        // LSP integration for autocomplete, hover, diagnostics
+                        languageServer({
+                            serverUri: goplsUri,
+                            rootUri: workspaceRoot,
+                            documentUri: documentUri,
+                            languageId: 'go',
+                            workspaceFolders: [{
+                                name: 'qntx',
+                                uri: workspaceRoot
+                            }]
+                        }),
                         goEditorTheme,
                         EditorView.lineWrapping
                     ]
@@ -191,10 +232,7 @@ func main() {
                 parent: container
             });
 
-            console.log('[Go Editor] CodeMirror initialized');
-
-            // Connect to gopls WebSocket at /gopls
-            this.connectToGopls();
+            console.log('[Go Editor] CodeMirror initialized with LSP support');
 
         } catch (error) {
             console.error('[Go Editor] Failed to initialize editor:', error);
