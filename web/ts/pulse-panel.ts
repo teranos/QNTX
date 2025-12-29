@@ -197,7 +197,7 @@ class PulsePanel {
                 .map(job => renderJobCard(job, this.state))
                 .join('');
 
-            container.innerHTML = `<div class="pulse-jobs-list">${jobsHtml}</div>`;
+            container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
 
             // Attach event listeners
             attachPanelEventListeners(this.panel!, {
