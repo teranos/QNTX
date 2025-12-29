@@ -209,7 +209,7 @@ func (idx *SymbolIndex) getCompletions(prefix string, symbols map[string]int, ki
 
 	// Check minimum prefix length based on context
 	// Explicit context (after is/of/by): minLength=1
-	// Ambiguous context (subjects at start): minLength=3 (reserved for keywords)
+	// Ambiguous context (subjects at start): minLength=2
 	if len(prefix) < minLength {
 		return items
 	}
