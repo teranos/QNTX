@@ -418,27 +418,27 @@ func mapCompletionKind(kind string) *protocol.CompletionItemKind {
 func mapSemanticTokenType(tokenType parser.SemanticTokenType) uint32 {
 	switch tokenType {
 	case parser.SemanticCommand, parser.SemanticKeyword:
-		return 0 // keyword
+		return lsp.TokenTypeKeyword
 	case parser.SemanticSubject:
-		return 1 // variable
+		return lsp.TokenTypeVariable
 	case parser.SemanticPredicate:
-		return 2 // function
+		return lsp.TokenTypeFunction
 	case parser.SemanticContext:
-		return 3 // namespace
+		return lsp.TokenTypeNamespace
 	case parser.SemanticActor:
-		return 4 // class
+		return lsp.TokenTypeClass
 	case parser.SemanticTemporal:
-		return 5 // number
+		return lsp.TokenTypeNumber
 	case parser.SemanticSymbol:
-		return 6 // operator
+		return lsp.TokenTypeOperator
 	case parser.SemanticString:
-		return 7 // string
+		return lsp.TokenTypeString
 	case parser.SemanticURL:
-		return 8 // comment
+		return lsp.TokenTypeComment
 	case parser.SemanticUnknown:
-		return 9 // type
+		return lsp.TokenTypeType
 	default:
-		return 9 // unknown -> type
+		return lsp.TokenTypeType // unknown
 	}
 }
 
@@ -489,6 +489,7 @@ func encodeSemanticTokens(tokens []parser.SemanticToken) []uint32 {
 // WebSocket upgrader
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
+		// TODO: If exposing server externally, validate Origin header
 		return true // Allow all origins for local development
 	},
 }
