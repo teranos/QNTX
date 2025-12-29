@@ -14,6 +14,7 @@ import { apiFetch } from '../api.ts';
 import { proseSchema } from './schema.ts';
 import { proseMarkdownParser, proseMarkdownSerializer } from './markdown.ts';
 import { ATSCodeBlockNodeView } from './nodes/ats-code-block.ts';
+import { GoCodeBlockNodeView } from './nodes/go-code-block.ts';
 import { proseInputRules } from './input-rules.ts';
 
 export interface ProseEditorCallbacks {
@@ -110,11 +111,12 @@ export class ProseEditor {
             this.editorView.destroy();
         }
 
-        // Create new editor view with custom NodeView for ats_code_block
+        // Create new editor view with custom NodeViews for ats_code_block and go_code_block
         this.editorView = new EditorView(this.editorContainer, {
             state,
             nodeViews: {
-                ats_code_block: (node, view, getPos) => new ATSCodeBlockNodeView(node, view, getPos as () => number, this.currentPath)
+                ats_code_block: (node, view, getPos) => new ATSCodeBlockNodeView(node, view, getPos as () => number, this.currentPath),
+                go_code_block: (node, view, getPos) => new GoCodeBlockNodeView(node, view, getPos as () => number, this.currentPath)
             },
             dispatchTransaction: (transaction) => {
                 if (!this.editorView) return;

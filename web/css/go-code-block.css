@@ -1,0 +1,82 @@
+/* Go Code Block Styles for ProseMirror + CodeMirror Integration */
+
+.go-code-block {
+    margin: 16px 0;
+    border: 1px solid var(--ats-editor-border);
+    border-left: 3px solid #00ADD8; /* Go brand color */
+    border-radius: 6px;
+    background: var(--ats-editor-bg);
+    overflow: hidden;
+    box-shadow: 0 2px 8px var(--ats-editor-shadow);
+    position: relative;
+}
+
+/* Go language badge */
+.go-code-block::before {
+    content: 'go';
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: lowercase;
+    color: var(--ats-editor-badge-text);
+    background: var(--ats-editor-badge-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    z-index: 10;
+}
+
+.go-code-block .cm-editor {
+    background: var(--ats-editor-bg);
+}
+
+.go-code-block .cm-scroller {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.go-code-block .cm-content {
+    padding: 16px;
+    color: var(--ats-editor-text-color);
+    min-height: 50px;
+}
+
+.go-code-block .cm-line {
+    color: var(--ats-editor-text-color);
+}
+
+.go-code-block .cm-gutters {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--ats-editor-border);
+    color: var(--text-tertiary);
+}
+
+.go-code-block .cm-activeLineGutter {
+    background: var(--bg-tertiary);
+}
+
+/* Selection highlighting */
+.go-code-block.ProseMirror-selectednode {
+    outline: 2px solid #00ADD8; /* Go brand color */
+    outline-offset: 2px;
+}
+
+/* Cursor - bright and visible */
+.go-code-block .cm-cursor,
+.go-code-block .cm-cursor-primary {
+    border-left: 4px solid var(--ats-editor-caret-color) !important;
+    border-left-width: 4px !important;
+}
+
+.go-code-block .cm-content {
+    caret-color: var(--ats-editor-caret-color) !important;
+}
+
+/* Selection */
+.go-code-block .cm-selectionBackground {
+    background: var(--ats-editor-selection) !important;
+}
