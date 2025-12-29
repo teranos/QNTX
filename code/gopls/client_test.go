@@ -3,12 +3,23 @@ package gopls
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+// skipIfGoplsNotAvailable skips the test if gopls is not in PATH
+func skipIfGoplsNotAvailable(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("gopls"); err != nil {
+		t.Skip("gopls not available in PATH - install with: go install golang.org/x/tools/gopls@latest")
+	}
+}
+
 func TestStdioClient_Initialize(t *testing.T) {
+	skipIfGoplsNotAvailable(t)
+
 	// Create a temporary Go module for testing
 	tmpDir := t.TempDir()
 
@@ -50,6 +61,8 @@ func main() {
 }
 
 func TestStdioClient_GoToDefinition(t *testing.T) {
+	skipIfGoplsNotAvailable(t)
+
 	// Create a temporary Go module for testing
 	tmpDir := t.TempDir()
 
@@ -134,6 +147,8 @@ func main() {
 }
 
 func TestStdioClient_GetHover(t *testing.T) {
+	skipIfGoplsNotAvailable(t)
+
 	// Create a temporary Go module for testing
 	tmpDir := t.TempDir()
 
@@ -197,6 +212,8 @@ func Greet(name string) {
 }
 
 func TestStdioClient_ListDocumentSymbols(t *testing.T) {
+	skipIfGoplsNotAvailable(t)
+
 	// Create a temporary Go module for testing
 	tmpDir := t.TempDir()
 
