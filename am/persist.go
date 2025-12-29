@@ -21,7 +21,10 @@ func createBackup(configPath string) error {
 	back1 := configPath + ".back1"
 
 	// Delete oldest backup if exists
-	os.Remove(back3)
+	if err := os.Remove(back3); err != nil && !os.IsNotExist(err) {
+		// Log deletion failures (but don't fail config save)
+		fmt.Printf("⚠️  Failed to delete old backup %s: %v\n", back3, err)
+	}
 
 	// Rotate .back2 to .back3
 	if _, err := os.Stat(back2); err == nil {
