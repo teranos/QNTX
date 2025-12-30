@@ -120,6 +120,7 @@ func init() {
 	IxCmd.AddCommand(IxStatusCmd)
 	IxCmd.AddCommand(IxPauseCmd)
 	IxCmd.AddCommand(IxResumeCmd)
+	IxCmd.AddCommand(IxGitCmd)
 }
 
 // runIxLs lists async jobs
