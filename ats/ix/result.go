@@ -1,8 +1,10 @@
 package ix
 
 import (
+	"fmt"
 	"sort"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ingestion"
 )
 
@@ -89,6 +91,22 @@ func (r *Result) AddError(stage, code, message string, hints ...string) {
 		issue.Hints = append([]string{}, hints...)
 	}
 	r.Errors = append(r.Errors, issue)
+}
+
+// AddStorageWarnings converts bounded storage warnings to IxIssues and adds them.
+// This enables predictive warnings about storage limits to flow through to the UI.
+func (r *Result) AddStorageWarnings(warnings []*ats.StorageWarning) {
+	for _, w := range warnings {
+		message := fmt.Sprintf("Storage approaching limit for actor %s in context %s: %d/%d (%.0f%% full)",
+			w.Actor, w.Context, w.Current, w.Limit, w.FillPercent*100)
+
+		hints := []string{
+			fmt.Sprintf("Time until full: %s", w.TimeUntilFull),
+			"Consider archiving old attestations or increasing limits",
+		}
+
+		r.AddWarning("persistence", "STORAGE_LIMIT_APPROACHING", message, hints...)
+	}
 }
 
 // SortedTraceKeys returns sorted trace keys for deterministic rendering.
