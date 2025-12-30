@@ -50,8 +50,7 @@ function initializeSymbolPalette(): void {
 
     cmdCells.forEach(cell => {
         cell.addEventListener('click', handleSymbolClick);
-        cell.addEventListener('mouseenter', showSymbolTooltip);
-        cell.addEventListener('mouseleave', hideSymbolTooltip);
+        // Tooltips now handled purely via CSS ::after pseudo-element
     });
 }
 
@@ -162,20 +161,6 @@ function handleSymbolClick(e: Event): void {
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
-}
-
-/**
- * Show tooltip with symbol description
- * Note: Tooltips now handled via CSS ::after pseudo-element using data-label attribute
- */
-function showSymbolTooltip(): void {
-    // Tooltip display is now handled purely by CSS using the data-label attribute
-    // This function maintained for potential future enhancements
-}
-
-function hideSymbolTooltip(): void {
-    // Tooltip hiding is now handled purely by CSS
-    // This function maintained for potential future enhancements
 }
 
 /**
