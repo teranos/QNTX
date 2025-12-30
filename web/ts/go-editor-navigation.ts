@@ -36,7 +36,7 @@ export class GoEditorNavigation {
     }
 
     bindElements(panel: HTMLElement): void {
-        this.treeContainer = panel.querySelector('.go-editor-tree');
+        this.treeContainer = panel.querySelector('#go-editor-tree');
         this.recentContainer = panel.querySelector('#go-editor-recent');
         this.searchInput = panel.querySelector('.go-editor-search') as HTMLInputElement;
 
@@ -65,7 +65,7 @@ export class GoEditorNavigation {
         if (!targetContainer) return;
 
         const ul = document.createElement('ul');
-        ul.className = 'go-editor-tree-list';
+        ul.className = 'prose-tree-list';
 
         // For root container, always show the list
         if (!container) {
@@ -74,21 +74,21 @@ export class GoEditorNavigation {
 
         for (const entry of entries) {
             const li = document.createElement('li');
-            li.className = 'go-editor-tree-item';
+            li.className = 'prose-tree-item';
 
             if (entry.isDir) {
                 // Directory entry
                 const toggle = document.createElement('span');
-                toggle.className = 'go-editor-tree-toggle';
+                toggle.className = 'prose-tree-toggle';
                 toggle.textContent = '▶';
 
                 const label = document.createElement('span');
-                label.className = 'go-editor-tree-label go-editor-tree-dir';
+                label.className = 'prose-tree-label prose-tree-dir';
                 label.textContent = entry.name;
 
                 // Function to toggle expansion
                 const toggleExpansion = () => {
-                    const childList = li.querySelector('.go-editor-tree-list');
+                    const childList = li.querySelector('.prose-tree-list');
                     if (childList) {
                         const isExpanded = childList.classList.contains('expanded');
                         childList.classList.toggle('expanded', !isExpanded);
@@ -110,7 +110,7 @@ export class GoEditorNavigation {
             } else {
                 // File entry
                 const label = document.createElement('span');
-                label.className = 'go-editor-tree-label go-editor-tree-file';
+                label.className = 'prose-tree-label prose-tree-file';
                 label.textContent = entry.name;
                 label.addEventListener('click', () => {
                     if (this.callbacks.onFileSelect) {
@@ -141,18 +141,18 @@ export class GoEditorNavigation {
         }
 
         const header = document.createElement('div');
-        header.className = 'go-editor-recent-header';
+        header.className = 'prose-recent-header';
         header.textContent = 'Recent Files';
 
         const list = document.createElement('ul');
-        list.className = 'go-editor-recent-list';
+        list.className = 'prose-recent-list';
 
         this.recentFiles.forEach(path => {
             const li = document.createElement('li');
-            li.className = 'go-editor-recent-item';
+            li.className = 'prose-recent-item';
 
             const label = document.createElement('span');
-            label.className = 'go-editor-recent-label';
+            label.className = 'prose-recent-label';
             label.textContent = path.split('/').pop() || path;
             label.title = path; // Full path on hover
             label.addEventListener('click', () => {
@@ -173,11 +173,11 @@ export class GoEditorNavigation {
     filterTree(query: string): void {
         if (!this.treeContainer) return;
 
-        const items = this.treeContainer.querySelectorAll('.go-editor-tree-item');
+        const items = this.treeContainer.querySelectorAll('.prose-tree-item');
         const lowerQuery = query.toLowerCase();
 
         items.forEach(item => {
-            const label = item.querySelector('.go-editor-tree-label');
+            const label = item.querySelector('.prose-tree-label');
             if (label) {
                 const text = label.textContent?.toLowerCase() || '';
                 const matches = text.includes(lowerQuery);

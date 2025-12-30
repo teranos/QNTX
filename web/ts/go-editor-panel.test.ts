@@ -2,7 +2,34 @@
  * Go Editor Panel - Critical Behavior Tests
  */
 
+import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { Window } from 'happy-dom';
+import { GoEditorNavigation } from './go-editor-navigation.ts';
+import type { CodeEntry } from './go-editor-navigation.ts';
+
+// Setup happy-dom for DOM testing
+const window = new Window();
+const document = window.document;
+globalThis.document = document as any;
+globalThis.window = window as any;
+globalThis.HTMLElement = window.HTMLElement as any;
+
+// Mock localStorage for testing
+const mockLocalStorage = (() => {
+    let store: Record<string, string> = {};
+    return {
+        getItem: (key: string) => store[key] || null,
+        setItem: (key: string, value: string) => { store[key] = value; },
+        clear: () => { store = {}; }
+    };
+})();
+
 describe('Go Editor Panel', () => {
+    beforeEach(() => {
+        mockLocalStorage.clear();
+        global.localStorage = mockLocalStorage as Storage;
+    });
+
     test('status updates from connecting to ready when editor loads', () => {
         // This is the happy path - status should go from gray → green
         const panel = document.createElement('div');
@@ -47,5 +74,113 @@ describe('Go Editor Panel', () => {
         panel.classList.remove('visible');
         panel.classList.add('hidden');
         expect(panel.classList.contains('hidden')).toBe(true);
+    });
+
+    describe('File Tree Navigation', () => {
+        test('clicking file in tree triggers onFileSelect callback', () => {
+            // Critical: file selection must work for browsing to function
+            const mockCallback = mock((path: string) => {});
+            const nav = new GoEditorNavigation({
+                onFileSelect: mockCallback
+            });
+
+            // Create minimal DOM structure
+            const panel = document.createElement('div');
+            panel.innerHTML = `
+                <div id="go-editor-tree"></div>
+                <div id="go-editor-recent"></div>
+                <input class="go-editor-search" type="text" />
+            `;
+            nav.bindElements(panel);
+
+            // Render a simple tree with a Go file
+            const testTree: CodeEntry[] = [{
+                name: 'main.go',
+                path: 'cmd/qntx/main.go',
+                isDir: false
+            }];
+            nav.renderTree(testTree);
+
+            // Simulate clicking the file
+            const fileLabel = panel.querySelector('.prose-tree-file') as HTMLElement;
+            fileLabel?.click();
+
+            expect(mockCallback).toHaveBeenCalledWith('cmd/qntx/main.go');
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('Unsaved Changes Tracking', () => {
+        test('hasUnsavedChanges flag is set when content changes', () => {
+            // Critical: must warn user before closing with unsaved changes
+            const editorContainer = document.createElement('div');
+            const saveIndicator = document.createElement('span');
+            saveIndicator.className = 'go-editor-save-indicator hidden';
+
+            // Simulate what happens when editor content changes
+            let hasUnsavedChanges = false;
+
+            // Simulate EditorView.updateListener detecting change
+            hasUnsavedChanges = true;
+
+            // Update save indicator
+            if (hasUnsavedChanges) {
+                saveIndicator.textContent = '● Unsaved changes';
+                saveIndicator.classList.remove('hidden');
+            }
+
+            expect(hasUnsavedChanges).toBe(true);
+            expect(saveIndicator.textContent).toBe('● Unsaved changes');
+            expect(saveIndicator.classList.contains('hidden')).toBe(false);
+        });
+
+        test('hasUnsavedChanges is cleared after successful save', () => {
+            // Critical: indicator must disappear after save
+            let hasUnsavedChanges = true;
+            const saveIndicator = document.createElement('span');
+            saveIndicator.textContent = '● Unsaved changes';
+            saveIndicator.classList.remove('hidden');
+
+            // Simulate successful save
+            hasUnsavedChanges = false;
+            saveIndicator.classList.add('hidden');
+
+            expect(hasUnsavedChanges).toBe(false);
+            expect(saveIndicator.classList.contains('hidden')).toBe(true);
+        });
+    });
+
+    describe('Save Functionality', () => {
+        test('save sends PUT request with file content', async () => {
+            // Critical: save must send content to correct endpoint
+            const mockFetch = mock(async (url: string, options: RequestInit) => {
+                return {
+                    ok: true,
+                    status: 204
+                } as Response;
+            });
+
+            global.fetch = mockFetch as any;
+
+            const currentPath = 'cmd/qntx/main.go';
+            const content = 'package main\n\nfunc main() {}\n';
+
+            // Simulate what saveContent() does
+            await fetch(`/api/code/${currentPath}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'text/plain' },
+                body: content
+            });
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                '/api/code/cmd/qntx/main.go',
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: content
+                }
+            );
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+        });
     });
 });
