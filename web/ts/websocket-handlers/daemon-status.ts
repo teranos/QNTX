@@ -32,20 +32,24 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
  * Check if budget limits are approaching and show warning toasts
  */
 function checkBudgetWarnings(data: DaemonStatusMessage): void {
-    // Daily budget
-    if (data.budget_daily_limit && data.budget_daily_limit > 0) {
-        const dailyPercent = data.budget_daily / data.budget_daily_limit;
+    // Daily budget - check both values are defined
+    const dailyUsage = data.budget_daily ?? 0;
+    const dailyLimit = data.budget_daily_limit ?? 0;
+    if (dailyLimit > 0) {
+        const dailyPercent = dailyUsage / dailyLimit;
         if (dailyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.daily) {
-            toast.warning(`Daily budget ${Math.round(dailyPercent * 100)}% used ($${data.budget_daily.toFixed(2)}/$${data.budget_daily_limit.toFixed(2)})`);
+            toast.warning(`Daily budget ${Math.round(dailyPercent * 100)}% used ($${dailyUsage.toFixed(2)}/$${dailyLimit.toFixed(2)})`);
             lastBudgetWarningState.daily = true;
         } else if (dailyPercent < BUDGET_WARNING_THRESHOLD) {
             lastBudgetWarningState.daily = false;
         }
     }
 
-    // Monthly budget
-    if (data.budget_monthly_limit && data.budget_monthly_limit > 0) {
-        const monthlyPercent = (data as any).budget_monthly / data.budget_monthly_limit;
+    // Monthly budget - check both values are defined
+    const monthlyUsage = data.budget_monthly ?? 0;
+    const monthlyLimit = data.budget_monthly_limit ?? 0;
+    if (monthlyLimit > 0) {
+        const monthlyPercent = monthlyUsage / monthlyLimit;
         if (monthlyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.monthly) {
             toast.warning(`Monthly budget ${Math.round(monthlyPercent * 100)}% used`);
             lastBudgetWarningState.monthly = true;
