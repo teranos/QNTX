@@ -69,13 +69,35 @@ func (s *Service) Shutdown(ctx context.Context) error {
 		return nil
 	}
 
-	if err := s.client.Shutdown(ctx); err != nil {
-		s.logger.Warnw("gopls shutdown error", "error", err)
-		return err
+	// Try graceful shutdown first
+	shutdownErr := s.client.Shutdown(ctx)
+
+	// If graceful shutdown failed or timed out, force kill the process
+	if shutdownErr != nil {
+		s.logger.Warnw("Graceful gopls shutdown failed, attempting force kill",
+			"error", shutdownErr,
+			"workspace", s.workspaceRoot,
+		)
+
+		// Try to force kill the process if it's a StdioClient
+		if stdioClient, ok := s.client.(*StdioClient); ok {
+			if killErr := stdioClient.ForceKill(); killErr != nil {
+				s.logger.Errorw("Failed to force kill gopls process",
+					"shutdown_error", shutdownErr,
+					"kill_error", killErr,
+				)
+				return fmt.Errorf("gopls shutdown failed and force kill failed: shutdown=%w, kill=%v", shutdownErr, killErr)
+			}
+			s.logger.Infow("gopls process force killed after failed graceful shutdown")
+		}
+
+		// Mark as not initialized even if shutdown failed
+		s.initialized = false
+		return fmt.Errorf("gopls required force kill: %w", shutdownErr)
 	}
 
 	s.initialized = false
-	s.logger.Infow("gopls service shut down")
+	s.logger.Infow("gopls service shut down cleanly")
 	return nil
 }
 

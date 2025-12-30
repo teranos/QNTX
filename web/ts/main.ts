@@ -27,6 +27,7 @@ import './command-explorer-panel.ts';
 import './hixtory-panel.ts';
 import './prose/panel.ts';
 import './theme.ts';
+import { initConsoleReporter } from './console-reporter.ts';
 
 import type { MessageHandlers } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -102,10 +103,18 @@ function handleVersion(data: VersionInfo): void {
 
 
 // Initialize the application
-function init(): void {
+async function init(): Promise<void> {
     // TIMING: Track when init() is called
     console.log('[TIMING] init() called:', Date.now() - performance.timing.navigationStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
+
+    // Initialize console reporter (dev mode only)
+    try {
+        await initConsoleReporter();
+    } catch (err) {
+        console.error('[Init] Failed to initialize console reporter:', err);
+        // Continue anyway - console reporting is not critical to app function
+    }
 
     // Restore previous session if exists
     const session = restoreSession();
