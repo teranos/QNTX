@@ -4,6 +4,16 @@
  */
 
 import type { DaemonStatusMessage } from '../../types/websocket';
+import { toast } from '../toast';
+
+// Track last warning state to avoid duplicate toasts
+let lastBudgetWarningState = {
+    daily: false,
+    weekly: false,
+    monthly: false,
+};
+
+const BUDGET_WARNING_THRESHOLD = 0.80; // Warn at 80% of budget
 
 /**
  * Handle daemon_status WebSocket messages
@@ -14,7 +24,33 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
     const { updatePulsePanelDaemonStatus } = await import('../pulse-panel.ts');
     updatePulsePanelDaemonStatus(data);
 
-    // Future: Add other components that need daemon status
-    // updateHeader(data);
-    // updateCostTracker(data);
+    // Check for budget warnings (only warn once per threshold crossing)
+    checkBudgetWarnings(data);
+}
+
+/**
+ * Check if budget limits are approaching and show warning toasts
+ */
+function checkBudgetWarnings(data: DaemonStatusMessage): void {
+    // Daily budget
+    if (data.budget_daily_limit && data.budget_daily_limit > 0) {
+        const dailyPercent = data.budget_daily / data.budget_daily_limit;
+        if (dailyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.daily) {
+            toast.warning(`Daily budget ${Math.round(dailyPercent * 100)}% used ($${data.budget_daily.toFixed(2)}/$${data.budget_daily_limit.toFixed(2)})`);
+            lastBudgetWarningState.daily = true;
+        } else if (dailyPercent < BUDGET_WARNING_THRESHOLD) {
+            lastBudgetWarningState.daily = false;
+        }
+    }
+
+    // Monthly budget
+    if (data.budget_monthly_limit && data.budget_monthly_limit > 0) {
+        const monthlyPercent = (data as any).budget_monthly / data.budget_monthly_limit;
+        if (monthlyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.monthly) {
+            toast.warning(`Monthly budget ${Math.round(monthlyPercent * 100)}% used`);
+            lastBudgetWarningState.monthly = true;
+        } else if (monthlyPercent < BUDGET_WARNING_THRESHOLD) {
+            lastBudgetWarningState.monthly = false;
+        }
+    }
 }
