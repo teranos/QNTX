@@ -14,6 +14,7 @@
 
 import type { JobUpdateData, JobDetailsData, LLMStreamData } from '../types/websocket';
 import type { Job as CoreJob } from '../types/core';
+import { toast } from './toast';
 
 interface Job extends CoreJob {
     cost_usd?: number;
@@ -172,11 +173,15 @@ class JobListPanel {
      */
     public handleJobUpdate(data: JobUpdateData): void {
         const job = data.job as Job;
+        const previousJob = this.jobs.get(job.id);
 
         // Store graph_query from metadata if available
         if (data.metadata && data.metadata.graph_query) {
             job._graph_query = data.metadata.graph_query;
         }
+
+        // Show toast notifications for important state changes
+        this.notifyJobStateChange(previousJob, job);
 
         // Update jobs map
         this.jobs.set(job.id, job);
@@ -187,6 +192,40 @@ class JobListPanel {
         // Re-render if panel is visible
         if (this.isVisible) {
             this.render();
+        }
+    }
+
+    /**
+     * Show toast notifications for important job state changes
+     */
+    private notifyJobStateChange(previous: Job | undefined, current: Job): void {
+        const jobName = current.id.substring(0, 8);
+
+        // Job just paused - show reason
+        if (current.status === 'paused' && previous?.status !== 'paused') {
+            const pulseState = (current as any).pulse_state;
+            const reason = pulseState?.pause_reason || 'unknown';
+
+            if (reason === 'rate_limited') {
+                toast.warning(`Job ${jobName} paused: Rate limit reached`);
+            } else if (reason === 'budget_exceeded') {
+                toast.warning(`Job ${jobName} paused: Budget limit exceeded`);
+            } else if (reason === 'user_requested') {
+                toast.info(`Job ${jobName} paused by user`);
+            }
+        }
+
+        // Job failed - show error
+        if (current.status === 'failed' && previous?.status !== 'failed') {
+            const errorMsg = current.error ? `: ${current.error.substring(0, 50)}` : '';
+            toast.error(`Job ${jobName} failed${errorMsg}`);
+        }
+
+        // Job completed - show success (only for top-level jobs, not tasks)
+        if (current.status === 'completed' && previous?.status !== 'completed') {
+            if (!(current as any).parent_job_id) {
+                toast.success(`Job ${jobName} completed`);
+            }
         }
     }
 
