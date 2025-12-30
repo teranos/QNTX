@@ -5,9 +5,9 @@
  * gopls LSP features (autocomplete, hover, diagnostics).
  */
 
-import { GoEditorNavigation } from './go-editor-navigation.ts';
-import { apiFetch } from './api.ts';
-import { fetchDevMode } from './dev-mode.ts';
+import { GoEditorNavigation } from './navigation.ts';
+import { apiFetch } from '../api.ts';
+import { fetchDevMode } from '../dev-mode.ts';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';

@@ -5,7 +5,7 @@
  * recent files tracking, and search/filter functionality.
  */
 
-import { apiFetch } from './api.ts';
+import { apiFetch } from '../api.ts';
 
 export interface CodeEntry {
     name: string;
