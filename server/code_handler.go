@@ -37,6 +37,8 @@ func (s *QNTXServer) HandleCode(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(tree); err != nil {
+		// Note: Headers already sent, can't change status code
+		// Log error for debugging but response is already committed
 		s.logger.Errorw("Failed to encode code tree", "error", err)
 	}
 }
@@ -133,6 +135,13 @@ func (s *QNTXServer) writeCodeFile(codePath string, content []byte) error {
 	workspaceRoot := s.getWorkspaceRoot()
 	fullPath := filepath.Join(workspaceRoot, codePath)
 
+	// Block symlinks for security
+	if info, err := os.Lstat(fullPath); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlinks not allowed: %s", codePath)
+		}
+	}
+
 	// Verify file is within workspace (additional safety check)
 	absFullPath, err := filepath.Abs(fullPath)
 	if err != nil {
@@ -164,7 +173,22 @@ func (s *QNTXServer) writeCodeFile(codePath string, content []byte) error {
 // buildCodeTree recursively builds the Go code tree structure from workspace
 func (s *QNTXServer) buildCodeTree() ([]CodeEntry, error) {
 	workspaceRoot := s.getWorkspaceRoot()
-	return s.buildCodeTreeFromFS(workspaceRoot, "")
+
+	// Validate workspace root is safe
+	absWorkspace, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve workspace: %w", err)
+	}
+
+	// Reject system directories
+	unsafeDirs := []string{"/", "/etc", "/root", "/bin", "/usr", "/var"}
+	for _, dir := range unsafeDirs {
+		if absWorkspace == dir {
+			return nil, fmt.Errorf("unsafe workspace root: %s", absWorkspace)
+		}
+	}
+
+	return s.buildCodeTreeFromFS(absWorkspace, "")
 }
 
 // buildCodeTreeFromFS builds code tree from filesystem
@@ -173,7 +197,7 @@ func (s *QNTXServer) buildCodeTreeFromFS(basePath, relPath string) ([]CodeEntry,
 
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read directory %s: %w", fullPath, err)
 	}
 
 	var code []CodeEntry
@@ -182,6 +206,7 @@ func (s *QNTXServer) buildCodeTreeFromFS(basePath, relPath string) ([]CodeEntry,
 
 		// Skip hidden files, vendor, node_modules, and common build artifacts
 		if strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "bin" {
+			s.logger.Debugw("Skipping directory in code tree", "name", name, "path", filepath.Join(fullPath, name))
 			continue
 		}
 
@@ -226,6 +251,15 @@ func (s *QNTXServer) readCodeFile(codePath string) ([]byte, error) {
 	workspaceRoot := s.getWorkspaceRoot()
 	fullPath := filepath.Join(workspaceRoot, codePath)
 
+	// Block symlinks for security
+	info, err := os.Lstat(fullPath)
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("symlinks not allowed: %s", codePath)
+	}
+
 	// Verify file is within workspace (security check)
 	absFullPath, err := filepath.Abs(fullPath)
 	if err != nil {
@@ -245,14 +279,54 @@ func (s *QNTXServer) readCodeFile(codePath string) ([]byte, error) {
 }
 
 // getWorkspaceRoot returns the gopls workspace root from config
+// If config is "." (default), attempts to detect git root or go.mod location
 func (s *QNTXServer) getWorkspaceRoot() string {
 	workspaceRoot := appcfg.GetString("code.gopls.workspace_root")
 	if workspaceRoot == "" || workspaceRoot == "." {
-		// Default to current directory
+		// Try to detect project root
+		if detected := s.detectProjectRoot(); detected != "" {
+			return detected
+		}
+
+		// Fall back to current directory
 		if absPath, err := filepath.Abs("."); err == nil {
 			return absPath
 		}
 		return "."
 	}
 	return workspaceRoot
+}
+
+// detectProjectRoot attempts to find git root or go.mod location
+func (s *QNTXServer) detectProjectRoot() string {
+	cwd, err := filepath.Abs(".")
+	if err != nil {
+		return ""
+	}
+
+	// Walk up directory tree looking for .git or go.mod
+	dir := cwd
+	for {
+		// Check for .git directory
+		gitPath := filepath.Join(dir, ".git")
+		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
+			return dir
+		}
+
+		// Check for go.mod file
+		goModPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(goModPath); err == nil {
+			return dir
+		}
+
+		// Move up one directory
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached root, stop
+			break
+		}
+		dir = parent
+	}
+
+	return ""
 }
