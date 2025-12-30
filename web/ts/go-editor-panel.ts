@@ -116,12 +116,12 @@ class GoEditorPanel {
             <div class="prose-body">
                 <div class="prose-sidebar">
                     <div class="prose-sidebar-header">
-                        <input type="text" class="go-editor-search" placeholder="Search files..." />
+                        <input type="text" class="prose-search go-editor-search" placeholder="Search files..." />
                     </div>
-                    <div class="go-editor-recent" id="go-editor-recent">
+                    <div class="prose-recent" id="go-editor-recent">
                         <!-- Recent files will be populated here -->
                     </div>
-                    <div class="go-editor-tree" id="go-editor-tree">
+                    <div class="prose-tree" id="go-editor-tree">
                         <!-- Tree will be populated here -->
                     </div>
                 </div>
