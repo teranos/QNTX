@@ -472,6 +472,7 @@ export interface MessageHandlers {
   pulse_execution_completed?: MessageHandler<PulseExecutionCompletedMessage>;
   pulse_execution_log_stream?: MessageHandler<PulseExecutionLogStreamMessage>;
   storage_warning?: MessageHandler<StorageWarningMessage>;
+  storage_eviction?: MessageHandler<StorageEvictionMessage>;
   _default?: MessageHandler<BaseMessage>;
 }
 
