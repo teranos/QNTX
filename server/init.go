@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/code/gopls"
 	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
@@ -23,7 +25,8 @@ import (
 // serverDependencies holds all dependencies created for QNTXServer
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service // Language service for ATS LSP features
+	langService   *lsp.Service   // Language service for ATS LSP features
+	goplsService  *gopls.Service // Language service for Go code intelligence
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
@@ -100,6 +103,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		dbPath:        dbPath,
 		builder:       deps.builder,
 		langService:   deps.langService,
+		goplsService:  deps.goplsService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon, // Use daemon with server context
@@ -179,18 +183,52 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	langService := lsp.NewService(symbolIndex)
 	serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
 
-	// Create usage tracker for AI model usage and cost monitoring
-	usageTracker := tracker.NewUsageTracker(db, verbosity)
-
-	// Load configuration for daemon setup
+	// Load configuration for gopls and daemon setup
 	cfgStart := time.Now()
 	cfg, err := appcfg.Load()
 	if err != nil {
 		// Log warning but continue with defaults
-		serverLogger.Warnw("Failed to load config, using defaults for daemon", "error", err)
+		serverLogger.Warnw("Failed to load config, using defaults", "error", err)
 		cfg = &appcfg.Config{} // Will use default values
 	}
 	serverLogger.Debugw("Config loaded", "duration_ms", time.Since(cfgStart).Milliseconds())
+
+	// Create gopls service for Go code intelligence (if enabled)
+	var goplsService *gopls.Service
+	if cfg.Code.Gopls.Enabled {
+		workspaceRoot := cfg.Code.Gopls.WorkspaceRoot
+		if workspaceRoot == "" || workspaceRoot == "." {
+			// Convert to absolute path
+			if absPath, err := filepath.Abs("."); err == nil {
+				workspaceRoot = absPath
+			} else {
+				workspaceRoot = "."
+			}
+		}
+		goplsService, err = gopls.NewService(gopls.Config{
+			WorkspaceRoot: workspaceRoot,
+			Logger:        serverLogger,
+		})
+		if err != nil {
+			serverLogger.Warnw("Failed to create gopls service, Go code intelligence disabled", "error", err)
+			goplsService = nil
+		} else {
+			// Initialize gopls service
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := goplsService.Initialize(ctx); err != nil {
+				serverLogger.Warnw("Failed to initialize gopls, Go code intelligence disabled", "error", err)
+				goplsService = nil
+			} else {
+				serverLogger.Infow(fmt.Sprintf("gopls service initialized (workspace: %s)", workspaceRoot))
+			}
+		}
+	} else {
+		serverLogger.Debugw("gopls service disabled in config")
+	}
+
+	// Create usage tracker for AI model usage and cost monitoring
+	usageTracker := tracker.NewUsageTracker(db, verbosity)
 
 	// Create budget tracker for Pulse daemon monitoring
 	budgetTracker := budget.NewTracker(db, budget.BudgetConfig{
@@ -211,6 +249,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	return &serverDependencies{
 		builder:       builder,
 		langService:   langService,
+		goplsService:  goplsService,
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
@@ -223,9 +262,11 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	// Get the config file path from Viper
 	configPath := appcfg.GetViper().ConfigFileUsed()
 	if configPath == "" {
-		serverLogger.Warnw("Could not determine config file path, config watching disabled")
+		serverLogger.Infow("No config file found, using defaults (config watching disabled)")
 		return
 	}
+
+	serverLogger.Infow(fmt.Sprintf("Using config file: %s", configPath))
 
 	configWatcher, err := appcfg.NewConfigWatcher(configPath)
 	if err != nil {

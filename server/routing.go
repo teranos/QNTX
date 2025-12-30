@@ -6,8 +6,7 @@ import "net/http"
 func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))          // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket))    // ATS LSP protocol (completions, hover, semantic tokens)
-	// TODO(#54): Extract gopls service - gopls endpoint deferred
-	// http.HandleFunc("/gopls", s.corsMiddleware(s.HandleGoplsWebSocket)) // gopls LSP protocol (Go code intelligence)
+	http.HandleFunc("/gopls", s.corsMiddleware(s.HandleGoplsWebSocket)) // gopls LSP protocol (Go code intelligence)
 	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))

@@ -215,6 +215,11 @@ function renderGraph(data: GraphData): void {
         .attr("role", "img")
         .attr("aria-label", `Graph visualization with ${visibleNodes.length} nodes and ${visibleLinks.length} connections`);
 
+    if (!svg) {
+        console.error('[Graph] Failed to create SVG element');
+        return;
+    }
+
     // Add pattern definition for problematic/unknown types
     const defs = svg.append("defs");
     const pattern = defs.append("pattern")

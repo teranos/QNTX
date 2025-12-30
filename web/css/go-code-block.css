@@ -1,0 +1,20 @@
+/* Go Code Block - Language-specific overrides */
+/* Base styles in code-block-base.css (loaded globally) */
+
+/* Go brand color */
+.go-code-block {
+    border-left: 3px solid #00ADD8;
+}
+
+/* Go language badge */
+.go-code-block::before {
+    content: 'go';
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    color: var(--ats-editor-badge-text);
+    text-transform: lowercase;
+}
+
+/* Go-specific selection outline */
+.go-code-block.ProseMirror-selectednode {
+    outline-color: #00ADD8;
+}

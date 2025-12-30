@@ -26,13 +26,13 @@ const baseParser = new MarkdownParser(
     }
 );
 
-// Wrap parser to transform code_block nodes with params='ats' into ats_code_block
+// Wrap parser to transform code_block nodes with params='ats' or 'go' into specialized blocks
 export const proseMarkdownParser = {
     parse(content: string): PMNode {
         const doc = baseParser.parse(content);
         if (!doc) return doc;
 
-        // Transform code_block nodes with params='ats' into ats_code_block
+        // Transform code_block nodes with params='ats' or 'go' into specialized blocks
         const transformedContent: PMNode[] = [];
         doc.forEach((node: PMNode) => {
             if (node.type.name === 'code_block' && node.attrs.params === 'ats') {
@@ -40,6 +40,14 @@ export const proseMarkdownParser = {
                 transformedContent.push(
                     proseSchema.nodes.ats_code_block.create(
                         { params: 'ats' },
+                        node.content
+                    )
+                );
+            } else if (node.type.name === 'code_block' && node.attrs.params === 'go') {
+                // Convert to go_code_block for Go language blocks
+                transformedContent.push(
+                    proseSchema.nodes.go_code_block.create(
+                        { params: 'go' },
                         node.content
                     )
                 );
@@ -54,7 +62,7 @@ export const proseMarkdownParser = {
     }
 };
 
-// Create custom markdown serializer that converts ats_code_block back to ```ats
+// Create custom markdown serializer that converts specialized code blocks back to ```lang
 export const proseMarkdownSerializer = new MarkdownSerializer(
     {
         // Copy all default node serializers
@@ -62,6 +70,14 @@ export const proseMarkdownSerializer = new MarkdownSerializer(
         // Add serializer for ats_code_block
         ats_code_block(state, node) {
             state.write('```' + (node.attrs.params || 'ats') + '\n');
+            state.text(node.textContent, false);
+            state.ensureNewLine();
+            state.write('```');
+            state.closeBlock(node);
+        },
+        // Add serializer for go_code_block
+        go_code_block(state, node) {
+            state.write('```' + (node.attrs.params || 'go') + '\n');
             state.text(node.textContent, false);
             state.ensureNewLine();
             state.write('```');

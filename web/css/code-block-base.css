@@ -1,0 +1,76 @@
+/* Shared Code Block Styles - Base for all language code blocks */
+
+/* Base code block structure - shared by all languages */
+.code-block {
+    margin: 16px 0;
+    border: 1px solid var(--ats-editor-border);
+    border-radius: 6px;
+    background: var(--ats-editor-bg);
+    overflow: hidden;
+    box-shadow: 0 2px 8px var(--ats-editor-shadow);
+    position: relative;
+}
+
+/* Language badge - positioned top-right */
+.code-block::before {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    z-index: 10;
+    background: var(--ats-editor-badge-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* CodeMirror integration */
+.code-block .cm-editor {
+    background: var(--ats-editor-bg);
+}
+
+.code-block .cm-scroller {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.code-block .cm-content {
+    padding: 16px;
+    color: var(--ats-editor-text-color);
+    min-height: 50px;
+    caret-color: var(--ats-editor-caret-color) !important;
+}
+
+.code-block .cm-line {
+    color: var(--ats-editor-text-color);
+}
+
+.code-block .cm-gutters {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--ats-editor-border);
+    color: var(--text-tertiary);
+}
+
+.code-block .cm-activeLineGutter {
+    background: var(--bg-tertiary);
+}
+
+/* Selection highlighting */
+.code-block.ProseMirror-selectednode {
+    outline: 2px solid var(--ats-editor-border-accent);
+    outline-offset: 2px;
+}
+
+/* Cursor - bright and visible */
+.code-block .cm-cursor,
+.code-block .cm-cursor-primary {
+    border-left: 4px solid var(--ats-editor-caret-color) !important;
+    border-left-width: 4px !important;
+}
+
+/* Selection */
+.code-block .cm-selectionBackground {
+    background: var(--ats-editor-selection) !important;
+}

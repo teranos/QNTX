@@ -1,37 +1,14 @@
 /**
  * CodeMirror 6 Editor with LSP Integration
- *
- * Uses pre-built bundle from js/vendor/codemirror-bundle.js
- * See internal/server/web/README.md for architecture details
  */
 
-// Import from vendored bundle (like d3.v7.min.js pattern)
-import {
-    EditorView,
-    keymap,
-    lineNumbers,
-    highlightActiveLine,
-    highlightActiveLineGutter,
-    EditorState,
-    Compartment,
-    StateField,
-    StateEffect,
-    RangeSetBuilder,
-    Decoration,
-    ViewPlugin,
-    defaultKeymap,
-    history,
-    historyKeymap,
-    indentWithTab,
-    syntaxHighlighting,
-    defaultHighlightStyle,
-    bracketMatching,
-    autocompletion,
-    completionKeymap,
-    closeBrackets,
-    lintKeymap,
-    languageServer
-} from './vendor/codemirror-bundle.js';
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, DecorationSet, ViewPlugin } from '@codemirror/view';
+import { EditorState, Compartment, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+import { autocompletion, completionKeymap, closeBrackets } from '@codemirror/autocomplete';
+import { lintKeymap } from '@codemirror/lint';
+import { languageServer } from 'codemirror-languageserver';
 
 // Linter - TODO: enable once we have a proper way to import this
 // import { linter } from '@codemirror/lint';
@@ -51,7 +28,7 @@ let currentDiagnostics: Diagnostic[] = [];
 // TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
 // For now, we manually request them from LSP server
 
-const updateSyntaxDecorations = StateEffect.define();
+const updateSyntaxDecorations = StateEffect.define<DecorationSet>();
 
 const syntaxDecorationsField = StateField.define({
     create() {
@@ -136,7 +113,7 @@ export function initCodeMirrorEditor(): EditorView | null {
     const backendUrl = validatedUrl || window.location.origin;
     const backendHost = backendUrl.replace(/^https?:\/\//, '');
     const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-    const serverUri = `${protocol}//${backendHost}/lsp`;
+    const serverUri = `${protocol}//${backendHost}/lsp` as `ws://${string}` | `wss://${string}`;
 
     console.log('[LSP] Configuring connection to', serverUri);
 
@@ -162,7 +139,8 @@ export function initCodeMirrorEditor(): EditorView | null {
                 serverUri: serverUri,
                 rootUri: 'file:///',
                 documentUri: 'inmemory://ats-query',
-                languageId: 'ats'
+                languageId: 'ats',
+                workspaceFolders: null
             }),
             keymap.of([
                 ...defaultKeymap,
@@ -257,7 +235,7 @@ export function updateDiagnosticsDisplay(diagnostics: Diagnostic[]): void {
 export function applySyntaxHighlighting(tokens: SemanticToken[]): void {
     if (!editorView || !tokens || tokens.length === 0) return;
 
-    const builder = new RangeSetBuilder();
+    const builder = new RangeSetBuilder<Decoration>();
 
     // Convert tokens to decorations using their actual Range positions
     for (const token of tokens) {

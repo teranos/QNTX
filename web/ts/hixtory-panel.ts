@@ -18,6 +18,7 @@ import type { Job as CoreJob } from '../types/core';
 interface Job extends CoreJob {
     cost_usd?: number;
     source?: string;
+    _graph_query?: string;
     metadata?: {
         total_operations?: number;
         completed_operations?: number;
@@ -81,7 +82,7 @@ class JobListPanel {
                 <button class="job-list-close" aria-label="Close">✕</button>
             </div>
             <div class="job-list-content" id="job-list-content">
-                <div class="job-list-empty">
+                <div class="panel-empty job-list-empty">
                     <p>No IX operations yet</p>
                     <p class="job-list-hint">Run an IX command to start</p>
                 </div>
@@ -276,7 +277,7 @@ class JobListPanel {
         if (this.jobs.size === 0) {
             // Build empty state using DOM API
             const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'job-list-empty';
+            emptyDiv.className = 'panel-empty job-list-empty';
 
             const p1 = document.createElement('p');
             p1.textContent = 'No IX operations yet';
@@ -311,9 +312,6 @@ class JobListPanel {
             const item = this.renderHistoryItem(job);
             content.appendChild(item);
         });
-
-        // Attach click handlers
-        this.attachHistoryItemListeners();
     }
 
     /**

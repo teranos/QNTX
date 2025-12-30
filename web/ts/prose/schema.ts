@@ -6,7 +6,7 @@ import { Schema } from 'prosemirror-model';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
 
-// Extend basic schema with ats_code_block node and update code_block to have params
+// Extend basic schema with ats_code_block and go_code_block nodes
 const schemaSpec = {
     nodes: addListNodes(basicSchema.spec.nodes, 'paragraph block*', 'block')
         .addBefore('code_block', 'ats_code_block', {
@@ -30,6 +30,26 @@ const schemaSpec = {
             toDOM: (node) => ['pre', {
                 'data-language': node.attrs.params,
                 'data-scheduled-job-id': node.attrs.scheduledJobId
+            }, ['code', 0]]
+        })
+        .addBefore('code_block', 'go_code_block', {
+            content: 'text*',
+            marks: '',
+            group: 'block',
+            code: true,
+            defining: true,
+            attrs: {
+                params: { default: 'go' }
+            },
+            parseDOM: [{
+                tag: 'pre[data-language="go"]',
+                preserveWhitespace: 'full',
+                getAttrs: (node) => ({
+                    params: (node as HTMLElement).getAttribute('data-language') || 'go'
+                })
+            }],
+            toDOM: (node) => ['pre', {
+                'data-language': node.attrs.params
             }, ['code', 0]]
         })
         .update('code_block', {

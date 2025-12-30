@@ -1,81 +1,19 @@
-/* ATS Code Block Styles for ProseMirror + CodeMirror Integration */
+/* ATS Code Block - Language-specific overrides */
+/* Base styles in code-block-base.css (loaded globally) */
 
+/* ATS-specific accent border */
 .ats-code-block {
-    margin: 16px 0;
-    border: 1px solid var(--ats-editor-border);
     border-left: 3px solid var(--ats-editor-border-accent);
-    border-radius: 6px;
-    background: var(--ats-editor-bg);
-    overflow: hidden;
-    box-shadow: 0 2px 8px var(--ats-editor-shadow);
-    position: relative;
 }
 
 /* ATS language badge */
 .ats-code-block::before {
     content: 'ats';
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    font-size: 11px;
-    font-weight: 600;
     color: var(--ats-editor-badge-color);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    z-index: 10;
-    background: var(--ats-editor-badge-bg);
-    padding: 2px 6px;
-    border-radius: 3px;
 }
 
-.ats-code-block .cm-editor {
-    background: var(--ats-editor-bg);
-}
-
-.ats-code-block .cm-scroller {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-.ats-code-block .cm-content {
-    padding: 16px;
-    color: var(--ats-editor-text-color);
-    min-height: 50px;
-}
-
-.ats-code-block .cm-line {
-    color: var(--ats-editor-text-color);
-}
-
-.ats-code-block .cm-gutters {
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--ats-editor-border);
-    color: var(--text-tertiary);
-}
-
-.ats-code-block .cm-activeLineGutter {
-    background: var(--bg-tertiary);
-}
-
-/* Selection highlighting */
+/* ATS-specific selection outline */
 .ats-code-block.ProseMirror-selectednode {
-    outline: 2px solid var(--ats-editor-border-accent);
-    outline-offset: 2px;
-}
-
-/* Cursor - bright and visible */
-.ats-code-block .cm-cursor,
-.ats-code-block .cm-cursor-primary {
-    border-left: 4px solid var(--ats-editor-caret-color) !important;
-    border-left-width: 4px !important;
-}
-
-.ats-code-block .cm-content {
-    caret-color: var(--ats-editor-caret-color) !important;
-}
-
-/* Selection */
-.ats-code-block .cm-selectionBackground {
-    background: var(--ats-editor-selection) !important;
+    outline-color: var(--ats-editor-border-accent);
 }
