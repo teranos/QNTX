@@ -2,8 +2,8 @@
  * CodeMirror 6 Editor with LSP Integration
  */
 
-import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, DecorationSet, ViewPlugin } from '@codemirror/view';
-import { EditorState, Compartment, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, DecorationSet } from '@codemirror/view';
+import { EditorState, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { autocompletion, completionKeymap, closeBrackets } from '@codemirror/autocomplete';
@@ -22,7 +22,6 @@ import type { Diagnostic, SemanticToken } from '../types/lsp';
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
 let parseTimeout: ReturnType<typeof setTimeout> | null = null;
-let currentDiagnostics: Diagnostic[] = [];
 
 // Syntax highlighting via LSP semantic tokens
 // TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
@@ -49,46 +48,6 @@ const syntaxDecorationsField = StateField.define({
     },
     provide: f => EditorView.decorations.from(f)
 });
-
-// CodeMirror diagnostic type
-interface CodeMirrorDiagnostic {
-    from: number;
-    to: number;
-    severity: 'error' | 'warning' | 'info';
-    message: string;
-}
-
-/**
- * Create a linter function that converts ATS diagnostics to CodeMirror format
- * Called whenever the editor content changes to provide diagnostics to CM6 linter
- */
-function createAtsLinter(): () => CodeMirrorDiagnostic[] {
-    return (): CodeMirrorDiagnostic[] => {
-        // Return diagnostics in CodeMirror format
-        return currentDiagnostics.map((diag: Diagnostic): CodeMirrorDiagnostic => {
-            // Map severity string to CodeMirror severity level
-            let severity: 'error' | 'warning' | 'info' = 'error';
-            if (diag.severity === 'warning') {
-                severity = 'warning';
-            } else if (diag.severity === 'info' || diag.severity === 'hint') {
-                severity = 'info';
-            }
-
-            // Build message with suggestions if available
-            let message = diag.message || 'Parse error';
-            if (diag.suggestions && diag.suggestions.length > 0) {
-                message += '\n\nSuggestions:\n• ' + diag.suggestions.join('\n• ');
-            }
-
-            return {
-                from: diag.range.start.offset,
-                to: diag.range.end.offset,
-                severity: severity,
-                message: message
-            };
-        });
-    };
-}
 
 /**
  * Initialize CodeMirror 6 editor with LSP support
@@ -216,14 +175,12 @@ function sendMultiLineQueries(text: string): void {
  * Update diagnostics and trigger linter re-evaluation
  * Called from parse response handler to display inline errors/warnings
  */
-export function updateDiagnosticsDisplay(diagnostics: Diagnostic[]): void {
+export function updateDiagnosticsDisplay(_diagnostics: Diagnostic[]): void {
     if (!editorView) return;
-
-    // Store diagnostics for linter to use
-    currentDiagnostics = diagnostics || [];
 
     // Force linter re-evaluation by dispatching an empty transaction
     // This causes the linter to be re-run and display updated diagnostics
+    // Note: Diagnostics are currently not stored as the linter is not yet enabled
     editorView.dispatch({});
 }
 

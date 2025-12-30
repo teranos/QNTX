@@ -86,7 +86,7 @@ export function updatePanelExecutionStatus(
     updates: Partial<PulseExecution>
 ): boolean {
     // Find which job contains this execution
-    for (const [jobId, executions] of state.jobExecutions.entries()) {
+    for (const [_jobId, executions] of state.jobExecutions.entries()) {
         const execution = executions.find(e => e.id === executionId);
         if (execution) {
             // Update execution fields

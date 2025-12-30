@@ -5,7 +5,7 @@
  */
 
 import { debugLog } from "../debug.ts";
-import type { ScheduledJob, ScheduledJobState } from "./types.ts";
+import type { ScheduledJob } from "./types.ts";
 import { INTERVAL_PRESETS, formatInterval } from "./types.ts";
 import {
   createScheduledJob,
