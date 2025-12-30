@@ -4,8 +4,8 @@
 
 import { describe, test, expect, mock, beforeEach } from 'bun:test';
 import { Window } from 'happy-dom';
-import { GoEditorNavigation } from './go-editor-navigation.ts';
-import type { CodeEntry } from './go-editor-navigation.ts';
+import { GoEditorNavigation } from './navigation.ts';
+import type { CodeEntry } from './navigation.ts';
 
 // Setup happy-dom for DOM testing
 const window = new Window();
