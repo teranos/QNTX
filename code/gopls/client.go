@@ -126,15 +126,64 @@ func (c *StdioClient) Shutdown(ctx context.Context) error {
 	c.mu.Unlock()
 
 	if err := c.call(ctx, "shutdown", nil, nil); err != nil {
-		return err
+		return fmt.Errorf("shutdown RPC failed: %w", err)
 	}
 
 	if err := c.notify("exit", nil); err != nil {
-		return err
+		return fmt.Errorf("exit notification failed: %w", err)
 	}
 
-	c.stdin.Close()
-	return c.cmd.Wait()
+	// Close stdin and mark as closed
+	if c.stdin != nil {
+		c.stdin.Close()
+		c.stdin = nil
+	}
+
+	// Wait for process to exit with context timeout
+	done := make(chan error, 1)
+	go func() {
+		done <- c.cmd.Wait()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("gopls process exited with error: %w", err)
+		}
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("timeout waiting for gopls process to exit: %w", ctx.Err())
+	}
+}
+
+// ForceKill forcefully terminates the gopls process
+func (c *StdioClient) ForceKill() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.shutdown {
+		return nil // Already shutdown
+	}
+	c.shutdown = true
+
+	if c.cmd == nil || c.cmd.Process == nil {
+		return fmt.Errorf("no process to kill")
+	}
+
+	// Close stdin to signal process (check if not already closed)
+	if c.stdin != nil {
+		if err := c.stdin.Close(); err != nil {
+			// Ignore close errors - stdin may already be closed
+		}
+		c.stdin = nil
+	}
+
+	// Kill the process
+	if err := c.cmd.Process.Kill(); err != nil {
+		return fmt.Errorf("failed to kill process: %w", err)
+	}
+
+	return nil
 }
 
 // GoToDefinition returns the definition location for a symbol

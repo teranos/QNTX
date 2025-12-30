@@ -12,6 +12,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))
 	http.HandleFunc("/api/config", s.corsMiddleware(s.HandleConfig))
 	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                      // Dev mode status
+	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                      // Browser console debugging (dev mode only)
 	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                      // Prose content tree
 	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))              // Individual prose files
 	http.HandleFunc("/api/code", s.corsMiddleware(s.HandleCode))                        // Code file tree
