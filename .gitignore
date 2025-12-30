@@ -5,7 +5,6 @@
 
 # Node/Bun
 node_modules/
-bun.lock
 
 # Build artifacts
 dist/
