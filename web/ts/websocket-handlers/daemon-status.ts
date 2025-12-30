@@ -9,7 +9,6 @@ import { toast } from '../toast';
 // Track last warning state to avoid duplicate toasts
 let lastBudgetWarningState = {
     daily: false,
-    weekly: false,
     monthly: false,
 };
 
