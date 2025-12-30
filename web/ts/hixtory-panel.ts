@@ -18,6 +18,7 @@ import type { Job as CoreJob } from '../types/core';
 interface Job extends CoreJob {
     cost_usd?: number;
     source?: string;
+    _graph_query?: string;
     metadata?: {
         total_operations?: number;
         completed_operations?: number;
@@ -311,9 +312,6 @@ class JobListPanel {
             const item = this.renderHistoryItem(job);
             content.appendChild(item);
         });
-
-        // Attach click handlers
-        this.attachHistoryItemListeners();
     }
 
     /**
