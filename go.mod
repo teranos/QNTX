@@ -15,7 +15,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/teranos/vanity-id v0.1.1-0.20251230011716-25f13d4e6a96
+	github.com/teranos/vanity-id v0.3.0
 	github.com/tliron/glsp v0.2.2
 	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v3 v3.0.1
