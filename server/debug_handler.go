@@ -35,7 +35,6 @@ func NewConsoleBuffer(maxSize int) *ConsoleBuffer {
 // Add adds a log entry to the buffer
 func (cb *ConsoleBuffer) Add(log ConsoleLog) {
 	cb.mu.Lock()
-	defer cb.mu.Unlock()
 
 	// Add timestamp if not set
 	if log.Timestamp.IsZero() {
@@ -48,9 +47,13 @@ func (cb *ConsoleBuffer) Add(log ConsoleLog) {
 	}
 	cb.logs = append(cb.logs, log)
 
-	// Call callback if set
-	if cb.onNewLog != nil {
-		cb.onNewLog(log)
+	// Get callback reference while holding lock
+	callback := cb.onNewLog
+	cb.mu.Unlock()
+
+	// Call callback outside lock to prevent deadlocks
+	if callback != nil {
+		callback(log)
 	}
 }
 
@@ -77,6 +80,9 @@ func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
+		// Limit request body size to 100KB to prevent DoS
+		r.Body = http.MaxBytesReader(w, r.Body, 100*1024)
+
 		var log ConsoleLog
 		if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -93,9 +99,9 @@ func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Validate and sanitize level
+		// Validate and sanitize level (always default to 'info' if empty or invalid)
 		validLevels := map[string]bool{"error": true, "warn": true, "info": true, "debug": true}
-		if log.Level != "" && !validLevels[log.Level] {
+		if log.Level == "" || !validLevels[log.Level] {
 			log.Level = "info" // Sanitize to safe default
 		}
 
