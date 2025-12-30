@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/code/gopls"
 	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/version"
 	"github.com/teranos/QNTX/graph"
@@ -27,6 +28,7 @@ type QNTXServer struct {
 	dbPath        string // Database file path (for display in banner)
 	builder       *graph.AxGraphBuilder
 	langService   *lsp.Service          // Language service for ATS LSP features
+	goplsService  *gopls.Service        // Language service for Go code intelligence
 	usageTracker  *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker *budget.Tracker       // Budget tracking for Pulse daemon
 	daemon        *async.WorkerPool  // Background job processor (daemon)

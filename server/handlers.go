@@ -405,8 +405,25 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get absolute workspace path for gopls
+	workspaceRoot := appcfg.GetString("code.gopls.workspace_root")
+	if workspaceRoot == "" || workspaceRoot == "." {
+		// Get absolute path to current directory
+		if absPath, err := filepath.Abs("."); err == nil {
+			workspaceRoot = absPath
+		} else {
+			workspaceRoot = "."
+		}
+	}
+
 	config := map[string]interface{}{
 		"config_file": appcfg.GetViper().ConfigFileUsed(),
+		"code": map[string]interface{}{
+			"gopls": map[string]interface{}{
+				"enabled":        appcfg.GetBool("code.gopls.enabled"),
+				"workspace_root": workspaceRoot,
+			},
+		},
 		"pulse": map[string]interface{}{
 			"daily_budget_usd":   status.DailyRemaining + status.DailySpend,     // Total limit
 			"weekly_budget_usd":  status.WeeklyRemaining + status.WeeklySpend,   // Total limit
