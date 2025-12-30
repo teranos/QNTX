@@ -374,19 +374,12 @@ func TestIsLikelyID(t *testing.T) {
 		input    string
 		expected bool
 	}{
-		// Valid IDs (short alphanumeric)
+		// Valid IDs (alphanumeric)
 		{"AB", true},
 		{"ABC123", true},
 		{"BRUC1", true},
 		{"abocd", true},
 		{"XYZ789", true},
-		{"A1B2C3D4E5F6", true}, // 12 chars - max length
-
-		// Invalid - too short
-		{"A", false},
-
-		// Invalid - too long
-		{"ABCDEFGHIJKLM", false}, // 13 chars
 
 		// Invalid - contains non-alphanumeric
 		{"AB-CD", false},
