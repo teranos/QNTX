@@ -97,6 +97,35 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		tickerCfg.Interval = time.Duration(deps.config.Pulse.TickerIntervalSeconds) * time.Second
 	}
 
+	// Create console buffer with callback to print logs to terminal
+	consoleBuffer := NewConsoleBuffer(100)
+	consoleBuffer.onNewLog = func(log ConsoleLog) {
+		// Format log level for display
+		levelIcon := map[string]string{
+			"error": "✗",
+			"warn":  "⚠",
+			"info":  "ℹ",
+			"debug": "→",
+		}
+		icon := levelIcon[log.Level]
+		if icon == "" {
+			icon = "·"
+		}
+
+		// Print to server terminal
+		serverLogger.Infow(fmt.Sprintf("[Browser %s] %s", icon, log.Message),
+			"level", log.Level,
+			"url", log.URL,
+		)
+
+		// Also print stack trace for errors
+		if log.Level == "error" && log.Stack != "" {
+			serverLogger.Debugw("Browser error stack trace",
+				"stack", log.Stack,
+			)
+		}
+	}
+
 	// Create server instance (before ticker so we can pass it as broadcaster)
 	server := &QNTXServer{
 		db:            db,
@@ -115,6 +144,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		logger:        serverLogger,
 		logTransport:  wsTransport,
 		wsCore:        wsCore,
+		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
 		initialQuery:  initialQuery,
 		ctx:           ctx,
 		cancel:        cancel,
