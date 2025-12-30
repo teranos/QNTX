@@ -30,7 +30,14 @@ export class GoCodeBlockNodeView {
 
     private async initializeEditor(): Promise<void> {
         // Load Go language support dynamically to avoid bundling issues
-        const { go } = await import('@codemirror/lang-go');
+        let goExtension;
+        try {
+            const goModule = await import('@codemirror/lang-go');
+            goExtension = goModule.go();
+        } catch (err) {
+            console.error('[Go Block] Go language support unavailable:', err);
+            goExtension = [];  // Editor works without syntax highlighting
+        }
 
         // Create CodeMirror instance
         const initialContent = this.node.textContent;
@@ -64,7 +71,7 @@ export class GoCodeBlockNodeView {
             state: EditorState.create({
                 doc: initialContent,
                 extensions: [
-                    go(), // Go language grammar
+                    goExtension,  // Go language support (empty if unavailable)
                     syntaxHighlighting(defaultHighlightStyle), // Apply syntax highlighting theme
                     goTheme,
                     EditorView.lineWrapping,
