@@ -3,7 +3,7 @@
  * Defines all message types exchanged between frontend and backend
  */
 
-import { GraphData, Job, DaemonStatus, GitBranch, GitStatus } from './core';
+import { GraphData, Job } from './core';
 
 // ============================================================================
 // Message Type Discriminators

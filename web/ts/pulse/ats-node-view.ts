@@ -7,7 +7,7 @@
 import { Node as PMNode } from "prosemirror-model";
 import { EditorView, NodeView } from "prosemirror-view";
 import type { ScheduledJob } from "./types.ts";
-import { createSchedulingControls, type ErrorContext } from "./scheduling-controls.ts";
+import { createSchedulingControls } from "./scheduling-controls.ts";
 
 export interface ATSNodeViewOptions {
   documentId?: string;

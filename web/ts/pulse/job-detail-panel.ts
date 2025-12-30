@@ -12,10 +12,7 @@ import type { ScheduledJob } from './types.ts';
 import type { PulseExecution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
 import {
   listExecutions,
-  getExecution,
-  getExecutionLogs,
   getJobStages,
-  getTaskLogs,
   getTaskLogsForJob,
   getJobChildren,
   formatDuration,
@@ -34,7 +31,6 @@ class JobDetailPanel {
   private currentPage: number = 0;
   private pageSize: number = 20;
   private totalExecutions: number = 0;
-  private selectedExecution: PulseExecution | null = null;
   private expandedExecutions: Set<string> = new Set();
   private executionStages: Map<string, JobStagesResponse> = new Map();
   private executionChildren: Map<string, JobChildrenResponse> = new Map();
@@ -43,8 +39,6 @@ class JobDetailPanel {
   private expandedTasks: Set<string> = new Set();
   private taskLogs: Map<string, TaskLogsResponse> = new Map();
   private loadingTasks: Set<string> = new Set(); // Track tasks currently being loaded
-  // Track which job each expanded execution/child belongs to for task log fetching
-  private currentJobContext: Map<string, string> = new Map(); // execution_id -> job_id
 
   constructor() {
     this.initialize();
@@ -75,7 +69,6 @@ class JobDetailPanel {
 
     this.currentJob = job;
     this.currentPage = 0;
-    this.selectedExecution = null;
 
     debugLog('[Job Detail] Showing panel for job:', job.id);
 
@@ -95,7 +88,6 @@ class JobDetailPanel {
     this.overlay.classList.remove('visible');
     this.isVisible = false;
     this.currentJob = null;
-    this.selectedExecution = null;
   }
 
   private async loadExecutions(): Promise<void> {
@@ -443,29 +435,6 @@ class JobDetailPanel {
       });
       this.render();
     }
-  }
-
-  private renderTask(task: { task_id: string; log_count: number }, jobId: string): string {
-    const taskKey = `${jobId}:${task.task_id}`;
-    const isExpanded = this.expandedTasks.has(taskKey);
-    const logs = this.taskLogs.get(taskKey);
-
-    return `
-      <div class="execution-task ${isExpanded ? 'expanded' : ''}" data-task-id="${task.task_id}" data-job-id="${jobId}">
-        <div class="task-header" onclick="window.jobDetailPanel.handleTaskClick('${jobId}', '${task.task_id}')">
-          <span class="task-expand-icon">${isExpanded ? '▼' : '▶'}</span>
-          <span class="task-id">${this.escapeHtml(task.task_id)}</span>
-          <span class="task-log-count">${task.log_count} logs</span>
-        </div>
-        ${isExpanded ? `
-          <div class="task-logs-container">
-            ${logs ? this.renderTaskLogs(logs) : `
-              <div class="task-logs-loading">Loading logs...</div>
-            `}
-          </div>
-        ` : ''}
-      </div>
-    `;
   }
 
   private renderTaskLogs(logsResponse: TaskLogsResponse): string {

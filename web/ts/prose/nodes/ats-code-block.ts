@@ -10,7 +10,6 @@ import type { EditorView as PMEditorView } from 'prosemirror-view';
 import { createSchedulingControls } from '../../pulse/scheduling-controls';
 import type { ScheduledJob } from '../../pulse/types';
 import { getScheduledJob } from '../../pulse/api';
-import { toast } from '../../toast';
 
 export class ATSCodeBlockNodeView {
     dom: HTMLElement;

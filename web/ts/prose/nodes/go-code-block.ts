@@ -18,8 +18,7 @@ export class GoCodeBlockNodeView {
     constructor(
         private node: PMNode,
         private view: PMEditorView,
-        private getPos: () => number | undefined,
-        documentPath: string
+        private getPos: () => number | undefined
     ) {
         // Create container
         this.dom = document.createElement('div');
