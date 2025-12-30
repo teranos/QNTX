@@ -244,7 +244,7 @@ class ConfigPanel {
         this.config.settingsEnhanced = mergedConfig.allSettings;
 
         const html = `
-            <div class="config-file-info">
+            <div class="panel-card config-file-info">
                 <strong>Final Merged Config</strong>
                 <span class="config-file-hint">This is what the server sees</span>
             </div>

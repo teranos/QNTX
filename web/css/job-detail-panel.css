@@ -1,4 +1,5 @@
 /**
+/* Uses panel-base.css for shared components */
  * Job Detail Panel - Execution History Display
  * Extends shared-panel.css for base panel structure
  */
@@ -26,11 +27,11 @@
   background: none;
   border: 1px solid #e0e0e0;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   cursor: pointer;
   font-size: 14px;
-  color: #666;
-  transition: all 0.15s ease;
+  color: var(--panel-text-secondary);
+  transition: var(--panel-transition-fast);
 }
 
 .job-detail-back:hover {
@@ -48,12 +49,8 @@
   background: #f5f5f5;
 }
 
-/* Job info card */
+/* Job info card - uses .panel-card from panel-base.css */
 .job-info-card {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 14px 16px;
   margin-bottom: 16px;
 }
 
@@ -66,7 +63,7 @@
 
 .job-info-label {
   font-weight: 500;
-  color: #666;
+  color: var(--panel-text-secondary);
 }
 
 .job-info-value {
@@ -111,7 +108,7 @@
 
 .execution-count {
   font-size: 12px;
-  color: #666;
+  color: var(--panel-text-secondary);
   font-weight: 500;
 }
 
@@ -122,13 +119,9 @@
   gap: 10px;
 }
 
-/* Execution cards */
+/* Execution cards - uses .panel-card from panel-base.css */
 .execution-card {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
   padding: 12px 14px;
-  transition: all 0.2s ease;
 }
 
 .execution-card.expanded {
@@ -170,37 +163,29 @@
   transition: transform 0.2s ease;
 }
 
-.execution-status {
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-weight: 500;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
+/* Execution status badges - uses .panel-badge from panel-base.css */
 .execution-status-running {
   background: #f3e5f5;
   color: #7b1fa2;
 }
 
 .execution-status-completed {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--status-completed-bg);
+  color: var(--status-completed-text);
 }
 
 .execution-status-failed {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--status-failed-bg);
+  color: var(--status-failed-text);
 }
 
 .execution-time {
-  color: #666;
+  color: var(--panel-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .execution-duration {
-  color: #666;
+  color: var(--panel-text-secondary);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -231,7 +216,7 @@
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: #666;
+  color: var(--panel-text-secondary);
 }
 
 .execution-meta-label {
@@ -256,7 +241,7 @@
   background: #1e1e1e;
   color: #d4d4d4;
   padding: 12px;
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 11px;
   line-height: 1.5;
@@ -280,7 +265,7 @@
 .execution-empty {
   text-align: center;
   padding: 32px 16px;
-  color: #666;
+  color: var(--panel-text-secondary);
 }
 
 .execution-empty p {
@@ -298,7 +283,7 @@
   padding: 16px;
   background: rgba(255, 0, 51, 0.1);
   border-left: 3px solid #ff0033;
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   color: #ff0033;
   font-size: 12px;
   margin-bottom: 12px;
@@ -317,8 +302,8 @@
 .pagination-btn {
   padding: 8px 14px;
   border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  background: #fff;
+  border-radius: var(--panel-border-radius);
+  background: var(--panel-bg);
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
@@ -338,7 +323,7 @@
 
 .pagination-info {
   font-size: 12px;
-  color: #666;
+  color: var(--panel-text-secondary);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }

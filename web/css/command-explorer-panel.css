@@ -1,18 +1,19 @@
 /* Command Explorer Panel - ix invocations and ax statements reference */
+/* Uses panel-base.css for shared components */
 
 .command-explorer-panel {
     position: relative;
     width: 100%;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    background: var(--panel-bg);
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
     margin: 8px 8px 8px 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
     max-height: 400px;
     display: flex;
     flex-direction: column;
-    transition: all 0.2s ease;
+    transition: var(--panel-transition-normal);
     overflow: hidden;
 }
 
@@ -41,7 +42,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     background: #f8f8f8;
     border-bottom: 1px solid #ddd;
 }
@@ -57,7 +58,7 @@
     background: none;
     border: none;
     font-size: 18px;
-    color: #666;
+    color: var(--panel-text-secondary);
     cursor: pointer;
     padding: 0;
     width: 24px;
@@ -66,7 +67,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 3px;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .command-explorer-close:hover {
@@ -77,7 +78,7 @@
 /* Search */
 .command-explorer-search {
     padding: 8px 16px;
-    background: #fff;
+    background: var(--panel-bg);
     border-bottom: 1px solid #eee;
 }
 
@@ -85,7 +86,7 @@
     width: 100%;
     padding: 8px 12px;
     font-size: 12px;
-    border: 1px solid #ddd;
+    border: var(--panel-border);
     border-radius: 3px;
     outline: none;
     transition: border-color 0.15s ease;
@@ -108,14 +109,11 @@
     gap: 8px;
 }
 
-/* Filter Item */
+/* Filter Item - uses .panel-card from panel-base.css */
 .filter-item {
     background: #f8f8f8;
-    border: 1px solid #ddd;
-    border-radius: 3px;
     padding: 12px;
     cursor: pointer;
-    transition: all 0.15s ease;
 }
 
 .filter-item:hover {
@@ -142,7 +140,7 @@
 }
 
 .filter-item.selected .filter-item-count {
-    background: #fff;
+    background: var(--panel-bg);
     color: #000;
 }
 
@@ -167,13 +165,10 @@
     font-family: 'Courier New', monospace;
 }
 
+/* Uses .panel-badge from panel-base.css */
 .filter-item-count {
     background: #000;
     color: #fff;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
 }
 
 /* Item Details */
@@ -186,7 +181,7 @@
 
 .filter-item-meta {
     font-size: 10px;
-    color: #666;
+    color: var(--panel-text-secondary);
     margin-bottom: 8px;
 }
 
@@ -206,8 +201,8 @@
 .filter-item-examples code {
     font-size: 10px;
     padding: 4px 6px;
-    background: #fff;
-    border: 1px solid #ddd;
+    background: var(--panel-bg);
+    border: var(--panel-border);
     border-radius: 2px;
     display: block;
     overflow: hidden;
@@ -229,7 +224,7 @@
 
 .command-explorer-content::-webkit-scrollbar-thumb {
     background: #ccc;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .command-explorer-content::-webkit-scrollbar-thumb:hover {
