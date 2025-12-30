@@ -1,6 +1,7 @@
 // File upload and import handling
 
 import { sendMessage } from './websocket.ts';
+import { toast } from './toast.ts';
 import type { ImportProgressData, ImportStatsData, ImportCompleteData } from '../types/websocket';
 
 // Handle import progress updates
@@ -51,6 +52,16 @@ export function handleImportComplete(data: ImportCompleteData): void {
     }
     if (status) {
         status.textContent = data.message || 'Import complete!';
+    }
+
+    // Show toast notification
+    if (data.success) {
+        const statsMsg = data.stats
+            ? ` (${data.stats.imported} imported, ${data.stats.skipped} skipped)`
+            : '';
+        toast.success(`Import complete${statsMsg}`);
+    } else {
+        toast.error(data.message || 'Import failed');
     }
 
     // Auto-hide progress after 3 seconds

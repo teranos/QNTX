@@ -36,7 +36,8 @@ export type MessageType =
   | 'pulse_execution_started'
   | 'pulse_execution_failed'
   | 'pulse_execution_completed'
-  | 'pulse_execution_log_stream';
+  | 'pulse_execution_log_stream'
+  | 'storage_warning';
 
 // ============================================================================
 // Base Message Interface
@@ -467,6 +468,7 @@ export interface MessageHandlers {
   pulse_execution_failed?: MessageHandler<PulseExecutionFailedMessage>;
   pulse_execution_completed?: MessageHandler<PulseExecutionCompletedMessage>;
   pulse_execution_log_stream?: MessageHandler<PulseExecutionLogStreamMessage>;
+  storage_warning?: MessageHandler<StorageWarningMessage>;
   _default?: MessageHandler<BaseMessage>;
 }
 
@@ -572,6 +574,20 @@ export interface PulseExecutionLogStreamMessage extends BaseMessage {
   scheduled_job_id: string;
   execution_id: string;
   log_chunk: string;
+  timestamp: number;
+}
+
+/**
+ * Storage warning for approaching bounded storage limits
+ */
+export interface StorageWarningMessage extends BaseMessage {
+  type: 'storage_warning';
+  actor: string;
+  context: string;
+  current: number;
+  limit: number;
+  fill_percent: number;
+  time_until_full: string;
   timestamp: number;
 }
 
