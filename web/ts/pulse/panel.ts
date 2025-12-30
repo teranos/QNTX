@@ -275,11 +275,14 @@ export function renderSystemStatus(daemonStatus: any): string {
     const running = daemonStatus?.running || false;
     const workers = daemonStatus?.worker_count || 0;
     const dailySpend = daemonStatus?.budget_daily || 0;
-    const dailyLimit = daemonStatus?.budget_daily_limit || 5.0;
+    const dailyLimit = daemonStatus?.budget_daily_limit || 1.0;
+    const weeklySpend = daemonStatus?.budget_weekly || 0;
+    const weeklyLimit = daemonStatus?.budget_weekly_limit || 7.0;
     const monthlySpend = daemonStatus?.budget_monthly || 0;
-    const monthlyLimit = daemonStatus?.budget_monthly_limit || 50.0;
+    const monthlyLimit = daemonStatus?.budget_monthly_limit || 30.0;
 
     const dailyPercent = dailyLimit > 0 ? Math.min((dailySpend / dailyLimit) * 100, 100) : 0;
+    const weeklyPercent = weeklyLimit > 0 ? Math.min((weeklySpend / weeklyLimit) * 100, 100) : 0;
     const monthlyPercent = monthlyLimit > 0 ? Math.min((monthlySpend / monthlyLimit) * 100, 100) : 0;
 
     return `
@@ -319,6 +322,17 @@ export function renderSystemStatus(daemonStatus: any): string {
                 </div>
                 <div class="pulse-budget-text">
                     $${dailySpend.toFixed(2)} / $${dailyLimit.toFixed(2)}
+                </div>
+            </div>
+
+            <!-- Weekly Budget -->
+            <div class="pulse-status-item pulse-budget-item">
+                <div class="pulse-status-label">Weekly Budget</div>
+                <div class="pulse-budget-bar">
+                    <div class="pulse-budget-fill" style="width: ${weeklyPercent}%"></div>
+                </div>
+                <div class="pulse-budget-text">
+                    $${weeklySpend.toFixed(2)} / $${weeklyLimit.toFixed(2)}
                 </div>
             </div>
 
