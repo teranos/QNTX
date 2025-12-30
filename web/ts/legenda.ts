@@ -52,8 +52,7 @@ function updateLegendaItemVisualState(item: HTMLElement, typeNameSpan: HTMLEleme
 // Helper: Setup type name click handler
 function setupTypeNameHandler(
     item: HTMLElement,
-    typeNameSpan: HTMLElement,
-    renderGraphFn: (data: GraphData) => void
+    typeNameSpan: HTMLElement
 ): void {
     typeNameSpan.addEventListener('click', function(e: Event): void {
         e.stopPropagation();
@@ -226,7 +225,7 @@ export function initLegendaToggles(
         if (!typeNameSpan) return;
 
         // Setup event handlers using helper functions
-        setupTypeNameHandler(htmlItem, typeNameSpan, renderGraphFn);
+        setupTypeNameHandler(htmlItem, typeNameSpan);
         if (revealButton) {
             setupRevealButtonHandler(htmlItem, revealButton, renderGraphFn);
         }

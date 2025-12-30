@@ -24,13 +24,10 @@ import { listScheduledJobs, pauseScheduledJob, resumeScheduledJob, deleteSchedul
 import { formatInterval } from './pulse/types';
 import { toast } from './toast';
 import { showErrorDialog } from './error-dialog';
-import type { PulseExecution } from './pulse/execution-types';
 import { listExecutions } from './pulse/execution-api';
 import { PulsePanelState } from './pulse/panel-state';
 import * as PanelRenderer from './pulse/panel';
-import type { PanelEventHandlers } from './pulse/panel-events';
 import { attachPanelEventListeners } from './pulse/panel-events';
-import * as RealtimeHandlers from './pulse/realtime-handlers';
 import type { DaemonStatusMessage } from '../types/websocket';
 
 // Global daemon status (updated via WebSocket)
