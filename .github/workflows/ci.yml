@@ -70,3 +70,5 @@ jobs:
 
       - name: Run tests
         run: cd web && bun test
+        env:
+          USE_JSDOM: 1
