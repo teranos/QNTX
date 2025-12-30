@@ -524,3 +524,27 @@ func (s *QNTXServer) BroadcastPulseExecutionLogStream(scheduledJobID, executionI
 		"clients", sent,
 	)
 }
+
+// BroadcastStorageWarning sends a bounded storage warning to all connected clients
+// Used to notify UI when storage limits are approaching for predictive action
+func (s *QNTXServer) BroadcastStorageWarning(actor, context string, current, limit int, fillPercent float64, timeUntilFull string) {
+	msg := StorageWarningMessage{
+		Type:          "storage_warning",
+		Actor:         actor,
+		Context:       context,
+		Current:       current,
+		Limit:         limit,
+		FillPercent:   fillPercent,
+		TimeUntilFull: timeUntilFull,
+		Timestamp:     time.Now().Unix(),
+	}
+
+	sent := s.broadcastMessage(msg)
+	s.logger.Warnw(fmt.Sprintf("%s Storage limit approaching", sym.DB),
+		"actor", actor,
+		"context", context,
+		"fill_percent", fmt.Sprintf("%.0f%%", fillPercent*100),
+		"time_until_full", timeUntilFull,
+		"clients", sent,
+	)
+}
