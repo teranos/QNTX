@@ -44,19 +44,27 @@ test-web: ## Run web UI tests
 	@echo "Running web UI tests..."
 	@cd web && bun test
 
-test: ## Run all tests with coverage
-	@echo "Running tests with coverage..."
+test: ## Run all tests (Go + TypeScript) with coverage
+	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
 	@go test -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
-	@echo "✓ Tests complete. Coverage report: tmp/coverage.html"
+	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
+	@echo ""
+	@echo "Running TypeScript tests..."
+	@cd web && bun test
+	@echo "✓ All tests complete"
 
-test-verbose: ## Run all tests with verbose output and coverage
-	@echo "Running tests with verbose output..."
+test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverage
+	@echo "Running Go tests with verbose output..."
 	@mkdir -p tmp
 	@go test -v -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
-	@echo "✓ Verbose tests complete. Coverage report: tmp/coverage.html"
+	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
+	@echo ""
+	@echo "Running TypeScript tests..."
+	@cd web && bun test
+	@echo "✓ All tests complete"
 
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist
