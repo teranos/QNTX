@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,7 @@ func NewAliasStore(db *sql.DB) *AliasStore {
 }
 
 // CreateAlias creates a simple bidirectional alias (implements ats.AliasResolver)
+// Aliases use case-insensitive lookups but preserve original values
 func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 	// Validate inputs to prevent empty or meaningless aliases
 	if alias == "" {
@@ -28,7 +30,7 @@ func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 	if target == "" {
 		return fmt.Errorf("target cannot be empty")
 	}
-	if alias == target {
+	if strings.EqualFold(alias, target) {
 		return fmt.Errorf("alias and target cannot be identical")
 	}
 
@@ -42,7 +44,8 @@ func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 
 	now := time.Now()
 
-	// Insert both directions
+	// Insert both directions preserving original values
+	// Lookups use COLLATE NOCASE for case-insensitive matching
 	_, err = tx.ExecContext(ctx, `
 		INSERT OR IGNORE INTO aliases (alias, target, created_by, created_at)
 		VALUES (?, ?, ?, ?)`,
@@ -69,12 +72,14 @@ func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 }
 
 // ResolveAlias returns all identifiers that should be included when searching for the given identifier (implements ats.AliasResolver)
+// Uses case-insensitive matching via COLLATE NOCASE
 func (as *AliasStore) ResolveAlias(identifier string) ([]string, error) {
 	ctx := context.Background()
+
 	query := `
 		SELECT target
 		FROM aliases
-		WHERE alias = ?
+		WHERE alias = ? COLLATE NOCASE
 		UNION
 		SELECT ?`
 
@@ -121,6 +126,7 @@ func (as *AliasStore) GetAllAliases() (map[string][]string, error) {
 }
 
 // RemoveAlias removes an alias mapping (implements ats.AliasResolver)
+// Uses case-insensitive matching via COLLATE NOCASE
 func (as *AliasStore) RemoveAlias(alias, target string) error {
 	// Validate inputs
 	if alias == "" {
@@ -130,11 +136,12 @@ func (as *AliasStore) RemoveAlias(alias, target string) error {
 		return fmt.Errorf("target cannot be empty")
 	}
 
-	// Remove both directions
+	// Remove both directions with case-insensitive matching
 	ctx := context.Background()
 	_, err := as.db.ExecContext(ctx, `
 		DELETE FROM aliases
-		WHERE (alias = ? AND target = ?) OR (alias = ? AND target = ?)`,
+		WHERE (alias = ? COLLATE NOCASE AND target = ? COLLATE NOCASE)
+		   OR (alias = ? COLLATE NOCASE AND target = ? COLLATE NOCASE)`,
 		alias, target, target, alias)
 	if err != nil {
 		return fmt.Errorf("failed to remove alias between %s and %s: %w", alias, target, err)
