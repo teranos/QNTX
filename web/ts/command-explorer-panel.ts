@@ -141,7 +141,7 @@ class CommandExplorerPanel {
 
         mockQueryHistory.forEach(query => {
             const item = document.createElement('div');
-            item.className = 'filter-item';
+            item.className = 'panel-card filter-item';
             item.dataset.mode = 'as';
 
             const queryDiv = document.createElement('div');
@@ -181,7 +181,7 @@ class CommandExplorerPanel {
 
         mockAxStatements.forEach(stmt => {
             const item = document.createElement('div');
-            item.className = 'filter-item';
+            item.className = 'panel-card filter-item';
             item.dataset.type = stmt.type;
             item.dataset.mode = 'ax';
 
@@ -194,7 +194,7 @@ class CommandExplorerPanel {
             typeSpan.textContent = stmt.type;
 
             const countSpan = document.createElement('span');
-            countSpan.className = 'filter-item-count';
+            countSpan.className = 'panel-badge filter-item-count';
             countSpan.textContent = String(stmt.count);
 
             header.appendChild(typeSpan);
