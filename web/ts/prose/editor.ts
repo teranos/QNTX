@@ -11,7 +11,6 @@ import { history, undo, redo } from 'prosemirror-history';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap } from 'prosemirror-commands';
 import { apiFetch } from '../api.ts';
-import { proseSchema } from './schema.ts';
 import { proseMarkdownParser, proseMarkdownSerializer } from './markdown.ts';
 import { ATSCodeBlockNodeView } from './nodes/ats-code-block.ts';
 import { GoCodeBlockNodeView } from './nodes/go-code-block.ts';
@@ -116,7 +115,7 @@ export class ProseEditor {
             state,
             nodeViews: {
                 ats_code_block: (node, view, getPos) => new ATSCodeBlockNodeView(node, view, getPos as () => number, this.currentPath),
-                go_code_block: (node, view, getPos) => new GoCodeBlockNodeView(node, view, getPos as () => number, this.currentPath)
+                go_code_block: (node, view, getPos) => new GoCodeBlockNodeView(node, view, getPos as () => number)
             },
             dispatchTransaction: (transaction) => {
                 if (!this.editorView) return;
