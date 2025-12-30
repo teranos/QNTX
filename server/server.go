@@ -48,7 +48,8 @@ type QNTXServer struct {
 	logger        *zap.SugaredLogger
 	logTransport  *wslogs.Transport
 	wsCore        *wslogs.WebSocketCore
-	initialQuery  string // Pre-loaded Ax query to execute on client connection
+	consoleBuffer *ConsoleBuffer // Browser console log buffer for debugging (dev mode only)
+	initialQuery  string         // Pre-loaded Ax query to execute on client connection
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
