@@ -37,7 +37,8 @@ export type MessageType =
   | 'pulse_execution_failed'
   | 'pulse_execution_completed'
   | 'pulse_execution_log_stream'
-  | 'storage_warning';
+  | 'storage_warning'
+  | 'storage_eviction';
 
 // ============================================================================
 // Base Message Interface
@@ -591,6 +592,19 @@ export interface StorageWarningMessage extends BaseMessage {
   fill_percent: number;
   time_until_full: string;
   timestamp: number;
+}
+
+/**
+ * Storage eviction notification when attestations are deleted due to limits
+ */
+export interface StorageEvictionMessage extends BaseMessage {
+  type: 'storage_eviction';
+  event_type: string;
+  actor: string;
+  context: string;
+  entity: string;
+  deletions_count: number;
+  message: string;
 }
 
 // ============================================================================

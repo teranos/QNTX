@@ -19,7 +19,8 @@ type StorageWarning struct {
 }
 
 // CheckStorageStatus checks bounded storage status for an attestation
-// Returns warnings for any (actor, context) pairs approaching limits (50-90% full)
+// Returns warnings for any (actor, context) pairs approaching limits (80-95% full)
+// Also logs warnings to storage_events table for UI notification
 func (bs *BoundedStore) CheckStorageStatus(as *types.As) []*StorageWarning {
 	// Skip self-certifying attestations (bypass 64-actor limit)
 	if len(as.Actors) > 0 && as.Actors[0] == as.ID {
@@ -33,6 +34,8 @@ func (bs *BoundedStore) CheckStorageStatus(as *types.As) []*StorageWarning {
 		for _, context := range as.Contexts {
 			if warning := bs.checkActorContext(actor, context); warning != nil {
 				warnings = append(warnings, warning)
+				// Log warning to storage_events for UI notification
+				bs.logStorageWarning(actor, context, warning.Current, warning.Limit)
 			}
 		}
 	}
@@ -60,8 +63,8 @@ func (bs *BoundedStore) checkActorContext(actor, context string) *StorageWarning
 
 	fillPercent := float64(count) / float64(limit)
 
-	// Only warn if 50-90% full
-	if fillPercent < 0.5 || fillPercent >= 1.0 {
+	// Only warn if 80-95% full
+	if fillPercent < 0.8 || fillPercent >= 0.95 {
 		return nil
 	}
 
