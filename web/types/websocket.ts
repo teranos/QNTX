@@ -113,8 +113,10 @@ export interface DaemonStatusMessage extends BaseMessage {
   active_jobs: number;
   load_percent: number;
   budget_daily?: number;
+  budget_weekly?: number;
   budget_monthly?: number;
   budget_daily_limit?: number;
+  budget_weekly_limit?: number;
   budget_monthly_limit?: number;
 }
 

@@ -9,6 +9,7 @@ import { toast } from '../toast';
 // Track last warning state to avoid duplicate toasts
 let lastBudgetWarningState = {
     daily: false,
+    weekly: false,
     monthly: false,
 };
 
@@ -31,7 +32,7 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
  * Check if budget limits are approaching and show warning toasts
  */
 function checkBudgetWarnings(data: DaemonStatusMessage): void {
-    // Daily budget - check both values are defined
+    // Daily budget
     const dailyUsage = data.budget_daily ?? 0;
     const dailyLimit = data.budget_daily_limit ?? 0;
     if (dailyLimit > 0) {
@@ -44,13 +45,26 @@ function checkBudgetWarnings(data: DaemonStatusMessage): void {
         }
     }
 
-    // Monthly budget - check both values are defined
+    // Weekly budget
+    const weeklyUsage = data.budget_weekly ?? 0;
+    const weeklyLimit = data.budget_weekly_limit ?? 0;
+    if (weeklyLimit > 0) {
+        const weeklyPercent = weeklyUsage / weeklyLimit;
+        if (weeklyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.weekly) {
+            toast.warning(`Weekly budget ${Math.round(weeklyPercent * 100)}% used ($${weeklyUsage.toFixed(2)}/$${weeklyLimit.toFixed(2)})`);
+            lastBudgetWarningState.weekly = true;
+        } else if (weeklyPercent < BUDGET_WARNING_THRESHOLD) {
+            lastBudgetWarningState.weekly = false;
+        }
+    }
+
+    // Monthly budget
     const monthlyUsage = data.budget_monthly ?? 0;
     const monthlyLimit = data.budget_monthly_limit ?? 0;
     if (monthlyLimit > 0) {
         const monthlyPercent = monthlyUsage / monthlyLimit;
         if (monthlyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.monthly) {
-            toast.warning(`Monthly budget ${Math.round(monthlyPercent * 100)}% used`);
+            toast.warning(`Monthly budget ${Math.round(monthlyPercent * 100)}% used ($${monthlyUsage.toFixed(2)}/$${monthlyLimit.toFixed(2)})`);
             lastBudgetWarningState.monthly = true;
         } else if (monthlyPercent < BUDGET_WARNING_THRESHOLD) {
             lastBudgetWarningState.monthly = false;
