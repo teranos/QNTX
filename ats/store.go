@@ -86,6 +86,19 @@ type PersistenceResult struct {
 	FailureCount   int
 	Errors         []string
 	SuccessRate    float64
+	// Warnings contains predictive storage warnings for (actor, context) pairs approaching limits
+	Warnings []*StorageWarning
+}
+
+// StorageWarning represents a bounded storage warning condition
+// Used for predictive warnings when storage approaches limits
+type StorageWarning struct {
+	Actor         string  // Actor approaching limit
+	Context       string  // Context approaching limit
+	Current       int     // Current attestation count
+	Limit         int     // Configured limit
+	FillPercent   float64 // Percentage full (0.0-1.0)
+	TimeUntilFull string  // Human-readable time until hitting limit
 }
 
 // AttestationQueryStore defines query operations for attestation retrieval.

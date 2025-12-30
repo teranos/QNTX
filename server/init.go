@@ -127,6 +127,15 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	ticker := schedule.NewTickerWithContext(ctx, scheduleStore, daemon.GetQueue(), daemon, server, tickerCfg, serverLogger)
 	server.ticker = ticker
 
+	// Create and start storage events poller for broadcasting warnings/evictions
+	storagePoller := NewStorageEventsPoller(db, server, serverLogger)
+	server.storageEventsPoller = storagePoller
+	server.wg.Add(1)
+	go func() {
+		defer server.wg.Done()
+		storagePoller.Start(ctx)
+	}()
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 

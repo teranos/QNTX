@@ -104,9 +104,9 @@ func TestCheckStorageStatus_AtThreshold(t *testing.T) {
 		EntityActorsLimit:  64,
 	})
 
-	// Create 8 attestations (50% exactly)
+	// Create 13 attestations (81.25% - above 80% threshold)
 	baseTime := time.Now().Add(-25 * time.Hour) // Old enough for rate calculation
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 13; i++ {
 		as := &types.As{
 			ID:         generateTestASID(i),
 			Subjects:   []string{"ALICE"},
@@ -120,7 +120,7 @@ func TestCheckStorageStatus_AtThreshold(t *testing.T) {
 		}
 	}
 
-	// Check status - should warn (at 50%)
+	// Check status - should warn (at 81.25%, threshold is 80-95%)
 	as := &types.As{
 		ID:         generateTestASID(99),
 		Subjects:   []string{"BOB"},
@@ -133,7 +133,7 @@ func TestCheckStorageStatus_AtThreshold(t *testing.T) {
 	warnings := store.CheckStorageStatus(as)
 
 	if len(warnings) != 1 {
-		t.Fatalf("expected 1 warning at 50%% full, got %d", len(warnings))
+		t.Fatalf("expected 1 warning at 81%% full, got %d", len(warnings))
 	}
 
 	w := warnings[0]
@@ -143,14 +143,14 @@ func TestCheckStorageStatus_AtThreshold(t *testing.T) {
 	if w.Context != "PROJECT" {
 		t.Errorf("expected context 'PROJECT', got %s", w.Context)
 	}
-	if w.Current != 8 {
-		t.Errorf("expected current count 8, got %d", w.Current)
+	if w.Current != 13 {
+		t.Errorf("expected current count 13, got %d", w.Current)
 	}
 	if w.Limit != 16 {
 		t.Errorf("expected limit 16, got %d", w.Limit)
 	}
-	if w.FillPercent != 0.5 {
-		t.Errorf("expected fill percent 0.5, got %f", w.FillPercent)
+	if w.FillPercent < 0.81 || w.FillPercent > 0.82 {
+		t.Errorf("expected fill percent ~0.81, got %f", w.FillPercent)
 	}
 }
 
@@ -237,8 +237,8 @@ func TestCheckStorageStatus_AccelerationDetection(t *testing.T) {
 		}
 	}
 
-	// Create 6 recent attestations (last 24 hours) - creates acceleration
-	for i := 2; i < 8; i++ {
+	// Create 11 recent attestations (last 24 hours) - creates acceleration and hits 81% threshold
+	for i := 2; i < 13; i++ {
 		as := &types.As{
 			ID:         generateTestASID(i),
 			Subjects:   []string{"ALICE"},
@@ -270,9 +270,9 @@ func TestCheckStorageStatus_AccelerationDetection(t *testing.T) {
 
 	w := warnings[0]
 
-	// Day rate: 6 attestations / 24 hours = 0.25/hour
-	// Week rate: 8 attestations / 168 hours = 0.047/hour
-	// Acceleration: 0.25 / 0.047 = ~5.3x
+	// Day rate: 11 attestations / 24 hours = 0.46/hour
+	// Week rate: 13 attestations / 168 hours = 0.077/hour
+	// Acceleration: 0.46 / 0.077 = ~6x
 	if w.AccelerationFactor < 2.0 {
 		t.Errorf("expected acceleration factor > 2.0 (recent burst), got %.2f", w.AccelerationFactor)
 	}
@@ -357,8 +357,8 @@ func TestCheckStorageStatus_MultipleContexts(t *testing.T) {
 
 	baseTime := time.Now().Add(-25 * time.Hour)
 
-	// Create 8 attestations for PROJECT_A
-	for i := 0; i < 8; i++ {
+	// Create 13 attestations for PROJECT_A (81.25% of 16)
+	for i := 0; i < 13; i++ {
 		as := &types.As{
 			ID:         generateTestASID(i),
 			Subjects:   []string{"ALICE"},
@@ -372,8 +372,8 @@ func TestCheckStorageStatus_MultipleContexts(t *testing.T) {
 		}
 	}
 
-	// Create 12 attestations for PROJECT_B
-	for i := 0; i < 12; i++ {
+	// Create 13 attestations for PROJECT_B (81.25% of 16)
+	for i := 0; i < 13; i++ {
 		as := &types.As{
 			ID:         generateTestASID(100 + i),
 			Subjects:   []string{"ALICE"},

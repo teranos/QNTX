@@ -159,9 +159,11 @@ class PulsePanel {
         const daemonStatus = {
             running: currentDaemonStatus?.running ?? false,
             budget_daily: currentDaemonStatus?.budget_daily ?? 0,
-            budget_daily_limit: currentDaemonStatus?.budget_daily_limit ?? 5.0,
+            budget_daily_limit: currentDaemonStatus?.budget_daily_limit ?? 1.0,
+            budget_weekly: currentDaemonStatus?.budget_weekly ?? 0,
+            budget_weekly_limit: currentDaemonStatus?.budget_weekly_limit ?? 7.0,
             budget_monthly: currentDaemonStatus?.budget_monthly ?? 0,
-            budget_monthly_limit: currentDaemonStatus?.budget_monthly_limit ?? 50.0
+            budget_monthly_limit: currentDaemonStatus?.budget_monthly_limit ?? 30.0
         };
 
         container.innerHTML = renderSystemStatus(daemonStatus);

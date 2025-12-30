@@ -2,7 +2,7 @@
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
-	@go build -o bin/qntx ./cmd/qntx
+	@go build -ldflags="-X 'github.com/teranos/QNTX/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
