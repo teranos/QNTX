@@ -100,7 +100,7 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 		}
 
 		// Log enforcement event for observability
-		bs.logStorageEvent("actor_context_limit", actor, context, "", deleteCount)
+		bs.logStorageEvent("actor_context_limit", actor, context, "", deleteCount, limit)
 	}
 
 	return nil
@@ -163,7 +163,7 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 
 		// Log enforcement event for observability
 		if totalDeleted > 0 {
-			bs.logStorageEvent("actor_contexts_limit", actor, "", "", totalDeleted)
+			bs.logStorageEvent("actor_contexts_limit", actor, "", "", totalDeleted, limit)
 		}
 	}
 
@@ -230,7 +230,7 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 
 		// Log enforcement event for observability
 		if totalDeleted > 0 {
-			bs.logStorageEvent("entity_actors_limit", "", "", entity, totalDeleted)
+			bs.logStorageEvent("entity_actors_limit", "", "", entity, totalDeleted, limit)
 		}
 	}
 
