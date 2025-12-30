@@ -240,7 +240,7 @@ class GoEditorPanel {
             const { EditorView, keymap } = await import('@codemirror/view');
             const { EditorState } = await import('@codemirror/state');
             const { defaultKeymap } = await import('@codemirror/commands');
-            const { syntaxHighlighting, defaultHighlightStyle } = await import('@codemirror/language');
+            const { oneDark } = await import('@codemirror/theme-one-dark');
             const { autocompletion, completionKeymap } = await import('@codemirror/autocomplete');
             const { languageServer } = await import('codemirror-languageserver');
 
@@ -299,34 +299,6 @@ class GoEditorPanel {
                 return;
             }
 
-            // Custom theme
-            const goEditorTheme = EditorView.theme({
-                "&": {
-                    height: "100%",
-                    fontSize: "14px",
-                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace"
-                },
-                ".cm-scroller": {
-                    overflow: "auto",
-                    backgroundColor: "#1e1e1e"
-                },
-                ".cm-content": {
-                    caretColor: "#66b3ff",
-                    padding: "16px"
-                },
-                ".cm-cursor, .cm-cursor-primary": {
-                    borderLeftColor: "#66b3ff !important",
-                    borderLeftWidth: "2px !important"
-                },
-                ".cm-gutters": {
-                    backgroundColor: "#1e1e1e",
-                    color: "#858585",
-                    border: "none"
-                },
-                ".cm-activeLineGutter": {
-                    backgroundColor: "#2a2d2e"
-                }
-            });
 
             // Create CodeMirror editor
             this.editor = new EditorView({
@@ -335,7 +307,7 @@ class GoEditorPanel {
                     extensions: [
                         keymap.of([...defaultKeymap, ...completionKeymap]),
                         goExtension,
-                        syntaxHighlighting(defaultHighlightStyle),
+                        oneDark,
                         autocompletion(),
                         languageServer({
                             serverUri: goplsUri,
@@ -347,7 +319,6 @@ class GoEditorPanel {
                                 uri: workspaceRoot
                             }]
                         }),
-                        goEditorTheme,
                         EditorView.lineWrapping,
                         EditorView.updateListener.of((update) => {
                             if (update.docChanged) {
