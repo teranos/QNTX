@@ -36,7 +36,9 @@ export type MessageType =
   | 'pulse_execution_started'
   | 'pulse_execution_failed'
   | 'pulse_execution_completed'
-  | 'pulse_execution_log_stream';
+  | 'pulse_execution_log_stream'
+  | 'storage_warning'
+  | 'storage_eviction';
 
 // ============================================================================
 // Base Message Interface
@@ -112,8 +114,10 @@ export interface DaemonStatusMessage extends BaseMessage {
   active_jobs: number;
   load_percent: number;
   budget_daily?: number;
+  budget_weekly?: number;
   budget_monthly?: number;
   budget_daily_limit?: number;
+  budget_weekly_limit?: number;
   budget_monthly_limit?: number;
 }
 
@@ -467,6 +471,8 @@ export interface MessageHandlers {
   pulse_execution_failed?: MessageHandler<PulseExecutionFailedMessage>;
   pulse_execution_completed?: MessageHandler<PulseExecutionCompletedMessage>;
   pulse_execution_log_stream?: MessageHandler<PulseExecutionLogStreamMessage>;
+  storage_warning?: MessageHandler<StorageWarningMessage>;
+  storage_eviction?: MessageHandler<StorageEvictionMessage>;
   _default?: MessageHandler<BaseMessage>;
 }
 
@@ -573,6 +579,33 @@ export interface PulseExecutionLogStreamMessage extends BaseMessage {
   execution_id: string;
   log_chunk: string;
   timestamp: number;
+}
+
+/**
+ * Storage warning for approaching bounded storage limits
+ */
+export interface StorageWarningMessage extends BaseMessage {
+  type: 'storage_warning';
+  actor: string;
+  context: string;
+  current: number;
+  limit: number;
+  fill_percent: number;
+  time_until_full: string;
+  timestamp: number;
+}
+
+/**
+ * Storage eviction notification when attestations are deleted due to limits
+ */
+export interface StorageEvictionMessage extends BaseMessage {
+  type: 'storage_eviction';
+  event_type: string;
+  actor: string;
+  context: string;
+  entity: string;
+  deletions_count: number;
+  message: string;
 }
 
 // ============================================================================

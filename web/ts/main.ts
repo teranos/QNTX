@@ -18,6 +18,8 @@ import {
     handlePulseExecutionCompleted,
     handlePulseExecutionLogStream
 } from './pulse/realtime-handlers.ts';
+import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
+import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import './config-panel.ts';
 import './ai-provider-panel.ts';
@@ -142,6 +144,8 @@ function init(): void {
         'pulse_execution_failed': handlePulseExecutionFailed as any,
         'pulse_execution_completed': handlePulseExecutionCompleted as any,
         'pulse_execution_log_stream': handlePulseExecutionLogStream as any,
+        'storage_warning': handleStorageWarning as any,
+        'storage_eviction': handleStorageEviction as any,
         '_default': updateGraph as any  // Default handler for graph data
     };
 

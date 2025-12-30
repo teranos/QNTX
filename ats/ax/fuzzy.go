@@ -2,6 +2,8 @@ package ax
 
 import (
 	"strings"
+
+	id "github.com/teranos/vanity-id"
 )
 
 // NOTE: This fuzzy matching system is an incremental improvement over the previous
@@ -66,6 +68,7 @@ func (fm *FuzzyMatcher) FindContextMatches(queryContext string, allContexts []st
 }
 
 // isMatch determines if a value matches the query
+// Uses NormalizeForLookup for ID-like values to handle 0/O and 1/I confusion
 func (fm *FuzzyMatcher) isMatch(query, value string) bool {
 	valueLower := strings.ToLower(strings.TrimSpace(value))
 
@@ -87,11 +90,38 @@ func (fm *FuzzyMatcher) isMatch(query, value string) bool {
 		}
 	}
 
+	// 4. Normalized ID match - handles 0/O and 1/I confusion for vanity IDs
+	// Only apply if query looks like an ID (uppercase alphanumeric)
+	if isLikelyID(query) {
+		normalizedQuery := id.NormalizeForLookup(query)
+		normalizedValue := id.NormalizeForLookup(value)
+		if normalizedQuery == normalizedValue {
+			return true
+		}
+		if strings.Contains(normalizedValue, normalizedQuery) {
+			return true
+		}
+	}
+
 	return false
+}
+
+// isLikelyID returns true if the string looks like a vanity ID (short, alphanumeric)
+func isLikelyID(s string) bool {
+	if len(s) < 2 || len(s) > 12 {
+		return false
+	}
+	for _, r := range s {
+		if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+	return true
 }
 
 // isContextMatch determines if a context value matches the query with enhanced fuzzy logic
 // NOTE: This is a basic implementation - more sophisticated matching planned for future
+// Uses NormalizeForLookup for ID-like values to handle 0/O and 1/I confusion
 func (fm *FuzzyMatcher) isContextMatch(query, value string) bool {
 	valueLower := strings.ToLower(strings.TrimSpace(value))
 
@@ -109,6 +139,18 @@ func (fm *FuzzyMatcher) isContextMatch(query, value string) bool {
 	words := strings.Fields(valueLower)
 	for _, word := range words {
 		if word == query {
+			return true
+		}
+	}
+
+	// 4. Normalized ID match - handles 0/O and 1/I confusion for vanity IDs
+	if isLikelyID(query) {
+		normalizedQuery := id.NormalizeForLookup(query)
+		normalizedValue := id.NormalizeForLookup(value)
+		if normalizedQuery == normalizedValue {
+			return true
+		}
+		if strings.Contains(normalizedValue, normalizedQuery) {
 			return true
 		}
 	}
