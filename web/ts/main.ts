@@ -3,7 +3,7 @@
 import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initLogPanel } from './log-panel.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
-import { updateGraph, initGraphResize, setTransform } from './graph-renderer.ts';
+import { updateGraph, initGraphResize } from './graph-renderer.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { restoreSession } from './state-manager.ts';
@@ -30,7 +30,6 @@ import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
 import type { MessageHandlers } from '../types/websocket';
-import type { GraphData } from '../types/core';
 
 // Extend window interface for global functions
 declare global {

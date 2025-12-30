@@ -25,33 +25,6 @@
 // Make this a module by exporting something
 export {};
 
-// Symbol-to-command mapping for dual-mode acceptance
-const SYMBOL_TO_CMD: Record<string, string> = {
-    '⍟': 'i',
-    '≡': 'am',
-    '⨳': 'ix',
-    '⋈': 'ax',
-    '+': 'as',
-    '=': 'is',
-    '∈': 'of',
-    '⌬': 'by',
-    '✦': 'at',
-    '⟶': 'so'
-};
-
-const CMD_TO_SYMBOL: Record<string, string> = {
-    'i': '⍟',
-    'am': '≡',
-    'ix': '⨳',
-    'ax': '⋈',
-    'as': '+',
-    'is': '=',
-    'of': '∈',
-    'by': '⌬',
-    'at': '✦',
-    'so': '⟶'
-};
-
 // Track current modality
 let currentModality: string = 'ax'; // Default to 'ax' modality
 
@@ -195,12 +168,12 @@ function handleSymbolClick(e: Event): void {
  * Show tooltip with symbol description
  * Note: Tooltips now handled via CSS ::after pseudo-element using data-label attribute
  */
-function showSymbolTooltip(e: Event): void {
+function showSymbolTooltip(): void {
     // Tooltip display is now handled purely by CSS using the data-label attribute
     // This function maintained for potential future enhancements
 }
 
-function hideSymbolTooltip(e: Event): void {
+function hideSymbolTooltip(): void {
     // Tooltip hiding is now handled purely by CSS
     // This function maintained for potential future enhancements
 }

@@ -2,8 +2,8 @@
 
 import { state, GRAPH_PHYSICS, GRAPH_STYLES } from './config.ts';
 import { saveSession } from './state-manager.ts';
-import { hiddenNodeTypes, hideIsolated, revealRelatedActive, initLegendaToggles } from './legenda.ts';
-import type { GraphData, Node, Link, Transform } from '../types/core';
+import { hiddenNodeTypes, initLegendaToggles } from './legenda.ts';
+import type { GraphData, Node, Transform } from '../types/core';
 import type {
     D3Node,
     D3Link,
@@ -11,8 +11,6 @@ import type {
     SVGSelection,
     GroupSelection,
     ZoomBehavior,
-    NodeSelection,
-    LinkSelection,
     DragEvent,
     ZoomEvent
 } from '../types/d3-graph';
@@ -27,9 +25,6 @@ let zoom: ZoomBehavior | null = null;
 
 // Individual node visibility state (by node ID)
 const hiddenNodes = new Set<string>();
-
-// Tiles are the only rendering mode
-const useTiles = true;
 
 // Virtue #2: Performance - Cache DOM references to avoid repeated queries
 interface DOMCache {
@@ -61,37 +56,6 @@ const domCache: DOMCache = {
 // Helper: Normalize node type for comparison (DRY)
 function normalizeNodeType(type: string | null | undefined): string {
     return (type || '').trim().toLowerCase();
-}
-
-// Virtue #6: Modularity - Extract node filtering logic
-function isConnectedToRevealedType(
-    nodeId: string,
-    links: Link[],
-    nodes: Node[],
-    revealedTypes: Set<string>
-): boolean {
-    if (revealedTypes.size === 0) return false;
-
-    for (const link of links) {
-        const sourceId = (typeof link.source === 'object' && link.source !== null)
-            ? (link.source as Node).id
-            : link.source;
-        const targetId = (typeof link.target === 'object' && link.target !== null)
-            ? (link.target as Node).id
-            : link.target;
-
-        // If this node is connected to another node...
-        if (sourceId === nodeId || targetId === nodeId) {
-            const connectedNodeId = sourceId === nodeId ? targetId : sourceId;
-            const connectedNode = nodes.find(n => n.id === connectedNodeId);
-
-            // ...and that connected node has a revealed type
-            if (connectedNode && revealedTypes.has(normalizeNodeType(connectedNode.type))) {
-                return true;
-            }
-        }
-    }
-    return false;
 }
 
 // Phase 2: Backend controls visibility - frontend just filters based on backend's decision
@@ -142,7 +106,6 @@ function renderGraph(data: GraphData): void {
             nodeColors[typeInfo.type] = typeInfo.color;
         });
     }
-    const defaultColor = nodeColors['entity'] || '#95a5a6'; // Gray fallback
 
     // Detect isolated nodes (nodes with no connections)
     const nodeHasLinks = new Set<string>();

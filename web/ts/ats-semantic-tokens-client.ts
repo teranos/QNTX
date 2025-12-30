@@ -13,7 +13,7 @@
 
 import { sendMessage } from './websocket.ts';
 import { applySyntaxHighlighting, updateDiagnosticsDisplay } from './codemirror-editor.ts';
-import type { ParseResponse, ParseRequest, SemanticToken, Diagnostic } from '../types/lsp';
+import type { ParseResponse, ParseRequest } from '../types/lsp';
 
 // Debounce timings
 // TODO(issue #14): Tune these values based on actual latency metrics

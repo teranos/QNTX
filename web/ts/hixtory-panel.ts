@@ -12,7 +12,7 @@
  * Design based on docs/development/pulse-async-ix.md - Phase 3
  */
 
-import type { JobUpdateData, JobDetailsData, LLMStreamData } from '../types/websocket';
+import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as CoreJob } from '../types/core';
 import { toast } from './toast';
 
@@ -231,7 +231,7 @@ class JobListPanel {
 
     // Handle streaming LLM output - display live tokens
     public handleLLMStream(data: LLMStreamData): void {
-        const { job_id, task_id, content, done, model, stage, error } = data;
+        const { job_id, content, done, model, stage, error } = data;
 
         if (!job_id) return;
 
@@ -431,14 +431,6 @@ class JobListPanel {
         return 'just now';
     }
 
-    /**
-     * Escape HTML to prevent XSS
-     */
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 }
 
 // Initialize and export
