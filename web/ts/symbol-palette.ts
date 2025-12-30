@@ -253,7 +253,7 @@ async function showProsePanel(): Promise<void> {
  * Show Go editor - displays Go code editor with gopls LSP integration
  */
 async function showGoEditor(): Promise<void> {
-    const { toggleGoEditor } = await import('./go-editor-panel.js');
+    const { toggleGoEditor } = await import('./code/panel.js');
     toggleGoEditor();
 }
 
