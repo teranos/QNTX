@@ -23,7 +23,7 @@ export function renderSystemStatus(daemonStatus: any): string {
 /**
  * Handle system status actions (start/stop daemon, edit budget)
  */
-export async function handleSystemStatusAction(action: string, value?: any): Promise<void> {
+export async function handleSystemStatusAction(action: string): Promise<void> {
     const { sendMessage } = await import('../websocket.ts');
 
     switch (action) {
