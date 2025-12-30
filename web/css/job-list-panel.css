@@ -1,18 +1,19 @@
 /* Job List Panel - Running IX operations */
+/* Uses panel-base.css for shared components */
 
 .job-list-panel {
     position: relative;
     width: 100%;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    background: var(--panel-bg);
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
     margin: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--panel-shadow-lg);
     z-index: 100;
     max-height: 500px;
     display: flex;
     flex-direction: column;
-    transition: all 0.2s ease;
+    transition: var(--panel-transition-normal);
     overflow: hidden;
 }
 
@@ -41,9 +42,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    background: #f8f8f8;
-    border-bottom: 1px solid #ddd;
+    padding: var(--panel-padding-md);
+    background: var(--panel-bg-secondary);
+    border-bottom: var(--panel-border);
 }
 
 .job-list-title {
@@ -57,7 +58,7 @@
     background: none;
     border: none;
     font-size: 18px;
-    color: #666;
+    color: var(--panel-text-secondary);
     cursor: pointer;
     padding: 0;
     width: 24px;
@@ -66,12 +67,12 @@
     align-items: center;
     justify-content: center;
     border-radius: 3px;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .job-list-close:hover {
-    background: #e0e0e0;
-    color: #000;
+    background: var(--panel-bg-secondary);
+    color: var(--panel-text-primary);
 }
 
 /* Content */
@@ -81,35 +82,20 @@
     padding: 8px;
 }
 
-.job-list-empty {
-    text-align: center;
-    padding: 40px 20px;
-    color: #666;
-}
-
+/* Empty state uses panel-empty from base */
 .job-list-empty p {
     margin: 4px 0;
     font-size: 13px;
 }
 
-.job-list-hint {
-    font-size: 12px;
-    color: #999;
-}
-
-/* Job Items */
+/* Job Items - extends panel-card */
 .job-item {
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: 6px; /* Slightly more rounded than default */
     margin-bottom: 8px;
-    transition: all 0.2s ease;
 }
 
 .job-item:hover {
     border-color: #999;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .job-item.completed {
@@ -127,11 +113,8 @@
     border-color: #ff9800;
 }
 
-/* Job Header */
+/* Job Header - extends panel-flex-center */
 .job-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     margin-bottom: 8px;
 }
 
@@ -146,34 +129,12 @@
     color: #000;
 }
 
+/* Status badges - use panel-badge from base */
 .job-status-badge {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 500;
     text-transform: uppercase;
 }
 
-.job-status-badge.pending {
-    background: #e3f2fd;
-    color: #1976d2;
-}
-
-.job-status-badge.running {
-    background: #e8f5e9;
-    color: #388e3c;
-}
-
-.job-status-badge.completed {
-    background: #f1f8e9;
-    color: #689f38;
-}
-
-.job-status-badge.failed {
-    background: #ffebee;
-    color: #d32f2f;
-}
-
+/* Job-specific badge state colors */
 .job-status-badge.paused {
     background: #fff3e0;
     color: #f57c00;

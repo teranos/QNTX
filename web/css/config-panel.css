@@ -1,4 +1,5 @@
 /**
+/* Uses panel-base.css for shared components */
  * Config Panel Styling - Configuration introspection display
  * Uses left-panel.css for base panel structure
  */
@@ -6,7 +7,7 @@
 /* Search */
 .config-panel-search {
     padding: 12px 20px;
-    background: #fff;
+    background: var(--panel-bg);
     border-bottom: 1px solid #eee;
     flex-shrink: 0;
 }
@@ -15,10 +16,10 @@
     width: 100%;
     padding: 10px 14px;
     font-size: 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
     outline: none;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
     font-family: inherit;
 }
 
@@ -28,7 +29,7 @@
 }
 
 .config-search-input::placeholder {
-    color: #999;
+    color: var(--panel-text-tertiary);
 }
 
 /* Config-specific content styling (layout handled by .panel-content) */
@@ -37,16 +38,13 @@
 .config-empty {
     text-align: center;
     padding: 32px 16px;
-    color: #666;
+    color: var(--panel-text-secondary);
     font-size: 12px;
 }
 
-/* Config File Info */
+/* Config File Info - uses .panel-card from panel-base.css */
 .config-file-info {
-    padding: 12px 16px;
     background: #f8f8f8;
-    border: 1px solid #ddd;
-    border-radius: 4px;
     margin-bottom: 20px;
     display: flex;
     flex-direction: column;
@@ -60,7 +58,7 @@
 }
 
 .config-file-hint {
-    color: #666;
+    color: var(--panel-text-secondary);
     font-size: 11px;
 }
 
@@ -130,7 +128,7 @@
 }
 
 .source-inactive {
-    color: #999;
+    color: var(--panel-text-tertiary);
     opacity: 0.6;
 }
 
@@ -144,7 +142,7 @@
     text-decoration: underline;
     text-decoration-style: dotted;
     text-decoration-color: transparent;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .source-clickable:hover {
@@ -153,7 +151,7 @@
 
 .config-edit-btn {
     background: transparent;
-    color: #666;
+    color: var(--panel-text-secondary);
     border: none;
     padding: 2px 6px;
     font-size: 12px;
@@ -167,7 +165,7 @@
 
 /* Value type styling */
 .config-value-null {
-    color: #999;
+    color: var(--panel-text-tertiary);
     font-style: italic;
 }
 
@@ -205,7 +203,7 @@
 
 .config-panel-content::-webkit-scrollbar-thumb {
     background: #ccc;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb:hover {

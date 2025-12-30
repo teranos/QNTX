@@ -132,7 +132,7 @@ class JobDetailPanel {
 
       <div class="job-detail-content">
         <!-- Job Info -->
-        <div class="job-info-card">
+        <div class="panel-card job-info-card">
           <div class="job-info-row">
             <span class="job-info-label">ATS Code:</span>
             <code class="job-info-value">${this.escapeHtml(this.currentJob.ats_code)}</code>
@@ -289,10 +289,10 @@ class JobDetailPanel {
     const children = this.executionChildren.get(exec.id);
 
     return `
-      <div class="execution-card ${statusClass} ${isExpanded ? 'expanded' : ''}" data-execution-id="${exec.id}">
+      <div class="panel-card execution-card ${statusClass} ${isExpanded ? 'expanded' : ''}" data-execution-id="${exec.id}">
         <div class="execution-header" data-action="toggle-expand">
           <span class="execution-expand-icon">${isExpanded ? '▼' : '▶'}</span>
-          <span class="execution-status execution-status-${this.escapeHtml(exec.status)}">${this.escapeHtml(exec.status)}</span>
+          <span class="panel-badge execution-status execution-status-${this.escapeHtml(exec.status)}">${this.escapeHtml(exec.status)}</span>
           <span class="execution-time">${timeAgo}</span>
           <span class="execution-duration">${duration}</span>
         </div>
