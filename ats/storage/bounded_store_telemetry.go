@@ -3,18 +3,19 @@ package storage
 import "time"
 
 // logStorageEvent records a bounded storage enforcement event for observability
-func (bs *BoundedStore) logStorageEvent(eventType, actor, context, entity string, deletionsCount int) {
+func (bs *BoundedStore) logStorageEvent(eventType, actor, context, entity string, deletionsCount, limitValue int) {
 	timestamp := time.Now().Format(time.RFC3339)
 
 	// Log to database for historical tracking
 	_, err := bs.db.Exec(`
-		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?)`,
+		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, limit_value, timestamp)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		eventType,
 		nullIfEmpty(actor),
 		nullIfEmpty(context),
 		nullIfEmpty(entity),
 		deletionsCount,
+		limitValue,
 		timestamp,
 	)
 	if err != nil {
@@ -45,12 +46,13 @@ func (bs *BoundedStore) logStorageWarning(actor, context string, current, limit 
 
 	// Log to database for historical tracking and UI notification
 	_, err := bs.db.Exec(`
-		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, timestamp)
-		VALUES (?, ?, ?, NULL, ?, ?)`,
+		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, limit_value, timestamp)
+		VALUES (?, ?, ?, NULL, ?, ?, ?)`,
 		"storage_warning",
 		nullIfEmpty(actor),
 		nullIfEmpty(context),
 		current, // Store current count in deletions_count field (reusing existing column)
+		limit,
 		timestamp,
 	)
 	if err != nil {

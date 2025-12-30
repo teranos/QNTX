@@ -59,7 +59,7 @@ func (p *StorageEventsPoller) Start(ctx context.Context) {
 func (p *StorageEventsPoller) pollEvents() {
 	// Query for new events since last poll
 	rows, err := p.db.Query(`
-		SELECT id, event_type, actor, context, entity, deletions_count, timestamp
+		SELECT id, event_type, actor, context, entity, deletions_count, limit_value, timestamp
 		FROM storage_events
 		WHERE id > ?
 		ORDER BY id ASC
@@ -79,19 +79,29 @@ func (p *StorageEventsPoller) pollEvents() {
 			context         sql.NullString
 			entity          sql.NullString
 			deletionsCount  int
+			limitValue      sql.NullInt64
 			timestamp       string
 		)
 
-		if err := rows.Scan(&id, &eventType, &actor, &context, &entity, &deletionsCount, &timestamp); err != nil {
+		if err := rows.Scan(&id, &eventType, &actor, &context, &entity, &deletionsCount, &limitValue, &timestamp); err != nil {
 			p.logger.Warnw("Failed to scan storage event", "error", err)
 			continue
 		}
 
 		// Broadcast notification based on event type
 		if eventType == "storage_warning" {
-			p.broadcastWarning(actor.String, context.String, deletionsCount)
+			limit := int(limitValue.Int64)
+			if !limitValue.Valid {
+				limit = 16 // Fallback to default for old events
+			}
+			p.broadcastWarning(actor.String, context.String, deletionsCount, limit)
 		} else {
-			p.broadcastEviction(eventType, actor.String, context.String, entity.String, deletionsCount)
+			limit := int(limitValue.Int64)
+			if !limitValue.Valid {
+				// Fallback to defaults for old events
+				limit = getDefaultLimit(eventType)
+			}
+			p.broadcastEviction(eventType, actor.String, context.String, entity.String, deletionsCount, limit)
 		}
 
 		// Update last processed ID
@@ -105,16 +115,16 @@ func (p *StorageEventsPoller) pollEvents() {
 }
 
 // broadcastEviction sends an eviction notification to WebSocket clients
-func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entity string, deletionsCount int) {
+func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entity string, deletionsCount, limit int) {
 	// Format message based on event type
 	var message string
 	switch eventType {
 	case "actor_context_limit":
-		message = fmt.Sprintf("Evicted %d old attestations for %s/%s (limit: 16)", deletionsCount, actor, context)
+		message = fmt.Sprintf("Evicted %d old attestations for %s/%s (limit: %d)", deletionsCount, actor, context, limit)
 	case "actor_contexts_limit":
-		message = fmt.Sprintf("Evicted %d attestations for actor %s (contexts limit: 64)", deletionsCount, actor)
+		message = fmt.Sprintf("Evicted %d attestations for actor %s (contexts limit: %d)", deletionsCount, actor, limit)
 	case "entity_actors_limit":
-		message = fmt.Sprintf("Evicted %d attestations for entity %s (actors limit: 64)", deletionsCount, entity)
+		message = fmt.Sprintf("Evicted %d attestations for entity %s (actors limit: %d)", deletionsCount, entity, limit)
 	default:
 		message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
 	}
@@ -137,9 +147,8 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 }
 
 // broadcastWarning sends a storage warning notification to WebSocket clients
-func (p *StorageEventsPoller) broadcastWarning(actor, context string, current int) {
+func (p *StorageEventsPoller) broadcastWarning(actor, context string, current, limit int) {
 	// For warnings, deletionsCount field contains current attestation count
-	limit := 16 // Default ActorContextLimit
 	fillPercent := float64(current) / float64(limit)
 
 	p.logger.Infow(fmt.Sprintf("⊔ Storage warning: %s/%s at %d%% (%d/%d)",
@@ -158,4 +167,19 @@ func (p *StorageEventsPoller) broadcastWarning(actor, context string, current in
 	}
 
 	p.server.broadcastMessage(msg)
+}
+
+// getDefaultLimit returns the default limit for a given event type
+// Used as fallback for old events that don't have limit_value stored
+func getDefaultLimit(eventType string) int {
+	switch eventType {
+	case "actor_context_limit":
+		return 16 // DefaultActorContextLimit
+	case "actor_contexts_limit":
+		return 64 // DefaultActorContextsLimit
+	case "entity_actors_limit":
+		return 64 // DefaultEntityActorsLimit
+	default:
+		return 0
+	}
 }
