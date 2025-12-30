@@ -318,3 +318,84 @@ func TestOrganizationSuffixMatching(t *testing.T) {
 	assert.ElementsMatch(t, expected, result,
 		"Query 'acme' should match all Acme organizations ignoring suffixes")
 }
+
+func TestVanityIDNormalization(t *testing.T) {
+	matcher := NewFuzzyMatcher()
+
+	// Test O/0 normalization - should match both variants
+	t.Run("O/0 confusion in predicates", func(t *testing.T) {
+		predicates := []string{"ABOCD", "AB0CD", "XYZAB"}
+
+		// Query with 0 should match O variant
+		result := matcher.FindMatches("ab0cd", predicates)
+		assert.Contains(t, result, "ABOCD", "Query 'ab0cd' should match 'ABOCD' via normalization")
+		assert.Contains(t, result, "AB0CD", "Query 'ab0cd' should match 'AB0CD' exactly")
+
+		// Query with O should match 0 variant
+		result = matcher.FindMatches("abocd", predicates)
+		assert.Contains(t, result, "ABOCD", "Query 'abocd' should match 'ABOCD' exactly")
+		assert.Contains(t, result, "AB0CD", "Query 'abocd' should match 'AB0CD' via normalization")
+	})
+
+	t.Run("I/1 confusion in predicates", func(t *testing.T) {
+		predicates := []string{"ABICD", "AB1CD", "XYZAB"}
+
+		// Query with 1 should match I variant
+		result := matcher.FindMatches("ab1cd", predicates)
+		assert.Contains(t, result, "ABICD", "Query 'ab1cd' should match 'ABICD' via normalization")
+		assert.Contains(t, result, "AB1CD", "Query 'ab1cd' should match 'AB1CD' exactly")
+
+		// Query with I should match 1 variant
+		result = matcher.FindMatches("abicd", predicates)
+		assert.Contains(t, result, "ABICD", "Query 'abicd' should match 'ABICD' exactly")
+		assert.Contains(t, result, "AB1CD", "Query 'abicd' should match 'AB1CD' via normalization")
+	})
+
+	t.Run("Mixed O/0 and I/1 confusion", func(t *testing.T) {
+		predicates := []string{"A0B1C", "AOBIC", "XYZ12"}
+
+		// Query with mixed should match via normalization
+		result := matcher.FindMatches("aob1c", predicates)
+		assert.Contains(t, result, "A0B1C", "Query 'aob1c' should match 'A0B1C' via normalization")
+		assert.Contains(t, result, "AOBIC", "Query 'aob1c' should match 'AOBIC' via normalization")
+	})
+
+	t.Run("Context matching with ID normalization", func(t *testing.T) {
+		contexts := []string{"Project-AB0CD", "Project-ABOCD", "Other-XYZ"}
+
+		result := matcher.FindContextMatches("ab0cd", contexts)
+		assert.Contains(t, result, "Project-AB0CD", "Should match context containing ID with 0")
+		assert.Contains(t, result, "Project-ABOCD", "Should match context containing ID with O via normalization")
+	})
+}
+
+func TestIsLikelyID(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		// Valid IDs (alphanumeric)
+		{"AB", true},
+		{"ABC123", true},
+		{"BRUC1", true},
+		{"abocd", true},
+		{"XYZ789", true},
+
+		// Invalid - contains non-alphanumeric
+		{"AB-CD", false},
+		{"AB CD", false},
+		{"AB.CD", false},
+		{"AB_CD", false},
+
+		// Invalid - empty
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := isLikelyID(tt.input)
+			assert.Equal(t, tt.expected, result,
+				"isLikelyID(%q) should be %v", tt.input, tt.expected)
+		})
+	}
+}

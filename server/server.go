@@ -31,9 +31,10 @@ type QNTXServer struct {
 	goplsService  *gopls.Service        // Language service for Go code intelligence
 	usageTracker  *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
 	budgetTracker *budget.Tracker       // Budget tracking for Pulse daemon
-	daemon        *async.WorkerPool  // Background job processor (daemon)
-	ticker        *schedule.Ticker   // Pulse ticker for scheduled jobs
-	configWatcher *am.ConfigWatcher  // Config watcher for auto-reload on config changes
+	daemon            *async.WorkerPool      // Background job processor (daemon)
+	ticker            *schedule.Ticker       // Pulse ticker for scheduled jobs
+	configWatcher     *am.ConfigWatcher      // Config watcher for auto-reload on config changes
+	storageEventsPoller *StorageEventsPoller // Poller for storage events (warnings/evictions)
 	clients       map[*Client]bool
 	broadcast     chan *graph.Graph
 	register      chan *Client
