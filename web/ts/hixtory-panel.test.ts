@@ -2,7 +2,7 @@
  * Tests for hixtory panel core functionality
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import type { JobUpdateData } from '../types/websocket';
 
 describe('Hixtory Panel - handleJobUpdate', () => {
