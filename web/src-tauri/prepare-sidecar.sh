@@ -8,25 +8,18 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SIDECAR_DIR="$SCRIPT_DIR/bin"
 
-# Detect architecture
-ARCH=$(uname -m)
-case "$ARCH" in
-    arm64)
-        TARGET="aarch64-apple-darwin"
-        ;;
-    x86_64)
-        TARGET="x86_64-apple-darwin"
-        ;;
-    *)
-        echo "❌ Unsupported architecture: $ARCH"
-        exit 1
-        ;;
-esac
+# Detect Rust target (more reliable than uname -m, especially with Rosetta 2)
+TARGET=$(rustc -vV | grep host | cut -d' ' -f2)
+if [ -z "$TARGET" ]; then
+    echo "❌ Failed to detect Rust target"
+    exit 1
+fi
+
+echo "Detected Rust target: $TARGET"
 
 SIDECAR_NAME="qntx-$TARGET"
 
 echo "Building QNTX for Tauri sidecar..."
-echo "  Architecture: $ARCH"
 echo "  Target: $TARGET"
 
 # Build qntx binary
