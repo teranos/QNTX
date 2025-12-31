@@ -28,8 +28,12 @@ func buildJSONLikePattern(value string) string {
 
 // buildSQLQuery builds a SQL query from the filter
 func (ae *AxExecutor) buildSQLQuery(filter types.AxFilter, expandedPredicates []string) (string, []interface{}, error) {
-	// Debug: Log filter for debugging natural language queries
-	// fmt.Printf("DEBUG: Filter predicates: %v, expandedPredicates: %v\n", filter.Predicates, expandedPredicates)
+	if ae.logger != nil {
+		ae.logger.Debugw("building SQL query",
+			"filter_predicates", filter.Predicates,
+			"expanded_predicates", expandedPredicates,
+		)
+	}
 
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at

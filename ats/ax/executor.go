@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/ax/classification"
@@ -20,6 +22,7 @@ type AxExecutor struct {
 	entityResolver ats.EntityResolver
 	queryExpander  ats.QueryExpander
 	useAdvanced    bool
+	logger         *zap.SugaredLogger
 }
 
 // NewAxExecutor creates a new ask executor with default components:
@@ -32,9 +35,10 @@ func NewAxExecutor(queryStore ats.AttestationQueryStore, aliasResolver *alias.Re
 
 // AxExecutorOptions provides optional configuration for AxExecutor.
 type AxExecutorOptions struct {
-	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
-	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
-	UseBasic       bool               // If true, disables smart classification
+	EntityResolver ats.EntityResolver   // Optional entity ID resolution (default: NoOpEntityResolver)
+	QueryExpander  ats.QueryExpander    // Optional query expansion (default: NoOpQueryExpander)
+	UseBasic       bool                 // If true, disables smart classification
+	Logger         *zap.SugaredLogger   // Optional logger for debug output (default: nil, no logging)
 }
 
 // NewAxExecutorWithOptions creates an executor with custom options.
@@ -63,6 +67,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 		entityResolver: opts.EntityResolver,
 		queryExpander:  opts.QueryExpander,
 		useAdvanced:    useAdvanced,
+		logger:         opts.Logger,
 	}
 }
 
