@@ -1,6 +1,6 @@
 # Understanding QNTX: Pattern Recognition Analysis
 
-*Written after consolidating issues and exploring the codebase architecture*
+*Written after migrating 10 issues from ExpGraph and exploring the codebase architecture*
 
 ## What This Is
 
@@ -68,9 +68,9 @@ Most systems treat their query language as an afterthought. QNTX treats ATS as a
 
 The CodeMirror + LSP + ProseMirror integration is **expensive to build**. You don't do this unless the query language is central to the user experience.
 
-## Issue Analysis
+## What the Migration Revealed
 
-Reviewing open issues exposed **vision clusters**:
+Migrating 10 issues from ExpGraph to QNTX exposed **vision clusters**:
 
 ### Cluster 1: Live Execution Awareness (#8, #16)
 - Real-time execution state indicators for ATS blocks
