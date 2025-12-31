@@ -13,11 +13,11 @@
 QNTX uses segments across the project:
 
 - **꩜** (Pulse) - Async operations, rate limiting, job processing
-- **⌬** (Actor/Agent) - of Actors/agents in the attestation system
-- **≡** (Configuration) - am Configuration and system settings
-- **⨳** (Ingestion) - ix Data ingestion operations
-- **⋈** (Join/Merge) - ax Entity merging and relationship operations
-- **⊔** (Square Cup) - Database/storage; material retention substrate
+- **⌬** (by) - Actor/catalyst, origin of action
+- **≡** (am) - Configuration and system settings
+- **⨳** (ix) - Data ingestion/import
+- **⋈** (ax) - Expand/query, contextual surfacing
+- **⊔** (db) - Database/storage, material retention substrate
 
 **Note:** These symbols are defined in the `sym` package for consistent use across QNTX.
 
