@@ -8,6 +8,9 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## ChildJobInfo
 
+**Source**: [`server/pulse_types.go:87`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L87)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -57,6 +60,9 @@ export interface ChildJobInfo {
 
 ## CodeEntry
 
+**Source**: [`server/code_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/code_handler.go#L16)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -92,6 +98,9 @@ export interface CodeEntry {
 
 ## CompleteMessage
 
+**Source**: [`server/types.go:94`](https://github.com/teranos/QNTX/blob/main/server/types.go#L94)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -124,6 +133,9 @@ export interface CompleteMessage {
 </table>
 
 ## ConsoleLog
+
+**Source**: [`server/debug_handler.go:11`](https://github.com/teranos/QNTX/blob/main/server/debug_handler.go#L11)
+
 
 <table>
 <tr>
@@ -162,6 +174,9 @@ export interface ConsoleLog {
 </table>
 
 ## CreateScheduledJobRequest
+
+**Source**: [`server/pulse_types.go:14`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L14)
+
 
 <table>
 <tr>
@@ -204,6 +219,9 @@ export interface CreateScheduledJobRequest {
 </table>
 
 ## DaemonStatusMessage
+
+**Source**: [`server/types.go:119`](https://github.com/teranos/QNTX/blob/main/server/types.go#L119)
+
 
 <table>
 <tr>
@@ -271,6 +289,9 @@ export interface DaemonStatusMessage {
 
 ## ErrorResponse
 
+**Source**: [`server/pulse_types.go:50`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L50)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -299,6 +320,9 @@ export interface ErrorResponse {
 </table>
 
 ## JobChildrenResponse
+
+**Source**: [`server/pulse_types.go:102`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L102)
+
 
 <table>
 <tr>
@@ -331,6 +355,9 @@ export interface JobChildrenResponse {
 
 ## JobStagesResponse
 
+**Source**: [`server/pulse_types.go:67`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L67)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -361,6 +388,9 @@ export interface JobStagesResponse {
 </table>
 
 ## JobUpdateMessage
+
+**Source**: [`server/types.go:112`](https://github.com/teranos/QNTX/blob/main/server/types.go#L112)
+
 
 <table>
 <tr>
@@ -397,6 +427,9 @@ export interface JobUpdateMessage {
 </table>
 
 ## LLMStreamMessage
+
+**Source**: [`server/types.go:136`](https://github.com/teranos/QNTX/blob/main/server/types.go#L136)
+
 
 <table>
 <tr>
@@ -449,6 +482,9 @@ export interface LLMStreamMessage {
 
 ## ListExecutionsResponse
 
+**Source**: [`server/pulse_execution_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L17)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -485,6 +521,9 @@ export interface ListExecutionsResponse {
 
 ## ListScheduledJobsResponse
 
+**Source**: [`server/pulse_types.go:44`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L44)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -515,6 +554,9 @@ export interface ListScheduledJobsResponse {
 </table>
 
 ## LogEntry
+
+**Source**: [`server/pulse_types.go:73`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L73)
+
 
 <table>
 <tr>
@@ -550,6 +592,9 @@ export interface LogEntry {
 </table>
 
 ## ProgressMessage
+
+**Source**: [`server/types.go:78`](https://github.com/teranos/QNTX/blob/main/server/types.go#L78)
+
 
 <table>
 <tr>
@@ -590,6 +635,9 @@ export interface ProgressMessage {
 
 ## ProseEntry
 
+**Source**: [`server/prose_handler.go:15`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L15)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -624,6 +672,9 @@ export interface ProseEntry {
 </table>
 
 ## PulseExecutionCompletedMessage
+
+**Source**: [`server/types.go:168`](https://github.com/teranos/QNTX/blob/main/server/types.go#L168)
+
 
 <table>
 <tr>
@@ -676,6 +727,9 @@ export interface PulseExecutionCompletedMessage {
 
 ## PulseExecutionFailedMessage
 
+**Source**: [`server/types.go:157`](https://github.com/teranos/QNTX/blob/main/server/types.go#L157)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -724,6 +778,9 @@ export interface PulseExecutionFailedMessage {
 
 ## PulseExecutionLogStreamMessage
 
+**Source**: [`server/types.go:180`](https://github.com/teranos/QNTX/blob/main/server/types.go#L180)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -766,6 +823,9 @@ export interface PulseExecutionLogStreamMessage {
 
 ## PulseExecutionStartedMessage
 
+**Source**: [`server/types.go:148`](https://github.com/teranos/QNTX/blob/main/server/types.go#L148)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -807,6 +867,9 @@ export interface PulseExecutionStartedMessage {
 </table>
 
 ## QueryMessage
+
+**Source**: [`server/types.go:58`](https://github.com/teranos/QNTX/blob/main/server/types.go#L58)
+
 
 <table>
 <tr>
@@ -883,6 +946,9 @@ export interface QueryMessage {
 
 ## ScheduledJobResponse
 
+**Source**: [`server/pulse_types.go:29`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L29)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -937,6 +1003,9 @@ export interface ScheduledJobResponse {
 
 ## StageInfo
 
+**Source**: [`server/pulse_types.go:61`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L61)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -967,6 +1036,9 @@ export interface StageInfo {
 </table>
 
 ## StatsMessage
+
+**Source**: [`server/types.go:86`](https://github.com/teranos/QNTX/blob/main/server/types.go#L86)
+
 
 <table>
 <tr>
@@ -1006,6 +1078,9 @@ export interface StatsMessage {
 </table>
 
 ## StorageWarningMessage
+
+**Source**: [`server/types.go:189`](https://github.com/teranos/QNTX/blob/main/server/types.go#L189)
+
 
 <table>
 <tr>
@@ -1058,6 +1133,9 @@ export interface StorageWarningMessage {
 
 ## TaskInfo
 
+**Source**: [`server/pulse_types.go:55`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L55)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -1089,6 +1167,9 @@ export interface TaskInfo {
 
 ## TaskLogsResponse
 
+**Source**: [`server/pulse_types.go:81`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L81)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -1119,6 +1200,9 @@ export interface TaskLogsResponse {
 </table>
 
 ## UpdateScheduledJobRequest
+
+**Source**: [`server/pulse_types.go:23`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L23)
+
 
 <table>
 <tr>
@@ -1152,6 +1236,9 @@ export interface UpdateScheduledJobRequest {
 </table>
 
 ## UsageUpdateMessage
+
+**Source**: [`server/types.go:100`](https://github.com/teranos/QNTX/blob/main/server/types.go#L100)
+
 
 <table>
 <tr>
