@@ -158,6 +158,12 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	// Generate const documentation (untyped consts)
 	if len(result.Consts) > 0 {
 		sb.WriteString("## Constants\n\n")
+
+		// Add source link to the file
+		if result.SourceFile != "" {
+			sb.WriteString(fmt.Sprintf("**Source**: [`%s`](https://github.com/teranos/QNTX/blob/main/%s)\n\n", result.SourceFile, result.SourceFile))
+		}
+
 		sb.WriteString("<table>\n<tr>\n<th>Go Source</th>\n<th>TypeScript</th>\n</tr>\n<tr>\n<td>\n\n```go\n")
 
 		// Sort const names for deterministic output
