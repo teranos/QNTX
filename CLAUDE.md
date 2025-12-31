@@ -13,11 +13,11 @@
 QNTX uses segments across the project:
 
 - **꩜** (Pulse) - Async operations, rate limiting, job processing
-- **⌬** (Actor/Agent) - of Actors/agents in the attestation system
-- **≡** (Configuration) - am Configuration and system settings
-- **⨳** (Ingestion) - ix Data ingestion operations
-- **⋈** (Join/Merge) - ax Entity merging and relationship operations
-- **⊔** (Square Cup) - Database/storage; material retention substrate
+- **⌬** (by) - Actor/catalyst, origin of action
+- **≡** (am) - Configuration and system settings
+- **⨳** (ix) - Data ingestion/import
+- **⋈** (ax) - Expand/query, contextual surfacing
+- **⊔** (db) - Database/storage, material retention substrate
 
 **Note:** These symbols are defined in the `sym` package for consistent use across QNTX.
 
@@ -40,7 +40,6 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 - **Zero values have meaning**: `0` workers = disabled, `0` rate limit = unlimited
 - **Empty is valid**: Empty database path defaults to `qntx.db`
 - **Multi-source merge**: All config files merge; later sources override earlier ones
-- **No domain entities**: Contact, Organization, Role belong in ExpGraph, not am
 
 **For Claude**: When adding config options, ensure sensible defaults exist in `am/defaults.go`. Only require configuration when truly necessary.
 
