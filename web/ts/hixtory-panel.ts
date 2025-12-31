@@ -15,7 +15,7 @@
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
-import { IX } from '@types/sym.js';
+import { IX } from '@generated/sym.js';
 
 // Extended Job type with frontend-specific fields
 interface Job extends BackendJob {
