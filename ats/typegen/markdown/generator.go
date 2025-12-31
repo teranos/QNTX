@@ -300,8 +300,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 // formatGoMapKeyWithConsts formats a map key for Go markdown output
 func formatGoMapKeyWithConsts(key string, consts map[string]string) string {
-	// Check if this key is actually a const reference
-	if _, isConst := consts[key]; isConst {
+	if typegen.IsConstReference(key, consts) {
 		return key
 	}
 	return "\"" + key + "\""
@@ -309,8 +308,7 @@ func formatGoMapKeyWithConsts(key string, consts map[string]string) string {
 
 // formatGoMapValueWithConsts formats a map value for Go markdown output
 func formatGoMapValueWithConsts(value string, consts map[string]string) string {
-	// Check if this value is actually a const reference
-	if _, isConst := consts[value]; isConst {
+	if typegen.IsConstReference(value, consts) {
 		return value
 	}
 	return "\"" + value + "\""
@@ -318,8 +316,7 @@ func formatGoMapValueWithConsts(value string, consts map[string]string) string {
 
 // formatTSMapKeyWithConsts formats a map key for TypeScript markdown output
 func formatTSMapKeyWithConsts(key string, consts map[string]string) string {
-	// Check if this key is actually a const reference
-	if _, isConst := consts[key]; isConst {
+	if typegen.IsConstReference(key, consts) {
 		return "[" + key + "]"
 	}
 	return "\"" + key + "\""
@@ -327,8 +324,7 @@ func formatTSMapKeyWithConsts(key string, consts map[string]string) string {
 
 // formatTSMapValueWithConsts formats a map value for TypeScript markdown output
 func formatTSMapValueWithConsts(value string, consts map[string]string) string {
-	// Check if this value is actually a const reference
-	if _, isConst := consts[value]; isConst {
+	if typegen.IsConstReference(value, consts) {
 		return value
 	}
 	return "\"" + value + "\""

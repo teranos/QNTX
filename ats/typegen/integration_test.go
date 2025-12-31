@@ -391,8 +391,9 @@ func TestGenerateSymPackage(t *testing.T) {
 	// Verify const exports
 	assertContains(t, output, `export const`)
 
-	// Verify array exports
-	assertContains(t, output, `string[]`)
+	// Verify array exports with const narrowing (as const for all-const arrays)
+	assertContains(t, output, `as const`)
+	assertContains(t, output, `export type`) // Union type generated
 
 	// Verify map exports
 	assertContains(t, output, `Record<string, string>`)

@@ -38,3 +38,9 @@ type Position struct {
 	// Line is the line number where the type is defined
 	Line int
 }
+
+// IsConstReference checks if a string value is a const reference (exists in consts map)
+func IsConstReference(value string, consts map[string]string) bool {
+	_, isConst := consts[value]
+	return isConst
+}

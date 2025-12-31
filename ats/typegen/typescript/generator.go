@@ -366,8 +366,28 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 		for _, name := range arrayNames {
 			elements := result.Arrays[name]
-			sb.WriteString(fmt.Sprintf("export const %s: string[] = [%s];\n",
-				name, strings.Join(elements, ", ")))
+
+			// Check if all elements are const references (for better type narrowing)
+			allConsts := true
+			for _, elem := range elements {
+				if !typegen.IsConstReference(elem, result.Consts) {
+					allConsts = false
+					break
+				}
+			}
+
+			if allConsts {
+				// Use 'as const' for readonly tuple with literal types
+				sb.WriteString(fmt.Sprintf("export const %s = [%s] as const;\n",
+					name, strings.Join(elements, ", ")))
+				// Generate union type for type checking
+				sb.WriteString(fmt.Sprintf("export type %sSymbol = typeof %s[number];\n",
+					name, name))
+			} else {
+				// Standard string array
+				sb.WriteString(fmt.Sprintf("export const %s: string[] = [%s];\n",
+					name, strings.Join(elements, ", ")))
+			}
 		}
 	}
 
@@ -422,8 +442,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 // formatMapKeyWithConsts formats a map key for TypeScript output.
 // Const references are wrapped in brackets, literals are quoted.
 func formatMapKeyWithConsts(key string, consts map[string]string) string {
-	// Check if this key is actually a const reference
-	if _, isConst := consts[key]; isConst {
+	if typegen.IsConstReference(key, consts) {
 		return "[" + key + "]"
 	}
 	return "\"" + key + "\""
@@ -432,8 +451,7 @@ func formatMapKeyWithConsts(key string, consts map[string]string) string {
 // formatMapValueWithConsts formats a map value for TypeScript output.
 // Const references are used as-is, literals are quoted.
 func formatMapValueWithConsts(value string, consts map[string]string) string {
-	// Check if this value is actually a const reference
-	if _, isConst := consts[value]; isConst {
+	if typegen.IsConstReference(value, consts) {
 		return value
 	}
 	return "\"" + value + "\""
