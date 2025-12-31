@@ -155,6 +155,39 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	sb.WriteString("This document shows Go type definitions alongside their TypeScript equivalents.\n")
 	sb.WriteString("Use this as a reference when working with QNTX types in different contexts.\n\n")
 
+	// Generate const documentation (untyped consts)
+	if len(result.Consts) > 0 {
+		sb.WriteString("## Constants\n\n")
+
+		// Add source link to the file
+		if result.SourceFile != "" {
+			sb.WriteString(fmt.Sprintf("**Source**: [`%s`](https://github.com/teranos/QNTX/blob/main/%s)\n\n", result.SourceFile, result.SourceFile))
+		}
+
+		sb.WriteString("<table>\n<tr>\n<th>Go Source</th>\n<th>TypeScript</th>\n</tr>\n<tr>\n<td>\n\n```go\n")
+
+		// Sort const names for deterministic output
+		constNames := make([]string, 0, len(result.Consts))
+		for name := range result.Consts {
+			constNames = append(constNames, name)
+		}
+		sort.Strings(constNames)
+
+		for _, name := range constNames {
+			value := result.Consts[name]
+			sb.WriteString(fmt.Sprintf("const %s = \"%s\"\n", name, value))
+		}
+
+		sb.WriteString("```\n\n</td>\n<td>\n\n```typescript\n")
+
+		for _, name := range constNames {
+			value := result.Consts[name]
+			sb.WriteString(fmt.Sprintf("export const %s = \"%s\";\n", name, value))
+		}
+
+		sb.WriteString("```\n\n</td>\n</tr>\n</table>\n\n")
+	}
+
 	// Sort type names for deterministic output
 	names := make([]string, 0, len(result.Types))
 	for name := range result.Types {
@@ -185,7 +218,116 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 		}
 	}
 
+	// Generate array documentation (slice literals)
+	if len(result.Arrays) > 0 {
+		sb.WriteString("\n## Collections\n\n")
+
+		// Sort array names for deterministic output
+		arrayNames := make([]string, 0, len(result.Arrays))
+		for name := range result.Arrays {
+			arrayNames = append(arrayNames, name)
+		}
+		sort.Strings(arrayNames)
+
+		for _, name := range arrayNames {
+			elements := result.Arrays[name]
+			sb.WriteString(fmt.Sprintf("### %s\n\n", name))
+			sb.WriteString("<table>\n<tr>\n<th>Go Source</th>\n<th>TypeScript</th>\n</tr>\n<tr>\n<td>\n\n```go\n")
+			sb.WriteString(fmt.Sprintf("var %s = []string{\n", name))
+			for _, elem := range elements {
+				sb.WriteString(fmt.Sprintf("  %s,\n", elem))
+			}
+			sb.WriteString("}\n```\n\n</td>\n<td>\n\n```typescript\n")
+			sb.WriteString(fmt.Sprintf("export const %s: string[] = [\n", name))
+			for i, elem := range elements {
+				sb.WriteString(fmt.Sprintf("  %s", elem))
+				if i < len(elements)-1 {
+					sb.WriteString(",\n")
+				} else {
+					sb.WriteString("\n")
+				}
+			}
+			sb.WriteString("];\n```\n\n</td>\n</tr>\n</table>\n\n")
+		}
+	}
+
+	// Generate map documentation (map literals)
+	if len(result.Maps) > 0 {
+		// Sort map names for deterministic output
+		mapNames := make([]string, 0, len(result.Maps))
+		for name := range result.Maps {
+			mapNames = append(mapNames, name)
+		}
+		sort.Strings(mapNames)
+
+		for _, name := range mapNames {
+			mapData := result.Maps[name]
+			sb.WriteString(fmt.Sprintf("### %s\n\n", name))
+			sb.WriteString("<table>\n<tr>\n<th>Go Source</th>\n<th>TypeScript</th>\n</tr>\n<tr>\n<td>\n\n```go\n")
+			sb.WriteString(fmt.Sprintf("var %s = map[string]string{\n", name))
+
+			// Sort map keys for deterministic output
+			keys := make([]string, 0, len(mapData))
+			for k := range mapData {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
+			for _, key := range keys {
+				value := mapData[key]
+				sb.WriteString(fmt.Sprintf("  %s: %s,\n", formatGoMapKeyWithConsts(key, result.Consts), formatGoMapValueWithConsts(value, result.Consts)))
+			}
+			sb.WriteString("}\n```\n\n</td>\n<td>\n\n```typescript\n")
+			sb.WriteString(fmt.Sprintf("export const %s: Record<string, string> = {\n", name))
+
+			for i, key := range keys {
+				value := mapData[key]
+				keyStr := formatTSMapKeyWithConsts(key, result.Consts)
+				valueStr := formatTSMapValueWithConsts(value, result.Consts)
+				sb.WriteString(fmt.Sprintf("  %s: %s", keyStr, valueStr))
+				if i < len(keys)-1 {
+					sb.WriteString(",\n")
+				} else {
+					sb.WriteString("\n")
+				}
+			}
+			sb.WriteString("};\n```\n\n</td>\n</tr>\n</table>\n\n")
+		}
+	}
+
 	return sb.String()
+}
+
+// formatGoMapKeyWithConsts formats a map key for Go markdown output
+func formatGoMapKeyWithConsts(key string, consts map[string]string) string {
+	if typegen.IsConstReference(key, consts) {
+		return key
+	}
+	return "\"" + key + "\""
+}
+
+// formatGoMapValueWithConsts formats a map value for Go markdown output
+func formatGoMapValueWithConsts(value string, consts map[string]string) string {
+	if typegen.IsConstReference(value, consts) {
+		return value
+	}
+	return "\"" + value + "\""
+}
+
+// formatTSMapKeyWithConsts formats a map key for TypeScript markdown output
+func formatTSMapKeyWithConsts(key string, consts map[string]string) string {
+	if typegen.IsConstReference(key, consts) {
+		return "[" + key + "]"
+	}
+	return "\"" + key + "\""
+}
+
+// formatTSMapValueWithConsts formats a map value for TypeScript markdown output
+func formatTSMapValueWithConsts(value string, consts map[string]string) string {
+	if typegen.IsConstReference(value, consts) {
+		return value
+	}
+	return "\"" + value + "\""
 }
 
 // formatFieldType converts an AST type expression to a string

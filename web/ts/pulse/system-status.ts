@@ -2,6 +2,8 @@
  * System Status Section - Daemon control
  */
 
+import { Pulse } from '@generated/sym.js';
+
 /**
  * Render System Status section
  */
@@ -11,7 +13,7 @@ export function renderSystemStatus(daemonStatus: any): string {
     return `
         <div class="pulse-daemon-status">
             <span class="pulse-daemon-badge ${running ? 'running' : 'stopped'}">
-                ${running ? '꩜ Running' : '꩜ Stopped'}
+                ${running ? `${Pulse} Running` : `${Pulse} Stopped`}
             </span>
             <button class="pulse-btn pulse-btn-sm" data-action="${running ? 'stop' : 'start'}-daemon">
                 ${running ? 'Stop' : 'Start'}

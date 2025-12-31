@@ -10,6 +10,7 @@
  */
 
 import { apiFetch } from './api.ts';
+import { AM } from '@generated/sym.js';
 
 interface ConfigSetting {
     key: string;
@@ -76,7 +77,7 @@ class ConfigPanel {
     getTemplate(): string {
         return `
             <div class="panel-header config-panel-header">
-                <h3 class="panel-title config-panel-title">≡ Configuration</h3>
+                <h3 class="panel-title config-panel-title">${AM} Configuration</h3>
                 <button class="panel-close config-panel-close" aria-label="Close">✕</button>
             </div>
 
