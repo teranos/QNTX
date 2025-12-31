@@ -15,6 +15,7 @@
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
+import { IX } from '../../types/generated/typescript/sym.js';
 
 // Extended Job type with frontend-specific fields
 interface Job extends BackendJob {
@@ -80,7 +81,7 @@ class JobListPanel {
     private getTemplate(): string {
         return `
             <div class="job-list-header">
-                <h3 class="job-list-title">⨳ Hixtory <span class="hixtory-count">(<span id="hixtory-count">0</span>)</span></h3>
+                <h3 class="job-list-title">${IX} Hixtory <span class="hixtory-count">(<span id="hixtory-count">0</span>)</span></h3>
                 <button class="job-list-close" aria-label="Close">✕</button>
             </div>
             <div class="job-list-content" id="job-list-content">
