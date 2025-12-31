@@ -2,7 +2,6 @@
 // Source: server
 
 import { Job } from './async';
-import { Execution } from './schedule';
 
 export interface ChildJobInfo {
   id: string;
