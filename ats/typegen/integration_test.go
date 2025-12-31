@@ -1,29 +1,26 @@
-package typegen
+package typegen_test
 
 import (
 	"strings"
 	"testing"
 
+	"github.com/teranos/QNTX/ats/typegen"
 	"github.com/teranos/QNTX/ats/typegen/typescript"
 )
 
 // Helper function to generate TypeScript file from Result
-func generateTypeScriptFile(result *Result) string {
-	// Convert to typescript.Result
-	tsResult := &typescript.Result{
-		Types:       result.Types,
-		PackageName: result.PackageName,
-	}
+func generateTypeScriptFile(result *typegen.Result) string {
 	gen := typescript.NewGenerator()
-	return gen.GenerateFile(tsResult)
+	return gen.GenerateFile(result)
 }
 
 func TestGenerateAs(t *testing.T) {
 	// Given: The ats/types package with the As struct
 	// When: We generate TypeScript from it
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/ats/types")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/ats/types", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	// Then: The output should contain a valid TypeScript interface for As
@@ -57,9 +54,10 @@ func TestGenerateAs(t *testing.T) {
 
 func TestGenerateAsCommand(t *testing.T) {
 	// The AsCommand struct should also be generated
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/ats/types")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/ats/types", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	asCommandTS, ok := result.Types["AsCommand"]
@@ -76,9 +74,10 @@ func TestGenerateAsCommand(t *testing.T) {
 
 func TestGenerateAxFilter(t *testing.T) {
 	// AxFilter has pointer types that should become optional
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/ats/types")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/ats/types", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	axFilterTS, ok := result.Types["AxFilter"]
@@ -96,9 +95,10 @@ func TestGenerateAxFilter(t *testing.T) {
 
 func TestGenerateOverFilter(t *testing.T) {
 	// OverFilter is a nested type referenced by AxFilter
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/ats/types")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/ats/types", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	overFilterTS, ok := result.Types["OverFilter"]
@@ -131,9 +131,10 @@ func keys(m map[string]string) []string {
 // TestGenerateFile_Output is a visual test to see the full generated output
 // Run with: go test -v -run TestGenerateFile_Output
 func TestGenerateFile_Output(t *testing.T) {
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/ats/types")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/ats/types", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	output := generateTypeScriptFile(result)
@@ -146,9 +147,10 @@ func TestGenerateFile_Output(t *testing.T) {
 
 func TestGenerateJob(t *testing.T) {
 	// Job is the core async job type from pulse/async
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/pulse/async", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	jobTS, ok := result.Types["Job"]
@@ -184,9 +186,10 @@ func TestGenerateJob(t *testing.T) {
 }
 
 func TestGenerateProgress(t *testing.T) {
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/pulse/async", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	progressTS, ok := result.Types["Progress"]
@@ -199,9 +202,10 @@ func TestGenerateProgress(t *testing.T) {
 }
 
 func TestGeneratePulseState(t *testing.T) {
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/pulse/async", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	pulseStateTS, ok := result.Types["PulseState"]
@@ -222,9 +226,10 @@ func TestGeneratePulseState(t *testing.T) {
 
 func TestGenerateServerTypes(t *testing.T) {
 	// Server types include WebSocket message types
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/server")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/server", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	// DaemonStatusMessage is a key WebSocket message type
@@ -241,9 +246,10 @@ func TestGenerateServerTypes(t *testing.T) {
 }
 
 func TestGenerateJobUpdateMessage(t *testing.T) {
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/server")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/server", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	// JobUpdateMessage references *async.Job from another package
@@ -261,9 +267,10 @@ func TestGenerateJobUpdateMessage(t *testing.T) {
 
 // TestGeneratePulseAsync_Output shows all generated types from pulse/async
 func TestGeneratePulseAsync_Output(t *testing.T) {
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/pulse/async", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	output := generateTypeScriptFile(result)
@@ -276,9 +283,10 @@ func TestGeneratePulseAsync_Output(t *testing.T) {
 
 func TestGenerateJobStatusEnum(t *testing.T) {
 	// JobStatus is a type alias with const values - should become a union type
-	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/pulse/async", gen)
 	if err != nil {
-		t.Fatalf("GenerateFromPackage failed: %v", err)
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
 	}
 
 	// Should have a type alias for JobStatus
