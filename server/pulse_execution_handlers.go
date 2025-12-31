@@ -15,7 +15,7 @@ import (
 
 // ListExecutionsResponse represents the response for listing job executions
 type ListExecutionsResponse struct {
-	Executions []schedule.Execution `json:"executions"`
+	Executions []schedule.Execution `json:"executions" tstype:"Execution[]"` // From pulse/schedule
 	Count      int                  `json:"count"`
 	Total      int                  `json:"total"`
 	HasMore    bool                 `json:"has_more"`
