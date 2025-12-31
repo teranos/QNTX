@@ -8,10 +8,7 @@
     "dev": "bun run dev-server.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:watch": "bun test --watch",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "test:watch": "bun test --watch"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "6.18.6",
@@ -24,7 +21,6 @@
     "@codemirror/view": "6.38.1",
     "@lezer/highlight": "1.2.3",
     "@tauri-apps/api": "^2.9.1",
-    "@tauri-apps/cli": "^2.9.6",
     "@types/d3": "7.4.3",
     "@types/jsdom": "27.0.0",
     "codemirror-languageserver": "1.17.0",
