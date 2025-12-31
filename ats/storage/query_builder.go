@@ -56,7 +56,7 @@ func (qb *queryBuilder) buildContextFilter(contexts []string) {
 
 	var contextClauses []string
 	for _, context := range contexts {
-		contextClauses = append(contextClauses, "contexts LIKE ? ESCAPE '\\'")
+		contextClauses = append(contextClauses, "contexts LIKE ? COLLATE NOCASE ESCAPE '\\'")
 		qb.args = append(qb.args, "%\""+escapeLikePattern(context)+"\"%")
 	}
 	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(contextClauses, " OR ")+")")

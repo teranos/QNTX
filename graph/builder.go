@@ -19,7 +19,9 @@ type AxGraphBuilder struct {
 // NewAxGraphBuilder creates a new Ax graph builder.
 // Node types are determined purely from attested node_type predicates.
 func NewAxGraphBuilder(db *sql.DB, verbosity int, logger *zap.SugaredLogger) (*AxGraphBuilder, error) {
-	executor := storage.NewExecutor(db)
+	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+		Logger: logger.Named("ax"),
+	})
 
 	return &AxGraphBuilder{
 		db:        db,
