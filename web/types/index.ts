@@ -5,7 +5,7 @@
  * 1. Generated types (from Go source via ats/typegen)
  * 2. Frontend-only types (UI state, D3 visualization, etc.)
  *
- * IMPORTANT: Types in generated/ are auto-generated. Do not edit them directly.
+ * IMPORTANT: Types in types/generated/typescript/ are auto-generated. Do not edit them directly.
  * Run `make types` to regenerate from Go source.
  */
 
@@ -13,8 +13,9 @@
 // Generated types (from Go source - single source of truth)
 // =============================================================================
 
-// Attestation types (ats/types)
+// All types are re-exported from the auto-generated barrel file
 export type {
+  // Attestation types (ats/types)
   As,
   AsCommand,
   AxDebug,
@@ -24,26 +25,19 @@ export type {
   CompletionItem,
   Conflict,
   OverFilter,
-} from './generated/types';
-
-// Async job types (pulse/async)
-// Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
-// Frontend code parses these with new Date(job.created_at)
-export type {
+  // Async job types (pulse/async)
+  // Job uses ISO 8601 date strings (e.g., "2024-01-15T10:30:00Z")
+  // Frontend code parses these with new Date(job.created_at)
   Job,
   JobStatus,
   Progress,
   PulseState,
-  BudgetStatus,
   ErrorCode,
   ErrorContext,
   QueueStats,
   SystemMetrics,
   WorkerPoolConfig,
-} from './generated/async';
-
-// Server/WebSocket message types (server)
-export type {
+  // Server/WebSocket message types (server)
   DaemonStatusMessage,
   JobUpdateMessage,
   LLMStreamMessage,
@@ -58,7 +52,7 @@ export type {
   PulseExecutionLogStreamMessage,
   StorageWarningMessage,
   ErrorResponse,
-} from './generated/server';
+} from '../../types/generated/typescript';
 
 // =============================================================================
 // Frontend-only types (not generated)

@@ -6,14 +6,14 @@ cli: ## Build QNTX CLI binary
 
 types: cli ## Generate TypeScript types from Go source
 	@echo "Generating TypeScript types..."
-	@./bin/qntx typegen --output web/types/generated/
-	@echo "✓ Types generated in web/types/generated/"
+	@./bin/qntx typegen --output types/generated/
+	@echo "✓ Types generated in types/generated/typescript/"
 
 types-check: cli ## Check if generated types are up to date
 	@echo "Checking TypeScript types..."
 	@mkdir -p tmp/types-check
 	@./bin/qntx typegen --output tmp/types-check/
-	@if diff -r tmp/types-check web/types/generated/ > /dev/null 2>&1; then \
+	@if diff -r tmp/types-check/typescript types/generated/typescript > /dev/null 2>&1; then \
 		echo "✓ Types are up to date"; \
 		rm -rf tmp/types-check; \
 	else \
