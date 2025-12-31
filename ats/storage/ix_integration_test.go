@@ -6,12 +6,11 @@
 // and will be extracted to QNTX when Pulse code is migrated.
 //
 // Dependencies needed:
-// - LogCapturingEmitter (from ExpGraph internal/ats/log_capturing_emitter.go)
+// - LogCapturingEmitter
 // - LogStore interface
 // - TaskLogStore implementation (currently in storage/log_store.go)
 //
-// Once Pulse extraction is complete, remove the build ignore tags and update the import:
-//   "github.com/sbvh-nl/expgraph/internal/ats" → "github.com/teranos/QNTX/ats/pulse" (or similar)
+// Once Pulse extraction is complete, remove the build ignore tags and update the imports.
 //
 // The tests themselves are valuable and should be preserved - they verify the
 // LogCapturingEmitter wrapper correctly logs to the database while passing through
@@ -28,7 +27,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/ix"
 	"github.com/teranos/QNTX/db"
-	"github.com/sbvh-nl/expgraph/internal/ats"
+	// TODO: Update import when LogCapturingEmitter is migrated to QNTX
 )
 
 // mockEmitter implements ProgressEmitter for testing
