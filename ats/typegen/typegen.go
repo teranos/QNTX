@@ -84,29 +84,90 @@ func GenerateFromPackage(importPath string) (*Result, error) {
 
 // processFile extracts type definitions from a Go AST file
 func processFile(file *ast.File, result *Result) {
+	// First pass: collect type aliases (e.g., type JobStatus string)
+	typeAliases := make(map[string]string) // typeName -> underlying type
+
+	// Second pass: collect const values for each type
+	constValues := make(map[string][]string) // typeName -> []values
+
 	ast.Inspect(file, func(n ast.Node) bool {
-		typeSpec, ok := n.(*ast.TypeSpec)
-		if !ok {
-			return true
+		switch node := n.(type) {
+		case *ast.GenDecl:
+			if node.Tok == token.CONST {
+				// Process const block
+				processConstBlock(node, constValues)
+			}
+		case *ast.TypeSpec:
+			// Only process exported types
+			if !node.Name.IsExported() {
+				return true
+			}
+
+			switch t := node.Type.(type) {
+			case *ast.StructType:
+				// Generate TypeScript interface
+				ts := generateInterface(node.Name.Name, t)
+				result.Types[node.Name.Name] = ts
+
+			case *ast.Ident:
+				// Type alias like: type JobStatus string
+				typeAliases[node.Name.Name] = t.Name
+			}
 		}
-
-		// Only process exported types
-		if !typeSpec.Name.IsExported() {
-			return true
-		}
-
-		// Only process struct types
-		structType, ok := typeSpec.Type.(*ast.StructType)
-		if !ok {
-			return true
-		}
-
-		// Generate TypeScript interface
-		ts := generateInterface(typeSpec.Name.Name, structType)
-		result.Types[typeSpec.Name.Name] = ts
-
 		return true
 	})
+
+	// Generate union types for type aliases that have const values
+	for typeName, underlyingType := range typeAliases {
+		values, hasConsts := constValues[typeName]
+		if hasConsts && len(values) > 0 && underlyingType == "string" {
+			// Generate union type from const values
+			ts := generateUnionType(typeName, values)
+			result.Types[typeName] = ts
+		}
+	}
+}
+
+// processConstBlock extracts const values grouped by their type
+func processConstBlock(decl *ast.GenDecl, constValues map[string][]string) {
+	var currentType string
+
+	for _, spec := range decl.Specs {
+		valueSpec, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+
+		// Get the type of this const
+		if valueSpec.Type != nil {
+			if ident, ok := valueSpec.Type.(*ast.Ident); ok {
+				currentType = ident.Name
+			}
+		}
+
+		// Skip if we don't know the type
+		if currentType == "" {
+			continue
+		}
+
+		// Extract string literal values
+		for _, value := range valueSpec.Values {
+			if lit, ok := value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+				// Remove quotes from string literal
+				strValue := strings.Trim(lit.Value, `"`)
+				constValues[currentType] = append(constValues[currentType], strValue)
+			}
+		}
+	}
+}
+
+// generateUnionType creates a TypeScript union type from const values
+func generateUnionType(name string, values []string) string {
+	var parts []string
+	for _, v := range values {
+		parts = append(parts, fmt.Sprintf("'%s'", v))
+	}
+	return fmt.Sprintf("export type %s = %s;", name, strings.Join(parts, " | "))
 }
 
 // generateInterface creates a TypeScript interface from a Go struct
