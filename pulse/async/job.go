@@ -10,6 +10,7 @@ import (
 )
 
 // JobStatus represents the current state of a job
+// @ts-export
 type JobStatus string
 
 const (
@@ -33,6 +34,7 @@ func IsValidStatus(s string) bool {
 }
 
 // PulseState represents the pulse rate limiting and budget state for a job
+// @ts-export
 type PulseState struct {
 	CallsThisMinute int     `json:"calls_this_minute"`
 	CallsRemaining  int     `json:"calls_remaining"`
@@ -44,6 +46,7 @@ type PulseState struct {
 }
 
 // Progress represents job progress information
+// @ts-export
 type Progress struct {
 	Current int `json:"current"` // Completed operations
 	Total   int `json:"total"`   // Total operations
@@ -64,6 +67,7 @@ func (p Progress) Percentage() float64 {
 // - Domain packages provide handlers and payloads
 // - HandlerName identifies which handler executes the job
 // - Payload contains handler-specific data (domain logic controls structure)
+// @ts-export
 type Job struct {
 	ID           string          `json:"id"`
 	HandlerName  string          `json:"handler_name"`      // "data.batch-import", "bio.sequence-align"

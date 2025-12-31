@@ -34,6 +34,10 @@ func Generate(goSource string) (string, error) {
 		return "", nil
 	}
 
+	// Find string type aliases and their const values
+	stringAliases := findStringTypeAliases(file, exportedTypes)
+	constValues := findConstValuesForTypes(file, stringAliases)
+
 	var result strings.Builder
 	first := true
 
@@ -54,21 +58,109 @@ func Generate(goSource string) (string, error) {
 				continue
 			}
 
-			structType, ok := typeSpec.Type.(*ast.StructType)
-			if !ok {
+			// Check if it's a struct
+			if structType, ok := typeSpec.Type.(*ast.StructType); ok {
+				if !first {
+					result.WriteString("\n\n")
+				}
+				first = false
+				result.WriteString(generateInterface(typeSpec.Name.Name, structType))
 				continue
 			}
 
-			if !first {
-				result.WriteString("\n\n")
+			// Check if it's a string type alias with const values
+			if values, ok := constValues[typeSpec.Name.Name]; ok && len(values) > 0 {
+				if !first {
+					result.WriteString("\n\n")
+				}
+				first = false
+				result.WriteString(generateStringUnion(typeSpec.Name.Name, values))
 			}
-			first = false
-
-			result.WriteString(generateInterface(typeSpec.Name.Name, structType))
 		}
 	}
 
 	return result.String(), nil
+}
+
+// findStringTypeAliases finds type aliases that are based on string
+func findStringTypeAliases(file *ast.File, exportedTypes map[string]bool) map[string]bool {
+	aliases := make(map[string]bool)
+
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			if !exportedTypes[typeSpec.Name.Name] {
+				continue
+			}
+
+			// Check if the underlying type is string
+			if ident, ok := typeSpec.Type.(*ast.Ident); ok && ident.Name == "string" {
+				aliases[typeSpec.Name.Name] = true
+			}
+		}
+	}
+
+	return aliases
+}
+
+// findConstValuesForTypes finds const values for string type aliases
+func findConstValuesForTypes(file *ast.File, typeNames map[string]bool) map[string][]string {
+	values := make(map[string][]string)
+
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.CONST {
+			continue
+		}
+
+		for _, spec := range genDecl.Specs {
+			valueSpec, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+
+			// Check if this const has a type that matches our type aliases
+			var typeName string
+			if valueSpec.Type != nil {
+				if ident, ok := valueSpec.Type.(*ast.Ident); ok {
+					typeName = ident.Name
+				}
+			}
+
+			if typeName == "" || !typeNames[typeName] {
+				continue
+			}
+
+			// Extract the string literal values
+			for _, val := range valueSpec.Values {
+				if lit, ok := val.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					// Remove quotes from the string literal
+					strVal := strings.Trim(lit.Value, "\"")
+					values[typeName] = append(values[typeName], strVal)
+				}
+			}
+		}
+	}
+
+	return values
+}
+
+// generateStringUnion generates a TypeScript string literal union type
+func generateStringUnion(name string, values []string) string {
+	quoted := make([]string, len(values))
+	for i, v := range values {
+		quoted[i] = fmt.Sprintf("\"%s\"", v)
+	}
+	return fmt.Sprintf("export type %s = %s;", name, strings.Join(quoted, " | "))
 }
 
 // findExportedTypes finds all type names that have @ts-export annotation

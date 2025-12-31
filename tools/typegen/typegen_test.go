@@ -193,6 +193,20 @@ type MessageWithOptionalNonPointers struct {
   count?: number;
 }`,
 		},
+		{
+			name: "string type alias with const values",
+			goSource: `package example
+
+// @ts-export
+type Status string
+
+const (
+	StatusPending   Status = "pending"
+	StatusActive    Status = "active"
+	StatusCompleted Status = "completed"
+)`,
+			wantTS: `export type Status = "pending" | "active" | "completed";`,
+		},
 	}
 
 	for _, tt := range tests {
