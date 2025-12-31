@@ -14,6 +14,7 @@ import {
   resumeScheduledJob,
   deleteScheduledJob,
 } from "./api.ts";
+import { Pulse } from "../../../types/generated/typescript/sym.js";
 
 export interface SchedulingControlsOptions {
   /**
@@ -94,7 +95,7 @@ function renderExistingJobControls(
 
   const icon = document.createElement('span');
   icon.className = 'pulse-icon';
-  icon.textContent = '꩜';
+  icon.textContent = Pulse;
 
   const interval = document.createElement('span');
   interval.className = 'pulse-interval';
@@ -239,7 +240,7 @@ function renderAddScheduleButton(
 
   const icon = document.createElement('span');
   icon.className = 'pulse-icon';
-  icon.textContent = '꩜';
+  icon.textContent = Pulse;
 
   addBtn.appendChild(icon);
   addBtn.appendChild(document.createTextNode(' Add Schedule'));
