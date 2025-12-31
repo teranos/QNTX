@@ -13,13 +13,14 @@
  */
 
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
-import type { Job as CoreJob } from '../types/core';
+import type { Job as BackendJob } from '../types/generated/async';
 import { toast } from './toast';
 
-interface Job extends CoreJob {
+// Extended Job type with frontend-specific fields
+interface Job extends BackendJob {
     cost_usd?: number;
-    source?: string;
     _graph_query?: string;
+    type?: string;  // Legacy alias for handler_name
     metadata?: {
         total_operations?: number;
         completed_operations?: number;
@@ -336,8 +337,9 @@ class JobListPanel {
         }
 
         // Get all jobs, sort by created_at descending (most recent first)
+        // created_at is ISO 8601 string, parse to Date for comparison
         const allJobs = Array.from(this.jobs.values())
-            .sort((a, b) => b.created_at - a.created_at);
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         // Update count
         if (countSpan) {
@@ -397,11 +399,12 @@ class JobListPanel {
         if (job.metadata?.command) return job.metadata.command;
         if (job.metadata?.query) return job.metadata.query;
 
-        // Fallback: construct from source and type
+        // Fallback: construct from source and handler_name
         if (job.source) return job.source;
 
-        // Last resort: use job type
-        return `${job.type} (${job.id.substring(0, 8)})`;
+        // Last resort: use handler_name (or legacy type alias)
+        const handlerName = job.handler_name || job.type || 'Unknown';
+        return `${handlerName} (${job.id.substring(0, 8)})`;
     }
 
     /**
@@ -415,11 +418,12 @@ class JobListPanel {
     }
 
     /**
-     * Format timestamp as relative time (e.g., "5m ago")
+     * Format ISO 8601 timestamp as relative time (e.g., "5m ago")
      */
-    private formatRelativeTime(timestamp: number): string {
+    private formatRelativeTime(timestamp: string): string {
+        const date = new Date(timestamp);
         const now = Date.now();
-        const diff = now - timestamp;
+        const diff = now - date.getTime();
         const seconds = Math.floor(diff / 1000);
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);

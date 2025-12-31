@@ -3,7 +3,8 @@
  * Defines all message types exchanged between frontend and backend
  */
 
-import { GraphData, Job } from './core';
+import { GraphData } from './core';
+import { Job } from './generated/async';
 
 // ============================================================================
 // Message Type Discriminators
