@@ -41,8 +41,29 @@ var TypeMapping = map[string]string{
 	"float64":                "number",
 	"bool":                   "boolean",
 	"time.Time":              "string",
+	"time.Duration":          "number",
 	"json.RawMessage":        "unknown",
 	"map[string]interface{}": "Record<string, unknown>",
+	// SQL nullable types - map to TypeScript optional unions
+	"sql.NullString": "string | null",
+	"sql.NullInt64":  "number | null",
+	"sql.NullInt32":  "number | null",
+	"sql.NullBool":   "boolean | null",
+	"sql.NullTime":   "string | null",
+	"NullString":     "string | null",
+	"NullInt64":      "number | null",
+	"NullTime":       "string | null",
+}
+
+// ExcludedTypes are types that should not be generated (internal implementation details)
+var ExcludedTypes = map[string]bool{
+	"JobScanArgs":     true, // Database scan helper
+	"HandlerRegistry": true, // Internal registry
+	"Store":           true, // Database store interface
+	"Queue":           true, // Internal queue
+	"WorkerPool":      true, // Internal pool
+	"RegistryExecutor": true,
+	"JobProgressEmitter": true,
 }
 
 // GenerateFromPackage parses a Go package and generates TypeScript interfaces
@@ -105,6 +126,10 @@ func processFile(file *ast.File, result *Result) {
 
 			switch t := node.Type.(type) {
 			case *ast.StructType:
+				// Skip excluded types (internal implementation details)
+				if ExcludedTypes[node.Name.Name] {
+					return true
+				}
 				// Generate TypeScript interface
 				ts := generateInterface(node.Name.Name, t)
 				result.Types[node.Name.Name] = ts
