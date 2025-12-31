@@ -39,7 +39,7 @@ func NewExecutor(db *sql.DB) *ax.AxExecutor {
 // The executor is created with:
 //   - SQLQueryStore (with optional QueryExpander for semantic queries)
 //   - AliasStore and Resolver for name normalization
-//   - Smart classification enabled (unless opts.UseBasic is true)
+//   - Smart classification enabled
 //   - Custom EntityResolver (if provided, otherwise NoOpEntityResolver)
 //   - Custom QueryExpander (if provided, otherwise NoOpQueryExpander)
 //

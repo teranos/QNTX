@@ -21,7 +21,6 @@ type AxExecutor struct {
 	aliasResolver  *alias.Resolver
 	entityResolver ats.EntityResolver
 	queryExpander  ats.QueryExpander
-	useAdvanced    bool
 	logger         *zap.SugaredLogger
 }
 
@@ -35,10 +34,9 @@ func NewAxExecutor(queryStore ats.AttestationQueryStore, aliasResolver *alias.Re
 
 // AxExecutorOptions provides optional configuration for AxExecutor.
 type AxExecutorOptions struct {
-	EntityResolver ats.EntityResolver   // Optional entity ID resolution (default: NoOpEntityResolver)
-	QueryExpander  ats.QueryExpander    // Optional query expansion (default: NoOpQueryExpander)
-	UseBasic       bool                 // If true, disables smart classification
-	Logger         *zap.SugaredLogger   // Optional logger for debug output (default: nil, no logging)
+	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
+	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
+	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
 }
 
 // NewAxExecutorWithOptions creates an executor with custom options.
@@ -51,30 +49,20 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 		opts.QueryExpander = &ats.NoOpQueryExpander{}
 	}
 
-	// Create classifier unless basic mode requested
-	var classifier *classification.SmartClassifier
-	useAdvanced := !opts.UseBasic
-	if useAdvanced {
-		config := classification.DefaultTemporalConfig()
-		classifier = classification.NewSmartClassifier(config)
-	}
-
 	return &AxExecutor{
 		queryStore:     queryStore,
 		fuzzy:          NewFuzzyMatcher(),
-		classifier:     classifier,
+		classifier:     classification.NewSmartClassifier(classification.DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,
 		queryExpander:  opts.QueryExpander,
-		useAdvanced:    useAdvanced,
 		logger:         opts.Logger,
 	}
 }
 
-// EnableAdvancedClassification enables smart classification with custom config
-func (ae *AxExecutor) EnableAdvancedClassification(config classification.TemporalConfig) {
+// SetClassificationConfig replaces the classifier with one using the provided config
+func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConfig) {
 	ae.classifier = classification.NewSmartClassifier(config)
-	ae.useAdvanced = true
 }
 
 // ExecuteAsk executes an ask query and returns results
@@ -147,13 +135,8 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	// 5. Apply cartesian expansion
 	claims := ats.ExpandCartesianClaims(attestations)
 
-	// 6. Conflict detection (basic or advanced)
-	if ae.useAdvanced && ae.classifier != nil {
-		result.Conflicts, result.Attestations = ae.executeAdvancedClassification(claims)
-	} else {
-		result.Conflicts = DetectBasicConflicts(claims)
-		result.Attestations = ats.ConvertClaimsToAttestations(claims)
-	}
+	// 6. Conflict detection with smart classification
+	result.Conflicts, result.Attestations = ae.executeAdvancedClassification(claims)
 
 	// 7. Generate summary
 	result.Summary = ae.generateSummary(result.Attestations)
