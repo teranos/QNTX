@@ -203,7 +203,7 @@ func (p *GitIxProcessor) processBranches(repo *git.Repository) ([]GitBranchResul
 		attestationCount++
 
 		if !p.dryRun {
-			err := p.storeAttestation([]string{branchName}, []string{"node_type"}, []string{"branch"}, nil, time.Now())
+			err := p.storeAttestation([]string{branchName}, []string{"node_type"}, []string{types.Branch.Name}, nil, time.Now())
 			if err != nil {
 				return fmt.Errorf("failed to store branch node_type attestation: %w", err)
 			}
@@ -341,7 +341,8 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	}
 
 	if !p.dryRun {
-		err := p.storeAttestation([]string{shortHash}, []string{"is_commit"}, []string{shortHash}, attrs, timestamp)
+		// Context "commit_metadata" groups all commit properties (is_commit, has_message, committed_at)
+		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"is_commit"}, []string{"commit_metadata"}, attrs, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store commit attestation: %w", err)
 		}
@@ -353,7 +354,7 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	attestationCount++
 
 	if !p.dryRun {
-		err := p.storeAttestation([]string{shortHash}, []string{"node_type"}, []string{"commit"}, nil, timestamp)
+		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"node_type"}, []string{types.Commit.Name}, nil, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store node_type attestation: %w", err)
 		}
@@ -373,19 +374,21 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	}
 
 	if !p.dryRun {
-		err := p.storeAttestation([]string{shortHash}, []string{"authored_by"}, []string{authorName}, nil, timestamp)
+		// Context "authorship" groups all author-related attestations
+		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"authored_by"}, []string{"authorship"}, nil, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store author attestation: %w", err)
 		}
 	}
 
 	// Attestation 2b: author node_type (explicit type for author node)
+	// Use commit hash as actor to avoid bounded storage issues (many commits per author)
 	authorTypeAttestation := fmt.Sprintf("as %s node_type author", authorName)
 	attestations = append(attestations, authorTypeAttestation)
 	attestationCount++
 
 	if !p.dryRun {
-		err := p.storeAttestation([]string{authorName}, []string{"node_type"}, []string{"author"}, nil, timestamp)
+		err := p.storeAttestationWithActor(shortHash, []string{authorName}, []string{"node_type"}, []string{types.Author.Name}, nil, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store author node_type attestation: %w", err)
 		}
@@ -405,7 +408,8 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	}
 
 	if !p.dryRun {
-		err := p.storeAttestation([]string{shortHash}, []string{"has_message"}, []string{message}, nil, timestamp)
+		// Context "commit_metadata" groups all commit properties
+		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"has_message"}, []string{"commit_metadata"}, nil, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store message attestation: %w", err)
 		}
@@ -426,7 +430,8 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	}
 
 	if !p.dryRun {
-		err := p.storeAttestation([]string{shortHash}, []string{"committed_at"}, []string{timestampStr}, nil, timestamp)
+		// Context "commit_metadata" groups all commit properties
+		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"committed_at"}, []string{"commit_metadata"}, nil, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store committed_at attestation: %w", err)
 		}
@@ -440,89 +445,51 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 		attestationCount++
 
 		if !p.dryRun {
-			err := p.storeAttestation([]string{shortHash}, []string{"is_child_of"}, []string{shortParentHash}, nil, timestamp)
+			// Context "lineage" groups all parent/child relationships
+			err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"is_child_of"}, []string{"lineage"}, nil, timestamp)
 			if err != nil {
 				return nil, fmt.Errorf("failed to store parent attestation: %w", err)
 			}
 		}
 	}
 
-	// Attestation 5+: file relationships (which files this commit modified)
-	// FIXED: Inverted to file→commit to avoid bounded storage limits (64 contexts/actor)
-	// Old: commit modifies file (breaks on commits with 65+ files)
-	// New: file modified_in commit (commit is unique context, no limit)
+	// Attestation 5+: package relationships (which packages this commit modified)
+	// Package-level tracking with semantic contexts to avoid bounded storage limits
+	// Context "code_changes" is shared across all commits, preventing context explosion
 	stats, err := commit.Stats()
 	if err == nil { // Stats might fail for some commits (e.g., merge commits with conflicts)
-		fileCount := len(stats)
-		if p.verbosity >= 4 && fileCount > 0 {
-			fmt.Printf("    %s↳%s %sProcessing %d files...%s\n",
+		// Extract modified packages from file stats
+		modifiedPackages := extractModifiedPackages(commit, stats)
+		packageCount := len(modifiedPackages)
+
+		if p.verbosity >= 4 && packageCount > 0 {
+			fmt.Printf("    %s↳%s %sProcessing %d packages...%s\n",
 				colorMagenta, colorReset,
-				colorCyan, fileCount, colorReset)
+				colorCyan, packageCount, colorReset)
 		}
 
-		for fileIdx, fileStat := range stats {
-			fileName := fileStat.Name
-			fileAttestation := fmt.Sprintf("as %s modified_in %s", fileName, shortHash)
-			attestations = append(attestations, fileAttestation)
+		for pkgIdx, pkgName := range modifiedPackages {
+			packageAttestation := fmt.Sprintf("as %s modified_in %s", pkgName, shortHash)
+			attestations = append(attestations, packageAttestation)
 			attestationCount++
 
-			// Show file progress at very high verbosity
+			// Show package progress at very high verbosity
 			if p.verbosity >= 4 {
 				fmt.Printf("      %s[%d/%d]%s %s%s%s %smodified_in%s %s%s%s\n",
-					colorGray, fileIdx+1, fileCount, colorReset,
-					colorCyan, fileName, colorReset,
+					colorGray, pkgIdx+1, packageCount, colorReset,
+					colorCyan, pkgName, colorReset,
 					colorMagenta, colorReset,
 					colorYellow, shortHash, colorReset)
 			}
 
 			if !p.dryRun {
-				// Store file→commit modification relationship
-				// Subject: file, Predicate: modified_in, Context: commit
-				// This avoids bounded storage: each commit is a unique context
-				err := p.storeAttestation([]string{fileName}, []string{"modified_in"}, []string{shortHash}, nil, timestamp)
+				// Store package→commit modification relationship
+				// Actor: commit hash, Subject: package, Predicate: modified_in
+				// Context: "code_changes" (semantic context, not instance data)
+				// This ensures all commits share the same context type
+				err := p.storeAttestationWithActor(shortHash, []string{pkgName}, []string{"modified_in"}, []string{"code_changes"}, nil, timestamp)
 				if err != nil {
-					return nil, fmt.Errorf("failed to store file attestation: %w", err)
-				}
-
-				// Store directory hierarchy: file → directories
-				// e.g., "internal/ixgest/git/ingest.go" → "internal/ixgest/git/" → "internal/ixgest/" → "internal/"
-				dirs := extractDirectories(fileName)
-				for i, dir := range dirs {
-					if i == 0 {
-						// Link file to immediate parent directory
-						err := p.storeAttestation([]string{fileName}, []string{"in_directory"}, []string{dir}, nil, timestamp)
-						if err != nil {
-							return nil, fmt.Errorf("failed to store file→directory attestation: %w", err)
-						}
-					} else {
-						// Link parent directory to grandparent directory
-						err := p.storeAttestation([]string{dirs[i-1]}, []string{"in_directory"}, []string{dir}, nil, timestamp)
-						if err != nil {
-							return nil, fmt.Errorf("failed to store directory→directory attestation: %w", err)
-						}
-					}
-				}
-
-				// Parse Go files to extract package and import relationships
-				if strings.HasSuffix(fileName, ".go") && !strings.Contains(fileName, "_test.go") {
-					pkgInfo := p.parseGoFile(commit, fileName)
-					if pkgInfo != nil {
-						// Attestation: file declares_package pkg
-						if pkgInfo.PackageName != "" {
-							err := p.storeAttestation([]string{fileName}, []string{"declares_package"}, []string{pkgInfo.PackageName}, nil, timestamp)
-							if err != nil {
-								return nil, fmt.Errorf("failed to store package attestation: %w", err)
-							}
-						}
-
-						// Attestation: file imports pkg (for each import)
-						for _, importPath := range pkgInfo.Imports {
-							err := p.storeAttestation([]string{fileName}, []string{"imports"}, []string{importPath}, nil, timestamp)
-							if err != nil {
-								return nil, fmt.Errorf("failed to store import attestation: %w", err)
-							}
-						}
-					}
+					return nil, fmt.Errorf("failed to store package attestation: %w", err)
 				}
 			}
 		}
@@ -540,9 +507,9 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	}, nil
 }
 
-// storeAttestation stores a git attestation using ASID-as-actor pattern (self-certifying).
-// For custom actors (e.g., type definitions), use storeTypeDefinition() or call store.CreateAttestation() directly.
-func (p *GitIxProcessor) storeAttestation(subjects []string, predicates []string, contexts []string, attrs map[string]interface{}, timestamp time.Time) error {
+// storeAttestation stores a git attestation with an explicit actor.
+// The actor parameter allows context-aware actor selection (e.g., commit hash for commit-related attestations).
+func (p *GitIxProcessor) storeAttestationWithActor(actor string, subjects []string, predicates []string, contexts []string, attrs map[string]interface{}, timestamp time.Time) error {
 	// Generate attestation ID using first elements of each array (or empty string if array is empty)
 	subject := ""
 	if len(subjects) > 0 {
@@ -557,20 +524,21 @@ func (p *GitIxProcessor) storeAttestation(subjects []string, predicates []string
 		context = contexts[0]
 	}
 
-	// Generate ASID with empty actor seed for self-certification
-	asid, err := id.GenerateASIDWithVanity(subject, predicate, context, "")
+	// Generate ASID with provided actor
+	asid, err := id.GenerateASIDWithVanity(subject, predicate, context, actor)
 	if err != nil {
 		return fmt.Errorf("failed to generate ASID: %w", err)
 	}
 
-	// Create attestation with self-certifying actor (ASID vouches for itself)
-	// This avoids bounded storage actor limits (64 contexts per actor)
+	// Create attestation with specified actor
+	// Bounded storage: Each commit is its own actor with ~10 contexts (is_commit, node_type, authored_by, etc.)
+	// This fits well within the 64-contexts-per-actor limit
 	attestation := &atstypes.As{
 		ID:         asid,
 		Subjects:   subjects,
 		Predicates: predicates,
 		Contexts:   contexts,
-		Actors:     []string{asid}, // Self-referential: attestation IS its own actor
+		Actors:     []string{actor},
 		Timestamp:  timestamp,
 		Source:     "ixgest-git",
 		Attributes: attrs,
@@ -585,6 +553,11 @@ func (p *GitIxProcessor) storeAttestation(subjects []string, predicates []string
 	return nil
 }
 
+// storeAttestation stores a git attestation using the default actor (backward compatibility wrapper)
+func (p *GitIxProcessor) storeAttestation(subjects []string, predicates []string, contexts []string, attrs map[string]interface{}, timestamp time.Time) error {
+	return p.storeAttestationWithActor(p.defaultActor, subjects, predicates, contexts, attrs, timestamp)
+}
+
 // truncateMessage truncates a commit message to a reasonable length for display
 func truncateMessage(message string) string {
 	if len(message) > 80 {
@@ -593,19 +566,51 @@ func truncateMessage(message string) string {
 	return message
 }
 
-// extractDirectories extracts the directory hierarchy from a file path.
-// Example: "internal/ixgest/git/ingest.go" → ["internal/ixgest/git/", "internal/ixgest/", "internal/"]
-func extractDirectories(filePath string) []string {
-	var dirs []string
-	parts := strings.Split(filePath, "/")
+// extractModifiedPackages extracts unique Go packages modified in a commit.
+// It parses Go files to determine package names and deduplicates them.
+// For non-Go files, uses directory-based heuristics.
+func extractModifiedPackages(commit *object.Commit, stats object.FileStats) []string {
+	packageSet := make(map[string]bool)
+	var packages []string
 
-	// Build directory paths from most specific to most general
-	for i := len(parts) - 1; i > 0; i-- {
-		dir := strings.Join(parts[:i], "/") + "/"
-		dirs = append(dirs, dir)
+	for _, fileStat := range stats {
+		fileName := fileStat.Name
+
+		// For Go files, parse to get actual package name
+		if strings.HasSuffix(fileName, ".go") {
+			pkgInfo := parseGoFileFromCommit(commit, fileName)
+			if pkgInfo != nil && pkgInfo.PackageName != "" {
+				// Use directory path as package identifier (more stable than package name)
+				// e.g., "internal/ixgest/git/ingest.go" → "internal/ixgest/git"
+				dir := extractPackageDir(fileName)
+				if dir != "" && !packageSet[dir] {
+					packageSet[dir] = true
+					packages = append(packages, dir)
+				}
+			}
+		} else {
+			// For non-Go files, use directory as package identifier
+			// e.g., "docs/README.md" → "docs"
+			dir := extractPackageDir(fileName)
+			if dir != "" && !packageSet[dir] {
+				packageSet[dir] = true
+				packages = append(packages, dir)
+			}
+		}
 	}
 
-	return dirs
+	return packages
+}
+
+// extractPackageDir extracts the directory containing a file as package identifier.
+// Example: "internal/ixgest/git/ingest.go" → "internal/ixgest/git"
+//          "README.md" → "." (root)
+func extractPackageDir(filePath string) string {
+	parts := strings.Split(filePath, "/")
+	if len(parts) == 1 {
+		return "." // Root directory files
+	}
+	return strings.Join(parts[:len(parts)-1], "/")
 }
 
 // GoPackageInfo contains parsed Go package information
@@ -614,8 +619,8 @@ type GoPackageInfo struct {
 	Imports     []string
 }
 
-// parseGoFile parses a Go file from a commit and extracts package and import information
-func (p *GitIxProcessor) parseGoFile(commit *object.Commit, filePath string) *GoPackageInfo {
+// parseGoFileFromCommit parses a Go file from a commit and extracts package and import information
+func parseGoFileFromCommit(commit *object.Commit, filePath string) *GoPackageInfo {
 	// Get the file from the commit tree
 	tree, err := commit.Tree()
 	if err != nil {
