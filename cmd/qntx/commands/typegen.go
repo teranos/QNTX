@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,6 +15,7 @@ import (
 var defaultPackages = []string{
 	"github.com/teranos/QNTX/ats/types",
 	"github.com/teranos/QNTX/pulse/async",
+	"github.com/teranos/QNTX/pulse/budget",
 	"github.com/teranos/QNTX/pulse/schedule",
 	"github.com/teranos/QNTX/server",
 }
@@ -133,15 +134,38 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 // findRequiredImports scans TypeScript output for type references from other packages
 func findRequiredImports(output, currentPackage string, typeToPackage map[string]string) map[string][]string {
 	imports := make(map[string][]string) // packageName -> []typeName
-
-	// Pattern to find type references in the output
-	// Matches: `: TypeName`, `: TypeName[]`, `: TypeName | null`, etc.
-	typeRefPattern := regexp.MustCompile(`:\s*([A-Z][A-Za-z0-9]*)(?:\[\])?(?:\s*\|\s*null)?`)
-	matches := typeRefPattern.FindAllStringSubmatch(output, -1)
-
 	seen := make(map[string]bool)
-	for _, match := range matches {
-		typeName := match[1]
+
+	// Parse line by line to find type annotations
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		// Look for ": TypeName" patterns in TypeScript interface fields
+		colonIdx := strings.Index(line, ":")
+		if colonIdx == -1 {
+			continue
+		}
+
+		// Extract everything after the colon
+		afterColon := strings.TrimSpace(line[colonIdx+1:])
+
+		// Remove array suffix if present: "TypeName[]" -> "TypeName"
+		afterColon = strings.TrimSuffix(afterColon, "[]")
+
+		// Remove nullable union if present: "TypeName | null" -> "TypeName"
+		if idx := strings.Index(afterColon, " | null"); idx != -1 {
+			afterColon = afterColon[:idx]
+		}
+
+		// Remove semicolon: "TypeName;" -> "TypeName"
+		afterColon = strings.TrimSuffix(strings.TrimSpace(afterColon), ";")
+
+		// Check if it's a PascalCase type name (starts with uppercase)
+		if len(afterColon) == 0 || afterColon[0] < 'A' || afterColon[0] > 'Z' {
+			continue
+		}
+
+		typeName := afterColon
+
 		// Skip if already seen or if it's a built-in type
 		if seen[typeName] || isBuiltinType(typeName) {
 			continue
@@ -171,9 +195,18 @@ func addImportsToOutput(output string, imports map[string][]string) string {
 		return output
 	}
 
-	// Build import statements
+	// Sort package names for deterministic output
+	var packageNames []string
+	for pkg := range imports {
+		packageNames = append(packageNames, pkg)
+	}
+	sort.Strings(packageNames)
+
+	// Build import statements with sorted packages and types
 	var importLines []string
-	for pkg, types := range imports {
+	for _, pkg := range packageNames {
+		types := imports[pkg]
+		sort.Strings(types) // Sort type names within each import
 		importLines = append(importLines, fmt.Sprintf("import { %s } from './%s';", strings.Join(types, ", "), pkg))
 	}
 
