@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "identifier": "nl.sbvh.qntx",
   "build": {
-    "beforeDevCommand": "bun run dev",
-    "beforeBuildCommand": "bun run build",
+    "beforeDevCommand": "cd .. && bun run dev",
+    "beforeBuildCommand": "cd .. && bun run build",
     "devUrl": "http://localhost:8820",
     "frontendDist": "../../internal/server/dist"
   },
