@@ -7,23 +7,16 @@
  * Go types are the source of truth - run `make typegen` to regenerate.
  */
 
-import { GraphData, Job } from './core';
+import { GraphData } from './core';
 
 // Re-export all Go-generated types
-export {
-  // WebSocket messages
+export type {
+  // WebSocket messages (base types from Go - TS adds discriminated union refinement)
   QueryMessage,
   ProgressMessage,
   StatsMessage,
   CompleteMessage,
   UsageUpdateMessage,
-  DaemonStatusMessage,
-  LLMStreamMessage,
-  PulseExecutionStartedMessage,
-  PulseExecutionFailedMessage,
-  PulseExecutionCompletedMessage,
-  PulseExecutionLogStreamMessage,
-  StorageWarningMessage,
   // Pulse API types
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
@@ -37,18 +30,49 @@ export {
   TaskLogsResponse,
   ChildJobInfo,
   JobChildrenResponse,
+  // Async job types
+  Job,
+  JobStatus,
+  Progress,
+  PulseState,
 } from './generated';
 
-// Import for use in this file
+// Import raw Go types to extend with TypeScript discriminated unions
 import type {
-  DaemonStatusMessage,
-  LLMStreamMessage,
-  PulseExecutionStartedMessage,
-  PulseExecutionFailedMessage,
-  PulseExecutionCompletedMessage,
-  PulseExecutionLogStreamMessage,
-  StorageWarningMessage,
+  DaemonStatusMessage as DaemonStatusMessageBase,
+  LLMStreamMessage as LLMStreamMessageBase,
+  PulseExecutionStartedMessage as PulseExecutionStartedMessageBase,
+  PulseExecutionFailedMessage as PulseExecutionFailedMessageBase,
+  PulseExecutionCompletedMessage as PulseExecutionCompletedMessageBase,
+  PulseExecutionLogStreamMessage as PulseExecutionLogStreamMessageBase,
+  StorageWarningMessage as StorageWarningMessageBase,
 } from './generated';
+
+// Re-export with refined type field for discriminated union support
+export interface DaemonStatusMessage extends Omit<DaemonStatusMessageBase, 'type'> {
+  type: 'daemon_status';
+}
+export interface LLMStreamMessage extends Omit<LLMStreamMessageBase, 'type'> {
+  type: 'llm_stream';
+}
+export interface PulseExecutionStartedMessage extends Omit<PulseExecutionStartedMessageBase, 'type'> {
+  type: 'pulse_execution_started';
+}
+export interface PulseExecutionFailedMessage extends Omit<PulseExecutionFailedMessageBase, 'type'> {
+  type: 'pulse_execution_failed';
+}
+export interface PulseExecutionCompletedMessage extends Omit<PulseExecutionCompletedMessageBase, 'type'> {
+  type: 'pulse_execution_completed';
+}
+export interface PulseExecutionLogStreamMessage extends Omit<PulseExecutionLogStreamMessageBase, 'type'> {
+  type: 'pulse_execution_log_stream';
+}
+export interface StorageWarningMessage extends Omit<StorageWarningMessageBase, 'type'> {
+  type: 'storage_warning';
+}
+
+// Import Job for use in this file
+import type { Job } from './generated';
 
 // ============================================================================
 // Message Type Discriminators

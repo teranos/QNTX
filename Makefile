@@ -68,12 +68,12 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 
 typegen: ## Generate TypeScript types from Go source
 	@echo "Generating TypeScript types..."
-	@go run ./cmd/typegen -src server/types.go,server/pulse_types.go -out web/types/generated.ts
+	@go run ./cmd/typegen -src server/types.go,server/pulse_types.go,pulse/async/job.go -out web/types/generated.ts
 	@echo "✓ Generated web/types/generated.ts"
 
 typegen-check: ## Check that generated TypeScript types are up to date (for CI)
 	@echo "Checking TypeScript types..."
-	@go run ./cmd/typegen -check -src server/types.go,server/pulse_types.go -out web/types/generated.ts
+	@go run ./cmd/typegen -check -src server/types.go,server/pulse_types.go,pulse/async/job.go -out web/types/generated.ts
 
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist

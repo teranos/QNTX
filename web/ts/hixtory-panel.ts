@@ -12,13 +12,10 @@
  * Design based on docs/development/pulse-async-ix.md - Phase 3
  */
 
-import type { JobUpdateData, LLMStreamData } from '../types/websocket';
-import type { Job as CoreJob } from '../types/core';
+import type { JobUpdateData, LLMStreamData, Job as GeneratedJob } from '../types/websocket';
 import { toast } from './toast';
 
-interface Job extends CoreJob {
-    cost_usd?: number;
-    source?: string;
+interface Job extends GeneratedJob {
     _graph_query?: string;
     metadata?: {
         total_operations?: number;
@@ -28,7 +25,7 @@ interface Job extends CoreJob {
         tasks?: Task[];
         command?: string;
         query?: string;
-        [key: string]: any;
+        [key: string]: unknown;
     };
 }
 
@@ -337,7 +334,7 @@ class JobListPanel {
 
         // Get all jobs, sort by created_at descending (most recent first)
         const allJobs = Array.from(this.jobs.values())
-            .sort((a, b) => b.created_at - a.created_at);
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         // Update count
         if (countSpan) {
@@ -358,7 +355,7 @@ class JobListPanel {
      */
     private renderHistoryItem(job: Job): HTMLElement {
         const statusClass = this.getStatusClass(job.status);
-        const timeAgo = this.formatRelativeTime(job.created_at);
+        const timeAgo = this.formatRelativeTime(new Date(job.created_at).getTime());
         const command = this.getJobCommand(job);
 
         const item = document.createElement('div');
@@ -400,8 +397,8 @@ class JobListPanel {
         // Fallback: construct from source and type
         if (job.source) return job.source;
 
-        // Last resort: use job type
-        return `${job.type} (${job.id.substring(0, 8)})`;
+        // Last resort: use job handler name
+        return `${job.handler_name} (${job.id.substring(0, 8)})`;
     }
 
     /**

@@ -72,3 +72,18 @@ jobs:
         run: cd web && bun test
         env:
           USE_JSDOM: 1
+
+  typegen:
+    name: TypeScript Types Up-to-Date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check generated types are up to date
+        run: make typegen-check
