@@ -232,6 +232,8 @@ func extractFieldComment(field *ast.Field) string {
 // cleanCommentText removes comment markers and trims whitespace
 func cleanCommentText(text string) string {
 	text = strings.TrimPrefix(text, "//")
+	// Handle both /** and /* block comments
+	text = strings.TrimPrefix(text, "/**")
 	text = strings.TrimPrefix(text, "/*")
 	text = strings.TrimSuffix(text, "*/")
 	return strings.TrimSpace(text)
@@ -239,6 +241,9 @@ func cleanCommentText(text string) string {
 
 // GenerateUnionType creates a TypeScript union type from const values
 func GenerateUnionType(name string, values []string) string {
+	// Sort values for deterministic output
+	sort.Strings(values)
+
 	var parts []string
 	for _, v := range values {
 		parts = append(parts, fmt.Sprintf("'%s'", v))

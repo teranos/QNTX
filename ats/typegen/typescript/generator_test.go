@@ -364,7 +364,8 @@ func TestGenerateUnionType(t *testing.T) {
 	values := []string{"active", "paused", "completed"}
 	result := GenerateUnionType("Status", values)
 
-	expected := "export type Status = 'active' | 'paused' | 'completed';"
+	// Values are sorted alphabetically for deterministic output
+	expected := "export type Status = 'active' | 'completed' | 'paused';"
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
 	}

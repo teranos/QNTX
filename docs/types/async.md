@@ -23,14 +23,14 @@ Use this as a reference when working with QNTX types in different contexts.
 type ErrorCode string
 
 const (
-	ErrorCodeFile_not_found ErrorCode = "file_not_found"
-	ErrorCodeParse_error ErrorCode = "parse_error"
-	ErrorCodeNetwork_error ErrorCode = "network_error"
-	ErrorCodeDatabase_error ErrorCode = "database_error"
-	ErrorCodeValidation_error ErrorCode = "validation_error"
 	ErrorCodeAi_error ErrorCode = "ai_error"
+	ErrorCodeDatabase_error ErrorCode = "database_error"
+	ErrorCodeFile_not_found ErrorCode = "file_not_found"
+	ErrorCodeNetwork_error ErrorCode = "network_error"
+	ErrorCodeParse_error ErrorCode = "parse_error"
 	ErrorCodeTimeout ErrorCode = "timeout"
 	ErrorCodeUnknown ErrorCode = "unknown"
+	ErrorCodeValidation_error ErrorCode = "validation_error"
 )
 ```
 
@@ -38,7 +38,7 @@ const (
 <td>
 
 ```typescript
-export type ErrorCode = 'file_not_found' | 'parse_error' | 'network_error' | 'database_error' | 'validation_error' | 'ai_error' | 'timeout' | 'unknown';
+export type ErrorCode = 'ai_error' | 'database_error' | 'file_not_found' | 'network_error' | 'parse_error' | 'timeout' | 'unknown' | 'validation_error';
 ```
 
 </td>
@@ -174,12 +174,12 @@ export interface Job {
 type JobStatus string
 
 const (
-	JobStatusQueued JobStatus = "queued"
-	JobStatusRunning JobStatus = "running"
-	JobStatusPaused JobStatus = "paused"
+	JobStatusCancelled JobStatus = "cancelled"
 	JobStatusCompleted JobStatus = "completed"
 	JobStatusFailed JobStatus = "failed"
-	JobStatusCancelled JobStatus = "cancelled"
+	JobStatusPaused JobStatus = "paused"
+	JobStatusQueued JobStatus = "queued"
+	JobStatusRunning JobStatus = "running"
 )
 ```
 
@@ -187,7 +187,7 @@ const (
 <td>
 
 ```typescript
-export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type JobStatus = 'cancelled' | 'completed' | 'failed' | 'paused' | 'queued' | 'running';
 ```
 
 </td>
