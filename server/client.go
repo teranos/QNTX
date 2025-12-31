@@ -473,7 +473,7 @@ func (c *Client) handleUpload(filename, fileType, data string) {
 			return
 		}
 
-		// TODO: Implement file upload handler (domain-specific)
+		// TODO: Implement file upload handler
 		// if err := c.server.handleFileUpload(filename, fileType, decodedData); err != nil {
 		// 	c.server.logger.Errorw("File upload processing failed",
 		// 		"client_id", c.id,
