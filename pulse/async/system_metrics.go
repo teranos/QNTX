@@ -6,13 +6,13 @@ import (
 
 // SystemMetrics tracks resource usage for worker pool monitoring
 type SystemMetrics struct {
-	WorkersActive  int     // Number of workers currently executing jobs
-	WorkersTotal   int     // Total configured workers
-	MemoryUsedGB   float64 // Current memory usage in GB
-	MemoryTotalGB  float64 // Total system memory in GB
-	MemoryPercent  float64 // Memory utilization percentage
-	JobsQueued     int     // Jobs waiting in queue
-	JobsRunning    int     // Jobs currently executing
+	WorkersActive  int     `json:"workers_active"`  // Number of workers currently executing jobs
+	WorkersTotal   int     `json:"workers_total"`   // Total configured workers
+	MemoryUsedGB   float64 `json:"memory_used_gb"`  // Current memory usage in GB
+	MemoryTotalGB  float64 `json:"memory_total_gb"` // Total system memory in GB
+	MemoryPercent  float64 `json:"memory_percent"`  // Memory utilization percentage
+	JobsQueued     int     `json:"jobs_queued"`     // Jobs waiting in queue
+	JobsRunning    int     `json:"jobs_running"`    // Jobs currently executing
 }
 
 // getMemoryStats is implemented in platform-specific files:
