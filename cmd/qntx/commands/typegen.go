@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats/typegen"
+	"github.com/teranos/QNTX/ats/typegen/markdown"
 	"github.com/teranos/QNTX/ats/typegen/typescript"
 )
 
@@ -89,9 +90,11 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript"} // Only TypeScript for now, will expand in v1.0.0
+		return []string{"typescript", "markdown"} // TypeScript + Markdown docs
 	case "typescript", "ts":
 		return []string{"typescript"}
+	case "markdown", "md":
+		return []string{"markdown"}
 	case "python", "py":
 		return []string{"python"}
 	case "rust", "rs":
@@ -130,20 +133,30 @@ type genResult struct {
 
 // generateForLanguage generates types for a specific language
 func generateForLanguage(lang string, packages []string) error {
-	// Only TypeScript is implemented for now
-	if lang != "typescript" {
+	// Create the appropriate generator
+	var gen typegen.Generator
+	switch lang {
+	case "typescript":
+		gen = typescript.NewGenerator()
+	case "markdown":
+		gen = markdown.NewGenerator()
+	case "python", "rust", "dart":
 		fmt.Printf("⚠ %s generator not yet implemented (coming in v1.0.0)\n", lang)
 		return nil
+	default:
+		return fmt.Errorf("unknown language: %s", lang)
 	}
 
 	// Generate types for all packages
-	results, typeToPackage, err := generateTypesForPackages(packages)
+	results, typeToPackage, err := generateTypesForPackages(packages, gen)
 	if err != nil {
 		return err
 	}
 
 	// Add cross-package imports (TypeScript-specific)
-	addCrossPackageImports(results, typeToPackage)
+	if lang == "typescript" {
+		addCrossPackageImports(results, typeToPackage)
+	}
 
 	// Determine output configuration
 	outputDir, fileExt := getOutputConfig(lang)
@@ -165,23 +178,18 @@ func generateForLanguage(lang string, packages []string) error {
 }
 
 // generateTypesForPackages generates types for all packages (first pass)
-func generateTypesForPackages(packages []string) ([]genResult, map[string]string, error) {
+func generateTypesForPackages(packages []string, gen typegen.Generator) ([]genResult, map[string]string, error) {
 	results := make([]genResult, 0, len(packages))
 	typeToPackage := make(map[string]string) // typeName -> packageName
 
 	for _, pkg := range packages {
-		result, err := typegen.GenerateFromPackage(pkg)
+		result, err := typegen.GenerateFromPackage(pkg, gen)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to generate types for %s: %w", pkg, err)
 		}
 
-		// Convert to TypeScript-specific result and generate
-		tsResult := &typescript.Result{
-			Types:       result.Types,
-			PackageName: result.PackageName,
-		}
-		gen := typescript.NewGenerator()
-		output := gen.GenerateFile(tsResult)
+		// Generate output file
+		output := gen.GenerateFile(result)
 
 		typeNames := make([]string, 0, len(result.Types))
 		for name := range result.Types {
@@ -212,14 +220,22 @@ func addCrossPackageImports(results []genResult, typeToPackage map[string]string
 // getOutputConfig determines the output directory and file extension for a language
 func getOutputConfig(lang string) (outputDir, fileExt string) {
 	if typegenOutput == "" {
-		outputDir = "" // stdout mode
+		// No output specified: markdown defaults to docs/types, others to stdout
+		if lang == "markdown" {
+			outputDir = "docs/types"
+		} else {
+			outputDir = "" // stdout mode
+		}
 	} else {
+		// Output specified: use it for all languages
 		outputDir = filepath.Join(typegenOutput, lang)
 	}
 
 	switch lang {
 	case "typescript":
 		fileExt = ".ts"
+	case "markdown":
+		fileExt = ".md"
 	case "python":
 		fileExt = ".py"
 	case "rust":
