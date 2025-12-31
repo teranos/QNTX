@@ -24,11 +24,11 @@ const (
 
 // ErrorContext provides structured error information for job failures
 type ErrorContext struct {
-	Stage       string    // Where the error occurred
-	Code        ErrorCode // Error classification
-	Message     string    // Human-readable message
-	Retryable   bool      // Can the job be retried?
-	Recoverable bool      // Can continue processing other items?
+	Stage       string    `json:"stage"`       // Where the error occurred
+	Code        ErrorCode `json:"code"`        // Error classification
+	Message     string    `json:"message"`     // Human-readable message
+	Retryable   bool      `json:"retryable"`   // Can the job be retried?
+	Recoverable bool      `json:"recoverable"` // Can continue processing other items?
 }
 
 // ClassifyError categorizes an error based on its message and stage
