@@ -8,6 +8,8 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## Constants
 
+**Source**: [`pulse/schedule/execution.go`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/execution.go)
+
 <table>
 <tr>
 <th>Go Source</th>
