@@ -7,6 +7,7 @@ import type { PulseExecution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml } from './panel.ts';
+import { Pulse } from '../../../types/generated/typescript/sym.js';
 
 /**
  * Render empty state when no scheduled jobs exist
@@ -50,7 +51,7 @@ export function renderJobCard(job: ScheduledJob, state: PulsePanelState): string
                     ${expandIcon}
                 </button>
                 <div class="panel-badge-icon pulse-job-badge pulse-badge-${job.state}">
-                    <span class="pulse-icon">꩜</span>
+                    <span class="pulse-icon">${Pulse}</span>
                     <span class="pulse-state">${job.state}</span>
                 </div>
                 <div class="pulse-job-interval">${formatInterval(job.interval_seconds)}</div>

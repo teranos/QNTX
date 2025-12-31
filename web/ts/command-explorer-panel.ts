@@ -8,6 +8,8 @@
  * For ix (⨳) operations, see job-list-panel.js
  */
 
+import { AX } from '../../types/generated/typescript/sym.js';
+
 interface AxStatement {
     type: string;
     count: number;
@@ -168,7 +170,7 @@ class CommandExplorerPanel {
         const content = this.panel.querySelector('.command-explorer-content');
 
         if (title) {
-            title.textContent = '⋈ ax Statements';
+            title.textContent = `${AX} ax Statements`;
         }
 
         if (!content) return;
