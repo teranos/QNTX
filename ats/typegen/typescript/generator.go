@@ -208,10 +208,7 @@ func extractFieldComment(field *ast.Field) string {
 		// Use Doc comment (appears before the field)
 		var lines []string
 		for _, comment := range field.Doc.List {
-			text := strings.TrimPrefix(comment.Text, "//")
-			text = strings.TrimPrefix(text, "/*")
-			text = strings.TrimSuffix(text, "*/")
-			text = strings.TrimSpace(text)
+			text := cleanCommentText(comment.Text)
 			if text != "" {
 				lines = append(lines, text)
 			}
@@ -221,14 +218,18 @@ func extractFieldComment(field *ast.Field) string {
 
 	if field.Comment != nil && len(field.Comment.List) > 0 {
 		// Use inline comment (appears after the field)
-		comment := field.Comment.List[0]
-		text := strings.TrimPrefix(comment.Text, "//")
-		text = strings.TrimPrefix(text, "/*")
-		text = strings.TrimSuffix(text, "*/")
-		return strings.TrimSpace(text)
+		return cleanCommentText(field.Comment.List[0].Text)
 	}
 
 	return ""
+}
+
+// cleanCommentText removes comment markers and trims whitespace
+func cleanCommentText(text string) string {
+	text = strings.TrimPrefix(text, "//")
+	text = strings.TrimPrefix(text, "/*")
+	text = strings.TrimSuffix(text, "*/")
+	return strings.TrimSpace(text)
 }
 
 // GenerateUnionType creates a TypeScript union type from const values

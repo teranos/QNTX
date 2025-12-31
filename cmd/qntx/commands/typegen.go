@@ -71,13 +71,7 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 	}
 
 	// Expand short package names to full import paths
-	for i, pkg := range packages {
-		if !strings.Contains(pkg, "/") {
-			packages[i] = "github.com/teranos/QNTX/" + pkg
-		} else if !strings.HasPrefix(pkg, "github.com/") {
-			packages[i] = "github.com/teranos/QNTX/" + pkg
-		}
-	}
+	packages = normalizePackagePaths(packages)
 
 	// Generate for each language
 	for _, lang := range languages {
@@ -109,6 +103,24 @@ func getLanguages(lang string) []string {
 	}
 }
 
+// normalizePackagePaths expands short package names to full import paths
+func normalizePackagePaths(packages []string) []string {
+	normalized := make([]string, len(packages))
+	for i, pkg := range packages {
+		if !strings.Contains(pkg, "/") {
+			// Short name like "types" -> "github.com/teranos/QNTX/types"
+			normalized[i] = "github.com/teranos/QNTX/" + pkg
+		} else if !strings.HasPrefix(pkg, "github.com/") {
+			// Partial path like "ats/types" -> "github.com/teranos/QNTX/ats/types"
+			normalized[i] = "github.com/teranos/QNTX/" + pkg
+		} else {
+			// Already full path
+			normalized[i] = pkg
+		}
+	}
+	return normalized
+}
+
 // genResult holds the generated output for a single package
 type genResult struct {
 	packageName string
@@ -124,14 +136,43 @@ func generateForLanguage(lang string, packages []string) error {
 		return nil
 	}
 
-	// First pass: generate all packages and collect type names
+	// Generate types for all packages
+	results, typeToPackage, err := generateTypesForPackages(packages)
+	if err != nil {
+		return err
+	}
+
+	// Add cross-package imports (TypeScript-specific)
+	addCrossPackageImports(results, typeToPackage)
+
+	// Determine output configuration
+	outputDir, fileExt := getOutputConfig(lang)
+
+	// Write generated files
+	if err := writeGeneratedOutput(results, outputDir, fileExt, lang); err != nil {
+		return err
+	}
+
+	// Generate index file for TypeScript (barrel export)
+	if outputDir != "" && lang == "typescript" {
+		exports := convertToPackageExports(results)
+		if err := typescript.GenerateIndexFile(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate index file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// generateTypesForPackages generates types for all packages (first pass)
+func generateTypesForPackages(packages []string) ([]genResult, map[string]string, error) {
 	results := make([]genResult, 0, len(packages))
 	typeToPackage := make(map[string]string) // typeName -> packageName
 
 	for _, pkg := range packages {
 		result, err := typegen.GenerateFromPackage(pkg)
 		if err != nil {
-			return fmt.Errorf("failed to generate types for %s: %w", pkg, err)
+			return nil, nil, fmt.Errorf("failed to generate types for %s: %w", pkg, err)
 		}
 
 		// Convert to TypeScript-specific result and generate
@@ -155,23 +196,24 @@ func generateForLanguage(lang string, packages []string) error {
 		})
 	}
 
-	// Second pass: add imports for cross-package references
+	return results, typeToPackage, nil
+}
+
+// addCrossPackageImports adds import statements for cross-package type references (second pass)
+func addCrossPackageImports(results []genResult, typeToPackage map[string]string) {
 	for i, res := range results {
 		imports := typescript.FindRequiredImports(res.output, res.packageName, typeToPackage)
 		if len(imports) > 0 {
 			results[i].output = typescript.AddImportsToOutput(res.output, imports)
 		}
 	}
+}
 
-	// Determine output directory and file extension
-	var outputDir string
-	var fileExt string
-
+// getOutputConfig determines the output directory and file extension for a language
+func getOutputConfig(lang string) (outputDir, fileExt string) {
 	if typegenOutput == "" {
-		// stdout mode
-		outputDir = ""
+		outputDir = "" // stdout mode
 	} else {
-		// File mode - add language subdirectory
 		outputDir = filepath.Join(typegenOutput, lang)
 	}
 
@@ -186,7 +228,11 @@ func generateForLanguage(lang string, packages []string) error {
 		fileExt = ".dart"
 	}
 
-	// Write output
+	return outputDir, fileExt
+}
+
+// writeGeneratedOutput writes generated types to stdout or files
+func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) error {
 	for _, res := range results {
 		if outputDir == "" {
 			// Write to stdout
@@ -210,21 +256,17 @@ func generateForLanguage(lang string, packages []string) error {
 			fmt.Printf("✓ Generated %s (%d types)\n", outputPath, len(res.typeNames))
 		}
 	}
+	return nil
+}
 
-	// Generate index file for cleaner imports (only when writing to files and for TypeScript)
-	if outputDir != "" && lang == "typescript" {
-		// Convert results to PackageExport format
-		exports := make([]typescript.PackageExport, len(results))
-		for i, res := range results {
-			exports[i] = typescript.PackageExport{
-				PackageName: res.packageName,
-				TypeNames:   res.typeNames,
-			}
-		}
-		if err := typescript.GenerateIndexFile(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate index file: %w", err)
+// convertToPackageExports converts genResults to TypeScript PackageExport format
+func convertToPackageExports(results []genResult) []typescript.PackageExport {
+	exports := make([]typescript.PackageExport, len(results))
+	for i, res := range results {
+		exports[i] = typescript.PackageExport{
+			PackageName: res.packageName,
+			TypeNames:   res.typeNames,
 		}
 	}
-
-	return nil
+	return exports
 }
