@@ -81,8 +81,38 @@ func TestParseFieldTags_NilTag(t *testing.T) {
 	// Test nil tag (no struct tags)
 	info := ParseFieldTags(nil)
 
-	if info.JSONName != "" || info.TSType != "" || info.Skip {
+	if info.JSONName != "" || info.TSType != "" || info.Skip || info.Readonly {
 		t.Error("Expected empty FieldTagInfo for nil tag")
+	}
+}
+
+func TestParseFieldTags_Readonly(t *testing.T) {
+	// Test readonly tag
+	tag := createTag(`json:"field" readonly:"true"`)
+	info := ParseFieldTags(tag)
+
+	if !info.Readonly {
+		t.Error("Expected Readonly to be true")
+	}
+}
+
+func TestParseFieldTags_ReadonlyShort(t *testing.T) {
+	// Test readonly tag without value
+	tag := createTag(`json:"field" readonly:""`)
+	info := ParseFieldTags(tag)
+
+	if !info.Readonly {
+		t.Error("Expected Readonly to be true for empty readonly tag")
+	}
+}
+
+func TestParseFieldTags_ReadonlyFalse(t *testing.T) {
+	// Test readonly:"false"
+	tag := createTag(`json:"field" readonly:"false"`)
+	info := ParseFieldTags(tag)
+
+	if info.Readonly {
+		t.Error("Expected Readonly to be false")
 	}
 }
 
@@ -234,6 +264,93 @@ func TestGenerateInterface_TSTypeOverride(t *testing.T) {
 
 	if !contains(result, "custom: CustomType;") {
 		t.Error("Expected tstype override")
+	}
+}
+
+func TestGenerateInterface_Readonly(t *testing.T) {
+	// Struct with readonly field
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "ID"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"id" readonly:"true"`),
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("WithReadonly", structType)
+
+	if !contains(result, "readonly id: string;") {
+		t.Error("Expected readonly modifier")
+	}
+}
+
+func TestGenerateInterface_Comments(t *testing.T) {
+	// Struct with field comments
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Name"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"name"`),
+					Doc: &ast.CommentGroup{
+						List: []*ast.Comment{
+							{Text: "// User's full name"},
+						},
+					},
+				},
+				{
+					Names: []*ast.Ident{{Name: "Email"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"email"`),
+					Comment: &ast.CommentGroup{
+						List: []*ast.Comment{
+							{Text: "// Primary email address"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("WithComments", structType)
+
+	if !contains(result, "/** User's full name */") {
+		t.Error("Expected Doc comment for name field")
+	}
+	if !contains(result, "/** Primary email address */") {
+		t.Error("Expected Comment for email field")
+	}
+}
+
+func TestGenerateInterface_MultilineComment(t *testing.T) {
+	// Struct with multiline comment
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Description"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"description"`),
+					Doc: &ast.CommentGroup{
+						List: []*ast.Comment{
+							{Text: "// A detailed description"},
+							{Text: "// that spans multiple lines"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("WithMultiline", structType)
+
+	if !contains(result, "/** A detailed description that spans multiple lines */") {
+		t.Error("Expected multiline comment joined")
 	}
 }
 

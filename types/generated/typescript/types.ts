@@ -4,23 +4,38 @@
 // Source package: types
 
 export interface As {
+  /** ASID: AS + UUID */
   id: string;
+  /** Entities being attested about */
   subjects: string[];
+  /** What is being claimed */
   predicates: string[];
+  /** Optional "of" context */
   contexts: string[];
+  /** Who made the attestation */
   actors: string[];
+  /** When attestation was made */
   timestamp: string;
+  /** How attestation was created */
   source: string;
+  /** Arbitrary JSON */
   attributes?: Record<string, unknown>;
+  /** Database creation time */
   created_at: string;
 }
 
 export interface AsCommand {
+  /** Entities being attested about */
   subjects: string[];
+  /** What is being claimed (optional, defaults to ["_"]) */
   predicates: string[];
+  /** Optional "of" context (defaults to ["_"]) */
   contexts: string[];
+  /** Who made the attestation (optional, uses default) */
   actors: string[];
+  /** When attestation was made (optional, uses now) */
   timestamp: string;
+  /** Arbitrary JSON */
   attributes?: Record<string, unknown>;
 }
 
@@ -35,23 +50,38 @@ export interface AxDebug {
 }
 
 export interface AxFilter {
+  /** Specific entities to ask about */
   subjects: string[];
+  /** What predicates to match (with fuzzy) */
   predicates: string[];
+  /** What contexts to match */
   contexts: string[];
+  /** Filter by specific actors */
   actors: string[];
+  /** Temporal range start */
   time_start?: string | null;
+  /** Temporal range end */
   time_end?: string | null;
+  /** Temporal comparison (e.g., "over 5y") */
   over_comparison?: OverFilter | null;
+  /** Maximum results */
   limit: number;
+  /** Output format: table, json */
   format: string;
+  /** Actions to perform after query: ex csv, summarize, etc */
   so_actions: string[];
 }
 
 export interface AxResult {
+  /** All matching attestations */
   attestations: As[];
+  /** Identified conflicts */
   conflicts: Conflict[];
+  /** Aggregated information */
   summary: AxSummary;
+  /** Output format for display */
   format: string;
+  /** Debug information (verbose mode) */
   debug?: AxDebug;
 }
 
@@ -65,10 +95,12 @@ export interface AxSummary {
 
 export interface CompletionItem {
   label: string;
+  /** predicate, subject, context, actor, keyword, symbol */
   kind: string;
   insert_text: string;
   detail?: string;
   documentation?: string;
+  /** For ranking */
   sort_text: string;
 }
 
@@ -77,11 +109,15 @@ export interface Conflict {
   predicate: string;
   context: string;
   attestations: As[];
+  /** "conflict", "evolution", "verification", "no_conflict" */
   resolution: string;
 }
 
 export interface OverFilter {
+  /** The numeric value (e.g., 5 for "5y") */
   value: number;
+  /** The unit: "y" for years, "m" for months */
   unit: string;
+  /** Comparison operator: "over" means >= */
   operator: string;
 }

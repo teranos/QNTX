@@ -6,17 +6,25 @@
 export type ErrorCode = 'file_not_found' | 'parse_error' | 'network_error' | 'database_error' | 'validation_error' | 'ai_error' | 'timeout' | 'unknown';
 
 export interface ErrorContext {
+  /** Where the error occurred */
   stage: string;
+  /** Error classification */
   code: ErrorCode;
+  /** Human-readable message */
   message: string;
+  /** Can the job be retried? */
   retryable: boolean;
+  /** Can continue processing other items? */
   recoverable: boolean;
 }
 
 export interface Job {
   id: string;
+  /** "data.batch-import", "bio.sequence-align" */
   handler_name: string;
+  /** Handler-specific data (domain-owned) */
   payload?: unknown;
+  /** For deduplication and logging */
   source: string;
   status: JobStatus;
   progress: Progress;
@@ -24,7 +32,9 @@ export interface Job {
   cost_actual: number;
   pulse_state?: PulseState | null;
   error?: string;
+  /** For tasks grouped under parent job */
   parent_job_id?: string;
+  /** Number of retry attempts (max 2) */
   retry_count: number;
   created_at: string;
   started_at?: string | null;
@@ -35,7 +45,9 @@ export interface Job {
 export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 export interface Progress {
+  /** Completed operations */
   current: number;
+  /** Total operations */
   total: number;
 }
 
@@ -46,6 +58,7 @@ export interface PulseState {
   spend_this_month: number;
   budget_remaining: number;
   is_paused: boolean;
+  /** "budget_exceeded", "rate_limit", "user_requested" */
   pause_reason?: string;
 }
 
@@ -59,18 +72,29 @@ export interface QueueStats {
 }
 
 export interface SystemMetrics {
+  /** Number of workers currently executing jobs */
   workers_active: number;
+  /** Total configured workers */
   workers_total: number;
+  /** Current memory usage in GB */
   memory_used_gb: number;
+  /** Total system memory in GB */
   memory_total_gb: number;
+  /** Memory utilization percentage */
   memory_percent: number;
+  /** Jobs waiting in queue */
   jobs_queued: number;
+  /** Jobs currently executing */
   jobs_running: number;
 }
 
 export interface WorkerPoolConfig {
+  /** Number of concurrent workers */
   workers: number;
+  /** How often to check for new jobs */
   poll_interval: number;
+  /** Pause jobs when budget exceeded */
   pause_on_budget: boolean;
+  /** Duration of each graceful start phase (default: 5min, test: 10s) */
   graceful_start_phase: number;
 }
