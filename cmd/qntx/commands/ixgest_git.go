@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,13 +13,15 @@ import (
 	qntxdisplay "github.com/teranos/QNTX/display"
 	"github.com/teranos/QNTX/ixgest/git"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/sym"
 )
 
 // IxGitCmd represents the ix git command
 var IxGitCmd = &cobra.Command{
 	Use:   "git <repository-path>",
-	Short: "Process git repository history and generate attestations",
-	Long: `Process git repository history and generate comprehensive attestations in the Ask System.
+	Short: sym.IX + " Process git repository history and generate attestations",
+	Long: sym.IX + ` Process git repository history and generate comprehensive attestations in the Ask System.
 
 This command ingests git commit history, branches, and relationships into qntx's attestation
 system, allowing you to visualize and query your development timeline through the web UI.
@@ -57,8 +61,9 @@ After ingestion:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		actor, _ := cmd.Flags().GetString("actor")
 		verbosity, _ := cmd.Flags().GetCount("verbose")
+		asyncMode, _ := cmd.Flags().GetBool("async")
 
-		return runIxGit(cmd, repoPath, dryRun, actor, verbosity)
+		return runIxGit(cmd, repoPath, dryRun, actor, verbosity, asyncMode)
 	},
 }
 
@@ -67,11 +72,86 @@ func init() {
 	IxGitCmd.Flags().String("actor", "ixgest-git@user", "Actor to attribute attestations to")
 	IxGitCmd.Flags().Bool("json", false, "Output results in JSON format")
 	IxGitCmd.Flags().Bool("dry-run", false, "Preview what would be ingested without writing to database")
+	IxGitCmd.Flags().Bool("async", false, "Run as background pulse job (allows pause/resume, progress tracking)")
 }
 
 // runIxGit handles git repository processing and attestation generation
-func runIxGit(cmd *cobra.Command, repoPath string, dryRun bool, actor string, verbosity int) error {
+func runIxGit(cmd *cobra.Command, repoPath string, dryRun bool, actor string, verbosity int, asyncMode bool) error {
 	useJSON := qntxdisplay.ShouldOutputJSON(cmd)
+
+	// Load config and open database
+	cfg, err := am.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer database.Close()
+
+	// Handle async mode
+	if asyncMode {
+		if dryRun {
+			return fmt.Errorf("--async and --dry-run cannot be used together")
+		}
+		return runIxGitAsync(database, repoPath, actor, verbosity, useJSON)
+	}
+
+	// Synchronous mode (original behavior)
+	return runIxGitSync(cmd, database, repoPath, dryRun, actor, verbosity, useJSON)
+}
+
+// runIxGitAsync creates an async pulse job for git ingestion
+func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity int, useJSON bool) error {
+	// Create payload
+	payload := git.GitIngestionPayload{
+		RepositoryPath: repoPath,
+		Actor:          actor,
+		Verbosity:      verbosity,
+	}
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	// Create job (we don't know total operations yet, will update during execution)
+	job, err := async.NewJobWithPayload(
+		"ixgest.git",
+		repoPath,
+		payloadJSON,
+		0,    // Total operations unknown until we scan the repo
+		0.0,  // No cost for git ingestion
+		actor,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create job: %w", err)
+	}
+
+	// Enqueue job
+	queue := async.NewQueue(database)
+	if err := queue.Enqueue(job); err != nil {
+		return fmt.Errorf("failed to enqueue job: %w", err)
+	}
+
+	if useJSON {
+		return qntxdisplay.OutputJSON(map[string]interface{}{
+			"job_id":     job.ID,
+			"status":     "queued",
+			"repository": repoPath,
+		})
+	}
+
+	pterm.Success.Printf("Git ingestion job created: %s", job.ID)
+	pterm.Info.Println("Track progress with: qntx ix status " + job.ID)
+	pterm.Info.Println("View all jobs with: qntx ix ls")
+
+	return nil
+}
+
+// runIxGitSync runs git ingestion synchronously (original behavior)
+func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun bool, actor string, verbosity int, useJSON bool) error {
 
 	if !useJSON {
 		pterm.DefaultHeader.WithFullWidth().Printf("Git IX - Attestation Generation")
@@ -89,18 +169,6 @@ func runIxGit(cmd *cobra.Command, repoPath string, dryRun bool, actor string, ve
 		}
 		pterm.Println()
 	}
-
-	// Load config and open database
-	cfg, err := am.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
-	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	}
-	defer database.Close()
 
 	// Create git processor with global logger
 	processor := git.NewGitIxProcessor(database, dryRun, actor, verbosity, logger.Logger)
