@@ -48,7 +48,7 @@ Examples:
   qntx typegen                                    # Generate TypeScript to stdout
   qntx typegen --lang typescript                  # Explicit language
   qntx typegen --lang all                         # All languages
-  qntx typegen --output web/types/generated/      # Write to directory
+  qntx typegen --output types/generated/          # Write to directory (creates typescript/ subdir)
   qntx typegen --packages pulse/async             # Specific package only`,
 	RunE: runTypegen,
 }
