@@ -56,14 +56,28 @@ var TypeMapping = map[string]string{
 }
 
 // ExcludedTypes are types that should not be generated (internal implementation details)
+// Use "package.Type" format for package-specific exclusions
 var ExcludedTypes = map[string]bool{
-	"JobScanArgs":     true, // Database scan helper
-	"HandlerRegistry": true, // Internal registry
-	"Store":           true, // Database store interface
-	"Queue":           true, // Internal queue
-	"WorkerPool":      true, // Internal pool
-	"RegistryExecutor": true,
+	// pulse/async internal types
+	"JobScanArgs":        true, // Database scan helper
+	"HandlerRegistry":    true, // Internal registry
+	"Store":              true, // Database store interface
+	"Queue":              true, // Internal queue
+	"WorkerPool":         true, // Internal pool
+	"RegistryExecutor":   true,
 	"JobProgressEmitter": true,
+	// pulse/schedule internal types
+	"ExecutionStore": true,       // Database store
+	"Ticker":         true,       // Internal scheduler
+	"TickerConfig":   true,       // Internal config
+	"schedule.Job":   true,       // No json tags, PascalCase fields - use async.Job instead
+	// server internal types
+	"Client":              true, // WebSocket client
+	"ConsoleBuffer":       true, // Internal buffer
+	"StorageEventsPoller": true, // Internal poller
+	"GraphViewState":      true, // Internal state
+	"GLSPHandler":         true, // Internal handler
+	"QNTXServer":          true, // Internal server
 }
 
 // GenerateFromPackage parses a Go package and generates TypeScript interfaces
@@ -97,14 +111,14 @@ func GenerateFromPackage(importPath string) (*Result, error) {
 
 	// Process all files in the package
 	for _, file := range pkg.Syntax {
-		processFile(file, result)
+		processFile(file, result, pkg.Name)
 	}
 
 	return result, nil
 }
 
 // processFile extracts type definitions from a Go AST file
-func processFile(file *ast.File, result *Result) {
+func processFile(file *ast.File, result *Result, packageName string) {
 	// First pass: collect type aliases (e.g., type JobStatus string)
 	typeAliases := make(map[string]string) // typeName -> underlying type
 
@@ -127,7 +141,9 @@ func processFile(file *ast.File, result *Result) {
 			switch t := node.Type.(type) {
 			case *ast.StructType:
 				// Skip excluded types (internal implementation details)
-				if ExcludedTypes[node.Name.Name] {
+				// Check both simple name and package-qualified name
+				qualifiedName := packageName + "." + node.Name.Name
+				if ExcludedTypes[node.Name.Name] || ExcludedTypes[qualifiedName] {
 					return true
 				}
 				// Generate TypeScript interface
