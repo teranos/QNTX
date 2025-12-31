@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check
+.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check desktop-prepare desktop-dev desktop-build
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
@@ -95,3 +95,18 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist
 	@rm -rf web/node_modules
+
+desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
+	@echo "Preparing desktop app assets..."
+	@./web/src-tauri/generate-icons.sh
+	@./web/src-tauri/prepare-sidecar.sh
+	@echo "✓ Desktop app prepared"
+
+desktop-dev: desktop-prepare ## Run desktop app in development mode
+	@echo "Starting QNTX Desktop in development mode..."
+	@cd web && bun run tauri:dev
+
+desktop-build: desktop-prepare ## Build production desktop app
+	@echo "Building QNTX Desktop for production..."
+	@cd web && bun run tauri:build
+	@echo "✓ Desktop app built in web/src-tauri/target/release/bundle/"
