@@ -10,6 +10,10 @@ type Result struct {
 	// PackageName is the Go package that was processed
 	PackageName string
 
+	// SourceFile is the repository-relative path to the package's source file
+	// e.g., "sym/symbols.go" - used for documentation links
+	SourceFile string
+
 	// TypePositions maps type names to their source location
 	// Used for generating documentation links
 	TypePositions map[string]Position

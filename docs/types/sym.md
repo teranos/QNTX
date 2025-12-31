@@ -8,6 +8,8 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## Constants
 
+**Source**: [`sym/symbols.go`](https://github.com/teranos/QNTX/blob/main/sym/symbols.go)
+
 <table>
 <tr>
 <th>Go Source</th>

@@ -99,6 +99,12 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 
 // processFile extracts type definitions from a Go AST file using the provided generator.
 func processFile(file *ast.File, result *Result, packageName string, gen Generator, fset *token.FileSet) {
+	// Capture source file path for documentation links (if not already set)
+	if result.SourceFile == "" && file.Pos().IsValid() {
+		pos := fset.Position(file.Pos())
+		result.SourceFile = makeRelativePath(pos.Filename)
+	}
+
 	// First pass: collect type aliases (e.g., type JobStatus string)
 	typeAliases := make(map[string]string) // typeName -> underlying type
 
