@@ -19,8 +19,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "bin/qntx-x86_64-apple-darwin",
-      "bin/qntx-aarch64-apple-darwin"
+      "bin/qntx"
     ]
   },
   "app": {
