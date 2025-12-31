@@ -442,7 +442,7 @@ type TypeDef struct {
 	Name string
 	Label string
 	Color string
-	Opacity float64
+	Opacity *float64
 	Deprecated bool
 }
 ```
@@ -458,8 +458,8 @@ export interface TypeDef {
   Label: string;
   /** Hex color code for graph visualization (e.g., "#34495e") */
   Color: string;
-  /** Visual opacity (0.0-1.0), defaults to 1.0 if unset (zero value) */
-  Opacity: number;
+  /** Visual opacity (0.0-1.0), nil defaults to 1.0 */
+  Opacity?: number | null;
   /** Whether this type is being phased out */
   Deprecated: boolean;
 }
