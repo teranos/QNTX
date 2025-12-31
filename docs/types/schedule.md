@@ -6,6 +6,45 @@
 This document shows Go type definitions alongside their TypeScript equivalents.
 Use this as a reference when working with QNTX types in different contexts.
 
+## Constants
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+const ExecutionStatusCompleted = "completed"
+const ExecutionStatusFailed = "failed"
+const ExecutionStatusRunning = "running"
+const StateActive = "active"
+const StateDeleted = "deleted"
+const StateInactive = "inactive"
+const StatePaused = "paused"
+const StateStopping = "stopping"
+```
+
+</td>
+<td>
+
+```typescript
+export const ExecutionStatusCompleted = "completed";
+export const ExecutionStatusFailed = "failed";
+export const ExecutionStatusRunning = "running";
+export const StateActive = "active";
+export const StateDeleted = "deleted";
+export const StateInactive = "inactive";
+export const StatePaused = "paused";
+export const StateStopping = "stopping";
+```
+
+</td>
+</tr>
+</table>
+
 ## Execution
 
 **Source**: [`pulse/schedule/execution.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/execution.go#L13)

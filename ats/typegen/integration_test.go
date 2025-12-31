@@ -310,6 +310,98 @@ func TestGenerateJobStatusEnum(t *testing.T) {
 }
 
 // =============================================================================
+// Symbol package (sym) tests - consts, arrays, maps
+// =============================================================================
+
+func TestGenerateSymConsts(t *testing.T) {
+	// sym package has untyped const declarations (const I = "⍟")
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/sym", gen)
+	if err != nil {
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
+	}
+
+	// Should extract untyped const values
+	if len(result.Consts) == 0 {
+		t.Fatalf("Expected const values, got none")
+	}
+
+	// Check for some known symbols
+	if val, ok := result.Consts["Pulse"]; !ok || val == "" {
+		t.Errorf("Expected 'Pulse' const to be extracted, got: %v", val)
+	}
+}
+
+func TestGenerateSymArrays(t *testing.T) {
+	// sym package has slice literal (var PaletteOrder = []string{...})
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/sym", gen)
+	if err != nil {
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
+	}
+
+	// Should extract array literals
+	if len(result.Arrays) == 0 {
+		t.Fatalf("Expected array values, got none")
+	}
+
+	// Check for PaletteOrder
+	if palette, ok := result.Arrays["PaletteOrder"]; !ok || len(palette) == 0 {
+		t.Errorf("Expected 'PaletteOrder' array to be extracted")
+	}
+}
+
+func TestGenerateSymMaps(t *testing.T) {
+	// sym package has map literals (var SymbolToCommand = map[string]string{...})
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/sym", gen)
+	if err != nil {
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
+	}
+
+	// Should extract map literals
+	if len(result.Maps) == 0 {
+		t.Fatalf("Expected map values, got none")
+	}
+
+	// Check for known maps
+	if _, ok := result.Maps["SymbolToCommand"]; !ok {
+		t.Errorf("Expected 'SymbolToCommand' map to be extracted")
+	}
+	if _, ok := result.Maps["CommandToSymbol"]; !ok {
+		t.Errorf("Expected 'CommandToSymbol' map to be extracted")
+	}
+	if _, ok := result.Maps["CommandDescriptions"]; !ok {
+		t.Errorf("Expected 'CommandDescriptions' map to be extracted")
+	}
+}
+
+func TestGenerateSymPackage(t *testing.T) {
+	// Full integration test for sym package
+	gen := typescript.NewGenerator()
+	result, err := typegen.GenerateFromPackage("github.com/teranos/QNTX/sym", gen)
+	if err != nil {
+		t.Fatalf("typegen.GenerateFromPackage failed: %v", err)
+	}
+
+	// Generate full TypeScript file
+	output := generateTypeScriptFile(result)
+	t.Logf("Generated TypeScript for sym:\n%s", output)
+
+	// Verify const exports
+	assertContains(t, output, `export const`)
+
+	// Verify array exports
+	assertContains(t, output, `string[]`)
+
+	// Verify map exports
+	assertContains(t, output, `Record<string, string>`)
+
+	// Verify file header
+	assertContains(t, output, `// Source package: sym`)
+}
+
+// =============================================================================
 // Note: TypeScript-specific unit tests are in typescript/generator_test.go
 // These are integration tests that verify the full pipeline
 // =============================================================================

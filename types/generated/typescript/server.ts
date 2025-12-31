@@ -351,3 +351,4 @@ export interface UsageUpdateMessage {
   /** Unix timestamp */
   timestamp: number;
 }
+

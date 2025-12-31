@@ -319,6 +319,21 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	sb.WriteString("// Regenerate with: make types\n")
 	sb.WriteString(fmt.Sprintf("// Source package: %s\n\n", result.PackageName))
 
+	// Generate const exports (untyped consts like const I = "⍟")
+	if len(result.Consts) > 0 {
+		constNames := make([]string, 0, len(result.Consts))
+		for name := range result.Consts {
+			constNames = append(constNames, name)
+		}
+		sort.Strings(constNames)
+
+		for _, name := range constNames {
+			value := result.Consts[name]
+			sb.WriteString(fmt.Sprintf("export const %s = \"%s\";\n", name, value))
+		}
+		sb.WriteString("\n")
+	}
+
 	// Sort type names for deterministic output
 	names := make([]string, 0, len(result.Types))
 	for name := range result.Types {
@@ -333,7 +348,93 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 		}
 	}
 
-	sb.WriteString("\n")
+	if len(result.Types) > 0 {
+		sb.WriteString("\n")
+	}
+
+	// Generate array exports (slice literals like var X = []string{...})
+	if len(result.Arrays) > 0 {
+		arrayNames := make([]string, 0, len(result.Arrays))
+		for name := range result.Arrays {
+			arrayNames = append(arrayNames, name)
+		}
+		sort.Strings(arrayNames)
+
+		if len(result.Types) > 0 || len(result.Consts) > 0 {
+			sb.WriteString("\n")
+		}
+
+		for _, name := range arrayNames {
+			elements := result.Arrays[name]
+			sb.WriteString(fmt.Sprintf("export const %s: string[] = [%s];\n",
+				name, strings.Join(elements, ", ")))
+		}
+	}
+
+	// Generate map exports (map literals like var X = map[string]string{...})
+	if len(result.Maps) > 0 {
+		mapNames := make([]string, 0, len(result.Maps))
+		for name := range result.Maps {
+			mapNames = append(mapNames, name)
+		}
+		sort.Strings(mapNames)
+
+		if len(result.Types) > 0 || len(result.Consts) > 0 || len(result.Arrays) > 0 {
+			sb.WriteString("\n")
+		}
+
+		for _, name := range mapNames {
+			mapData := result.Maps[name]
+			sb.WriteString(fmt.Sprintf("export const %s: Record<string, string> = {\n", name))
+
+			// Sort map keys for deterministic output
+			keys := make([]string, 0, len(mapData))
+			for k := range mapData {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
+			for i, key := range keys {
+				value := mapData[key]
+				// Check if key or value is a const reference by checking if it's in the Consts map
+				keyStr := formatMapKeyWithConsts(key, result.Consts)
+				valueStr := formatMapValueWithConsts(value, result.Consts)
+
+				sb.WriteString(fmt.Sprintf("  %s: %s", keyStr, valueStr))
+				if i < len(keys)-1 {
+					sb.WriteString(",\n")
+				} else {
+					sb.WriteString("\n")
+				}
+			}
+
+			sb.WriteString("};\n")
+		}
+	}
+
+	if len(result.Types) > 0 || len(result.Consts) > 0 || len(result.Arrays) > 0 || len(result.Maps) > 0 {
+		sb.WriteString("\n")
+	}
 
 	return sb.String()
+}
+
+// formatMapKeyWithConsts formats a map key for TypeScript output.
+// Const references are wrapped in brackets, literals are quoted.
+func formatMapKeyWithConsts(key string, consts map[string]string) string {
+	// Check if this key is actually a const reference
+	if _, isConst := consts[key]; isConst {
+		return "[" + key + "]"
+	}
+	return "\"" + key + "\""
+}
+
+// formatMapValueWithConsts formats a map value for TypeScript output.
+// Const references are used as-is, literals are quoted.
+func formatMapValueWithConsts(value string, consts map[string]string) string {
+	// Check if this value is actually a const reference
+	if _, isConst := consts[value]; isConst {
+		return value
+	}
+	return "\"" + value + "\""
 }
