@@ -126,3 +126,164 @@ func TestGenerateFile_Output(t *testing.T) {
 	output := GenerateFile(result)
 	t.Logf("Generated TypeScript:\n%s", output)
 }
+
+// =============================================================================
+// Cross-package tests: pulse/async
+// =============================================================================
+
+func TestGenerateJob(t *testing.T) {
+	// Job is the core async job type from pulse/async
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	jobTS, ok := result.Types["Job"]
+	if !ok {
+		t.Fatalf("Expected 'Job' type in result, got types: %v", keys(result.Types))
+	}
+
+	// Core fields
+	assertContains(t, jobTS, `id: string`)
+	assertContains(t, jobTS, `handler_name: string`)
+	assertContains(t, jobTS, `source: string`)
+
+	// json.RawMessage should map to unknown
+	assertContains(t, jobTS, `payload?: unknown`)
+
+	// JobStatus is a type alias - for now it will be the type name
+	// TODO: When we add enum support, this should be a union type
+	assertContains(t, jobTS, `status: JobStatus`)
+
+	// Nested struct reference
+	assertContains(t, jobTS, `progress: Progress`)
+
+	// Pointer to nested struct (optional)
+	assertContains(t, jobTS, `pulse_state?: PulseState | null`)
+
+	// time.Time fields
+	assertContains(t, jobTS, `created_at: string`)
+	assertContains(t, jobTS, `updated_at: string`)
+
+	// Pointer time.Time (optional)
+	assertContains(t, jobTS, `started_at?: string | null`)
+	assertContains(t, jobTS, `completed_at?: string | null`)
+}
+
+func TestGenerateProgress(t *testing.T) {
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	progressTS, ok := result.Types["Progress"]
+	if !ok {
+		t.Fatalf("Expected 'Progress' type in result, got types: %v", keys(result.Types))
+	}
+
+	assertContains(t, progressTS, `current: number`)
+	assertContains(t, progressTS, `total: number`)
+}
+
+func TestGeneratePulseState(t *testing.T) {
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	pulseStateTS, ok := result.Types["PulseState"]
+	if !ok {
+		t.Fatalf("Expected 'PulseState' type in result, got types: %v", keys(result.Types))
+	}
+
+	assertContains(t, pulseStateTS, `calls_this_minute: number`)
+	assertContains(t, pulseStateTS, `calls_remaining: number`)
+	assertContains(t, pulseStateTS, `spend_today: number`)
+	assertContains(t, pulseStateTS, `is_paused: boolean`)
+	assertContains(t, pulseStateTS, `pause_reason?: string`)
+}
+
+// =============================================================================
+// Cross-package tests: server
+// =============================================================================
+
+func TestGenerateServerTypes(t *testing.T) {
+	// Server types include WebSocket message types
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/server")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	// DaemonStatusMessage is a key WebSocket message type
+	daemonStatusTS, ok := result.Types["DaemonStatusMessage"]
+	if !ok {
+		t.Fatalf("Expected 'DaemonStatusMessage' type in result, got types: %v", keys(result.Types))
+	}
+
+	assertContains(t, daemonStatusTS, `type: string`)
+	assertContains(t, daemonStatusTS, `running: boolean`)
+	assertContains(t, daemonStatusTS, `active_jobs: number`)
+	assertContains(t, daemonStatusTS, `load_percent: number`)
+	assertContains(t, daemonStatusTS, `budget_daily: number`)
+}
+
+func TestGenerateJobUpdateMessage(t *testing.T) {
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/server")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	// JobUpdateMessage references *async.Job from another package
+	jobUpdateTS, ok := result.Types["JobUpdateMessage"]
+	if !ok {
+		t.Fatalf("Expected 'JobUpdateMessage' type in result, got types: %v", keys(result.Types))
+	}
+
+	assertContains(t, jobUpdateTS, `type: string`)
+	// Cross-package reference: *async.Job
+	// For now this will just be "Job" - we may need to handle package prefixes
+	assertContains(t, jobUpdateTS, `job?: Job | null`)
+	assertContains(t, jobUpdateTS, `metadata: Record<string, unknown>`)
+}
+
+// TestGeneratePulseAsync_Output shows all generated types from pulse/async
+func TestGeneratePulseAsync_Output(t *testing.T) {
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	output := GenerateFile(result)
+	t.Logf("Generated TypeScript for pulse/async:\n%s", output)
+}
+
+// =============================================================================
+// Enum support tests
+// =============================================================================
+
+func TestGenerateJobStatusEnum(t *testing.T) {
+	// JobStatus is a type alias with const values - should become a union type
+	result, err := GenerateFromPackage("github.com/teranos/QNTX/pulse/async")
+	if err != nil {
+		t.Fatalf("GenerateFromPackage failed: %v", err)
+	}
+
+	// Should have a type alias for JobStatus
+	jobStatusTS, ok := result.Types["JobStatus"]
+	if !ok {
+		t.Fatalf("Expected 'JobStatus' type in result, got types: %v", keys(result.Types))
+	}
+
+	// Should be a union of string literals
+	assertContains(t, jobStatusTS, `'queued'`)
+	assertContains(t, jobStatusTS, `'running'`)
+	assertContains(t, jobStatusTS, `'paused'`)
+	assertContains(t, jobStatusTS, `'completed'`)
+	assertContains(t, jobStatusTS, `'failed'`)
+	assertContains(t, jobStatusTS, `'cancelled'`)
+
+	// Should be a type alias, not interface
+	if !strings.HasPrefix(strings.TrimSpace(jobStatusTS), "export type JobStatus =") {
+		t.Errorf("Expected type alias declaration, got: %s", jobStatusTS)
+	}
+}
