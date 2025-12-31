@@ -84,6 +84,9 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 		Types:         make(map[string]string),
 		PackageName:   pkg.Name,
 		TypePositions: make(map[string]Position),
+		Consts:        make(map[string]string),
+		Arrays:        make(map[string][]string),
+		Maps:          make(map[string]map[string]string),
 	}
 
 	// Process all files in the package
@@ -96,6 +99,12 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 
 // processFile extracts type definitions from a Go AST file using the provided generator.
 func processFile(file *ast.File, result *Result, packageName string, gen Generator, fset *token.FileSet) {
+	// Capture source file path for documentation links (if not already set)
+	if result.SourceFile == "" && file.Pos().IsValid() {
+		pos := fset.Position(file.Pos())
+		result.SourceFile = makeRelativePath(pos.Filename)
+	}
+
 	// First pass: collect type aliases (e.g., type JobStatus string)
 	typeAliases := make(map[string]string) // typeName -> underlying type
 
@@ -106,8 +115,13 @@ func processFile(file *ast.File, result *Result, packageName string, gen Generat
 		switch node := n.(type) {
 		case *ast.GenDecl:
 			if node.Tok == token.CONST {
-				// Process const block
+				// Process const block for typed consts (union types)
 				processConstBlock(node, constValues)
+				// Also process untyped consts (direct exports)
+				processUntypedConsts(node, result)
+			} else if node.Tok == token.VAR {
+				// Process var declarations (slice and map literals)
+				processVarDecls(node, result)
 			}
 		case *ast.TypeSpec:
 			// Only process exported types
@@ -199,6 +213,121 @@ func processConstBlock(decl *ast.GenDecl, constValues map[string][]string) {
 				// Remove quotes from string literal
 				strValue := strings.Trim(lit.Value, `"`)
 				constValues[currentType] = append(constValues[currentType], strValue)
+			}
+		}
+	}
+}
+
+// processUntypedConsts extracts untyped const declarations (const X = "value").
+// These are exported directly as const values, not as union types.
+func processUntypedConsts(decl *ast.GenDecl, result *Result) {
+	for _, spec := range decl.Specs {
+		valueSpec, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+
+		// Only process untyped consts (no explicit type declaration)
+		if valueSpec.Type != nil {
+			continue
+		}
+
+		// Only process exported consts
+		for i, name := range valueSpec.Names {
+			if !name.IsExported() {
+				continue
+			}
+
+			// Extract string literal values
+			if i < len(valueSpec.Values) {
+				if lit, ok := valueSpec.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					// Remove quotes from string literal
+					strValue := strings.Trim(lit.Value, `"`)
+					result.Consts[name.Name] = strValue
+				}
+			}
+		}
+	}
+}
+
+// processVarDecls extracts variable declarations with slice or map literals.
+// e.g., var X = []string{...} or var Y = map[string]string{...}
+func processVarDecls(decl *ast.GenDecl, result *Result) {
+	for _, spec := range decl.Specs {
+		valueSpec, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+
+		// Only process exported vars
+		for i, name := range valueSpec.Names {
+			if !name.IsExported() {
+				continue
+			}
+
+			// Extract slice or map literal values
+			if i < len(valueSpec.Values) {
+				switch lit := valueSpec.Values[i].(type) {
+				case *ast.CompositeLit:
+					// Check if it's a slice literal []string{...}
+					if arrayType, ok := lit.Type.(*ast.ArrayType); ok {
+						if ident, ok := arrayType.Elt.(*ast.Ident); ok && ident.Name == "string" {
+							// Extract slice elements
+							var elements []string
+							for _, elt := range lit.Elts {
+								if ident, ok := elt.(*ast.Ident); ok {
+									// Element is a const reference (e.g., I, AM, IX)
+									elements = append(elements, ident.Name)
+								} else if lit, ok := elt.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+									// Element is a string literal
+									strValue := strings.Trim(lit.Value, `"`)
+									elements = append(elements, strValue)
+								}
+							}
+							result.Arrays[name.Name] = elements
+						}
+					}
+
+					// Check if it's a map literal map[string]string{...}
+					if mapType, ok := lit.Type.(*ast.MapType); ok {
+						if keyIdent, ok := mapType.Key.(*ast.Ident); ok && keyIdent.Name == "string" {
+							if valIdent, ok := mapType.Value.(*ast.Ident); ok && valIdent.Name == "string" {
+								// Extract map entries
+								mapEntries := make(map[string]string)
+								for _, elt := range lit.Elts {
+									if kv, ok := elt.(*ast.KeyValueExpr); ok {
+										// Extract key
+										var key string
+										switch k := kv.Key.(type) {
+										case *ast.BasicLit:
+											// Key is a string literal
+											key = strings.Trim(k.Value, `"`)
+										case *ast.Ident:
+											// Key is a const reference
+											key = k.Name
+										}
+
+										// Extract value
+										var value string
+										switch v := kv.Value.(type) {
+										case *ast.BasicLit:
+											// Value is a string literal
+											value = strings.Trim(v.Value, `"`)
+										case *ast.Ident:
+											// Value is a const reference
+											value = v.Name
+										}
+
+										if key != "" && value != "" {
+											mapEntries[key] = value
+										}
+									}
+								}
+								result.Maps[name.Name] = mapEntries
+							}
+						}
+					}
+				}
 			}
 		}
 	}

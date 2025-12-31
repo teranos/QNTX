@@ -19,6 +19,7 @@ var defaultPackages = []string{
 	"github.com/teranos/QNTX/pulse/budget",
 	"github.com/teranos/QNTX/pulse/schedule",
 	"github.com/teranos/QNTX/server",
+	"github.com/teranos/QNTX/sym",
 }
 
 var (
@@ -67,7 +68,8 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 	}
 
 	packages := typegenPackages
-	if len(packages) == 0 {
+	usingDefaultPackages := len(packages) == 0
+	if usingDefaultPackages {
 		packages = defaultPackages
 	}
 
@@ -76,7 +78,7 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 
 	// Generate for each language
 	for _, lang := range languages {
-		if err := generateForLanguage(lang, packages); err != nil {
+		if err := generateForLanguage(lang, packages, usingDefaultPackages); err != nil {
 			return err
 		}
 	}
@@ -132,7 +134,7 @@ type genResult struct {
 }
 
 // generateForLanguage generates types for a specific language
-func generateForLanguage(lang string, packages []string) error {
+func generateForLanguage(lang string, packages []string, generateIndex bool) error {
 	// Create the appropriate generator
 	var gen typegen.Generator
 	switch lang {
@@ -167,7 +169,8 @@ func generateForLanguage(lang string, packages []string) error {
 	}
 
 	// Generate index file for TypeScript (barrel export)
-	if outputDir != "" && lang == "typescript" {
+	// Only generate when processing all default packages to avoid partial indices
+	if outputDir != "" && lang == "typescript" && generateIndex {
 		exports := convertToPackageExports(results)
 		if err := typescript.GenerateIndexFile(outputDir, exports); err != nil {
 			return fmt.Errorf("failed to generate index file: %w", err)
@@ -175,7 +178,8 @@ func generateForLanguage(lang string, packages []string) error {
 	}
 
 	// Generate README.md index for markdown documentation
-	if outputDir != "" && lang == "markdown" {
+	// Only generate when processing all default packages to avoid partial indices
+	if outputDir != "" && lang == "markdown" && generateIndex {
 		readme := generateMarkdownIndex(results)
 		readmePath := filepath.Join(outputDir, "README.md")
 		if err := os.WriteFile(readmePath, []byte(readme), 0644); err != nil {
@@ -308,6 +312,7 @@ func generateMarkdownIndex(results []genResult) string {
 		"budget":   "Cost tracking and budget management",
 		"schedule": "Scheduled execution with cron",
 		"server":   "WebSocket message types for real-time updates",
+		"sym":      "QNTX symbol constants and collections",
 	}
 
 	sb.WriteString("# QNTX Type Definitions\n\n")
@@ -318,7 +323,7 @@ func generateMarkdownIndex(results []genResult) string {
 	sb.WriteString("## Packages\n\n")
 
 	// Group packages by category
-	corePackages := []string{"types"}
+	corePackages := []string{"types", "sym"}
 	pulsePackages := []string{"async", "budget", "schedule"}
 	serverPackages := []string{"server"}
 
