@@ -6,14 +6,9 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-)
 
-// Result holds the generated TypeScript for all types in a package.
-// This matches the typegen.Result interface.
-type Result struct {
-	Types       map[string]string
-	PackageName string
-}
+	"github.com/teranos/QNTX/ats/typegen"
+)
 
 // FieldTagInfo contains parsed struct tag information for TypeScript generation
 type FieldTagInfo struct {
@@ -95,6 +90,16 @@ func (g *Generator) Language() string {
 // FileExtension returns "ts"
 func (g *Generator) FileExtension() string {
 	return "ts"
+}
+
+// GenerateInterface converts a Go struct to a TypeScript interface (implements typegen.Generator)
+func (g *Generator) GenerateInterface(name string, structType *ast.StructType) string {
+	return GenerateInterface(name, structType)
+}
+
+// GenerateUnionType converts const values to a TypeScript union type (implements typegen.Generator)
+func (g *Generator) GenerateUnionType(name string, values []string) string {
+	return GenerateUnionType(name, values)
 }
 
 // TypeMapping defines how Go types map to TypeScript types
@@ -300,8 +305,8 @@ func goTypeToTS(expr ast.Expr) string {
 	}
 }
 
-// GenerateFile creates a complete TypeScript file from a Result
-func (g *Generator) GenerateFile(result *Result) string {
+// GenerateFile creates a complete TypeScript file from a typegen.Result
+func (g *Generator) GenerateFile(result *typegen.Result) string {
 	var sb strings.Builder
 
 	sb.WriteString("/* eslint-disable */\n")

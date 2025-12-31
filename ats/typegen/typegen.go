@@ -20,7 +20,6 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/typegen/typescript"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -50,10 +49,10 @@ var ExcludedTypes = map[string]bool{
 }
 
 // GenerateFromPackage parses a Go package and generates type definitions
-// for all exported struct types.
+// for all exported struct types using the provided generator.
 //
 // Import path should be a full Go import path like "github.com/teranos/QNTX/ats/types"
-func GenerateFromPackage(importPath string) (*Result, error) {
+func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 	// Load the package
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
@@ -78,30 +77,22 @@ func GenerateFromPackage(importPath string) (*Result, error) {
 			importPath, len(pkg.Errors), strings.Join(errorMsgs, "\n  - "))
 	}
 
-	// TODO: Make this generator-agnostic
-	// For now, use TypeScript generator directly
-	tsResult := &typescript.Result{
+	// Create language-agnostic result
+	result := &Result{
 		Types:       make(map[string]string),
 		PackageName: pkg.Name,
 	}
 
 	// Process all files in the package
 	for _, file := range pkg.Syntax {
-		processFile(file, tsResult, pkg.Name)
-	}
-
-	// Convert to language-agnostic Result
-	result := &Result{
-		Types:       tsResult.Types,
-		PackageName: tsResult.PackageName,
+		processFile(file, result, pkg.Name, gen)
 	}
 
 	return result, nil
 }
 
-// processFile extracts type definitions from a Go AST file.
-// TODO: Make this generator-agnostic - currently hardcoded to TypeScript
-func processFile(file *ast.File, result *typescript.Result, packageName string) {
+// processFile extracts type definitions from a Go AST file using the provided generator.
+func processFile(file *ast.File, result *Result, packageName string, gen Generator) {
 	// First pass: collect type aliases (e.g., type JobStatus string)
 	typeAliases := make(map[string]string) // typeName -> underlying type
 
@@ -129,10 +120,9 @@ func processFile(file *ast.File, result *typescript.Result, packageName string) 
 				if ExcludedTypes[node.Name.Name] || ExcludedTypes[qualifiedName] {
 					return true
 				}
-				// Generate TypeScript interface
-				// TODO: Make this generator-agnostic
-				ts := typescript.GenerateInterface(node.Name.Name, t)
-				result.Types[node.Name.Name] = ts
+				// Generate interface using the provided generator
+				typeStr := gen.GenerateInterface(node.Name.Name, t)
+				result.Types[node.Name.Name] = typeStr
 
 			case *ast.Ident:
 				// Type alias like: type JobStatus string
@@ -146,15 +136,15 @@ func processFile(file *ast.File, result *typescript.Result, packageName string) 
 	for typeName, underlyingType := range typeAliases {
 		values, hasConsts := constValues[typeName]
 		if hasConsts && len(values) > 0 && underlyingType == "string" {
-			// Generate union type from const values
-			// TODO: Make this generator-agnostic
-			ts := typescript.GenerateUnionType(typeName, values)
-			result.Types[typeName] = ts
+			// Generate union type using the provided generator
+			typeStr := gen.GenerateUnionType(typeName, values)
+			result.Types[typeName] = typeStr
 		}
 	}
 }
 
-// processConstBlock extracts const values grouped by their type
+// processConstBlock extracts const values grouped by their type.
+// It modifies constValues in-place by appending values for each type.
 func processConstBlock(decl *ast.GenDecl, constValues map[string][]string) {
 	var currentType string
 

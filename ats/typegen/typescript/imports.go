@@ -103,14 +103,14 @@ func extractTypeNames(output string) []string {
 	return typeNames
 }
 
-// stripComments removes JSDoc comments (/** ... */) and line comments (//) from TypeScript output
+// stripComments removes block comments (/* ... */ and /** ... */) and line comments (//) from TypeScript output
 func stripComments(output string) string {
 	var result strings.Builder
 	i := 0
 
 	for i < len(output) {
-		// Check for /** ... */ comments
-		if i+2 < len(output) && output[i:i+3] == "/**" {
+		// Check for /* ... */ comments (handles both /** and /*)
+		if i+1 < len(output) && output[i:i+2] == "/*" {
 			// Skip until we find */
 			end := strings.Index(output[i:], "*/")
 			if end != -1 {
