@@ -2,22 +2,7 @@
 // Source: server
 
 import { Job } from './async';
-
-// Execution type from pulse/schedule (cross-package reference)
-export interface Execution {
-  id: string;
-  scheduled_job_id: string;
-  async_job_id?: string | null;
-  status: string;
-  started_at: string;
-  completed_at?: string | null;
-  duration_ms?: number | null;
-  logs?: string | null;
-  result_summary?: string | null;
-  error_message?: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { Execution } from './schedule';
 
 export interface ChildJobInfo {
   id: string;
@@ -33,9 +18,6 @@ export interface ChildJobInfo {
   completed_at?: string | null;
 }
 
-export interface Client {
-}
-
 export interface CodeEntry {
   name: string;
   path: string;
@@ -46,9 +28,6 @@ export interface CodeEntry {
 export interface CompleteMessage {
   type: string;
   message: string;
-}
-
-export interface ConsoleBuffer {
 }
 
 export interface ConsoleLog {
@@ -85,12 +64,6 @@ export interface DaemonStatusMessage {
 
 export interface ErrorResponse {
   error: string;
-}
-
-export interface GLSPHandler {
-}
-
-export interface GraphViewState {
 }
 
 export interface JobChildrenResponse {
@@ -190,9 +163,6 @@ export interface PulseExecutionStartedMessage {
   timestamp: number;
 }
 
-export interface QNTXServer {
-}
-
 export interface QueryMessage {
   type: string;
   query: string;
@@ -236,9 +206,6 @@ export interface StatsMessage {
   contacts: number;
   attestations: number;
   companies: number;
-}
-
-export interface StorageEventsPoller {
 }
 
 export interface StorageWarningMessage {
