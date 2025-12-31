@@ -98,3 +98,4 @@ export interface WorkerPoolConfig {
   /** Duration of each graceful start phase (default: 5min, test: 10s) */
   graceful_start_phase: number;
 }
+

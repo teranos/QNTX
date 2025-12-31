@@ -10,9 +10,25 @@ type Result struct {
 	// PackageName is the Go package that was processed
 	PackageName string
 
+	// SourceFile is the repository-relative path to the package's source file
+	// e.g., "sym/symbols.go" - used for documentation links
+	SourceFile string
+
 	// TypePositions maps type names to their source location
 	// Used for generating documentation links
 	TypePositions map[string]Position
+
+	// Consts maps constant names to their values (for untyped consts)
+	// e.g., const I = "⍟" → Consts["I"] = "⍟"
+	Consts map[string]string
+
+	// Arrays maps variable names to their slice literal values
+	// e.g., var X = []string{"a", "b"} → Arrays["X"] = []string{"a", "b"}
+	Arrays map[string][]string
+
+	// Maps maps variable names to their map literal values
+	// e.g., var X = map[string]string{"k": "v"} → Maps["X"] = map[string]string{"k": "v"}
+	Maps map[string]map[string]string
 }
 
 // Position represents a source code location
@@ -21,4 +37,10 @@ type Position struct {
 	File string
 	// Line is the line number where the type is defined
 	Line int
+}
+
+// IsConstReference checks if a string value is a const reference (exists in consts map)
+func IsConstReference(value string, consts map[string]string) bool {
+	_, isConst := consts[value]
+	return isConst
 }
