@@ -57,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.IxCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
+	rootCmd.AddCommand(commands.TypegenCmd)
 }
 
 func main() {

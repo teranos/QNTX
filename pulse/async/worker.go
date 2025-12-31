@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
@@ -22,18 +23,7 @@ const (
 // BudgetTracker interface defines budget tracking operations
 type BudgetTracker interface {
 	CheckBudget(estimatedCost float64) error
-	GetStatus() (BudgetStatus, error)
-}
-
-// BudgetStatus represents current budget usage
-type BudgetStatus struct {
-	DailySpend       float64
-	DailyLimit       float64
-	DailyRemaining   float64
-	MonthlySpend     float64
-	MonthlyLimit     float64
-	MonthlyRemaining float64
-	HandlerName      string
+	GetStatus() (*budget.Status, error)
 }
 
 // RateLimiter interface defines rate limiting operations
@@ -96,10 +86,10 @@ type WorkerPool struct {
 
 // WorkerPoolConfig contains configuration for the worker pool
 type WorkerPoolConfig struct {
-	Workers            int           // Number of concurrent workers
-	PollInterval       time.Duration // How often to check for new jobs
-	PauseOnBudget      bool          // Pause jobs when budget exceeded
-	GracefulStartPhase time.Duration // Duration of each graceful start phase (default: 5min, test: 10s)
+	Workers            int           `json:"workers"`               // Number of concurrent workers
+	PollInterval       time.Duration `json:"poll_interval"`         // How often to check for new jobs
+	PauseOnBudget      bool          `json:"pause_on_budget"`       // Pause jobs when budget exceeded
+	GracefulStartPhase time.Duration `json:"graceful_start_phase"`  // Duration of each graceful start phase (default: 5min, test: 10s)
 }
 
 // DefaultWorkerPoolConfig returns sensible defaults
