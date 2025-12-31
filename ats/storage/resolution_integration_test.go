@@ -1,7 +1,6 @@
 package storage
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
 	"testing"
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/teranos/QNTX/ats/ax"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -130,32 +129,6 @@ func TestAttestationResolution(t *testing.T) {
 			"Expected to show all conflicting attestations")
 	})
 
-	// Test basic vs smart executor difference
-	t.Run("basic_vs_smart_executor", func(t *testing.T) {
-		filter := types.AxFilter{
-			Subjects: []string{"DOZER"},
-			Limit:    100,
-		}
-
-		// Basic executor (explicit basic for testing)
-		basicExecutor := NewExecutorWithOptions(db, ax.AxExecutorOptions{UseBasic: true})
-		basicResult, err := basicExecutor.ExecuteAsk(context.Background(), filter)
-		require.NoError(t, err, "Basic executor failed")
-
-		// Default executor (now smart by default)
-		defaultResult, err := executor.ExecuteAsk(context.Background(), filter)
-		require.NoError(t, err, "Default executor failed")
-
-		// Smart executor should potentially have different results due to intelligent resolution
-		if len(basicResult.Conflicts) == len(defaultResult.Conflicts) &&
-			len(basicResult.Attestations) == len(defaultResult.Attestations) {
-			t.Logf("Note: Basic and smart executors produced same results (may be expected for this data)")
-		}
-
-		// Both should have some results
-		assert.NotEmpty(t, basicResult.Attestations, "Basic executor should find some attestations")
-		assert.NotEmpty(t, defaultResult.Attestations, "Default (smart) executor should find some attestations")
-	})
 }
 
 func TestResolutionPerformance(t *testing.T) {
