@@ -4,7 +4,7 @@
  */
 
 import { GraphData } from './core';
-import { Job } from './generated/async';
+import { Job } from '../../types/generated/typescript';
 
 // ============================================================================
 // Message Type Discriminators

@@ -13,7 +13,7 @@
  */
 
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
-import type { Job as BackendJob } from '../types/generated/async';
+import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
 
 // Extended Job type with frontend-specific fields
