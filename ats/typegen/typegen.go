@@ -213,33 +213,40 @@ func generateInterface(name string, structType *ast.StructType) string {
 				continue
 			}
 
-			// Get json tag
-			jsonName, omitempty := parseJSONTag(field.Tag)
-			if jsonName == "-" {
-				continue // Skip fields with json:"-"
+			// Parse struct tags (json and tstype)
+			tagInfo := parseFieldTags(field.Tag)
+
+			// Skip fields marked with json:"-" or tstype:"-"
+			if tagInfo.Skip {
+				continue
 			}
+
+			// Determine field name (json tag or Go field name)
+			jsonName := tagInfo.JSONName
 			if jsonName == "" {
 				jsonName = fieldName.Name
 			}
 
-			// Determine if field is optional (pointer or omitempty)
+			// Determine if field is optional
 			isPointer := isPointerType(field.Type)
-			isOptional := omitempty || isPointer
+			isOptional := tagInfo.Omitempty || tagInfo.TSOptional || isPointer
 
-			// Get TypeScript type
-			tsType := goTypeToTS(field.Type)
+			// Get TypeScript type (tstype tag overrides inferred type)
+			var tsType string
+			if tagInfo.TSType != "" {
+				tsType = tagInfo.TSType
+			} else {
+				tsType = goTypeToTS(field.Type)
+				// For pointer types without tstype override, add null union
+				if isPointer {
+					tsType = tsType + " | null"
+				}
+			}
 
 			// Build field declaration
 			optionalMark := ""
 			if isOptional {
 				optionalMark = "?"
-			}
-
-			// For pointer types, add null union
-			if isPointer && !omitempty {
-				tsType = tsType + " | null"
-			} else if isPointer && omitempty {
-				tsType = tsType + " | null"
 			}
 
 			sb.WriteString(fmt.Sprintf("  %s%s: %s;\n", jsonName, optionalMark, tsType))
@@ -251,33 +258,70 @@ func generateInterface(name string, structType *ast.StructType) string {
 	return sb.String()
 }
 
-// parseJSONTag extracts the json field name and omitempty flag from a struct tag
-func parseJSONTag(tag *ast.BasicLit) (name string, omitempty bool) {
+// FieldTagInfo contains parsed struct tag information for TypeScript generation
+type FieldTagInfo struct {
+	JSONName   string // Field name from json tag
+	Omitempty  bool   // Has omitempty option
+	TSType     string // Custom TypeScript type from tstype tag
+	TSOptional bool   // Force optional with tstype:",optional"
+	Skip       bool   // Skip this field (json:"-" or tstype:"-")
+}
+
+// parseFieldTags extracts json and tstype tags from a struct field tag
+//
+// Supported tags:
+//   - json:"name,omitempty" - Standard JSON field naming
+//   - tstype:"CustomType" - Override TypeScript type
+//   - tstype:"-" - Skip field in TypeScript output
+//   - tstype:"Type,optional" - Override type and force optional
+//
+// Example:
+//
+//	Field string `json:"field" tstype:"string | null"`
+func parseFieldTags(tag *ast.BasicLit) FieldTagInfo {
+	info := FieldTagInfo{}
+
 	if tag == nil {
-		return "", false
+		return info
 	}
 
 	// Remove backticks
 	tagValue := strings.Trim(tag.Value, "`")
-
-	// Parse struct tag
 	st := reflect.StructTag(tagValue)
+
+	// Parse json tag
 	jsonTag := st.Get("json")
-
-	if jsonTag == "" {
-		return "", false
-	}
-
-	parts := strings.Split(jsonTag, ",")
-	name = parts[0]
-
-	for _, part := range parts[1:] {
-		if part == "omitempty" {
-			omitempty = true
+	if jsonTag != "" {
+		parts := strings.Split(jsonTag, ",")
+		info.JSONName = parts[0]
+		if info.JSONName == "-" {
+			info.Skip = true
+			return info
+		}
+		for _, part := range parts[1:] {
+			if part == "omitempty" {
+				info.Omitempty = true
+			}
 		}
 	}
 
-	return name, omitempty
+	// Parse tstype tag
+	tstypeTag := st.Get("tstype")
+	if tstypeTag != "" {
+		if tstypeTag == "-" {
+			info.Skip = true
+			return info
+		}
+		parts := strings.Split(tstypeTag, ",")
+		info.TSType = parts[0]
+		for _, part := range parts[1:] {
+			if part == "optional" {
+				info.TSOptional = true
+			}
+		}
+	}
+
+	return info
 }
 
 // isPointerType checks if the AST expression represents a pointer type
