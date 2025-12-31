@@ -266,40 +266,17 @@ func generateIndexFile(outputDir string, results []genResult, lang string, fileE
 }
 
 // findRequiredImports scans TypeScript output for type references from other packages
+// Handles: field: Type, field: Type[], field?: Type | null, Record<string, Type>
+// Limitation: Does not handle deeply nested generics or complex union types
 func findRequiredImports(output, currentPackage string, typeToPackage map[string]string) map[string][]string {
 	imports := make(map[string][]string) // packageName -> []typeName
 	seen := make(map[string]bool)
 
-	// Parse line by line to find type annotations
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		// Look for ": TypeName" patterns in TypeScript interface fields
-		colonIdx := strings.Index(line, ":")
-		if colonIdx == -1 {
-			continue
-		}
+	// Extract all potential type names from the output
+	// This simple approach works for our current use cases
+	candidates := extractTypeNames(output)
 
-		// Extract everything after the colon
-		afterColon := strings.TrimSpace(line[colonIdx+1:])
-
-		// Remove array suffix if present: "TypeName[]" -> "TypeName"
-		afterColon = strings.TrimSuffix(afterColon, "[]")
-
-		// Remove nullable union if present: "TypeName | null" -> "TypeName"
-		if idx := strings.Index(afterColon, " | null"); idx != -1 {
-			afterColon = afterColon[:idx]
-		}
-
-		// Remove semicolon: "TypeName;" -> "TypeName"
-		afterColon = strings.TrimSuffix(strings.TrimSpace(afterColon), ";")
-
-		// Check if it's a PascalCase type name (starts with uppercase)
-		if len(afterColon) == 0 || afterColon[0] < 'A' || afterColon[0] > 'Z' {
-			continue
-		}
-
-		typeName := afterColon
-
+	for _, typeName := range candidates {
 		// Skip if already seen or if it's a built-in type
 		if seen[typeName] || isBuiltinType(typeName) {
 			continue
@@ -313,6 +290,65 @@ func findRequiredImports(output, currentPackage string, typeToPackage map[string
 	}
 
 	return imports
+}
+
+// extractTypeNames finds all PascalCase identifiers in TypeScript output
+// Simple approach: split on common delimiters and check each word
+func extractTypeNames(output string) []string {
+	var typeNames []string
+
+	// Delimiters: space, colon, semicolon, brackets, pipes, angle brackets, parentheses
+	delimiters := " :;[]|<>()\n\t,?"
+
+	// Split the output into words
+	words := splitByDelimiters(output, delimiters)
+
+	for _, word := range words {
+		word = strings.TrimSpace(word)
+
+		// Check if it's a PascalCase type name (starts with uppercase letter)
+		if len(word) > 0 && word[0] >= 'A' && word[0] <= 'Z' {
+			// Simple check: all alphanumeric (no dots, no special chars)
+			if isAlphanumeric(word) {
+				typeNames = append(typeNames, word)
+			}
+		}
+	}
+
+	return typeNames
+}
+
+// splitByDelimiters splits a string by any character in the delimiters string
+func splitByDelimiters(s, delimiters string) []string {
+	var result []string
+	var current strings.Builder
+
+	for _, ch := range s {
+		if strings.ContainsRune(delimiters, ch) {
+			if current.Len() > 0 {
+				result = append(result, current.String())
+				current.Reset()
+			}
+		} else {
+			current.WriteRune(ch)
+		}
+	}
+
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+
+	return result
+}
+
+// isAlphanumeric checks if a string contains only letters and numbers
+func isAlphanumeric(s string) bool {
+	for _, ch := range s {
+		if !((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+			return false
+		}
+	}
+	return true
 }
 
 // isBuiltinType returns true for TypeScript built-in types
