@@ -297,11 +297,15 @@ func findRequiredImports(output, currentPackage string, typeToPackage map[string
 func extractTypeNames(output string) []string {
 	var typeNames []string
 
+	// Strip comments to avoid false positives from JSDoc
+	// Remove /** ... */ comments
+	cleanOutput := stripComments(output)
+
 	// Delimiters: space, colon, semicolon, brackets, pipes, angle brackets, parentheses
 	delimiters := " :;[]|<>()\n\t,?"
 
 	// Split the output into words
-	words := splitByDelimiters(output, delimiters)
+	words := splitByDelimiters(cleanOutput, delimiters)
 
 	for _, word := range words {
 		word = strings.TrimSpace(word)
@@ -316,6 +320,43 @@ func extractTypeNames(output string) []string {
 	}
 
 	return typeNames
+}
+
+// stripComments removes JSDoc comments (/** ... */) and line comments (//) from TypeScript output
+func stripComments(output string) string {
+	var result strings.Builder
+	i := 0
+
+	for i < len(output) {
+		// Check for /** ... */ comments
+		if i+2 < len(output) && output[i:i+3] == "/**" {
+			// Skip until we find */
+			end := strings.Index(output[i:], "*/")
+			if end != -1 {
+				i += end + 2
+				continue
+			}
+		}
+
+		// Check for // comments
+		if i+1 < len(output) && output[i:i+2] == "//" {
+			// Skip until end of line
+			end := strings.IndexByte(output[i:], '\n')
+			if end != -1 {
+				result.WriteByte('\n') // Keep the newline
+				i += end + 1
+				continue
+			} else {
+				// Comment goes to end of file
+				break
+			}
+		}
+
+		result.WriteByte(output[i])
+		i++
+	}
+
+	return result.String()
 }
 
 // splitByDelimiters splits a string by any character in the delimiters string
