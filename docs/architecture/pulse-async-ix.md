@@ -90,6 +90,8 @@ type JobHandler interface {
 }
 ```
 
+> **Type Reference**: See [Job](../types/async.md#job), [PulseState](../types/async.md#pulsestate), and [Progress](../types/async.md#progress) type definitions.
+
 **Generic Architecture:**
 - No JobType enum - handlers identified by string name
 - No JobMetadata struct - payloads are handler-specific JSON
@@ -210,6 +212,8 @@ func (b *Tracker) GetStatus() (*Status, error) {
     // Returns current budget status from ai_model_usage table
 }
 ```
+
+> **Type Reference**: See [Limiter](../types/budget.md#limiter), [Tracker](../types/budget.md#tracker), [BudgetConfig](../types/budget.md#budgetconfig), and [Status](../types/budget.md#status) type definitions.
 
 **Package:** `pulse/budget` - Separated from async to eliminate import cycles
 
