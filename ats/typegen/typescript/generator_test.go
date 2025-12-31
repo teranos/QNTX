@@ -92,3 +92,272 @@ func createTag(tagValue string) *ast.BasicLit {
 		Value: "`" + tagValue + "`",
 	}
 }
+
+// =============================================================================
+// GenerateInterface tests
+// =============================================================================
+
+func TestGenerateInterface_Basic(t *testing.T) {
+	// Simple struct with basic fields
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Name"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"name"`),
+				},
+				{
+					Names: []*ast.Ident{{Name: "Age"}},
+					Type:  &ast.Ident{Name: "int"},
+					Tag:   createTag(`json:"age"`),
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("Person", structType)
+
+	if !contains(result, "export interface Person {") {
+		t.Error("Expected interface declaration")
+	}
+	if !contains(result, "name: string;") {
+		t.Error("Expected name field")
+	}
+	if !contains(result, "age: number;") {
+		t.Error("Expected age field")
+	}
+}
+
+func TestGenerateInterface_OptionalFields(t *testing.T) {
+	// Struct with optional fields (omitempty and pointer)
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Email"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"email,omitempty"`),
+				},
+				{
+					Names: []*ast.Ident{{Name: "Phone"}},
+					Type:  &ast.StarExpr{X: &ast.Ident{Name: "string"}},
+					Tag:   createTag(`json:"phone"`),
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("Contact", structType)
+
+	if !contains(result, "email?: string;") {
+		t.Error("Expected optional email field")
+	}
+	if !contains(result, "phone?: string | null;") {
+		t.Error("Expected optional phone field with null union")
+	}
+}
+
+func TestGenerateInterface_ArrayFields(t *testing.T) {
+	// Struct with array/slice field
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Tags"}},
+					Type:  &ast.ArrayType{Elt: &ast.Ident{Name: "string"}},
+					Tag:   createTag(`json:"tags"`),
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("Tagged", structType)
+
+	if !contains(result, "tags: string[];") {
+		t.Error("Expected array field")
+	}
+}
+
+func TestGenerateInterface_SkipFields(t *testing.T) {
+	// Struct with fields that should be skipped
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Public"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"public"`),
+				},
+				{
+					Names: []*ast.Ident{{Name: "Internal"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"-"`),
+				},
+				{
+					Names: []*ast.Ident{{Name: "private"}},
+					Type:  &ast.Ident{Name: "string"},
+					Tag:   createTag(`json:"private"`),
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("Mixed", structType)
+
+	if !contains(result, "public: string;") {
+		t.Error("Expected public field")
+	}
+	if contains(result, "Internal") || contains(result, "internal") {
+		t.Error("Should skip json:\"-\" field")
+	}
+	if contains(result, "private") {
+		t.Error("Should skip unexported field")
+	}
+}
+
+func TestGenerateInterface_TSTypeOverride(t *testing.T) {
+	// Struct with tstype override
+	structType := &ast.StructType{
+		Fields: &ast.FieldList{
+			List: []*ast.Field{
+				{
+					Names: []*ast.Ident{{Name: "Custom"}},
+					Type:  &ast.Ident{Name: "interface{}"},
+					Tag:   createTag(`json:"custom" tstype:"CustomType"`),
+				},
+			},
+		},
+	}
+
+	result := GenerateInterface("WithCustom", structType)
+
+	if !contains(result, "custom: CustomType;") {
+		t.Error("Expected tstype override")
+	}
+}
+
+// =============================================================================
+// GenerateUnionType tests
+// =============================================================================
+
+func TestGenerateUnionType(t *testing.T) {
+	values := []string{"active", "paused", "completed"}
+	result := GenerateUnionType("Status", values)
+
+	expected := "export type Status = 'active' | 'paused' | 'completed';"
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+}
+
+func TestGenerateUnionType_Single(t *testing.T) {
+	values := []string{"only"}
+	result := GenerateUnionType("Single", values)
+
+	expected := "export type Single = 'only';"
+	if result != expected {
+		t.Errorf("Expected %q, got %q", expected, result)
+	}
+}
+
+// =============================================================================
+// GenerateFile tests
+// =============================================================================
+
+func TestGenerateFile(t *testing.T) {
+	gen := NewGenerator()
+	result := &Result{
+		Types: map[string]string{
+			"TypeA": "export interface TypeA { a: string; }",
+			"TypeB": "export interface TypeB { b: number; }",
+		},
+		PackageName: "test",
+	}
+
+	output := gen.GenerateFile(result)
+
+	// Check header
+	if !contains(output, "/* eslint-disable */") {
+		t.Error("Expected eslint disable comment")
+	}
+	if !contains(output, "DO NOT EDIT") {
+		t.Error("Expected DO NOT EDIT warning")
+	}
+	if !contains(output, "make types") {
+		t.Error("Expected regeneration instructions")
+	}
+	if !contains(output, "Source package: test") {
+		t.Error("Expected package name in header")
+	}
+
+	// Check types are included
+	if !contains(output, "TypeA") {
+		t.Error("Expected TypeA in output")
+	}
+	if !contains(output, "TypeB") {
+		t.Error("Expected TypeB in output")
+	}
+}
+
+func TestGenerateFile_DeterministicOrder(t *testing.T) {
+	gen := NewGenerator()
+	result := &Result{
+		Types: map[string]string{
+			"Zebra": "export type Zebra = string;",
+			"Alpha": "export type Alpha = string;",
+			"Beta":  "export type Beta = string;",
+		},
+		PackageName: "test",
+	}
+
+	output := gen.GenerateFile(result)
+
+	// Types should be sorted alphabetically
+	alphaIdx := indexOf(output, "Alpha")
+	betaIdx := indexOf(output, "Beta")
+	zebraIdx := indexOf(output, "Zebra")
+
+	if alphaIdx == -1 || betaIdx == -1 || zebraIdx == -1 {
+		t.Fatal("Not all types found in output")
+	}
+
+	if !(alphaIdx < betaIdx && betaIdx < zebraIdx) {
+		t.Error("Types not in alphabetical order")
+	}
+}
+
+// =============================================================================
+// Generator interface tests
+// =============================================================================
+
+func TestGenerator_Language(t *testing.T) {
+	gen := NewGenerator()
+	if gen.Language() != "typescript" {
+		t.Errorf("Expected 'typescript', got '%s'", gen.Language())
+	}
+}
+
+func TestGenerator_FileExtension(t *testing.T) {
+	gen := NewGenerator()
+	if gen.FileExtension() != "ts" {
+		t.Errorf("Expected 'ts', got '%s'", gen.FileExtension())
+	}
+}
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+func contains(s, substr string) bool {
+	return indexOf(s, substr) != -1
+}
+
+func indexOf(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
