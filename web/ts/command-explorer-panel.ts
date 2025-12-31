@@ -8,7 +8,7 @@
  * For ix (⨳) operations, see job-list-panel.js
  */
 
-import { AX } from '../../types/generated/typescript/sym.js';
+import { AX } from '@types/sym.js';
 
 interface AxStatement {
     type: string;
