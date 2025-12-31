@@ -143,9 +143,9 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 		})
 	}
 
-	pterm.Success.Printf("Git ingestion job created: %s", job.ID)
-	pterm.Info.Println("Track progress with: qntx ix status " + job.ID)
-	pterm.Info.Println("View all jobs with: qntx ix ls")
+	pterm.Success.Printf("%s Git ingestion job created: %s", sym.IX, job.ID)
+	pterm.Info.Printf("%s Track progress with: qntx ix status %s", sym.IX, job.ID)
+	pterm.Info.Printf("%s View all jobs with: qntx ix ls", sym.IX)
 
 	return nil
 }
@@ -154,7 +154,7 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun bool, actor string, verbosity int, useJSON bool) error {
 
 	if !useJSON {
-		pterm.DefaultHeader.WithFullWidth().Printf("Git IX - Attestation Generation")
+		pterm.DefaultHeader.WithFullWidth().Printf("%s Git IX - Attestation Generation", sym.IX)
 		pterm.Println()
 
 		if dryRun {
@@ -162,8 +162,8 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 			pterm.Println()
 		}
 
-		pterm.Info.Printf("Processing repository: %s", repoPath)
-		pterm.Info.Printf("Actor: %s", actor)
+		pterm.Info.Printf("%s Processing repository: %s", sym.IX, repoPath)
+		pterm.Info.Printf("%s Actor: %s", sym.IX, actor)
 		if verbosity > 0 {
 			pterm.Info.Printf("Verbosity level: %d", verbosity)
 		}
@@ -209,7 +209,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 
 	// Non-JSON output
 	pterm.Println()
-	pterm.Success.Printf("Git repository processing completed!")
+	pterm.Success.Printf("%s Git repository processing completed!", sym.IX)
 	pterm.Println()
 
 	// Display statistics
@@ -249,9 +249,9 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 
 	// Next steps
 	if dryRun {
-		pterm.Info.Println("Use 'qntx ix git <path>' without --dry-run to create attestations")
+		pterm.Info.Printf("%s Use 'qntx ix git <path>' without --dry-run to create attestations", sym.IX)
 	} else {
-		pterm.Info.Println("Next steps:")
+		pterm.Info.Printf("%s Next steps:", sym.IX)
 		pterm.Printf("  Query commits: qntx as <commit-hash>")
 		pterm.Printf("  Find by author: qntx as authored_by <author-name>")
 		pterm.Printf("  Temporal queries: qntx as committed_at \"2025-11\"")

@@ -17,11 +17,11 @@ type AttestationStore interface {
 // Types are richer than single predicates - they represent semantic categories with
 // multiple identifying patterns, relationships, and behavioral rules.
 type TypeDef struct {
-	Name       string  // Type identifier (e.g., "commit", "author")
-	Label      string  // Human-readable label for UI (e.g., "Commit", "Author")
-	Color      string  // Hex color code for graph visualization (e.g., "#34495e")
-	Opacity    float64 // Visual opacity (0.0-1.0), defaults to 1.0 if unset (zero value)
-	Deprecated bool    // Whether this type is being phased out
+	Name       string   // Type identifier (e.g., "commit", "author")
+	Label      string   // Human-readable label for UI (e.g., "Commit", "Author")
+	Color      string   // Hex color code for graph visualization (e.g., "#34495e")
+	Opacity    *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
+	Deprecated bool     // Whether this type is being phased out
 }
 
 // AttestType creates a type definition attestation with arbitrary attributes.
@@ -102,10 +102,10 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 	var errors []error
 
 	for _, def := range typeDefs {
-		// Default opacity to 1.0 if not set
-		opacity := def.Opacity
-		if opacity == 0.0 {
-			opacity = 1.0
+		// Default opacity to 1.0 if not explicitly set
+		opacity := 1.0
+		if def.Opacity != nil {
+			opacity = *def.Opacity
 		}
 
 		attrs := map[string]interface{}{
