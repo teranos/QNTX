@@ -11,6 +11,7 @@ import (
 // =======================
 
 // CreateScheduledJobRequest represents the request to create a new scheduled job
+// @ts-export
 type CreateScheduledJobRequest struct {
 	ATSCode         string `json:"ats_code"`         // ATS code to execute (e.g., "ix https://...")
 	IntervalSeconds int    `json:"interval_seconds"` // Execution interval in seconds
@@ -20,12 +21,14 @@ type CreateScheduledJobRequest struct {
 }
 
 // UpdateScheduledJobRequest represents the request to update a scheduled job
+// @ts-export
 type UpdateScheduledJobRequest struct {
 	State           *string `json:"state,omitempty"`            // active, paused, stopping, inactive
 	IntervalSeconds *int    `json:"interval_seconds,omitempty"` // Update interval
 }
 
 // ScheduledJobResponse represents a scheduled job in API responses
+// @ts-export
 type ScheduledJobResponse struct {
 	ID              string  `json:"id"`
 	ATSCode         string  `json:"ats_code"`
@@ -41,35 +44,41 @@ type ScheduledJobResponse struct {
 }
 
 // ListScheduledJobsResponse represents the response for listing scheduled jobs
+// @ts-export
 type ListScheduledJobsResponse struct {
 	Jobs  []ScheduledJobResponse `json:"jobs"`
 	Count int                    `json:"count"`
 }
 
 // ErrorResponse represents an API error
+// @ts-export
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
 // TaskInfo represents a task within a stage
+// @ts-export
 type TaskInfo struct {
 	TaskID   string `json:"task_id"`
 	LogCount int    `json:"log_count"`
 }
 
 // StageInfo represents a stage with its tasks
+// @ts-export
 type StageInfo struct {
 	Stage string     `json:"stage"`
 	Tasks []TaskInfo `json:"tasks"`
 }
 
 // JobStagesResponse represents the response for GET /jobs/:job_id/stages
+// @ts-export
 type JobStagesResponse struct {
 	JobID  string      `json:"job_id"`
 	Stages []StageInfo `json:"stages"`
 }
 
 // LogEntry represents a single log entry
+// @ts-export
 type LogEntry struct {
 	Timestamp string                 `json:"timestamp"`
 	Level     string                 `json:"level"`
@@ -78,12 +87,14 @@ type LogEntry struct {
 }
 
 // TaskLogsResponse represents the response for GET /tasks/:task_id/logs
+// @ts-export
 type TaskLogsResponse struct {
 	TaskID string     `json:"task_id"`
 	Logs   []LogEntry `json:"logs"`
 }
 
 // ChildJobInfo represents a child job summary
+// @ts-export
 type ChildJobInfo struct {
 	ID           string  `json:"id"`
 	HandlerName  string  `json:"handler_name"`
@@ -99,6 +110,7 @@ type ChildJobInfo struct {
 }
 
 // JobChildrenResponse represents the response for GET /api/pulse/jobs/:id/children
+// @ts-export
 type JobChildrenResponse struct {
 	ParentJobID string         `json:"parent_job_id"`
 	Children    []ChildJobInfo `json:"children"`

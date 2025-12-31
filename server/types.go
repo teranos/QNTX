@@ -55,6 +55,7 @@ type cachedUsageStats struct {
 }
 
 // QueryMessage represents a client message
+// @ts-export
 type QueryMessage struct {
 	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility"
 	Query         string  `json:"query"`          // The Ax query text (can be multi-line)
@@ -75,6 +76,7 @@ type QueryMessage struct {
 }
 
 // ProgressMessage represents an import progress message
+// @ts-export
 type ProgressMessage struct {
 	Type    string `json:"type"`    // "import_progress"
 	Current int    `json:"current"` // Current item being processed
@@ -83,6 +85,7 @@ type ProgressMessage struct {
 }
 
 // StatsMessage represents import statistics
+// @ts-export
 type StatsMessage struct {
 	Type         string `json:"type"`         // "import_stats"
 	Contacts     int    `json:"contacts"`     // Number of contacts imported
@@ -91,12 +94,14 @@ type StatsMessage struct {
 }
 
 // CompleteMessage represents import completion
+// @ts-export
 type CompleteMessage struct {
 	Type    string `json:"type"`    // "import_complete"
 	Message string `json:"message"` // Completion message
 }
 
 // UsageUpdateMessage represents AI usage statistics update
+// @ts-export
 type UsageUpdateMessage struct {
 	Type      string  `json:"type"`       // "usage_update"
 	TotalCost float64 `json:"total_cost"` // Total cost in last 24h
@@ -116,6 +121,7 @@ type JobUpdateMessage struct {
 }
 
 // DaemonStatusMessage represents daemon status update
+// @ts-export
 type DaemonStatusMessage struct {
 	Type                string  `json:"type"`                  // "daemon_status"
 	Running             bool    `json:"running"`               // Is daemon running
@@ -133,6 +139,7 @@ type DaemonStatusMessage struct {
 }
 
 // LLMStreamMessage represents streaming LLM output
+// @ts-export
 type LLMStreamMessage struct {
 	Type    string `json:"type"`              // "llm_stream"
 	JobID   string `json:"job_id"`            // Job ID this stream belongs to
@@ -145,6 +152,7 @@ type LLMStreamMessage struct {
 }
 
 // PulseExecutionStartedMessage represents a Pulse execution that just started
+// @ts-export
 type PulseExecutionStartedMessage struct {
 	Type           string `json:"type"`             // "pulse_execution_started"
 	ScheduledJobID string `json:"scheduled_job_id"` // Job that's executing
@@ -154,6 +162,7 @@ type PulseExecutionStartedMessage struct {
 }
 
 // PulseExecutionFailedMessage represents a Pulse execution that failed
+// @ts-export
 type PulseExecutionFailedMessage struct {
 	Type           string `json:"type"`             // "pulse_execution_failed"
 	ScheduledJobID string `json:"scheduled_job_id"` // Job that failed
@@ -165,6 +174,7 @@ type PulseExecutionFailedMessage struct {
 }
 
 // PulseExecutionCompletedMessage represents a Pulse execution that completed successfully
+// @ts-export
 type PulseExecutionCompletedMessage struct {
 	Type           string `json:"type"`             // "pulse_execution_completed"
 	ScheduledJobID string `json:"scheduled_job_id"` // Job that completed
@@ -177,6 +187,7 @@ type PulseExecutionCompletedMessage struct {
 }
 
 // PulseExecutionLogStreamMessage represents live log output from a running execution
+// @ts-export
 type PulseExecutionLogStreamMessage struct {
 	Type           string `json:"type"`             // "pulse_execution_log_stream"
 	ScheduledJobID string `json:"scheduled_job_id"` // Job being executed
@@ -186,6 +197,7 @@ type PulseExecutionLogStreamMessage struct {
 }
 
 // StorageWarningMessage represents a bounded storage warning for approaching limits
+// @ts-export
 type StorageWarningMessage struct {
 	Type          string  `json:"type"`            // "storage_warning"
 	Actor         string  `json:"actor"`           // Actor approaching limit
