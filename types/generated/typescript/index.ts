@@ -72,5 +72,6 @@ export type {
   CompletionItem,
   Conflict,
   OverFilter,
+  TypeDef,
 } from './types';
 
