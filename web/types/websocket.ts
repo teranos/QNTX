@@ -1,9 +1,54 @@
 /**
  * WebSocket message type definitions for QNTX Web UI
- * Defines all message types exchanged between frontend and backend
+ *
+ * This file imports Go-generated types from generated.ts and adds TS-specific
+ * constructs (union types, handlers, client-only types).
+ *
+ * Go types are the source of truth - run `make typegen` to regenerate.
  */
 
 import { GraphData, Job } from './core';
+
+// Re-export all Go-generated types
+export {
+  // WebSocket messages
+  QueryMessage,
+  ProgressMessage,
+  StatsMessage,
+  CompleteMessage,
+  UsageUpdateMessage,
+  DaemonStatusMessage,
+  LLMStreamMessage,
+  PulseExecutionStartedMessage,
+  PulseExecutionFailedMessage,
+  PulseExecutionCompletedMessage,
+  PulseExecutionLogStreamMessage,
+  StorageWarningMessage,
+  // Pulse API types
+  CreateScheduledJobRequest,
+  UpdateScheduledJobRequest,
+  ScheduledJobResponse,
+  ListScheduledJobsResponse,
+  ErrorResponse,
+  TaskInfo,
+  StageInfo,
+  JobStagesResponse,
+  LogEntry,
+  TaskLogsResponse,
+  ChildJobInfo,
+  JobChildrenResponse,
+} from './generated';
+
+// Import for use in this file
+import type {
+  DaemonStatusMessage,
+  LLMStreamMessage,
+  PulseExecutionStartedMessage,
+  PulseExecutionFailedMessage,
+  PulseExecutionCompletedMessage,
+  PulseExecutionLogStreamMessage,
+  StorageWarningMessage,
+} from './generated';
 
 // ============================================================================
 // Message Type Discriminators
@@ -54,29 +99,20 @@ export interface BaseMessage {
 }
 
 // ============================================================================
-// System Messages
+// Client-Only Message Types (not from Go)
 // ============================================================================
 
-/**
- * Reload command - triggers UI refresh
- */
 export interface ReloadMessage extends BaseMessage {
   type: 'reload';
   reason?: string;
 }
 
-/**
- * Backend status update
- */
 export interface BackendStatusMessage extends BaseMessage {
   type: 'backend_status';
   status: 'connected' | 'disconnected' | 'error';
   message?: string;
 }
 
-/**
- * Version information
- */
 export interface VersionMessage extends BaseMessage {
   type: 'version';
   version: string;
@@ -85,9 +121,6 @@ export interface VersionMessage extends BaseMessage {
   go_version?: string;
 }
 
-/**
- * Error message
- */
 export interface ErrorMessage extends BaseMessage {
   type: 'error';
   error: string;
@@ -95,48 +128,16 @@ export interface ErrorMessage extends BaseMessage {
   details?: unknown;
 }
 
-// ============================================================================
-// Git Messages
-// ============================================================================
-
-
-
-// ============================================================================
-// Daemon & Job Messages
-// ============================================================================
-
-/**
- * Daemon status update
- */
-export interface DaemonStatusMessage extends BaseMessage {
-  type: 'daemon_status';
-  running: boolean;
-  active_jobs: number;
-  load_percent: number;
-  budget_daily?: number;
-  budget_weekly?: number;
-  budget_monthly?: number;
-  budget_daily_limit?: number;
-  budget_weekly_limit?: number;
-  budget_monthly_limit?: number;
-}
-
-/**
- * Job update notification
- */
 export interface JobUpdateMessage extends BaseMessage {
   type: 'job_update';
   job: Job;
   metadata?: {
     graph_query?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   action?: 'created' | 'updated' | 'completed' | 'failed' | 'cancelled';
 }
 
-/**
- * Job details response
- */
 export interface JobDetailsMessage extends BaseMessage {
   type: 'job_details';
   job: Job;
@@ -145,36 +146,6 @@ export interface JobDetailsMessage extends BaseMessage {
   page?: number;
 }
 
-// ============================================================================
-// LLM Streaming Messages
-// ============================================================================
-
-/**
- * LLM streaming output
- */
-export interface LLMStreamMessage extends BaseMessage {
-  type: 'llm_stream';
-  job_id?: string;
-  task_id?: string;
-  stage?: string;
-  model?: string;
-  content: string;
-  done: boolean;
-  error?: string;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
-}
-
-// ============================================================================
-// Import/Ingestion Messages
-// ============================================================================
-
-/**
- * Import progress update
- */
 export interface ImportProgressMessage extends BaseMessage {
   type: 'import_progress';
   stage: string;
@@ -183,9 +154,6 @@ export interface ImportProgressMessage extends BaseMessage {
   message?: string;
 }
 
-/**
- * Import statistics
- */
 export interface ImportStatsMessage extends BaseMessage {
   type: 'import_stats';
   imported?: number;
@@ -197,9 +165,6 @@ export interface ImportStatsMessage extends BaseMessage {
   companies?: number;
 }
 
-/**
- * Import completion
- */
 export interface ImportCompleteMessage extends BaseMessage {
   type: 'import_complete';
   success: boolean;
@@ -211,13 +176,6 @@ export interface ImportCompleteMessage extends BaseMessage {
   };
 }
 
-// ============================================================================
-// IX (Index) Operation Messages
-// ============================================================================
-
-/**
- * IX operation progress
- */
 export interface IXProgressMessage extends BaseMessage {
   type: 'ix_progress';
   operation: string;
@@ -227,13 +185,10 @@ export interface IXProgressMessage extends BaseMessage {
   event: {
     type: string;
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   };
 }
 
-/**
- * IX operation error
- */
 export interface IXErrorMessage extends BaseMessage {
   type: 'ix_error';
   operation: string;
@@ -242,13 +197,10 @@ export interface IXErrorMessage extends BaseMessage {
   event: {
     type: string;
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   };
 }
 
-/**
- * IX operation complete
- */
 export interface IXCompleteMessage extends BaseMessage {
   type: 'ix_complete';
   operation: string;
@@ -257,43 +209,10 @@ export interface IXCompleteMessage extends BaseMessage {
   event: {
     type: string;
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   };
 }
 
-// ============================================================================
-// Usage Messages
-// ============================================================================
-
-/**
- * Usage update
- */
-export interface UsageUpdateMessage extends BaseMessage {
-  type: 'usage_update';
-  daily: {
-    used: number;
-    limit: number;
-    percentage: number;
-  };
-  monthly: {
-    used: number;
-    limit: number;
-    percentage: number;
-  };
-  costs?: {
-    daily: number;
-    monthly: number;
-    currency: string;
-  };
-}
-
-// ============================================================================
-// Parse/Query Messages
-// ============================================================================
-
-/**
- * Parse request (sent from frontend)
- */
 export interface ParseRequestMessage extends BaseMessage {
   type: 'parse_request';
   query: string;
@@ -302,9 +221,6 @@ export interface ParseRequestMessage extends BaseMessage {
   requestId?: string;
 }
 
-/**
- * Parse response (received from backend)
- */
 export interface ParseResponseMessage extends BaseMessage {
   type: 'parse_response';
   tokens: SemanticToken[];
@@ -313,23 +229,6 @@ export interface ParseResponseMessage extends BaseMessage {
   requestId?: string;
 }
 
-/**
- * Query request (sent from frontend)
- */
-export interface QueryMessage extends BaseMessage {
-  type: 'query';
-  query: string;
-  verbosity?: number;
-  options?: {
-    limit?: number;
-    offset?: number;
-    format?: string;
-  };
-}
-
-/**
- * Graph data response
- */
 export interface GraphDataMessage extends BaseMessage {
   type: 'graph_data';
   data: GraphData;
@@ -337,13 +236,6 @@ export interface GraphDataMessage extends BaseMessage {
   execution_time?: number;
 }
 
-// ============================================================================
-// Log Messages
-// ============================================================================
-
-/**
- * Log messages
- */
 export interface LogsMessage extends BaseMessage {
   type: 'logs';
   logs: Array<{
@@ -354,13 +246,20 @@ export interface LogsMessage extends BaseMessage {
   }>;
 }
 
+export interface StorageEvictionMessage extends BaseMessage {
+  type: 'storage_eviction';
+  event_type: string;
+  actor: string;
+  context: string;
+  entity: string;
+  deletions_count: number;
+  message: string;
+}
+
 // ============================================================================
-// Type Definitions for Parse Components
+// Parse Components
 // ============================================================================
 
-/**
- * Semantic token for syntax highlighting
- */
 export interface SemanticToken {
   text: string;
   semantic_type: string;
@@ -368,26 +267,17 @@ export interface SemanticToken {
   modifiers?: string[];
 }
 
-/**
- * Text range
- */
 export interface Range {
   start: Position;
   end: Position;
 }
 
-/**
- * Text position
- */
 export interface Position {
   line: number;
   column: number;
   offset: number;
 }
 
-/**
- * Diagnostic message (error, warning, etc.)
- */
 export interface Diagnostic {
   message: string;
   severity: 'error' | 'warning' | 'info' | 'hint';
@@ -398,9 +288,6 @@ export interface Diagnostic {
   related_information?: DiagnosticRelatedInformation[];
 }
 
-/**
- * Related diagnostic information
- */
 export interface DiagnosticRelatedInformation {
   location: Range;
   message: string;
@@ -410,9 +297,6 @@ export interface DiagnosticRelatedInformation {
 // Union Types
 // ============================================================================
 
-/**
- * All possible WebSocket messages
- */
 export type WebSocketMessage =
   | ReloadMessage
   | BackendStatusMessage
@@ -428,25 +312,23 @@ export type WebSocketMessage =
   | IXProgressMessage
   | IXErrorMessage
   | IXCompleteMessage
-  | UsageUpdateMessage
   | ParseRequestMessage
   | ParseResponseMessage
-  | QueryMessage
   | GraphDataMessage
-  | LogsMessage;
+  | LogsMessage
+  | PulseExecutionStartedMessage
+  | PulseExecutionFailedMessage
+  | PulseExecutionCompletedMessage
+  | PulseExecutionLogStreamMessage
+  | StorageWarningMessage
+  | StorageEvictionMessage;
 
 // ============================================================================
 // Message Handler Types
 // ============================================================================
 
-/**
- * Generic message handler
- */
 export type MessageHandler<T extends BaseMessage = BaseMessage> = (data: T) => void | Promise<void>;
 
-/**
- * Map of message handlers by type
- */
 export interface MessageHandlers {
   reload?: MessageHandler<ReloadMessage>;
   backend_status?: MessageHandler<BackendStatusMessage>;
@@ -463,9 +345,8 @@ export interface MessageHandlers {
   ix_progress?: MessageHandler<IXProgressMessage>;
   ix_error?: MessageHandler<IXErrorMessage>;
   ix_complete?: MessageHandler<IXCompleteMessage>;
-  usage_update?: MessageHandler<UsageUpdateMessage>;
+  usage_update?: MessageHandler<BaseMessage>;
   parse_response?: MessageHandler<ParseResponseMessage>;
-  query?: MessageHandler<QueryMessage>;
   graph_data?: MessageHandler<GraphDataMessage>;
   pulse_execution_started?: MessageHandler<PulseExecutionStartedMessage>;
   pulse_execution_failed?: MessageHandler<PulseExecutionFailedMessage>;
@@ -480,9 +361,6 @@ export interface MessageHandlers {
 // WebSocket Connection Types
 // ============================================================================
 
-/**
- * WebSocket connection state
- */
 export interface WebSocketState {
   connected: boolean;
   connecting: boolean;
@@ -492,9 +370,6 @@ export interface WebSocketState {
   lastMessageTime?: number;
 }
 
-/**
- * WebSocket configuration
- */
 export interface WebSocketConfig {
   url: string;
   reconnect?: boolean;
@@ -505,134 +380,15 @@ export interface WebSocketConfig {
 }
 
 // ============================================================================
-// Type Aliases for Data Payloads (for backwards compatibility)
+// Type Aliases (backward compatibility)
 // ============================================================================
 
-/**
- * Type alias for import progress data
- */
 export type ImportProgressData = ImportProgressMessage;
-
-/**
- * Type alias for import stats data
- */
 export type ImportStatsData = ImportStatsMessage;
-
-/**
- * Type alias for import complete data
- */
 export type ImportCompleteData = ImportCompleteMessage;
-
-/**
- * Type alias for IX progress data
- */
 export type IxProgressData = IXProgressMessage;
-
-// ============================================================================
-// Pulse Execution Messages
-// ============================================================================
-
-/**
- * Pulse execution started notification
- */
-export interface PulseExecutionStartedMessage extends BaseMessage {
-  type: 'pulse_execution_started';
-  scheduled_job_id: string;
-  execution_id: string;
-  ats_code: string;
-  timestamp: number;
-}
-
-/**
- * Pulse execution failed notification
- */
-export interface PulseExecutionFailedMessage extends BaseMessage {
-  type: 'pulse_execution_failed';
-  scheduled_job_id: string;
-  execution_id: string;
-  ats_code: string;
-  error_message: string;
-  duration_ms: number;
-  timestamp: number;
-}
-
-/**
- * Pulse execution completed notification
- */
-export interface PulseExecutionCompletedMessage extends BaseMessage {
-  type: 'pulse_execution_completed';
-  scheduled_job_id: string;
-  execution_id: string;
-  ats_code: string;
-  async_job_id: string;
-  result_summary: string;
-  duration_ms: number;
-  timestamp: number;
-}
-
-/**
- * Pulse execution log stream chunk
- */
-export interface PulseExecutionLogStreamMessage extends BaseMessage {
-  type: 'pulse_execution_log_stream';
-  scheduled_job_id: string;
-  execution_id: string;
-  log_chunk: string;
-  timestamp: number;
-}
-
-/**
- * Storage warning for approaching bounded storage limits
- */
-export interface StorageWarningMessage extends BaseMessage {
-  type: 'storage_warning';
-  actor: string;
-  context: string;
-  current: number;
-  limit: number;
-  fill_percent: number;
-  time_until_full: string;
-  timestamp: number;
-}
-
-/**
- * Storage eviction notification when attestations are deleted due to limits
- */
-export interface StorageEvictionMessage extends BaseMessage {
-  type: 'storage_eviction';
-  event_type: string;
-  actor: string;
-  context: string;
-  entity: string;
-  deletions_count: number;
-  message: string;
-}
-
-// ============================================================================
-// Message Data Type Aliases
-// ============================================================================
-
-/**
- * Type alias for IX error data
- */
 export type IxErrorData = IXErrorMessage;
-
-/**
- * Type alias for IX complete data
- */
 export type IxCompleteData = IXCompleteMessage;
-
-/**
- * Type alias for LLM stream data
- */
 export type LLMStreamData = LLMStreamMessage;
-
-/**
- * Type alias for job update data
- */
 export type JobUpdateData = JobUpdateMessage;
-
-/**
- * Type alias for job details data
- */
 export type JobDetailsData = JobDetailsMessage;
