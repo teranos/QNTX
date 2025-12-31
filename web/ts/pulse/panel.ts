@@ -9,6 +9,7 @@ import type { ScheduledJob } from './types';
 import type { PulseExecution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
+import { Pulse } from '@generated/sym.js';
 
 /**
  * Render the main panel template (header + content wrapper)
@@ -16,7 +17,7 @@ import { formatInterval } from './types';
 export function renderPanelTemplate(): string {
     return `
         <div class="panel-header pulse-panel-header">
-            <h2 class="panel-title"><span class="pulse-icon">꩜</span> Pulse</h2>
+            <h2 class="panel-title"><span class="pulse-icon">${Pulse}</span> Pulse</h2>
             <button class="panel-close pulse-close-btn" onclick="window.pulsePanel.hide()">✕</button>
         </div>
         <div class="panel-content pulse-panel-content">
@@ -89,7 +90,7 @@ export function renderJobCard(job: ScheduledJob, state: PulsePanelState): string
                     ${expandIcon}
                 </button>
                 <div class="panel-badge-icon pulse-job-badge pulse-badge-${job.state}">
-                    <span class="pulse-icon">꩜</span>
+                    <span class="pulse-icon">${Pulse}</span>
                     <span class="pulse-state">${job.state}</span>
                 </div>
                 <div class="pulse-job-interval">${formatInterval(job.interval_seconds)}</div>

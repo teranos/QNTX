@@ -6,6 +6,7 @@
  */
 
 import { apiFetch } from './api.ts';
+import { BY } from '@generated/sym.js';
 
 interface ConfigResponse {
     config_file?: string;
@@ -53,7 +54,7 @@ class AIProviderPanel {
     getTemplate(): string {
         return `
             <div class="ai-provider-header">
-                <h3 class="ai-provider-title">⌬ Actor / AI Provider</h3>
+                <h3 class="ai-provider-title">${BY} Actor / AI Provider</h3>
                 <button class="ai-provider-close" aria-label="Close">✕</button>
             </div>
             <div class="ai-provider-content">
