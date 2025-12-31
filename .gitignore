@@ -25,3 +25,7 @@ bin/
 coverage*.out
 server/docs_embedded/
 /qntx
+
+# Tauri
+web/src-tauri/target/
+web/src-tauri/bin/
