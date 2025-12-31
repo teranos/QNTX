@@ -18,9 +18,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/typegen/typescript"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -50,10 +51,10 @@ var ExcludedTypes = map[string]bool{
 }
 
 // GenerateFromPackage parses a Go package and generates type definitions
-// for all exported struct types.
+// for all exported struct types using the provided generator.
 //
 // Import path should be a full Go import path like "github.com/teranos/QNTX/ats/types"
-func GenerateFromPackage(importPath string) (*Result, error) {
+func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 	// Load the package
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
@@ -78,30 +79,23 @@ func GenerateFromPackage(importPath string) (*Result, error) {
 			importPath, len(pkg.Errors), strings.Join(errorMsgs, "\n  - "))
 	}
 
-	// TODO: Make this generator-agnostic
-	// For now, use TypeScript generator directly
-	tsResult := &typescript.Result{
-		Types:       make(map[string]string),
-		PackageName: pkg.Name,
+	// Create language-agnostic result
+	result := &Result{
+		Types:         make(map[string]string),
+		PackageName:   pkg.Name,
+		TypePositions: make(map[string]Position),
 	}
 
 	// Process all files in the package
 	for _, file := range pkg.Syntax {
-		processFile(file, tsResult, pkg.Name)
-	}
-
-	// Convert to language-agnostic Result
-	result := &Result{
-		Types:       tsResult.Types,
-		PackageName: tsResult.PackageName,
+		processFile(file, result, pkg.Name, gen, pkg.Fset)
 	}
 
 	return result, nil
 }
 
-// processFile extracts type definitions from a Go AST file.
-// TODO: Make this generator-agnostic - currently hardcoded to TypeScript
-func processFile(file *ast.File, result *typescript.Result, packageName string) {
+// processFile extracts type definitions from a Go AST file using the provided generator.
+func processFile(file *ast.File, result *Result, packageName string, gen Generator, fset *token.FileSet) {
 	// First pass: collect type aliases (e.g., type JobStatus string)
 	typeAliases := make(map[string]string) // typeName -> underlying type
 
@@ -129,10 +123,16 @@ func processFile(file *ast.File, result *typescript.Result, packageName string) 
 				if ExcludedTypes[node.Name.Name] || ExcludedTypes[qualifiedName] {
 					return true
 				}
-				// Generate TypeScript interface
-				// TODO: Make this generator-agnostic
-				ts := typescript.GenerateInterface(node.Name.Name, t)
-				result.Types[node.Name.Name] = ts
+				// Generate interface using the provided generator
+				typeStr := gen.GenerateInterface(node.Name.Name, t)
+				result.Types[node.Name.Name] = typeStr
+
+				// Capture position for documentation links
+				pos := fset.Position(node.Pos())
+				result.TypePositions[node.Name.Name] = Position{
+					File: makeRelativePath(pos.Filename),
+					Line: pos.Line,
+				}
 
 			case *ast.Ident:
 				// Type alias like: type JobStatus string
@@ -143,18 +143,35 @@ func processFile(file *ast.File, result *typescript.Result, packageName string) 
 	})
 
 	// Generate union types for type aliases that have const values
-	for typeName, underlyingType := range typeAliases {
-		values, hasConsts := constValues[typeName]
-		if hasConsts && len(values) > 0 && underlyingType == "string" {
-			// Generate union type from const values
-			// TODO: Make this generator-agnostic
-			ts := typescript.GenerateUnionType(typeName, values)
-			result.Types[typeName] = ts
+	// We need to track positions for type aliases too
+	ast.Inspect(file, func(n ast.Node) bool {
+		if node, ok := n.(*ast.TypeSpec); ok {
+			if node.Name.IsExported() {
+				if _, isIdent := node.Type.(*ast.Ident); isIdent {
+					typeName := node.Name.Name
+					values, hasConsts := constValues[typeName]
+					underlyingType := typeAliases[typeName]
+					if hasConsts && len(values) > 0 && underlyingType == "string" {
+						// Generate union type using the provided generator
+						typeStr := gen.GenerateUnionType(typeName, values)
+						result.Types[typeName] = typeStr
+
+						// Capture position for documentation links
+						pos := fset.Position(node.Pos())
+						result.TypePositions[typeName] = Position{
+							File: makeRelativePath(pos.Filename),
+							Line: pos.Line,
+						}
+					}
+				}
+			}
 		}
-	}
+		return true
+	})
 }
 
-// processConstBlock extracts const values grouped by their type
+// processConstBlock extracts const values grouped by their type.
+// It modifies constValues in-place by appending values for each type.
 func processConstBlock(decl *ast.GenDecl, constValues map[string][]string) {
 	var currentType string
 
@@ -184,5 +201,31 @@ func processConstBlock(decl *ast.GenDecl, constValues map[string][]string) {
 				constValues[currentType] = append(constValues[currentType], strValue)
 			}
 		}
+	}
+}
+
+// makeRelativePath converts an absolute file path to a repository-relative path.
+// For example: /Users/x/QNTX/ats/types/types.go -> ats/types/types.go
+func makeRelativePath(absPath string) string {
+	// Find the repository root by looking for go.mod
+	dir := absPath
+	for {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root, fallback to filename
+			return filepath.Base(absPath)
+		}
+
+		// Check if go.mod exists in this directory
+		if _, err := os.Stat(filepath.Join(parent, "go.mod")); err == nil {
+			// Found repo root, make path relative to it
+			relPath, err := filepath.Rel(parent, absPath)
+			if err != nil {
+				return filepath.Base(absPath)
+			}
+			return relPath
+		}
+
+		dir = parent
 	}
 }

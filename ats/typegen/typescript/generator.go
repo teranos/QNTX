@@ -6,14 +6,9 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-)
 
-// Result holds the generated TypeScript for all types in a package.
-// This matches the typegen.Result interface.
-type Result struct {
-	Types       map[string]string
-	PackageName string
-}
+	"github.com/teranos/QNTX/ats/typegen"
+)
 
 // FieldTagInfo contains parsed struct tag information for TypeScript generation
 type FieldTagInfo struct {
@@ -95,6 +90,16 @@ func (g *Generator) Language() string {
 // FileExtension returns "ts"
 func (g *Generator) FileExtension() string {
 	return "ts"
+}
+
+// GenerateInterface converts a Go struct to a TypeScript interface (implements typegen.Generator)
+func (g *Generator) GenerateInterface(name string, structType *ast.StructType) string {
+	return GenerateInterface(name, structType)
+}
+
+// GenerateUnionType converts const values to a TypeScript union type (implements typegen.Generator)
+func (g *Generator) GenerateUnionType(name string, values []string) string {
+	return GenerateUnionType(name, values)
 }
 
 // TypeMapping defines how Go types map to TypeScript types
@@ -227,6 +232,8 @@ func extractFieldComment(field *ast.Field) string {
 // cleanCommentText removes comment markers and trims whitespace
 func cleanCommentText(text string) string {
 	text = strings.TrimPrefix(text, "//")
+	// Handle both /** and /* block comments
+	text = strings.TrimPrefix(text, "/**")
 	text = strings.TrimPrefix(text, "/*")
 	text = strings.TrimSuffix(text, "*/")
 	return strings.TrimSpace(text)
@@ -234,6 +241,9 @@ func cleanCommentText(text string) string {
 
 // GenerateUnionType creates a TypeScript union type from const values
 func GenerateUnionType(name string, values []string) string {
+	// Sort values for deterministic output
+	sort.Strings(values)
+
 	var parts []string
 	for _, v := range values {
 		parts = append(parts, fmt.Sprintf("'%s'", v))
@@ -300,8 +310,8 @@ func goTypeToTS(expr ast.Expr) string {
 	}
 }
 
-// GenerateFile creates a complete TypeScript file from a Result
-func (g *Generator) GenerateFile(result *Result) string {
+// GenerateFile creates a complete TypeScript file from a typegen.Result
+func (g *Generator) GenerateFile(result *typegen.Result) string {
 	var sb strings.Builder
 
 	sb.WriteString("/* eslint-disable */\n")
