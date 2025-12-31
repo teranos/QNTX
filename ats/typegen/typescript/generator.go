@@ -22,6 +22,7 @@ type FieldTagInfo struct {
 	TSType     string // Custom TypeScript type from tstype tag
 	TSOptional bool   // Force optional with tstype:",optional"
 	Skip       bool   // Skip this field (json:"-" or tstype:"-")
+	Readonly   bool   // Mark field as readonly
 }
 
 // ParseFieldTags extracts json and tstype tags from a struct field tag.
@@ -67,6 +68,12 @@ func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
 				info.TSOptional = true
 			}
 		}
+	}
+
+	// Parse readonly tag
+	readonlyTag, ok := st.Lookup("readonly")
+	if ok && readonlyTag != "false" {
+		info.Readonly = true
 	}
 
 	return info
@@ -169,19 +176,59 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 				}
 			}
 
+			// Extract and format comments
+			comment := extractFieldComment(field)
+			if comment != "" {
+				sb.WriteString(fmt.Sprintf("  /** %s */\n", comment))
+			}
+
 			// Build field declaration
 			optionalMark := ""
 			if isOptional {
 				optionalMark = "?"
 			}
 
-			sb.WriteString(fmt.Sprintf("  %s%s: %s;\n", jsonName, optionalMark, tsType))
+			readonlyMark := ""
+			if tagInfo.Readonly {
+				readonlyMark = "readonly "
+			}
+
+			sb.WriteString(fmt.Sprintf("  %s%s%s: %s;\n", readonlyMark, jsonName, optionalMark, tsType))
 		}
 	}
 
 	sb.WriteString("}")
 
 	return sb.String()
+}
+
+// extractFieldComment extracts and formats the comment from a field
+func extractFieldComment(field *ast.Field) string {
+	if field.Doc != nil && len(field.Doc.List) > 0 {
+		// Use Doc comment (appears before the field)
+		var lines []string
+		for _, comment := range field.Doc.List {
+			text := strings.TrimPrefix(comment.Text, "//")
+			text = strings.TrimPrefix(text, "/*")
+			text = strings.TrimSuffix(text, "*/")
+			text = strings.TrimSpace(text)
+			if text != "" {
+				lines = append(lines, text)
+			}
+		}
+		return strings.Join(lines, " ")
+	}
+
+	if field.Comment != nil && len(field.Comment.List) > 0 {
+		// Use inline comment (appears after the field)
+		comment := field.Comment.List[0]
+		text := strings.TrimPrefix(comment.Text, "//")
+		text = strings.TrimPrefix(text, "/*")
+		text = strings.TrimSuffix(text, "*/")
+		return strings.TrimSpace(text)
+	}
+
+	return ""
 }
 
 // GenerateUnionType creates a TypeScript union type from const values
