@@ -68,6 +68,15 @@ func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConf
 // ExecuteAsk executes an ask query and returns results
 func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*types.AxResult, error) {
 	startTime := time.Now()
+
+	if ae.logger != nil {
+		ae.logger.Debugw("executing ax query",
+			"subjects", filter.Subjects,
+			"predicates", filter.Predicates,
+			"contexts", filter.Contexts,
+		)
+	}
+
 	result := &types.AxResult{
 		Attestations: []types.As{},
 		Conflicts:    []types.Conflict{}, // Empty for now - defer to Phase 2.4
