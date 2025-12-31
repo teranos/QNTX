@@ -8,13 +8,18 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 ### Core Types
 
+- **[types](./types.md)** - Core attestation types (As, AsCommand, AxFilter) (9 types)
 - **[sym](./sym.md)** - QNTX symbol constants and collections (0 types)
 
 ### Pulse System
 
+- **[async](./async.md)** - Asynchronous job processing with Pulse (9 types)
+- **[budget](./budget.md)** - Cost tracking and budget management (4 types)
+- **[schedule](./schedule.md)** - Scheduled execution with cron (1 types)
 
 ### Server
 
+- **[server](./server.md)** - WebSocket message types for real-time updates (29 types)
 
 ## Usage
 
