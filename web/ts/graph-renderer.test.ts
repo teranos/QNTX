@@ -4,7 +4,7 @@
  * Basic tests for node visibility filtering
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { filterVisibleNodes } from './graph-renderer';
 
 describe('Graph Visibility', () => {
