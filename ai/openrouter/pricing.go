@@ -8,7 +8,7 @@ type ModelPricing struct {
 }
 
 // modelPricing contains hardcoded pricing for common OpenRouter models
-// TODO(#pricing): Replace with dynamic pricing from OpenRouter API (see docs/future/openrouter-pricing-attestations.md)
+// TODO: Replace with dynamic pricing - periodically pull from OpenRouter API and store as attestations
 var modelPricing = map[string]ModelPricing{
 	// OpenAI models via OpenRouter
 	"openai/gpt-4o": {

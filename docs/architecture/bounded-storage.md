@@ -33,6 +33,8 @@ This maintains a rolling window of recent attestations while preventing unbounde
 
 ## Self-Certifying ASIDs
 
+> **For bulk ingestion, self-certifying ASIDs are required, not optional.** Without them, the 64-actor limit will cause silent data loss once exceeded. There is currently no other workaround.
+
 ### The Problem
 
 Using the same actor string (e.g., `"processor@system"`) for all ingestion operations creates a hard limit:
