@@ -2,6 +2,33 @@
 //
 // This is QNTX's own type generator, designed to work with the attestation
 // type system and maintain consistency between Go and TypeScript types.
+//
+// # Struct Tag Support
+//
+// The generator recognizes standard json tags and custom tstype tags:
+//
+//	json:"fieldName,omitempty" - Sets TypeScript field name and makes it optional
+//	tstype:"CustomType"        - Overrides inferred TypeScript type
+//	tstype:"-"                 - Skips field in TypeScript output
+//	tstype:"Type,optional"     - Overrides type and forces optional
+//
+// Examples:
+//
+//	// Basic field with JSON tag
+//	Name string `json:"name"`
+//	// → name: string;
+//
+//	// Optional field
+//	Email string `json:"email,omitempty"`
+//	// → email?: string;
+//
+//	// Custom TypeScript type
+//	Status string `json:"status" tstype:"'active' | 'inactive'"`
+//	// → status: 'active' | 'inactive';
+//
+//	// Cross-package type reference
+//	Job *async.Job `json:"job" tstype:"Job | null"`
+//	// → job: Job | null;
 package typegen
 
 import (
@@ -101,7 +128,12 @@ func GenerateFromPackage(importPath string) (*Result, error) {
 
 	pkg := pkgs[0]
 	if len(pkg.Errors) > 0 {
-		return nil, fmt.Errorf("package errors: %v", pkg.Errors)
+		var errorMsgs []string
+		for _, pkgErr := range pkg.Errors {
+			errorMsgs = append(errorMsgs, pkgErr.Error())
+		}
+		return nil, fmt.Errorf("package %s has %d error(s):\n  - %s",
+			importPath, len(pkg.Errors), strings.Join(errorMsgs, "\n  - "))
 	}
 
 	result := &Result{
@@ -424,6 +456,3 @@ func GenerateFile(result *Result) string {
 
 	return sb.String()
 }
-
-// Ensure token is used (needed for packages.Load)
-var _ = token.NoPos
