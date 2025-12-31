@@ -19,7 +19,8 @@ export const PulseOpen = "✿";
 export const SO = "⟶";
 
 
-export const PaletteOrder: string[] = [I, AM, IX, AX, AS, IS, OF, BY, AT, SO];
+export const PaletteOrder = [I, AM, IX, AX, AS, IS, OF, BY, AT, SO] as const;
+export type PaletteOrderSymbol = typeof PaletteOrder[number];
 
 export const CommandDescriptions: Record<string, string> = {
   "am": "Structure — QNTX's internal understanding",
