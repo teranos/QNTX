@@ -25,9 +25,9 @@ else
     exit 1
 fi
 
-# Generate PNG icons for different sizes
+# Generate PNG icons for different sizes (force RGBA format)
 for size in 32 128 256 512; do
-    $CONVERT "$SOURCE_IMG" -resize ${size}x${size} "$ICONS_DIR/${size}x${size}.png"
+    $CONVERT "$SOURCE_IMG" -resize ${size}x${size} -define png:color-type=6 "$ICONS_DIR/${size}x${size}.png"
     echo "  ✓ Created ${size}x${size}.png"
 done
 
