@@ -8,6 +8,9 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## ErrorCode
 
+**Source**: [`pulse/async/error.go:12`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L12)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -43,6 +46,9 @@ export type ErrorCode = 'file_not_found' | 'parse_error' | 'network_error' | 'da
 </table>
 
 ## ErrorContext
+
+**Source**: [`pulse/async/error.go:26`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L26)
+
 
 <table>
 <tr>
@@ -85,6 +91,9 @@ export interface ErrorContext {
 </table>
 
 ## Job
+
+**Source**: [`pulse/async/job.go:67`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L67)
+
 
 <table>
 <tr>
@@ -150,6 +159,9 @@ export interface Job {
 
 ## JobStatus
 
+**Source**: [`pulse/async/job.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L13)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -184,6 +196,9 @@ export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed'
 
 ## Progress
 
+**Source**: [`pulse/async/job.go:47`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L47)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -216,6 +231,9 @@ export interface Progress {
 </table>
 
 ## PulseState
+
+**Source**: [`pulse/async/job.go:36`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L36)
+
 
 <table>
 <tr>
@@ -259,6 +277,9 @@ export interface PulseState {
 
 ## QueueStats
 
+**Source**: [`pulse/async/queue.go:329`](https://github.com/teranos/QNTX/blob/main/pulse/async/queue.go#L329)
+
+
 <table>
 <tr>
 <th>Go Source</th>
@@ -297,6 +318,9 @@ export interface QueueStats {
 </table>
 
 ## SystemMetrics
+
+**Source**: [`pulse/async/system_metrics.go:8`](https://github.com/teranos/QNTX/blob/main/pulse/async/system_metrics.go#L8)
+
 
 <table>
 <tr>
@@ -345,6 +369,9 @@ export interface SystemMetrics {
 </table>
 
 ## WorkerPoolConfig
+
+**Source**: [`pulse/async/worker.go:88`](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go#L88)
+
 
 <table>
 <tr>
