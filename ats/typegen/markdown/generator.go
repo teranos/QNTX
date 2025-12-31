@@ -159,9 +159,24 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	}
 	sort.Strings(names)
 
-	// Add each type
+	// Add each type with source links
 	for i, name := range names {
-		sb.WriteString(result.Types[name])
+		typeMarkdown := result.Types[name]
+
+		// Inject source link after the heading if we have position info
+		if pos, ok := result.TypePositions[name]; ok {
+			// Find the heading line (## TypeName)
+			lines := strings.Split(typeMarkdown, "\n")
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "## ") {
+				// Insert source link after heading
+				sourceLink := fmt.Sprintf("\n**Source**: [`%s:%d`](https://github.com/teranos/QNTX/blob/main/%s#L%d)\n",
+					pos.File, pos.Line, pos.File, pos.Line)
+				lines = append(lines[:1], append([]string{sourceLink}, lines[1:]...)...)
+				typeMarkdown = strings.Join(lines, "\n")
+			}
+		}
+
+		sb.WriteString(typeMarkdown)
 		if i < len(names)-1 {
 			sb.WriteString("\n")
 		}
