@@ -96,6 +96,9 @@ func (g *Generator) GenerateInterface(name string, structType *ast.StructType) s
 func (g *Generator) GenerateUnionType(name string, values []string) string {
 	var sb strings.Builder
 
+	// Sort values for deterministic output
+	sort.Strings(values)
+
 	// Generate TypeScript union for comparison
 	tsUnion := g.tsGen.GenerateUnionType(name, values)
 
