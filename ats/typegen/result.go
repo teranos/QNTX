@@ -13,6 +13,18 @@ type Result struct {
 	// TypePositions maps type names to their source location
 	// Used for generating documentation links
 	TypePositions map[string]Position
+
+	// Consts maps constant names to their values (for untyped consts)
+	// e.g., const I = "⍟" → Consts["I"] = "⍟"
+	Consts map[string]string
+
+	// Arrays maps variable names to their slice literal values
+	// e.g., var X = []string{"a", "b"} → Arrays["X"] = []string{"a", "b"}
+	Arrays map[string][]string
+
+	// Maps maps variable names to their map literal values
+	// e.g., var X = map[string]string{"k": "v"} → Maps["X"] = map[string]string{"k": "v"}
+	Maps map[string]map[string]string
 }
 
 // Position represents a source code location

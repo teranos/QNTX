@@ -19,6 +19,7 @@ var defaultPackages = []string{
 	"github.com/teranos/QNTX/pulse/budget",
 	"github.com/teranos/QNTX/pulse/schedule",
 	"github.com/teranos/QNTX/server",
+	"github.com/teranos/QNTX/sym",
 }
 
 var (
@@ -308,6 +309,7 @@ func generateMarkdownIndex(results []genResult) string {
 		"budget":   "Cost tracking and budget management",
 		"schedule": "Scheduled execution with cron",
 		"server":   "WebSocket message types for real-time updates",
+		"sym":      "QNTX symbol constants and collections",
 	}
 
 	sb.WriteString("# QNTX Type Definitions\n\n")
@@ -318,7 +320,7 @@ func generateMarkdownIndex(results []genResult) string {
 	sb.WriteString("## Packages\n\n")
 
 	// Group packages by category
-	corePackages := []string{"types"}
+	corePackages := []string{"types", "sym"}
 	pulsePackages := []string{"async", "budget", "schedule"}
 	serverPackages := []string{"server"}
 
