@@ -135,12 +135,6 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 		attestations[i] = *as
 	}
 
-	// 4.5. Apply "over" post-processing filter if specified
-	// But only for pure OVER queries without other conditions (handled in SQL for combined queries)
-	if expandedFilter.OverComparison != nil && ae.shouldUsePostProcessingForOver(expandedFilter) {
-		attestations = ae.applyOverFilter(attestations, expandedFilter.OverComparison)
-	}
-
 	// 5. Apply cartesian expansion
 	claims := ats.ExpandCartesianClaims(attestations)
 
