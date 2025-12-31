@@ -9,7 +9,7 @@ import type { ScheduledJob } from './types';
 import type { PulseExecution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
-import { Pulse } from '../../../types/generated/typescript/sym.js';
+import { Pulse } from '@types/sym.js';
 
 /**
  * Render the main panel template (header + content wrapper)

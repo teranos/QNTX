@@ -7,7 +7,7 @@ import type { PulseExecution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml } from './panel.ts';
-import { Pulse } from '../../../types/generated/typescript/sym.js';
+import { Pulse } from '@types/sym.js';
 
 /**
  * Render empty state when no scheduled jobs exist

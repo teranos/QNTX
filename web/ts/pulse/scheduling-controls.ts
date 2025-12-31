@@ -14,7 +14,7 @@ import {
   resumeScheduledJob,
   deleteScheduledJob,
 } from "./api.ts";
-import { Pulse } from "../../../types/generated/typescript/sym.js";
+import { Pulse } from "@types/sym.js";
 
 export interface SchedulingControlsOptions {
   /**

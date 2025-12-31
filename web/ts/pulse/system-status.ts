@@ -2,7 +2,7 @@
  * System Status Section - Daemon control
  */
 
-import { Pulse } from '../../../types/generated/typescript/sym.js';
+import { Pulse } from '@types/sym.js';
 
 /**
  * Render System Status section
