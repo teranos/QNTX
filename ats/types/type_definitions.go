@@ -13,6 +13,17 @@ type AttestationStore interface {
 	CreateAttestation(as *As) error
 }
 
+// TypeDef defines a QNTX domain type with display metadata and semantic information.
+// Types are richer than single predicates - they represent semantic categories with
+// multiple identifying patterns, relationships, and behavioral rules.
+type TypeDef struct {
+	Name       string   // Type identifier (e.g., "commit", "author")
+	Label      string   // Human-readable label for UI (e.g., "Commit", "Author")
+	Color      string   // Hex color code for graph visualization (e.g., "#34495e")
+	Opacity    *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
+	Deprecated bool     // Whether this type is being phased out
+}
+
 // AttestType creates a type definition attestation with arbitrary attributes.
 //
 // Format: "as <typeName> type graph" with self-certifying actor (type-as-actor pattern).
@@ -68,6 +79,54 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 	// Store the attestation
 	if err := store.CreateAttestation(attestation); err != nil {
 		return fmt.Errorf("failed to create type attestation for %s: %w", typeName, err)
+	}
+
+	return nil
+}
+
+// EnsureTypes ensures the specified types exist in the attestation store.
+// This creates type attestations with display metadata for graph visualization.
+//
+// Non-fatal: If type creation fails, the error is returned but ingestion can continue
+// with hardcoded fallback type colors/labels.
+//
+// Example usage:
+//
+//	err := types.EnsureTypes(store, "ixgest-git", types.Commit, types.Author, types.Branch)
+//	if err != nil {
+//	    logger.Errorw("Failed to create type definitions - falling back to hardcoded types",
+//	        "error", err,
+//	        "impact", "graph visualization may lack custom type metadata")
+//	}
+func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) error {
+	var errors []error
+
+	for _, def := range typeDefs {
+		// Default opacity to 1.0 if not explicitly set
+		opacity := 1.0
+		if def.Opacity != nil {
+			opacity = *def.Opacity
+		}
+
+		attrs := map[string]interface{}{
+			"display_color": def.Color,
+			"display_label": def.Label,
+			"deprecated":    def.Deprecated,
+			"opacity":       opacity,
+		}
+
+		if err := AttestType(store, def.Name, source, attrs); err != nil {
+			errors = append(errors, fmt.Errorf("failed to attest type %s: %w", def.Name, err))
+		}
+	}
+
+	// Return combined error if any failed, but all were attempted
+	if len(errors) > 0 {
+		errMsg := "failed to create some type definitions:"
+		for _, err := range errors {
+			errMsg += "\n  - " + err.Error()
+		}
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	return nil

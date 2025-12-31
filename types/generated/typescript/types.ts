@@ -122,3 +122,16 @@ export interface OverFilter {
   operator: string;
 }
 
+export interface TypeDef {
+  /** Type identifier (e.g., "commit", "author") */
+  Name: string;
+  /** Human-readable label for UI (e.g., "Commit", "Author") */
+  Label: string;
+  /** Hex color code for graph visualization (e.g., "#34495e") */
+  Color: string;
+  /** Visual opacity (0.0-1.0), nil defaults to 1.0 */
+  Opacity?: number | null;
+  /** Whether this type is being phased out */
+  Deprecated: boolean;
+}
+
