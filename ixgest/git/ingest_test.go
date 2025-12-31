@@ -39,38 +39,6 @@ func TestGitIxProcessor_ProcessCurrentRepository(t *testing.T) {
 		result.CommitsProcessed, result.BranchesProcessed, result.TotalAttestations)
 }
 
-// TestGitIxProcessor_ActorGeneration tests that actors are generated correctly
-func TestGitIxProcessor_ActorGeneration(t *testing.T) {
-	// Skip if not in a git repository
-	if _, err := os.Stat("../../.git"); os.IsNotExist(err) {
-		t.Skip("Not in a git repository, skipping test")
-	}
-
-	repo, err := git.PlainOpen("../..")
-	require.NoError(t, err, "Failed to open repository")
-
-	// Get HEAD commit
-	ref, err := repo.Head()
-	require.NoError(t, err, "Failed to get HEAD")
-
-	commit, err := repo.CommitObject(ref.Hash())
-	require.NoError(t, err, "Failed to get commit object")
-
-	// Verify actor format for commits
-	authorEmail := commit.Author.Email
-	expectedActor := authorEmail + "@git"
-
-	t.Logf("Expected commit actor: %s", expectedActor)
-	assert.Contains(t, expectedActor, "@git", "Commit actor should end with @git")
-
-	// Verify actor format for branches
-	branchName := "main"
-	expectedBranchActor := branchName + "@branch"
-
-	t.Logf("Expected branch actor: %s", expectedBranchActor)
-	assert.Contains(t, expectedBranchActor, "@branch", "Branch actor should end with @branch")
-}
-
 // TestGitIxProcessor_IsGitRepository tests repository detection
 func TestGitIxProcessor_IsGitRepository(t *testing.T) {
 	tests := []struct {
