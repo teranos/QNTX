@@ -4,7 +4,7 @@
  * Basic tests for node type state management
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { hiddenNodeTypes } from './legenda';
 
 describe('Legenda State Management', () => {

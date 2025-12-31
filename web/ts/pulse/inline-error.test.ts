@@ -4,7 +4,7 @@
  * Verifies that scheduling errors are displayed inline (not as toasts)
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { Window } from 'happy-dom';
 
 // Set up DOM environment
