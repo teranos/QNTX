@@ -3,7 +3,7 @@
 // Regenerate with: make types
 // Source package: async
 
-export type ErrorCode = 'file_not_found' | 'parse_error' | 'network_error' | 'database_error' | 'validation_error' | 'ai_error' | 'timeout' | 'unknown';
+export type ErrorCode = 'ai_error' | 'database_error' | 'file_not_found' | 'network_error' | 'parse_error' | 'timeout' | 'unknown' | 'validation_error';
 
 export interface ErrorContext {
   /** Where the error occurred */
@@ -42,7 +42,7 @@ export interface Job {
   updated_at: string;
 }
 
-export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type JobStatus = 'cancelled' | 'completed' | 'failed' | 'paused' | 'queued' | 'running';
 
 export interface Progress {
   /** Completed operations */
