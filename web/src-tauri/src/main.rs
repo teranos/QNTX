@@ -57,10 +57,10 @@ fn main() {
                 while let Some(event) = rx.recv().await {
                     match event {
                         tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                            println!("[qntx] {}", String::from_utf8_lossy(&line));
+                            print!("[qntx] {}", String::from_utf8_lossy(&line));
                         }
                         tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                            eprintln!("[qntx] {}", String::from_utf8_lossy(&line));
+                            eprint!("[qntx] {}", String::from_utf8_lossy(&line));
                         }
                         tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
                             eprintln!("[qntx] Server terminated: {:?}", status);
