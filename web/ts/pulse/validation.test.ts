@@ -4,7 +4,7 @@
  * Ensures job state integrity and valid transitions
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import type { ScheduledJob, ScheduledJobState } from './types';
 
 // Validation utilities
