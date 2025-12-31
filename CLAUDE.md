@@ -40,7 +40,7 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 - **Zero values have meaning**: `0` workers = disabled, `0` rate limit = unlimited
 - **Empty is valid**: Empty database path defaults to `qntx.db`
 - **Multi-source merge**: All config files merge; later sources override earlier ones
-- **No domain entities**: Contact, Organization, Role belong in ExpGraph, not am
+- **No domain entities**: Contact, Organization, Role belong in domain applications, not am
 
 **For Claude**: When adding config options, ensure sensible defaults exist in `am/defaults.go`. Only require configuration when truly necessary.
 
