@@ -29,3 +29,4 @@ server/docs_embedded/
 # Tauri
 web/src-tauri/target/
 web/src-tauri/bin/
+web/src-tauri/icons/
