@@ -3,6 +3,15 @@
 // Regenerate with: make types
 // Source package: schedule
 
+export const ExecutionStatusCompleted = "completed";
+export const ExecutionStatusFailed = "failed";
+export const ExecutionStatusRunning = "running";
+export const StateActive = "active";
+export const StateDeleted = "deleted";
+export const StateInactive = "inactive";
+export const StatePaused = "paused";
+export const StateStopping = "stopping";
+
 export interface Execution {
   /** Identity */
   id: string;
@@ -29,3 +38,4 @@ export interface Execution {
   /** RFC3339 timestamp */
   updated_at: string;
 }
+

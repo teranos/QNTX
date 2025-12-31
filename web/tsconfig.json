@@ -16,7 +16,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./ts/*"],
-      "@types/*": ["./types/*"]
+      "@generated/*": ["../types/generated/typescript/*"]
     },
 
     // Full strict mode
