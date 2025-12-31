@@ -6,7 +6,7 @@
  */
 
 import { apiFetch } from './api.ts';
-import { BY } from '@types/sym.js';
+import { BY } from '@generated/sym.js';
 
 interface ConfigResponse {
     config_file?: string;

@@ -10,7 +10,7 @@
  */
 
 import { apiFetch } from './api.ts';
-import { AM } from '@types/sym.js';
+import { AM } from '@generated/sym.js';
 
 interface ConfigSetting {
     key: string;
