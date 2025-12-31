@@ -423,3 +423,48 @@ export interface OverFilter {
 </td>
 </tr>
 </table>
+
+## TypeDef
+
+**Source**: [`ats/types/type_definitions.go:19`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L19)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type TypeDef struct {
+	Name string
+	Label string
+	Color string
+	Opacity *float64
+	Deprecated bool
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface TypeDef {
+  /** Type identifier (e.g., "commit", "author") */
+  Name: string;
+  /** Human-readable label for UI (e.g., "Commit", "Author") */
+  Label: string;
+  /** Hex color code for graph visualization (e.g., "#34495e") */
+  Color: string;
+  /** Visual opacity (0.0-1.0), nil defaults to 1.0 */
+  Opacity?: number | null;
+  /** Whether this type is being phased out */
+  Deprecated: boolean;
+}
+```
+
+</td>
+</tr>
+</table>
