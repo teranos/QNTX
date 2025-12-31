@@ -1,8 +1,26 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev
+.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
 	@go build -ldflags="-X 'github.com/teranos/QNTX/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+
+types: cli ## Generate TypeScript types from Go source
+	@echo "Generating TypeScript types..."
+	@./bin/qntx typegen --output types/generated/
+	@echo "✓ Types generated in types/generated/typescript/"
+
+types-check: cli ## Check if generated types are up to date
+	@echo "Checking TypeScript types..."
+	@mkdir -p tmp/types-check
+	@./bin/qntx typegen --output tmp/types-check/
+	@if diff -r tmp/types-check/typescript types/generated/typescript > /dev/null 2>&1; then \
+		echo "✓ Types are up to date"; \
+		rm -rf tmp/types-check; \
+	else \
+		echo "✗ Types are out of date. Run 'make types' to regenerate."; \
+		rm -rf tmp/types-check; \
+		exit 1; \
+	fi
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."

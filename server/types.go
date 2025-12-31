@@ -110,9 +110,9 @@ type UsageUpdateMessage struct {
 
 // JobUpdateMessage represents async IX job update
 type JobUpdateMessage struct {
-	Type     string                 `json:"type"`     // "job_update"
-	Job      *async.Job             `json:"job"`      // Full job details
-	Metadata map[string]interface{} `json:"metadata"` // Additional metadata
+	Type     string                 `json:"type"`                      // "job_update"
+	Job      *async.Job             `json:"job" tstype:"Job | null"`   // Full job details (from pulse/async)
+	Metadata map[string]interface{} `json:"metadata"`                  // Additional metadata
 }
 
 // DaemonStatusMessage represents daemon status update
