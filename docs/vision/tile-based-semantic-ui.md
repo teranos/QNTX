@@ -245,5 +245,4 @@ Each view maintains independent zoom level:
 
 ## Related Documentation
 
-- **Symbols System:** [`docs/development/symbols.md`](../development/symbols.md) - QNTX symbol definitions
-- **Multi-Frontend Switching:** [`docs/vision/multi-frontend-switching.md`](multi-frontend-switching.md) - AI-generated UI comparison
+- **Symbols System:** [`sym/README.md`](../../sym/README.md) - QNTX symbol definitions

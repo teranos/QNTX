@@ -27,7 +27,7 @@ Job management commands:
   qntx ix resume <id>     # Resume a paused job
 
 For domain-specific ingestion (linkedin, vcf, jd, etc.):
-  See your application's ix commands (e.g., expgraph ix)`,
+  See your application's ix commands for domain-specific ingesters.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	},
