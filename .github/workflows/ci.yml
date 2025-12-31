@@ -50,6 +50,9 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Check generated types are up to date
+        run: make types-check
+
   typescript:
     name: TypeScript Tests
     runs-on: ubuntu-latest
