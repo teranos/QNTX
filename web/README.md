@@ -121,10 +121,10 @@ The `package.json` locks **exact versions** (no `^` or `~`):
 make cli
 
 # Start server in test mode
-./bin/expgraph server --test-mode
+./bin/qntx server --test-mode
 
 # Or without test mode (requires existing database)
-./bin/expgraph server
+./bin/qntx server
 
 # Visit http://localhost:877 in browser
 # Verify:
@@ -200,7 +200,7 @@ Check `js/main.js` size after build. If larger than expected:
 ### Changes not appearing in app
 1. Did you run `bun run build`? (Creates dist/)
 2. Did you run `make cli`? (Rebuilds Go binary with new dist/)
-3. Are you running the new binary? (`./bin/expgraph`)
+3. Are you running the new binary? (`./bin/qntx`)
 
 ### Outdated versions causing issues
 Check `bun.lock` - if versions don't match package.json:

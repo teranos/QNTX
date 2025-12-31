@@ -16,9 +16,9 @@ QNTX provides a **domain-agnostic foundation** for building knowledge systems. A
 
 - **꩜** pulse - continuous compute (heartbeat)
 - **≡** am - system configuration (being/state)
-- **⌬** of - actors/agents
-- **⨳** ix - ingest
-- **⋈** ax - ask/query
+- **⌬** by - actor/catalyst (origin of action)
+- **⨳** ix - ingest/import
+- **⋈** ax - expand/query (contextual surfacing)
 - **⊔** db - database/storage (material retention substrate)
 
 ## Configuration
