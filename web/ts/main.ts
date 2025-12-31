@@ -78,7 +78,7 @@ function handleVersion(data: VersionInfo): void {
         buildHash.textContent = `${versionText} · `;
 
         const commitLink = document.createElement('a');
-        commitLink.href = `https://github.com/sbvh-nl/expgraph/commit/${data.commit}`;
+        commitLink.href = `https://github.com/teranos/QNTX/commit/${data.commit}`;
         commitLink.target = '_blank';
         commitLink.style.color = 'inherit';
         commitLink.style.textDecoration = 'none';

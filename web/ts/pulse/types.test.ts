@@ -4,7 +4,7 @@
  * Covers interval formatting/parsing and type validation
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 import { formatInterval, parseInterval } from './types';
 
 describe('Pulse Type Utilities', () => {

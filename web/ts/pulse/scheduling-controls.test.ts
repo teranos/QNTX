@@ -4,7 +4,7 @@
  * Tests UI state and interactions for scheduling controls
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { Window } from 'happy-dom';
 import { createSchedulingControls } from './scheduling-controls';
 import type { ScheduledJob } from './types';
@@ -15,17 +15,27 @@ globalThis.document = window.document as unknown as Document;
 globalThis.window = window as unknown as Window & typeof globalThis;
 
 // Mock API functions
-vi.mock('./api', () => ({
-  createScheduledJob: vi.fn(),
-  updateScheduledJob: vi.fn(),
-  pauseScheduledJob: vi.fn(),
-  resumeScheduledJob: vi.fn(),
-  deleteScheduledJob: vi.fn(),
+const mockCreateScheduledJob = mock(() => Promise.resolve());
+const mockUpdateScheduledJob = mock(() => Promise.resolve());
+const mockPauseScheduledJob = mock(() => Promise.resolve());
+const mockResumeScheduledJob = mock(() => Promise.resolve());
+const mockDeleteScheduledJob = mock(() => Promise.resolve());
+
+mock.module('./api', () => ({
+  createScheduledJob: mockCreateScheduledJob,
+  updateScheduledJob: mockUpdateScheduledJob,
+  pauseScheduledJob: mockPauseScheduledJob,
+  resumeScheduledJob: mockResumeScheduledJob,
+  deleteScheduledJob: mockDeleteScheduledJob,
 }));
 
 describe('Scheduling Controls UI', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockCreateScheduledJob.mockClear();
+    mockUpdateScheduledJob.mockClear();
+    mockPauseScheduledJob.mockClear();
+    mockResumeScheduledJob.mockClear();
+    mockDeleteScheduledJob.mockClear();
   });
 
   describe('Empty ATS Code Prevention', () => {
@@ -186,7 +196,7 @@ describe('Scheduling Controls UI', () => {
   describe('ATS Code Callback Pattern', () => {
     it('should call function to get fresh ATS code when needed', () => {
       let currentCode = 'ix https://example.com/api/data';
-      const getCode = vi.fn(() => currentCode);
+      const getCode = mock(() => currentCode);
 
       const controls = createSchedulingControls({
         atsCode: getCode,

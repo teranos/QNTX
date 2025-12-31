@@ -6,7 +6,7 @@
  * allowing users to navigate back to the source document.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'bun:test';
 
 describe('Prose Document Linking', () => {
   it('should include document path when creating job from prose document', () => {
