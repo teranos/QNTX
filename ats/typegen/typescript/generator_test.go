@@ -3,6 +3,8 @@ package typescript
 import (
 	"go/ast"
 	"testing"
+
+	"github.com/teranos/QNTX/ats/typegen"
 )
 
 func TestParseFieldTags_JSONOnly(t *testing.T) {
@@ -362,7 +364,8 @@ func TestGenerateUnionType(t *testing.T) {
 	values := []string{"active", "paused", "completed"}
 	result := GenerateUnionType("Status", values)
 
-	expected := "export type Status = 'active' | 'paused' | 'completed';"
+	// Values are sorted alphabetically for deterministic output
+	expected := "export type Status = 'active' | 'completed' | 'paused';"
 	if result != expected {
 		t.Errorf("Expected %q, got %q", expected, result)
 	}
@@ -384,7 +387,7 @@ func TestGenerateUnionType_Single(t *testing.T) {
 
 func TestGenerateFile(t *testing.T) {
 	gen := NewGenerator()
-	result := &Result{
+	result := &typegen.Result{
 		Types: map[string]string{
 			"TypeA": "export interface TypeA { a: string; }",
 			"TypeB": "export interface TypeB { b: number; }",
@@ -419,7 +422,7 @@ func TestGenerateFile(t *testing.T) {
 
 func TestGenerateFile_DeterministicOrder(t *testing.T) {
 	gen := NewGenerator()
-	result := &Result{
+	result := &typegen.Result{
 		Types: map[string]string{
 			"Zebra": "export type Zebra = string;",
 			"Alpha": "export type Alpha = string;",

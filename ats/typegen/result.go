@@ -9,4 +9,16 @@ type Result struct {
 
 	// PackageName is the Go package that was processed
 	PackageName string
+
+	// TypePositions maps type names to their source location
+	// Used for generating documentation links
+	TypePositions map[string]Position
+}
+
+// Position represents a source code location
+type Position struct {
+	// File is the repository-relative path (e.g., "ats/types/types.go")
+	File string
+	// Line is the line number where the type is defined
+	Line int
 }
