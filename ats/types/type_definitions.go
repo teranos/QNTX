@@ -99,6 +99,8 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 //	        "impact", "graph visualization may lack custom type metadata")
 //	}
 func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) error {
+	var errors []error
+
 	for _, def := range typeDefs {
 		// Default opacity to 1.0 if not set
 		opacity := def.Opacity
@@ -114,8 +116,17 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 		}
 
 		if err := AttestType(store, def.Name, source, attrs); err != nil {
-			return fmt.Errorf("failed to attest type %s: %w", def.Name, err)
+			errors = append(errors, fmt.Errorf("failed to attest type %s: %w", def.Name, err))
 		}
+	}
+
+	// Return combined error if any failed, but all were attempted
+	if len(errors) > 0 {
+		errMsg := "failed to create some type definitions:"
+		for _, err := range errors {
+			errMsg += "\n  - " + err.Error()
+		}
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	return nil
