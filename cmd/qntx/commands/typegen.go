@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats/typegen"
+	"github.com/teranos/QNTX/ats/typegen/markdown"
 	"github.com/teranos/QNTX/ats/typegen/typescript"
 )
 
@@ -89,9 +90,11 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript"} // Only TypeScript for now, will expand in v1.0.0
+		return []string{"typescript", "markdown"} // TypeScript + Markdown docs
 	case "typescript", "ts":
 		return []string{"typescript"}
+	case "markdown", "md":
+		return []string{"markdown"}
 	case "python", "py":
 		return []string{"python"}
 	case "rust", "rs":
@@ -130,20 +133,30 @@ type genResult struct {
 
 // generateForLanguage generates types for a specific language
 func generateForLanguage(lang string, packages []string) error {
-	// Only TypeScript is implemented for now
-	if lang != "typescript" {
+	// Create the appropriate generator
+	var gen typegen.Generator
+	switch lang {
+	case "typescript":
+		gen = typescript.NewGenerator()
+	case "markdown":
+		gen = markdown.NewGenerator()
+	case "python", "rust", "dart":
 		fmt.Printf("⚠ %s generator not yet implemented (coming in v1.0.0)\n", lang)
 		return nil
+	default:
+		return fmt.Errorf("unknown language: %s", lang)
 	}
 
 	// Generate types for all packages
-	results, typeToPackage, err := generateTypesForPackages(packages)
+	results, typeToPackage, err := generateTypesForPackages(packages, gen)
 	if err != nil {
 		return err
 	}
 
 	// Add cross-package imports (TypeScript-specific)
-	addCrossPackageImports(results, typeToPackage)
+	if lang == "typescript" {
+		addCrossPackageImports(results, typeToPackage)
+	}
 
 	// Determine output configuration
 	outputDir, fileExt := getOutputConfig(lang)
@@ -161,27 +174,32 @@ func generateForLanguage(lang string, packages []string) error {
 		}
 	}
 
+	// Generate README.md index for markdown documentation
+	if outputDir != "" && lang == "markdown" {
+		readme := generateMarkdownIndex(results)
+		readmePath := filepath.Join(outputDir, "README.md")
+		if err := os.WriteFile(readmePath, []byte(readme), 0644); err != nil {
+			return fmt.Errorf("failed to write README: %w", err)
+		}
+		fmt.Printf("✓ Generated %s (index)\n", readmePath)
+	}
+
 	return nil
 }
 
 // generateTypesForPackages generates types for all packages (first pass)
-func generateTypesForPackages(packages []string) ([]genResult, map[string]string, error) {
+func generateTypesForPackages(packages []string, gen typegen.Generator) ([]genResult, map[string]string, error) {
 	results := make([]genResult, 0, len(packages))
 	typeToPackage := make(map[string]string) // typeName -> packageName
 
 	for _, pkg := range packages {
-		result, err := typegen.GenerateFromPackage(pkg)
+		result, err := typegen.GenerateFromPackage(pkg, gen)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to generate types for %s: %w", pkg, err)
 		}
 
-		// Convert to TypeScript-specific result and generate
-		tsResult := &typescript.Result{
-			Types:       result.Types,
-			PackageName: result.PackageName,
-		}
-		gen := typescript.NewGenerator()
-		output := gen.GenerateFile(tsResult)
+		// Generate output file
+		output := gen.GenerateFile(result)
 
 		typeNames := make([]string, 0, len(result.Types))
 		for name := range result.Types {
@@ -212,14 +230,22 @@ func addCrossPackageImports(results []genResult, typeToPackage map[string]string
 // getOutputConfig determines the output directory and file extension for a language
 func getOutputConfig(lang string) (outputDir, fileExt string) {
 	if typegenOutput == "" {
-		outputDir = "" // stdout mode
+		// No output specified: markdown defaults to docs/types, others to stdout
+		if lang == "markdown" {
+			outputDir = "docs/types"
+		} else {
+			outputDir = "" // stdout mode
+		}
 	} else {
+		// Output specified: use it for all languages
 		outputDir = filepath.Join(typegenOutput, lang)
 	}
 
 	switch lang {
 	case "typescript":
 		fileExt = ".ts"
+	case "markdown":
+		fileExt = ".md"
 	case "python":
 		fileExt = ".py"
 	case "rust":
@@ -269,4 +295,99 @@ func convertToPackageExports(results []genResult) []typescript.PackageExport {
 		}
 	}
 	return exports
+}
+
+// generateMarkdownIndex creates a README.md index for the docs/types directory
+func generateMarkdownIndex(results []genResult) string {
+	var sb strings.Builder
+
+	// Package descriptions
+	packageDescriptions := map[string]string{
+		"types":    "Core attestation types (As, AsCommand, AxFilter)",
+		"async":    "Asynchronous job processing with Pulse",
+		"budget":   "Cost tracking and budget management",
+		"schedule": "Scheduled execution with cron",
+		"server":   "WebSocket message types for real-time updates",
+	}
+
+	sb.WriteString("# QNTX Type Definitions\n\n")
+	sb.WriteString("Auto-generated documentation showing Go source code alongside TypeScript type definitions.\n\n")
+	sb.WriteString("> **Purpose**: Provides a single source of truth for type definitions across different contexts ")
+	sb.WriteString("(ChatGPT projects, documentation, etc.) to prevent type drift.\n\n")
+
+	sb.WriteString("## Packages\n\n")
+
+	// Group packages by category
+	corePackages := []string{"types"}
+	pulsePackages := []string{"async", "budget", "schedule"}
+	serverPackages := []string{"server"}
+
+	writePackageSection := func(title string, packages []string) {
+		if len(packages) == 0 {
+			return
+		}
+		sb.WriteString(fmt.Sprintf("### %s\n\n", title))
+		for _, pkg := range packages {
+			for _, res := range results {
+				if res.packageName == pkg {
+					desc := packageDescriptions[pkg]
+					if desc == "" {
+						desc = fmt.Sprintf("%s types", pkg)
+					}
+					sb.WriteString(fmt.Sprintf("- **[%s](./%s.md)** - %s (%d types)\n",
+						pkg, pkg, desc, len(res.typeNames)))
+					break
+				}
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	writePackageSection("Core Types", corePackages)
+	writePackageSection("Pulse System", pulsePackages)
+	writePackageSection("Server", serverPackages)
+
+	sb.WriteString("## Usage\n\n")
+	sb.WriteString("### For LLM Contexts (ChatGPT, Claude Projects)\n\n")
+	sb.WriteString("Copy the relevant markdown file into your project context to ensure type consistency:\n\n")
+	sb.WriteString("```\n")
+	sb.WriteString("Project Files/\n")
+	sb.WriteString("  └── qntx-types.md  (copy from docs/types/)\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("### For Development\n\n")
+	sb.WriteString("Use as reference when:\n")
+	sb.WriteString("- Writing TypeScript code that interfaces with QNTX\n")
+	sb.WriteString("- Understanding the shape of API responses\n")
+	sb.WriteString("- Debugging type mismatches\n\n")
+
+	sb.WriteString("### For Documentation\n\n")
+	sb.WriteString("Link to specific types in your docs:\n")
+	sb.WriteString("```markdown\n")
+	sb.WriteString("See [Job type](./docs/types/async.md#job) for details.\n")
+	sb.WriteString("```\n\n")
+
+	sb.WriteString("## Regeneration\n\n")
+	sb.WriteString("These files are automatically regenerated from Go source code:\n\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString("make types              # Regenerate all types\n")
+	sb.WriteString("make types-check        # Verify types are up to date (CI)\n")
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Do not edit manually** - changes will be overwritten.\n\n")
+
+	sb.WriteString("## Format\n\n")
+	sb.WriteString("Each type is shown side-by-side:\n\n")
+	sb.WriteString("| Go Source | TypeScript |\n")
+	sb.WriteString("|-----------|------------|\n")
+	sb.WriteString("| Full struct with tags | Generated interface |\n\n")
+	sb.WriteString("This makes it easy to:\n")
+	sb.WriteString("- See the canonical Go definition\n")
+	sb.WriteString("- Understand the TypeScript mapping\n")
+	sb.WriteString("- Verify struct tags are correct\n")
+	sb.WriteString("- Cross-reference between languages\n\n")
+
+	sb.WriteString("---\n\n")
+	sb.WriteString("*Generated by `qntx typegen`*\n")
+
+	return sb.String()
 }
