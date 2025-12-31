@@ -57,7 +57,10 @@ func AddImportsToOutput(output string, imports map[string][]string) string {
 	var result []string
 	headerEnd := 0
 	for i, line := range lines {
-		if !strings.HasPrefix(line, "//") && line != "" {
+		trimmed := strings.TrimSpace(line)
+		// Skip comment lines (both // and /* */), empty lines
+		isComment := strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*")
+		if !isComment && trimmed != "" {
 			headerEnd = i
 			break
 		}
