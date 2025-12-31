@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ixgest/git"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -78,13 +79,12 @@ The daemon will:
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Create worker pool
-		pool := async.NewWorkerPoolWithContext(ctx, database, cfg, poolCfg, logger.Logger)
+		// Create handler registry and register handlers
+		registry := async.NewHandlerRegistry()
+		registry.Register(git.NewGitIngestionHandler(database, logger.Logger))
 
-		// Note: The Pulse daemon processes jobs created by the application.
-		// Jobs are self-contained with handler_name and payload fields.
-		// Applications are responsible for creating properly-formed jobs via the Queue API.
-		// See pulse/async package documentation for job creation examples.
+		// Create worker pool with registered handlers
+		pool := async.NewWorkerPoolWithRegistry(ctx, database, cfg, poolCfg, logger.Logger, registry, nil, nil)
 
 		pool.Start()
 
