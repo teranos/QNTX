@@ -39,24 +39,6 @@ fn get_server_url(state: State<ServerState>) -> Option<String> {
     }
 }
 
-fn update_tray_menu(app: &AppHandle, is_running: bool) {
-    let status_item = MenuItem::with_id(
-        app,
-        "status",
-        if is_running { "Server: Running ✓" } else { "Server: Stopped" },
-        false,
-        None::<&str>,
-    ).unwrap();
-
-    let quit_item = MenuItem::with_id(app, "quit", "Quit QNTX", true, None::<&str>).unwrap();
-
-    let menu = Menu::with_items(app, &[&status_item, &quit_item]).unwrap();
-
-    if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_menu(Some(menu));
-    }
-}
-
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -108,7 +90,7 @@ fn main() {
                         // Stop server and quit
                         if let Some(state) = app.try_state::<ServerState>() {
                             let mut child = state.child.lock().unwrap();
-                            if let Some(mut process) = child.take() {
+                            if let Some(process) = child.take() {
                                 let _ = process.kill();
                             }
                         }
