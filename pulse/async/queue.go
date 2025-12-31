@@ -327,12 +327,12 @@ func (q *Queue) Cleanup(ctx context.Context, olderThan time.Duration) (int, erro
 
 // QueueStats returns statistics about the queue
 type QueueStats struct {
-	Queued    int
-	Running   int
-	Paused    int
-	Completed int
-	Failed    int
-	Total     int
+	Queued    int `json:"queued"`
+	Running   int `json:"running"`
+	Paused    int `json:"paused"`
+	Completed int `json:"completed"`
+	Failed    int `json:"failed"`
+	Total     int `json:"total"`
 }
 
 // GetStats returns queue statistics

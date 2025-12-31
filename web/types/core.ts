@@ -237,42 +237,6 @@ export interface LogBatchData {
   };
 }
 
-/**
- * Job information
- */
-export interface Job {
-  id: string;
-  status: 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
-  type: string;
-  description?: string;
-  progress?: number;
-  created_at: number;
-  updated_at?: number;
-  error?: string;
-  result?: unknown;
-}
-
-// ============================================================================
-// Daemon State Types
-// ============================================================================
-
-/**
- * Daemon status information
- */
-export interface DaemonStatus {
-  running: boolean;
-  active_jobs: number;
-  load_percent: number;
-  budget_daily?: number;
-  budget_weekly?: number;
-  budget_monthly?: number;
-  budget_daily_limit?: number;
-  budget_weekly_limit?: number;
-  budget_monthly_limit?: number;
-  uptime?: number;
-  version?: string;
-}
-
 // ============================================================================
 // Git Integration Types
 // ============================================================================
