@@ -2,6 +2,7 @@
 // Regenerate with: make types
 // Source package: budget
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#budgetconfig>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BudgetConfig {
     pub daily_budget_usd: f64,
@@ -10,10 +11,12 @@ pub struct BudgetConfig {
     pub cost_per_score_usd: f64,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#limiter>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limiter {
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#status>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Status {
     pub daily_spend: f64,
@@ -27,6 +30,7 @@ pub struct Status {
     pub monthly_ops: i64,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#tracker>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tracker {
 }
