@@ -26,5 +26,5 @@ pub mod types;
 // Re-export commonly used types for convenience
 pub use async_types::{ErrorCode, ErrorContext, Job, JobStatus, Progress, PulseState};
 pub use budget::{Limiter, Tracker};
-pub use schedule::{Execution};
+pub use schedule::Execution;
 pub use server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage};

@@ -22,6 +22,6 @@ pub mod sym;
 pub mod types;
 
 // Re-export commonly used types for convenience
-pub use r#async::{ErrorCode, ErrorContext, Job, JobStatus, Progress, PulseState};
 pub use budget::{Limiter, Tracker};
-pub use schedule::{Execution};
+pub use r#async::{ErrorCode, ErrorContext, Job, JobStatus, Progress, PulseState};
+pub use schedule::Execution;
