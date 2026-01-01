@@ -375,3 +375,25 @@ func GetGitHash() string {
 	}
 	return strings.TrimSpace(string(output))
 }
+
+// GetLastCommitHash returns the hash of the last commit that modified the given file
+// Returns empty string if file doesn't exist or not in git repo
+func GetLastCommitHash(filepath string) string {
+	cmd := exec.Command("git", "log", "-1", "--format=%h", "--", filepath)
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// GetLastCommitTime returns the timestamp of the last commit that modified the given file
+// Returns empty string if file doesn't exist or not in git repo
+func GetLastCommitTime(filepath string) string {
+	cmd := exec.Command("git", "log", "-1", "--format=%cI", "--", filepath)
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
