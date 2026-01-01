@@ -8,7 +8,7 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## As
 
-**Source**: [`ats/types/attestation.go:8`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L8)
+**Source**: [`ats/types/attestation.go:9`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L9)
 
 
 <table>
@@ -65,7 +65,7 @@ export interface As {
 
 ## AsCommand
 
-**Source**: [`ats/types/attestation.go:21`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L21)
+**Source**: [`ats/types/attestation.go:22`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L22)
 
 
 <table>
@@ -113,7 +113,7 @@ export interface AsCommand {
 
 ## AxDebug
 
-**Source**: [`ats/types/attestation.go:103`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L103)
+**Source**: [`ats/types/attestation.go:104`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L104)
 
 
 <table>
@@ -157,7 +157,7 @@ export interface AxDebug {
 
 ## AxFilter
 
-**Source**: [`ats/types/attestation.go:80`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L80)
+**Source**: [`ats/types/attestation.go:81`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L81)
 
 
 <table>
@@ -217,7 +217,7 @@ export interface AxFilter {
 
 ## AxResult
 
-**Source**: [`ats/types/attestation.go:94`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L94)
+**Source**: [`ats/types/attestation.go:95`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L95)
 
 
 <table>
@@ -262,7 +262,7 @@ export interface AxResult {
 
 ## AxSummary
 
-**Source**: [`ats/types/attestation.go:114`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L114)
+**Source**: [`ats/types/attestation.go:115`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L115)
 
 
 <table>
@@ -346,7 +346,7 @@ export interface CompletionItem {
 
 ## Conflict
 
-**Source**: [`ats/types/attestation.go:123`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L123)
+**Source**: [`ats/types/attestation.go:124`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L124)
 
 
 <table>
@@ -387,7 +387,7 @@ export interface Conflict {
 
 ## OverFilter
 
-**Source**: [`ats/types/attestation.go:73`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L73)
+**Source**: [`ats/types/attestation.go:74`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L74)
 
 
 <table>
