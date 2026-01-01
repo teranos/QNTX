@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teranos/QNTX/ats/typegen"
-	"github.com/teranos/QNTX/ats/typegen/typescript"
+	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/code/typegen/typescript"
 )
 
 // Helper function to generate TypeScript file from Result
