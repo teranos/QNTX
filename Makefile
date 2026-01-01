@@ -8,7 +8,7 @@ QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
-	@go build -ldflags="-X 'github.com/teranos/QNTX/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+	@go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
