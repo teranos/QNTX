@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        # CI image with Go + Rust toolchain
+        # CI image with Go + Rust toolchain + prebuilt QNTX binary
         ciImage = pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
@@ -44,6 +44,11 @@
           ];
 
           extraCommands = ''
+            # Copy prebuilt QNTX binary to image
+            mkdir -p usr/local/bin
+            cp ${./bin/qntx} usr/local/bin/qntx
+            chmod +x usr/local/bin/qntx
+
             # GitHub Actions compatibility: symlink dynamic linker
             mkdir -p lib64
             ln -sf ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 lib64/ld-linux-x86-64.so.2
@@ -55,6 +60,7 @@
 
           config = {
             Env = [
+              "PATH=/usr/local/bin:${pkgs.lib.makeBinPath [ pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.findutils pkgs.bash ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
             ];
