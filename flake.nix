@@ -14,7 +14,7 @@
         # Build QNTX binary with Nix
         qntx = pkgs.buildGoModule {
           pname = "qntx";
-          version = "0.14.11";
+          version = self.rev or "dev";
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
