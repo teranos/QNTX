@@ -33,11 +33,6 @@ jobs:
       - name: Configure git safe directory
         run: git config --global --add safe.directory /__w/QNTX/QNTX
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
