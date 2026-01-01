@@ -10,6 +10,8 @@
  * - Track job durations to avoid notification spam
  */
 
+import { invoke } from '@tauri-apps/api/core';
+
 // Threshold for "long-running" job notifications (30 seconds)
 const LONG_JOB_THRESHOLD_MS = 30000;
 
@@ -36,13 +38,7 @@ async function invokeIfTauri<T>(command: string, args: Record<string, unknown>):
     }
 
     try {
-        // Access the global Tauri API (injected by Tauri with withGlobalTauri: true)
-        const tauri = (window as any).__TAURI__;
-        if (!tauri?.core?.invoke) {
-            console.warn('[tauri-notifications] Tauri API not available');
-            return undefined;
-        }
-        return await tauri.core.invoke(command, args) as T;
+        return await invoke<T>(command, args);
     } catch (error) {
         console.warn(`[tauri-notifications] Failed to invoke ${command}:`, error);
         return undefined;
