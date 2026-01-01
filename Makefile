@@ -28,7 +28,10 @@ types-check: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Check if generated t
 		echo "✓ Types are up to date"; \
 		rm -rf tmp/types-check; \
 	else \
-		echo "✗ Types are out of date. Run 'make types' to regenerate."; \
+		echo "✗ Types are out of date. Showing diff:"; \
+		diff -r tmp/types-check/typescript types/generated/typescript || true; \
+		diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target tmp/types-check/rust types/generated/rust || true; \
+		diff -r tmp/types-check/markdown docs/types || true; \
 		rm -rf tmp/types-check; \
 		exit 1; \
 	fi
