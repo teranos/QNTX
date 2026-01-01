@@ -86,6 +86,7 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 		Types:         make(map[string]string),
 		PackageName:   pkg.Name,
 		TypePositions: make(map[string]Position),
+		TypeComments:  make(map[string]string),
 		Consts:        make(map[string]string),
 		Arrays:        make(map[string][]string),
 		Maps:          make(map[string]map[string]string),
@@ -124,6 +125,18 @@ func processFile(file *ast.File, result *Result, packageName string, gen Generat
 			} else if node.Tok == token.VAR {
 				// Process var declarations (slice and map literals)
 				processVarDecls(node, result)
+			} else if node.Tok == token.TYPE {
+				// Process type declarations to extract doc comments
+				for _, spec := range node.Specs {
+					if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+						// Capture doc comment (prefer spec-level, fall back to general decl)
+						if typeSpec.Doc != nil && typeSpec.Doc.Text() != "" {
+							result.TypeComments[typeSpec.Name.Name] = strings.TrimSpace(typeSpec.Doc.Text())
+						} else if node.Doc != nil && node.Doc.Text() != "" {
+							result.TypeComments[typeSpec.Name.Name] = strings.TrimSpace(node.Doc.Text())
+						}
+					}
+				}
 			}
 		case *ast.TypeSpec:
 			// Only process exported types

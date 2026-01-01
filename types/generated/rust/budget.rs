@@ -14,6 +14,9 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
+/// BudgetConfig contains budget limits for daily/weekly/monthly spend tracking.
+/// Uses pure sliding windows (24h/7d/30d) on ai_model_usage table to prevent boundary gaming.
+/// See docs/architecture/pulse-resource-coordination.md for multi-process coordination design.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#budgetconfig>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BudgetConfig {
@@ -23,11 +26,13 @@ pub struct BudgetConfig {
     pub cost_per_score_usd: f64,
 }
 
+/// Limiter enforces max calls per time window using sliding window algorithm
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#limiter>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Limiter {
 }
 
+/// Status represents current budget state
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#status>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Status {
@@ -42,6 +47,7 @@ pub struct Status {
     pub monthly_ops: i64,
 }
 
+/// Tracker tracks and enforces budget limits
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#tracker>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tracker {

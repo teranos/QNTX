@@ -23,6 +23,14 @@ pub const STATE_INACTIVE: &str = "inactive";
 pub const STATE_PAUSED: &str = "paused";
 pub const STATE_STOPPING: &str = "stopping";
 
+/// Execution represents a single execution of a scheduled Pulse job
+/// Each time a scheduled job runs, an Execution record is created to track:
+/// - Timing (started_at, completed_at, duration)
+/// - Status (running, completed, failed)
+/// - Output (logs, result summary, errors)
+/// - Link to async job for detailed processing
+/// This provides execution history for debugging, monitoring, performance
+/// tracking, and failure troubleshooting.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#execution>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Execution {

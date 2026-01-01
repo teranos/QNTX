@@ -16,6 +16,7 @@
 
 use crate::{Execution, Job};
 
+/// ChildJobInfo represents a child job summary
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#childjobinfo>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ChildJobInfo {
@@ -35,6 +36,7 @@ pub struct ChildJobInfo {
     pub completed_at: Option<String>,
 }
 
+/// CodeEntry represents a code file or directory in the workspace
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#codeentry>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CodeEntry {
@@ -46,6 +48,7 @@ pub struct CodeEntry {
     pub children: Option<Vec<CodeEntry>>,
 }
 
+/// CompleteMessage represents import completion
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#completemessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompleteMessage {
@@ -55,6 +58,7 @@ pub struct CompleteMessage {
     pub message: String,
 }
 
+/// ConsoleLog represents a browser console message
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#consolelog>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConsoleLog {
@@ -68,6 +72,7 @@ pub struct ConsoleLog {
     pub url: Option<String>,
 }
 
+/// CreateScheduledJobRequest represents the request to create a new scheduled job
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#createscheduledjobrequest>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateScheduledJobRequest {
@@ -84,6 +89,7 @@ pub struct CreateScheduledJobRequest {
     pub force: Option<bool>,
 }
 
+/// DaemonStatusMessage represents daemon status update
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#daemonstatusmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DaemonStatusMessage {
@@ -115,12 +121,14 @@ pub struct DaemonStatusMessage {
     pub timestamp: i64,
 }
 
+/// ErrorResponse represents an API error
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#errorresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ErrorResponse {
     pub error: String,
 }
 
+/// JobChildrenResponse represents the response for GET /api/pulse/jobs/:id/children
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#jobchildrenresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct JobChildrenResponse {
@@ -128,6 +136,7 @@ pub struct JobChildrenResponse {
     pub children: Vec<ChildJobInfo>,
 }
 
+/// JobStagesResponse represents the response for GET /jobs/:job_id/stages
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#jobstagesresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct JobStagesResponse {
@@ -135,6 +144,7 @@ pub struct JobStagesResponse {
     pub stages: Vec<StageInfo>,
 }
 
+/// JobUpdateMessage represents async IX job update
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#jobupdatemessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct JobUpdateMessage {
@@ -147,6 +157,7 @@ pub struct JobUpdateMessage {
     pub metadata: serde_json::Map<String, serde_json::Value>,
 }
 
+/// LLMStreamMessage represents streaming LLM output
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#llmstreammessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LLMStreamMessage {
@@ -172,6 +183,7 @@ pub struct LLMStreamMessage {
     pub error: Option<String>,
 }
 
+/// ListExecutionsResponse represents the response for listing job executions
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#listexecutionsresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ListExecutionsResponse {
@@ -182,6 +194,7 @@ pub struct ListExecutionsResponse {
     pub has_more: bool,
 }
 
+/// ListScheduledJobsResponse represents the response for listing scheduled jobs
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#listscheduledjobsresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ListScheduledJobsResponse {
@@ -189,6 +202,7 @@ pub struct ListScheduledJobsResponse {
     pub count: i64,
 }
 
+/// LogEntry represents a single log entry
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#logentry>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LogEntry {
@@ -199,6 +213,7 @@ pub struct LogEntry {
     pub metadata: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
+/// ProgressMessage represents an import progress message
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#progressmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ProgressMessage {
@@ -212,6 +227,7 @@ pub struct ProgressMessage {
     pub message: String,
 }
 
+/// ProseEntry represents a prose content file or directory
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#proseentry>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ProseEntry {
@@ -223,6 +239,7 @@ pub struct ProseEntry {
     pub children: Option<Vec<ProseEntry>>,
 }
 
+/// PulseExecutionCompletedMessage represents a Pulse execution that completed successfully
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutioncompletedmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseExecutionCompletedMessage {
@@ -244,6 +261,7 @@ pub struct PulseExecutionCompletedMessage {
     pub timestamp: i64,
 }
 
+/// PulseExecutionFailedMessage represents a Pulse execution that failed
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutionfailedmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseExecutionFailedMessage {
@@ -263,6 +281,7 @@ pub struct PulseExecutionFailedMessage {
     pub timestamp: i64,
 }
 
+/// PulseExecutionLogStreamMessage represents live log output from a running execution
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutionlogstreammessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseExecutionLogStreamMessage {
@@ -278,6 +297,7 @@ pub struct PulseExecutionLogStreamMessage {
     pub timestamp: i64,
 }
 
+/// PulseExecutionStartedMessage represents a Pulse execution that just started
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutionstartedmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseExecutionStartedMessage {
@@ -293,6 +313,7 @@ pub struct PulseExecutionStartedMessage {
     pub timestamp: i64,
 }
 
+/// QueryMessage represents a client message
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#querymessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueryMessage {
@@ -331,6 +352,7 @@ pub struct QueryMessage {
     pub hidden: bool,
 }
 
+/// ScheduledJobResponse represents a scheduled job in API responses
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#scheduledjobresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScheduledJobResponse {
@@ -353,6 +375,7 @@ pub struct ScheduledJobResponse {
     pub updated_at: String,
 }
 
+/// StageInfo represents a stage with its tasks
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#stageinfo>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StageInfo {
@@ -360,6 +383,7 @@ pub struct StageInfo {
     pub tasks: Vec<TaskInfo>,
 }
 
+/// StatsMessage represents import statistics
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#statsmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StatsMessage {
@@ -373,6 +397,7 @@ pub struct StatsMessage {
     pub companies: i64,
 }
 
+/// StorageWarningMessage represents a bounded storage warning for approaching limits
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#storagewarningmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StorageWarningMessage {
@@ -394,6 +419,7 @@ pub struct StorageWarningMessage {
     pub timestamp: i64,
 }
 
+/// TaskInfo represents a task within a stage
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#taskinfo>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TaskInfo {
@@ -401,6 +427,7 @@ pub struct TaskInfo {
     pub log_count: i64,
 }
 
+/// TaskLogsResponse represents the response for GET /tasks/:task_id/logs
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#tasklogsresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TaskLogsResponse {
@@ -408,6 +435,7 @@ pub struct TaskLogsResponse {
     pub logs: Vec<LogEntry>,
 }
 
+/// UpdateScheduledJobRequest represents the request to update a scheduled job
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#updatescheduledjobrequest>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UpdateScheduledJobRequest {
@@ -419,6 +447,7 @@ pub struct UpdateScheduledJobRequest {
     pub interval_seconds: Option<i64>,
 }
 
+/// UsageUpdateMessage represents AI usage statistics update
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#usageupdatemessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UsageUpdateMessage {

@@ -14,6 +14,7 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
+/// ErrorCode represents the classification of an error
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcode>"]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ErrorCode {
@@ -35,6 +36,7 @@ pub enum ErrorCode {
     ValidationError,
 }
 
+/// ErrorContext provides structured error information for job failures
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcontext>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ErrorContext {
@@ -50,6 +52,12 @@ pub struct ErrorContext {
     pub recoverable: bool,
 }
 
+/// Job represents an async IX operation
+/// ARCHITECTURE: Generic job system with handler-based execution
+/// - Infrastructure (pulse/async) is domain-agnostic
+/// - Domain packages provide handlers and payloads
+/// - HandlerName identifies which handler executes the job
+/// - Payload contains handler-specific data (domain logic controls structure)
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#job>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Job {
@@ -82,6 +90,7 @@ pub struct Job {
     pub updated_at: String,
 }
 
+/// JobStatus represents the current state of a job
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#jobstatus>"]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum JobStatus {
@@ -99,6 +108,7 @@ pub enum JobStatus {
     Running,
 }
 
+/// Progress represents job progress information
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#progress>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Progress {
@@ -108,6 +118,7 @@ pub struct Progress {
     pub total: i64,
 }
 
+/// PulseState represents the pulse rate limiting and budget state for a job
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#pulsestate>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseState {
@@ -122,6 +133,7 @@ pub struct PulseState {
     pub pause_reason: Option<String>,
 }
 
+/// QueueStats returns statistics about the queue
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#queuestats>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueueStats {
@@ -133,6 +145,7 @@ pub struct QueueStats {
     pub total: i64,
 }
 
+/// SystemMetrics tracks resource usage for worker pool monitoring
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#systemmetrics>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SystemMetrics {
@@ -152,6 +165,7 @@ pub struct SystemMetrics {
     pub jobs_running: i64,
 }
 
+/// WorkerPoolConfig contains configuration for the worker pool
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#workerpoolconfig>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkerPoolConfig {

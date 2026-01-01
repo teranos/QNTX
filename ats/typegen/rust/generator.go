@@ -543,6 +543,18 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	// Sort type names for deterministic output
 	names := sortedKeys(result.Types)
 	for i, name := range names {
+		// Add Go doc comment if available (appears above the struct/type)
+		if docComment, hasComment := result.TypeComments[name]; hasComment && docComment != "" {
+			// Split multi-line comments
+			lines := strings.Split(docComment, "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line != "" {
+					sb.WriteString(fmt.Sprintf("/// %s\n", line))
+				}
+			}
+		}
+
 		// Add documentation link as #[doc] attribute (preferred for generated code)
 		// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
 		anchor := strings.ToLower(strings.ReplaceAll(toSnakeCase(name), "_", ""))
