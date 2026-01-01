@@ -121,9 +121,13 @@ type CompleteMessage struct {
 
 ```typescript
 export interface CompleteMessage {
-  /** "import_complete" */
+  /**
+   * "import_complete"
+   */
   type: string;
-  /** Completion message */
+  /**
+   * Completion message
+   */
   message: string;
 }
 ```
@@ -161,7 +165,9 @@ type ConsoleLog struct {
 ```typescript
 export interface ConsoleLog {
   timestamp: string;
-  /** error, warn, info, debug */
+  /**
+   * error, warn, info, debug
+   */
   level: string;
   message: string;
   stack?: string;
@@ -201,15 +207,25 @@ type CreateScheduledJobRequest struct {
 
 ```typescript
 export interface CreateScheduledJobRequest {
-  /** ATS code to execute (e.g., "ix https://...") */
+  /**
+   * ATS code to execute (e.g., "ix https://...")
+   */
   ats_code: string;
-  /** Execution interval in seconds */
+  /**
+   * Execution interval in seconds
+   */
   interval_seconds: number;
-  /** Optional: ProseMirror document ID */
+  /**
+   * Optional: ProseMirror document ID
+   */
   created_from_doc: string;
-  /** Optional: JSON metadata */
+  /**
+   * Optional: JSON metadata
+   */
   metadata: string;
-  /** Bypass deduplication checks (force execution) */
+  /**
+   * Bypass deduplication checks (force execution)
+   */
   force?: boolean;
 }
 ```
@@ -254,31 +270,57 @@ type DaemonStatusMessage struct {
 
 ```typescript
 export interface DaemonStatusMessage {
-  /** "daemon_status" */
+  /**
+   * "daemon_status"
+   */
   type: string;
-  /** Is daemon running */
+  /**
+   * Is daemon running
+   */
   running: boolean;
-  /** Number of active jobs */
+  /**
+   * Number of active jobs
+   */
   active_jobs: number;
-  /** Number of queued jobs */
+  /**
+   * Number of queued jobs
+   */
   queued_jobs: number;
-  /** CPU/processing load (0-100) */
+  /**
+   * CPU/processing load (0-100)
+   */
   load_percent: number;
-  /** Daily budget spent */
+  /**
+   * Daily budget spent
+   */
   budget_daily: number;
-  /** Weekly budget spent */
+  /**
+   * Weekly budget spent
+   */
   budget_weekly: number;
-  /** Monthly budget spent */
+  /**
+   * Monthly budget spent
+   */
   budget_monthly: number;
-  /** Daily budget limit (config) */
+  /**
+   * Daily budget limit (config)
+   */
   budget_daily_limit: number;
-  /** Weekly budget limit (config) */
+  /**
+   * Weekly budget limit (config)
+   */
   budget_weekly_limit: number;
-  /** Monthly budget limit (config) */
+  /**
+   * Monthly budget limit (config)
+   */
   budget_monthly_limit: number;
-  /** GRACE Phase 4: "running", "draining", "stopped" */
+  /**
+   * GRACE Phase 4: "running", "draining", "stopped"
+   */
   server_state: string;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```
@@ -413,11 +455,17 @@ type JobUpdateMessage struct {
 
 ```typescript
 export interface JobUpdateMessage {
-  /** "job_update" */
+  /**
+   * "job_update"
+   */
   type: string;
-  /** Full job details (from pulse/async) */
+  /**
+   * Full job details (from pulse/async)
+   */
   job?: Job | null;
-  /** Additional metadata */
+  /**
+   * Additional metadata
+   */
   metadata: Record<string, unknown>;
 }
 ```
@@ -457,21 +505,37 @@ type LLMStreamMessage struct {
 
 ```typescript
 export interface LLMStreamMessage {
-  /** "llm_stream" */
+  /**
+   * "llm_stream"
+   */
   type: string;
-  /** Job ID this stream belongs to */
+  /**
+   * Job ID this stream belongs to
+   */
   job_id: string;
-  /** Optional task ID within job (for sub-tasks) */
+  /**
+   * Optional task ID within job (for sub-tasks)
+   */
   task_id?: string;
-  /** Token/chunk of text */
+  /**
+   * Token/chunk of text
+   */
   content: string;
-  /** True when stream is complete */
+  /**
+   * True when stream is complete
+   */
   done: boolean;
-  /** Model name */
+  /**
+   * Model name
+   */
   model?: string;
-  /** Current stage (e.g., "extraction") */
+  /**
+   * Current stage (e.g., "extraction")
+   */
   stage?: string;
-  /** Error message if streaming failed */
+  /**
+   * Error message if streaming failed
+   */
   error?: string;
 }
 ```
@@ -507,7 +571,9 @@ type ListExecutionsResponse struct {
 
 ```typescript
 export interface ListExecutionsResponse {
-  /** From pulse/schedule */
+  /**
+   * From pulse/schedule
+   */
   executions: Execution[];
   count: number;
   total: number;
@@ -618,13 +684,21 @@ type ProgressMessage struct {
 
 ```typescript
 export interface ProgressMessage {
-  /** "import_progress" */
+  /**
+   * "import_progress"
+   */
   type: string;
-  /** Current item being processed */
+  /**
+   * Current item being processed
+   */
   current: number;
-  /** Total items to process */
+  /**
+   * Total items to process
+   */
   total: number;
-  /** Status message */
+  /**
+   * Status message
+   */
   message: string;
 }
 ```
@@ -702,21 +776,37 @@ type PulseExecutionCompletedMessage struct {
 
 ```typescript
 export interface PulseExecutionCompletedMessage {
-  /** "pulse_execution_completed" */
+  /**
+   * "pulse_execution_completed"
+   */
   type: string;
-  /** Job that completed */
+  /**
+   * Job that completed
+   */
   scheduled_job_id: string;
-  /** Execution record ID */
+  /**
+   * Execution record ID
+   */
   execution_id: string;
-  /** ATS code that was executed */
+  /**
+   * ATS code that was executed
+   */
   ats_code: string;
-  /** Created async job ID */
+  /**
+   * Created async job ID
+   */
   async_job_id: string;
-  /** Brief result description */
+  /**
+   * Brief result description
+   */
   result_summary: string;
-  /** Execution duration */
+  /**
+   * Execution duration
+   */
   duration_ms: number;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```
@@ -755,19 +845,33 @@ type PulseExecutionFailedMessage struct {
 
 ```typescript
 export interface PulseExecutionFailedMessage {
-  /** "pulse_execution_failed" */
+  /**
+   * "pulse_execution_failed"
+   */
   type: string;
-  /** Job that failed */
+  /**
+   * Job that failed
+   */
   scheduled_job_id: string;
-  /** Execution record ID */
+  /**
+   * Execution record ID
+   */
   execution_id: string;
-  /** ATS code that was executed */
+  /**
+   * ATS code that was executed
+   */
   ats_code: string;
-  /** Error description */
+  /**
+   * Error description
+   */
   error_message: string;
-  /** How long before failure */
+  /**
+   * How long before failure
+   */
   duration_ms: number;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```
@@ -804,15 +908,25 @@ type PulseExecutionLogStreamMessage struct {
 
 ```typescript
 export interface PulseExecutionLogStreamMessage {
-  /** "pulse_execution_log_stream" */
+  /**
+   * "pulse_execution_log_stream"
+   */
   type: string;
-  /** Job being executed */
+  /**
+   * Job being executed
+   */
   scheduled_job_id: string;
-  /** Execution record ID */
+  /**
+   * Execution record ID
+   */
   execution_id: string;
-  /** Log text chunk */
+  /**
+   * Log text chunk
+   */
   log_chunk: string;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```
@@ -849,15 +963,25 @@ type PulseExecutionStartedMessage struct {
 
 ```typescript
 export interface PulseExecutionStartedMessage {
-  /** "pulse_execution_started" */
+  /**
+   * "pulse_execution_started"
+   */
   type: string;
-  /** Job that's executing */
+  /**
+   * Job that's executing
+   */
   scheduled_job_id: string;
-  /** Execution record ID */
+  /**
+   * Execution record ID
+   */
   execution_id: string;
-  /** ATS code being executed */
+  /**
+   * ATS code being executed
+   */
   ats_code: string;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```
@@ -905,37 +1029,69 @@ type QueryMessage struct {
 
 ```typescript
 export interface QueryMessage {
-  /** "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility" */
+  /**
+   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility"
+   */
   type: string;
-  /** The Ax query text (can be multi-line) */
+  /**
+   * The Ax query text (can be multi-line)
+   */
   query: string;
-  /** Current line number (for multi-line support) */
+  /**
+   * Current line number (for multi-line support)
+   */
   line: number;
-  /** Cursor position */
+  /**
+   * Cursor position
+   */
   cursor: number;
-  /** Verbosity level for set_verbosity */
+  /**
+   * Verbosity level for set_verbosity
+   */
   verbosity: number;
-  /** Graph node limit for set_graph_limit */
+  /**
+   * Graph node limit for set_graph_limit
+   */
   graph_limit: number;
-  /** For upload messages */
+  /**
+   * For upload messages
+   */
   filename: string;
-  /** For upload messages: "linkedin", "vcf", etc. */
+  /**
+   * For upload messages: "linkedin", "vcf", etc.
+   */
   fileType: string;
-  /** For upload messages: base64 encoded file content */
+  /**
+   * For upload messages: base64 encoded file content
+   */
   data: string;
-  /** For daemon_control/job_control/visibility messages: "start", "stop", "pause", "resume", "details", "toggle_node_type", "toggle_isolated" */
+  /**
+   * For daemon_control/job_control/visibility messages: "start", "stop", "pause", "resume", "details", "toggle_node_type", "toggle_isolated"
+   */
   action: string;
-  /** For pulse_config_update messages */
+  /**
+   * For pulse_config_update messages
+   */
   daily_budget: number;
-  /** For pulse_config_update messages */
+  /**
+   * For pulse_config_update messages
+   */
   weekly_budget: number;
-  /** For pulse_config_update messages */
+  /**
+   * For pulse_config_update messages
+   */
   monthly_budget: number;
-  /** For job_control messages */
+  /**
+   * For job_control messages
+   */
   job_id: string;
-  /** For visibility messages: node type to toggle */
+  /**
+   * For visibility messages: node type to toggle
+   */
   node_type: string;
-  /** For visibility messages: whether to hide the node type/isolated nodes */
+  /**
+   * For visibility messages: whether to hide the node type/isolated nodes
+   */
   hidden: boolean;
 }
 ```
@@ -981,18 +1137,28 @@ export interface ScheduledJobResponse {
   id: string;
   ats_code: string;
   interval_seconds: number;
-  /** RFC3339 timestamp */
+  /**
+   * RFC3339 timestamp
+   */
   next_run_at: string;
-  /** RFC3339 timestamp */
+  /**
+   * RFC3339 timestamp
+   */
   last_run_at?: string | null;
-  /** Last async job ID */
+  /**
+   * Last async job ID
+   */
   last_execution_id: string;
   state: string;
   created_from_doc: string;
   metadata: string;
-  /** RFC3339 timestamp */
+  /**
+   * RFC3339 timestamp
+   */
   created_at: string;
-  /** RFC3339 timestamp */
+  /**
+   * RFC3339 timestamp
+   */
   updated_at: string;
 }
 ```
@@ -1062,13 +1228,21 @@ type StatsMessage struct {
 
 ```typescript
 export interface StatsMessage {
-  /** "import_stats" */
+  /**
+   * "import_stats"
+   */
   type: string;
-  /** Number of contacts imported */
+  /**
+   * Number of contacts imported
+   */
   contacts: number;
-  /** Number of attestations created */
+  /**
+   * Number of attestations created
+   */
   attestations: number;
-  /** Number of companies found */
+  /**
+   * Number of companies found
+   */
   companies: number;
 }
 ```
@@ -1108,21 +1282,37 @@ type StorageWarningMessage struct {
 
 ```typescript
 export interface StorageWarningMessage {
-  /** "storage_warning" */
+  /**
+   * "storage_warning"
+   */
   type: string;
-  /** Actor approaching limit */
+  /**
+   * Actor approaching limit
+   */
   actor: string;
-  /** Context approaching limit */
+  /**
+   * Context approaching limit
+   */
   context: string;
-  /** Current attestation count */
+  /**
+   * Current attestation count
+   */
   current: number;
-  /** Configured limit */
+  /**
+   * Configured limit
+   */
   limit: number;
-  /** Percentage full (0.0-1.0) */
+  /**
+   * Percentage full (0.0-1.0)
+   */
   fill_percent: number;
-  /** Human-readable time until hitting limit */
+  /**
+   * Human-readable time until hitting limit
+   */
   time_until_full: string;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```
@@ -1224,9 +1414,13 @@ type UpdateScheduledJobRequest struct {
 
 ```typescript
 export interface UpdateScheduledJobRequest {
-  /** active, paused, stopping, inactive */
+  /**
+   * active, paused, stopping, inactive
+   */
   state?: string | null;
-  /** Update interval */
+  /**
+   * Update interval
+   */
   interval_seconds?: number | null;
 }
 ```
@@ -1266,21 +1460,37 @@ type UsageUpdateMessage struct {
 
 ```typescript
 export interface UsageUpdateMessage {
-  /** "usage_update" */
+  /**
+   * "usage_update"
+   */
   type: string;
-  /** Total cost in last 24h */
+  /**
+   * Total cost in last 24h
+   */
   total_cost: number;
-  /** Total requests */
+  /**
+   * Total requests
+   */
   requests: number;
-  /** Successful requests */
+  /**
+   * Successful requests
+   */
   success: number;
-  /** Total tokens used */
+  /**
+   * Total tokens used
+   */
   tokens: number;
-  /** Unique models used */
+  /**
+   * Unique models used
+   */
   models: number;
-  /** Time period (e.g., "24h") */
+  /**
+   * Time period (e.g., "24h")
+   */
   since: string;
-  /** Unix timestamp */
+  /**
+   * Unix timestamp
+   */
   timestamp: number;
 }
 ```

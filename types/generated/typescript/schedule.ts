@@ -13,29 +13,53 @@ export const StatePaused = "paused";
 export const StateStopping = "stopping";
 
 export interface Execution {
-  /** Identity */
+  /**
+   * Identity
+   */
   id: string;
-  /** FK to ScheduledJob */
+  /**
+   * FK to ScheduledJob
+   */
   scheduled_job_id: string;
-  /** Optional FK to async job */
+  /**
+   * Optional FK to async job
+   */
   async_job_id?: string | null;
-  /** Execution status */
+  /**
+   * Execution status
+   */
   status: string;
-  /** Timing */
+  /**
+   * Timing
+   */
   started_at: string;
-  /** RFC3339 timestamp (null if running) */
+  /**
+   * RFC3339 timestamp (null if running)
+   */
   completed_at?: string | null;
-  /** Milliseconds (null if running) */
+  /**
+   * Milliseconds (null if running)
+   */
   duration_ms?: number | null;
-  /** Output capture */
+  /**
+   * Output capture
+   */
   logs?: string | null;
-  /** Brief summary */
+  /**
+   * Brief summary
+   */
   result_summary?: string | null;
-  /** Error if failed */
+  /**
+   * Error if failed
+   */
   error_message?: string | null;
-  /** Metadata */
+  /**
+   * Metadata
+   */
   created_at: string;
-  /** RFC3339 timestamp */
+  /**
+   * RFC3339 timestamp
+   */
   updated_at: string;
 }
 
