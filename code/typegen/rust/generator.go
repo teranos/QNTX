@@ -141,7 +141,7 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 			}
 
 			// Determine if field is optional
-			isPointer := isPointerType(field.Type)
+			isPointer := util.IsPointerType(field.Type)
 			isOptional := tagInfo.Omitempty || tagInfo.RustOption || isPointer
 
 			// Get Rust type (rusttype tag overrides inferred type)
@@ -245,12 +245,6 @@ func GenerateEnum(name string, values []string) string {
 	return sb.String()
 }
 
-// isPointerType checks if the AST expression represents a pointer type
-func isPointerType(expr ast.Expr) bool {
-	_, ok := expr.(*ast.StarExpr)
-	return ok
-}
-
 // goTypeToRust converts a Go AST type expression to Rust type string
 func goTypeToRust(expr ast.Expr) string {
 	switch t := expr.(type) {
@@ -335,15 +329,6 @@ func toRustConstIdent(s string) string {
 	return strings.ToUpper(snakeCase)
 }
 
-// sortedKeys returns map keys as a sorted slice
-func sortedKeys[K ~string, V any](m map[K]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, string(k))
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 // extractTypeReferences extracts all type names referenced in Rust type strings
 // For example: "Option<Job>" -> ["Job"], "Vec<Execution>" -> ["Execution"]
@@ -474,7 +459,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	// Generate const declarations (untyped consts)
 	if len(result.Consts) > 0 {
-		for _, name := range sortedKeys(result.Consts) {
+		for _, name := range util.SortedKeys(result.Consts) {
 			value := result.Consts[name]
 			rustName := toRustConstIdent(name)
 			sb.WriteString(fmt.Sprintf("pub const %s: &str = \"%s\";\n", rustName, value))
@@ -483,7 +468,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	}
 
 	// Sort type names for deterministic output
-	names := sortedKeys(result.Types)
+	names := util.SortedKeys(result.Types)
 	for i, name := range names {
 		// Add Go doc comment if available (appears above the struct/type)
 		if docComment, hasComment := result.TypeComments[name]; hasComment && docComment != "" {
@@ -519,7 +504,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("\n")
 		}
 
-		for _, name := range sortedKeys(result.Arrays) {
+		for _, name := range util.SortedKeys(result.Arrays) {
 			elements := result.Arrays[name]
 
 			// Check if all elements are const references
@@ -561,7 +546,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("\n")
 		}
 
-		for _, name := range sortedKeys(result.Maps) {
+		for _, name := range util.SortedKeys(result.Maps) {
 			mapData := result.Maps[name]
 
 			// For Rust, we'll use lazy_static for const maps (uppercase)
@@ -571,7 +556,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("        let mut m = std::collections::HashMap::new();\n")
 
 			// Sort map keys for deterministic output
-			for _, key := range sortedKeys(mapData) {
+			for _, key := range util.SortedKeys(mapData) {
 				value := mapData[key]
 				keyStr := formatMapKey(key, result.Consts)
 				valueStr := formatMapValue(value, result.Consts)
