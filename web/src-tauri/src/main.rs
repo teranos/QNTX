@@ -120,6 +120,10 @@ fn main() {
                 _ => {}
             }
         })
+        .on_page_load(|window, _payload| {
+            // Inject backend URL for Tauri environment
+            let _ = window.eval(&format!("window.__BACKEND_URL__ = 'http://localhost:{}';", SERVER_PORT));
+        })
         .invoke_handler(tauri::generate_handler![
             get_server_status,
             get_server_url

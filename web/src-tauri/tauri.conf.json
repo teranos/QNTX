@@ -23,6 +23,7 @@
     ]
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "QNTX",
