@@ -47,6 +47,10 @@
             # GitHub Actions compatibility: symlink dynamic linker
             mkdir -p lib64
             ln -sf ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 lib64/ld-linux-x86-64.so.2
+
+            # Create tmp directories for Go and other build tools
+            mkdir -p tmp var/tmp
+            chmod 1777 tmp var/tmp
           '';
 
           config = {
