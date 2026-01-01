@@ -43,9 +43,16 @@
             (pkgs.writeTextDir "etc/os-release" "ID=nixos\n")
           ];
 
+          extraCommands = ''
+            # GitHub Actions compatibility: symlink dynamic linker
+            mkdir -p lib64
+            ln -s ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 lib64/ld-linux-x86-64.so.2
+          '';
+
           config = {
             Env = [
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
             ];
             WorkingDir = "/workspace";
           };
