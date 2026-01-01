@@ -20,18 +20,29 @@
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct As {
     /// ASID: AS + UUID
+    /// Validation: required
     pub id: String,
     /// Entities being attested about
+    /// Validation: required
+    /// Validation: min length/items: 1
     pub subjects: Vec<String>,
     /// What is being claimed
+    /// Validation: required
+    /// Validation: min length/items: 1
     pub predicates: Vec<String>,
     /// Optional "of" context
+    /// Validation: required
+    /// Validation: min length/items: 1
     pub contexts: Vec<String>,
     /// Who made the attestation
+    /// Validation: required
+    /// Validation: min length/items: 1
     pub actors: Vec<String>,
     /// When attestation was made
+    /// Validation: required
     pub timestamp: String,
     /// How attestation was created
+    /// Validation: required
     pub source: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Arbitrary JSON

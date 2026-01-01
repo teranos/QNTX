@@ -73,15 +73,25 @@ type ErrorContext struct {
 
 ```typescript
 export interface ErrorContext {
-  /** Where the error occurred */
+  /**
+   * Where the error occurred
+   */
   stage: string;
-  /** Error classification */
+  /**
+   * Error classification
+   */
   code: ErrorCode;
-  /** Human-readable message */
+  /**
+   * Human-readable message
+   */
   message: string;
-  /** Can the job be retried? */
+  /**
+   * Can the job be retried?
+   */
   retryable: boolean;
-  /** Can continue processing other items? */
+  /**
+   * Can continue processing other items?
+   */
   recoverable: boolean;
 }
 ```
@@ -130,11 +140,17 @@ type Job struct {
 ```typescript
 export interface Job {
   id: string;
-  /** "data.batch-import", "bio.sequence-align" */
+  /**
+   * "data.batch-import", "bio.sequence-align"
+   */
   handler_name: string;
-  /** Handler-specific data (domain-owned) */
+  /**
+   * Handler-specific data (domain-owned)
+   */
   payload?: unknown;
-  /** For deduplication and logging */
+  /**
+   * For deduplication and logging
+   */
   source: string;
   status: JobStatus;
   progress: Progress;
@@ -142,9 +158,13 @@ export interface Job {
   cost_actual: number;
   pulse_state?: PulseState | null;
   error?: string;
-  /** For tasks grouped under parent job */
+  /**
+   * For tasks grouped under parent job
+   */
   parent_job_id?: string;
-  /** Number of retry attempts (max 2) */
+  /**
+   * Number of retry attempts (max 2)
+   */
   retry_count: number;
   created_at: string;
   started_at?: string | null;
@@ -219,9 +239,13 @@ type Progress struct {
 
 ```typescript
 export interface Progress {
-  /** Completed operations */
+  /**
+   * Completed operations
+   */
   current: number;
-  /** Total operations */
+  /**
+   * Total operations
+   */
   total: number;
 }
 ```
@@ -266,7 +290,9 @@ export interface PulseState {
   spend_this_month: number;
   budget_remaining: number;
   is_paused: boolean;
-  /** "budget_exceeded", "rate_limit", "user_requested" */
+  /**
+   * "budget_exceeded", "rate_limit", "user_requested"
+   */
   pause_reason?: string;
 }
 ```
@@ -347,19 +373,33 @@ type SystemMetrics struct {
 
 ```typescript
 export interface SystemMetrics {
-  /** Number of workers currently executing jobs */
+  /**
+   * Number of workers currently executing jobs
+   */
   workers_active: number;
-  /** Total configured workers */
+  /**
+   * Total configured workers
+   */
   workers_total: number;
-  /** Current memory usage in GB */
+  /**
+   * Current memory usage in GB
+   */
   memory_used_gb: number;
-  /** Total system memory in GB */
+  /**
+   * Total system memory in GB
+   */
   memory_total_gb: number;
-  /** Memory utilization percentage */
+  /**
+   * Memory utilization percentage
+   */
   memory_percent: number;
-  /** Jobs waiting in queue */
+  /**
+   * Jobs waiting in queue
+   */
   jobs_queued: number;
-  /** Jobs currently executing */
+  /**
+   * Jobs currently executing
+   */
   jobs_running: number;
 }
 ```
@@ -395,13 +435,21 @@ type WorkerPoolConfig struct {
 
 ```typescript
 export interface WorkerPoolConfig {
-  /** Number of concurrent workers */
+  /**
+   * Number of concurrent workers
+   */
   workers: number;
-  /** How often to check for new jobs */
+  /**
+   * How often to check for new jobs
+   */
   poll_interval: number;
-  /** Pause jobs when budget exceeded */
+  /**
+   * Pause jobs when budget exceeded
+   */
   pause_on_budget: boolean;
-  /** Duration of each graceful start phase (default: 5min, test: 10s) */
+  /**
+   * Duration of each graceful start phase (default: 5min, test: 10s)
+   */
   graceful_start_phase: number;
 }
 ```
