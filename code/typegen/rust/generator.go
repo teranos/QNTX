@@ -191,13 +191,24 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 					sb.WriteString("    /// Validation: required\n")
 				}
 				if validateInfo.Min != util.NoConstraint || validateInfo.Max != util.NoConstraint {
+					// Determine constraint type based on Rust type
+					constraintType := "value"
+					baseType := strings.TrimPrefix(rustType, "Option<")
+					baseType = strings.TrimSuffix(baseType, ">")
+
+					if strings.HasPrefix(baseType, "Vec<") {
+						constraintType = "items"
+					} else if baseType == "String" {
+						constraintType = "length"
+					}
+
 					var constraint string
 					if validateInfo.Min != util.NoConstraint && validateInfo.Max != util.NoConstraint {
-						constraint = fmt.Sprintf("length/items: %d..%d", validateInfo.Min, validateInfo.Max)
+						constraint = fmt.Sprintf("%s: %d..%d", constraintType, validateInfo.Min, validateInfo.Max)
 					} else if validateInfo.Min != util.NoConstraint {
-						constraint = fmt.Sprintf("min length/items: %d", validateInfo.Min)
+						constraint = fmt.Sprintf("min %s: %d", constraintType, validateInfo.Min)
 					} else {
-						constraint = fmt.Sprintf("max length/items: %d", validateInfo.Max)
+						constraint = fmt.Sprintf("max %s: %d", constraintType, validateInfo.Max)
 					}
 					sb.WriteString(fmt.Sprintf("    /// Validation: %s\n", constraint))
 				}
