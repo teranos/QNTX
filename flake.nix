@@ -38,6 +38,7 @@
             pkgs.cacert
 
             # System files for GitHub Actions compatibility
+            pkgs.glibc
             pkgs.dockerTools.fakeNss
             (pkgs.writeTextDir "etc/os-release" "ID=nixos\n")
           ];
