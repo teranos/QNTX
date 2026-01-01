@@ -64,7 +64,7 @@ fn notify_job_completed(
         .notification()
         .builder()
         .title("QNTX: Job Completed")
-        .body(&format!("{}{}", handler_name, duration_text))
+        .body(format!("{}{}", handler_name, duration_text))
         .show()
     {
         eprintln!("[notification] Failed to show job completion: {}", e);
@@ -90,7 +90,7 @@ fn notify_job_failed(
         .notification()
         .builder()
         .title("QNTX: Job Failed")
-        .body(&format!("{}: {}", handler_name, error_text))
+        .body(format!("{}: {}", handler_name, error_text))
         .show()
     {
         eprintln!("[notification] Failed to show job failure: {}", e);
@@ -109,7 +109,7 @@ fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f6
         .notification()
         .builder()
         .title("QNTX: Storage Warning")
-        .body(&format!(
+        .body(format!(
             "{} is at {:.0}% capacity",
             actor,
             fill_percent * 100.0
@@ -181,7 +181,7 @@ fn main() {
                 .expect("failed to create qntx sidecar command");
 
             let (mut rx, child) = sidecar_command
-                .args(&["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
+                .args(["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
                 .spawn()
                 .expect("Failed to spawn qntx server");
 
@@ -245,18 +245,15 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            match event {
-                tauri::WindowEvent::CloseRequested { api, .. } => {
-                    // Hide window instead of closing (keep server running)
-                    window.hide().unwrap();
-                    api.prevent_close();
-                }
-                _ => {}
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Hide window instead of closing (keep server running)
+                window.hide().unwrap();
+                api.prevent_close();
             }
         })
         .on_page_load(|window, _payload| {
             // Inject backend URL for Tauri environment
-            let _ = window.eval(&format!(
+            let _ = window.eval(format!(
                 "window.__BACKEND_URL__ = 'http://localhost:{}';",
                 SERVER_PORT
             ));
