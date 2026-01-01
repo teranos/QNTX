@@ -46,7 +46,7 @@
             pkgs.rustfmt
 
             # Tauri system dependencies
-            pkgs.webkitgtk
+            pkgs.webkitgtk_4_1
             pkgs.gtk3
             pkgs.libayatana-appindicator
             pkgs.librsvg
