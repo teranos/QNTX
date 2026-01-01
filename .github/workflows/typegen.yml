@@ -32,6 +32,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
       - name: Download dependencies
         run: go mod download
 
