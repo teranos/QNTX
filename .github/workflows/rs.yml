@@ -20,14 +20,18 @@ jobs:
   check:
     name: Rust Check
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -47,17 +51,13 @@ jobs:
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      # TODO: Re-enable Tauri checks once system dependencies are available in CI
-      # See https://github.com/teranos/QNTX/issues/97
-      # - name: Clippy (Tauri app)
-      #   run: cd web/src-tauri && cargo clippy --all-targets --all-features
-      #   env:
-      #     RUSTFLAGS: "-Dwarnings"
+      - name: Clippy (Tauri app)
+        run: cd web/src-tauri && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
 
       - name: Check (generated types)
         run: cd types/generated/rust && cargo check
 
-      # TODO: Re-enable Tauri checks once system dependencies are available in CI
-      # See https://github.com/teranos/QNTX/issues/97
-      # - name: Check (Tauri app)
-      #   run: cd web/src-tauri && cargo check
+      - name: Check (Tauri app)
+        run: cd web/src-tauri && cargo check
