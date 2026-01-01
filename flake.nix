@@ -40,10 +40,11 @@
             pkgs.go
             pkgs.git
 
-            # Rust toolchain with rustfmt
+            # Rust toolchain with rustfmt and clippy
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
+            pkgs.clippy
 
             # Tauri system dependencies
             pkgs.webkitgtk_4_1
