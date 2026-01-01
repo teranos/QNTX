@@ -1,0 +1,39 @@
+name: TypeGen Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'typegen/**'
+      - '.github/workflows/typegen.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'typegen/**'
+  workflow_dispatch:
+
+jobs:
+  types-check:
+    name: TypeGen Check
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Check generated types are up to date
+        run: make types-check

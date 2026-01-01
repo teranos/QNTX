@@ -45,8 +45,3 @@ jobs:
 
       - name: Build
         run: go build ./...
-
-      # TODO: Fix types-check to work reliably in CI
-      # See issue for rustfmt dependency and CI detection
-      # - name: Check generated types are up to date
-      #   run: make types-check
