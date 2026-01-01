@@ -69,6 +69,7 @@ func SetDefaults(v *viper.Viper) {
 		"https://localhost",
 		"http://127.0.0.1",
 		"https://127.0.0.1",
+		"tauri://localhost", // Allow Tauri desktop app
 	})
 	v.SetDefault("server.log_theme", "everforest")
 }
@@ -118,6 +119,7 @@ func (c *Config) GetServerAllowedOrigins() []string {
 			"https://localhost",
 			"http://127.0.0.1",
 			"https://127.0.0.1",
+			"tauri://localhost", // Allow Tauri desktop app
 		}
 	}
 	return c.Server.AllowedOrigins
