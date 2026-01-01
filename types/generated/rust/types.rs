@@ -202,4 +202,3 @@ pub struct TypeDef {
     /// Whether this type is being phased out
     pub deprecated: bool,
 }
-
