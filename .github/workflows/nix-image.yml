@@ -17,14 +17,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Build QNTX CLI
-        run: make cli
-
       - name: Install Nix
         uses: cachix/install-nix-action@v26
         with:
