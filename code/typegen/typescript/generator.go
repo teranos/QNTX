@@ -401,20 +401,24 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	return sb.String()
 }
 
+// toTSComputedKey wraps a const name in brackets for computed property syntax
+func toTSComputedKey(s string) string {
+	return "[" + s + "]"
+}
+
+// identity returns the string unchanged (for TypeScript const values)
+func identity(s string) string {
+	return s
+}
+
 // formatMapKeyWithConsts formats a map key for TypeScript output.
 // Const references are wrapped in brackets, literals are quoted.
 func formatMapKeyWithConsts(key string, consts map[string]string) string {
-	if typegen.IsConstReference(key, consts) {
-		return "[" + key + "]"
-	}
-	return "\"" + key + "\""
+	return typegen.FormatMapEntry(key, consts, toTSComputedKey)
 }
 
 // formatMapValueWithConsts formats a map value for TypeScript output.
 // Const references are used as-is, literals are quoted.
 func formatMapValueWithConsts(value string, consts map[string]string) string {
-	if typegen.IsConstReference(value, consts) {
-		return value
-	}
-	return "\"" + value + "\""
+	return typegen.FormatMapEntry(value, consts, identity)
 }

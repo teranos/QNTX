@@ -180,6 +180,13 @@ func GenerateReadme(outputDir string, exports []PackageExport) error {
 	sb.WriteString("Auto-generated Python type definitions from QNTX's Go source code.\n\n")
 
 	sb.WriteString("## Installation\n\n")
+	sb.WriteString("**Using uv (recommended):**\n")
+	sb.WriteString("```bash\n")
+	sb.WriteString("uv pip install -e types/generated/python\n")
+	sb.WriteString("# Or add to your project:\n")
+	sb.WriteString("uv add ./types/generated/python\n")
+	sb.WriteString("```\n\n")
+	sb.WriteString("**Using pip:**\n")
 	sb.WriteString("```bash\n")
 	sb.WriteString("pip install -e types/generated/python\n")
 	sb.WriteString("```\n\n")

@@ -546,16 +546,10 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 // formatMapKey formats a map key for Rust output
 func formatMapKey(key string, consts map[string]string) string {
-	if typegen.IsConstReference(key, consts) {
-		return toRustConstIdent(key)
-	}
-	return "\"" + key + "\""
+	return typegen.FormatMapEntry(key, consts, toRustConstIdent)
 }
 
 // formatMapValue formats a map value for Rust output
 func formatMapValue(value string, consts map[string]string) string {
-	if typegen.IsConstReference(value, consts) {
-		return toRustConstIdent(value)
-	}
-	return "\"" + value + "\""
+	return typegen.FormatMapEntry(value, consts, toRustConstIdent)
 }
