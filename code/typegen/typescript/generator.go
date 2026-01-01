@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/typegen"
+	"github.com/teranos/QNTX/code/typegen"
 )
 
 // FieldTagInfo contains parsed struct tag information for TypeScript generation

@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/ats/typegen"
-	"github.com/teranos/QNTX/ats/typegen/markdown"
-	"github.com/teranos/QNTX/ats/typegen/rust"
-	"github.com/teranos/QNTX/ats/typegen/typescript"
+	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/code/typegen/markdown"
+	"github.com/teranos/QNTX/code/typegen/rust"
+	"github.com/teranos/QNTX/code/typegen/typescript"
 )
 
 // Default packages to generate types from
