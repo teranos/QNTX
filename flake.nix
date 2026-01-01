@@ -1,5 +1,5 @@
 {
-  description = "QNTX CI container image";
+  description = "QNTX container image";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
