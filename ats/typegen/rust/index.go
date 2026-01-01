@@ -285,7 +285,7 @@ func GenerateReadme(outputDir string, exports []PackageExport) error {
 	}
 
 	sb.WriteString("\n## Type Compatibility\n\n")
-	sb.WriteString("All types include `serde::Serialize` and `serde::Deserialize` traits, ensuring JSON compatibility with the QNTX Go server.\n\n")
+	sb.WriteString("All types derive `serde::Serialize` and `serde::Deserialize` for JSON compatibility with QNTX's Go backend.\n\n")
 	sb.WriteString("### Example: Deserializing from QNTX API\n\n")
 	sb.WriteString("```rust\n")
 	sb.WriteString("use qntx_types::async::Job;\n\n")
@@ -299,7 +299,7 @@ func GenerateReadme(outputDir string, exports []PackageExport) error {
 	sb.WriteString("# or\n")
 	sb.WriteString("./qntx typegen --lang rust --output types/generated/\n")
 	sb.WriteString("```\n\n")
-	sb.WriteString("**Do not manually edit** these files - they will be overwritten on the next generation.\n")
+	sb.WriteString("**Do not manually edit** - changes will be overwritten when types are regenerated.\n")
 
 	newContent := sb.String()
 	readmePath := filepath.Join(outputDir, "README.md")
