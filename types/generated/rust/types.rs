@@ -24,19 +24,19 @@ pub struct As {
     pub id: String,
     /// Entities being attested about
     /// Validation: required
-    /// Validation: min length/items: 1
+    /// Validation: min items: 1
     pub subjects: Vec<String>,
     /// What is being claimed
     /// Validation: required
-    /// Validation: min length/items: 1
+    /// Validation: min items: 1
     pub predicates: Vec<String>,
     /// Optional "of" context
     /// Validation: required
-    /// Validation: min length/items: 1
+    /// Validation: min items: 1
     pub contexts: Vec<String>,
     /// Who made the attestation
     /// Validation: required
-    /// Validation: min length/items: 1
+    /// Validation: min items: 1
     pub actors: Vec<String>,
     /// When attestation was made
     /// Validation: required
