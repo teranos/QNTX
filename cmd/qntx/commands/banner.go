@@ -5,7 +5,7 @@ import (
 
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/sym"
-	"github.com/teranos/QNTX/version"
+	"github.com/teranos/QNTX/internal/version"
 )
 
 // printStartupBanner prints the user-friendly startup message

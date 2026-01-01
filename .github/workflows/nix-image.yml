@@ -1,0 +1,59 @@
+name: Build Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build CI image with Nix
+        run: nix build .#ci-image
+
+      - name: Load image into Docker
+        run: docker load < result
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_version=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_version=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Tag and push
+        run: |
+          # Push latest
+          docker push ghcr.io/teranos/qntx:latest
+
+          # Push versioned tag if this is a tag push
+          if [[ "${{ steps.version.outputs.has_version }}" == "true" ]]; then
+            docker tag ghcr.io/teranos/qntx:latest ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
+            docker push ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
+          fi

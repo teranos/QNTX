@@ -1,34 +1,26 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check desktop-prepare desktop-dev desktop-build
+.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check desktop-prepare desktop-dev desktop-build install
+
+# Installation prefix (override with PREFIX=/custom/path make install)
+PREFIX ?= $(HOME)/.qntx
+
+# Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
+QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
-	@go build -ldflags="-X 'github.com/teranos/QNTX/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+	@go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
-types: cli ## Generate TypeScript, Rust types and markdown docs from Go source
+types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
-	@./bin/qntx typegen --lang typescript --output types/generated/
-	@./bin/qntx typegen --lang rust --output types/generated/
-	@./bin/qntx typegen --lang markdown  # Defaults to docs/types/
+	@$(QNTX) typegen --lang typescript --output types/generated/
+	@$(QNTX) typegen --lang rust --output types/generated/
+	@$(QNTX) typegen --lang markdown  # Defaults to docs/types/
 	@echo "✓ TypeScript types generated in types/generated/typescript/"
 	@echo "✓ Rust types generated in types/generated/rust/"
 	@echo "✓ Markdown docs generated in docs/types/"
 
-types-check: cli ## Check if generated types are up to date
-	@echo "Checking generated types..."
-	@mkdir -p tmp/types-check
-	@./bin/qntx typegen --lang typescript --output tmp/types-check/
-	@./bin/qntx typegen --lang rust --output tmp/types-check/
-	@./bin/qntx typegen --lang markdown --output tmp/types-check/
-	@if diff -r tmp/types-check/typescript types/generated/typescript > /dev/null 2>&1 && \
-	   diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target tmp/types-check/rust types/generated/rust > /dev/null 2>&1 && \
-	   diff -r tmp/types-check/markdown docs/types > /dev/null 2>&1; then \
-		echo "✓ Types are up to date"; \
-		rm -rf tmp/types-check; \
-	else \
-		echo "✗ Types are out of date. Run 'make types' to regenerate."; \
-		rm -rf tmp/types-check; \
-		exit 1; \
-	fi
+types-check: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Check if generated types are up to date
+	@$(QNTX) typegen check
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
@@ -95,6 +87,19 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist
 	@rm -rf web/node_modules
+
+install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
+	@echo "Installing qntx to $(PREFIX)/bin..."
+	@mkdir -p $(PREFIX)/bin
+	@cp bin/qntx $(PREFIX)/bin/qntx
+	@chmod +x $(PREFIX)/bin/qntx
+	@echo "✓ qntx installed to $(PREFIX)/bin/qntx"
+	@if ! echo $$PATH | grep -q "$(PREFIX)/bin"; then \
+		echo ""; \
+		echo "⚠️  $(PREFIX)/bin is not in your PATH"; \
+		echo "Add this to your shell config:"; \
+		echo "  export PATH=\"$(PREFIX)/bin:\$$PATH\""; \
+	fi
 
 desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 	@echo "Preparing desktop app assets..."
