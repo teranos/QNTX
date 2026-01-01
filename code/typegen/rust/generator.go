@@ -174,8 +174,33 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 
 			// Extract and format comments
 			comment := util.ExtractFieldComment(field)
+
+			// Parse validation constraints
+			validateInfo := util.ParseValidateTag(field.Tag)
+
+			// Add doc comment with validation info
 			if comment != "" {
 				sb.WriteString(fmt.Sprintf("    /// %s\n", comment))
+			}
+			if validateInfo != nil {
+				// Add validation constraints as doc comments
+				if comment == "" {
+					sb.WriteString("    ///\n")
+				}
+				if validateInfo.Required {
+					sb.WriteString("    /// Validation: required\n")
+				}
+				if validateInfo.Min >= 0 || validateInfo.Max >= 0 {
+					var constraint string
+					if validateInfo.Min >= 0 && validateInfo.Max >= 0 {
+						constraint = fmt.Sprintf("length/items: %d..%d", validateInfo.Min, validateInfo.Max)
+					} else if validateInfo.Min >= 0 {
+						constraint = fmt.Sprintf("min length/items: %d", validateInfo.Min)
+					} else {
+						constraint = fmt.Sprintf("max length/items: %d", validateInfo.Max)
+					}
+					sb.WriteString(fmt.Sprintf("    /// Validation: %s\n", constraint))
+				}
 			}
 
 			sb.WriteString(fmt.Sprintf("    pub %s: %s,\n", toRustIdent(rustFieldName), rustType))

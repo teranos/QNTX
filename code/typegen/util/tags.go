@@ -3,6 +3,7 @@ package util
 import (
 	"go/ast"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -77,4 +78,68 @@ func ParseCustomTag(tag *ast.BasicLit, tagName string) (name string, options map
 	}
 
 	return name, options, false
+}
+
+// ValidateTagInfo holds parsed information from a validate struct tag
+type ValidateTagInfo struct {
+	Required bool // Has required constraint
+	Min      int  // Minimum value/length/items (-1 if not set)
+	Max      int  // Maximum value/length/items (-1 if not set)
+}
+
+// ParseValidateTag extracts validation constraints from a validate tag.
+// Supports: required, min=N, max=N
+// Returns nil if there's no validate tag.
+func ParseValidateTag(tag *ast.BasicLit) *ValidateTagInfo {
+	if tag == nil {
+		return nil
+	}
+
+	// Remove backticks
+	tagValue := strings.Trim(tag.Value, "`")
+	st := reflect.StructTag(tagValue)
+
+	validateTag := st.Get("validate")
+	if validateTag == "" {
+		return nil
+	}
+
+	info := &ValidateTagInfo{
+		Min: -1,
+		Max: -1,
+	}
+
+	// Parse comma-separated constraints
+	parts := strings.Split(validateTag, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+
+		if part == "required" {
+			info.Required = true
+			continue
+		}
+
+		// Parse key=value constraints
+		if strings.Contains(part, "=") {
+			kv := strings.SplitN(part, "=", 2)
+			if len(kv) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(kv[0])
+			valueStr := strings.TrimSpace(kv[1])
+
+			switch key {
+			case "min":
+				if v, err := strconv.Atoi(valueStr); err == nil {
+					info.Min = v
+				}
+			case "max":
+				if v, err := strconv.Atoi(valueStr); err == nil {
+					info.Max = v
+				}
+			}
+		}
+	}
+
+	return info
 }
