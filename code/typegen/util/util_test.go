@@ -386,15 +386,15 @@ func TestParseValidateTag(t *testing.T) {
 			name:        "required only",
 			tag:         `validate:"required"`,
 			expectedReq: true,
-			expectedMin: -1,
-			expectedMax: -1,
+			expectedMin: NoConstraint,
+			expectedMax: NoConstraint,
 		},
 		{
 			name:        "required with min",
 			tag:         `validate:"required,min=1"`,
 			expectedReq: true,
 			expectedMin: 1,
-			expectedMax: -1,
+			expectedMax: NoConstraint,
 		},
 		{
 			name:        "min and max",
@@ -414,8 +414,8 @@ func TestParseValidateTag(t *testing.T) {
 			name:        "no validate tag",
 			tag:         `json:"field"`,
 			expectedReq: false,
-			expectedMin: -1,
-			expectedMax: -1,
+			expectedMin: NoConstraint,
+			expectedMax: NoConstraint,
 		},
 	}
 
@@ -467,11 +467,11 @@ func TestParseValidateTag_InvalidNumbers(t *testing.T) {
 		t.Fatal("ParseValidateTag() = nil, want non-nil")
 	}
 
-	// Invalid numbers should be ignored (remain at -1)
-	if result.Min != -1 {
-		t.Errorf("Min = %d, want -1 (invalid should be ignored)", result.Min)
+	// Invalid numbers should be ignored (remain at NoConstraint)
+	if result.Min != NoConstraint {
+		t.Errorf("Min = %d, want NoConstraint (invalid should be ignored)", result.Min)
 	}
-	if result.Max != -1 {
-		t.Errorf("Max = %d, want -1 (invalid should be ignored)", result.Max)
+	if result.Max != NoConstraint {
+		t.Errorf("Max = %d, want NoConstraint (invalid should be ignored)", result.Max)
 	}
 }
