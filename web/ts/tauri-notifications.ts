@@ -16,6 +16,9 @@ const LONG_JOB_THRESHOLD_MS = 30000;
 // Track when jobs started for duration-based notifications
 const jobStartTimes = new Map<string, number>();
 
+// Track last server state to detect transitions
+let lastServerState: string | undefined = undefined;
+
 /**
  * Check if running in Tauri desktop environment
  */
@@ -167,4 +170,55 @@ export async function handleJobNotification(job: {
             cleanupJobTracking(job.id);
             break;
     }
+}
+
+/**
+ * Send a notification when server enters draining mode
+ * Only sends if in Tauri environment
+ */
+export async function notifyServerDraining(
+    activeJobs: number,
+    queuedJobs: number
+): Promise<void> {
+    await invokeIfTauri('notify_server_draining', {
+        activeJobs,
+        queuedJobs
+    });
+}
+
+/**
+ * Send a notification when server stops
+ * Only sends if in Tauri environment
+ */
+export async function notifyServerStopped(): Promise<void> {
+    await invokeIfTauri('notify_server_stopped', {});
+}
+
+/**
+ * Handle daemon status updates and send notifications for state changes
+ * Called from WebSocket handler when daemon_status messages arrive
+ */
+export async function handleDaemonStatusNotification(status: {
+    server_state?: string;
+    active_jobs: number;
+    queued_jobs: number;
+}): Promise<void> {
+    // Don't send notifications if not in Tauri
+    if (!isTauri()) return;
+
+    const currentState = status.server_state || 'running';
+
+    // Detect state transitions
+    if (lastServerState !== currentState) {
+        if (currentState === 'draining' && lastServerState !== 'draining') {
+            // Server just entered draining mode
+            await notifyServerDraining(status.active_jobs, status.queued_jobs);
+        } else if (currentState === 'stopped' && lastServerState !== 'stopped') {
+            // Server just stopped
+            await notifyServerStopped();
+        }
+    }
+
+    // Update tracked state
+    lastServerState = currentState;
 }

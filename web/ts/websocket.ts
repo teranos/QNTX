@@ -12,7 +12,7 @@ import type {
     LLMStreamMessage,
     StorageWarningMessage
 } from '../types/websocket';
-import { handleJobNotification, notifyStorageWarning } from './tauri-notifications';
+import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -118,7 +118,21 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         // Handler registered in main.js -> daemon-indicator.js displays animated status
         if (data.type === 'daemon_status') {
             const daemonData = data as DaemonStatusMessage;
-            console.log('⚙️  Daemon status:', daemonData.running, `${daemonData.active_jobs} jobs`, `${daemonData.load_percent}% load`);
+            console.log(
+                '⚙️  Daemon status:',
+                daemonData.server_state || 'running',
+                `${daemonData.active_jobs} active`,
+                `${daemonData.queued_jobs} queued`,
+                `${daemonData.load_percent}% load`
+            );
+
+            // Send native desktop notification for server state changes (e.g., draining)
+            handleDaemonStatusNotification({
+                server_state: daemonData.server_state,
+                active_jobs: daemonData.active_jobs,
+                queued_jobs: daemonData.queued_jobs,
+            });
+
             const handler = messageHandlers['daemon_status'];
             if (handler) {
                 handler(daemonData);

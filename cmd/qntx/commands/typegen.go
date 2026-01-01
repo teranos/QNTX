@@ -187,6 +187,12 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		if err := rust.GenerateIndexFile(outputDir, exports); err != nil {
 			return fmt.Errorf("failed to generate mod.rs: %w", err)
 		}
+		if err := rust.GenerateLibRs(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate lib.rs: %w", err)
+		}
+		if err := rust.GenerateCargoToml(outputDir); err != nil {
+			return fmt.Errorf("failed to generate Cargo.toml: %w", err)
+		}
 		if err := rust.GenerateReadme(outputDir, exports); err != nil {
 			return fmt.Errorf("failed to generate README.md: %w", err)
 		}
