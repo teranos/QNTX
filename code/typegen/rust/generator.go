@@ -3,11 +3,11 @@ package rust
 import (
 	"fmt"
 	"go/ast"
-	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/code/typegen/util"
 )
 
 // FieldTagInfo contains parsed struct tag information for Rust generation
@@ -24,44 +24,25 @@ type FieldTagInfo struct {
 func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
 	info := FieldTagInfo{}
 
-	if tag == nil {
+	// Parse JSON tag using shared utility
+	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
+		info.JSONName = jsonInfo.Name
+		info.Omitempty = jsonInfo.Omitempty
+		info.Skip = jsonInfo.Skip
+		if info.Skip {
+			return info
+		}
+	}
+
+	// Parse rusttype tag using shared custom tag parser
+	rustType, options, skip := util.ParseCustomTag(tag, "rusttype")
+	if skip {
+		info.Skip = true
 		return info
 	}
-
-	// Remove backticks
-	tagValue := strings.Trim(tag.Value, "`")
-	st := reflect.StructTag(tagValue)
-
-	// Parse json tag
-	jsonTag := st.Get("json")
-	if jsonTag != "" {
-		parts := strings.Split(jsonTag, ",")
-		info.JSONName = parts[0]
-		if info.JSONName == "-" {
-			info.Skip = true
-			return info
-		}
-		for _, part := range parts[1:] {
-			if part == "omitempty" {
-				info.Omitempty = true
-			}
-		}
-	}
-
-	// Parse rusttype tag
-	rusttypeTag := st.Get("rusttype")
-	if rusttypeTag != "" {
-		if rusttypeTag == "-" {
-			info.Skip = true
-			return info
-		}
-		parts := strings.Split(rusttypeTag, ",")
-		info.RustType = parts[0]
-		for _, part := range parts[1:] {
-			if part == "optional" {
-				info.RustOption = true
-			}
-		}
+	if rustType != "" {
+		info.RustType = rustType
+		info.RustOption = options["optional"]
 	}
 
 	return info
@@ -156,7 +137,7 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 			// Determine field name (json tag or Go field name in snake_case)
 			jsonName := tagInfo.JSONName
 			if jsonName == "" {
-				jsonName = toSnakeCase(fieldName.Name)
+				jsonName = util.ToSnakeCase(fieldName.Name)
 			}
 
 			// Determine if field is optional
@@ -181,7 +162,7 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 			}
 
 			// Add serde rename if json name differs from Rust field name
-			rustFieldName := toSnakeCase(fieldName.Name)
+			rustFieldName := util.ToSnakeCase(fieldName.Name)
 			if jsonName != rustFieldName {
 				sb.WriteString(fmt.Sprintf("    #[serde(rename = \"%s\")]\n", jsonName))
 			}
@@ -192,7 +173,7 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 			}
 
 			// Extract and format comments
-			comment := extractFieldComment(field)
+			comment := util.ExtractFieldComment(field)
 			if comment != "" {
 				sb.WriteString(fmt.Sprintf("    /// %s\n", comment))
 			}
@@ -204,37 +185,6 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 	sb.WriteString("}")
 
 	return sb.String()
-}
-
-// extractFieldComment extracts and formats the comment from a field
-func extractFieldComment(field *ast.Field) string {
-	if field.Doc != nil && len(field.Doc.List) > 0 {
-		// Use Doc comment (appears before the field)
-		var lines []string
-		for _, comment := range field.Doc.List {
-			text := cleanCommentText(comment.Text)
-			if text != "" {
-				lines = append(lines, text)
-			}
-		}
-		return strings.Join(lines, " ")
-	}
-
-	if field.Comment != nil && len(field.Comment.List) > 0 {
-		// Use inline comment (appears after the field)
-		return cleanCommentText(field.Comment.List[0].Text)
-	}
-
-	return ""
-}
-
-// cleanCommentText removes comment markers and trims whitespace
-func cleanCommentText(text string) string {
-	text = strings.TrimPrefix(text, "//")
-	text = strings.TrimPrefix(text, "/**")
-	text = strings.TrimPrefix(text, "/*")
-	text = strings.TrimSuffix(text, "*/")
-	return strings.TrimSpace(text)
 }
 
 // GenerateEnum creates a Rust enum from const values
@@ -249,7 +199,7 @@ func GenerateEnum(name string, values []string) string {
 
 	for _, v := range values {
 		// Convert value to PascalCase variant name
-		variantName := toPascalCase(v)
+		variantName := util.ToPascalCase(v)
 		sb.WriteString(fmt.Sprintf("    #[serde(rename = \"%s\")]\n", v))
 		sb.WriteString(fmt.Sprintf("    %s,\n", variantName))
 	}
@@ -342,55 +292,11 @@ func toRustIdent(s string) string {
 // toRustConstIdent converts an identifier to a valid Rust constant identifier (SCREAMING_SNAKE_CASE)
 // Handles keyword escaping properly (r#AS not R#AS)
 func toRustConstIdent(s string) string {
-	snakeCase := toSnakeCase(s)
+	snakeCase := util.ToSnakeCase(s)
 	if rustKeywords[snakeCase] {
 		return "r#" + strings.ToUpper(snakeCase)
 	}
 	return strings.ToUpper(snakeCase)
-}
-
-// toSnakeCase converts PascalCase or camelCase to snake_case
-// Handles acronyms like "ID" -> "id" not "i_d"
-func toSnakeCase(s string) string {
-	var result strings.Builder
-	runes := []rune(s)
-
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-
-		// Check if we need to insert underscore before this character
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			// Don't insert underscore if previous char was uppercase (acronym)
-			// unless next char is lowercase (end of acronym)
-			prevUpper := runes[i-1] >= 'A' && runes[i-1] <= 'Z'
-			nextLower := i+1 < len(runes) && runes[i+1] >= 'a' && runes[i+1] <= 'z'
-
-			if !prevUpper || nextLower {
-				result.WriteRune('_')
-			}
-		}
-
-		result.WriteRune(r)
-	}
-
-	return strings.ToLower(result.String())
-}
-
-// toPascalCase converts snake_case or kebab-case to PascalCase
-func toPascalCase(s string) string {
-	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return r == '_' || r == '-'
-	})
-	var result strings.Builder
-	for _, part := range parts {
-		if len(part) > 0 {
-			result.WriteString(strings.ToUpper(string(part[0])))
-			if len(part) > 1 {
-				result.WriteString(part[1:])
-			}
-		}
-	}
-	return result.String()
 }
 
 // sortedKeys returns map keys as a sorted slice
@@ -557,7 +463,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 		// Add documentation link as #[doc] attribute (preferred for generated code)
 		// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
-		anchor := strings.ToLower(strings.ReplaceAll(toSnakeCase(name), "_", ""))
+		anchor := strings.ToLower(strings.ReplaceAll(util.ToSnakeCase(name), "_", ""))
 		docLink := fmt.Sprintf("https://github.com/teranos/QNTX/blob/main/docs/types/%s.md#%s", result.PackageName, anchor)
 		sb.WriteString(fmt.Sprintf("#[doc = \"Documentation: <%s>\"]\n", docLink))
 
