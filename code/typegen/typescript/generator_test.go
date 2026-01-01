@@ -321,10 +321,11 @@ func TestGenerateInterface_Comments(t *testing.T) {
 
 	result := GenerateInterface("WithComments", structType)
 
-	if !contains(result, "/** User's full name */") {
+	// Check for multi-line JSDoc format (new format with validation support)
+	if !contains(result, "/**\n   * User's full name\n   */") {
 		t.Error("Expected Doc comment for name field")
 	}
-	if !contains(result, "/** Primary email address */") {
+	if !contains(result, "/**\n   * Primary email address\n   */") {
 		t.Error("Expected Comment for email field")
 	}
 }
@@ -351,7 +352,8 @@ func TestGenerateInterface_MultilineComment(t *testing.T) {
 
 	result := GenerateInterface("WithMultiline", structType)
 
-	if !contains(result, "/** A detailed description that spans multiple lines */") {
+	// Check for multi-line JSDoc format
+	if !contains(result, "/**\n   * A detailed description that spans multiple lines\n   */") {
 		t.Error("Expected multiline comment joined")
 	}
 }
