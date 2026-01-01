@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // PackageExport represents a generated Rust module with its exported types
@@ -233,6 +234,7 @@ func GenerateLibRs(outputDir string, exports []PackageExport) error {
 }
 
 // GenerateReadme creates a README.md file for the Rust types directory
+// Only updates the file if content has changed (timestamp footer is added when content changes)
 func GenerateReadme(outputDir string, exports []PackageExport) error {
 	var sb strings.Builder
 
@@ -299,11 +301,51 @@ func GenerateReadme(outputDir string, exports []PackageExport) error {
 	sb.WriteString("```\n\n")
 	sb.WriteString("**Do not manually edit** these files - they will be overwritten on the next generation.\n")
 
-	// Write the file
+	newContent := sb.String()
 	readmePath := filepath.Join(outputDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte(sb.String()), 0644); err != nil {
+
+	// Read existing README if it exists
+	existingContent, err := os.ReadFile(readmePath)
+	if err == nil {
+		// Strip timestamp footer from existing content for comparison
+		existingContentStr := string(existingContent)
+		existingContentStr = stripTimestampFooter(existingContentStr)
+
+		// If content is identical, don't update (preserves existing timestamp)
+		if existingContentStr == newContent {
+			return nil
+		}
+	}
+
+	// Content changed or file doesn't exist - write with new timestamp
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	contentWithTimestamp := newContent + fmt.Sprintf("\n---\n\n*Generated at: %s*\n", timestamp)
+
+	if err := os.WriteFile(readmePath, []byte(contentWithTimestamp), 0644); err != nil {
 		return fmt.Errorf("failed to write README.md: %w", err)
 	}
 
 	return nil
+}
+
+// stripTimestampFooter removes the timestamp footer from README content
+func stripTimestampFooter(content string) string {
+	// Look for the pattern: \n---\n\n*Generated at: ...*\n at the end
+	lines := strings.Split(content, "\n")
+
+	// Check if last few lines match the timestamp pattern
+	if len(lines) >= 4 {
+		lastLine := strings.TrimSpace(lines[len(lines)-1])
+		secondLastLine := strings.TrimSpace(lines[len(lines)-2])
+		thirdLastLine := strings.TrimSpace(lines[len(lines)-3])
+		fourthLastLine := strings.TrimSpace(lines[len(lines)-4])
+
+		if lastLine == "" && strings.HasPrefix(secondLastLine, "*Generated at:") &&
+		   thirdLastLine == "" && fourthLastLine == "---" {
+			// Remove the last 4 lines
+			return strings.Join(lines[:len(lines)-4], "\n")
+		}
+	}
+
+	return content
 }
