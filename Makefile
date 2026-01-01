@@ -1,22 +1,26 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check
+.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check desktop-prepare desktop-dev desktop-build
 
 cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
 	@go build -ldflags="-X 'github.com/teranos/QNTX/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
-types: cli ## Generate TypeScript types and markdown docs from Go source
+types: cli ## Generate TypeScript, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
 	@./bin/qntx typegen --lang typescript --output types/generated/
+	@./bin/qntx typegen --lang rust --output types/generated/
 	@./bin/qntx typegen --lang markdown  # Defaults to docs/types/
 	@echo "✓ TypeScript types generated in types/generated/typescript/"
+	@echo "✓ Rust types generated in types/generated/rust/"
 	@echo "✓ Markdown docs generated in docs/types/"
 
 types-check: cli ## Check if generated types are up to date
 	@echo "Checking generated types..."
 	@mkdir -p tmp/types-check
 	@./bin/qntx typegen --lang typescript --output tmp/types-check/
+	@./bin/qntx typegen --lang rust --output tmp/types-check/
 	@./bin/qntx typegen --lang markdown --output tmp/types-check/
 	@if diff -r tmp/types-check/typescript types/generated/typescript > /dev/null 2>&1 && \
+	   diff -r tmp/types-check/rust types/generated/rust > /dev/null 2>&1 && \
 	   diff -r tmp/types-check/markdown docs/types > /dev/null 2>&1; then \
 		echo "✓ Types are up to date"; \
 		rm -rf tmp/types-check; \
@@ -91,3 +95,20 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist
 	@rm -rf web/node_modules
+
+desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
+	@echo "Preparing desktop app assets..."
+	@./web/src-tauri/generate-icons.sh
+	@./web/src-tauri/prepare-sidecar.sh
+	@echo "✓ Desktop app prepared"
+
+desktop-dev: desktop-prepare ## Run desktop app in development mode
+	@echo "Starting QNTX Desktop in development mode..."
+	@echo "  Frontend dev server: http://localhost:8820"
+	@echo "  Backend will start as sidecar on port 877"
+	@cd web/src-tauri && cargo run
+
+desktop-build: desktop-prepare ## Build production desktop app (requires: cargo install tauri-cli)
+	@echo "Building QNTX Desktop for production..."
+	@cd web/src-tauri && cargo tauri build
+	@echo "✓ Desktop app built in web/src-tauri/target/release/bundle/"
