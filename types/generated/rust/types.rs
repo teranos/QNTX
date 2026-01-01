@@ -2,6 +2,7 @@
 // Regenerate with: make types
 // Source package: types
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#as>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct As {
     /// ASID: AS + UUID
@@ -25,6 +26,7 @@ pub struct As {
     pub created_at: String,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#ascommand>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AsCommand {
     /// Entities being attested about
@@ -42,6 +44,7 @@ pub struct AsCommand {
     pub attributes: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axdebug>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxDebug {
     pub execution_time_ms: i64,
@@ -57,6 +60,7 @@ pub struct AxDebug {
     pub database_row_count: i64,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axfilter>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxFilter {
     /// Specific entities to ask about
@@ -84,6 +88,7 @@ pub struct AxFilter {
     pub so_actions: Vec<String>,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axresult>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxResult {
     /// All matching attestations
@@ -99,6 +104,7 @@ pub struct AxResult {
     pub debug: Option<AxDebug>,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axsummary>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxSummary {
     pub total_attestations: i64,
@@ -108,6 +114,7 @@ pub struct AxSummary {
     pub unique_actors: std::collections::HashMap<String, i64>,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#completionitem>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionItem {
     pub label: String,
@@ -122,6 +129,7 @@ pub struct CompletionItem {
     pub sort_text: String,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#conflict>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Conflict {
     pub subject: String,
@@ -132,6 +140,7 @@ pub struct Conflict {
     pub resolution: String,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#overfilter>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OverFilter {
     /// The numeric value (e.g., 5 for "5y")
@@ -142,6 +151,7 @@ pub struct OverFilter {
     pub operator: String,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#typedef>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
     /// Type identifier (e.g., "commit", "author")

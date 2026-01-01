@@ -2,26 +2,26 @@
 // Regenerate with: make types
 // Source package: sym
 
-pub const am: &str = "≡";
-pub const r#as: &str = "+";
-pub const at: &str = "✦";
-pub const ax: &str = "⋈";
-pub const by: &str = "⌬";
-pub const db: &str = "⊔";
-pub const i: &str = "⍟";
-pub const is: &str = "=";
-pub const ix: &str = "⨳";
-pub const of: &str = "∈";
-pub const pulse: &str = "꩜";
-pub const pulse_close: &str = "❀";
-pub const pulse_open: &str = "✿";
-pub const so: &str = "⟶";
+pub const AM: &str = "≡";
+pub const r#AS: &str = "+";
+pub const AT: &str = "✦";
+pub const AX: &str = "⋈";
+pub const BY: &str = "⌬";
+pub const DB: &str = "⊔";
+pub const I: &str = "⍟";
+pub const IS: &str = "=";
+pub const IX: &str = "⨳";
+pub const OF: &str = "∈";
+pub const PULSE: &str = "꩜";
+pub const PULSE_CLOSE: &str = "❀";
+pub const PULSE_OPEN: &str = "✿";
+pub const SO: &str = "⟶";
 
 
-pub const palette_order: &[&str] = &[i, am, ix, ax, r#as, is, of, by, at, so];
+pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, r#AS, IS, OF, BY, AT, SO];
 
 lazy_static::lazy_static! {
-    pub static ref command_descriptions: std::collections::HashMap<&'static str, &'static str> = {
+    pub static ref COMMAND_DESCRIPTIONS: std::collections::HashMap<&'static str, &'static str> = {
         let mut m = std::collections::HashMap::new();
         m.insert("am", "Structure — QNTX's internal understanding");
         m.insert("as", "Assert — Emit an attestation");
@@ -37,34 +37,34 @@ lazy_static::lazy_static! {
     };
 }
 lazy_static::lazy_static! {
-    pub static ref command_to_symbol: std::collections::HashMap<&'static str, &'static str> = {
+    pub static ref COMMAND_TO_SYMBOL: std::collections::HashMap<&'static str, &'static str> = {
         let mut m = std::collections::HashMap::new();
-        m.insert("am", am);
-        m.insert("as", r#as);
-        m.insert("at", at);
-        m.insert("ax", ax);
-        m.insert("by", by);
-        m.insert("i", i);
-        m.insert("is", is);
-        m.insert("ix", ix);
-        m.insert("of", of);
-        m.insert("so", so);
+        m.insert("am", AM);
+        m.insert("as", r#AS);
+        m.insert("at", AT);
+        m.insert("ax", AX);
+        m.insert("by", BY);
+        m.insert("i", I);
+        m.insert("is", IS);
+        m.insert("ix", IX);
+        m.insert("of", OF);
+        m.insert("so", SO);
         m
     };
 }
 lazy_static::lazy_static! {
-    pub static ref symbol_to_command: std::collections::HashMap<&'static str, &'static str> = {
+    pub static ref SYMBOL_TO_COMMAND: std::collections::HashMap<&'static str, &'static str> = {
         let mut m = std::collections::HashMap::new();
-        m.insert(am, "am");
-        m.insert(r#as, "as");
-        m.insert(at, "at");
-        m.insert(ax, "ax");
-        m.insert(by, "by");
-        m.insert(i, "i");
-        m.insert(is, "is");
-        m.insert(ix, "ix");
-        m.insert(of, "of");
-        m.insert(so, "so");
+        m.insert(AM, "am");
+        m.insert(r#AS, "as");
+        m.insert(AT, "at");
+        m.insert(AX, "ax");
+        m.insert(BY, "by");
+        m.insert(I, "i");
+        m.insert(IS, "is");
+        m.insert(IX, "ix");
+        m.insert(OF, "of");
+        m.insert(SO, "so");
         m
     };
 }
