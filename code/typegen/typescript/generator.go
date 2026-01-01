@@ -7,7 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/typegen"
+	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/code/typegen/util"
 )
 
 // FieldTagInfo contains parsed struct tag information for TypeScript generation
@@ -25,50 +26,35 @@ type FieldTagInfo struct {
 func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
 	info := FieldTagInfo{}
 
-	if tag == nil {
+	// Parse JSON tag using shared utility
+	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
+		info.JSONName = jsonInfo.Name
+		info.Omitempty = jsonInfo.Omitempty
+		info.Skip = jsonInfo.Skip
+		if info.Skip {
+			return info
+		}
+	}
+
+	// Parse tstype tag using shared custom tag parser
+	tsType, options, skip := util.ParseCustomTag(tag, "tstype")
+	if skip {
+		info.Skip = true
 		return info
 	}
-
-	// Remove backticks
-	tagValue := strings.Trim(tag.Value, "`")
-	st := reflect.StructTag(tagValue)
-
-	// Parse json tag
-	jsonTag := st.Get("json")
-	if jsonTag != "" {
-		parts := strings.Split(jsonTag, ",")
-		info.JSONName = parts[0]
-		if info.JSONName == "-" {
-			info.Skip = true
-			return info
-		}
-		for _, part := range parts[1:] {
-			if part == "omitempty" {
-				info.Omitempty = true
-			}
-		}
-	}
-
-	// Parse tstype tag
-	tstypeTag := st.Get("tstype")
-	if tstypeTag != "" {
-		if tstypeTag == "-" {
-			info.Skip = true
-			return info
-		}
-		parts := strings.Split(tstypeTag, ",")
-		info.TSType = parts[0]
-		for _, part := range parts[1:] {
-			if part == "optional" {
-				info.TSOptional = true
-			}
-		}
+	if tsType != "" {
+		info.TSType = tsType
+		info.TSOptional = options["optional"]
 	}
 
 	// Parse readonly tag
-	readonlyTag, ok := st.Lookup("readonly")
-	if ok && readonlyTag != "false" {
-		info.Readonly = true
+	if tag != nil {
+		tagValue := strings.Trim(tag.Value, "`")
+		st := reflect.StructTag(tagValue)
+		readonlyTag, ok := st.Lookup("readonly")
+		if ok && readonlyTag != "false" {
+			info.Readonly = true
+		}
 	}
 
 	return info
@@ -182,9 +168,46 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 			}
 
 			// Extract and format comments
-			comment := extractFieldComment(field)
-			if comment != "" {
-				sb.WriteString(fmt.Sprintf("  /** %s */\n", comment))
+			comment := util.ExtractFieldComment(field)
+
+			// Parse validation constraints
+			validateInfo := util.ParseValidateTag(field.Tag)
+
+			// Build JSDoc comment with validation info
+			if comment != "" || validateInfo != nil {
+				sb.WriteString("  /**\n")
+				if comment != "" {
+					sb.WriteString(fmt.Sprintf("   * %s\n", comment))
+				}
+				if validateInfo != nil {
+					if comment != "" {
+						sb.WriteString("   *\n") // Blank line separator
+					}
+					// Add validation constraints as JSDoc tags
+					if validateInfo.Required {
+						sb.WriteString("   * @required\n")
+					}
+					if validateInfo.Min != util.NoConstraint {
+						// Determine if it's array or string based on type
+						if strings.HasSuffix(tsType, "[]") {
+							sb.WriteString(fmt.Sprintf("   * @minItems %d\n", validateInfo.Min))
+						} else if tsType == "string" {
+							sb.WriteString(fmt.Sprintf("   * @minLength %d\n", validateInfo.Min))
+						} else if tsType == "number" {
+							sb.WriteString(fmt.Sprintf("   * @minimum %d\n", validateInfo.Min))
+						}
+					}
+					if validateInfo.Max != util.NoConstraint {
+						if strings.HasSuffix(tsType, "[]") {
+							sb.WriteString(fmt.Sprintf("   * @maxItems %d\n", validateInfo.Max))
+						} else if tsType == "string" {
+							sb.WriteString(fmt.Sprintf("   * @maxLength %d\n", validateInfo.Max))
+						} else if tsType == "number" {
+							sb.WriteString(fmt.Sprintf("   * @maximum %d\n", validateInfo.Max))
+						}
+					}
+				}
+				sb.WriteString("   */\n")
 			}
 
 			// Build field declaration
@@ -205,38 +228,6 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 	sb.WriteString("}")
 
 	return sb.String()
-}
-
-// extractFieldComment extracts and formats the comment from a field
-func extractFieldComment(field *ast.Field) string {
-	if field.Doc != nil && len(field.Doc.List) > 0 {
-		// Use Doc comment (appears before the field)
-		var lines []string
-		for _, comment := range field.Doc.List {
-			text := cleanCommentText(comment.Text)
-			if text != "" {
-				lines = append(lines, text)
-			}
-		}
-		return strings.Join(lines, " ")
-	}
-
-	if field.Comment != nil && len(field.Comment.List) > 0 {
-		// Use inline comment (appears after the field)
-		return cleanCommentText(field.Comment.List[0].Text)
-	}
-
-	return ""
-}
-
-// cleanCommentText removes comment markers and trims whitespace
-func cleanCommentText(text string) string {
-	text = strings.TrimPrefix(text, "//")
-	// Handle both /** and /* block comments
-	text = strings.TrimPrefix(text, "/**")
-	text = strings.TrimPrefix(text, "/*")
-	text = strings.TrimSuffix(text, "*/")
-	return strings.TrimSpace(text)
 }
 
 // GenerateUnionType creates a TypeScript union type from const values
