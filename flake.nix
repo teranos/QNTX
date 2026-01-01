@@ -17,8 +17,9 @@
           version = "0.14.11";
           src = ./.;
 
-          # Use Go module proxy instead of vendoring
-          proxyVendor = true;
+          # Nix will compute this hash from go.sum
+          # Set to lib.fakeHash to get the correct hash on first build
+          vendorHash = pkgs.lib.fakeHash;
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/version.BuildTime=nix-build'"
