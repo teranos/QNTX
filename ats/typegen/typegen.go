@@ -19,8 +19,10 @@ import (
 	"go/ast"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -357,4 +359,19 @@ func makeRelativePath(absPath string) string {
 
 		dir = parent
 	}
+}
+
+// GetTimestamp returns the current UTC timestamp in RFC3339 format for generated code headers
+func GetTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// GetGitHash returns the current git commit hash, or empty string if not in a git repo
+func GetGitHash() string {
+	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
 }
