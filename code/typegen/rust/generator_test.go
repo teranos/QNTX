@@ -227,8 +227,8 @@ func TestGenerateStruct_ValidationMetadata(t *testing.T) {
 	if !contains(result, "/// Validation: required") {
 		t.Error("Expected required validation comment")
 	}
-	if !contains(result, "/// Validation: min length/items: 1") {
-		t.Error("Expected min validation comment")
+	if !contains(result, "/// Validation: min items: 1") {
+		t.Error("Expected min items validation comment (type-specific)")
 	}
 }
 

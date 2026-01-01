@@ -94,10 +94,17 @@ type ValidateTagInfo struct {
 }
 
 // ParseValidateTag extracts validation constraints from a validate tag.
-// Supports: required, min=N, max=N
-// Returns nil if there's no validate tag.
+//
+// Supported validators (documentation-only, not enforced at runtime):
+//   - required: Field must have a value
+//   - min=N: Minimum value/length/items
+//   - max=N: Maximum value/length/items
+//
+// Not yet supported: email, url, pattern, enum, gt, gte, lt, lte, etc.
 // Invalid values are silently ignored, allowing generators to handle
 // malformed tags gracefully rather than failing the entire generation.
+//
+// Returns nil if there's no validate tag.
 func ParseValidateTag(tag *ast.BasicLit) *ValidateTagInfo {
 	if tag == nil {
 		return nil
