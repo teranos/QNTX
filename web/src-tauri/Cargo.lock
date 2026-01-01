@@ -2785,12 +2785,22 @@ dependencies = [
 name = "qntx-desktop"
 version = "0.1.0"
 dependencies = [
+ "qntx-types",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-notification",
  "tauri-plugin-shell",
+]
+
+[[package]]
+name = "qntx-types"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

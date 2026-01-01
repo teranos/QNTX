@@ -2,15 +2,16 @@
 // Regenerate with: make types
 // Source package: schedule
 
-pub const execution_status_completed: &str = "completed";
-pub const execution_status_failed: &str = "failed";
-pub const execution_status_running: &str = "running";
-pub const state_active: &str = "active";
-pub const state_deleted: &str = "deleted";
-pub const state_inactive: &str = "inactive";
-pub const state_paused: &str = "paused";
-pub const state_stopping: &str = "stopping";
+pub const EXECUTION_STATUS_COMPLETED: &str = "completed";
+pub const EXECUTION_STATUS_FAILED: &str = "failed";
+pub const EXECUTION_STATUS_RUNNING: &str = "running";
+pub const STATE_ACTIVE: &str = "active";
+pub const STATE_DELETED: &str = "deleted";
+pub const STATE_INACTIVE: &str = "inactive";
+pub const STATE_PAUSED: &str = "paused";
+pub const STATE_STOPPING: &str = "stopping";
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#execution>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Execution {
     /// Identity

@@ -2,6 +2,7 @@
 // Regenerate with: make types
 // Source package: async
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcode>
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ErrorCode {
     #[serde(rename = "ai_error")]
@@ -22,6 +23,7 @@ pub enum ErrorCode {
     ValidationError,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcontext>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ErrorContext {
     /// Where the error occurred
@@ -36,6 +38,7 @@ pub struct ErrorContext {
     pub recoverable: bool,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#job>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Job {
     pub id: String,
@@ -67,6 +70,7 @@ pub struct Job {
     pub updated_at: String,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#jobstatus>
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum JobStatus {
     #[serde(rename = "cancelled")]
@@ -83,6 +87,7 @@ pub enum JobStatus {
     Running,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#progress>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Progress {
     /// Completed operations
@@ -91,6 +96,7 @@ pub struct Progress {
     pub total: i64,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#pulsestate>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseState {
     pub calls_this_minute: i64,
@@ -104,6 +110,7 @@ pub struct PulseState {
     pub pause_reason: Option<String>,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#queuestats>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueueStats {
     pub queued: i64,
@@ -114,6 +121,7 @@ pub struct QueueStats {
     pub total: i64,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#systemmetrics>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SystemMetrics {
     /// Number of workers currently executing jobs
@@ -132,6 +140,7 @@ pub struct SystemMetrics {
     pub jobs_running: i64,
 }
 
+/// Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#workerpoolconfig>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkerPoolConfig {
     /// Number of concurrent workers
