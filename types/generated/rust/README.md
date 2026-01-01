@@ -39,7 +39,7 @@ println!("Command for IX: {}", command_to_symbol.get("ix").unwrap());
 
 ## Type Compatibility
 
-All types include `serde::Serialize` and `serde::Deserialize` traits, ensuring JSON compatibility with the QNTX Go server.
+All types derive `serde::Serialize` and `serde::Deserialize` for JSON compatibility with QNTX's Go backend.
 
 ### Example: Deserializing from QNTX API
 
@@ -60,4 +60,8 @@ make types
 ./qntx typegen --lang rust --output types/generated/
 ```
 
-**Do not manually edit** these files - they will be overwritten on the next generation.
+**Do not manually edit** - changes will be overwritten when types are regenerated.
+
+---
+
+*Generated at: 2026-01-01T12:20:44Z*
