@@ -1,0 +1,44 @@
+{
+  "productName": "QNTX",
+  "version": "0.1.0",
+  "identifier": "nl.sbvh.qntx",
+  "build": {
+    "beforeDevCommand": "cd .. && bun run dev",
+    "beforeBuildCommand": "cd .. && bun run build",
+    "devUrl": "http://localhost:8820",
+    "frontendDist": "../../internal/server/dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "bin/qntx"
+    ]
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "QNTX",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    }
+  }
+}
