@@ -26,14 +26,14 @@ types-check: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Check if generated t
 	@$(QNTX) typegen --lang rust --output tmp/types-check/
 	@$(QNTX) typegen --lang markdown --output tmp/types-check/
 	@if diff -r tmp/types-check/typescript types/generated/typescript > /dev/null 2>&1 && \
-	   diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target -I '^// Source (last modified|version):' tmp/types-check/rust types/generated/rust > /dev/null 2>&1 && \
+	   diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target -I '^// Source last modified:' -I '^// Source version:' tmp/types-check/rust types/generated/rust > /dev/null 2>&1 && \
 	   diff -r tmp/types-check/markdown docs/types > /dev/null 2>&1; then \
 		echo "✓ Types are up to date"; \
 		rm -rf tmp/types-check; \
 	else \
 		echo "✗ Types are out of date. Showing diff:"; \
 		diff -r tmp/types-check/typescript types/generated/typescript || true; \
-		diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target -I '^// Source (last modified|version):' tmp/types-check/rust types/generated/rust || true; \
+		diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target -I '^// Source last modified:' -I '^// Source version:' tmp/types-check/rust types/generated/rust || true; \
 		diff -r tmp/types-check/markdown docs/types || true; \
 		rm -rf tmp/types-check; \
 		exit 1; \
