@@ -255,9 +255,7 @@ class GoEditorPanel {
             }
 
             // Get backend URL and gopls configuration
-            const isTauri = window.location.protocol === 'tauri:';
-            const defaultUrl = isTauri ? 'http://localhost:877' : window.location.origin;
-            const backendUrl = (window as any).__BACKEND_URL__ || defaultUrl;
+            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
             const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
             const wsHost = backendUrl.replace(/^https?:\/\//, '');
             const goplsUri = `${wsProtocol}//${wsHost}/gopls` as `ws://${string}` | `wss://${string}`;
