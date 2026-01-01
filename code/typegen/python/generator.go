@@ -10,42 +10,10 @@ import (
 	"github.com/teranos/QNTX/code/typegen/util"
 )
 
-// FieldTagInfo contains parsed struct tag information for Python generation
-type FieldTagInfo struct {
-	JSONName   string // Field name from json tag
-	Omitempty  bool   // Has omitempty option (maps to Optional)
-	PyType     string // Custom Python type from pytype tag
-	PyOptional bool   // Force Optional with pytype:",optional"
-	Skip       bool   // Skip this field (json:"-" or pytype:"-")
-}
-
 // ParseFieldTags extracts json and pytype tags from a struct field tag.
-// Exported for testing.
-func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
-	info := FieldTagInfo{}
-
-	// Parse JSON tag using shared utility
-	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
-		info.JSONName = jsonInfo.Name
-		info.Omitempty = jsonInfo.Omitempty
-		info.Skip = jsonInfo.Skip
-		if info.Skip {
-			return info
-		}
-	}
-
-	// Parse pytype tag using shared custom tag parser
-	pyType, options, skip := util.ParseCustomTag(tag, "pytype")
-	if skip {
-		info.Skip = true
-		return info
-	}
-	if pyType != "" {
-		info.PyType = pyType
-		info.PyOptional = options["optional"]
-	}
-
-	return info
+// Exported for testing. Uses shared util.ParseFieldTags internally.
+func ParseFieldTags(tag *ast.BasicLit) util.FieldTagInfo {
+	return util.ParseFieldTags(tag, "pytype")
 }
 
 // Generator implements typegen.Generator for Python
@@ -178,12 +146,12 @@ func GenerateDataclass(name string, structType *ast.StructType) string {
 
 			// Determine if field is optional
 			isPointer := util.IsPointerType(field.Type)
-			isOptional := tagInfo.Omitempty || tagInfo.PyOptional || isPointer
+			isOptional := tagInfo.Omitempty || tagInfo.CustomOptional || isPointer
 
 			// Get Python type (pytype tag overrides inferred type)
 			var pyType string
-			if tagInfo.PyType != "" {
-				pyType = tagInfo.PyType
+			if tagInfo.CustomType != "" {
+				pyType = tagInfo.CustomType
 			} else {
 				pyType = goTypeToPython(field.Type)
 				// For pointer types without pytype override, add None union
