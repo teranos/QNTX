@@ -178,4 +178,3 @@ pub struct WorkerPoolConfig {
     /// Duration of each graceful start phase (default: 5min, test: 10s)
     pub graceful_start_phase: i64,
 }
-

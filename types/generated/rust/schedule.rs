@@ -65,4 +65,3 @@ pub struct Execution {
     /// RFC3339 timestamp
     pub updated_at: String,
 }
-

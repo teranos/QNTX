@@ -3,6 +3,7 @@ package rust
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -106,6 +107,11 @@ func GenerateIndexFile(outputDir string, exports []PackageExport) error {
 	indexPath := filepath.Join(outputDir, "mod.rs")
 	if err := os.WriteFile(indexPath, []byte(sb.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write mod.rs: %w", err)
+	}
+
+	// Format the file
+	if err := FormatFile(indexPath); err != nil {
+		return err
 	}
 
 	return nil
@@ -230,6 +236,11 @@ func GenerateLibRs(outputDir string, exports []PackageExport) error {
 		return fmt.Errorf("failed to write lib.rs: %w", err)
 	}
 
+	// Format the file
+	if err := FormatFile(libPath); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -348,4 +359,23 @@ func stripTimestampFooter(content string) string {
 	}
 
 	return content
+}
+
+// FormatFile formats a Rust file using rustfmt if available
+// Returns nil if rustfmt is not found (graceful degradation)
+func FormatFile(path string) error {
+	// Check if rustfmt is available
+	if _, err := exec.LookPath("rustfmt"); err != nil {
+		// rustfmt not found - warn but don't fail
+		fmt.Fprintf(os.Stderr, "⚠ rustfmt not found, skipping format for %s\n", path)
+		return nil
+	}
+
+	// Run rustfmt on the file
+	cmd := exec.Command("rustfmt", path)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("rustfmt failed for %s: %w\n%s", path, err, output)
+	}
+
+	return nil
 }

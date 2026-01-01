@@ -29,8 +29,7 @@ pub struct BudgetConfig {
 /// Limiter enforces max calls per time window using sliding window algorithm
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#limiter>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Limiter {
-}
+pub struct Limiter {}
 
 /// Status represents current budget state
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#status>"]
@@ -50,6 +49,4 @@ pub struct Status {
 /// Tracker tracks and enforces budget limits
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#tracker>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Tracker {
-}
-
+pub struct Tracker {}

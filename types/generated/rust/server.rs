@@ -468,4 +468,3 @@ pub struct UsageUpdateMessage {
     /// Unix timestamp
     pub timestamp: i64,
 }
-

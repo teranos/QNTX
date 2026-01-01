@@ -304,6 +304,13 @@ func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) 
 				return fmt.Errorf("failed to write %s: %w", outputPath, err)
 			}
 
+			// Format Rust files after writing
+			if lang == "rust" {
+				if err := rust.FormatFile(outputPath); err != nil {
+					return err
+				}
+			}
+
 			fmt.Printf("✓ Generated %s (%d types)\n", outputPath, len(res.typeNames))
 		}
 	}
