@@ -26,6 +26,9 @@
             pkgs.cargo
             pkgs.rustfmt
 
+            # Node.js for GitHub Actions
+            pkgs.nodejs_20
+
             # Build tools and utilities
             pkgs.sqlite
             pkgs.gcc
