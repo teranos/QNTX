@@ -18,7 +18,7 @@
 
           contents = [
             # Go toolchain
-            pkgs.go_1_23  # nixpkgs may not have 1.24 yet, use latest stable
+            pkgs.go
             pkgs.git
 
             # Rust toolchain with rustfmt
@@ -57,7 +57,7 @@
         # Development shell with same tools
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            pkgs.go_1_23
+            pkgs.go
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
