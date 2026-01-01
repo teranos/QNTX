@@ -61,15 +61,18 @@ export function initCodeMirrorEditor(): EditorView | null {
 
     // LSP configuration (async connection, won't block page load)
     // Use backend URL from injected global with validation
-    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+    // In Tauri, window.location.origin is tauri://localhost, so detect and use correct backend
+    const isTauri = window.location.protocol === 'tauri:';
+    const defaultUrl = isTauri ? 'http://localhost:877' : window.location.origin;
+    const rawUrl = (window as any).__BACKEND_URL__ || defaultUrl;
     const validatedUrl = validateBackendURL(rawUrl);
 
     if (!validatedUrl) {
         console.error('[LSP] Invalid backend URL:', rawUrl);
-        console.log('[LSP] Falling back to same-origin');
+        console.log('[LSP] Falling back to default URL');
     }
 
-    const backendUrl = validatedUrl || window.location.origin;
+    const backendUrl = validatedUrl || defaultUrl;
     const backendHost = backendUrl.replace(/^https?:\/\//, '');
     const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
     const serverUri = `${protocol}//${backendHost}/lsp` as `ws://${string}` | `wss://${string}`;

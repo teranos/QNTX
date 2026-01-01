@@ -4,9 +4,12 @@
 
 /**
  * Get the backend base URL from injected global or current origin
+ * In Tauri, defaults to http://localhost:877
  */
 function getBackendUrl(): string {
-    return (window as any).__BACKEND_URL__ || window.location.origin;
+    const isTauri = window.location.protocol === 'tauri:';
+    const defaultUrl = isTauri ? 'http://localhost:877' : window.location.origin;
+    return (window as any).__BACKEND_URL__ || defaultUrl;
 }
 
 /**
