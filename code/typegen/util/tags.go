@@ -1,3 +1,6 @@
+// Package util provides shared utilities for type generators.
+// It includes functions for parsing struct tags, extracting field comments,
+// and performing case conversions between Go and target language conventions.
 package util
 
 import (
@@ -6,6 +9,9 @@ import (
 	"strconv"
 	"strings"
 )
+
+// NoConstraint is the sentinel value indicating no min/max constraint is set
+const NoConstraint = -1
 
 // JSONTagInfo holds parsed information from a json struct tag
 type JSONTagInfo struct {
@@ -83,13 +89,15 @@ func ParseCustomTag(tag *ast.BasicLit, tagName string) (name string, options map
 // ValidateTagInfo holds parsed information from a validate struct tag
 type ValidateTagInfo struct {
 	Required bool // Has required constraint
-	Min      int  // Minimum value/length/items (-1 if not set)
-	Max      int  // Maximum value/length/items (-1 if not set)
+	Min      int  // Minimum value/length/items (NoConstraint if not set)
+	Max      int  // Maximum value/length/items (NoConstraint if not set)
 }
 
 // ParseValidateTag extracts validation constraints from a validate tag.
 // Supports: required, min=N, max=N
 // Returns nil if there's no validate tag.
+// Invalid values are silently ignored, allowing generators to handle
+// malformed tags gracefully rather than failing the entire generation.
 func ParseValidateTag(tag *ast.BasicLit) *ValidateTagInfo {
 	if tag == nil {
 		return nil
@@ -105,8 +113,8 @@ func ParseValidateTag(tag *ast.BasicLit) *ValidateTagInfo {
 	}
 
 	info := &ValidateTagInfo{
-		Min: -1,
-		Max: -1,
+		Min: NoConstraint,
+		Max: NoConstraint,
 	}
 
 	// Parse comma-separated constraints

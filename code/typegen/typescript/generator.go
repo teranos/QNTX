@@ -187,7 +187,7 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 					if validateInfo.Required {
 						sb.WriteString("   * @required\n")
 					}
-					if validateInfo.Min >= 0 {
+					if validateInfo.Min != util.NoConstraint {
 						// Determine if it's array or string based on type
 						if strings.HasSuffix(tsType, "[]") {
 							sb.WriteString(fmt.Sprintf("   * @minItems %d\n", validateInfo.Min))
@@ -197,7 +197,7 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 							sb.WriteString(fmt.Sprintf("   * @minimum %d\n", validateInfo.Min))
 						}
 					}
-					if validateInfo.Max >= 0 {
+					if validateInfo.Max != util.NoConstraint {
 						if strings.HasSuffix(tsType, "[]") {
 							sb.WriteString(fmt.Sprintf("   * @maxItems %d\n", validateInfo.Max))
 						} else if tsType == "string" {
