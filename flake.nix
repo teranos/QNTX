@@ -17,9 +17,8 @@
           version = "0.14.11";
           src = ./.;
 
-          # Nix will compute this hash from go.sum
-          # Set to lib.fakeHash to get the correct hash on first build
-          vendorHash = pkgs.lib.fakeHash;
+          # Hash of vendored Go dependencies (computed from go.sum)
+          vendorHash = "sha256-lI/fmwBx3ukxiclu4L0YfOgscA7qUpCVdBv4ex4Uu+o=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/version.BuildTime=nix-build'"
