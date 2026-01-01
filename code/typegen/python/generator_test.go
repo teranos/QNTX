@@ -18,8 +18,8 @@ func TestParseFieldTags_JSONOnly(t *testing.T) {
 	if !info.Omitempty {
 		t.Error("Expected Omitempty to be true")
 	}
-	if info.PyType != "" {
-		t.Errorf("Expected empty PyType, got '%s'", info.PyType)
+	if info.CustomType != "" {
+		t.Errorf("Expected empty CustomType, got '%s'", info.CustomType)
 	}
 }
 
@@ -30,8 +30,8 @@ func TestParseFieldTags_PyTypeOverride(t *testing.T) {
 	if info.JSONName != "field" {
 		t.Errorf("Expected JSONName 'field', got '%s'", info.JSONName)
 	}
-	if info.PyType != "CustomType" {
-		t.Errorf("Expected PyType 'CustomType', got '%s'", info.PyType)
+	if info.CustomType != "CustomType" {
+		t.Errorf("Expected CustomType 'CustomType', got '%s'", info.CustomType)
 	}
 }
 
@@ -39,8 +39,8 @@ func TestParseFieldTags_PyTypeWithUnion(t *testing.T) {
 	tag := createTag(`json:"nullable" pytype:"str | None"`)
 	info := ParseFieldTags(tag)
 
-	if info.PyType != "str | None" {
-		t.Errorf("Expected PyType 'str | None', got '%s'", info.PyType)
+	if info.CustomType != "str | None" {
+		t.Errorf("Expected CustomType 'str | None', got '%s'", info.CustomType)
 	}
 }
 
@@ -48,11 +48,11 @@ func TestParseFieldTags_PyTypeOptional(t *testing.T) {
 	tag := createTag(`json:"opt" pytype:"int,optional"`)
 	info := ParseFieldTags(tag)
 
-	if info.PyType != "int" {
-		t.Errorf("Expected PyType 'int', got '%s'", info.PyType)
+	if info.CustomType != "int" {
+		t.Errorf("Expected CustomType 'int', got '%s'", info.CustomType)
 	}
-	if !info.PyOptional {
-		t.Error("Expected PyOptional to be true")
+	if !info.CustomOptional {
+		t.Error("Expected CustomOptional to be true")
 	}
 }
 
@@ -77,7 +77,7 @@ func TestParseFieldTags_JSONSkip(t *testing.T) {
 func TestParseFieldTags_NilTag(t *testing.T) {
 	info := ParseFieldTags(nil)
 
-	if info.JSONName != "" || info.PyType != "" || info.Skip {
+	if info.JSONName != "" || info.CustomType != "" || info.Skip {
 		t.Error("Expected empty FieldTagInfo for nil tag")
 	}
 }

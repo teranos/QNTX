@@ -11,43 +11,20 @@ import (
 	"github.com/teranos/QNTX/code/typegen/util"
 )
 
-// FieldTagInfo contains parsed struct tag information for TypeScript generation
+// FieldTagInfo extends util.FieldTagInfo with TypeScript-specific fields
 type FieldTagInfo struct {
-	JSONName   string // Field name from json tag
-	Omitempty  bool   // Has omitempty option
-	TSType     string // Custom TypeScript type from tstype tag
-	TSOptional bool   // Force optional with tstype:",optional"
-	Skip       bool   // Skip this field (json:"-" or tstype:"-")
-	Readonly   bool   // Mark field as readonly
+	util.FieldTagInfo        // Embed shared tag info
+	Readonly          bool   // Mark field as readonly (TypeScript-specific)
 }
 
 // ParseFieldTags extracts json and tstype tags from a struct field tag.
-// Exported for testing.
+// Exported for testing. Uses shared util.ParseFieldTags with TypeScript-specific extensions.
 func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
-	info := FieldTagInfo{}
-
-	// Parse JSON tag using shared utility
-	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
-		info.JSONName = jsonInfo.Name
-		info.Omitempty = jsonInfo.Omitempty
-		info.Skip = jsonInfo.Skip
-		if info.Skip {
-			return info
-		}
+	info := FieldTagInfo{
+		FieldTagInfo: util.ParseFieldTags(tag, "tstype"),
 	}
 
-	// Parse tstype tag using shared custom tag parser
-	tsType, options, skip := util.ParseCustomTag(tag, "tstype")
-	if skip {
-		info.Skip = true
-		return info
-	}
-	if tsType != "" {
-		info.TSType = tsType
-		info.TSOptional = options["optional"]
-	}
-
-	// Parse readonly tag
+	// Parse readonly tag (TypeScript-specific)
 	if tag != nil {
 		tagValue := strings.Trim(tag.Value, "`")
 		st := reflect.StructTag(tagValue)
@@ -153,12 +130,12 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 
 			// Determine if field is optional
 			isPointer := util.IsPointerType(field.Type)
-			isOptional := tagInfo.Omitempty || tagInfo.TSOptional || isPointer
+			isOptional := tagInfo.Omitempty || tagInfo.CustomOptional || isPointer
 
 			// Get TypeScript type (tstype tag overrides inferred type)
 			var tsType string
-			if tagInfo.TSType != "" {
-				tsType = tagInfo.TSType
+			if tagInfo.CustomType != "" {
+				tsType = tagInfo.CustomType
 			} else {
 				tsType = goTypeToTS(field.Type)
 				// For pointer types without tstype override, add null union
