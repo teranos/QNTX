@@ -75,6 +75,16 @@ var TypeMapping = map[string]string{
 	"NullTime":       "str | None",
 }
 
+// typeConverterConfig is the Python-specific type conversion configuration
+var typeConverterConfig = &util.TypeConverterConfig{
+	TypeMapping:          TypeMapping,
+	ArrayFormat:          func(elem string) string { return "list[" + elem + "]" },
+	MapFormat:            func(key, val string) string { return fmt.Sprintf("dict[%s, %s]", key, val) },
+	StringMapUnknownType: "dict[str, Any]",
+	UnknownType:          "Any",
+	StringType:           "str",
+}
+
 // pythonKeywords are reserved words in Python that need special handling
 var pythonKeywords = map[string]bool{
 	"False": true, "None": true, "True": true, "and": true, "as": true,
@@ -252,55 +262,7 @@ func GenerateEnum(name string, values []string) string {
 
 // goTypeToPython converts a Go AST type expression to Python type string
 func goTypeToPython(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Basic type or type reference in same package
-		if py, ok := TypeMapping[t.Name]; ok {
-			return py
-		}
-		// Assume it's a reference to another type in the same package
-		return t.Name
-
-	case *ast.SelectorExpr:
-		// Qualified type like time.Time
-		if ident, ok := t.X.(*ast.Ident); ok {
-			fullName := ident.Name + "." + t.Sel.Name
-			if py, ok := TypeMapping[fullName]; ok {
-				return py
-			}
-			// Unknown qualified type
-			return t.Sel.Name
-		}
-		return "Any"
-
-	case *ast.StarExpr:
-		// Pointer type - get the underlying type
-		return goTypeToPython(t.X)
-
-	case *ast.ArrayType:
-		// Slice or array
-		elemType := goTypeToPython(t.Elt)
-		return "list[" + elemType + "]"
-
-	case *ast.MapType:
-		// Map type
-		keyType := goTypeToPython(t.Key)
-		valType := goTypeToPython(t.Value)
-
-		// Special case for map[string]interface{}
-		if keyType == "str" && valType == "Any" {
-			return "dict[str, Any]"
-		}
-
-		return fmt.Sprintf("dict[%s, %s]", keyType, valType)
-
-	case *ast.InterfaceType:
-		// interface{} -> Any
-		return "Any"
-
-	default:
-		return "Any"
-	}
+	return util.ConvertGoType(expr, typeConverterConfig)
 }
 
 // GenerateFile creates a complete Python file from a typegen.Result

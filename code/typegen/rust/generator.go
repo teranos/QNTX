@@ -75,6 +75,16 @@ var TypeMapping = map[string]string{
 	"NullTime":       "Option<String>",
 }
 
+// typeConverterConfig is the Rust-specific type conversion configuration
+var typeConverterConfig = &util.TypeConverterConfig{
+	TypeMapping:          TypeMapping,
+	ArrayFormat:          func(elem string) string { return "Vec<" + elem + ">" },
+	MapFormat:            func(key, val string) string { return fmt.Sprintf("std::collections::HashMap<%s, %s>", key, val) },
+	StringMapUnknownType: "serde_json::Map<String, serde_json::Value>",
+	UnknownType:          "serde_json::Value",
+	StringType:           "String",
+}
+
 // GenerateStruct creates a Rust struct from a Go struct
 func GenerateStruct(name string, structType *ast.StructType) string {
 	var sb strings.Builder
@@ -215,55 +225,7 @@ func GenerateEnum(name string, values []string) string {
 
 // goTypeToRust converts a Go AST type expression to Rust type string
 func goTypeToRust(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Basic type or type reference in same package
-		if rs, ok := TypeMapping[t.Name]; ok {
-			return rs
-		}
-		// Assume it's a reference to another type in the same package
-		return t.Name
-
-	case *ast.SelectorExpr:
-		// Qualified type like time.Time
-		if ident, ok := t.X.(*ast.Ident); ok {
-			fullName := ident.Name + "." + t.Sel.Name
-			if rs, ok := TypeMapping[fullName]; ok {
-				return rs
-			}
-			// Unknown qualified type
-			return t.Sel.Name
-		}
-		return "serde_json::Value"
-
-	case *ast.StarExpr:
-		// Pointer type - get the underlying type
-		return goTypeToRust(t.X)
-
-	case *ast.ArrayType:
-		// Slice or array
-		elemType := goTypeToRust(t.Elt)
-		return "Vec<" + elemType + ">"
-
-	case *ast.MapType:
-		// Map type
-		keyType := goTypeToRust(t.Key)
-		valType := goTypeToRust(t.Value)
-
-		// Special case for map[string]interface{}
-		if keyType == "String" && valType == "serde_json::Value" {
-			return "serde_json::Map<String, serde_json::Value>"
-		}
-
-		return fmt.Sprintf("std::collections::HashMap<%s, %s>", keyType, valType)
-
-	case *ast.InterfaceType:
-		// interface{} -> serde_json::Value
-		return "serde_json::Value"
-
-	default:
-		return "serde_json::Value"
-	}
+	return util.ConvertGoType(expr, typeConverterConfig)
 }
 
 // Rust keywords that need raw identifier prefix (r#)
