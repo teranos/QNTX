@@ -13,7 +13,7 @@
 
         # CI image with Go + Rust toolchain
         ciImage = pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-ci";
+          name = "ghcr.io/teranos/qntx";
           tag = "latest";
 
           contents = [

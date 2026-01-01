@@ -23,7 +23,7 @@ jobs:
     name: TypeGen Check
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/teranos/qntx-ci:latest
+      image: ghcr.io/teranos/qntx:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
