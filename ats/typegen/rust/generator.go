@@ -393,6 +393,16 @@ func toPascalCase(s string) string {
 	return result.String()
 }
 
+// sortedKeys returns map keys as a sorted slice
+func sortedKeys[K ~string, V any](m map[K]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, string(k))
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // extractTypeReferences extracts all type names referenced in Rust type strings
 // For example: "Option<Job>" -> ["Job"], "Vec<Execution>" -> ["Execution"]
 func extractTypeReferences(rustType string) []string {
@@ -496,13 +506,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	// Generate const declarations (untyped consts)
 	if len(result.Consts) > 0 {
-		constNames := make([]string, 0, len(result.Consts))
-		for name := range result.Consts {
-			constNames = append(constNames, name)
-		}
-		sort.Strings(constNames)
-
-		for _, name := range constNames {
+		for _, name := range sortedKeys(result.Consts) {
 			value := result.Consts[name]
 			rustName := toRustConstIdent(name)
 			sb.WriteString(fmt.Sprintf("pub const %s: &str = \"%s\";\n", rustName, value))
@@ -511,12 +515,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	}
 
 	// Sort type names for deterministic output
-	names := make([]string, 0, len(result.Types))
-	for name := range result.Types {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
+	names := sortedKeys(result.Types)
 	for i, name := range names {
 		// Add documentation link comment
 		// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
@@ -536,17 +535,11 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	// Generate array constants (slice literals)
 	if len(result.Arrays) > 0 {
-		arrayNames := make([]string, 0, len(result.Arrays))
-		for name := range result.Arrays {
-			arrayNames = append(arrayNames, name)
-		}
-		sort.Strings(arrayNames)
-
 		if len(result.Types) > 0 || len(result.Consts) > 0 {
 			sb.WriteString("\n")
 		}
 
-		for _, name := range arrayNames {
+		for _, name := range sortedKeys(result.Arrays) {
 			elements := result.Arrays[name]
 
 			// Check if all elements are const references
@@ -584,17 +577,11 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	// Generate map constants (map literals)
 	if len(result.Maps) > 0 {
-		mapNames := make([]string, 0, len(result.Maps))
-		for name := range result.Maps {
-			mapNames = append(mapNames, name)
-		}
-		sort.Strings(mapNames)
-
 		if len(result.Types) > 0 || len(result.Consts) > 0 || len(result.Arrays) > 0 {
 			sb.WriteString("\n")
 		}
 
-		for _, name := range mapNames {
+		for _, name := range sortedKeys(result.Maps) {
 			mapData := result.Maps[name]
 
 			// For Rust, we'll use lazy_static for const maps (uppercase)
@@ -604,13 +591,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("        let mut m = std::collections::HashMap::new();\n")
 
 			// Sort map keys for deterministic output
-			keys := make([]string, 0, len(mapData))
-			for k := range mapData {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-
-			for _, key := range keys {
+			for _, key := range sortedKeys(mapData) {
 				value := mapData[key]
 				keyStr := formatMapKey(key, result.Consts)
 				valueStr := formatMapValue(value, result.Consts)
