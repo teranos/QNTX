@@ -21,8 +21,8 @@
           vendorHash = "sha256-lI/fmwBx3ukxiclu4L0YfOgscA7qUpCVdBv4ex4Uu+o=";
 
           ldflags = [
-            "-X 'github.com/teranos/QNTX/version.BuildTime=nix-build'"
-            "-X 'github.com/teranos/QNTX/version.CommitHash=${self.rev or "dirty"}'"
+            "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
+            "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
           ];
 
           subPackages = [ "cmd/qntx" ];

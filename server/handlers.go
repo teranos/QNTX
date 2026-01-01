@@ -20,7 +20,7 @@ import (
 
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/server/wslogs"
-	"github.com/teranos/QNTX/version"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/pulse/async"

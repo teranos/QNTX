@@ -58,6 +58,7 @@ func init() {
 	rootCmd.AddCommand(commands.IxCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
 	rootCmd.AddCommand(commands.TypegenCmd)
+	rootCmd.AddCommand(commands.VersionCmd)
 }
 
 func main() {
