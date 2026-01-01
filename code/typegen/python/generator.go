@@ -177,7 +177,7 @@ func GenerateDataclass(name string, structType *ast.StructType) string {
 			}
 
 			// Determine if field is optional
-			isPointer := isPointerType(field.Type)
+			isPointer := util.IsPointerType(field.Type)
 			isOptional := tagInfo.Omitempty || tagInfo.PyOptional || isPointer
 
 			// Get Python type (pytype tag overrides inferred type)
@@ -280,12 +280,6 @@ func GenerateEnum(name string, values []string) string {
 	}
 
 	return strings.TrimRight(sb.String(), "\n")
-}
-
-// isPointerType checks if the AST expression represents a pointer type
-func isPointerType(expr ast.Expr) bool {
-	_, ok := expr.(*ast.StarExpr)
-	return ok
 }
 
 // goTypeToPython converts a Go AST type expression to Python type string

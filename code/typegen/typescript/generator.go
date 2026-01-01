@@ -152,7 +152,7 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 			}
 
 			// Determine if field is optional
-			isPointer := isPointerType(field.Type)
+			isPointer := util.IsPointerType(field.Type)
 			isOptional := tagInfo.Omitempty || tagInfo.TSOptional || isPointer
 
 			// Get TypeScript type (tstype tag overrides inferred type)
@@ -240,12 +240,6 @@ func GenerateUnionType(name string, values []string) string {
 		parts = append(parts, fmt.Sprintf("'%s'", v))
 	}
 	return fmt.Sprintf("export type %s = %s;", name, strings.Join(parts, " | "))
-}
-
-// isPointerType checks if the AST expression represents a pointer type
-func isPointerType(expr ast.Expr) bool {
-	_, ok := expr.(*ast.StarExpr)
-	return ok
 }
 
 // goTypeToTS converts a Go AST type expression to TypeScript type string
