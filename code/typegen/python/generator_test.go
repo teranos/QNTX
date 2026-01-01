@@ -292,27 +292,49 @@ func TestGenerateDataclass_PythonKeywords(t *testing.T) {
 }
 
 // =============================================================================
-// GenerateLiteralType tests
+// GenerateEnum tests
 // =============================================================================
 
-func TestGenerateLiteralType(t *testing.T) {
+func TestGenerateEnum(t *testing.T) {
 	values := []string{"active", "paused", "completed"}
-	result := GenerateLiteralType("Status", values)
+	result := GenerateEnum("Status", values)
 
 	// Values are sorted alphabetically for deterministic output
-	expected := `Status = Literal["active", "completed", "paused"]`
-	if result != expected {
-		t.Errorf("Expected %q, got %q", expected, result)
+	if !contains(result, "class Status(str, Enum):") {
+		t.Error("Expected class declaration with str, Enum")
+	}
+	if !contains(result, "ACTIVE = \"active\"") {
+		t.Error("Expected ACTIVE enum member")
+	}
+	if !contains(result, "COMPLETED = \"completed\"") {
+		t.Error("Expected COMPLETED enum member")
+	}
+	if !contains(result, "PAUSED = \"paused\"") {
+		t.Error("Expected PAUSED enum member")
 	}
 }
 
-func TestGenerateLiteralType_Single(t *testing.T) {
+func TestGenerateEnum_Single(t *testing.T) {
 	values := []string{"only"}
-	result := GenerateLiteralType("Single", values)
+	result := GenerateEnum("Single", values)
 
-	expected := `Single = Literal["only"]`
-	if result != expected {
-		t.Errorf("Expected %q, got %q", expected, result)
+	if !contains(result, "class Single(str, Enum):") {
+		t.Error("Expected class declaration")
+	}
+	if !contains(result, "ONLY = \"only\"") {
+		t.Error("Expected ONLY enum member")
+	}
+}
+
+func TestGenerateEnum_SnakeCase(t *testing.T) {
+	values := []string{"ai_error", "network_error"}
+	result := GenerateEnum("ErrorCode", values)
+
+	if !contains(result, "AI_ERROR = \"ai_error\"") {
+		t.Error("Expected AI_ERROR enum member")
+	}
+	if !contains(result, "NETWORK_ERROR = \"network_error\"") {
+		t.Error("Expected NETWORK_ERROR enum member")
 	}
 }
 

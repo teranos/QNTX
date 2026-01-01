@@ -71,9 +71,9 @@ func (g *Generator) GenerateInterface(name string, structType *ast.StructType) s
 	return GenerateDataclass(name, structType)
 }
 
-// GenerateUnionType converts const values to a Python Literal type (implements typegen.Generator)
+// GenerateUnionType converts const values to a Python Enum class (implements typegen.Generator)
 func (g *Generator) GenerateUnionType(name string, values []string) string {
-	return GenerateLiteralType(name, values)
+	return GenerateEnum(name, values)
 }
 
 // TypeMapping defines how Go types map to Python types
@@ -264,16 +264,22 @@ func GenerateDataclass(name string, structType *ast.StructType) string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-// GenerateLiteralType creates a Python Literal type from const values
-func GenerateLiteralType(name string, values []string) string {
+// GenerateEnum creates a Python Enum class from const values
+// Uses (str, Enum) for JSON serialization compatibility
+func GenerateEnum(name string, values []string) string {
 	// Sort values for deterministic output
 	sort.Strings(values)
 
-	var parts []string
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("class %s(str, Enum):\n", name))
+
 	for _, v := range values {
-		parts = append(parts, fmt.Sprintf("\"%s\"", v))
+		// Convert value to SCREAMING_SNAKE_CASE for enum member name
+		memberName := strings.ToUpper(util.ToSnakeCase(v))
+		sb.WriteString(fmt.Sprintf("    %s = \"%s\"\n", memberName, v))
 	}
-	return fmt.Sprintf("%s = Literal[%s]", name, strings.Join(parts, ", "))
+
+	return strings.TrimRight(sb.String(), "\n")
 }
 
 // isPointerType checks if the AST expression represents a pointer type
@@ -358,16 +364,16 @@ All types are Python dataclasses compatible with JSON serialization.
 
 	// Collect imports needed
 	needsAny := false
-	needsLiteral := false
+	needsEnum := false
 	needsDataclass := true
 
-	// Check if we need Any or Literal
+	// Check if we need Any or Enum
 	for _, typeCode := range result.Types {
 		if strings.Contains(typeCode, "Any") {
 			needsAny = true
 		}
-		if strings.Contains(typeCode, "Literal[") {
-			needsLiteral = true
+		if strings.Contains(typeCode, "(str, Enum)") {
+			needsEnum = true
 		}
 	}
 
@@ -377,17 +383,12 @@ All types are Python dataclasses compatible with JSON serialization.
 	if needsDataclass {
 		sb.WriteString("from dataclasses import dataclass\n")
 	}
+	if needsEnum {
+		sb.WriteString("from enum import Enum\n")
+	}
 
-	typingImports := []string{}
 	if needsAny {
-		typingImports = append(typingImports, "Any")
-	}
-	if needsLiteral {
-		typingImports = append(typingImports, "Literal")
-	}
-
-	if len(typingImports) > 0 {
-		sb.WriteString(fmt.Sprintf("from typing import %s\n", strings.Join(typingImports, ", ")))
+		sb.WriteString("from typing import Any\n")
 	}
 
 	sb.WriteString("\n")
@@ -416,10 +417,10 @@ All types are Python dataclasses compatible with JSON serialization.
 	}
 	sort.Strings(names)
 
-	// Generate Literal types first (union types from consts)
+	// Generate Enum classes first (union types from consts)
 	for _, name := range names {
 		typeCode := result.Types[name]
-		if strings.HasPrefix(typeCode, name+" = Literal[") {
+		if strings.HasPrefix(typeCode, "class "+name+"(str, Enum)") {
 			// Add doc comment if available
 			if docComment, hasComment := result.TypeComments[name]; hasComment && docComment != "" {
 				lines := strings.Split(docComment, "\n")
