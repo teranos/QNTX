@@ -86,6 +86,45 @@ func ParseCustomTag(tag *ast.BasicLit, tagName string) (name string, options map
 	return name, options, false
 }
 
+// FieldTagInfo contains common parsed struct tag information for all generators.
+// Each generator can embed this or use it directly for shared field parsing logic.
+type FieldTagInfo struct {
+	JSONName       string // Field name from json tag
+	Omitempty      bool   // Has omitempty option
+	Skip           bool   // Skip this field (json:"-" or customtag:"-")
+	CustomType     string // Custom type override from language-specific tag
+	CustomOptional bool   // Force optional with customtag:",optional"
+}
+
+// ParseFieldTags extracts common field tag information for any generator.
+// tagName is the language-specific tag (e.g., "tstype", "rusttype", "pytype").
+func ParseFieldTags(tag *ast.BasicLit, tagName string) FieldTagInfo {
+	info := FieldTagInfo{}
+
+	// Parse JSON tag using shared utility
+	if jsonInfo := ParseJSONTag(tag); jsonInfo != nil {
+		info.JSONName = jsonInfo.Name
+		info.Omitempty = jsonInfo.Omitempty
+		info.Skip = jsonInfo.Skip
+		if info.Skip {
+			return info
+		}
+	}
+
+	// Parse language-specific tag using shared custom tag parser
+	customType, options, skip := ParseCustomTag(tag, tagName)
+	if skip {
+		info.Skip = true
+		return info
+	}
+	if customType != "" {
+		info.CustomType = customType
+		info.CustomOptional = options["optional"]
+	}
+
+	return info
+}
+
 // ValidateTagInfo holds parsed information from a validate struct tag
 type ValidateTagInfo struct {
 	Required bool // Has required constraint

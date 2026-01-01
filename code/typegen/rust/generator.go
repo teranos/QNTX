@@ -10,42 +10,10 @@ import (
 	"github.com/teranos/QNTX/code/typegen/util"
 )
 
-// FieldTagInfo contains parsed struct tag information for Rust generation
-type FieldTagInfo struct {
-	JSONName   string // Field name from json tag
-	Omitempty  bool   // Has omitempty option (maps to Option<T>)
-	RustType   string // Custom Rust type from rusttype tag
-	RustOption bool   // Force Option<T> with rusttype:",optional"
-	Skip       bool   // Skip this field (json:"-" or rusttype:"-")
-}
-
 // ParseFieldTags extracts json and rusttype tags from a struct field tag.
-// Exported for testing.
-func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
-	info := FieldTagInfo{}
-
-	// Parse JSON tag using shared utility
-	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
-		info.JSONName = jsonInfo.Name
-		info.Omitempty = jsonInfo.Omitempty
-		info.Skip = jsonInfo.Skip
-		if info.Skip {
-			return info
-		}
-	}
-
-	// Parse rusttype tag using shared custom tag parser
-	rustType, options, skip := util.ParseCustomTag(tag, "rusttype")
-	if skip {
-		info.Skip = true
-		return info
-	}
-	if rustType != "" {
-		info.RustType = rustType
-		info.RustOption = options["optional"]
-	}
-
-	return info
+// Exported for testing. Uses shared util.ParseFieldTags internally.
+func ParseFieldTags(tag *ast.BasicLit) util.FieldTagInfo {
+	return util.ParseFieldTags(tag, "rusttype")
 }
 
 // Generator implements typegen.Generator for Rust
@@ -142,12 +110,12 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 
 			// Determine if field is optional
 			isPointer := util.IsPointerType(field.Type)
-			isOptional := tagInfo.Omitempty || tagInfo.RustOption || isPointer
+			isOptional := tagInfo.Omitempty || tagInfo.CustomOptional || isPointer
 
 			// Get Rust type (rusttype tag overrides inferred type)
 			var rustType string
-			if tagInfo.RustType != "" {
-				rustType = tagInfo.RustType
+			if tagInfo.CustomType != "" {
+				rustType = tagInfo.CustomType
 			} else {
 				rustType = goTypeToRust(field.Type)
 				// For pointer types without rusttype override, wrap in Option
