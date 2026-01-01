@@ -30,3 +30,4 @@ server/docs_embedded/
 web/src-tauri/target/
 web/src-tauri/bin/
 web/src-tauri/icons/
+web/src-tauri/gen/
