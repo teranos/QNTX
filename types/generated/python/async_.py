@@ -16,12 +16,15 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 # ErrorCode represents the classification of an error
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcode
 ErrorCode = Literal["ai_error", "database_error", "file_not_found", "network_error", "parse_error", "timeout", "unknown", "validation_error"]
 
 # JobStatus represents the current state of a job
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#jobstatus
 JobStatus = Literal["cancelled", "completed", "failed", "paused", "queued", "running"]
 
-"""ErrorContext provides structured error information for job failures"""
+# ErrorContext provides structured error information for job failures
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcontext
 @dataclass
 class ErrorContext:
     # Where the error occurred
@@ -35,7 +38,8 @@ class ErrorContext:
     # Can continue processing other items?
     recoverable: bool
 
-"""Job represents an async IX operation"""
+# Job represents an async IX operation
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#job
 @dataclass
 class Job:
     id: str
@@ -60,7 +64,8 @@ class Job:
     started_at: str | None = None
     completed_at: str | None = None
 
-"""Progress represents job progress information"""
+# Progress represents job progress information
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#progress
 @dataclass
 class Progress:
     # Completed operations
@@ -68,7 +73,8 @@ class Progress:
     # Total operations
     total: int
 
-"""PulseState represents the pulse rate limiting and budget state for a job"""
+# PulseState represents the pulse rate limiting and budget state for a job
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#pulsestate
 @dataclass
 class PulseState:
     calls_this_minute: int
@@ -80,7 +86,8 @@ class PulseState:
     # "budget_exceeded", "rate_limit", "user_requested"
     pause_reason: str | None = None
 
-"""QueueStats returns statistics about the queue"""
+# QueueStats returns statistics about the queue
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#queuestats
 @dataclass
 class QueueStats:
     queued: int
@@ -90,7 +97,8 @@ class QueueStats:
     failed: int
     total: int
 
-"""SystemMetrics tracks resource usage for worker pool monitoring"""
+# SystemMetrics tracks resource usage for worker pool monitoring
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#systemmetrics
 @dataclass
 class SystemMetrics:
     # Number of workers currently executing jobs
@@ -108,7 +116,8 @@ class SystemMetrics:
     # Jobs currently executing
     jobs_running: int
 
-"""WorkerPoolConfig contains configuration for the worker pool"""
+# WorkerPoolConfig contains configuration for the worker pool
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#workerpoolconfig
 @dataclass
 class WorkerPoolConfig:
     # Number of concurrent workers

@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-"""BudgetConfig contains budget limits for daily/weekly/monthly spend tracking."""
+# BudgetConfig contains budget limits for daily/weekly/monthly spend tracking.
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#budgetconfig
 @dataclass
 class BudgetConfig:
     daily_budget_usd: float
@@ -22,13 +23,15 @@ class BudgetConfig:
     monthly_budget_usd: float
     cost_per_score_usd: float
 
-"""Limiter enforces max calls per time window using sliding window algorithm"""
+# Limiter enforces max calls per time window using sliding window algorithm
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#limiter
 @dataclass
 class Limiter:
     pass
 
 
-"""Status represents current budget state"""
+# Status represents current budget state
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#status
 @dataclass
 class Status:
     daily_spend: float
@@ -41,7 +44,8 @@ class Status:
     weekly_ops: int
     monthly_ops: int
 
-"""Tracker tracks and enforces budget limits"""
+# Tracker tracks and enforces budget limits
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#tracker
 @dataclass
 class Tracker:
     pass
