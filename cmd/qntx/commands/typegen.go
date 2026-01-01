@@ -59,6 +59,79 @@ func init() {
 	TypegenCmd.Flags().StringVarP(&typegenOutput, "output", "o", "", "Output directory (default: stdout)")
 	TypegenCmd.Flags().StringSliceVarP(&typegenPackages, "packages", "p", nil, "Packages to process (default: ats/types, pulse/async, server)")
 	TypegenCmd.Flags().StringVarP(&typegenLang, "lang", "l", "typescript", "Target language: typescript, python, rust, dart, all")
+
+	// Add check subcommand
+	TypegenCmd.AddCommand(TypegenCheckCmd)
+}
+
+// TypegenCheckCmd checks if generated types are up to date
+var TypegenCheckCmd = &cobra.Command{
+	Use:   "check",
+	Short: "Check if generated types are up to date",
+	Long: `Check if generated types match the current Go source code.
+
+This command generates types to a temporary directory and compares them
+with existing types, ignoring metadata comments that change on every run.
+
+Exit codes:
+  0 - Types are up to date
+  1 - Types are out of date (diff shown)
+  2 - Error during check
+
+Examples:
+  qntx typegen check                      # Check all generated types
+  make types-check                        # Same, via Makefile`,
+	RunE: runTypegenCheck,
+}
+
+func runTypegenCheck(cmd *cobra.Command, args []string) error {
+	fmt.Println("Checking generated types...")
+
+	// Create temp directory for generated types
+	tempDir, err := os.MkdirTemp("", "qntx-types-check-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Override output directory for generation
+	originalOutput := typegenOutput
+	typegenOutput = tempDir
+	defer func() { typegenOutput = originalOutput }()
+
+	// Generate all types to temp directory
+	languages := []string{"typescript", "rust", "markdown"}
+	packages := defaultPackages
+
+	for _, lang := range languages {
+		if err := generateForLanguage(lang, packages, true); err != nil {
+			return fmt.Errorf("failed to generate %s types: %w", lang, err)
+		}
+	}
+
+	// Compare with existing types using the typegen package
+	result, err := typegen.CompareDirectories(tempDir)
+	if err != nil {
+		return err
+	}
+
+	if result.UpToDate {
+		fmt.Println("✓ Types are up to date")
+		return nil
+	}
+
+	// Show differences
+	fmt.Println("✗ Types are out of date.")
+	for lang, files := range result.Differences {
+		if len(files) > 0 {
+			fmt.Printf("\n%s files differ:\n", lang)
+			for _, file := range files {
+				fmt.Printf("  - %s\n", file)
+			}
+		}
+	}
+
+	return fmt.Errorf("types are out of date - run 'qntx typegen' or 'make types' to update")
 }
 
 func runTypegen(cmd *cobra.Command, args []string) error {
