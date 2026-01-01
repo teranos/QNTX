@@ -13,15 +13,30 @@ All types are Python dataclasses compatible with JSON serialization.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from enum import Enum
+from typing import Any
 
 # ErrorCode represents the classification of an error
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcode
-ErrorCode = Literal["ai_error", "database_error", "file_not_found", "network_error", "parse_error", "timeout", "unknown", "validation_error"]
+class ErrorCode(str, Enum):
+    AI_ERROR = "ai_error"
+    DATABASE_ERROR = "database_error"
+    FILE_NOT_FOUND = "file_not_found"
+    NETWORK_ERROR = "network_error"
+    PARSE_ERROR = "parse_error"
+    TIMEOUT = "timeout"
+    UNKNOWN = "unknown"
+    VALIDATION_ERROR = "validation_error"
 
 # JobStatus represents the current state of a job
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#jobstatus
-JobStatus = Literal["cancelled", "completed", "failed", "paused", "queued", "running"]
+class JobStatus(str, Enum):
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PAUSED = "paused"
+    QUEUED = "queued"
+    RUNNING = "running"
 
 # ErrorContext provides structured error information for job failures
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/async.md#errorcontext
