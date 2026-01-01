@@ -19,8 +19,10 @@ import (
 	"go/ast"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -84,6 +86,7 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 		Types:         make(map[string]string),
 		PackageName:   pkg.Name,
 		TypePositions: make(map[string]Position),
+		TypeComments:  make(map[string]string),
 		Consts:        make(map[string]string),
 		Arrays:        make(map[string][]string),
 		Maps:          make(map[string]map[string]string),
@@ -122,6 +125,18 @@ func processFile(file *ast.File, result *Result, packageName string, gen Generat
 			} else if node.Tok == token.VAR {
 				// Process var declarations (slice and map literals)
 				processVarDecls(node, result)
+			} else if node.Tok == token.TYPE {
+				// Process type declarations to extract doc comments
+				for _, spec := range node.Specs {
+					if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+						// Capture doc comment (prefer spec-level, fall back to general decl)
+						if typeSpec.Doc != nil && typeSpec.Doc.Text() != "" {
+							result.TypeComments[typeSpec.Name.Name] = strings.TrimSpace(typeSpec.Doc.Text())
+						} else if node.Doc != nil && node.Doc.Text() != "" {
+							result.TypeComments[typeSpec.Name.Name] = strings.TrimSpace(node.Doc.Text())
+						}
+					}
+				}
 			}
 		case *ast.TypeSpec:
 			// Only process exported types
@@ -357,4 +372,41 @@ func makeRelativePath(absPath string) string {
 
 		dir = parent
 	}
+}
+
+// GetTimestamp returns the current UTC timestamp in RFC3339 format for generated code headers
+func GetTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// GetGitHash returns the current git commit hash, or empty string if not in a git repo
+func GetGitHash() string {
+	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// GetLastCommitHash returns the hash of the last commit that modified the given file
+// Returns empty string if file doesn't exist or not in git repo
+func GetLastCommitHash(filepath string) string {
+	cmd := exec.Command("git", "log", "-1", "--format=%h", "--", filepath)
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// GetLastCommitTime returns the timestamp of the last commit that modified the given file
+// Returns empty string if file doesn't exist or not in git repo
+func GetLastCommitTime(filepath string) string {
+	cmd := exec.Command("git", "log", "-1", "--format=%cI", "--", filepath)
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
 }

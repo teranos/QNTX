@@ -31,3 +31,7 @@ web/src-tauri/target/
 web/src-tauri/bin/
 web/src-tauri/icons/
 web/src-tauri/gen/
+
+# Generated Rust types (library crate - ignore build artifacts and Cargo.lock)
+types/generated/rust/target/
+types/generated/rust/Cargo.lock

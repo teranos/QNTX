@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/ats/typegen"
-	"github.com/teranos/QNTX/ats/typegen/markdown"
-	"github.com/teranos/QNTX/ats/typegen/rust"
-	"github.com/teranos/QNTX/ats/typegen/typescript"
+	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/code/typegen/markdown"
+	"github.com/teranos/QNTX/code/typegen/rust"
+	"github.com/teranos/QNTX/code/typegen/typescript"
 )
 
 // Default packages to generate types from
@@ -187,6 +187,12 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		if err := rust.GenerateIndexFile(outputDir, exports); err != nil {
 			return fmt.Errorf("failed to generate mod.rs: %w", err)
 		}
+		if err := rust.GenerateLibRs(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate lib.rs: %w", err)
+		}
+		if err := rust.GenerateCargoToml(outputDir); err != nil {
+			return fmt.Errorf("failed to generate Cargo.toml: %w", err)
+		}
 		if err := rust.GenerateReadme(outputDir, exports); err != nil {
 			return fmt.Errorf("failed to generate README.md: %w", err)
 		}
@@ -296,6 +302,13 @@ func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) 
 
 			if err := os.WriteFile(outputPath, []byte(res.output), 0644); err != nil {
 				return fmt.Errorf("failed to write %s: %w", outputPath, err)
+			}
+
+			// Format Rust files after writing
+			if lang == "rust" {
+				if err := rust.FormatFile(outputPath); err != nil {
+					return err
+				}
 			}
 
 			fmt.Printf("✓ Generated %s (%d types)\n", outputPath, len(res.typeNames))

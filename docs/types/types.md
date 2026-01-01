@@ -8,7 +8,7 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## As
 
-**Source**: [`ats/types/attestation.go:8`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L8)
+**Source**: [`ats/types/attestation.go:9`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L9)
 
 
 <table>
@@ -38,23 +38,59 @@ type As struct {
 
 ```typescript
 export interface As {
-  /** ASID: AS + UUID */
+  /**
+   * ASID: AS + UUID
+   *
+   * @required
+   */
   id: string;
-  /** Entities being attested about */
+  /**
+   * Entities being attested about
+   *
+   * @required
+   * @minItems 1
+   */
   subjects: string[];
-  /** What is being claimed */
+  /**
+   * What is being claimed
+   *
+   * @required
+   * @minItems 1
+   */
   predicates: string[];
-  /** Optional "of" context */
+  /**
+   * Optional "of" context
+   *
+   * @required
+   * @minItems 1
+   */
   contexts: string[];
-  /** Who made the attestation */
+  /**
+   * Who made the attestation
+   *
+   * @required
+   * @minItems 1
+   */
   actors: string[];
-  /** When attestation was made */
+  /**
+   * When attestation was made
+   *
+   * @required
+   */
   timestamp: string;
-  /** How attestation was created */
+  /**
+   * How attestation was created
+   *
+   * @required
+   */
   source: string;
-  /** Arbitrary JSON */
+  /**
+   * Arbitrary JSON
+   */
   attributes?: Record<string, unknown>;
-  /** Database creation time */
+  /**
+   * Database creation time
+   */
   created_at: string;
 }
 ```
@@ -65,7 +101,7 @@ export interface As {
 
 ## AsCommand
 
-**Source**: [`ats/types/attestation.go:21`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L21)
+**Source**: [`ats/types/attestation.go:22`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L22)
 
 
 <table>
@@ -92,17 +128,29 @@ type AsCommand struct {
 
 ```typescript
 export interface AsCommand {
-  /** Entities being attested about */
+  /**
+   * Entities being attested about
+   */
   subjects: string[];
-  /** What is being claimed (optional, defaults to ["_"]) */
+  /**
+   * What is being claimed (optional, defaults to ["_"])
+   */
   predicates: string[];
-  /** Optional "of" context (defaults to ["_"]) */
+  /**
+   * Optional "of" context (defaults to ["_"])
+   */
   contexts: string[];
-  /** Who made the attestation (optional, uses default) */
+  /**
+   * Who made the attestation (optional, uses default)
+   */
   actors: string[];
-  /** When attestation was made (optional, uses now) */
+  /**
+   * When attestation was made (optional, uses now)
+   */
   timestamp: string;
-  /** Arbitrary JSON */
+  /**
+   * Arbitrary JSON
+   */
   attributes?: Record<string, unknown>;
 }
 ```
@@ -113,7 +161,7 @@ export interface AsCommand {
 
 ## AxDebug
 
-**Source**: [`ats/types/attestation.go:103`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L103)
+**Source**: [`ats/types/attestation.go:104`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L104)
 
 
 <table>
@@ -157,7 +205,7 @@ export interface AxDebug {
 
 ## AxFilter
 
-**Source**: [`ats/types/attestation.go:80`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L80)
+**Source**: [`ats/types/attestation.go:81`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L81)
 
 
 <table>
@@ -188,25 +236,45 @@ type AxFilter struct {
 
 ```typescript
 export interface AxFilter {
-  /** Specific entities to ask about */
+  /**
+   * Specific entities to ask about
+   */
   subjects: string[];
-  /** What predicates to match (with fuzzy) */
+  /**
+   * What predicates to match (with fuzzy)
+   */
   predicates: string[];
-  /** What contexts to match */
+  /**
+   * What contexts to match
+   */
   contexts: string[];
-  /** Filter by specific actors */
+  /**
+   * Filter by specific actors
+   */
   actors: string[];
-  /** Temporal range start */
+  /**
+   * Temporal range start
+   */
   time_start?: string | null;
-  /** Temporal range end */
+  /**
+   * Temporal range end
+   */
   time_end?: string | null;
-  /** Temporal comparison (e.g., "over 5y") */
+  /**
+   * Temporal comparison (e.g., "over 5y")
+   */
   over_comparison?: OverFilter | null;
-  /** Maximum results */
+  /**
+   * Maximum results
+   */
   limit: number;
-  /** Output format: table, json */
+  /**
+   * Output format: table, json
+   */
   format: string;
-  /** Actions to perform after query: ex csv, summarize, etc */
+  /**
+   * Actions to perform after query: ex csv, summarize, etc
+   */
   so_actions: string[];
 }
 ```
@@ -217,7 +285,7 @@ export interface AxFilter {
 
 ## AxResult
 
-**Source**: [`ats/types/attestation.go:94`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L94)
+**Source**: [`ats/types/attestation.go:95`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L95)
 
 
 <table>
@@ -243,15 +311,25 @@ type AxResult struct {
 
 ```typescript
 export interface AxResult {
-  /** All matching attestations */
+  /**
+   * All matching attestations
+   */
   attestations: As[];
-  /** Identified conflicts */
+  /**
+   * Identified conflicts
+   */
   conflicts: Conflict[];
-  /** Aggregated information */
+  /**
+   * Aggregated information
+   */
   summary: AxSummary;
-  /** Output format for display */
+  /**
+   * Output format for display
+   */
   format: string;
-  /** Debug information (verbose mode) */
+  /**
+   * Debug information (verbose mode)
+   */
   debug?: AxDebug;
 }
 ```
@@ -262,7 +340,7 @@ export interface AxResult {
 
 ## AxSummary
 
-**Source**: [`ats/types/attestation.go:114`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L114)
+**Source**: [`ats/types/attestation.go:115`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L115)
 
 
 <table>
@@ -330,12 +408,16 @@ type CompletionItem struct {
 ```typescript
 export interface CompletionItem {
   label: string;
-  /** predicate, subject, context, actor, keyword, symbol */
+  /**
+   * predicate, subject, context, actor, keyword, symbol
+   */
   kind: string;
   insert_text: string;
   detail?: string;
   documentation?: string;
-  /** For ranking */
+  /**
+   * For ranking
+   */
   sort_text: string;
 }
 ```
@@ -346,7 +428,7 @@ export interface CompletionItem {
 
 ## Conflict
 
-**Source**: [`ats/types/attestation.go:123`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L123)
+**Source**: [`ats/types/attestation.go:124`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L124)
 
 
 <table>
@@ -376,7 +458,9 @@ export interface Conflict {
   predicate: string;
   context: string;
   attestations: As[];
-  /** "conflict", "evolution", "verification", "no_conflict" */
+  /**
+   * "conflict", "evolution", "verification", "no_conflict"
+   */
   resolution: string;
 }
 ```
@@ -387,7 +471,7 @@ export interface Conflict {
 
 ## OverFilter
 
-**Source**: [`ats/types/attestation.go:73`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L73)
+**Source**: [`ats/types/attestation.go:74`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L74)
 
 
 <table>
@@ -411,11 +495,17 @@ type OverFilter struct {
 
 ```typescript
 export interface OverFilter {
-  /** The numeric value (e.g., 5 for "5y") */
+  /**
+   * The numeric value (e.g., 5 for "5y")
+   */
   value: number;
-  /** The unit: "y" for years, "m" for months */
+  /**
+   * The unit: "y" for years, "m" for months
+   */
   unit: string;
-  /** Comparison operator: "over" means >= */
+  /**
+   * Comparison operator: "over" means >=
+   */
   operator: string;
 }
 ```
@@ -452,15 +542,25 @@ type TypeDef struct {
 
 ```typescript
 export interface TypeDef {
-  /** Type identifier (e.g., "commit", "author") */
+  /**
+   * Type identifier (e.g., "commit", "author")
+   */
   Name: string;
-  /** Human-readable label for UI (e.g., "Commit", "Author") */
+  /**
+   * Human-readable label for UI (e.g., "Commit", "Author")
+   */
   Label: string;
-  /** Hex color code for graph visualization (e.g., "#34495e") */
+  /**
+   * Hex color code for graph visualization (e.g., "#34495e")
+   */
   Color: string;
-  /** Visual opacity (0.0-1.0), nil defaults to 1.0 */
+  /**
+   * Visual opacity (0.0-1.0), nil defaults to 1.0
+   */
   Opacity?: number | null;
-  /** Whether this type is being phased out */
+  /**
+   * Whether this type is being phased out
+   */
   Deprecated: boolean;
 }
 ```
