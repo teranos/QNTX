@@ -190,11 +190,11 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 				if validateInfo.Required {
 					sb.WriteString("    /// Validation: required\n")
 				}
-				if validateInfo.Min >= 0 || validateInfo.Max >= 0 {
+				if validateInfo.Min != util.NoConstraint || validateInfo.Max != util.NoConstraint {
 					var constraint string
-					if validateInfo.Min >= 0 && validateInfo.Max >= 0 {
+					if validateInfo.Min != util.NoConstraint && validateInfo.Max != util.NoConstraint {
 						constraint = fmt.Sprintf("length/items: %d..%d", validateInfo.Min, validateInfo.Max)
-					} else if validateInfo.Min >= 0 {
+					} else if validateInfo.Min != util.NoConstraint {
 						constraint = fmt.Sprintf("min length/items: %d", validateInfo.Min)
 					} else {
 						constraint = fmt.Sprintf("max length/items: %d", validateInfo.Max)
