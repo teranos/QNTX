@@ -35,9 +35,10 @@ func checkOrigin(r *http.Request) bool {
 	// Load allowed origins from config
 	serverCfg, err := appcfg.GetServerConfig()
 	if err != nil {
-		// If config fails to load, use secure defaults (localhost only)
+		// If config fails to load, use secure defaults (localhost only + Tauri)
 		return strings.HasPrefix(origin, "http://localhost") ||
-			strings.HasPrefix(origin, "https://localhost")
+			strings.HasPrefix(origin, "https://localhost") ||
+			strings.HasPrefix(origin, "tauri://localhost")
 	}
 
 	// Check if origin matches any of the configured allowed origins
