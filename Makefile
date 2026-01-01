@@ -10,12 +10,14 @@ cli: ## Build QNTX CLI binary
 	@echo "Building QNTX CLI..."
 	@go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
-types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Rust types and markdown docs from Go source
+types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
 	@$(QNTX) typegen --lang typescript --output types/generated/
+	@$(QNTX) typegen --lang python --output types/generated/
 	@$(QNTX) typegen --lang rust --output types/generated/
 	@$(QNTX) typegen --lang markdown  # Defaults to docs/types/
 	@echo "✓ TypeScript types generated in types/generated/typescript/"
+	@echo "✓ Python types generated in types/generated/python/"
 	@echo "✓ Rust types generated in types/generated/rust/"
 	@echo "✓ Markdown docs generated in docs/types/"
 
