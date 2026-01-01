@@ -8,6 +8,14 @@ use tauri::{Manager, State};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::ShellExt;
 
+// Import generated types from Go source (single source of truth)
+// These types are kept in sync with the backend via `make types`
+#[allow(unused_imports)]
+use qntx_types::{
+    async_types::{Job, JobStatus},
+    server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
+};
+
 const SERVER_PORT: &str = "877";
 
 struct ServerState {
@@ -109,6 +117,43 @@ fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f6
     );
 }
 
+/// Send a native notification when server enters draining mode
+/// This happens during graceful shutdown when completing remaining jobs
+#[tauri::command]
+fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: i64) {
+    let total = active_jobs + queued_jobs;
+    let body = if total > 0 {
+        format!("Completing {} remaining job(s) before shutdown", total)
+    } else {
+        "Preparing for shutdown...".to_string()
+    };
+
+    let _ = app
+        .notification()
+        .builder()
+        .title("QNTX: Server Draining")
+        .body(&body)
+        .show();
+
+    println!(
+        "[notification] Server draining: {} active, {} queued",
+        active_jobs, queued_jobs
+    );
+}
+
+/// Send a native notification when server stops
+#[tauri::command]
+fn notify_server_stopped(app: tauri::AppHandle) {
+    let _ = app
+        .notification()
+        .builder()
+        .title("QNTX: Server Stopped")
+        .body("The QNTX server has stopped")
+        .show();
+
+    println!("[notification] Server stopped");
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -206,7 +251,9 @@ fn main() {
             get_server_url,
             notify_job_completed,
             notify_job_failed,
-            notify_storage_warning
+            notify_storage_warning,
+            notify_server_draining,
+            notify_server_stopped
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
