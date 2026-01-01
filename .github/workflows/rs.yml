@@ -47,13 +47,17 @@ jobs:
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      - name: Clippy (Tauri app)
-        run: cd web/src-tauri && cargo clippy --all-targets --all-features
-        env:
-          RUSTFLAGS: "-Dwarnings"
+      # TODO: Re-enable Tauri checks once system dependencies are available in CI
+      # See https://github.com/teranos/QNTX/issues/97
+      # - name: Clippy (Tauri app)
+      #   run: cd web/src-tauri && cargo clippy --all-targets --all-features
+      #   env:
+      #     RUSTFLAGS: "-Dwarnings"
 
       - name: Check (generated types)
         run: cd types/generated/rust && cargo check
 
-      - name: Check (Tauri app)
-        run: cd web/src-tauri && cargo check
+      # TODO: Re-enable Tauri checks once system dependencies are available in CI
+      # See https://github.com/teranos/QNTX/issues/97
+      # - name: Check (Tauri app)
+      #   run: cd web/src-tauri && cargo check
