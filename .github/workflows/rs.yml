@@ -33,10 +33,10 @@ jobs:
       - name: Configure git safe directory
         run: git config --global --add safe.directory /__w/QNTX/QNTX
 
-      - name: Install Rust toolchain with rustup
-        run: |
-          rustup default stable
-          rustup component add rustfmt clippy
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
