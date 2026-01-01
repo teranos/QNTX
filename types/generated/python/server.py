@@ -15,7 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-"""ChildJobInfo represents a child job summary"""
+# ChildJobInfo represents a child job summary
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#childjobinfo
 @dataclass
 class ChildJobInfo:
     id: str
@@ -30,7 +31,8 @@ class ChildJobInfo:
     started_at: str | None = None
     completed_at: str | None = None
 
-"""CodeEntry represents a code file or directory in the workspace"""
+# CodeEntry represents a code file or directory in the workspace
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#codeentry
 @dataclass
 class CodeEntry:
     name: str
@@ -38,7 +40,8 @@ class CodeEntry:
     isDir: bool
     children: list[CodeEntry] | None = None
 
-"""CompleteMessage represents import completion"""
+# CompleteMessage represents import completion
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#completemessage
 @dataclass
 class CompleteMessage:
     # "import_complete"
@@ -46,7 +49,8 @@ class CompleteMessage:
     # Completion message
     message: str
 
-"""ConsoleLog represents a browser console message"""
+# ConsoleLog represents a browser console message
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#consolelog
 @dataclass
 class ConsoleLog:
     timestamp: str
@@ -56,7 +60,8 @@ class ConsoleLog:
     stack: str | None = None
     url: str | None = None
 
-"""CreateScheduledJobRequest represents the request to create a new scheduled job"""
+# CreateScheduledJobRequest represents the request to create a new scheduled job
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#createscheduledjobrequest
 @dataclass
 class CreateScheduledJobRequest:
     # ATS code to execute (e.g., "ix https://...")
@@ -70,7 +75,8 @@ class CreateScheduledJobRequest:
     # Bypass deduplication checks (force execution)
     force: bool | None = None
 
-"""DaemonStatusMessage represents daemon status update"""
+# DaemonStatusMessage represents daemon status update
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#daemonstatusmessage
 @dataclass
 class DaemonStatusMessage:
     # "daemon_status"
@@ -100,24 +106,28 @@ class DaemonStatusMessage:
     # Unix timestamp
     timestamp: int
 
-"""ErrorResponse represents an API error"""
+# ErrorResponse represents an API error
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#errorresponse
 @dataclass
 class ErrorResponse:
     error: str
 
-"""JobChildrenResponse represents the response for GET /api/pulse/jobs/:id/children"""
+# JobChildrenResponse represents the response for GET /api/pulse/jobs/:id/children
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#jobchildrenresponse
 @dataclass
 class JobChildrenResponse:
     parent_job_id: str
     children: list[ChildJobInfo]
 
-"""JobStagesResponse represents the response for GET /jobs/:job_id/stages"""
+# JobStagesResponse represents the response for GET /jobs/:job_id/stages
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#jobstagesresponse
 @dataclass
 class JobStagesResponse:
     job_id: str
     stages: list[StageInfo]
 
-"""JobUpdateMessage represents async IX job update"""
+# JobUpdateMessage represents async IX job update
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#jobupdatemessage
 @dataclass
 class JobUpdateMessage:
     # "job_update"
@@ -127,7 +137,8 @@ class JobUpdateMessage:
     # Full job details (from pulse/async)
     job: Job | None = None
 
-"""LLMStreamMessage represents streaming LLM output"""
+# LLMStreamMessage represents streaming LLM output
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#llmstreammessage
 @dataclass
 class LLMStreamMessage:
     # "llm_stream"
@@ -147,7 +158,8 @@ class LLMStreamMessage:
     # Error message if streaming failed
     error: str | None = None
 
-"""ListExecutionsResponse represents the response for listing job executions"""
+# ListExecutionsResponse represents the response for listing job executions
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#listexecutionsresponse
 @dataclass
 class ListExecutionsResponse:
     # From pulse/schedule
@@ -156,13 +168,15 @@ class ListExecutionsResponse:
     total: int
     has_more: bool
 
-"""ListScheduledJobsResponse represents the response for listing scheduled jobs"""
+# ListScheduledJobsResponse represents the response for listing scheduled jobs
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#listscheduledjobsresponse
 @dataclass
 class ListScheduledJobsResponse:
     jobs: list[ScheduledJobResponse]
     count: int
 
-"""LogEntry represents a single log entry"""
+# LogEntry represents a single log entry
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#logentry
 @dataclass
 class LogEntry:
     timestamp: str
@@ -170,7 +184,8 @@ class LogEntry:
     message: str
     metadata: dict[str, Any] | None = None
 
-"""ProgressMessage represents an import progress message"""
+# ProgressMessage represents an import progress message
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#progressmessage
 @dataclass
 class ProgressMessage:
     # "import_progress"
@@ -182,7 +197,8 @@ class ProgressMessage:
     # Status message
     message: str
 
-"""ProseEntry represents a prose content file or directory"""
+# ProseEntry represents a prose content file or directory
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#proseentry
 @dataclass
 class ProseEntry:
     name: str
@@ -190,7 +206,8 @@ class ProseEntry:
     isDir: bool
     children: list[ProseEntry] | None = None
 
-"""PulseExecutionCompletedMessage represents a Pulse execution that completed successfully"""
+# PulseExecutionCompletedMessage represents a Pulse execution that completed successfully
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutioncompletedmessage
 @dataclass
 class PulseExecutionCompletedMessage:
     # "pulse_execution_completed"
@@ -210,7 +227,8 @@ class PulseExecutionCompletedMessage:
     # Unix timestamp
     timestamp: int
 
-"""PulseExecutionFailedMessage represents a Pulse execution that failed"""
+# PulseExecutionFailedMessage represents a Pulse execution that failed
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutionfailedmessage
 @dataclass
 class PulseExecutionFailedMessage:
     # "pulse_execution_failed"
@@ -228,7 +246,8 @@ class PulseExecutionFailedMessage:
     # Unix timestamp
     timestamp: int
 
-"""PulseExecutionLogStreamMessage represents live log output from a running execution"""
+# PulseExecutionLogStreamMessage represents live log output from a running execution
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutionlogstreammessage
 @dataclass
 class PulseExecutionLogStreamMessage:
     # "pulse_execution_log_stream"
@@ -242,7 +261,8 @@ class PulseExecutionLogStreamMessage:
     # Unix timestamp
     timestamp: int
 
-"""PulseExecutionStartedMessage represents a Pulse execution that just started"""
+# PulseExecutionStartedMessage represents a Pulse execution that just started
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pulseexecutionstartedmessage
 @dataclass
 class PulseExecutionStartedMessage:
     # "pulse_execution_started"
@@ -256,7 +276,8 @@ class PulseExecutionStartedMessage:
     # Unix timestamp
     timestamp: int
 
-"""QueryMessage represents a client message"""
+# QueryMessage represents a client message
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#querymessage
 @dataclass
 class QueryMessage:
     # "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility"
@@ -292,7 +313,8 @@ class QueryMessage:
     # For visibility messages: whether to hide the node type/isolated nodes
     hidden: bool
 
-"""ScheduledJobResponse represents a scheduled job in API responses"""
+# ScheduledJobResponse represents a scheduled job in API responses
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#scheduledjobresponse
 @dataclass
 class ScheduledJobResponse:
     id: str
@@ -312,13 +334,15 @@ class ScheduledJobResponse:
     # RFC3339 timestamp
     last_run_at: str | None = None
 
-"""StageInfo represents a stage with its tasks"""
+# StageInfo represents a stage with its tasks
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#stageinfo
 @dataclass
 class StageInfo:
     stage: str
     tasks: list[TaskInfo]
 
-"""StatsMessage represents import statistics"""
+# StatsMessage represents import statistics
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#statsmessage
 @dataclass
 class StatsMessage:
     # "import_stats"
@@ -330,7 +354,8 @@ class StatsMessage:
     # Number of companies found
     companies: int
 
-"""StorageWarningMessage represents a bounded storage warning for approaching limits"""
+# StorageWarningMessage represents a bounded storage warning for approaching limits
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#storagewarningmessage
 @dataclass
 class StorageWarningMessage:
     # "storage_warning"
@@ -350,19 +375,22 @@ class StorageWarningMessage:
     # Unix timestamp
     timestamp: int
 
-"""TaskInfo represents a task within a stage"""
+# TaskInfo represents a task within a stage
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#taskinfo
 @dataclass
 class TaskInfo:
     task_id: str
     log_count: int
 
-"""TaskLogsResponse represents the response for GET /tasks/:task_id/logs"""
+# TaskLogsResponse represents the response for GET /tasks/:task_id/logs
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#tasklogsresponse
 @dataclass
 class TaskLogsResponse:
     task_id: str
     logs: list[LogEntry]
 
-"""UpdateScheduledJobRequest represents the request to update a scheduled job"""
+# UpdateScheduledJobRequest represents the request to update a scheduled job
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#updatescheduledjobrequest
 @dataclass
 class UpdateScheduledJobRequest:
     # active, paused, stopping, inactive
@@ -370,7 +398,8 @@ class UpdateScheduledJobRequest:
     # Update interval
     interval_seconds: int | None = None
 
-"""UsageUpdateMessage represents AI usage statistics update"""
+# UsageUpdateMessage represents AI usage statistics update
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#usageupdatemessage
 @dataclass
 class UsageUpdateMessage:
     # "usage_update"

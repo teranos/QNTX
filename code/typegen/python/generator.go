@@ -430,6 +430,10 @@ All types are Python dataclasses compatible with JSON serialization.
 					}
 				}
 			}
+			// Add documentation link
+			anchor := strings.ToLower(name)
+			docLink := fmt.Sprintf("https://github.com/teranos/QNTX/blob/main/docs/types/%s.md#%s", result.PackageName, anchor)
+			sb.WriteString(fmt.Sprintf("# Documentation: %s\n", docLink))
 			sb.WriteString(typeCode)
 			sb.WriteString("\n\n")
 		}
@@ -442,9 +446,12 @@ All types are Python dataclasses compatible with JSON serialization.
 			// Add doc comment if available
 			if docComment, hasComment := result.TypeComments[name]; hasComment && docComment != "" {
 				lines := strings.Split(docComment, "\n")
-				sb.WriteString(fmt.Sprintf(`"""%s"""`, strings.TrimSpace(lines[0])))
-				sb.WriteString("\n")
+				sb.WriteString(fmt.Sprintf("# %s\n", strings.TrimSpace(lines[0])))
 			}
+			// Add documentation link
+			anchor := strings.ToLower(name)
+			docLink := fmt.Sprintf("https://github.com/teranos/QNTX/blob/main/docs/types/%s.md#%s", result.PackageName, anchor)
+			sb.WriteString(fmt.Sprintf("# Documentation: %s\n", docLink))
 			sb.WriteString(typeCode)
 			sb.WriteString("\n\n")
 		}

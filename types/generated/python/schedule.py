@@ -23,7 +23,8 @@ STATE_INACTIVE = "inactive"
 STATE_PAUSED = "paused"
 STATE_STOPPING = "stopping"
 
-"""Execution represents a single execution of a scheduled Pulse job"""
+# Execution represents a single execution of a scheduled Pulse job
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/schedule.md#execution
 @dataclass
 class Execution:
     # Identity

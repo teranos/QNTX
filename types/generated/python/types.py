@@ -15,7 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-"""As represents an attestation - a verifiable claim about subjects,"""
+# As represents an attestation - a verifiable claim about subjects,
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#as
 @dataclass
 class As:
     # ASID: AS + UUID | required
@@ -37,7 +38,8 @@ class As:
     # Arbitrary JSON
     attributes: dict[str, Any] | None = None
 
-"""AsCommand represents the parsed CLI command for creating attestations"""
+# AsCommand represents the parsed CLI command for creating attestations
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#ascommand
 @dataclass
 class AsCommand:
     # Entities being attested about
@@ -53,7 +55,8 @@ class AsCommand:
     # Arbitrary JSON
     attributes: dict[str, Any] | None = None
 
-"""AxDebug provides debugging information for ax queries"""
+# AxDebug provides debugging information for ax queries
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axdebug
 @dataclass
 class AxDebug:
     execution_time_ms: int
@@ -64,7 +67,8 @@ class AxDebug:
     expanded_filter: AxFilter | None = None
     alias_expansions: dict[str, list[str]] | None = None
 
-"""AxFilter represents the parsed CLI command for querying attestations"""
+# AxFilter represents the parsed CLI command for querying attestations
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axfilter
 @dataclass
 class AxFilter:
     # Specific entities to ask about
@@ -88,7 +92,8 @@ class AxFilter:
     # Temporal comparison (e.g., "over 5y")
     over_comparison: OverFilter | None = None
 
-"""AxResult represents the result of an ax query"""
+# AxResult represents the result of an ax query
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axresult
 @dataclass
 class AxResult:
     # All matching attestations
@@ -102,7 +107,8 @@ class AxResult:
     # Debug information (verbose mode)
     debug: AxDebug | None = None
 
-"""AxSummary provides aggregated information about ax results"""
+# AxSummary provides aggregated information about ax results
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axsummary
 @dataclass
 class AxSummary:
     total_attestations: int
@@ -111,7 +117,8 @@ class AxSummary:
     unique_contexts: dict[str, int]
     unique_actors: dict[str, int]
 
-"""CompletionItem represents an autocomplete suggestion"""
+# CompletionItem represents an autocomplete suggestion
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#completionitem
 @dataclass
 class CompletionItem:
     label: str
@@ -123,7 +130,8 @@ class CompletionItem:
     detail: str | None = None
     documentation: str | None = None
 
-"""Conflict represents conflicting attestations"""
+# Conflict represents conflicting attestations
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#conflict
 @dataclass
 class Conflict:
     subject: str
@@ -133,7 +141,8 @@ class Conflict:
     # "conflict", "evolution", "verification", "no_conflict"
     resolution: str
 
-"""OverFilter represents temporal comparison for "over X years/months" queries"""
+# OverFilter represents temporal comparison for "over X years/months" queries
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#overfilter
 @dataclass
 class OverFilter:
     # The numeric value (e.g., 5 for "5y")
@@ -143,7 +152,8 @@ class OverFilter:
     # Comparison operator: "over" means >=
     operator: str
 
-"""TypeDef defines a QNTX domain type with display metadata and semantic information."""
+# TypeDef defines a QNTX domain type with display metadata and semantic information.
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#typedef
 @dataclass
 class TypeDef:
     # Type identifier (e.g., "commit", "author")
