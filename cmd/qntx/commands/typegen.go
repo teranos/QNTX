@@ -206,6 +206,9 @@ type genResult struct {
 	packageName string
 	output      string
 	typeNames   []string
+	constNames  []string
+	arrayNames  []string
+	mapNames    []string
 }
 
 // generateForLanguage generates types for a specific language
@@ -323,10 +326,28 @@ func generateTypesForPackages(packages []string, gen typegen.Generator) ([]genRe
 			typeToPackage[name] = result.PackageName
 		}
 
+		constNames := make([]string, 0, len(result.Consts))
+		for name := range result.Consts {
+			constNames = append(constNames, name)
+		}
+
+		arrayNames := make([]string, 0, len(result.Arrays))
+		for name := range result.Arrays {
+			arrayNames = append(arrayNames, name)
+		}
+
+		mapNames := make([]string, 0, len(result.Maps))
+		for name := range result.Maps {
+			mapNames = append(mapNames, name)
+		}
+
 		results = append(results, genResult{
 			packageName: result.PackageName,
 			output:      output,
 			typeNames:   typeNames,
+			constNames:  constNames,
+			arrayNames:  arrayNames,
+			mapNames:    mapNames,
 		})
 	}
 
@@ -444,6 +465,9 @@ func convertToPythonPackageExports(results []genResult) []python.PackageExport {
 		exports[i] = python.PackageExport{
 			PackageName: res.packageName,
 			TypeNames:   res.typeNames,
+			ConstNames:  res.constNames,
+			ArrayNames:  res.arrayNames,
+			MapNames:    res.mapNames,
 		}
 	}
 	return exports
