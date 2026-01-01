@@ -14,6 +14,8 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
+/// As represents an attestation - a verifiable claim about subjects,
+/// predicates, and contexts with actor attribution and timestamps
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#as>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct As {
@@ -38,6 +40,7 @@ pub struct As {
     pub created_at: String,
 }
 
+/// AsCommand represents the parsed CLI command for creating attestations
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#ascommand>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AsCommand {
@@ -56,6 +59,7 @@ pub struct AsCommand {
     pub attributes: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
+/// AxDebug provides debugging information for ax queries
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axdebug>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxDebug {
@@ -72,6 +76,7 @@ pub struct AxDebug {
     pub database_row_count: i64,
 }
 
+/// AxFilter represents the parsed CLI command for querying attestations
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axfilter>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxFilter {
@@ -100,6 +105,7 @@ pub struct AxFilter {
     pub so_actions: Vec<String>,
 }
 
+/// AxResult represents the result of an ax query
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axresult>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxResult {
@@ -116,6 +122,7 @@ pub struct AxResult {
     pub debug: Option<AxDebug>,
 }
 
+/// AxSummary provides aggregated information about ax results
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#axsummary>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AxSummary {
@@ -126,6 +133,7 @@ pub struct AxSummary {
     pub unique_actors: std::collections::HashMap<String, i64>,
 }
 
+/// CompletionItem represents an autocomplete suggestion
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#completionitem>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionItem {
@@ -141,6 +149,7 @@ pub struct CompletionItem {
     pub sort_text: String,
 }
 
+/// Conflict represents conflicting attestations
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#conflict>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Conflict {
@@ -152,6 +161,7 @@ pub struct Conflict {
     pub resolution: String,
 }
 
+/// OverFilter represents temporal comparison for "over X years/months" queries
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#overfilter>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OverFilter {
@@ -163,6 +173,9 @@ pub struct OverFilter {
     pub operator: String,
 }
 
+/// TypeDef defines a QNTX domain type with display metadata and semantic information.
+/// Types are richer than single predicates - they represent semantic categories with
+/// multiple identifying patterns, relationships, and behavioral rules.
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#typedef>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
