@@ -2,9 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, State};
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::ShellExt;
 
 const SERVER_PORT: &str = "877";
@@ -39,12 +40,84 @@ fn get_server_url(state: State<ServerState>) -> Option<String> {
     }
 }
 
+/// Send a native notification for job completion
+#[tauri::command]
+fn notify_job_completed(
+    app: tauri::AppHandle,
+    handler_name: String,
+    job_id: String,
+    duration_ms: Option<i64>,
+) {
+    let duration_text = duration_ms
+        .map(|ms| format!(" in {:.1}s", ms as f64 / 1000.0))
+        .unwrap_or_default();
+
+    let _ = app
+        .notification()
+        .builder()
+        .title("QNTX: Job Completed")
+        .body(&format!("{}{}", handler_name, duration_text))
+        .show();
+
+    println!(
+        "[notification] Job completed: {} ({})",
+        handler_name, job_id
+    );
+}
+
+/// Send a native notification for job failure
+#[tauri::command]
+fn notify_job_failed(
+    app: tauri::AppHandle,
+    handler_name: String,
+    job_id: String,
+    error: Option<String>,
+) {
+    let error_text = error.unwrap_or_else(|| "Unknown error".to_string());
+
+    let _ = app
+        .notification()
+        .builder()
+        .title("QNTX: Job Failed")
+        .body(&format!("{}: {}", handler_name, error_text))
+        .show();
+
+    println!(
+        "[notification] Job failed: {} ({}) - {}",
+        handler_name, job_id, error_text
+    );
+}
+
+/// Send a native notification for storage warnings
+#[tauri::command]
+fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f64) {
+    let _ = app
+        .notification()
+        .builder()
+        .title("QNTX: Storage Warning")
+        .body(&format!(
+            "{} is at {:.0}% capacity",
+            actor,
+            fill_percent * 100.0
+        ))
+        .show();
+
+    println!(
+        "[notification] Storage warning: {} at {:.0}%",
+        actor,
+        fill_percent * 100.0
+    );
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Start QNTX server as sidecar
-            let sidecar_command = app.shell().sidecar("qntx")
+            let sidecar_command = app
+                .shell()
+                .sidecar("qntx")
                 .expect("failed to create qntx sidecar command");
 
             let (mut rx, child) = sidecar_command
@@ -79,7 +152,8 @@ fn main() {
 
             // Create tray icon
             let quit_item = MenuItem::with_id(app, "quit", "Quit QNTX", true, None::<&str>)?;
-            let status_item = MenuItem::with_id(app, "status", "Server: Running ✓", false, None::<&str>)?;
+            let status_item =
+                MenuItem::with_id(app, "status", "Server: Running ✓", false, None::<&str>)?;
             let menu = Menu::with_items(app, &[&status_item, &quit_item])?;
 
             let _tray = TrayIconBuilder::with_id("main")
@@ -122,11 +196,17 @@ fn main() {
         })
         .on_page_load(|window, _payload| {
             // Inject backend URL for Tauri environment
-            let _ = window.eval(&format!("window.__BACKEND_URL__ = 'http://localhost:{}';", SERVER_PORT));
+            let _ = window.eval(&format!(
+                "window.__BACKEND_URL__ = 'http://localhost:{}';",
+                SERVER_PORT
+            ));
         })
         .invoke_handler(tauri::generate_handler![
             get_server_status,
-            get_server_url
+            get_server_url,
+            notify_job_completed,
+            notify_job_failed,
+            notify_storage_warning
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

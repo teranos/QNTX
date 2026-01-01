@@ -9,8 +9,10 @@ import type {
     BackendStatusMessage,
     JobUpdateMessage,
     DaemonStatusMessage,
-    LLMStreamMessage
+    LLMStreamMessage,
+    StorageWarningMessage
 } from '../types/websocket';
+import { handleJobNotification, notifyStorageWarning } from './tauri-notifications';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -93,6 +95,17 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         if (data.type === 'job_update') {
             const jobData = data as JobUpdateMessage;
             console.log('📦 Job update:', jobData.job.id, jobData.job.status);
+
+            // Send native desktop notification if in Tauri
+            if (jobData.job) {
+                handleJobNotification({
+                    id: jobData.job.id,
+                    handler_name: jobData.job.handler_name,
+                    status: jobData.job.status,
+                    error: jobData.job.error
+                });
+            }
+
             const handler = messageHandlers['job_update'];
             if (handler) {
                 handler(jobData);
@@ -122,6 +135,22 @@ export function connectWebSocket(handlers: MessageHandlers): void {
             const handler = messageHandlers['llm_stream'];
             if (handler) {
                 handler(llmData);
+            }
+            return;
+        }
+
+        // Handle storage warning messages
+        // Backend broadcasts when storage limits are approaching
+        if (data.type === 'storage_warning') {
+            const warningData = data as StorageWarningMessage;
+            console.log('⚠️ Storage warning:', warningData.actor, `${(warningData.fill_percent * 100).toFixed(0)}%`);
+
+            // Send native desktop notification if in Tauri
+            notifyStorageWarning(warningData.actor, warningData.fill_percent);
+
+            const handler = messageHandlers['storage_warning'];
+            if (handler) {
+                handler(warningData);
             }
             return;
         }
