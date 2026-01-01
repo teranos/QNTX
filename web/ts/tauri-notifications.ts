@@ -15,11 +15,101 @@ import { invoke } from '@tauri-apps/api/core';
 // Threshold for "long-running" job notifications (30 seconds)
 const LONG_JOB_THRESHOLD_MS = 30000;
 
-// Track when jobs started for duration-based notifications
-const jobStartTimes = new Map<string, number>();
+// Maximum number of jobs to track before cleanup (prevents unbounded growth)
+const MAX_TRACKED_JOBS = 1000;
 
-// Track last server state to detect transitions
-let lastServerState: string | undefined = undefined;
+// Age after which stale job entries are cleaned up (2 hours)
+const STALE_JOB_AGE_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Notification state manager
+ * Encapsulates mutable state to avoid race conditions with multiple connections
+ */
+class NotificationState {
+    private jobStartTimes = new Map<string, number>();
+    private lastServerState: string | undefined = undefined;
+
+    /**
+     * Track when a job starts running
+     */
+    trackJobStart(jobId: string): void {
+        // Enforce max size limit to prevent unbounded growth
+        if (this.jobStartTimes.size >= MAX_TRACKED_JOBS) {
+            this.cleanupStaleJobs();
+        }
+        this.jobStartTimes.set(jobId, Date.now());
+    }
+
+    /**
+     * Get the duration a job has been running
+     * Returns undefined if job wasn't tracked
+     */
+    getJobDuration(jobId: string): number | undefined {
+        const startTime = this.jobStartTimes.get(jobId);
+        if (!startTime) return undefined;
+        return Date.now() - startTime;
+    }
+
+    /**
+     * Clean up tracking for a completed/failed job
+     */
+    cleanupJob(jobId: string): void {
+        this.jobStartTimes.delete(jobId);
+    }
+
+    /**
+     * Clean up jobs that have been tracked for too long (likely stuck or orphaned)
+     * Prevents memory leaks from jobs that never complete
+     */
+    private cleanupStaleJobs(): void {
+        const now = Date.now();
+        const staleJobs: string[] = [];
+
+        for (const [jobId, startTime] of this.jobStartTimes.entries()) {
+            if (now - startTime > STALE_JOB_AGE_MS) {
+                staleJobs.push(jobId);
+            }
+        }
+
+        if (staleJobs.length > 0) {
+            console.warn(
+                `[tauri-notifications] Cleaning up ${staleJobs.length} stale job(s)`,
+                staleJobs
+            );
+            for (const jobId of staleJobs) {
+                this.jobStartTimes.delete(jobId);
+            }
+        }
+    }
+
+    /**
+     * Determine if a completed job should trigger a notification
+     */
+    shouldNotifyCompletion(jobId: string): boolean {
+        const duration = this.getJobDuration(jobId);
+        if (duration === undefined) return false;
+        return duration >= LONG_JOB_THRESHOLD_MS;
+    }
+
+    /**
+     * Get the last server state
+     */
+    getLastServerState(): string | undefined {
+        return this.lastServerState;
+    }
+
+    /**
+     * Update the last server state
+     */
+    setLastServerState(state: string): void {
+        this.lastServerState = state;
+    }
+}
+
+// Single instance for the application lifetime
+// Note: This assumes a single WebSocket connection. If you need to support
+// multiple connections, create separate instances per connection.
+const notificationState = new NotificationState();
 
 /**
  * Check if running in Tauri desktop environment
@@ -50,7 +140,7 @@ async function invokeIfTauri<T>(command: string, args: Record<string, unknown>):
  * Call this when a job transitions to 'running' status
  */
 export function trackJobStart(jobId: string): void {
-    jobStartTimes.set(jobId, Date.now());
+    notificationState.trackJobStart(jobId);
 }
 
 /**
@@ -58,16 +148,14 @@ export function trackJobStart(jobId: string): void {
  * Returns undefined if job wasn't tracked
  */
 export function getJobDuration(jobId: string): number | undefined {
-    const startTime = jobStartTimes.get(jobId);
-    if (!startTime) return undefined;
-    return Date.now() - startTime;
+    return notificationState.getJobDuration(jobId);
 }
 
 /**
  * Clean up tracking for a completed/failed job
  */
 export function cleanupJobTracking(jobId: string): void {
-    jobStartTimes.delete(jobId);
+    notificationState.cleanupJob(jobId);
 }
 
 /**
@@ -75,9 +163,7 @@ export function cleanupJobTracking(jobId: string): void {
  * Only notifies for long-running jobs to avoid spam
  */
 export function shouldNotifyCompletion(jobId: string): boolean {
-    const duration = getJobDuration(jobId);
-    if (duration === undefined) return false;
-    return duration >= LONG_JOB_THRESHOLD_MS;
+    return notificationState.shouldNotifyCompletion(jobId);
 }
 
 /**
@@ -203,18 +289,19 @@ export async function handleDaemonStatusNotification(status: {
     if (!isTauri()) return;
 
     const currentState = status.server_state || 'running';
+    const lastState = notificationState.getLastServerState();
 
     // Detect state transitions
-    if (lastServerState !== currentState) {
-        if (currentState === 'draining' && lastServerState !== 'draining') {
+    if (lastState !== currentState) {
+        if (currentState === 'draining' && lastState !== 'draining') {
             // Server just entered draining mode
             await notifyServerDraining(status.active_jobs, status.queued_jobs);
-        } else if (currentState === 'stopped' && lastServerState !== 'stopped') {
+        } else if (currentState === 'stopped' && lastState !== 'stopped') {
             // Server just stopped
             await notifyServerStopped();
         }
     }
 
     // Update tracked state
-    lastServerState = currentState;
+    notificationState.setLastServerState(currentState);
 }
