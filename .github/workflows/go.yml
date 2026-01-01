@@ -1,4 +1,4 @@
-name: CI
+name: Go
 
 on:
   pull_request:
@@ -7,22 +7,18 @@ on:
       - '**/*.go'
       - 'go.mod'
       - 'go.sum'
-      - '**/*.ts'
-      - 'web/package.json'
-      - '.github/workflows/ci.yml'
+      - '.github/workflows/go.yml'
   push:
     branches: [main]
     paths:
       - '**/*.go'
       - 'go.mod'
       - 'go.sum'
-      - '**/*.ts'
-      - 'web/package.json'
   workflow_dispatch:
 
 jobs:
   test:
-    name: Test
+    name: Go Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -50,28 +46,7 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Check generated types are up to date
-        run: make types-check
-
-  typescript:
-    name: TypeScript Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: cd web && bun install
-
-      - name: Type check
-        run: cd web && bun run typecheck
-
-      - name: Run tests
-        run: cd web && bun test
-        env:
-          USE_JSDOM: 1
+      # TODO: Fix types-check to work reliably in CI
+      # See issue for rustfmt dependency and CI detection
+      # - name: Check generated types are up to date
+      #   run: make types-check

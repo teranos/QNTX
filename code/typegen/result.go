@@ -18,6 +18,10 @@ type Result struct {
 	// Used for generating documentation links
 	TypePositions map[string]Position
 
+	// TypeComments maps type names to their Go doc comments
+	// Used for preserving documentation in generated code
+	TypeComments map[string]string
+
 	// Consts maps constant names to their values (for untyped consts)
 	// e.g., const I = "⍟" → Consts["I"] = "⍟"
 	Consts map[string]string

@@ -1,0 +1,63 @@
+name: Rust
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.rs'
+      - 'web/src-tauri/Cargo.toml'
+      - 'types/generated/rust/Cargo.toml'
+      - '.github/workflows/rs.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.rs'
+      - 'web/src-tauri/Cargo.toml'
+      - 'types/generated/rust/Cargo.toml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Rust Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            types/generated/rust
+            web/src-tauri
+
+      - name: Check formatting (generated types)
+        run: cd types/generated/rust && cargo fmt --check
+
+      - name: Check formatting (Tauri app)
+        run: cd web/src-tauri && cargo fmt --check
+
+      - name: Clippy (generated types)
+        run: cd types/generated/rust && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      # TODO: Re-enable Tauri checks once system dependencies are available in CI
+      # See https://github.com/teranos/QNTX/issues/97
+      # - name: Clippy (Tauri app)
+      #   run: cd web/src-tauri && cargo clippy --all-targets --all-features
+      #   env:
+      #     RUSTFLAGS: "-Dwarnings"
+
+      - name: Check (generated types)
+        run: cd types/generated/rust && cargo check
+
+      # TODO: Re-enable Tauri checks once system dependencies are available in CI
+      # See https://github.com/teranos/QNTX/issues/97
+      # - name: Check (Tauri app)
+      #   run: cd web/src-tauri && cargo check

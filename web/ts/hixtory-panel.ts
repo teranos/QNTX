@@ -179,7 +179,7 @@ class JobListPanel {
 
         // Store graph_query from metadata if available
         if (data.metadata && data.metadata.graph_query) {
-            job._graph_query = data.metadata.graph_query;
+            job._graph_query = data.metadata.graph_query as string;
         }
 
         // Show toast notifications for important state changes
