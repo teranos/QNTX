@@ -1,4 +1,4 @@
-name: TypeGen Test
+name: TypeGen Check
 
 on:
   pull_request:
