@@ -60,12 +60,15 @@ fn notify_job_completed(
         .map(|ms| format!(" in {:.1}s", ms as f64 / 1000.0))
         .unwrap_or_default();
 
-    let _ = app
+    if let Err(e) = app
         .notification()
         .builder()
         .title("QNTX: Job Completed")
         .body(&format!("{}{}", handler_name, duration_text))
-        .show();
+        .show()
+    {
+        eprintln!("[notification] Failed to show job completion: {}", e);
+    }
 
     println!(
         "[notification] Job completed: {} ({})",
@@ -83,12 +86,15 @@ fn notify_job_failed(
 ) {
     let error_text = error.unwrap_or_else(|| "Unknown error".to_string());
 
-    let _ = app
+    if let Err(e) = app
         .notification()
         .builder()
         .title("QNTX: Job Failed")
         .body(&format!("{}: {}", handler_name, error_text))
-        .show();
+        .show()
+    {
+        eprintln!("[notification] Failed to show job failure: {}", e);
+    }
 
     println!(
         "[notification] Job failed: {} ({}) - {}",
@@ -99,7 +105,7 @@ fn notify_job_failed(
 /// Send a native notification for storage warnings
 #[tauri::command]
 fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f64) {
-    let _ = app
+    if let Err(e) = app
         .notification()
         .builder()
         .title("QNTX: Storage Warning")
@@ -108,7 +114,10 @@ fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f6
             actor,
             fill_percent * 100.0
         ))
-        .show();
+        .show()
+    {
+        eprintln!("[notification] Failed to show storage warning: {}", e);
+    }
 
     println!(
         "[notification] Storage warning: {} at {:.0}%",
@@ -128,12 +137,15 @@ fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: 
         "Preparing for shutdown...".to_string()
     };
 
-    let _ = app
+    if let Err(e) = app
         .notification()
         .builder()
         .title("QNTX: Server Draining")
         .body(&body)
-        .show();
+        .show()
+    {
+        eprintln!("[notification] Failed to show server draining: {}", e);
+    }
 
     println!(
         "[notification] Server draining: {} active, {} queued",
@@ -144,12 +156,15 @@ fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: 
 /// Send a native notification when server stops
 #[tauri::command]
 fn notify_server_stopped(app: tauri::AppHandle) {
-    let _ = app
+    if let Err(e) = app
         .notification()
         .builder()
         .title("QNTX: Server Stopped")
         .body("The QNTX server has stopped")
-        .show();
+        .show()
+    {
+        eprintln!("[notification] Failed to show server stopped: {}", e);
+    }
 
     println!("[notification] Server stopped");
 }
