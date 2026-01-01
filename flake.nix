@@ -45,6 +45,13 @@
             pkgs.cargo
             pkgs.rustfmt
 
+            # Tauri system dependencies
+            pkgs.webkitgtk
+            pkgs.gtk3
+            pkgs.libayatana-appindicator
+            pkgs.librsvg
+            pkgs.patchelf
+
             # Build tools and utilities
             pkgs.sqlite
             pkgs.gcc
