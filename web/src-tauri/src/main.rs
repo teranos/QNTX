@@ -7,7 +7,7 @@ use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::menu::{Menu, MenuItem};
 use tauri_plugin_shell::ShellExt;
 
-const SERVER_PORT: &str = "8765";
+const SERVER_PORT: &str = "877";
 
 struct ServerState {
     child: Arc<Mutex<Option<tauri_plugin_shell::process::CommandChild>>>,
