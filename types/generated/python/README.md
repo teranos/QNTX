@@ -4,6 +4,14 @@ Auto-generated Python type definitions from QNTX's Go source code.
 
 ## Installation
 
+**Using uv (recommended):**
+```bash
+uv pip install -e types/generated/python
+# Or add to your project:
+uv add ./types/generated/python
+```
+
+**Using pip:**
 ```bash
 pip install -e types/generated/python
 ```

@@ -546,18 +546,17 @@ All types are Python dataclasses compatible with JSON serialization.
 	return sb.String()
 }
 
+// toPyConstName converts an identifier to Python constant naming (SCREAMING_SNAKE_CASE)
+func toPyConstName(s string) string {
+	return strings.ToUpper(util.ToSnakeCase(s))
+}
+
 // formatMapKey formats a map key for Python output
 func formatMapKey(key string, consts map[string]string) string {
-	if typegen.IsConstReference(key, consts) {
-		return strings.ToUpper(util.ToSnakeCase(key))
-	}
-	return "\"" + key + "\""
+	return typegen.FormatMapEntry(key, consts, toPyConstName)
 }
 
 // formatMapValue formats a map value for Python output
 func formatMapValue(value string, consts map[string]string) string {
-	if typegen.IsConstReference(value, consts) {
-		return strings.ToUpper(util.ToSnakeCase(value))
-	}
-	return "\"" + value + "\""
+	return typegen.FormatMapEntry(value, consts, toPyConstName)
 }
