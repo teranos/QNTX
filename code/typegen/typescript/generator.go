@@ -96,6 +96,16 @@ var TypeMapping = map[string]string{
 	"NullTime":       "string | null",
 }
 
+// typeConverterConfig is the TypeScript-specific type conversion configuration
+var typeConverterConfig = &util.TypeConverterConfig{
+	TypeMapping:          TypeMapping,
+	ArrayFormat:          func(elem string) string { return elem + "[]" },
+	MapFormat:            func(key, val string) string { return fmt.Sprintf("Record<%s, %s>", key, val) },
+	StringMapUnknownType: "Record<string, unknown>",
+	UnknownType:          "unknown",
+	StringType:           "string",
+}
+
 // GenerateInterface creates a TypeScript interface from a Go struct
 func GenerateInterface(name string, structType *ast.StructType) string {
 	var sb strings.Builder
@@ -221,55 +231,7 @@ func GenerateUnionType(name string, values []string) string {
 
 // goTypeToTS converts a Go AST type expression to TypeScript type string
 func goTypeToTS(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Basic type or type reference in same package
-		if ts, ok := TypeMapping[t.Name]; ok {
-			return ts
-		}
-		// Assume it's a reference to another type in the same package
-		return t.Name
-
-	case *ast.SelectorExpr:
-		// Qualified type like time.Time
-		if ident, ok := t.X.(*ast.Ident); ok {
-			fullName := ident.Name + "." + t.Sel.Name
-			if ts, ok := TypeMapping[fullName]; ok {
-				return ts
-			}
-			// Unknown qualified type
-			return t.Sel.Name
-		}
-		return "unknown"
-
-	case *ast.StarExpr:
-		// Pointer type - get the underlying type
-		return goTypeToTS(t.X)
-
-	case *ast.ArrayType:
-		// Slice or array
-		elemType := goTypeToTS(t.Elt)
-		return elemType + "[]"
-
-	case *ast.MapType:
-		// Map type
-		keyType := goTypeToTS(t.Key)
-		valType := goTypeToTS(t.Value)
-
-		// Special case for map[string]interface{}
-		if keyType == "string" && valType == "unknown" {
-			return "Record<string, unknown>"
-		}
-
-		return fmt.Sprintf("Record<%s, %s>", keyType, valType)
-
-	case *ast.InterfaceType:
-		// interface{} -> unknown
-		return "unknown"
-
-	default:
-		return "unknown"
-	}
+	return util.ConvertGoType(expr, typeConverterConfig)
 }
 
 // GenerateFile creates a complete TypeScript file from a typegen.Result
