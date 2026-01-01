@@ -48,7 +48,7 @@ fn main() {
                 .expect("failed to create qntx sidecar command");
 
             let (mut rx, child) = sidecar_command
-                .args(&["server", "--port", SERVER_PORT, "--dev"])
+                .args(&["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
                 .spawn()
                 .expect("Failed to spawn qntx server");
 
