@@ -151,6 +151,7 @@ func filesAreDifferent(file1, file2 string, ignoreMetadata bool) (bool, error) {
 // filterMetadataLines removes metadata comment lines from content.
 // These are the "// Source last modified:" and "// Source version:" lines
 // that change on every generation and don't represent actual type changes.
+// Returns empty string if scanner encounters an error.
 func filterMetadataLines(content []byte) string {
 	var result strings.Builder
 	scanner := bufio.NewScanner(bytes.NewReader(content))
@@ -167,6 +168,13 @@ func filterMetadataLines(content []byte) string {
 
 		result.WriteString(line)
 		result.WriteString("\n")
+	}
+
+	// Check for scanner errors (e.g., lines too long)
+	if err := scanner.Err(); err != nil {
+		// Return empty string on error - will cause comparison to fail
+		// This is safer than silently ignoring the error
+		return ""
 	}
 
 	return result.String()
