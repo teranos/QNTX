@@ -434,7 +434,13 @@ export type WebSocketMessage =
   | ParseResponseMessage
   | QueryMessage
   | GraphDataMessage
-  | LogsMessage;
+  | LogsMessage
+  | PulseExecutionStartedMessage
+  | PulseExecutionFailedMessage
+  | PulseExecutionCompletedMessage
+  | PulseExecutionLogStreamMessage
+  | StorageWarningMessage
+  | StorageEvictionMessage;
 
 // ============================================================================
 // Message Handler Types
