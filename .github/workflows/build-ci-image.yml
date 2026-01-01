@@ -3,11 +3,7 @@ name: Build CI Image
 on:
   push:
     tags:
-      - 'ci-v*'
-    paths:
-      - 'flake.nix'
-      - 'flake.lock'
-      - '.github/workflows/build-ci-image.yml'
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -43,8 +39,8 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/ci-v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/ci-v}
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "has_version=true" >> $GITHUB_OUTPUT
           else
@@ -54,10 +50,10 @@ jobs:
       - name: Tag and push
         run: |
           # Push latest
-          docker push ghcr.io/teranos/qntx-ci:latest
+          docker push ghcr.io/teranos/qntx:latest
 
           # Push versioned tag if this is a tag push
           if [[ "${{ steps.version.outputs.has_version }}" == "true" ]]; then
-            docker tag ghcr.io/teranos/qntx-ci:latest ghcr.io/teranos/qntx-ci:${{ steps.version.outputs.version }}
-            docker push ghcr.io/teranos/qntx-ci:${{ steps.version.outputs.version }}
+            docker tag ghcr.io/teranos/qntx:latest ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
+            docker push ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
           fi
