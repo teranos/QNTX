@@ -12,7 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/code/gopls"
 	"github.com/teranos/QNTX/server/wslogs"
-	"github.com/teranos/QNTX/version"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
