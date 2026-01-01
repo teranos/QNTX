@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats/typegen"
 	"github.com/teranos/QNTX/ats/typegen/markdown"
+	"github.com/teranos/QNTX/ats/typegen/rust"
 	"github.com/teranos/QNTX/ats/typegen/typescript"
 )
 
@@ -92,7 +93,7 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript", "markdown"} // TypeScript + Markdown docs
+		return []string{"typescript", "rust", "markdown"} // TypeScript, Rust, + Markdown docs
 	case "typescript", "ts":
 		return []string{"typescript"}
 	case "markdown", "md":
@@ -142,7 +143,9 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		gen = typescript.NewGenerator()
 	case "markdown":
 		gen = markdown.NewGenerator()
-	case "python", "rust", "dart":
+	case "rust":
+		gen = rust.NewGenerator()
+	case "python", "dart":
 		fmt.Printf("⚠ %s generator not yet implemented (coming in v1.0.0)\n", lang)
 		return nil
 	default:
@@ -174,6 +177,18 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		exports := convertToPackageExports(results)
 		if err := typescript.GenerateIndexFile(outputDir, exports); err != nil {
 			return fmt.Errorf("failed to generate index file: %w", err)
+		}
+	}
+
+	// Generate mod.rs index for Rust
+	// Only generate when processing all default packages to avoid partial indices
+	if outputDir != "" && lang == "rust" && generateIndex {
+		exports := convertToRustPackageExports(results)
+		if err := rust.GenerateIndexFile(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate mod.rs: %w", err)
+		}
+		if err := rust.GenerateReadme(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate README.md: %w", err)
 		}
 	}
 
@@ -294,6 +309,18 @@ func convertToPackageExports(results []genResult) []typescript.PackageExport {
 	exports := make([]typescript.PackageExport, len(results))
 	for i, res := range results {
 		exports[i] = typescript.PackageExport{
+			PackageName: res.packageName,
+			TypeNames:   res.typeNames,
+		}
+	}
+	return exports
+}
+
+// convertToRustPackageExports converts genResults to Rust PackageExports
+func convertToRustPackageExports(results []genResult) []rust.PackageExport {
+	exports := make([]rust.PackageExport, len(results))
+	for i, res := range results {
+		exports[i] = rust.PackageExport{
 			PackageName: res.packageName,
 			TypeNames:   res.typeNames,
 		}
