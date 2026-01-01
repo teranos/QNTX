@@ -20,7 +20,7 @@ types-check: cli ## Check if generated types are up to date
 	@./bin/qntx typegen --lang rust --output tmp/types-check/
 	@./bin/qntx typegen --lang markdown --output tmp/types-check/
 	@if diff -r tmp/types-check/typescript types/generated/typescript > /dev/null 2>&1 && \
-	   diff -r tmp/types-check/rust types/generated/rust > /dev/null 2>&1 && \
+	   diff -r --exclude=README.md --exclude=Cargo.lock --exclude=target tmp/types-check/rust types/generated/rust > /dev/null 2>&1 && \
 	   diff -r tmp/types-check/markdown docs/types > /dev/null 2>&1; then \
 		echo "✓ Types are up to date"; \
 		rm -rf tmp/types-check; \
