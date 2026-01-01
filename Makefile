@@ -105,7 +105,7 @@ desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "Starting QNTX Desktop in development mode..."
 	@echo "  Frontend dev server: http://localhost:8820"
-	@echo "  Backend will start as sidecar on port 8765"
+	@echo "  Backend will start as sidecar on port 877"
 	@cd web/src-tauri && cargo run
 
 desktop-build: desktop-prepare ## Build production desktop app (requires: cargo install tauri-cli)
