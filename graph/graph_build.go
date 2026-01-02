@@ -33,6 +33,9 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 	// Extract type definitions from attestations (type display metadata)
 	typeDefinitions := b.extractTypeDefinitions(attestations)
 
+	// Extract relationship type definitions from attestations (physics metadata)
+	relationshipDefinitions := b.extractRelationshipTypeDefinitions(attestations)
+
 	// Track unique nodes by ID
 	nodeMap := make(map[string]*Node)
 	linkMap := make(map[string]*Link)
@@ -156,6 +159,9 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 
 	// Collect node type information for frontend
 	graph.Meta.NodeTypes = collectNodeTypeInfo(graph.Nodes, typeDefinitions)
+
+	// Collect relationship type information for frontend (physics metadata)
+	graph.Meta.RelationshipTypes = collectRelationshipTypeInfo(graph.Links, relationshipDefinitions)
 
 	return graph
 }
