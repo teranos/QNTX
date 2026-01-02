@@ -514,6 +514,66 @@ export interface OverFilter {
 </tr>
 </table>
 
+## RelationshipTypeDef
+
+**Source**: [`ats/types/type_definitions.go:30`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L30)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type RelationshipTypeDef struct {
+	Name string
+	Label string
+	Color string
+	LinkDistance *float64
+	LinkStrength *float64
+	Deprecated bool
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface RelationshipTypeDef {
+  /**
+   * Predicate name (e.g., "is_child_of", "points_to")
+   */
+  Name: string;
+  /**
+   * Human-readable label for UI (e.g., "Child Of", "Points To")
+   */
+  Label: string;
+  /**
+   * Optional link color override (hex code)
+   */
+  Color: string;
+  /**
+   * D3 force distance override (nil = use default)
+   */
+  LinkDistance?: number | null;
+  /**
+   * D3 force strength override (nil = use default)
+   */
+  LinkStrength?: number | null;
+  /**
+   * Whether this relationship type is being phased out
+   */
+  Deprecated: boolean;
+}
+```
+
+</td>
+</tr>
+</table>
+
 ## TypeDef
 
 **Source**: [`ats/types/type_definitions.go:19`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L19)

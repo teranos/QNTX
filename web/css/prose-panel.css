@@ -381,12 +381,3 @@
     }
 }
 
-@media (max-width: 600px) {
-    .prose-panel {
-        width: 100%;
-    }
-    .prose-overlay {
-        display: none;
-    }
-}
-
