@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { filterVisibleNodes, getLinkDistance, getLinkStrength } from './graph-renderer';
+import { filterVisibleNodes } from './graph-renderer';
+import { getLinkDistance, getLinkStrength } from './graph-physics';
 import { GRAPH_PHYSICS } from './config';
 
 describe('Graph Visibility', () => {
