@@ -28,6 +28,12 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
+      - name: Setup Node/Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build frontend
+        run: make web
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
