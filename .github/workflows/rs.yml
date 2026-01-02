@@ -43,18 +43,19 @@ jobs:
       - name: Check formatting (generated types)
         run: cd types/generated/rust && cargo fmt --check
 
-      - name: Check formatting (Tauri app)
-        run: cd web/src-tauri && cargo fmt --check
+      # Tauri app checks disabled on Linux - see macos-tauri.yml for macOS builds
+      # - name: Check formatting (Tauri app)
+      #   run: cd web/src-tauri && cargo fmt --check
 
       - name: Clippy (generated types)
         run: cd types/generated/rust && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      - name: Clippy (Tauri app)
-        run: cd web/src-tauri && cargo clippy --all-targets --all-features
-        env:
-          RUSTFLAGS: "-Dwarnings"
+      # - name: Clippy (Tauri app)
+      #   run: cd web/src-tauri && cargo clippy --all-targets --all-features
+      #   env:
+      #     RUSTFLAGS: "-Dwarnings"
 
       - name: Check (generated types)
         run: cd types/generated/rust && cargo check
