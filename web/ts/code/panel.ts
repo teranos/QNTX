@@ -476,7 +476,11 @@ class GoEditorPanel {
 // Create singleton instance
 const goEditorPanel = new GoEditorPanel();
 
-// Export toggle function for symbol palette
+// Export show and toggle functions
+export function showGoEditor(): void {
+    goEditorPanel.show();
+}
+
 export function toggleGoEditor(): void {
     goEditorPanel.toggle();
 }
