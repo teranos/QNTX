@@ -107,26 +107,35 @@ func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
-	// Given: $28 spent distributed across the last 30 days (sliding window)
+	// Given: Realistic usage pattern across 30-day sliding window
+	// - $0.90/day for 28 days spread across last 30 days = $25.20
+	// - $1.00 spend within last 24 hours = $1.00 daily
+	// - Total monthly: $26.20 (under $30 limit)
 	now := time.Now()
 
-	// Create 28 records distributed across days 2-29 of the sliding 30-day window
-	// This tests the rolling nature of the 30-day budget while staying outside the 24h daily window
+	// Create historical usage: $0.90/day for days 2-29 (28 days = $25.20)
+	// Spread across the 30-day window, outside the 24-hour daily window
 	for i := 2; i <= 29; i++ {
-		// Days 2-29 ago: safely outside 24h window, well within 30-day window
 		timestamp := now.Add(time.Duration(-i) * 24 * time.Hour)
-		insertUsage(t, db, timestamp, 1.00) // $1 per day for 28 days = $28 total
+		insertUsage(t, db, timestamp, 0.90)
 	}
+
+	// Create recent usage: $1.00 within the 24-hour window
+	// This tests that daily budget check passes ($1.00 < $10.00)
+	// while monthly accumulates both historical and recent ($26.20 total)
+	insertUsage(t, db, now.Add(-1*time.Hour), 1.00)
 
 	// Create budget tracker with $30 monthly limit
 	config := BudgetConfig{
-		DailyBudgetUSD:   10.00, // High daily limit (won't be triggered)
-		MonthlyBudgetUSD: 30.00,
+		DailyBudgetUSD:   10.00, // Daily check should pass ($1.00 < $10.00)
+		MonthlyBudgetUSD: 30.00, // Monthly check should fail ($26.20 + $5.00 > $30.00)
 		CostPerScoreUSD:  0.002,
 	}
 	tracker := NewTracker(db, config)
 
-	// When: CheckBudget($5.00) called (would exceed $30.00 monthly limit)
+	// When: CheckBudget($5.00) called
+	// - Daily: $1.00 + $5.00 = $6.00 < $10.00 ✓ (passes)
+	// - Monthly: $26.20 + $5.00 = $31.20 > $30.00 ✗ (fails)
 	err := tracker.CheckBudget(5.00)
 
 	// Then: Error "monthly budget would be exceeded"
