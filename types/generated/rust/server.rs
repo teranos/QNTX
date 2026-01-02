@@ -80,10 +80,12 @@ pub struct CreateScheduledJobRequest {
     pub ats_code: String,
     /// Execution interval in seconds
     pub interval_seconds: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Optional: ProseMirror document ID
-    pub created_from_doc: String,
+    pub created_from_doc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Optional: JSON metadata
-    pub metadata: String,
+    pub metadata: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Bypass deduplication checks (force execution)
     pub force: Option<bool>,

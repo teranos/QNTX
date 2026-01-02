@@ -9,7 +9,6 @@ import type {
   PulseExecution,
   ListExecutionsResponse,
   ListExecutionsParams,
-  ExecutionStatus,
   JobStagesResponse,
   TaskLogsResponse,
   JobChildrenResponse,
@@ -196,10 +195,10 @@ export function formatRelativeTime(timestamp: string): string {
 /**
  * Get status color class for styling
  *
- * @param status - Execution status
+ * @param status - Execution status (string from API)
  * @returns CSS class name for status color
  */
-export function getStatusColorClass(status: ExecutionStatus): string {
+export function getStatusColorClass(status: string): string {
   switch (status) {
     case "running":
       return "status-running";

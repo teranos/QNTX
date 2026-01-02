@@ -52,7 +52,48 @@ export type {
   PulseExecutionLogStreamMessage,
   StorageWarningMessage,
   ErrorResponse,
+  // Scheduled job types (server)
+  ScheduledJobResponse,
+  CreateScheduledJobRequest,
+  UpdateScheduledJobRequest,
+  ListScheduledJobsResponse,
+  ListExecutionsResponse,
+  // Execution/task logging types (server)
+  TaskInfo,
+  StageInfo,
+  JobStagesResponse,
+  TaskLogsResponse,
+  ChildJobInfo,
+  JobChildrenResponse,
+  // Execution type (schedule)
+  Execution,
 } from '../../types/generated/typescript';
+
+// Re-export LogEntry from generated as TaskLogEntry (to avoid conflict with core.ts LogEntry)
+export type { LogEntry as TaskLogEntry } from '../../types/generated/typescript';
+
+// Re-export with aliases for backward compatibility
+// (frontend code uses these names instead of generated names)
+export type { ScheduledJobResponse as ScheduledJob } from '../../types/generated/typescript';
+export type { Execution as PulseExecution } from '../../types/generated/typescript';
+
+// Re-export state/status constants from schedule
+export {
+  ExecutionStatusRunning,
+  ExecutionStatusCompleted,
+  ExecutionStatusFailed,
+  StateActive,
+  StatePaused,
+  StateStopping,
+  StateInactive,
+  StateDeleted,
+} from '../../types/generated/typescript/schedule';
+
+// Type alias for ScheduledJobState (union of state constants)
+export type ScheduledJobState = "active" | "paused" | "stopping" | "inactive";
+
+// Type alias for ExecutionStatus (union of status constants)
+export type ExecutionStatus = "running" | "completed" | "failed";
 
 // =============================================================================
 // Frontend-only types (not generated)
