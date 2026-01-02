@@ -1,11 +1,11 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use qntx_types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
-use qntx_types::sym;
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::ShellExt;
@@ -224,7 +224,13 @@ fn main() {
                 &[
                     &MenuItem::with_id(app, "about", "About QNTX", false, None::<&str>)?,
                     &PredefinedMenuItem::separator(app)?,
-                    &MenuItem::with_id(app, "preferences", "Preferences...", true, Some("CmdOrCtrl+,"))?,
+                    &MenuItem::with_id(
+                        app,
+                        "preferences",
+                        "Preferences...",
+                        true,
+                        Some("CmdOrCtrl+,"),
+                    )?,
                     &PredefinedMenuItem::separator(app)?,
                     &PredefinedMenuItem::hide(app, None)?,
                     &PredefinedMenuItem::hide_others(app, None)?,
@@ -255,14 +261,56 @@ fn main() {
                 "View",
                 true,
                 &[
-                    &MenuItem::with_id(app, "config_panel", format!("{} Configuration", sym::AM), true, None::<&str>)?,
-                    &MenuItem::with_id(app, "pulse_panel", format!("{} Pulse Scheduler", sym::PULSE), true, Some("CmdOrCtrl+P"))?,
-                    &MenuItem::with_id(app, "prose_panel", format!("{} Documentation", sym::PROSE), true, Some("CmdOrCtrl+/"))?,
-                    &MenuItem::with_id(app, "code_panel", "Code Editor", true, Some("CmdOrCtrl+K"))?,
-                    &MenuItem::with_id(app, "hixtory_panel", format!("{} Hixtory", sym::IX), true, None::<&str>)?,
+                    &MenuItem::with_id(
+                        app,
+                        "config_panel",
+                        format!("{} Configuration", sym::AM),
+                        true,
+                        None::<&str>,
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "pulse_panel",
+                        format!("{} Pulse Scheduler", sym::PULSE),
+                        true,
+                        Some("CmdOrCtrl+P"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "prose_panel",
+                        format!("{} Documentation", sym::PROSE),
+                        true,
+                        Some("CmdOrCtrl+/"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "code_panel",
+                        "Code Editor",
+                        true,
+                        Some("CmdOrCtrl+K"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "hixtory_panel",
+                        format!("{} Hixtory", sym::IX),
+                        true,
+                        None::<&str>,
+                    )?,
                     &PredefinedMenuItem::separator(app)?,
-                    &MenuItem::with_id(app, "refresh_graph", "Refresh Graph", true, Some("CmdOrCtrl+R"))?,
-                    &MenuItem::with_id(app, "toggle_logs", "Toggle Logs", true, Some("CmdOrCtrl+J"))?,
+                    &MenuItem::with_id(
+                        app,
+                        "refresh_graph",
+                        "Refresh Graph",
+                        true,
+                        Some("CmdOrCtrl+R"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "toggle_logs",
+                        "Toggle Logs",
+                        true,
+                        Some("CmdOrCtrl+J"),
+                    )?,
                 ],
             )?;
 
@@ -274,7 +322,13 @@ fn main() {
                     &PredefinedMenuItem::minimize(app, None)?,
                     &PredefinedMenuItem::maximize(app, None)?,
                     &PredefinedMenuItem::separator(app)?,
-                    &MenuItem::with_id(app, "bring_all_to_front", "Bring All to Front", true, None::<&str>)?,
+                    &MenuItem::with_id(
+                        app,
+                        "bring_all_to_front",
+                        "Bring All to Front",
+                        true,
+                        None::<&str>,
+                    )?,
                 ],
             )?;
 
@@ -408,15 +462,18 @@ fn main() {
 
             let separator = PredefinedMenuItem::separator(app)?;
             let separator2 = PredefinedMenuItem::separator(app)?;
-            let menu = Menu::with_items(app, &[
-                &status_item,
-                &separator,
-                &preferences_item,
-                &pause_pulse_item,
-                &separator2,
-                &autostart_item,
-                &quit_item
-            ])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &status_item,
+                    &separator,
+                    &preferences_item,
+                    &pause_pulse_item,
+                    &separator2,
+                    &autostart_item,
+                    &quit_item,
+                ],
+            )?;
 
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
