@@ -42,12 +42,13 @@ entity_actors_limit = 64
 port = 877
 
 # Allowed CORS origins for web UI access
-# Default: localhost and 127.0.0.1 (HTTP and HTTPS)
+# Default: localhost and 127.0.0.1 (HTTP and HTTPS), plus Tauri desktop app
 allowed_origins = [
     "http://localhost",
     "https://localhost",
     "http://127.0.0.1",
-    "https://127.0.0.1"
+    "https://127.0.0.1",
+    "tauri://localhost"
 ]
 
 # Log output color theme: "everforest" or "gruvbox"
