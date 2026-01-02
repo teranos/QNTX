@@ -61,11 +61,11 @@ export interface CreateScheduledJobRequest {
   /**
    * Optional: ProseMirror document ID
    */
-  created_from_doc: string;
+  created_from_doc?: string;
   /**
    * Optional: JSON metadata
    */
-  metadata: string;
+  metadata?: string;
   /**
    * Bypass deduplication checks (force execution)
    */
