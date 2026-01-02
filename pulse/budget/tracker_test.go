@@ -110,10 +110,11 @@ func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
 	// Given: $28 spent in the last 30 days in ai_model_usage
 	now := time.Now()
 
-	// Spread across 28 days in the past (avoiding last 24 hours to prevent daily limit trigger)
-	// This ensures only the monthly budget check is triggered, not the daily one
-	for i := 2; i <= 29; i++ {
-		// Start from 29 days ago, end at 2 days ago (outside 24h window)
+	// Spread across 28 days starting from 3 days ago to 30 days ago
+	// This ensures records are safely outside the 24-hour window (avoiding daily limit trigger)
+	// while remaining within the 30-day monthly window
+	for i := 3; i <= 30; i++ {
+		// Start from 30 days ago, end at 3 days ago (safely outside 24h window)
 		timestamp := now.Add(time.Duration(-i) * 24 * time.Hour)
 		insertUsage(t, db, timestamp, 1.00) // $1 per day for 28 days
 	}
