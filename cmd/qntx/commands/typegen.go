@@ -16,6 +16,7 @@ import (
 // Default packages to generate types from
 var defaultPackages = []string{
 	"github.com/teranos/QNTX/ats/types",
+	"github.com/teranos/QNTX/graph",
 	"github.com/teranos/QNTX/pulse/async",
 	"github.com/teranos/QNTX/pulse/budget",
 	"github.com/teranos/QNTX/pulse/schedule",
