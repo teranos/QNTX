@@ -21,8 +21,8 @@ types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Pytho
 	@echo "✓ Rust types generated in types/generated/rust/"
 	@echo "✓ Markdown docs generated in docs/types/"
 
-types-check: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Check if generated types are up to date
-	@$(QNTX) typegen check
+types-check: cli ## Check if generated types are up to date (always builds from source)
+	@./bin/qntx typegen check
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
