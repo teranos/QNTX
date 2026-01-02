@@ -29,7 +29,6 @@ server/docs_embedded/
 # Tauri
 web/src-tauri/target/
 web/src-tauri/bin/
-web/src-tauri/icons/
 web/src-tauri/gen/
 
 # Generated Rust types (library crate - ignore build artifacts and Cargo.lock)
