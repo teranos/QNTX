@@ -3,6 +3,22 @@
  * These are the fundamental data structures used throughout the application
  */
 
+// Import generated graph types from Go source (single source of truth)
+import type {
+  Graph,
+  Node as GeneratedNode,
+  Link as GeneratedLink,
+  Meta,
+  NodeTypeInfo as GeneratedNodeTypeInfo,
+  RelationshipTypeInfo as GeneratedRelationshipTypeInfo,
+  Stats,
+} from '../../types/generated/typescript/graph';
+
+// Re-export generated types with frontend names
+export type { Stats };
+export type GraphData = Graph;
+export type GraphMeta = Meta;
+
 // ============================================================================
 // State Management Types
 // ============================================================================
@@ -57,22 +73,10 @@ export interface ProgressEvent {
 // ============================================================================
 
 /**
- * Complete graph data sent from backend
- */
-export interface GraphData {
-  nodes: Node[];
-  links: Link[];
-  meta?: GraphMeta;
-}
-
-/**
  * Graph node representing an entity
+ * Extends generated type with D3 simulation and UI properties
  */
-export interface Node {
-  id: string;
-  label: string;
-  type: string;
-  metadata?: Record<string, unknown>;
+export interface Node extends Omit<GeneratedNode, 'visible'> {
   // D3 simulation properties
   x?: number;
   y?: number;
@@ -82,46 +86,34 @@ export interface Node {
   fy?: number | null;  // Fixed y position
   // UI properties
   hidden?: boolean;
-  visible?: boolean;  // Phase 2: Backend controls visibility
+  visible?: boolean;  // Phase 2: Backend controls visibility (override required from generated)
   selected?: boolean;
   radius?: number;
 }
 
 /**
  * Graph link representing a relationship
+ * Extends generated type with D3 simulation and UI properties
  */
-export interface Link {
-  source: string | Node;
-  target: string | Node;
-  type: string;
-  label?: string;
-  weight?: number;
+export interface Link extends Omit<GeneratedLink, 'source' | 'target' | 'value'> {
+  source: string | Node;  // D3 converts string IDs to Node references during simulation
+  target: string | Node;  // D3 converts string IDs to Node references during simulation
+  weight?: number;        // Alias for D3's 'value' field
   // UI properties
-  hidden?: boolean;
   selected?: boolean;
 }
 
 /**
- * Graph metadata for statistics and configuration
+ * Node type information for legend
+ * Re-export generated type
  */
-export interface GraphMeta {
-  node_types?: NodeTypeInfo[];
-  total_nodes?: number;
-  total_links?: number;
-  query?: string;
-  timestamp?: number;
-}
+export type NodeTypeInfo = GeneratedNodeTypeInfo;
 
 /**
- * Node type information for legend
- * Backend sends complete display information - frontend just renders
+ * Relationship type information for physics configuration
+ * Re-export generated type
  */
-export interface NodeTypeInfo {
-  type: string;   // Type key (e.g., "jd", "commit")
-  label: string;  // Human-readable label (e.g., "Job Description") - from backend
-  color: string;  // Hex color code
-  count: number;  // Number of nodes of this type
-}
+export type RelationshipTypeInfo = GeneratedRelationshipTypeInfo;
 
 /**
  * Graph transform for zoom and pan

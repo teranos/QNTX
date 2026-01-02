@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { Window } from 'happy-dom';
 import { createSchedulingControls } from './scheduling-controls';
-import type { ScheduledJob } from './types';
+import type { ScheduledJobResponse } from './types';
 
 // Set up DOM environment
 const window = new Window();
@@ -91,7 +91,7 @@ describe('Scheduling Controls UI', () => {
 
   describe('Pause/Resume UI State', () => {
     it('should show pause button for active jobs', () => {
-      const job: ScheduledJob = {
+      const job: ScheduledJobResponse = {
         id: 'SPJ_123',
         ats_code: 'ix https://example.com',
         interval_seconds: 3600,
@@ -117,7 +117,7 @@ describe('Scheduling Controls UI', () => {
     });
 
     it('should show resume button for paused jobs', () => {
-      const job: ScheduledJob = {
+      const job: ScheduledJobResponse = {
         id: 'SPJ_123',
         ats_code: 'ix https://example.com',
         interval_seconds: 3600,
@@ -143,7 +143,7 @@ describe('Scheduling Controls UI', () => {
     });
 
     it('should show interval dropdown for existing jobs', () => {
-      const job: ScheduledJob = {
+      const job: ScheduledJobResponse = {
         id: 'SPJ_123',
         ats_code: 'ix https://example.com',
         interval_seconds: 21600, // 6 hours
@@ -168,7 +168,7 @@ describe('Scheduling Controls UI', () => {
     });
 
     it('should show delete button for existing jobs', () => {
-      const job: ScheduledJob = {
+      const job: ScheduledJobResponse = {
         id: 'SPJ_123',
         ats_code: 'ix https://example.com',
         interval_seconds: 3600,

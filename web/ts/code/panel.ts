@@ -5,6 +5,7 @@
  * gopls LSP features (autocomplete, hover, diagnostics).
  */
 
+import { BasePanel } from '../base-panel.ts';
 import { GoEditorNavigation } from './navigation.ts';
 import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
@@ -20,10 +21,7 @@ const STATUS_CONFIG: Record<GoplsStatus, { message: string; className: string }>
     unavailable: { message: 'unavailable', className: 'gopls-status-unavailable' }
 };
 
-class GoEditorPanel {
-    private panel: HTMLElement | null = null;
-    private overlay: HTMLElement | null = null;
-    private isVisible: boolean = false;
+class GoEditorPanel extends BasePanel {
     private editor: any | null = null; // CodeMirror editor instance
     private currentPath: string = '';
     private hasUnsavedChanges: boolean = false;
@@ -38,12 +36,17 @@ class GoEditorPanel {
     private saveIndicator: HTMLElement | null = null;
     private statusElement: HTMLElement | null = null;
 
-    // Event listeners
-    private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+    // Save keyboard handler
     private saveHandler: ((e: KeyboardEvent) => void) | null = null;
-    private overlayClickHandler: (() => void) | null = null;
 
     constructor() {
+        super({
+            id: 'go-editor-panel',
+            classes: ['prose-panel'], // Reuse prose panel styles
+            useOverlay: true,
+            closeOnEscape: true
+        });
+
         // Initialize navigation with callback
         this.navigation = new GoEditorNavigation({
             onFileSelect: (path: string) => {
@@ -51,59 +54,16 @@ class GoEditorPanel {
             }
         });
 
-        this.initialize();
-    }
-
-    initialize(): void {
-        // Create overlay
-        this.overlay = document.createElement('div');
-        this.overlay.id = 'go-editor-overlay';
-        this.overlay.className = 'prose-overlay hidden'; // Reuse prose overlay styles
-
-        // Create panel
-        this.panel = document.createElement('div');
-        this.panel.id = 'go-editor-panel';
-        this.panel.className = 'prose-panel hidden'; // Reuse prose panel styles
-        this.panel.innerHTML = this.getTemplate();
-
-        // Append to body
-        document.body.appendChild(this.overlay);
-        document.body.appendChild(this.panel);
-
         // Bind DOM elements
-        this.breadcrumbElement = this.panel.querySelector('.prose-breadcrumb');
-        this.saveIndicator = this.panel.querySelector('.go-editor-save-indicator');
-        this.statusElement = this.panel.querySelector('#gopls-status');
-
-        // Bind navigation elements
-        this.navigation.bindElements(this.panel);
-
-        // Click overlay to close
-        this.overlayClickHandler = () => this.handleClose();
-        this.overlay.addEventListener('click', this.overlayClickHandler);
-
-        // Escape key to close
-        this.escapeHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && this.isVisible) {
-                this.handleClose();
-            }
-        };
-        document.addEventListener('keydown', this.escapeHandler);
-
-        // Save on Cmd/Ctrl+S
-        this.saveHandler = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 's' && this.isVisible) {
-                e.preventDefault();
-                this.saveContent();
-            }
-        };
-        document.addEventListener('keydown', this.saveHandler);
-
-        // Setup event listeners
-        this.setupEventListeners();
+        if (this.panel) {
+            this.breadcrumbElement = this.panel.querySelector('.prose-breadcrumb');
+            this.saveIndicator = this.panel.querySelector('.go-editor-save-indicator');
+            this.statusElement = this.panel.querySelector('#gopls-status');
+            this.navigation.bindElements(this.panel);
+        }
     }
 
-    getTemplate(): string {
+    protected getTemplate(): string {
         return `
             <div class="prose-header">
                 <div class="prose-title">
@@ -141,22 +101,29 @@ class GoEditorPanel {
         `;
     }
 
-    setupEventListeners(): void {
-        const closeBtn = this.panel?.querySelector('.go-editor-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.handleClose());
-        }
+    protected setupEventListeners(): void {
+        // Close button
+        const closeBtn = this.$('.go-editor-close');
+        closeBtn?.addEventListener('click', () => this.hide());
+
+        // Save on Cmd/Ctrl+S
+        this.saveHandler = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 's' && this.isVisible) {
+                e.preventDefault();
+                this.saveContent();
+            }
+        };
+        document.addEventListener('keydown', this.saveHandler);
     }
 
-    async show(): Promise<void> {
-        if (this.isVisible) return;
+    protected beforeHide(): boolean {
+        if (this.hasUnsavedChanges) {
+            return confirm('You have unsaved changes. Close anyway?');
+        }
+        return true;
+    }
 
-        this.isVisible = true;
-        this.overlay?.classList.remove('hidden');
-        this.overlay?.classList.add('visible');
-        this.panel?.classList.remove('hidden');
-        this.panel?.classList.add('visible');
-
+    protected async onShow(): Promise<void> {
         // Fetch dev mode status
         this.isDevMode = await fetchDevMode();
 
@@ -175,13 +142,7 @@ class GoEditorPanel {
         console.log('[Go Editor] Panel shown');
     }
 
-    hide(): void {
-        this.isVisible = false;
-        this.panel?.classList.remove('visible');
-        this.panel?.classList.add('hidden');
-        this.overlay?.classList.remove('visible');
-        this.overlay?.classList.add('hidden');
-
+    protected onHide(): void {
         // Clear URL fragment when closing
         if (window.location.hash.startsWith('#go-editor/')) {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -193,13 +154,12 @@ class GoEditorPanel {
         console.log('[Go Editor] Panel closed');
     }
 
-    handleClose(): void {
-        if (this.hasUnsavedChanges) {
-            if (confirm('You have unsaved changes. Close anyway?')) {
-                this.hide();
-            }
-        } else {
-            this.hide();
+    protected onDestroy(): void {
+        this.destroyEditor();
+
+        if (this.saveHandler) {
+            document.removeEventListener('keydown', this.saveHandler);
+            this.saveHandler = null;
         }
     }
 
@@ -293,12 +253,11 @@ class GoEditorPanel {
 
             console.log('[Go Editor] Initializing with workspace:', workspaceRoot, 'document:', documentUri);
 
-            const container = this.panel?.querySelector('#go-editor-container');
+            const container = this.$('#go-editor-container');
             if (!container) {
                 console.error('[Go Editor] Container not found');
                 return;
             }
-
 
             // Create CodeMirror editor
             this.editor = new EditorView({
@@ -405,12 +364,11 @@ class GoEditorPanel {
     }
 
     showStatus(message: string): void {
-        // Could add a status message display
         console.log('[Go Editor]', message);
     }
 
     showError(message: string): void {
-        const container = this.panel?.querySelector('#go-editor-container');
+        const container = this.$('#go-editor-container');
         if (container) {
             container.innerHTML = `
                 <div class="go-editor-error">
@@ -430,46 +388,6 @@ class GoEditorPanel {
             }
             this.editor = null;
         }
-    }
-
-    async toggle(): Promise<void> {
-        if (this.isVisible) {
-            this.hide();
-        } else {
-            await this.show();
-        }
-    }
-
-    destroy(): void {
-        console.log('[Go Editor] Destroying panel');
-
-        this.destroyEditor();
-
-        // Remove event listeners
-        if (this.escapeHandler) {
-            document.removeEventListener('keydown', this.escapeHandler);
-            this.escapeHandler = null;
-        }
-        if (this.saveHandler) {
-            document.removeEventListener('keydown', this.saveHandler);
-            this.saveHandler = null;
-        }
-        if (this.overlay && this.overlayClickHandler) {
-            this.overlay.removeEventListener('click', this.overlayClickHandler);
-            this.overlayClickHandler = null;
-        }
-
-        // Remove DOM elements
-        if (this.panel) {
-            this.panel.remove();
-            this.panel = null;
-        }
-        if (this.overlay) {
-            this.overlay.remove();
-            this.overlay = null;
-        }
-
-        this.isVisible = false;
     }
 }
 

@@ -5,7 +5,7 @@
  */
 
 import { debugLog } from "../debug.ts";
-import type { ScheduledJob } from "./types.ts";
+import type { ScheduledJobResponse } from "./types.ts";
 import { INTERVAL_PRESETS, formatInterval } from "./types.ts";
 import {
   createScheduledJob,
@@ -34,9 +34,9 @@ export interface SchedulingControlsOptions {
   atsCode: string | (() => string);
 
   documentId?: string;
-  existingJob?: ScheduledJob;
-  onJobCreated?: (job: ScheduledJob) => void;
-  onJobUpdated?: (job: ScheduledJob) => void;
+  existingJob?: ScheduledJobResponse;
+  onJobCreated?: (job: ScheduledJobResponse) => void;
+  onJobUpdated?: (job: ScheduledJobResponse) => void;
   onJobDeleted?: () => void;
   onError?: (error: Error, context?: ErrorContext) => void;
 }

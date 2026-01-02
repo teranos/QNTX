@@ -3,6 +3,7 @@
 import { state, GRAPH_PHYSICS, GRAPH_STYLES } from './config.ts';
 import { saveSession } from './state-manager.ts';
 import { hiddenNodeTypes, initLegendaToggles } from './legenda.ts';
+import { getLinkDistance, getLinkStrength } from './graph-physics.ts';
 import type { GraphData, Node, Transform } from '../types/core';
 import type {
     D3Node,
@@ -233,22 +234,13 @@ function renderGraph(data: GraphData): void {
     const d3Links = visibleLinks as D3Link[];
 
     // Create force simulation with filtered data
-    // TODO(issue #7): Domain leakage - git-specific logic should be moved to type metadata
+    // Phase 2: Physics metadata from backend type system (issue #7)
+    const relationshipMeta = data.meta?.relationship_types;
     simulation = d3.forceSimulation(d3Nodes)
         .force("link", d3.forceLink(d3Links)
             .id((d: D3Node) => d.id)
-            .distance((d: D3Link) => {
-                // TODO(issue #7): This hardcodes git domain knowledge - should query type metadata
-                if (d.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_DISTANCE;
-                if (d.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_DISTANCE;
-                return GRAPH_PHYSICS.LINK_DISTANCE;
-            })
-            .strength((d: D3Link) => {
-                // TODO(issue #7): This hardcodes git domain knowledge - should query type metadata
-                if (d.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_STRENGTH;
-                if (d.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_STRENGTH;
-                return GRAPH_PHYSICS.DEFAULT_LINK_STRENGTH;
-            }))
+            .distance((link: D3Link) => getLinkDistance(link, relationshipMeta))
+            .strength((link: D3Link) => getLinkStrength(link, relationshipMeta)))
         .force("charge", d3.forceManyBody()
             .strength(GRAPH_PHYSICS.TILE_CHARGE_STRENGTH)
             .distanceMax(GRAPH_PHYSICS.CHARGE_MAX_DISTANCE))

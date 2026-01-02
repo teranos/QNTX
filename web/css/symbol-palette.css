@@ -70,19 +70,60 @@
     transform: scale(0.98);
 }
 
-/* Responsive - Smaller screens */
-@media (max-width: 480px) {
-    .command-palette {
-        grid-template-columns: repeat(5, 1fr);
-        padding: 6px 10px;
+/* Mobile - Symbol palette inside fixed bottom query bar */
+@media (max-width: 768px) {
+    /* Go code editor not practical on mobile */
+    .palette-cell[data-cmd="go"] {
+        display: none;
+    }
+
+    .symbol-palette {
+        /* Not fixed - flows inside #query-container which is fixed */
+        position: static;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 1px;
+        padding: 6px 4px;
+        padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+        background: #fff;
+        margin-bottom: 0;
     }
 
     .palette-cell {
-        padding: 6px 3px;
-        font-size: 14px;
+        padding: 8px 2px;
+        font-size: 12px;
+        min-height: 40px; /* Touch-friendly tap target */
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    /* Hide tooltip on small screens to avoid overflow */
+    /* Hide tooltip on touch - no hover state */
+    .palette-cell::after {
+        display: none;
+    }
+}
+
+/* Smaller phones - horizontal scroll */
+@media (max-width: 480px) {
+    .symbol-palette {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+        gap: 4px;
+    }
+
+    .symbol-palette::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+
+    .palette-cell {
+        flex: 0 0 auto;
+        min-width: 44px;
+        padding: 10px 8px;
+    }
+
+    /* Hide tooltip completely on small screens */
     .palette-cell::after {
         display: none;
     }

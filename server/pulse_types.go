@@ -12,11 +12,11 @@ import (
 
 // CreateScheduledJobRequest represents the request to create a new scheduled job
 type CreateScheduledJobRequest struct {
-	ATSCode         string `json:"ats_code"`         // ATS code to execute (e.g., "ix https://...")
-	IntervalSeconds int    `json:"interval_seconds"` // Execution interval in seconds
-	CreatedFromDoc  string `json:"created_from_doc"` // Optional: ProseMirror document ID
-	Metadata        string `json:"metadata"`         // Optional: JSON metadata
-	Force           bool   `json:"force,omitempty"`  // Bypass deduplication checks (force execution)
+	ATSCode         string `json:"ats_code"`                    // ATS code to execute (e.g., "ix https://...")
+	IntervalSeconds int    `json:"interval_seconds"`            // Execution interval in seconds
+	CreatedFromDoc  string `json:"created_from_doc,omitempty"`  // Optional: ProseMirror document ID
+	Metadata        string `json:"metadata,omitempty"`          // Optional: JSON metadata
+	Force           bool   `json:"force,omitempty"`             // Bypass deduplication checks (force execution)
 }
 
 // UpdateScheduledJobRequest represents the request to update a scheduled job

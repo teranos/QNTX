@@ -165,3 +165,67 @@ func TestEnsureTypes_OpacityHandling(t *testing.T) {
 		t.Errorf("semi-transparent type: expected opacity 0.5, got %v", semiAttestation.Attributes["opacity"])
 	}
 }
+
+// TestIsExistenceAttestation validates detection of pure existence claims vs relationships
+// Critical for graph building: existence attestations don't create links, relationships do
+func TestIsExistenceAttestation(t *testing.T) {
+	// Pure existence: "as alice" becomes "as alice _ _"
+	existence := &As{
+		Subjects:   []string{"alice"},
+		Predicates: []string{"_"},
+		Contexts:   []string{"_"},
+	}
+	if !existence.IsExistenceAttestation() {
+		t.Error("Expected existence attestation for 'as alice _ _'")
+	}
+
+	// Relationship: "as alice works_at acme"
+	relationship := &As{
+		Subjects:   []string{"alice"},
+		Predicates: []string{"works_at"},
+		Contexts:   []string{"acme"},
+	}
+	if relationship.IsExistenceAttestation() {
+		t.Error("Expected NOT existence attestation for relationship")
+	}
+
+	// Has predicate but default context: "as alice is _"
+	predicateOnly := &As{
+		Subjects:   []string{"alice"},
+		Predicates: []string{"is"},
+		Contexts:   []string{"_"},
+	}
+	if predicateOnly.IsExistenceAttestation() {
+		t.Error("Expected NOT existence attestation when predicate is not '_'")
+	}
+
+	// Has context but default predicate: "as alice _ engineer"
+	contextOnly := &As{
+		Subjects:   []string{"alice"},
+		Predicates: []string{"_"},
+		Contexts:   []string{"engineer"},
+	}
+	if contextOnly.IsExistenceAttestation() {
+		t.Error("Expected NOT existence attestation when context is not '_'")
+	}
+
+	// Multiple predicates (even if one is _)
+	multiPredicate := &As{
+		Subjects:   []string{"alice"},
+		Predicates: []string{"_", "is"},
+		Contexts:   []string{"_"},
+	}
+	if multiPredicate.IsExistenceAttestation() {
+		t.Error("Expected NOT existence attestation with multiple predicates")
+	}
+
+	// Multiple contexts (even if one is _)
+	multiContext := &As{
+		Subjects:   []string{"alice"},
+		Predicates: []string{"_"},
+		Contexts:   []string{"_", "engineer"},
+	}
+	if multiContext.IsExistenceAttestation() {
+		t.Error("Expected NOT existence attestation with multiple contexts")
+	}
+}

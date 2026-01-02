@@ -130,6 +130,18 @@ func (p *GitIxProcessor) ProcessGitRepository(repoPath string) (*GitProcessingRe
 				"impact", "graph visualization may lack custom type metadata",
 				"fallback", "using hardcoded NodeTypeColors map")
 		}
+
+		// Ensure relationship type definitions exist for git predicates
+		// Non-fatal - frontend will fall back to default physics if this fails
+		if err := atstypes.EnsureRelationshipTypes(p.store, "ixgest-git", types.IsChildOf, types.PointsTo); err != nil {
+			p.logger.Warnw("Failed to create relationship type definitions - falling back to default physics",
+				"error", err,
+				"component", "git_ingestion",
+				"source", "ixgest-git",
+				"types_attempted", []string{"is_child_of", "points_to"},
+				"impact", "graph physics will use default values",
+				"fallback", "using frontend GRAPH_PHYSICS constants")
+		}
 	}
 
 	// Process branches

@@ -7,25 +7,27 @@
  * This module orchestrates the ProseEditor and ProseNavigation components.
  */
 
+import { BasePanel } from '../base-panel.ts';
 import { ProseEditor } from './editor.ts';
 import { ProseNavigation } from './navigation.ts';
 import { fetchDevMode } from '../dev-mode.ts';
 
-class ProsePanel {
-    private panel: HTMLElement | null = null;
-    private overlay: HTMLElement | null = null;
-    private isVisible: boolean = false;
-
+class ProsePanel extends BasePanel {
     // Component modules
     private editor: ProseEditor;
     private navigation: ProseNavigation;
 
-    // Event listener references for cleanup
-    private escapeKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+    // Save keyboard handler (separate from escape, which BasePanel handles)
     private saveKeyHandler: ((e: KeyboardEvent) => void) | null = null;
-    private overlayClickHandler: (() => void) | null = null;
 
     constructor() {
+        super({
+            id: 'prose-panel',
+            classes: ['prose-panel'],
+            useOverlay: true,
+            closeOnEscape: true
+        });
+
         // Initialize component modules with callbacks
         this.editor = new ProseEditor({
             onDocumentLoad: (path: string) => {
@@ -47,46 +49,14 @@ class ProsePanel {
         // When view DocBlocks are implemented, fetch data from /api/view/render
         // Replace placeholder rendering with live attestation data
 
-        this.initialize();
-    }
-
-    initialize(): void {
-        // Create overlay element
-        this.overlay = document.createElement('div');
-        this.overlay.id = 'prose-overlay';
-        this.overlay.className = 'prose-overlay hidden';
-
-        // Create panel element
-        this.panel = document.createElement('div');
-        this.panel.id = 'prose-panel';
-        this.panel.className = 'prose-panel hidden';
-        this.panel.innerHTML = this.getTemplate();
-
-        // Append to body
-        document.body.appendChild(this.overlay);
-        document.body.appendChild(this.panel);
-
         // Bind DOM elements to component modules
-        this.editor.bindElements(this.panel);
-        this.navigation.bindElements(this.panel);
-
-        // Click overlay to close
-        this.overlayClickHandler = () => this.handleClose();
-        this.overlay.addEventListener('click', this.overlayClickHandler);
-
-        // Escape key to close
-        this.escapeKeyHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && this.isVisible) {
-                this.handleClose();
-            }
-        };
-        document.addEventListener('keydown', this.escapeKeyHandler);
-
-        // Setup event listeners
-        this.setupEventListeners();
+        if (this.panel) {
+            this.editor.bindElements(this.panel);
+            this.navigation.bindElements(this.panel);
+        }
     }
 
-    getTemplate(): string {
+    protected getTemplate(): string {
         return `
             <div class="prose-header">
                 <div class="prose-title">
@@ -124,14 +94,10 @@ class ProsePanel {
         `;
     }
 
-    setupEventListeners(): void {
-        if (!this.panel) return;
-
+    protected setupEventListeners(): void {
         // Close button
-        const closeBtn = this.panel.querySelector('.prose-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.handleClose());
-        }
+        const closeBtn = this.$('.prose-close');
+        closeBtn?.addEventListener('click', () => this.hide());
 
         // Save on Cmd/Ctrl+S
         this.saveKeyHandler = (e: KeyboardEvent) => {
@@ -143,25 +109,14 @@ class ProsePanel {
         document.addEventListener('keydown', this.saveKeyHandler);
     }
 
-    handleClose(): void {
+    protected beforeHide(): boolean {
         if (this.editor.getHasUnsavedChanges()) {
-            if (confirm('You have unsaved changes. Close anyway?')) {
-                this.hide();
-            }
-        } else {
-            this.hide();
+            return confirm('You have unsaved changes. Close anyway?');
         }
+        return true;
     }
 
-    async show(): Promise<void> {
-        if (!this.panel || !this.overlay) return;
-
-        this.isVisible = true;
-        this.overlay.classList.remove('hidden');
-        this.overlay.classList.add('visible');
-        this.panel.classList.remove('hidden');
-        this.panel.classList.add('visible');
-
+    protected async onShow(): Promise<void> {
         // Fetch dev mode status and set on editor
         const isDevMode = await fetchDevMode();
         this.editor.setDevMode(isDevMode);
@@ -176,15 +131,7 @@ class ProsePanel {
         await this.editor.loadDocument(docPath);
     }
 
-    hide(): void {
-        if (!this.panel || !this.overlay) return;
-
-        this.isVisible = false;
-        this.panel.classList.remove('visible');
-        this.panel.classList.add('hidden');
-        this.overlay.classList.remove('visible');
-        this.overlay.classList.add('hidden');
-
+    protected onHide(): void {
         // Clear URL fragment when closing
         if (window.location.hash) {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -194,44 +141,15 @@ class ProsePanel {
         this.editor.destroy();
     }
 
-    toggle(): void {
-        if (this.isVisible) {
-            this.hide();
-        } else {
-            this.show();
-        }
-    }
-
-    // Clean up event listeners (for proper resource management)
-    destroy(): void {
-        // Remove document-level event listeners
-        if (this.escapeKeyHandler) {
-            document.removeEventListener('keydown', this.escapeKeyHandler);
-            this.escapeKeyHandler = null;
-        }
+    protected onDestroy(): void {
+        // Remove save key handler
         if (this.saveKeyHandler) {
             document.removeEventListener('keydown', this.saveKeyHandler);
             this.saveKeyHandler = null;
         }
 
-        // Remove overlay listener
-        if (this.overlay && this.overlayClickHandler) {
-            this.overlay.removeEventListener('click', this.overlayClickHandler);
-            this.overlayClickHandler = null;
-        }
-
         // Clean up component modules
         this.editor.destroy();
-
-        // Remove DOM elements
-        if (this.panel) {
-            this.panel.remove();
-            this.panel = null;
-        }
-        if (this.overlay) {
-            this.overlay.remove();
-            this.overlay = null;
-        }
     }
 }
 
