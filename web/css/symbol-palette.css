@@ -70,19 +70,70 @@
     transform: scale(0.98);
 }
 
-/* Responsive - Smaller screens */
-@media (max-width: 480px) {
-    .command-palette {
-        grid-template-columns: repeat(5, 1fr);
-        padding: 6px 10px;
+/* Mobile - Fixed bottom bar */
+@media (max-width: 768px) {
+    .symbol-palette {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 1px;
+        padding: 8px 4px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        background: #fff;
+        border-top: 1px solid #ddd;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .palette-cell {
-        padding: 6px 3px;
+        padding: 10px 2px;
         font-size: 14px;
+        min-height: 44px; /* Touch-friendly tap target */
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    /* Hide tooltip on small screens to avoid overflow */
+    /* Tooltip above on mobile */
+    .palette-cell::after {
+        bottom: auto;
+        top: -32px;
+    }
+
+    /* Hide tooltip on touch - no hover state */
+    .palette-cell:hover::after {
+        display: none;
+    }
+
+    /* Prevent body scroll when at bottom */
+    #left-panel {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* Smaller phones - horizontal scroll */
+@media (max-width: 480px) {
+    .symbol-palette {
+        display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+        gap: 4px;
+    }
+
+    .symbol-palette::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+
+    .palette-cell {
+        flex: 0 0 auto;
+        min-width: 44px;
+        padding: 10px 8px;
+    }
+
+    /* Hide tooltip completely on small screens */
     .palette-cell::after {
         display: none;
     }
