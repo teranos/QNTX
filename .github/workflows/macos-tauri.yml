@@ -1,0 +1,48 @@
+name: macOS Tauri
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/src-tauri/**'
+      - 'web/src/**'
+      - '.github/workflows/macos-tauri.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/src-tauri/**'
+      - 'web/src/**'
+  workflow_dispatch:
+
+jobs:
+  tauri-check:
+    name: Tauri Check (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web/src-tauri
+
+      - name: Check formatting
+        run: cd web/src-tauri && cargo fmt --check
+
+      - name: Clippy
+        run: cd web/src-tauri && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Check (Apple Silicon)
+        run: cd web/src-tauri && cargo check --target aarch64-apple-darwin
+
+      - name: Check (Intel)
+        run: cd web/src-tauri && cargo check --target x86_64-apple-darwin
