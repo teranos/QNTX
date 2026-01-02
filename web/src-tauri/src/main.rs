@@ -222,7 +222,7 @@ fn main() {
                 "QNTX",
                 true,
                 &[
-                    &MenuItem::with_id(app, "about", "About QNTX", true, None::<&str>)?,
+                    &MenuItem::with_id(app, "about", "About QNTX", false, None::<&str>)?,
                     &PredefinedMenuItem::separator(app)?,
                     &MenuItem::with_id(app, "preferences", "Preferences...", true, Some("CmdOrCtrl+,"))?,
                     &PredefinedMenuItem::separator(app)?,
@@ -298,11 +298,6 @@ fn main() {
             // Handle menu bar events
             app.on_menu_event(|app_handle, event| {
                 match event.id.as_ref() {
-                    // App menu
-                    "about" => {
-                        // TODO: Show about dialog
-                        println!("[menu] About QNTX");
-                    }
                     // Edit menu - these are handled by the webview
                     "undo" | "redo" | "cut" | "copy" | "paste" | "select_all" => {
                         // Let webview handle standard edit commands
@@ -310,48 +305,50 @@ fn main() {
                             let _ = window.emit("menu-edit", event.id.as_ref());
                         }
                     }
-                    // View menu - emit events to toggle panels
+                    // View menu - emit events to show panels
                     "config_panel" | "preferences" => {
-                        println!("[menu] Preferences/Config clicked - event id: {}", event.id.as_ref());
                         if let Some(window) = app_handle.get_webview_window("main") {
-                            println!("[menu] Got window, showing and emitting event");
                             let _ = window.show();
                             let _ = window.set_focus();
                             if let Err(e) = window.emit("show-config-panel", ()) {
-                                println!("[menu] Failed to emit event: {}", e);
-                            } else {
-                                println!("[menu] Event emitted successfully");
+                                eprintln!("[menu] Failed to emit show-config-panel event: {}", e);
                             }
-                        } else {
-                            println!("[menu] No window found!");
                         }
                     }
                     "pulse_panel" => {
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
-                            let _ = window.emit("toggle-pulse-panel", ());
+                            if let Err(e) = window.emit("show-pulse-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-pulse-panel event: {}", e);
+                            }
                         }
                     }
                     "prose_panel" | "documentation" => {
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
-                            let _ = window.emit("toggle-prose-panel", ());
+                            if let Err(e) = window.emit("show-prose-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-prose-panel event: {}", e);
+                            }
                         }
                     }
                     "code_panel" => {
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
-                            let _ = window.emit("toggle-code-panel", ());
+                            if let Err(e) = window.emit("show-code-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-code-panel event: {}", e);
+                            }
                         }
                     }
                     "hixtory_panel" => {
                         if let Some(window) = app_handle.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
-                            let _ = window.emit("toggle-hixtory-panel", ());
+                            if let Err(e) = window.emit("show-hixtory-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-hixtory-panel event: {}", e);
+                            }
                         }
                     }
                     "refresh_graph" => {

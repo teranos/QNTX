@@ -192,7 +192,8 @@ async function init(): Promise<void> {
             });
         });
 
-        // Keep for backwards compatibility if needed elsewhere
+        // Kept for backwards compatibility - not used by menu system
+        // Keyboard shortcuts use toggleConfig() directly (see Cmd+, handler below)
         listen('toggle-config-panel', () => {
             toggleConfig();
         });
@@ -208,27 +209,29 @@ async function init(): Promise<void> {
             });
         });
 
-        // Panel toggle events from menu bar
-        listen('toggle-pulse-panel', () => {
-            togglePulsePanel();
+        // Panel show events from menu bar (menu items always show, never toggle)
+        listen('show-pulse-panel', () => {
+            import('./pulse-panel.ts').then(({ showPulsePanel }) => {
+                showPulsePanel();
+            });
         });
 
-        listen('toggle-prose-panel', () => {
-            toggleProsePanel();
+        listen('show-prose-panel', () => {
+            import('./prose/panel.ts').then(({ showProsePanel }) => {
+                showProsePanel();
+            });
         });
 
-        listen('toggle-code-panel', () => {
-            toggleGoEditor();
+        listen('show-code-panel', () => {
+            import('./code/panel.ts').then(({ showGoEditor }) => {
+                showGoEditor();
+            });
         });
 
-        listen('toggle-command-explorer', () => {
-            if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle('ax');
-            }
-        });
-
-        listen('toggle-hixtory-panel', () => {
-            toggleJobList();
+        listen('show-hixtory-panel', () => {
+            import('./hixtory-panel.ts').then(({ showJobList }) => {
+                showJobList();
+            });
         });
 
         listen('refresh-graph', () => {
@@ -256,6 +259,7 @@ async function init(): Promise<void> {
     }
 
     // Register Cmd+, keyboard shortcut (standard macOS preferences shortcut)
+    // Note: Keyboard shortcuts toggle (show/hide), while menu items always show (macOS convention)
     document.addEventListener('keydown', (e: KeyboardEvent) => {
         // Cmd+, on Mac, Ctrl+, on Windows/Linux
         if ((e.metaKey || e.ctrlKey) && e.key === ',') {
