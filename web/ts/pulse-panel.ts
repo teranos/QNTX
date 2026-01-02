@@ -9,6 +9,13 @@
  * - Updates in real-time via WebSocket
  * - Inline execution history (expandable per job)
  * - Force trigger button for immediate execution
+ *
+ * TODO: Future improvements for inline execution view:
+ * - Add full log viewing capability directly in execution cards (currently requires "View detailed history" link)
+ * - Add search/filtering for executions (by status, date range, etc.)
+ * - Consider infinite scroll instead of "Load N more" pagination
+ * - Add execution progress indicators for running jobs
+ * - Add bulk actions (cancel all running, retry failed, etc.)
  */
 
 import { BasePanel } from './base-panel.ts';
@@ -315,6 +322,8 @@ class PulsePanel extends BasePanel {
 }
 
 // Create global instance
+// TODO(issue #16): Refactor global window pollution
+// Replace with event delegation and custom events for cross-panel communication
 const pulsePanel = new PulsePanel();
 (window as any).pulsePanel = pulsePanel;
 
