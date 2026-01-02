@@ -25,9 +25,25 @@ describe('Graph Visibility', () => {
 
 describe('Link Physics Configuration', () => {
   describe('getLinkDistance', () => {
-    it('should return git child distance for is_child_of links', () => {
+    it('should use metadata when available', () => {
+      const link = { type: 'is_child_of', source: 'a', target: 'b' };
+      const metadata = [
+        { type: 'is_child_of', label: 'Child Of', link_distance: 42, link_strength: 0.5, count: 10 }
+      ];
+      expect(getLinkDistance(link as any, metadata)).toBe(42);
+    });
+
+    it('should fall back to hardcoded git values without metadata', () => {
       const link = { type: 'is_child_of', source: 'a', target: 'b' };
       expect(getLinkDistance(link as any)).toBe(GRAPH_PHYSICS.GIT_CHILD_LINK_DISTANCE);
+    });
+
+    it('should fall back to hardcoded git values when metadata missing type', () => {
+      const link = { type: 'is_child_of', source: 'a', target: 'b' };
+      const metadata = [
+        { type: 'points_to', label: 'Points To', link_distance: 60, link_strength: 0.2, count: 5 }
+      ];
+      expect(getLinkDistance(link as any, metadata)).toBe(GRAPH_PHYSICS.GIT_CHILD_LINK_DISTANCE);
     });
 
     it('should return git branch distance for points_to links', () => {
@@ -52,9 +68,25 @@ describe('Link Physics Configuration', () => {
   });
 
   describe('getLinkStrength', () => {
-    it('should return git child strength for is_child_of links', () => {
+    it('should use metadata when available', () => {
+      const link = { type: 'points_to', source: 'a', target: 'b' };
+      const metadata = [
+        { type: 'points_to', label: 'Points To', link_distance: 60, link_strength: 0.8, count: 5 }
+      ];
+      expect(getLinkStrength(link as any, metadata)).toBe(0.8);
+    });
+
+    it('should fall back to hardcoded git values without metadata', () => {
       const link = { type: 'is_child_of', source: 'a', target: 'b' };
       expect(getLinkStrength(link as any)).toBe(GRAPH_PHYSICS.GIT_CHILD_LINK_STRENGTH);
+    });
+
+    it('should fall back to hardcoded git values when metadata missing type', () => {
+      const link = { type: 'points_to', source: 'a', target: 'b' };
+      const metadata = [
+        { type: 'is_child_of', label: 'Child Of', link_distance: 50, link_strength: 0.3, count: 10 }
+      ];
+      expect(getLinkStrength(link as any, metadata)).toBe(GRAPH_PHYSICS.GIT_BRANCH_LINK_STRENGTH);
     });
 
     it('should return git branch strength for points_to links', () => {

@@ -106,6 +106,7 @@ export interface Link {
  */
 export interface GraphMeta {
   node_types?: NodeTypeInfo[];
+  relationship_types?: RelationshipTypeInfo[];
   total_nodes?: number;
   total_links?: number;
   query?: string;
@@ -121,6 +122,19 @@ export interface NodeTypeInfo {
   label: string;  // Human-readable label (e.g., "Job Description") - from backend
   color: string;  // Hex color code
   count: number;  // Number of nodes of this type
+}
+
+/**
+ * Relationship type information for physics configuration
+ * Backend sends physics metadata - frontend uses for force simulation
+ */
+export interface RelationshipTypeInfo {
+  type: string;           // Predicate name (e.g., "is_child_of", "points_to")
+  label: string;          // Human-readable label
+  color?: string;         // Optional link color override
+  link_distance?: number; // D3 force distance override (null = use default)
+  link_strength?: number; // D3 force strength override (null = use default)
+  count: number;          // Number of links of this type
 }
 
 /**
