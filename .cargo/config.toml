@@ -1,0 +1,5 @@
+# Cargo configuration for QNTX project
+# Moves Rust build artifacts out of web/ to avoid interfering with TypeScript test discovery
+
+[build]
+target-dir = "target"  # Use project root target/ instead of web/src-tauri/target/

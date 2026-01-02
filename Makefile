@@ -141,4 +141,4 @@ desktop-dev: desktop-prepare ## Run desktop app in development mode
 desktop-build: desktop-prepare ## Build production desktop app (requires: cargo install tauri-cli)
 	@echo "Building QNTX Desktop for production..."
 	@cd web/src-tauri && cargo tauri build
-	@echo "✓ Desktop app built in web/src-tauri/target/release/bundle/"
+	@echo "✓ Desktop app built in target/release/bundle/"
