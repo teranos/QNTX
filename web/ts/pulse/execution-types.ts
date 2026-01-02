@@ -10,13 +10,13 @@ import type { ExecutionStatus as ExecutionStatusType } from '../../types';
 
 // Re-export types from central location for convenience
 export type {
-  PulseExecution,
+  Execution,
   ExecutionStatus,
   ListExecutionsResponse,
   TaskInfo,
   StageInfo,
   JobStagesResponse,
-  TaskLogEntry as LogEntry,
+  ServerLogEntry,
   TaskLogsResponse,
   ChildJobInfo,
   JobChildrenResponse,

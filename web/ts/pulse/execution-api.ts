@@ -6,7 +6,7 @@
 
 import { debugLog, debugError } from "../debug.ts";
 import type {
-  PulseExecution,
+  Execution,
   ListExecutionsResponse,
   ListExecutionsParams,
   JobStagesResponse,
@@ -91,7 +91,7 @@ export async function listExecutions(
  */
 export async function getExecution(
   executionId: string
-): Promise<PulseExecution> {
+): Promise<Execution> {
   const url = `${getBaseUrl()}/executions/${executionId}`;
   debugLog("[Execution API] Getting execution:", { executionId, url });
 

@@ -69,13 +69,9 @@ export type {
   Execution,
 } from '../../types/generated/typescript';
 
-// Re-export LogEntry from generated as TaskLogEntry (to avoid conflict with core.ts LogEntry)
-export type { LogEntry as TaskLogEntry } from '../../types/generated/typescript';
-
-// Re-export with aliases for backward compatibility
-// (frontend code uses these names instead of generated names)
-export type { ScheduledJobResponse as ScheduledJob } from '../../types/generated/typescript';
-export type { Execution as PulseExecution } from '../../types/generated/typescript';
+// Re-export generated LogEntry with server prefix to avoid conflict with core.ts LogEntry
+// (core.ts LogEntry is for UI console logs, ServerLogEntry is for task/execution logs)
+export type { LogEntry as ServerLogEntry } from '../../types/generated/typescript';
 
 // Re-export state/status constants from schedule
 export {
