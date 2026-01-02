@@ -12,6 +12,7 @@
  * Design based on docs/development/pulse-async-ix.md - Phase 3
  */
 
+import { BasePanel } from './base-panel.ts';
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
@@ -43,42 +44,20 @@ interface Task {
     cost_actual?: number;
 }
 
-
-class JobListPanel {
-    private panel: HTMLElement | null = null;
-    private isVisible: boolean = false;
+class JobListPanel extends BasePanel {
     private jobs: Map<string, Job> = new Map();
 
     constructor() {
-        this.initialize();
-    }
-
-    private initialize(): void {
-        // Create panel element
-        this.panel = document.createElement('div');
-        this.panel.id = 'job-list-panel';
-        this.panel.className = 'job-list-panel hidden';
-        this.panel.innerHTML = this.getTemplate();
-
-        // Insert after symbol palette
-        const symbolPalette = document.getElementById('symbolPalette');
-        if (symbolPalette && symbolPalette.parentNode) {
-            symbolPalette.parentNode.insertBefore(this.panel, symbolPalette.nextSibling);
-        }
-
-        // Click outside to close
-        document.addEventListener('click', (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (this.isVisible && this.panel && !this.panel.contains(target) && !target.closest('.palette-cell[data-cmd="ix"]')) {
-                this.hide();
-            }
+        super({
+            id: 'job-list-panel',
+            classes: ['job-list-panel'],
+            useOverlay: false,  // No overlay, uses click-outside
+            closeOnEscape: true,
+            insertAfter: '#symbolPalette'
         });
-
-        // Setup event listeners
-        this.setupEventListeners();
     }
 
-    private getTemplate(): string {
+    protected getTemplate(): string {
         return `
             <div class="job-list-header">
                 <h3 class="job-list-title">${IX} Hixtory <span class="hixtory-count">(<span id="hixtory-count">0</span>)</span></h3>
@@ -93,27 +72,30 @@ class JobListPanel {
         `;
     }
 
-    private setupEventListeners(): void {
-        if (!this.panel) return;
-
+    protected setupEventListeners(): void {
         // Close button
-        const closeBtn = this.panel.querySelector('.job-list-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.hide());
-        }
+        const closeBtn = this.$('.job-list-close');
+        closeBtn?.addEventListener('click', () => this.hide());
 
         // New operation button
-        const newBtn = this.panel.querySelector('#new-ix-operation');
+        const newBtn = this.$('#new-ix-operation');
         if (newBtn) {
             newBtn.addEventListener('click', () => {
                 this.hide();
-                // Trigger file upload
                 const fileUploadInput = document.getElementById('file-upload');
                 if (fileUploadInput) {
                     (fileUploadInput as HTMLInputElement).click();
                 }
             });
         }
+    }
+
+    protected async onShow(): Promise<void> {
+        // Fetch jobs from API on first show (if jobs map is empty)
+        if (this.jobs.size === 0) {
+            await this.fetchJobs();
+        }
+        this.render();
     }
 
     /**
@@ -130,7 +112,6 @@ class JobListPanel {
             const data = await response.json();
             const jobs = data.jobs || [];
 
-            // Populate jobs map
             jobs.forEach((job: Job) => {
                 this.jobs.set(job.id, job);
             });
@@ -138,35 +119,6 @@ class JobListPanel {
             console.log(`Loaded ${jobs.length} async jobs from API`);
         } catch (error) {
             console.error('Error fetching jobs:', error);
-        }
-    }
-
-    public async show(): Promise<void> {
-        if (!this.panel) return;
-        this.isVisible = true;
-        this.panel.classList.remove('hidden');
-        this.panel.classList.add('visible');
-
-        // Fetch jobs from API on first show (if jobs map is empty)
-        if (this.jobs.size === 0) {
-            await this.fetchJobs();
-        }
-
-        this.render();
-    }
-
-    public hide(): void {
-        if (!this.panel) return;
-        this.isVisible = false;
-        this.panel.classList.remove('visible');
-        this.panel.classList.add('hidden');
-    }
-
-    public toggle(): void {
-        if (this.isVisible) {
-            this.hide();
-        } else {
-            this.show();
         }
     }
 
@@ -187,9 +139,6 @@ class JobListPanel {
 
         // Update jobs map
         this.jobs.set(job.id, job);
-
-        // Keep completed/failed jobs visible for exploration
-        // (removed auto-delete timer - users can manually dismiss jobs)
 
         // Re-render if panel is visible
         if (this.isVisible) {
@@ -287,11 +236,8 @@ class JobListPanel {
 
         // Append content tokens
         if (content && content.length > 0 && contentDiv) {
-            // Create text node for efficient DOM updates
             const textNode = document.createTextNode(content);
             contentDiv.appendChild(textNode);
-
-            // Auto-scroll to bottom
             contentDiv.scrollTop = contentDiv.scrollHeight;
         }
 
@@ -308,15 +254,12 @@ class JobListPanel {
      * Render hixtory - compact list of job executions
      */
     private render(): void {
-        if (!this.panel) return;
-
-        const content = this.panel.querySelector('#job-list-content');
-        const countSpan = this.panel.querySelector('#hixtory-count');
+        const content = this.$('#job-list-content');
+        const countSpan = this.$('#hixtory-count');
 
         if (!content) return;
 
         if (this.jobs.size === 0) {
-            // Build empty state using DOM API
             const emptyDiv = document.createElement('div');
             emptyDiv.className = 'panel-empty job-list-empty';
 
@@ -338,16 +281,13 @@ class JobListPanel {
         }
 
         // Get all jobs, sort by created_at descending (most recent first)
-        // created_at is ISO 8601 string, parse to Date for comparison
         const allJobs = Array.from(this.jobs.values())
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-        // Update count
         if (countSpan) {
             countSpan.textContent = allJobs.length.toString();
         }
 
-        // Build hixtory items using DOM API for security
         content.innerHTML = '';
 
         allJobs.forEach(job => {
@@ -396,14 +336,10 @@ class JobListPanel {
      * Get display command for a job
      */
     private getJobCommand(job: Job): string {
-        // Try to get command from metadata
         if (job.metadata?.command) return job.metadata.command;
         if (job.metadata?.query) return job.metadata.query;
-
-        // Fallback: construct from source and handler_name
         if (job.source) return job.source;
 
-        // Last resort: use handler_name (or legacy type alias)
         const handlerName = job.handler_name || job.type || 'Unknown';
         return `${handlerName} (${job.id.substring(0, 8)})`;
     }
@@ -435,7 +371,6 @@ class JobListPanel {
         if (minutes > 0) return `${minutes}m ago`;
         return 'just now';
     }
-
 }
 
 // Initialize and export
