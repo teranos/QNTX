@@ -19,7 +19,7 @@ interface ConfigResponse {
 }
 
 class AIProviderPanel extends BasePanel {
-    private config: ConfigResponse | null = null;
+    private appConfig: ConfigResponse | null = null;
 
     constructor() {
         super({
@@ -96,21 +96,21 @@ class AIProviderPanel extends BasePanel {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            this.config = await response.json();
+            this.appConfig = await response.json();
         } catch (error) {
             console.error('[AI Provider Panel] Failed to fetch config:', error);
         }
     }
 
     private setupProviderButtons(): void {
-        if (!this.config?.settings) return;
+        if (!this.appConfig?.settings) return;
 
         // Find local_inference.enabled setting
-        const localInferenceSetting = this.config.settings.find(s => s.key === 'local_inference.enabled');
+        const localInferenceSetting = this.appConfig.settings.find(s => s.key === 'local_inference.enabled');
         const isOllamaEnabled = localInferenceSetting?.value === true;
 
         // Find local_inference.model setting
-        const modelSetting = this.config.settings.find(s => s.key === 'local_inference.model');
+        const modelSetting = this.appConfig.settings.find(s => s.key === 'local_inference.model');
         const effectiveModel = (modelSetting?.value as string) || 'llama3.2:3b';
 
         // Update UI
