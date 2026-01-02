@@ -68,3 +68,33 @@ jobs:
 
       - name: Check (Intel)
         run: cd web/src-tauri && cargo check --target x86_64-apple-darwin
+
+  ios-check:
+    name: iOS Simulator Check
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - name: Install CocoaPods
+        run: brew install cocoapods
+
+      - name: Setup Node/Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build frontend
+        run: make web
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web/src-tauri
+
+      - name: Check (iOS Simulator)
+        run: cd web/src-tauri && cargo check --lib --target aarch64-apple-ios-sim
