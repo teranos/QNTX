@@ -24,6 +24,7 @@ pub const I: &str = "⍟";
 pub const IS: &str = "=";
 pub const IX: &str = "⨳";
 pub const OF: &str = "∈";
+pub const PROSE: &str = "▣";
 pub const PULSE: &str = "꩜";
 pub const PULSE_CLOSE: &str = "❀";
 pub const PULSE_OPEN: &str = "✿";
