@@ -133,7 +133,6 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 
 	// Generate all types to temp directory
 	languages := []string{"typescript", "python", "rust", "markdown"}
-	packages := defaultPackages
 
 	for _, lang := range languages {
 		packages := getDefaultPackages(lang)

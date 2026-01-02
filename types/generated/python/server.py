@@ -69,9 +69,9 @@ class CreateScheduledJobRequest:
     # Execution interval in seconds
     interval_seconds: int
     # Optional: ProseMirror document ID
-    created_from_doc: str
+    created_from_doc: str | None = None
     # Optional: JSON metadata
-    metadata: str
+    metadata: str | None = None
     # Bypass deduplication checks (force execution)
     force: bool | None = None
 

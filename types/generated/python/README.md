@@ -38,6 +38,7 @@ print(f"Pulse symbol: {PULSE}")
 - [`__init__.py`](./__init__.py) - Package entry point with re-exports
 - [`async_.py`](./async_.py) - Async job types (Job, JobStatus, Progress, etc.)
 - [`budget.py`](./budget.py) - Rate limiting and budget types
+- [`graph.py`](./graph.py) - graph types
 - [`schedule.py`](./schedule.py) - Pulse scheduling types
 - [`server.py`](./server.py) - Server API request/response types
 - [`sym.py`](./sym.py) - Symbol constants and mappings
