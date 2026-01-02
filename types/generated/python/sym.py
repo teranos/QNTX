@@ -24,6 +24,7 @@ I = "⍟"
 IS = "="
 IX = "⨳"
 OF = "∈"
+PROSE = "▣"
 PULSE = "꩜"
 PULSE_CLOSE = "❀"
 PULSE_OPEN = "✿"
@@ -81,6 +82,7 @@ __all__ = [
     "IS",
     "IX",
     "OF",
+    "PROSE",
     "PULSE",
     "PULSE_CLOSE",
     "PULSE_OPEN",
