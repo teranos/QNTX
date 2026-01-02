@@ -13,6 +13,13 @@ if [ ! -f "$SOURCE_IMG" ]; then
 fi
 
 mkdir -p "$ICONS_DIR"
+
+# Check if icons are already up-to-date
+if [ -f "$ICONS_DIR/icon.icns" ] && [ "$ICONS_DIR/icon.icns" -nt "$SOURCE_IMG" ]; then
+    echo "✓ Icons already up-to-date (newer than qntx.jpg)"
+    exit 0
+fi
+
 echo "Generating QNTX app icons from qntx.jpg..."
 
 # Check for image conversion tool
