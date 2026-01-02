@@ -8,7 +8,7 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 ### Core Types
 
-- **[types](./types.md)** - Core attestation types (As, AsCommand, AxFilter) (10 types)
+- **[types](./types.md)** - Core attestation types (As, AsCommand, AxFilter) (11 types)
 - **[sym](./sym.md)** - QNTX symbol constants and collections (0 types)
 
 ### Pulse System
