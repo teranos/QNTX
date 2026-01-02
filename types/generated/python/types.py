@@ -152,6 +152,23 @@ class OverFilter:
     # Comparison operator: "over" means >=
     operator: str
 
+# RelationshipTypeDef defines a relationship type with physics and display metadata.
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#relationshiptypedef
+@dataclass
+class RelationshipTypeDef:
+    # Predicate name (e.g., "is_child_of", "points_to")
+    name: str
+    # Human-readable label for UI (e.g., "Child Of", "Points To")
+    label: str
+    # Optional link color override (hex code)
+    color: str
+    # Whether this relationship type is being phased out
+    deprecated: bool
+    # D3 force distance override (nil = use default)
+    link_distance: float | None = None
+    # D3 force strength override (nil = use default)
+    link_strength: float | None = None
+
 # TypeDef defines a QNTX domain type with display metadata and semantic information.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/types.md#typedef
 @dataclass
@@ -177,5 +194,6 @@ __all__ = [
     "CompletionItem",
     "Conflict",
     "OverFilter",
+    "RelationshipTypeDef",
     "TypeDef",
 ]
