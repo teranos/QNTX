@@ -84,7 +84,8 @@ export abstract class BasePanel {
     protected createPanel(): HTMLElement {
         const panel = document.createElement('div');
         panel.id = this.config.id;
-        panel.className = this.config.classes.join(' ');
+        // Start panels hidden by default
+        panel.className = `${this.config.classes.join(' ')} hidden`;
         return panel;
     }
 
