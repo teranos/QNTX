@@ -210,19 +210,31 @@ fn main() {
                     .ok()
                     .and_then(|d| d.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf()));
 
-                let binary_path = if let Some(root) = &project_root {
-                    root.join("web/src-tauri/bin/qntx-aarch64-apple-darwin")
-                } else {
-                    std::path::PathBuf::from("./bin/qntx-aarch64-apple-darwin")
+                // Construct platform-specific binary name (e.g., qntx-aarch64-apple-darwin)
+                let arch = std::env::consts::ARCH;
+                let target_triple = match std::env::consts::OS {
+                    "macos" => format!("{}-apple-darwin", arch),
+                    "linux" => format!("{}-unknown-linux-gnu", arch),
+                    "windows" => format!("{}-pc-windows-msvc", arch),
+                    os => format!("{}-unknown-{}", arch, os), // Fallback
                 };
+                let binary_name = format!("qntx-{}", target_triple);
+                let binary_path = if let Some(root) = &project_root {
+                    root.join("web/src-tauri/bin").join(&binary_name)
+                } else {
+                    std::path::PathBuf::from("./bin").join(&binary_name)
+                };
+
+                // Determine working directory: prefer project root, fallback to current dir or "."
+                let working_dir = project_root
+                    .as_ref()
+                    .cloned()
+                    .or_else(|| std::env::current_dir().ok())
+                    .unwrap_or_else(|| std::path::PathBuf::from("."));
 
                 let child = match Command::new(&binary_path)
                     .args(&["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
-                    .current_dir(
-                        project_root
-                            .clone()
-                            .unwrap_or_else(|| std::env::current_dir().unwrap()),
-                    )
+                    .current_dir(&working_dir)
                     .stdout(Stdio::inherit())
                     .stderr(Stdio::inherit())
                     .spawn()
