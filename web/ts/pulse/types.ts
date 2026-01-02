@@ -7,7 +7,7 @@
 
 // Re-export types from central location for convenience
 export type {
-  ScheduledJob,
+  ScheduledJobResponse,
   ScheduledJobState,
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
