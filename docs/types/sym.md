@@ -29,6 +29,7 @@ const I = "⍟"
 const IS = "="
 const IX = "⨳"
 const OF = "∈"
+const Prose = "▣"
 const Pulse = "꩜"
 const PulseClose = "❀"
 const PulseOpen = "✿"
@@ -49,6 +50,7 @@ export const I = "⍟";
 export const IS = "=";
 export const IX = "⨳";
 export const OF = "∈";
+export const Prose = "▣";
 export const Pulse = "꩜";
 export const PulseClose = "❀";
 export const PulseOpen = "✿";

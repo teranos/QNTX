@@ -1,10 +1,12 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use qntx_types::sym;
 use std::sync::{Arc, Mutex};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::ShellExt;
 
@@ -173,6 +175,10 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         .setup(|app| {
             // Start QNTX server as sidecar
             let sidecar_command = app
@@ -210,11 +216,264 @@ fn main() {
                 port: SERVER_PORT.to_string(),
             });
 
+            // Create application menu bar
+            let app_menu = Submenu::with_items(
+                app,
+                "QNTX",
+                true,
+                &[
+                    &MenuItem::with_id(app, "about", "About QNTX", false, None::<&str>)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(
+                        app,
+                        "preferences",
+                        "Preferences...",
+                        true,
+                        Some("CmdOrCtrl+,"),
+                    )?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::hide(app, None)?,
+                    &PredefinedMenuItem::hide_others(app, None)?,
+                    &PredefinedMenuItem::show_all(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::quit(app, None)?,
+                ],
+            )?;
+
+            let edit_menu = Submenu::with_items(
+                app,
+                "Edit",
+                true,
+                &[
+                    &MenuItem::with_id(app, "undo", "Undo", true, Some("CmdOrCtrl+Z"))?,
+                    &MenuItem::with_id(app, "redo", "Redo", true, Some("CmdOrCtrl+Shift+Z"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, "cut", "Cut", true, Some("CmdOrCtrl+X"))?,
+                    &MenuItem::with_id(app, "copy", "Copy", true, Some("CmdOrCtrl+C"))?,
+                    &MenuItem::with_id(app, "paste", "Paste", true, Some("CmdOrCtrl+V"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, "select_all", "Select All", true, Some("CmdOrCtrl+A"))?,
+                ],
+            )?;
+
+            let view_menu = Submenu::with_items(
+                app,
+                "View",
+                true,
+                &[
+                    &MenuItem::with_id(
+                        app,
+                        "config_panel",
+                        format!("{} Configuration", sym::AM),
+                        true,
+                        None::<&str>,
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "pulse_panel",
+                        format!("{} Pulse Scheduler", sym::PULSE),
+                        true,
+                        Some("CmdOrCtrl+P"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "prose_panel",
+                        format!("{} Documentation", sym::PROSE),
+                        true,
+                        Some("CmdOrCtrl+/"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "code_panel",
+                        "Code Editor",
+                        true,
+                        Some("CmdOrCtrl+K"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "hixtory_panel",
+                        format!("{} Hixtory", sym::IX),
+                        true,
+                        None::<&str>,
+                    )?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(
+                        app,
+                        "refresh_graph",
+                        "Refresh Graph",
+                        true,
+                        Some("CmdOrCtrl+R"),
+                    )?,
+                    &MenuItem::with_id(
+                        app,
+                        "toggle_logs",
+                        "Toggle Logs",
+                        true,
+                        Some("CmdOrCtrl+J"),
+                    )?,
+                ],
+            )?;
+
+            let window_menu = Submenu::with_items(
+                app,
+                "Window",
+                true,
+                &[
+                    &PredefinedMenuItem::minimize(app, None)?,
+                    &PredefinedMenuItem::maximize(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(
+                        app,
+                        "bring_all_to_front",
+                        "Bring All to Front",
+                        true,
+                        None::<&str>,
+                    )?,
+                ],
+            )?;
+
+            let help_menu = Submenu::with_items(
+                app,
+                "Help",
+                true,
+                &[
+                    &MenuItem::with_id(app, "documentation", "Documentation", true, None::<&str>)?,
+                    &MenuItem::with_id(app, "github", "View on GitHub", true, None::<&str>)?,
+                ],
+            )?;
+
+            let menu_bar = Menu::with_items(
+                app,
+                &[&app_menu, &edit_menu, &view_menu, &window_menu, &help_menu],
+            )?;
+
+            app.set_menu(menu_bar)?;
+
+            // Handle menu bar events
+            app.on_menu_event(|app_handle, event| {
+                match event.id.as_ref() {
+                    // Edit menu - these are handled by the webview
+                    "undo" | "redo" | "cut" | "copy" | "paste" | "select_all" => {
+                        // Let webview handle standard edit commands
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.emit("menu-edit", event.id.as_ref());
+                        }
+                    }
+                    // View menu - emit events to show panels
+                    "config_panel" | "preferences" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            if let Err(e) = window.emit("show-config-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-config-panel event: {}", e);
+                            }
+                        }
+                    }
+                    "pulse_panel" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            if let Err(e) = window.emit("show-pulse-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-pulse-panel event: {}", e);
+                            }
+                        }
+                    }
+                    "prose_panel" | "documentation" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            if let Err(e) = window.emit("show-prose-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-prose-panel event: {}", e);
+                            }
+                        }
+                    }
+                    "code_panel" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            if let Err(e) = window.emit("show-code-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-code-panel event: {}", e);
+                            }
+                        }
+                    }
+                    "hixtory_panel" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            if let Err(e) = window.emit("show-hixtory-panel", ()) {
+                                eprintln!("[menu] Failed to emit show-hixtory-panel event: {}", e);
+                            }
+                        }
+                    }
+                    "refresh_graph" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.emit("refresh-graph", ());
+                        }
+                    }
+                    "toggle_logs" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.emit("toggle-logs", ());
+                        }
+                    }
+                    // Help menu
+                    "github" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.emit("open-url", "https://github.com/teranos/QNTX");
+                        }
+                    }
+                    _ => {}
+                }
+            });
+
             // Create tray icon
             let quit_item = MenuItem::with_id(app, "quit", "Quit QNTX", true, None::<&str>)?;
             let status_item =
                 MenuItem::with_id(app, "status", "Server: Running ✓", false, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&status_item, &quit_item])?;
+
+            // Preferences menu item with Cmd+, accelerator (standard macOS pattern)
+            let preferences_item = MenuItem::with_id(
+                app,
+                "preferences",
+                "Preferences...",
+                true,
+                Some("CmdOrCtrl+,"),
+            )?;
+
+            // Pulse daemon control
+            let pause_pulse_item = MenuItem::with_id(
+                app,
+                "toggle_pulse",
+                "Pause Pulse Daemon",
+                true,
+                None::<&str>,
+            )?;
+
+            // Check current autostart state and create checkbox menu item
+            let autostart_manager = app.autolaunch();
+            let is_enabled = autostart_manager.is_enabled().unwrap_or(false);
+            let autostart_item = CheckMenuItem::with_id(
+                app,
+                "autostart",
+                "Launch at Login",
+                true,
+                is_enabled,
+                None::<&str>,
+            )?;
+
+            let separator = PredefinedMenuItem::separator(app)?;
+            let separator2 = PredefinedMenuItem::separator(app)?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &status_item,
+                    &separator,
+                    &preferences_item,
+                    &pause_pulse_item,
+                    &separator2,
+                    &autostart_item,
+                    &quit_item,
+                ],
+            )?;
 
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
@@ -229,6 +488,30 @@ fn main() {
                             }
                         }
                         app.exit(0);
+                    } else if event.id == "preferences" {
+                        // Open preferences (config panel)
+                        if let Some(window) = app.get_webview_window("main") {
+                            // Show window if hidden
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            // Emit event to show config panel (always show, never toggle)
+                            let _ = window.emit("show-config-panel", ());
+                        }
+                    } else if event.id == "toggle_pulse" {
+                        // Toggle Pulse daemon (emit event to frontend)
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.emit("toggle-pulse-daemon", ());
+                        }
+                    } else if event.id == "autostart" {
+                        // Toggle autostart
+                        let autostart_manager = app.autolaunch();
+                        let is_enabled = autostart_manager.is_enabled().unwrap_or(false);
+
+                        if is_enabled {
+                            let _ = autostart_manager.disable();
+                        } else {
+                            let _ = autostart_manager.enable();
+                        }
                     }
                 })
                 .on_tray_icon_event(|tray, event| {
