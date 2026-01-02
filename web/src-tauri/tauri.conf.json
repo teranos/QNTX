@@ -5,7 +5,7 @@
   "identifier": "nl.sbvh.qntx",
   "build": {
     "beforeDevCommand": "test \"$SKIP_DEV_SERVER\" = \"1\" && echo 'Skipping dev server (already running)' || (cd .. && bun run dev)",
-    "beforeBuildCommand": "cd .. && bun run build",
+    "beforeBuildCommand": "",
     "devUrl": "http://localhost:8820",
     "frontendDist": "../../internal/server/dist"
   },
