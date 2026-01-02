@@ -21,6 +21,7 @@ const (
 	PulseOpen  = "✿" // Graceful start
 	PulseClose = "❀" // Graceful shutdown
 	DB         = "⊔" // Database: material retention substrate (square cup)
+	Prose      = "▣" // Documentation and prose content
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
