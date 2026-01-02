@@ -20,7 +20,7 @@
 
 import { BasePanel } from './base-panel.ts';
 import { debugLog } from './debug';
-import type { ScheduledJob } from './pulse/types';
+import type { ScheduledJobResponse } from './pulse/types';
 import { listScheduledJobs, pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './pulse/api';
 import { formatInterval } from './pulse/types';
 import { toast } from './toast';
@@ -38,7 +38,7 @@ let currentDaemonStatus: DaemonStatusMessage | null = null;
 let pulsePanelInstance: PulsePanel | null = null;
 
 class PulsePanel extends BasePanel {
-    private jobs: Map<string, ScheduledJob> = new Map();
+    private jobs: Map<string, ScheduledJobResponse> = new Map();
     private state: PulsePanelState;
 
     constructor() {

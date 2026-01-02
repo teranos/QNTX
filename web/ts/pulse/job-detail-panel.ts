@@ -8,8 +8,8 @@
  */
 
 import { debugLog } from '../debug.ts';
-import type { ScheduledJob } from './types.ts';
-import type { PulseExecution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
+import type { ScheduledJobResponse } from './types.ts';
+import type { Execution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
 import {
   listExecutions,
   getJobStages,
@@ -26,8 +26,8 @@ class JobDetailPanel {
   private panel: HTMLElement | null = null;
   private overlay: HTMLElement | null = null;
   private isVisible: boolean = false;
-  private currentJob: ScheduledJob | null = null;
-  private executions: PulseExecution[] = [];
+  private currentJob: ScheduledJobResponse | null = null;
+  private executions: Execution[] = [];
   private currentPage: number = 0;
   private pageSize: number = 20;
   private totalExecutions: number = 0;
@@ -64,7 +64,7 @@ class JobDetailPanel {
     });
   }
 
-  public async show(job: ScheduledJob): Promise<void> {
+  public async show(job: ScheduledJobResponse): Promise<void> {
     if (!this.panel || !this.overlay) return;
 
     this.currentJob = job;
@@ -272,7 +272,7 @@ class JobDetailPanel {
     `;
   }
 
-  private renderExecutionCard(exec: PulseExecution): string {
+  private renderExecutionCard(exec: Execution): string {
     const statusClass = getStatusColorClass(exec.status);
     const duration = exec.duration_ms ? formatDuration(exec.duration_ms) : '—';
     const timeAgo = formatRelativeTime(exec.started_at);
@@ -654,11 +654,11 @@ class JobDetailPanel {
   /**
    * Add a newly started execution to the list
    */
-  public addStartedExecution(execution: Partial<PulseExecution>): void {
+  public addStartedExecution(execution: Partial<Execution>): void {
     if (!this.isShowingJob(execution.scheduled_job_id!)) return;
 
     // Add to start of executions array
-    this.executions.unshift(execution as PulseExecution);
+    this.executions.unshift(execution as Execution);
     this.totalExecutions++;
 
     // Re-render
@@ -668,7 +668,7 @@ class JobDetailPanel {
   /**
    * Update execution status (for failed/completed events)
    */
-  public updateExecutionStatus(executionId: string, updates: Partial<PulseExecution>): void {
+  public updateExecutionStatus(executionId: string, updates: Partial<Execution>): void {
     if (!this.isVisible) return;
 
     const execution = this.executions.find(e => e.id === executionId);
@@ -708,6 +708,6 @@ class JobDetailPanel {
 const jobDetailPanel = new JobDetailPanel();
 (window as any).jobDetailPanel = jobDetailPanel;
 
-export function showJobDetail(job: ScheduledJob): void {
+export function showJobDetail(job: ScheduledJobResponse): void {
   jobDetailPanel.show(job);
 }

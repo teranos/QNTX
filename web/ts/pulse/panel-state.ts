@@ -10,14 +10,14 @@
  * - localStorage persistence
  */
 
-import type { PulseExecution } from './execution-types';
+import type { Execution } from './execution-types';
 
 export class PulsePanelState {
     // Which jobs have their execution history expanded
     public expandedJobs: Set<string> = new Set();
 
     // Executions loaded for each job
-    public jobExecutions: Map<string, PulseExecution[]> = new Map();
+    public jobExecutions: Map<string, Execution[]> = new Map();
 
     // Jobs currently loading executions
     public loadingExecutions: Set<string> = new Set();
@@ -108,14 +108,14 @@ export class PulsePanelState {
     /**
      * Set executions for a job
      */
-    public setExecutions(jobId: string, executions: PulseExecution[]): void {
+    public setExecutions(jobId: string, executions: Execution[]): void {
         this.jobExecutions.set(jobId, executions);
     }
 
     /**
      * Get executions for a job
      */
-    public getExecutions(jobId: string): PulseExecution[] | undefined {
+    public getExecutions(jobId: string): Execution[] | undefined {
         return this.jobExecutions.get(jobId);
     }
 
@@ -123,7 +123,7 @@ export class PulsePanelState {
      * Add a single execution to a job's execution list
      * Returns true if added successfully
      */
-    public addExecution(jobId: string, execution: PulseExecution): boolean {
+    public addExecution(jobId: string, execution: Execution): boolean {
         const existing = this.jobExecutions.get(jobId);
         if (!existing) {
             this.jobExecutions.set(jobId, [execution]);
@@ -147,7 +147,7 @@ export class PulsePanelState {
      * Update an execution's status/data
      * Returns true if found and updated
      */
-    public updateExecution(executionId: string, updates: Partial<PulseExecution>): boolean {
+    public updateExecution(executionId: string, updates: Partial<Execution>): boolean {
         for (const executions of this.jobExecutions.values()) {
             const index = executions.findIndex(e => e.id === executionId);
             if (index >= 0) {
