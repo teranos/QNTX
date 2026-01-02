@@ -1,5 +1,6 @@
 // Main entry point for graph viewer
 
+import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initLogPanel } from './log-panel.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
@@ -21,11 +22,14 @@ import {
 import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
-import './config-panel.ts';
+import { toggleConfig } from './config-panel.ts';
 import './ai-provider-panel.ts';
 import './command-explorer-panel.ts';
-import './hixtory-panel.ts';
+import { toggleJobList } from './hixtory-panel.ts';
 import './prose/panel.ts';
+import { toggleProsePanel } from './prose/panel.ts';
+import { toggleGoEditor } from './code/panel.ts';
+import { togglePulsePanel } from './pulse-panel.ts';
 import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
@@ -36,6 +40,8 @@ declare global {
     interface Window {
         logLoaderStep?: (message: string, isLoading?: boolean, isSubStep?: boolean) => void;
         hideLoadingScreen?: () => void;
+        __TAURI__?: unknown;
+        commandExplorerPanel?: { toggle: (mode: string) => void };
     }
 }
 
@@ -176,6 +182,87 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
     initLegendaToggles(updateGraph);  // Pass renderGraph function for legenda callbacks
     initUsageBadge();
+
+    // Listen for Tauri events (menu actions)
+    if (typeof window.__TAURI__ !== 'undefined') {
+        // Menu items always show (never toggle/hide)
+        listen('show-config-panel', () => {
+            import('./config-panel.ts').then(({ showConfig }) => {
+                showConfig();
+            });
+        });
+
+        // Keep for backwards compatibility if needed elsewhere
+        listen('toggle-config-panel', () => {
+            toggleConfig();
+        });
+
+        listen('toggle-pulse-daemon', () => {
+            // TODO: Track daemon state to toggle between start/stop
+            // For now, always send stop (pause)
+            import('./websocket.ts').then(({ sendMessage }) => {
+                sendMessage({
+                    type: 'daemon_control',
+                    action: 'stop'
+                });
+            });
+        });
+
+        // Panel toggle events from menu bar
+        listen('toggle-pulse-panel', () => {
+            togglePulsePanel();
+        });
+
+        listen('toggle-prose-panel', () => {
+            toggleProsePanel();
+        });
+
+        listen('toggle-code-panel', () => {
+            toggleGoEditor();
+        });
+
+        listen('toggle-command-explorer', () => {
+            if (window.commandExplorerPanel) {
+                window.commandExplorerPanel.toggle('ax');
+            }
+        });
+
+        listen('toggle-hixtory-panel', () => {
+            toggleJobList();
+        });
+
+        listen('refresh-graph', () => {
+            // Trigger graph refresh
+            import('./websocket.ts').then(({ sendMessage }) => {
+                sendMessage({
+                    type: 'query',
+                    query: state.currentQuery || 'i'
+                });
+            });
+        });
+
+        listen('toggle-logs', () => {
+            // Toggle log panel visibility
+            const logPanel = document.getElementById('log-panel');
+            if (logPanel) {
+                logPanel.classList.toggle('collapsed');
+            }
+        });
+
+        listen('open-url', (event: any) => {
+            // Open URL in default browser
+            window.open(event.payload, '_blank');
+        });
+    }
+
+    // Register Cmd+, keyboard shortcut (standard macOS preferences shortcut)
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        // Cmd+, on Mac, Ctrl+, on Windows/Linux
+        if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+            e.preventDefault();
+            toggleConfig();
+        }
+    });
 
     if (window.logLoaderStep) window.logLoaderStep('Finalizing startup...');
 
