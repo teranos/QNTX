@@ -3,6 +3,8 @@
 *.db-shm
 *.db-wal
 
+am.toml
+
 # Node/Bun
 node_modules/
 
@@ -34,3 +36,4 @@ web/src-tauri/gen/
 # Generated Rust types (library crate - ignore build artifacts and Cargo.lock)
 types/generated/rust/target/
 types/generated/rust/Cargo.lock
+target/

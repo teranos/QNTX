@@ -13,14 +13,45 @@ import (
 	"github.com/teranos/QNTX/code/typegen/typescript"
 )
 
-// Default packages to generate types from
-var defaultPackages = []string{
-	"github.com/teranos/QNTX/ats/types",
-	"github.com/teranos/QNTX/pulse/async",
-	"github.com/teranos/QNTX/pulse/budget",
-	"github.com/teranos/QNTX/pulse/schedule",
-	"github.com/teranos/QNTX/server",
-	"github.com/teranos/QNTX/sym",
+// Package lists per language target
+// Each language can have a different set of packages to generate types from
+var languagePackages = map[string][]string{
+	"typescript": {
+		"github.com/teranos/QNTX/ats/types",
+		"github.com/teranos/QNTX/graph", // Frontend graph visualization
+		"github.com/teranos/QNTX/pulse/async",
+		"github.com/teranos/QNTX/pulse/budget",
+		"github.com/teranos/QNTX/pulse/schedule",
+		"github.com/teranos/QNTX/server",
+		"github.com/teranos/QNTX/sym",
+	},
+	"rust": {
+		"github.com/teranos/QNTX/ats/types",
+		// graph package excluded - frontend-only types
+		"github.com/teranos/QNTX/pulse/async",
+		"github.com/teranos/QNTX/pulse/budget",
+		"github.com/teranos/QNTX/pulse/schedule",
+		"github.com/teranos/QNTX/server",
+		"github.com/teranos/QNTX/sym",
+	},
+	"markdown": {
+		"github.com/teranos/QNTX/ats/types",
+		"github.com/teranos/QNTX/graph",
+		"github.com/teranos/QNTX/pulse/async",
+		"github.com/teranos/QNTX/pulse/budget",
+		"github.com/teranos/QNTX/pulse/schedule",
+		"github.com/teranos/QNTX/server",
+		"github.com/teranos/QNTX/sym",
+	},
+}
+
+// Default packages when --packages flag is used (all packages for that language)
+func getDefaultPackages(lang string) []string {
+	if pkgs, ok := languagePackages[lang]; ok {
+		return pkgs
+	}
+	// Fallback to TypeScript packages if language not defined
+	return languagePackages["typescript"]
 }
 
 var (
@@ -101,9 +132,9 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 
 	// Generate all types to temp directory
 	languages := []string{"typescript", "rust", "markdown"}
-	packages := defaultPackages
 
 	for _, lang := range languages {
+		packages := getDefaultPackages(lang)
 		if err := generateForLanguage(lang, packages, true); err != nil {
 			return fmt.Errorf("failed to generate %s types: %w", lang, err)
 		}
@@ -141,17 +172,18 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid language: %s (supported: typescript, python, rust, dart, all)", typegenLang)
 	}
 
-	packages := typegenPackages
-	usingDefaultPackages := len(packages) == 0
-	if usingDefaultPackages {
-		packages = defaultPackages
-	}
-
-	// Expand short package names to full import paths
-	packages = normalizePackagePaths(packages)
-
 	// Generate for each language
 	for _, lang := range languages {
+		// Use custom packages if provided, otherwise use language-specific defaults
+		packages := typegenPackages
+		usingDefaultPackages := len(packages) == 0
+		if usingDefaultPackages {
+			packages = getDefaultPackages(lang)
+		} else {
+			// Expand short package names to full import paths
+			packages = normalizePackagePaths(packages)
+		}
+
 		if err := generateForLanguage(lang, packages, usingDefaultPackages); err != nil {
 			return err
 		}
