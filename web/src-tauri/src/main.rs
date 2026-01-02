@@ -184,10 +184,18 @@ fn main() {
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
     {
-        builder = builder.plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--minimized"]),
-        ));
+        builder = builder
+            .plugin(tauri_plugin_autostart::init(
+                MacosLauncher::LaunchAgent,
+                Some(vec!["--minimized"]),
+            ))
+            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                // When another instance tries to start, show the existing window
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }));
     }
 
     builder
