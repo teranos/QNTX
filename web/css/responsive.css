@@ -35,4 +35,9 @@
         border-top: none;
         border-bottom: 1px solid #333;
     }
+
+    /* Hide build hash on mobile to save space */
+    #build-hash {
+        display: none !important;
+    }
 }
