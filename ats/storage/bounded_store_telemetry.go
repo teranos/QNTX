@@ -30,12 +30,28 @@ func (bs *BoundedStore) logStorageEvent(eventType, actor, context, entity string
 
 	// Also log to structured logger for real-time visibility
 	if bs.logger != nil {
-		bs.logger.Infow("Bounded storage limit enforced",
+		// Build human-readable message with key details
+		msg := "Bounded storage limit enforced"
+		if actor != "" {
+			msg += " for actor=" + actor
+		}
+		if context != "" {
+			msg += " context=" + context
+		}
+		if entity != "" {
+			msg += " entity=" + entity
+		}
+		if deletionsCount > 0 {
+			msg += " (deleted oldest)"
+		}
+
+		bs.logger.Infow(msg,
 			"event_type", eventType,
 			"actor", actor,
 			"context", context,
 			"entity", entity,
 			"deletions", deletionsCount,
+			"limit", limitValue,
 		)
 	}
 }
