@@ -58,6 +58,32 @@ function normalizeNodeType(type: string | null | undefined): string {
     return (type || '').trim().toLowerCase();
 }
 
+/**
+ * Calculate link distance for D3 force simulation based on link type.
+ * TODO(issue #7): This hardcodes git domain knowledge - should query type metadata.
+ *
+ * @param link - D3 link with type property
+ * @returns Distance value for force simulation
+ */
+export function getLinkDistance(link: D3Link): number {
+    if (link.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_DISTANCE;
+    if (link.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_DISTANCE;
+    return GRAPH_PHYSICS.LINK_DISTANCE;
+}
+
+/**
+ * Calculate link strength for D3 force simulation based on link type.
+ * TODO(issue #7): This hardcodes git domain knowledge - should query type metadata.
+ *
+ * @param link - D3 link with type property
+ * @returns Strength value for force simulation
+ */
+export function getLinkStrength(link: D3Link): number {
+    if (link.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_STRENGTH;
+    if (link.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_STRENGTH;
+    return GRAPH_PHYSICS.DEFAULT_LINK_STRENGTH;
+}
+
 // Phase 2: Backend controls visibility - frontend just filters based on backend's decision
 // Backend sets node.visible and link.hidden based on client preferences
 export function filterVisibleNodes(nodes: Node[]): Node[] {
@@ -237,18 +263,8 @@ function renderGraph(data: GraphData): void {
     simulation = d3.forceSimulation(d3Nodes)
         .force("link", d3.forceLink(d3Links)
             .id((d: D3Node) => d.id)
-            .distance((d: D3Link) => {
-                // TODO(issue #7): This hardcodes git domain knowledge - should query type metadata
-                if (d.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_DISTANCE;
-                if (d.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_DISTANCE;
-                return GRAPH_PHYSICS.LINK_DISTANCE;
-            })
-            .strength((d: D3Link) => {
-                // TODO(issue #7): This hardcodes git domain knowledge - should query type metadata
-                if (d.type === 'is_child_of') return GRAPH_PHYSICS.GIT_CHILD_LINK_STRENGTH;
-                if (d.type === 'points_to') return GRAPH_PHYSICS.GIT_BRANCH_LINK_STRENGTH;
-                return GRAPH_PHYSICS.DEFAULT_LINK_STRENGTH;
-            }))
+            .distance(getLinkDistance)
+            .strength(getLinkStrength))
         .force("charge", d3.forceManyBody()
             .strength(GRAPH_PHYSICS.TILE_CHARGE_STRENGTH)
             .distanceMax(GRAPH_PHYSICS.CHARGE_MAX_DISTANCE))
