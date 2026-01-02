@@ -72,6 +72,7 @@ export type {
   CompletionItem,
   Conflict,
   OverFilter,
+  RelationshipTypeDef,
   TypeDef,
 } from './types';
 
