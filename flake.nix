@@ -40,12 +40,30 @@
             pkgs.go
             pkgs.git
 
-            # Rust toolchain with rustfmt
+            # Complete Rust toolchain
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
+            pkgs.clippy
+
+            # Tauri system dependencies (from NixOS Wiki)
+            pkgs.webkitgtk_4_1
+            pkgs.gtk3
+            pkgs.at-spi2-atk
+            pkgs.cairo
+            pkgs.gdk-pixbuf
+            pkgs.glib
+            pkgs.harfbuzz
+            pkgs.librsvg
+            pkgs.libsoup_3
+            pkgs.pango
+            pkgs.gobject-introspection
+            pkgs.openssl
+            pkgs.libayatana-appindicator
+            pkgs.patchelf
 
             # Build tools and utilities
+            pkgs.pkg-config
             pkgs.sqlite
             pkgs.gcc
             pkgs.gnumake
@@ -71,7 +89,8 @@
 
           config = {
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
+              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
+              "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.glib pkgs.gtk3 pkgs.at-spi2-atk pkgs.cairo pkgs.gdk-pixbuf pkgs.harfbuzz pkgs.librsvg pkgs.libsoup_3 pkgs.pango pkgs.gobject-introspection pkgs.webkitgtk_4_1 pkgs.openssl ]}:${pkgs.lib.concatMapStringsSep ":" (p: "${p}/lib/pkgconfig") [ pkgs.libayatana-appindicator ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
             ];
