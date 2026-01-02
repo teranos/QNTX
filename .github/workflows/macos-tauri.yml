@@ -28,6 +28,12 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
+      - name: Setup Node/Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build frontend
+        run: make web
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -36,8 +42,13 @@ jobs:
       - name: Build qntx CLI (sidecar dependency)
         run: make cli
 
-      - name: Prepare Tauri sidecar binaries
-        run: ./web/src-tauri/prepare-sidecar.sh
+      - name: Prepare Tauri sidecars (both architectures)
+        run: |
+          # Create sidecars for both Intel and Apple Silicon
+          mkdir -p web/src-tauri/bin
+          cp bin/qntx web/src-tauri/bin/qntx-aarch64-apple-darwin
+          cp bin/qntx web/src-tauri/bin/qntx-x86_64-apple-darwin
+          chmod +x web/src-tauri/bin/qntx-*
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
