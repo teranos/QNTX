@@ -26,8 +26,8 @@ import {
     PulseExecutionLogStreamMessage
 } from '../../types/websocket';
 import { toast } from '../toast';
-import type { ScheduledJob } from './types';
-import type { PulseExecution } from './execution-types';
+import type { ScheduledJobResponse } from './types';
+import type { Execution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 
 // ========================================================================
@@ -39,7 +39,7 @@ import type { PulsePanelState } from './panel-state';
  * Returns true if job was found and updated
  */
 export function updatePanelJobLastRun(
-    jobs: Map<string, ScheduledJob>,
+    jobs: Map<string, ScheduledJobResponse>,
     jobId: string,
     lastRunAt: string
 ): boolean {
@@ -57,7 +57,7 @@ export function updatePanelJobLastRun(
  */
 export function addExecutionToPanel(
     state: PulsePanelState,
-    execution: Partial<PulseExecution>
+    execution: Partial<Execution>
 ): boolean {
     if (!execution.scheduled_job_id) return false;
 
@@ -70,7 +70,7 @@ export function addExecutionToPanel(
     const executions = state.getExecutions(jobId) || [];
 
     // Add new execution at the start
-    executions.unshift(execution as PulseExecution);
+    executions.unshift(execution as Execution);
     state.setExecutions(jobId, executions);
 
     return true;
@@ -83,7 +83,7 @@ export function addExecutionToPanel(
 export function updatePanelExecutionStatus(
     state: PulsePanelState,
     executionId: string,
-    updates: Partial<PulseExecution>
+    updates: Partial<Execution>
 ): boolean {
     // Find which job contains this execution
     for (const [_jobId, executions] of state.jobExecutions.entries()) {

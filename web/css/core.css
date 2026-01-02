@@ -169,3 +169,73 @@ body.disconnected #container {
     color: #86efac;
 }
 
+/* Responsive Utility Classes */
+@media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none !important;
+    }
+}
+
+/* Mobile Layout - Full screen graph with bottom input bar */
+@media (max-width: 768px) {
+    /* Hide left panel chrome on mobile */
+    #left-panel {
+        position: static;
+        width: auto;
+        background: transparent;
+        border: none;
+        display: contents; /* Let children escape the container */
+    }
+
+    #header,
+    #stats {
+        display: none;
+    }
+
+    /* Query container becomes fixed bottom bar */
+    #query-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: #fff;
+        border-top: 1px solid #ddd;
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Editor area - compact on mobile */
+    #query-drop-zone {
+        padding: 8px;
+        background: #f8f8f8;
+    }
+
+    #codemirror-container {
+        max-height: 80px;
+        overflow-y: auto;
+    }
+
+    /* Hide run button on mobile - use keyboard submit */
+    #run-ix-button {
+        display: none !important;
+    }
+
+    /* Graph takes full viewport minus bottom bar */
+    #graph-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 140px; /* Space for bottom bar */
+        height: auto !important;
+    }
+}
+

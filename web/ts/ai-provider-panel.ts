@@ -5,6 +5,7 @@
  * Allows switching between OpenRouter (cloud) and Ollama (local) providers.
  */
 
+import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
 import { BY } from '@generated/sym.js';
 
@@ -17,41 +18,20 @@ interface ConfigResponse {
     }>;
 }
 
-class AIProviderPanel {
-    private panel: HTMLElement | null = null;
-    private isVisible: boolean = false;
-    private config: ConfigResponse | null = null;
+class AIProviderPanel extends BasePanel {
+    private appConfig: ConfigResponse | null = null;
 
     constructor() {
-        this.initialize();
-    }
-
-    initialize(): void {
-        // Create panel element
-        this.panel = document.createElement('div');
-        this.panel.id = 'ai-provider-panel';
-        this.panel.className = 'ai-provider-panel hidden';
-        this.panel.innerHTML = this.getTemplate();
-
-        // Insert after symbol palette (same as IX panel)
-        const symbolPalette = document.getElementById('symbolPalette');
-        if (symbolPalette && symbolPalette.parentNode) {
-            symbolPalette.parentNode.insertBefore(this.panel, symbolPalette.nextSibling);
-        }
-
-        // Click outside to close
-        document.addEventListener('click', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (this.panel && this.isVisible && !this.panel.contains(target) && !target.closest('.palette-cell[data-cmd="by"]')) {
-                this.hide();
-            }
+        super({
+            id: 'ai-provider-panel',
+            classes: ['ai-provider-panel'],
+            useOverlay: false,  // No overlay, uses click-outside
+            closeOnEscape: true,
+            insertAfter: '#symbolPalette'
         });
-
-        // Setup event listeners
-        this.setupEventListeners();
     }
 
-    getTemplate(): string {
+    protected getTemplate(): string {
         return `
             <div class="ai-provider-header">
                 <h3 class="ai-provider-title">${BY} Actor / AI Provider</h3>
@@ -87,104 +67,67 @@ class AIProviderPanel {
         `;
     }
 
-    setupEventListeners(): void {
-        if (!this.panel) return;
-
+    protected setupEventListeners(): void {
         // Close button
-        const closeBtn = this.panel.querySelector('.ai-provider-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.hide());
-        }
+        const closeBtn = this.$('.ai-provider-close');
+        closeBtn?.addEventListener('click', () => this.hide());
 
         // AI Provider toggle buttons
-        const openrouterBtn = this.panel.querySelector('#provider-openrouter-btn');
-        const ollamaBtn = this.panel.querySelector('#provider-ollama-btn');
-        const modelSelect = this.panel.querySelector('#ollama-model-select') as HTMLSelectElement | null;
+        const openrouterBtn = this.$('#provider-openrouter-btn');
+        const ollamaBtn = this.$('#provider-ollama-btn');
+        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
 
-        if (openrouterBtn) {
-            openrouterBtn.addEventListener('click', () => this.switchToOpenRouter());
-        }
-
-        if (ollamaBtn) {
-            ollamaBtn.addEventListener('click', () => this.switchToOllama());
-        }
-
-        if (modelSelect) {
-            modelSelect.addEventListener('change', (e: Event) => {
-                const target = e.target as HTMLSelectElement;
-                this.updateOllamaModel(target.value);
-            });
-        }
+        openrouterBtn?.addEventListener('click', () => this.switchToOpenRouter());
+        ollamaBtn?.addEventListener('click', () => this.switchToOllama());
+        modelSelect?.addEventListener('change', (e: Event) => {
+            const target = e.target as HTMLSelectElement;
+            this.updateOllamaModel(target.value);
+        });
     }
 
-    async show(): Promise<void> {
-        if (!this.panel) return;
-
-        this.isVisible = true;
-        this.panel.classList.remove('hidden');
-        this.panel.classList.add('visible');
-
-        // Fetch current config
+    protected async onShow(): Promise<void> {
         await this.fetchConfig();
         this.setupProviderButtons();
     }
 
-    hide(): void {
-        if (!this.panel) return;
-
-        this.isVisible = false;
-        this.panel.classList.remove('visible');
-        this.panel.classList.add('hidden');
-    }
-
-    toggle(): void {
-        if (this.isVisible) {
-            this.hide();
-        } else {
-            this.show();
-        }
-    }
-
-    async fetchConfig(): Promise<void> {
+    private async fetchConfig(): Promise<void> {
         try {
             const response = await apiFetch('/api/config?introspection=true');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            this.config = await response.json();
+            this.appConfig = await response.json();
         } catch (error) {
             console.error('[AI Provider Panel] Failed to fetch config:', error);
         }
     }
 
-    setupProviderButtons(): void {
-        if (!this.panel || !this.config || !this.config.settings) return;
+    private setupProviderButtons(): void {
+        if (!this.appConfig?.settings) return;
 
         // Find local_inference.enabled setting
-        const localInferenceSetting = this.config.settings.find(s => s.key === 'local_inference.enabled');
+        const localInferenceSetting = this.appConfig.settings.find(s => s.key === 'local_inference.enabled');
         const isOllamaEnabled = localInferenceSetting?.value === true;
 
         // Find local_inference.model setting
-        const modelSetting = this.config.settings.find(s => s.key === 'local_inference.model');
+        const modelSetting = this.appConfig.settings.find(s => s.key === 'local_inference.model');
         const effectiveModel = (modelSetting?.value as string) || 'llama3.2:3b';
 
         // Update UI
         this.updateProviderUI(isOllamaEnabled ? 'ollama' : 'openrouter');
 
         // Update model dropdown
-        const modelSelect = this.panel.querySelector('#ollama-model-select') as HTMLSelectElement | null;
+        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
         if (modelSelect) {
             modelSelect.value = effectiveModel;
         }
     }
 
-    async switchToOpenRouter(): Promise<void> {
+    private async switchToOpenRouter(): Promise<void> {
         console.log('[AI Provider Panel] Switching to OpenRouter');
 
-        // Update UI immediately
         this.updateProviderUI('openrouter');
 
-        // Send config update to backend
         try {
             await this.updateConfig({
                 'local_inference.enabled': false
@@ -197,19 +140,14 @@ class AIProviderPanel {
         }
     }
 
-    async switchToOllama(): Promise<void> {
-        if (!this.panel) return;
-
+    private async switchToOllama(): Promise<void> {
         console.log('[AI Provider Panel] Switching to Ollama');
 
-        // Update UI immediately
         this.updateProviderUI('ollama');
 
-        // Get selected model
-        const modelSelect = this.panel.querySelector('#ollama-model-select') as HTMLSelectElement | null;
+        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
         const model = modelSelect ? modelSelect.value : 'llama3.2:3b';
 
-        // Send config update to backend
         try {
             await this.updateConfig({
                 'local_inference.enabled': true,
@@ -223,7 +161,7 @@ class AIProviderPanel {
         }
     }
 
-    async updateOllamaModel(model: string): Promise<void> {
+    private async updateOllamaModel(model: string): Promise<void> {
         console.log('[AI Provider Panel] Updating Ollama model to:', model);
 
         try {
@@ -238,12 +176,10 @@ class AIProviderPanel {
         }
     }
 
-    updateProviderUI(provider: 'openrouter' | 'ollama'): void {
-        if (!this.panel) return;
-
-        const openrouterBtn = this.panel.querySelector('#provider-openrouter-btn');
-        const ollamaBtn = this.panel.querySelector('#provider-ollama-btn');
-        const modelSelector = this.panel.querySelector('#ollama-model-selector');
+    private updateProviderUI(provider: 'openrouter' | 'ollama'): void {
+        const openrouterBtn = this.$('#provider-openrouter-btn');
+        const ollamaBtn = this.$('#provider-ollama-btn');
+        const modelSelector = this.$('#ollama-model-selector');
 
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
@@ -256,10 +192,8 @@ class AIProviderPanel {
         }
     }
 
-    updateStatus(message: string, type: 'success' | 'error' | 'warning'): void {
-        if (!this.panel) return;
-
-        const statusEl = this.panel.querySelector('#ai-provider-status');
+    private updateStatus(message: string, type: 'success' | 'error' | 'warning'): void {
+        const statusEl = this.$('#ai-provider-status');
         if (statusEl) {
             statusEl.textContent = message;
             statusEl.className = `config-toggle-status status-${type}`;
@@ -274,7 +208,7 @@ class AIProviderPanel {
         }
     }
 
-    async updateConfig(updates: Record<string, unknown>): Promise<unknown> {
+    private async updateConfig(updates: Record<string, unknown>): Promise<unknown> {
         const response = await apiFetch('/api/config', {
             method: 'POST',
             headers: {

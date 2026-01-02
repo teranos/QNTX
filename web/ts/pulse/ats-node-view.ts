@@ -6,7 +6,7 @@
 
 import { Node as PMNode } from "prosemirror-model";
 import { EditorView, NodeView } from "prosemirror-view";
-import type { ScheduledJob } from "./types.ts";
+import type { ScheduledJobResponse } from "./types.ts";
 import { createSchedulingControls } from "./scheduling-controls.ts";
 
 export interface ATSNodeViewOptions {
@@ -21,7 +21,7 @@ export class ATSNodeView implements NodeView {
   dom: HTMLElement;
   contentDOM: HTMLElement;
   private schedulingControls: HTMLElement | null = null;
-  private currentJob: ScheduledJob | null = null;
+  private currentJob: ScheduledJobResponse | null = null;
 
   constructor(
     private node: PMNode,

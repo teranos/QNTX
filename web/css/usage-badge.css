@@ -106,15 +106,30 @@
 @media (max-width: 768px) {
     .usage-badge {
         top: 8px;
-        right: 8px;
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
         font-size: 10px;
         padding: 3px 6px;
     }
 
     .usage-detail-box {
-        right: 70px;
+        /* Center below badge on mobile */
+        top: 36px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
         min-width: 240px;
+        max-width: calc(100vw - 24px);
         padding: 10px 12px;
         font-size: 10px;
+    }
+
+    .usage-detail-box.expanded {
+        /* Full width on mobile when expanded */
+        top: 36px;
+        left: 12px;
+        right: 12px;
+        transform: none;
     }
 }

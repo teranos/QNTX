@@ -5,16 +5,16 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import type { ScheduledJob, ScheduledJobState } from './types';
+import type { ScheduledJobResponseResponse, ScheduledJobResponseState } from './types';
 
 // Validation utilities
-function isValidState(state: string): state is ScheduledJobState {
+function isValidState(state: string): state is ScheduledJobResponseState {
   return ['active', 'paused', 'stopping', 'inactive'].includes(state);
 }
 
-function canTransitionTo(from: ScheduledJobState, to: ScheduledJobState): boolean {
+function canTransitionTo(from: ScheduledJobResponseState, to: ScheduledJobResponseState): boolean {
   // Valid state transitions
-  const transitions: Record<ScheduledJobState, ScheduledJobState[]> = {
+  const transitions: Record<ScheduledJobResponseState, ScheduledJobResponseState[]> = {
     active: ['paused', 'stopping', 'inactive'],
     paused: ['active', 'inactive'],
     stopping: ['inactive'],
@@ -24,7 +24,7 @@ function canTransitionTo(from: ScheduledJobState, to: ScheduledJobState): boolea
   return transitions[from]?.includes(to) ?? false;
 }
 
-function isScheduledJob(obj: any): obj is ScheduledJob {
+function isScheduledJobResponse(obj: any): obj is ScheduledJobResponse {
   return (
     typeof obj === 'object' &&
     obj !== null &&
@@ -103,9 +103,9 @@ describe('Pulse Job Validation', () => {
     });
   });
 
-  describe('isScheduledJob', () => {
+  describe('isScheduledJobResponse', () => {
     it('should accept valid job object', () => {
-      const job: ScheduledJob = {
+      const job: ScheduledJobResponse = {
         id: 'SPJ_123',
         ats_code: 'ix https://example.com',
         interval_seconds: 3600,
@@ -119,18 +119,18 @@ describe('Pulse Job Validation', () => {
         updated_at: '2025-12-06T09:00:00Z',
       };
 
-      expect(isScheduledJob(job)).toBe(true);
+      expect(isScheduledJobResponse(job)).toBe(true);
     });
 
     it('should reject missing required fields', () => {
-      expect(isScheduledJob({})).toBe(false);
-      expect(isScheduledJob({ id: 'SPJ_123' })).toBe(false);
-      expect(isScheduledJob({ id: 'SPJ_123', ats_code: 'ix url' })).toBe(false);
+      expect(isScheduledJobResponse({})).toBe(false);
+      expect(isScheduledJobResponse({ id: 'SPJ_123' })).toBe(false);
+      expect(isScheduledJobResponse({ id: 'SPJ_123', ats_code: 'ix url' })).toBe(false);
     });
 
     it('should reject invalid types', () => {
       expect(
-        isScheduledJob({
+        isScheduledJobResponse({
           id: 123, // Should be string
           ats_code: 'ix url',
           interval_seconds: 3600,
@@ -139,7 +139,7 @@ describe('Pulse Job Validation', () => {
       ).toBe(false);
 
       expect(
-        isScheduledJob({
+        isScheduledJobResponse({
           id: 'SPJ_123',
           ats_code: 'ix url',
           interval_seconds: '3600', // Should be number
@@ -150,7 +150,7 @@ describe('Pulse Job Validation', () => {
 
     it('should reject invalid state', () => {
       expect(
-        isScheduledJob({
+        isScheduledJobResponse({
           id: 'SPJ_123',
           ats_code: 'ix url',
           interval_seconds: 3600,
@@ -160,14 +160,14 @@ describe('Pulse Job Validation', () => {
     });
 
     it('should reject null and undefined', () => {
-      expect(isScheduledJob(null)).toBe(false);
-      expect(isScheduledJob(undefined)).toBe(false);
+      expect(isScheduledJobResponse(null)).toBe(false);
+      expect(isScheduledJobResponse(undefined)).toBe(false);
     });
 
     it('should reject primitives', () => {
-      expect(isScheduledJob('job')).toBe(false);
-      expect(isScheduledJob(123)).toBe(false);
-      expect(isScheduledJob(true)).toBe(false);
+      expect(isScheduledJobResponse('job')).toBe(false);
+      expect(isScheduledJobResponse(123)).toBe(false);
+      expect(isScheduledJobResponse(true)).toBe(false);
     });
   });
 
