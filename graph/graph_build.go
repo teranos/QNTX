@@ -72,14 +72,19 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 				}
 			}
 
-			// Skip metadata predicates that shouldn't create visual links
-			// node_type is metadata about the node itself, not a relationship
-			if claim.Predicate == "node_type" {
-				continue
+		// Skip metadata predicates that shouldn't create visual links
+		// These are stored as node properties, not relationships
+		if isMetadataPredicate(claim.Predicate) {
+			node := nodeMap[subjectID]
+			if node.Metadata == nil {
+				node.Metadata = make(map[string]interface{})
 			}
+			node.Metadata[claim.Predicate] = claim.Context
+			continue
+		}
 
-			// Create or update object node (if not a literal value)
-			if !isLiteralValue(claim.Context) {
+		// Create or update object node (if not a literal value)
+		if !isLiteralValue(claim.Context) {
 				objectID := normalizeNodeID(claim.Context)
 
 				// Determine object node type
