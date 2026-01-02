@@ -96,8 +96,5 @@ jobs:
         with:
           workspaces: web/src-tauri
 
-      - name: Initialize iOS project
-        run: cd web/src-tauri && cargo tauri ios init
-
       - name: Check (iOS Simulator)
         run: cd web/src-tauri && cargo check --lib --target aarch64-apple-ios-sim

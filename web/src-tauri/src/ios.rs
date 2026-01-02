@@ -25,7 +25,10 @@ pub fn ios_biometric_available() -> bool {
 pub async fn ios_request_permissions(permission: String) -> Result<bool, String> {
     println!("[ios] Permission request for: {}", permission);
     // TODO: Implement iOS permission handling
-    Err(format!("Permission '{}' handling not implemented", permission))
+    Err(format!(
+        "Permission '{}' handling not implemented",
+        permission
+    ))
 }
 
 /// Get iOS-specific device info
