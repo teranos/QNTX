@@ -1,7 +1,7 @@
 [package]
-name = "qntx-desktop"
+name = "qntx-app"
 version = "0.1.0"
-description = "QNTX Desktop Application"
+description = "QNTX Application (Desktop & Mobile)"
 authors = ["Sebastiaan Brandon van Houten <me@sbvh.nl>"]
 license = "MIT"
 repository = "https://github.com/teranos/QNTX"
