@@ -11,6 +11,12 @@
  * - getTemplate(): HTML content
  * - setupEventListeners(): custom handlers
  * - onShow()/onHide(): lifecycle hooks
+ *
+ * Configuration guidelines:
+ * - useOverlay: true (default) for modal-style panels that dim the rest of the UI
+ * - useOverlay: false for inline panels that integrate with the page (click-outside closes)
+ * - insertAfter: specify a selector to insert panel after a specific element (e.g., '#symbolPalette')
+ * - insertAfter: '' (default) appends panel to document.body
  */
 
 export interface PanelConfig {
@@ -96,8 +102,8 @@ export abstract class BasePanel {
     }
 
     private attachCommonListeners(): void {
-        // Close button
-        const closeBtn = this.panel?.querySelector('[class*="close"]');
+        // Close button - using specific class selector for safety
+        const closeBtn = this.panel?.querySelector('.panel-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
         // Escape key
