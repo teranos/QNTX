@@ -28,6 +28,17 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build qntx CLI (sidecar dependency)
+        run: make cli
+
+      - name: Prepare Tauri sidecar binaries
+        run: ./web/src-tauri/prepare-sidecar.sh
+
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
