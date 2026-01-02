@@ -18,8 +18,9 @@
  * - Add bulk actions (cancel all running, retry failed, etc.)
  */
 
+import { BasePanel } from './base-panel.ts';
 import { debugLog } from './debug';
-import type { ScheduledJob } from './pulse/types';
+import type { ScheduledJobResponse } from './pulse/types';
 import { listScheduledJobs, pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './pulse/api';
 import { formatInterval } from './pulse/types';
 import { toast } from './toast';
@@ -36,77 +37,36 @@ let currentDaemonStatus: DaemonStatusMessage | null = null;
 // Global pulse panel instance
 let pulsePanelInstance: PulsePanel | null = null;
 
-class PulsePanel {
-    private panel: HTMLElement | null = null;
-    private overlay: HTMLElement;
-    private isVisible: boolean = false;
-    private jobs: Map<string, ScheduledJob> = new Map();
-    // Inline execution view state
+class PulsePanel extends BasePanel {
+    private jobs: Map<string, ScheduledJobResponse> = new Map();
     private state: PulsePanelState;
 
     constructor() {
-        // Create overlay element
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'panel-overlay pulse-panel-overlay';
-        this.overlay.addEventListener('click', () => this.hide());
-        document.body.appendChild(this.overlay);
-
-        // Initialize state manager
-        this.state = new PulsePanelState();
-
-        // Store global reference
-        pulsePanelInstance = this;
-
-        this.initialize();
-    }
-
-    private initialize(): void {
-        // Create panel element
-        this.panel = document.createElement('div');
-        this.panel.id = 'pulse-panel';
-        this.panel.className = 'panel-slide-left pulse-panel';
-        this.panel.innerHTML = PanelRenderer.renderPanelTemplate();
-        document.body.appendChild(this.panel);
-
-        // Click outside to close (handled by overlay)
-        // Kept for palette cell clicks
-        document.addEventListener('click', (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (this.panel && this.isVisible && !this.panel.contains(target) && !target.closest('.palette-cell[data-cmd="pulse"]')) {
-                this.hide();
-            }
+        super({
+            id: 'pulse-panel',
+            classes: ['panel-slide-left', 'pulse-panel'],
+            useOverlay: true,
+            closeOnEscape: true
         });
+
+        this.state = new PulsePanelState();
+        pulsePanelInstance = this;
     }
 
-    public async toggle(): Promise<void> {
-        if (this.isVisible) {
-            this.hide();
-        } else {
-            await this.show();
-        }
+    protected getTemplate(): string {
+        return PanelRenderer.renderPanelTemplate();
     }
 
-    public async show(): Promise<void> {
-        if (!this.panel) return;
+    protected setupEventListeners(): void {
+        // Event listeners are attached dynamically in renderSchedules()
+    }
 
-        this.panel.classList.add('visible');
-        this.overlay.classList.add('visible');
-        this.isVisible = true;
-
-        // Load jobs
+    protected async onShow(): Promise<void> {
         await this.loadJobs();
     }
 
-    public hide(): void {
-        if (!this.panel) return;
-
-        this.panel.classList.remove('visible');
-        this.overlay.classList.remove('visible');
-        this.isVisible = false;
-    }
-
     private async loadJobs(): Promise<void> {
-        const content = this.panel?.querySelector('.pulse-panel-content');
+        const content = this.$('.pulse-panel-content');
         if (!content) return;
 
         try {
@@ -115,14 +75,13 @@ class PulsePanel {
             this.jobs.clear();
             jobs.forEach(job => this.jobs.set(job.id, job));
 
-            // Clean up orphaned job IDs from expandedJobs (memory leak prevention)
+            // Clean up orphaned job IDs from expandedJobs
             this.state.cleanupOrphanedJobs(new Set(this.jobs.keys()));
 
             this.render();
         } catch (error) {
             console.error('[Pulse Panel] Failed to load jobs:', error);
 
-            // Build error display using DOM API for security
             const errorDiv = document.createElement('div');
             errorDiv.className = 'panel-error pulse-error';
             errorDiv.textContent = `Failed to load scheduled jobs: ${(error as Error).message}`;
@@ -133,26 +92,17 @@ class PulsePanel {
     }
 
     private async render(): Promise<void> {
-        if (!this.panel) return;
-
-        // Render System Status section
         await this.renderSystemStatus();
-
-        // Render Active Queue section
         await this.renderActiveQueue();
-
-        // Render Schedules section
         this.renderSchedules();
     }
 
     private async renderSystemStatus(): Promise<void> {
-        const container = this.panel?.querySelector('#pulse-system-status-content');
+        const container = this.$('#pulse-system-status-content');
         if (!container) return;
 
-        // Import and use system-status renderer
         const { renderSystemStatus } = await import('./pulse/system-status.ts');
 
-        // Use current daemon status or defaults
         const daemonStatus = {
             running: currentDaemonStatus?.running ?? false,
             budget_daily: currentDaemonStatus?.budget_daily ?? 0,
@@ -164,16 +114,13 @@ class PulsePanel {
         };
 
         container.innerHTML = renderSystemStatus(daemonStatus);
-
-        // Attach event handlers for system status actions
         this.attachSystemStatusHandlers();
     }
 
     private async renderActiveQueue(): Promise<void> {
-        const container = this.panel?.querySelector('#pulse-active-queue-content');
+        const container = this.$('#pulse-active-queue-content');
         if (!container) return;
 
-        // Import and fetch active jobs
         const { renderActiveQueue, fetchActiveJobs } = await import('./pulse/active-queue.ts');
         const activeJobs = await fetchActiveJobs();
 
@@ -181,10 +128,9 @@ class PulsePanel {
     }
 
     private renderSchedules(): void {
-        const container = this.panel?.querySelector('#pulse-schedules-content');
+        const container = this.$('#pulse-schedules-content');
         if (!container) return;
 
-        // Import schedules renderer
         import('./pulse/schedules.ts').then(({ renderEmptyState, renderJobCard }) => {
             if (this.jobs.size === 0) {
                 container.innerHTML = renderEmptyState();
@@ -198,7 +144,6 @@ class PulsePanel {
 
             container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
 
-            // Attach event listeners
             attachPanelEventListeners(this.panel!, {
                 onToggleExpansion: (jobId) => this.toggleJobExpansion(jobId),
                 onForceTrigger: (jobId) => this.handleForceTrigger(jobId),
@@ -211,17 +156,10 @@ class PulsePanel {
         });
     }
 
-    // ========================================================================
-    // System Status Event Handlers
-    // ========================================================================
-
     private attachSystemStatusHandlers(): void {
-        if (!this.panel) return;
-
-        const container = this.panel.querySelector('#pulse-system-status-content');
+        const container = this.$('#pulse-system-status-content');
         if (!container) return;
 
-        // Start/Stop daemon button
         const daemonBtn = container.querySelector('[data-action="start-daemon"], [data-action="stop-daemon"]') as HTMLButtonElement;
         if (daemonBtn) {
             daemonBtn.addEventListener('click', async (e) => {
@@ -233,7 +171,6 @@ class PulsePanel {
             });
         }
 
-        // Edit budget button
         const budgetBtn = container.querySelector('[data-action="edit-budget"]') as HTMLButtonElement;
         if (budgetBtn) {
             budgetBtn.addEventListener('click', async (e) => {
@@ -248,19 +185,13 @@ class PulsePanel {
         await handleSystemStatusAction(action);
     }
 
-    // ========================================================================
-    // Event handler methods (called by panel-events.ts)
-    // ========================================================================
-
     private async handleLoadMore(jobId: string): Promise<void> {
-        // Increase limit by 10
         const currentLimit = this.state.executionLimits.get(jobId) || 5;
         this.state.executionLimits.set(jobId, currentLimit + 10);
         this.render();
     }
 
     private async handleRetryExecutions(jobId: string): Promise<void> {
-        // Clear error and retry
         this.state.executionErrors.delete(jobId);
         await this.loadExecutionsForJob(jobId);
     }
@@ -269,24 +200,20 @@ class PulsePanel {
         const job = this.jobs.get(jobId);
         if (!job) return;
 
-        // Open the original job detail panel
         const { showJobDetail } = await import('./pulse/job-detail-panel.js');
         showJobDetail(job);
     }
 
     private async toggleJobExpansion(jobId: string): Promise<void> {
         if (this.state.expandedJobs.has(jobId)) {
-            // Collapse
             this.state.expandedJobs.delete(jobId);
             this.state.saveToLocalStorage();
             this.render();
         } else {
-            // Expand
             this.state.expandedJobs.add(jobId);
             this.state.saveToLocalStorage();
             this.render();
 
-            // Load executions if not already loaded
             if (!this.state.jobExecutions.has(jobId) && !this.state.loadingExecutions.has(jobId)) {
                 await this.loadExecutionsForJob(jobId);
             }
@@ -295,17 +222,17 @@ class PulsePanel {
 
     private async loadExecutionsForJob(jobId: string): Promise<void> {
         this.state.loadingExecutions.add(jobId);
-        this.state.executionErrors.delete(jobId); // Clear previous error
+        this.state.executionErrors.delete(jobId);
         this.render();
 
         try {
             const response = await listExecutions(jobId, { limit: 20, offset: 0 });
             this.state.jobExecutions.set(jobId, response.executions);
-            this.state.executionErrors.delete(jobId); // Clear error on success
+            this.state.executionErrors.delete(jobId);
         } catch (error) {
             console.error('[Pulse Panel] Failed to load executions:', error);
             const errorMessage = (error as Error).message || 'Unknown error';
-            this.state.executionErrors.set(jobId, errorMessage); // Store error for display
+            this.state.executionErrors.set(jobId, errorMessage);
             toast.error(`Failed to load execution history: ${errorMessage}`);
         } finally {
             this.state.loadingExecutions.delete(jobId);
@@ -320,16 +247,13 @@ class PulsePanel {
         try {
             debugLog('[Pulse Panel] Force triggering job:', job.ats_code);
 
-            // Call force trigger API
             await forceTriggerJob(job.ats_code);
 
-            // Expand the job if collapsed
             if (!this.state.expandedJobs.has(jobId)) {
                 this.state.expandedJobs.add(jobId);
                 this.state.saveToLocalStorage();
             }
 
-            // Reload executions to show the new one
             await this.loadExecutionsForJob(jobId);
 
             toast.success('Force trigger started - check execution history below');
@@ -359,12 +283,10 @@ class PulsePanel {
                     break;
             }
 
-            // Reload jobs
             await this.loadJobs();
         } catch (error) {
             console.error(`[Pulse Panel] Failed to ${action} job:`, error);
 
-            // Build detailed error message with context
             let errorMsg = `Failed to ${action} job: ${(error as Error).message}`;
 
             if (job) {
@@ -382,14 +304,8 @@ class PulsePanel {
     private async handleProseLocationClick(docId: string): Promise<void> {
         debugLog('[Pulse Panel] Opening prose document:', docId);
 
-        // Dynamically import prose panel to avoid circular dependencies
         const { showProseDocument } = await import('./prose/panel.js');
-
-        // Open prose panel and navigate to document
         await showProseDocument(docId);
-
-        // Keep pulse panel open so user can see both
-        // User can manually close pulse panel if desired
     }
 
     /**
@@ -397,10 +313,8 @@ class PulsePanel {
      * Called by WebSocket handler when daemon_status messages arrive
      */
     public async updateDaemonStatus(data: DaemonStatusMessage): Promise<void> {
-        // Store current daemon status
         currentDaemonStatus = data;
 
-        // Update System Status section if panel is visible
         if (this.isVisible) {
             await this.renderSystemStatus();
         }

@@ -2,8 +2,8 @@
  * Schedules Section - Recurring timer jobs
  */
 
-import type { ScheduledJob } from './types';
-import type { PulseExecution } from './execution-types';
+import type { ScheduledJobResponse } from './types';
+import type { Execution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml } from './panel.ts';
@@ -24,7 +24,7 @@ export function renderEmptyState(): string {
 /**
  * Render a single scheduled job card
  */
-export function renderJobCard(job: ScheduledJob, state: PulsePanelState): string {
+export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState): string {
     const isActive = job.state === 'active';
     const nextRun = formatRelativeTime(job.next_run_at);
     const lastRun = job.last_run_at ? formatRelativeTime(job.last_run_at) : 'Never';
@@ -99,7 +99,7 @@ export function renderJobCard(job: ScheduledJob, state: PulsePanelState): string
 /**
  * Render execution history section for an expanded job
  */
-function renderExecutionHistory(job: ScheduledJob, state: PulsePanelState): string {
+function renderExecutionHistory(job: ScheduledJobResponse, state: PulsePanelState): string {
     const executions = state.jobExecutions.get(job.id) || [];
     const isLoading = state.loadingExecutions.has(job.id);
     const error = state.executionErrors.get(job.id);
@@ -163,7 +163,7 @@ function renderExecutionHistory(job: ScheduledJob, state: PulsePanelState): stri
 /**
  * Render a single execution card
  */
-function renderExecutionCard(exec: PulseExecution): string {
+function renderExecutionCard(exec: Execution): string {
     const statusClass = exec.status === 'completed' ? 'success' : exec.status === 'failed' ? 'error' : 'running';
     const duration = exec.duration_ms ? formatDuration(exec.duration_ms) : '—';
     const timeAgo = formatRelativeTime(exec.started_at);

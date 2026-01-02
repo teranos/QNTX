@@ -8,7 +8,7 @@ import { EditorState } from '@codemirror/state';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView as PMEditorView } from 'prosemirror-view';
 import { createSchedulingControls } from '../../pulse/scheduling-controls';
-import type { ScheduledJob } from '../../pulse/types';
+import type { ScheduledJobResponse } from '../../pulse/types';
 import { getScheduledJob } from '../../pulse/api';
 
 export class ATSCodeBlockNodeView {
@@ -101,7 +101,7 @@ export class ATSCodeBlockNodeView {
 
         // Load existing scheduled job if node has one
         const scheduledJobId = this.node.attrs.scheduledJobId;
-        let existingJob: ScheduledJob | undefined;
+        let existingJob: ScheduledJobResponse | undefined;
 
         // If there's a job ID, load it asynchronously
         if (scheduledJobId) {
@@ -122,11 +122,11 @@ export class ATSCodeBlockNodeView {
             atsCode: () => this.cmView.state.doc.toString(),  // Always get fresh content
             documentId: this.documentPath, // Prose document path for linking back
             existingJob,
-            onJobCreated: (job: ScheduledJob) => {
+            onJobCreated: (job: ScheduledJobResponse) => {
                 this.updateNodeAttributes({ scheduledJobId: job.id });
                 this.updateSchedulingControls(job);
             },
-            onJobUpdated: (job: ScheduledJob) => {
+            onJobUpdated: (job: ScheduledJobResponse) => {
                 this.updateSchedulingControls(job);
             },
             onJobDeleted: () => {
@@ -143,7 +143,7 @@ export class ATSCodeBlockNodeView {
         this.dom.appendChild(this.schedulingControls);
     }
 
-    private updateSchedulingControls(job: ScheduledJob): void {
+    private updateSchedulingControls(job: ScheduledJobResponse): void {
         // Re-render controls with updated job
         if (this.schedulingControls) {
             this.schedulingControls.remove();
@@ -154,11 +154,11 @@ export class ATSCodeBlockNodeView {
             atsCode: () => this.cmView.state.doc.toString(),
             documentId: this.documentPath,
             existingJob: job,  // Pass the updated job directly
-            onJobCreated: (job: ScheduledJob) => {
+            onJobCreated: (job: ScheduledJobResponse) => {
                 this.updateNodeAttributes({ scheduledJobId: job.id });
                 this.updateSchedulingControls(job);
             },
-            onJobUpdated: (job: ScheduledJob) => {
+            onJobUpdated: (job: ScheduledJobResponse) => {
                 this.updateSchedulingControls(job);
             },
             onJobDeleted: () => {
