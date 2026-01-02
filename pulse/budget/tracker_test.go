@@ -107,18 +107,20 @@ func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	defer db.Close()
 
-	// Given: $28 spent this month in ai_model_usage
+	// Given: $28 spent in the last 30 days in ai_model_usage
 	now := time.Now()
 
-	// Spread across multiple days this month
-	for i := 1; i <= 28; i++ {
-		dayOfMonth := time.Date(now.Year(), now.Month(), min(i, daysInMonth(now)), 12, 0, 0, 0, time.UTC)
-		insertUsage(t, db, dayOfMonth, 1.00) // $1 per day for 28 days
+	// Spread across 28 days in the past (avoiding last 24 hours to prevent daily limit trigger)
+	// This ensures only the monthly budget check is triggered, not the daily one
+	for i := 2; i <= 29; i++ {
+		// Start from 29 days ago, end at 2 days ago (outside 24h window)
+		timestamp := now.Add(time.Duration(-i) * 24 * time.Hour)
+		insertUsage(t, db, timestamp, 1.00) // $1 per day for 28 days
 	}
 
 	// Create budget tracker with $30 monthly limit
 	config := BudgetConfig{
-		DailyBudgetUSD:   10.00, // High daily limit
+		DailyBudgetUSD:   10.00, // High daily limit (won't be triggered)
 		MonthlyBudgetUSD: 30.00,
 		CostPerScoreUSD:  0.002,
 	}
