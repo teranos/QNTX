@@ -39,7 +39,7 @@ interface EnhancedSetting extends ConfigSetting {
 }
 
 class ConfigPanel extends BasePanel {
-    private config: ConfigResponse | null = null;
+    private appConfig: ConfigResponse | null = null;
 
     constructor() {
         super({
@@ -142,12 +142,12 @@ class ConfigPanel extends BasePanel {
                 throw new Error('Invalid config response: missing settings array');
             }
 
-            this.config = data;
+            this.appConfig = data;
             console.log('[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
         } catch (error) {
             console.error('[Config Panel] Failed to fetch config:', error);
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.config = {
+            this.appConfig = {
                 config_file: `Error: ${errorMessage}`,
                 settings: []
             };
@@ -158,7 +158,7 @@ class ConfigPanel extends BasePanel {
         const content = this.$('#config-panel-content');
         if (!content) return;
 
-        if (!this.config || this.config.settings.length === 0) {
+        if (!this.appConfig || this.appConfig.settings.length === 0) {
             content.innerHTML = `
                 <div class="config-empty">
                     <p>No configuration loaded</p>
@@ -167,8 +167,8 @@ class ConfigPanel extends BasePanel {
             return;
         }
 
-        const mergedConfig = this.calculateMergedConfig(this.config.settings);
-        this.config.settingsEnhanced = mergedConfig.allSettings;
+        const mergedConfig = this.calculateMergedConfig(this.appConfig.settings);
+        this.appConfig.settingsEnhanced = mergedConfig.allSettings;
 
         content.innerHTML = `
             <div class="panel-card config-file-info">
@@ -195,7 +195,7 @@ class ConfigPanel extends BasePanel {
         const effectiveSettings: EnhancedSetting[] = [];
         const allSettings: EnhancedSetting[] = [];
 
-        Object.entries(settingsByKey).forEach(([key, sources]) => {
+        Object.entries(settingsByKey).forEach(([_key, sources]) => {
             let effectiveSource: ConfigSetting | null = null;
             let effectivePrecedence = Infinity;
 
