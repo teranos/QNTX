@@ -70,6 +70,14 @@
     transform: scale(0.98);
 }
 
+/* Hide desktop-only symbols on mobile */
+@media (max-width: 768px) {
+    /* Go code editor not practical on mobile */
+    .palette-cell[data-cmd="go"] {
+        display: none;
+    }
+}
+
 /* Mobile - Fixed bottom bar */
 @media (max-width: 768px) {
     .symbol-palette {

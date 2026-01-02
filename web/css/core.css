@@ -169,3 +169,16 @@ body.disconnected #container {
     color: #86efac;
 }
 
+/* Responsive Utility Classes */
+@media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none !important;
+    }
+}
+
