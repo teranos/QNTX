@@ -81,23 +81,3 @@ func isLiteralValue(context string) bool {
 
 	return false
 }
-
-// isMetadataPredicate determines if a predicate represents node metadata
-// rather than a relationship to another entity. Metadata predicates should
-// be stored as node properties, not create visual links in the graph.
-func isMetadataPredicate(predicate string) bool {
-	metadataPredicates := []string{
-		"node_type",    // Type declaration (e.g., "as abc123 node_type commit")
-		"is_commit",    // Commit marker (e.g., "as abc123 is_commit commit_metadata")
-		"has_message",  // Commit message property
-		"committed_at", // Commit timestamp property
-	}
-
-	for _, mp := range metadataPredicates {
-		if predicate == mp {
-			return true
-		}
-	}
-
-	return false
-}

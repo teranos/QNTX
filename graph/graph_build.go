@@ -36,11 +36,21 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 	// Extract relationship type definitions from attestations (physics metadata)
 	relationshipDefinitions := b.extractRelationshipTypeDefinitions(attestations)
 
+	// Pass 1: Build set of all subject IDs (domain-agnostic entity detection)
+	// Contexts that appear as subjects are entities; those that don't are grouping labels/literals
+	subjectSet := make(map[string]bool)
+	for _, attestation := range attestations {
+		for _, subject := range attestation.Subjects {
+			subjectID := normalizeNodeID(subject)
+			subjectSet[subjectID] = true
+		}
+	}
+
 	// Track unique nodes by ID
 	nodeMap := make(map[string]*Node)
 	linkMap := make(map[string]*Link)
 
-	// Process each attestation
+	// Pass 2: Process each attestation
 	for _, attestation := range attestations {
 		// Expand attestation into individual claims
 		claims := expandAttestation(attestation)
@@ -72,20 +82,14 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 				}
 			}
 
-		// Skip metadata predicates that shouldn't create visual links
-		// These are stored as node properties, not relationships
-		if isMetadataPredicate(claim.Predicate) {
-			node := nodeMap[subjectID]
-			if node.Metadata == nil {
-				node.Metadata = make(map[string]interface{})
-			}
-			node.Metadata[claim.Predicate] = claim.Context
-			continue
-		}
-
-		// Create or update object node (if not a literal value)
+		// Create or update object node (if context is an entity)
+		// Two-pass approach: contexts that appear as subjects are entities
+		// Grouping labels (commit_metadata, lineage, authorship) never appear as subjects
 		if !isLiteralValue(claim.Context) {
-				objectID := normalizeNodeID(claim.Context)
+			objectID := normalizeNodeID(claim.Context)
+
+			// Only create node and link if context appears as a subject elsewhere (is an entity)
+			if subjectSet[objectID] {
 
 				// Determine object node type
 				objectNodeType, objectTypeSource := b.determineNodeType(
@@ -124,16 +128,18 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 					// Increase weight for duplicate relationships
 					linkMap[linkID].Weight += linkWeightIncrement
 				}
-			} else {
-				// For literal values, add as metadata to the subject node
-				node := nodeMap[subjectID]
-				if node.Metadata == nil {
-					node.Metadata = make(map[string]interface{})
-				}
-				node.Metadata[claim.Predicate] = claim.Context
 			}
+			// else: context is a grouping label (doesn't appear as subject) - skip entirely
+		} else {
+			// For literal values, add as metadata to the subject node
+			node := nodeMap[subjectID]
+			if node.Metadata == nil {
+				node.Metadata = make(map[string]interface{})
+			}
+			node.Metadata[claim.Predicate] = claim.Context
 		}
 	}
+}
 
 	// Convert maps to slices with deterministic ordering
 	// Sort by ID for consistent output across runs
