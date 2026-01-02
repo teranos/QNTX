@@ -1,9 +1,10 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "QNTX",
   "version": "0.1.0",
   "identifier": "nl.sbvh.qntx",
   "build": {
-    "beforeDevCommand": "cd .. && bun run dev",
+    "beforeDevCommand": "test \"$SKIP_DEV_SERVER\" = \"1\" && echo 'Skipping dev server (already running)' || (cd .. && bun run dev)",
     "beforeBuildCommand": "cd .. && bun run build",
     "devUrl": "http://localhost:8820",
     "frontendDist": "../../internal/server/dist"
@@ -20,7 +21,10 @@
     ],
     "externalBin": [
       "bin/qntx"
-    ]
+    ],
+    "iOS": {
+      "developmentTeam": "88645J88Q8"
+    }
   },
   "app": {
     "withGlobalTauri": true,

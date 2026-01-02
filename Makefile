@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev types types-check desktop-prepare desktop-dev desktop-build install
+.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -48,6 +48,31 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	FRONTEND_PID=$$!; \
 	echo "✨ Development servers running"; \
 	echo "Press Ctrl+C to stop both servers"; \
+	wait
+
+dev-mobile: web cli ## Start dev servers and run iOS app in simulator
+	@echo "📱 Starting mobile development environment..."
+	@echo "  Backend:  http://localhost:877"
+	@echo "  Frontend: http://localhost:8820 (with live reload)"
+	@echo "  iOS:      Launching simulator..."
+	@echo ""
+	@# Clean up any lingering processes
+	@pkill -f "bun.*dev" 2>/dev/null || true
+	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@# Start servers in background
+	@trap 'echo "Shutting down dev servers..."; \
+		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
+		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
+		pkill -f "bun.*dev" 2>/dev/null || true; \
+		wait 2>/dev/null || true; \
+		echo "✓ Servers stopped cleanly"' INT; \
+	DB_PATH=dev-qntx.db ./bin/qntx server --dev --no-browser -vvv & \
+	BACKEND_PID=$$!; \
+	cd web && bun run dev & \
+	FRONTEND_PID=$$!; \
+	sleep 3; \
+	echo "✨ Servers running, launching iOS app..."; \
+	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
 web: ## Build web assets with Bun
