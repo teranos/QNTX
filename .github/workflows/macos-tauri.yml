@@ -42,7 +42,7 @@ jobs:
       - name: Build qntx CLI (sidecar dependency)
         run: make cli
 
-      - name: Prepare Tauri sidecar binaries
+      - name: Prepare Tauri sidecar
         run: ./web/src-tauri/prepare-sidecar.sh
 
       - name: Cache Rust dependencies
