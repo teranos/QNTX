@@ -3,12 +3,17 @@
 
 use qntx_types::sym;
 use std::sync::{Arc, Mutex};
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
-use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_shell::ShellExt;
+
+// Desktop-only features (menu bar, tray, autostart)
+#[cfg(not(target_os = "ios"))]
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+#[cfg(not(target_os = "ios"))]
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+#[cfg(not(target_os = "ios"))]
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 // Import generated types from Go source (single source of truth)
 // These types are kept in sync with the backend via `make types`
@@ -172,15 +177,23 @@ fn notify_server_stopped(app: tauri::AppHandle) {
 }
 
 fn main() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_autostart::init(
+        .plugin(tauri_plugin_notification::init());
+
+    // Desktop-only plugins
+    #[cfg(not(target_os = "ios"))]
+    {
+        builder = builder.plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
-        ))
-        .setup(|app| {
-            // Start QNTX server as sidecar
+        ));
+    }
+
+    builder.setup(|app| {
+            #[cfg(not(target_os = "ios"))]
+            {
+            // Desktop only: Start QNTX server as sidecar
             let sidecar_command = app
                 .shell()
                 .sidecar("qntx")
@@ -210,13 +223,25 @@ fn main() {
                 }
             });
 
-            // Store server state
+            // Store server state (desktop has running sidecar)
             app.manage(ServerState {
                 child: Arc::new(Mutex::new(Some(child))),
                 port: SERVER_PORT.to_string(),
             });
+            }
 
-            // Create application menu bar
+            // iOS: No sidecar, store empty server state
+            #[cfg(target_os = "ios")]
+            {
+            app.manage(ServerState {
+                child: Arc::new(Mutex::new(None)),
+                port: SERVER_PORT.to_string(),
+            });
+            }
+
+            // Desktop only: Create application menu bar
+            #[cfg(not(target_os = "ios"))]
+            {
             let app_menu = Submenu::with_items(
                 app,
                 "QNTX",
@@ -524,6 +549,7 @@ fn main() {
                     }
                 })
                 .build(app)?;
+            } // End desktop-only menu/tray setup
 
             Ok(())
         })

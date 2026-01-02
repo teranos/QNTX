@@ -1,4 +1,5 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "QNTX",
   "version": "0.1.0",
   "identifier": "nl.sbvh.qntx",
@@ -20,7 +21,10 @@
     ],
     "externalBin": [
       "bin/qntx"
-    ]
+    ],
+    "iOS": {
+      "developmentTeam": "88645J88Q8"
+    }
   },
   "app": {
     "withGlobalTauri": true,
