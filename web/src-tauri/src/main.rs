@@ -5,7 +5,6 @@ use qntx_types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
-use tauri_plugin_shell::ShellExt;
 
 // Desktop-only features (menu bar, tray, autostart)
 #[cfg(not(target_os = "ios"))]
@@ -26,7 +25,7 @@ use qntx_types::{
 const SERVER_PORT: &str = "877";
 
 struct ServerState {
-    child: Arc<Mutex<Option<tauri_plugin_shell::process::CommandChild>>>,
+    child: Arc<Mutex<Option<std::process::Child>>>,
     port: String,
 }
 
@@ -179,7 +178,14 @@ fn notify_server_stopped(app: tauri::AppHandle) {
 fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // When another instance tries to start, just show the existing window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }));
 
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
@@ -194,35 +200,41 @@ fn main() {
         .setup(|app| {
             #[cfg(not(target_os = "ios"))]
             {
-                // Desktop only: Start QNTX server as sidecar
-                let sidecar_command = app
-                    .shell()
-                    .sidecar("qntx")
-                    .expect("failed to create qntx sidecar command");
+                // Desktop only: Start QNTX server
+                // Note: Using std::process::Command directly instead of Tauri's sidecar system
+                // because Tauri v2's sidecar has output streaming issues in dev mode
+                use std::process::{Command, Stdio};
 
-                let (mut rx, child) = sidecar_command
-                    .args(["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
+                // Set working directory to project root (two levels up from src-tauri)
+                let project_root = std::env::current_dir()
+                    .ok()
+                    .and_then(|d| d.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf()));
+
+                let binary_path = if let Some(root) = &project_root {
+                    root.join("web/src-tauri/bin/qntx-aarch64-apple-darwin")
+                } else {
+                    std::path::PathBuf::from("./bin/qntx-aarch64-apple-darwin")
+                };
+
+                let child = match Command::new(&binary_path)
+                    .args(&["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
+                    .current_dir(project_root.clone().unwrap_or_else(|| std::env::current_dir().unwrap()))
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
                     .spawn()
-                    .expect("Failed to spawn qntx server");
-
-                // Log server output
-                tauri::async_runtime::spawn(async move {
-                    while let Some(event) = rx.recv().await {
-                        match event {
-                            tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                                print!("[qntx] {}", String::from_utf8_lossy(&line));
-                            }
-                            tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                                eprint!("[qntx] {}", String::from_utf8_lossy(&line));
-                            }
-                            tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
-                                eprintln!("[qntx] Server terminated: {:?}", status);
-                                break;
-                            }
-                            _ => {}
-                        }
+                {
+                    Ok(child) => child,
+                    Err(e) => {
+                        eprintln!("[error] Failed to spawn qntx server: {}", e);
+                        eprintln!("[error] The QNTX server will not be available.");
+                        // Store empty server state and continue without server
+                        app.manage(ServerState {
+                            child: Arc::new(Mutex::new(None)),
+                            port: SERVER_PORT.to_string(),
+                        });
+                        return Ok(());
                     }
-                });
+                };
 
                 // Store server state (desktop has running sidecar)
                 app.manage(ServerState {
@@ -533,7 +545,7 @@ fn main() {
                             // Stop server and quit
                             if let Some(state) = app.try_state::<ServerState>() {
                                 let mut child = state.child.lock().unwrap();
-                                if let Some(process) = child.take() {
+                                if let Some(mut process) = child.take() {
                                     let _ = process.kill();
                                 }
                             }

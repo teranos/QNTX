@@ -32,8 +32,8 @@ func checkOrigin(r *http.Request) bool {
 		return true
 	}
 
-	// Load allowed origins from config
-	serverCfg, err := appcfg.GetServerConfig()
+	// Load allowed origins from config (with defaults)
+	config, err := appcfg.Load()
 	if err != nil {
 		// If config fails to load, use secure defaults (localhost only + Tauri)
 		return strings.HasPrefix(origin, "http://localhost") ||
@@ -41,9 +41,12 @@ func checkOrigin(r *http.Request) bool {
 			strings.HasPrefix(origin, "tauri://localhost")
 	}
 
+	// Get allowed origins (includes defaults if not configured)
+	allowedOrigins := config.GetServerAllowedOrigins()
+
 	// Check if origin matches any of the configured allowed origins
 	// We use prefix matching to allow any port number
-	for _, allowedOrigin := range serverCfg.AllowedOrigins {
+	for _, allowedOrigin := range allowedOrigins {
 		if strings.HasPrefix(origin, allowedOrigin) {
 			return true
 		}

@@ -136,9 +136,28 @@ desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "Starting QNTX Desktop in development mode..."
 	@echo "  Frontend dev server: http://localhost:8820"
 	@echo "  Backend will start as sidecar on port 877"
-	@cd web/src-tauri && cargo run
+	@echo ""
+	@# Clean up any lingering dev server processes
+	@pkill -f "bun.*dev" 2>/dev/null || true
+	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@# Start dev server in background, then launch Tauri
+	@trap 'echo "Shutting down dev server..."; \
+		pkill -f "bun.*dev" 2>/dev/null || true; \
+		wait 2>/dev/null || true; \
+		echo "✓ Dev server stopped"' INT; \
+	cd web && bun run dev & \
+	DEV_SERVER_PID=$$!; \
+	sleep 2; \
+	echo "✨ Dev server running, launching desktop app..."; \
+	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo run; \
+	kill $$DEV_SERVER_PID 2>/dev/null || true; \
+	wait
 
 desktop-build: desktop-prepare ## Build production desktop app (requires: cargo install tauri-cli)
 	@echo "Building QNTX Desktop for production..."
 	@cd web/src-tauri && cargo tauri build
+	@# Workaround: Manually copy sidecar to bundle (Tauri v2 bundling issue)
+	@echo "Bundling sidecar binary..."
+	@TARGET=$$(rustc -vV | grep host | cut -d' ' -f2) && \
+		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
