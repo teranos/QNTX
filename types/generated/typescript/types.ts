@@ -212,6 +212,33 @@ export interface OverFilter {
   operator: string;
 }
 
+export interface RelationshipTypeDef {
+  /**
+   * Predicate name (e.g., "is_child_of", "points_to")
+   */
+  Name: string;
+  /**
+   * Human-readable label for UI (e.g., "Child Of", "Points To")
+   */
+  Label: string;
+  /**
+   * Optional link color override (hex code)
+   */
+  Color: string;
+  /**
+   * D3 force distance override (nil = use default)
+   */
+  LinkDistance?: number | null;
+  /**
+   * D3 force strength override (nil = use default)
+   */
+  LinkStrength?: number | null;
+  /**
+   * Whether this relationship type is being phased out
+   */
+  Deprecated: boolean;
+}
+
 export interface TypeDef {
   /**
    * Type identifier (e.g., "commit", "author")

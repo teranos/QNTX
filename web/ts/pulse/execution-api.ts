@@ -6,10 +6,9 @@
 
 import { debugLog, debugError } from "../debug.ts";
 import type {
-  PulseExecution,
+  Execution,
   ListExecutionsResponse,
   ListExecutionsParams,
-  ExecutionStatus,
   JobStagesResponse,
   TaskLogsResponse,
   JobChildrenResponse,
@@ -92,7 +91,7 @@ export async function listExecutions(
  */
 export async function getExecution(
   executionId: string
-): Promise<PulseExecution> {
+): Promise<Execution> {
   const url = `${getBaseUrl()}/executions/${executionId}`;
   debugLog("[Execution API] Getting execution:", { executionId, url });
 
@@ -196,10 +195,10 @@ export function formatRelativeTime(timestamp: string): string {
 /**
  * Get status color class for styling
  *
- * @param status - Execution status
+ * @param status - Execution status (string from API)
  * @returns CSS class name for status color
  */
-export function getStatusColorClass(status: ExecutionStatus): string {
+export function getStatusColorClass(status: string): string {
   switch (status) {
     case "running":
       return "status-running";

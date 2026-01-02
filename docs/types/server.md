@@ -196,8 +196,8 @@ export interface ConsoleLog {
 type CreateScheduledJobRequest struct {
 	ATSCode string `json:"ats_code"`
 	IntervalSeconds int `json:"interval_seconds"`
-	CreatedFromDoc string `json:"created_from_doc"`
-	Metadata string `json:"metadata"`
+	CreatedFromDoc string `json:"created_from_doc,omitempty"`
+	Metadata string `json:"metadata,omitempty"`
 	Force bool `json:"force,omitempty"`
 }
 ```
@@ -218,11 +218,11 @@ export interface CreateScheduledJobRequest {
   /**
    * Optional: ProseMirror document ID
    */
-  created_from_doc: string;
+  created_from_doc?: string;
   /**
    * Optional: JSON metadata
    */
-  metadata: string;
+  metadata?: string;
   /**
    * Bypass deduplication checks (force execution)
    */

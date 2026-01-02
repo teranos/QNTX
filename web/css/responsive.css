@@ -1,0 +1,43 @@
+/* Responsive Utilities - Centralized mobile behavior */
+
+:root {
+    /* Breakpoint documentation (can't use in @media, but documents standards) */
+    --breakpoint-mobile: 768px;
+    --breakpoint-tablet: 900px;
+    --breakpoint-desktop: 1200px;
+}
+
+/* Mobile: Full-width panels and layout adjustments */
+@media (max-width: 768px) {
+    /* Left-sliding panels - full width */
+    .panel-slide-left {
+        width: 100%;
+    }
+
+    .panel-overlay {
+        left: 0;
+        width: 100%;
+    }
+
+    /* Right-sliding panels - full width */
+    .prose-panel {
+        width: 100%;
+    }
+
+    .prose-overlay {
+        display: none;
+    }
+
+    /* Log panel - move to top */
+    #log-panel {
+        top: 0;
+        bottom: auto;
+        border-top: none;
+        border-bottom: 1px solid #333;
+    }
+
+    /* Hide build hash on mobile to save space */
+    #build-hash {
+        display: none !important;
+    }
+}

@@ -34,10 +34,11 @@ type Link struct {
 
 // Meta contains metadata about the graph
 type Meta struct {
-	GeneratedAt time.Time         `json:"generated_at"`
-	Stats       Stats             `json:"stats"`
-	Config      map[string]string `json:"config"`
-	NodeTypes   []NodeTypeInfo    `json:"node_types"` // Available node types in this graph
+	GeneratedAt       time.Time              `json:"generated_at"`
+	Stats             Stats                  `json:"stats"`
+	Config            map[string]string      `json:"config"`
+	NodeTypes         []NodeTypeInfo         `json:"node_types"`         // Available node types in this graph
+	RelationshipTypes []RelationshipTypeInfo `json:"relationship_types"` // Available relationship types with physics
 }
 
 // NodeTypeInfo describes a node type and its visual configuration
@@ -46,6 +47,16 @@ type NodeTypeInfo struct {
 	Label string `json:"label"` // Human-readable display name (e.g., "Artist", "Album")
 	Color string `json:"color"` // Hex color code
 	Count int    `json:"count"` // Number of nodes of this type
+}
+
+// RelationshipTypeInfo describes a relationship type with physics and visual configuration
+type RelationshipTypeInfo struct {
+	Type         string   `json:"type"`                    // Predicate name (e.g., "is_child_of", "points_to")
+	Label        string   `json:"label"`                   // Human-readable display name
+	Color        string   `json:"color,omitempty"`         // Optional link color override
+	LinkDistance *float64 `json:"link_distance,omitempty"` // D3 force distance override (nil = use default)
+	LinkStrength *float64 `json:"link_strength,omitempty"` // D3 force strength override (nil = use default)
+	Count        int      `json:"count"`                   // Number of links of this type
 }
 
 // Stats provides graph statistics

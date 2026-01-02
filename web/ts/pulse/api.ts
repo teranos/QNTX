@@ -6,7 +6,7 @@
 
 import { debugLog, debugError } from "../debug.ts";
 import type {
-  ScheduledJob,
+  ScheduledJobResponse,
   CreateScheduledJobRequest,
   UpdateScheduledJobRequest,
   ListScheduledJobsResponse,
@@ -32,7 +32,7 @@ function getBaseUrl(): string {
 /**
  * List all scheduled jobs
  */
-export async function listScheduledJobs(): Promise<ScheduledJob[]> {
+export async function listScheduledJobs(): Promise<ScheduledJobResponse[]> {
   const response = await fetch(getBaseUrl());
   if (!response.ok) {
     throw new Error(`Failed to list scheduled jobs: ${response.statusText}`);
@@ -44,7 +44,7 @@ export async function listScheduledJobs(): Promise<ScheduledJob[]> {
 /**
  * Get a specific scheduled job by ID
  */
-export async function getScheduledJob(id: string): Promise<ScheduledJob> {
+export async function getScheduledJob(id: string): Promise<ScheduledJobResponse> {
   const response = await fetch(`${getBaseUrl()}/${id}`);
   if (!response.ok) {
     throw new Error(`Failed to get scheduled job: ${response.statusText}`);
@@ -57,7 +57,7 @@ export async function getScheduledJob(id: string): Promise<ScheduledJob> {
  */
 export async function createScheduledJob(
   request: CreateScheduledJobRequest
-): Promise<ScheduledJob> {
+): Promise<ScheduledJobResponse> {
   const baseUrl = getBaseUrl();
   debugLog('[Pulse API] Creating scheduled job:', request);
 
@@ -106,7 +106,7 @@ export async function createScheduledJob(
 export async function updateScheduledJob(
   id: string,
   request: UpdateScheduledJobRequest
-): Promise<ScheduledJob> {
+): Promise<ScheduledJobResponse> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/${id}`;
 
@@ -149,14 +149,14 @@ export async function deleteScheduledJob(id: string): Promise<void> {
 /**
  * Pause a scheduled job
  */
-export async function pauseScheduledJob(id: string): Promise<ScheduledJob> {
+export async function pauseScheduledJob(id: string): Promise<ScheduledJobResponse> {
   return updateScheduledJob(id, { state: "paused" });
 }
 
 /**
  * Resume a scheduled job
  */
-export async function resumeScheduledJob(id: string): Promise<ScheduledJob> {
+export async function resumeScheduledJob(id: string): Promise<ScheduledJobResponse> {
   return updateScheduledJob(id, { state: "active" });
 }
 
@@ -164,7 +164,7 @@ export async function resumeScheduledJob(id: string): Promise<ScheduledJob> {
  * Create a one-time force trigger job (bypasses deduplication)
  * Uses interval_seconds: 0 to indicate one-time execution
  */
-export async function forceTriggerJob(atsCode: string): Promise<ScheduledJob> {
+export async function forceTriggerJob(atsCode: string): Promise<ScheduledJobResponse> {
   debugLog('[Pulse API] Force triggering job:', atsCode);
 
   return createScheduledJob({

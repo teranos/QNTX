@@ -1,42 +1,18 @@
 /**
- * TypeScript types for Pulse Scheduled Jobs API
+ * Pulse Scheduled Jobs - UI Helpers
  *
- * Matches the Go API contracts from internal/server/pulse_handlers.go
+ * Type definitions are imported from generated types.
+ * This file only contains UI-specific utilities.
  */
 
-export type ScheduledJobState = "active" | "paused" | "stopping" | "inactive";
-
-export interface ScheduledJob {
-  id: string;
-  ats_code: string;
-  interval_seconds: number;
-  next_run_at: string; // RFC3339 timestamp
-  last_run_at: string | null; // RFC3339 timestamp
-  last_execution_id: string;
-  state: ScheduledJobState;
-  created_from_doc: string;
-  metadata: string;
-  created_at: string; // RFC3339 timestamp
-  updated_at: string; // RFC3339 timestamp
-}
-
-export interface CreateScheduledJobRequest {
-  ats_code: string;
-  interval_seconds: number;
-  created_from_doc?: string;
-  metadata?: string;
-  force?: boolean; // Bypass deduplication for one-time execution
-}
-
-export interface UpdateScheduledJobRequest {
-  state?: ScheduledJobState;
-  interval_seconds?: number;
-}
-
-export interface ListScheduledJobsResponse {
-  jobs: ScheduledJob[];
-  count: number;
-}
+// Re-export types from central location for convenience
+export type {
+  ScheduledJobResponse,
+  ScheduledJobState,
+  CreateScheduledJobRequest,
+  UpdateScheduledJobRequest,
+  ListScheduledJobsResponse,
+} from '../../types';
 
 /**
  * Common interval presets for UI
