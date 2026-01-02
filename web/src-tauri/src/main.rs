@@ -218,7 +218,11 @@ fn main() {
 
                 let child = match Command::new(&binary_path)
                     .args(&["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
-                    .current_dir(project_root.clone().unwrap_or_else(|| std::env::current_dir().unwrap()))
+                    .current_dir(
+                        project_root
+                            .clone()
+                            .unwrap_or_else(|| std::env::current_dir().unwrap()),
+                    )
                     .stdout(Stdio::inherit())
                     .stderr(Stdio::inherit())
                     .spawn()
