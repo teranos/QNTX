@@ -25,11 +25,10 @@ import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
 import './ai-provider-panel.ts';
 import './command-explorer-panel.ts';
-import { toggleJobList } from './hixtory-panel.ts';
+// Note: Panel toggle functions are dynamically imported in Tauri event listeners below
+// to avoid unused import warnings. Menu items use "show" events with dynamic imports,
+// while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
-import { toggleProsePanel } from './prose/panel.ts';
-import { toggleGoEditor } from './code/panel.ts';
-import { togglePulsePanel } from './pulse-panel.ts';
 import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
