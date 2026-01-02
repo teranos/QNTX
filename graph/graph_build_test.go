@@ -59,23 +59,24 @@ func TestBuildGraphFromAttestationsSingle(t *testing.T) {
 
 	graph := builder.buildGraphFromAttestations(attestations, "is engineer")
 
-	// Should create 2 nodes: alice (subject) and engineer (object)
-	if len(graph.Nodes) != 2 {
-		t.Errorf("Expected 2 nodes, got %d", len(graph.Nodes))
+	// Should create 1 node: alice (subject only)
+	// "engineer" doesn't appear as subject, so it's skipped (two-pass approach)
+	if len(graph.Nodes) != 1 {
+		t.Errorf("Expected 1 node, got %d", len(graph.Nodes))
 	}
 
-	// Should create 1 link: alice -> engineer
-	if len(graph.Links) != 1 {
-		t.Errorf("Expected 1 link, got %d", len(graph.Links))
+	// Should create 0 links (engineer is not an entity in this attestation set)
+	if len(graph.Links) != 0 {
+		t.Errorf("Expected 0 links, got %d", len(graph.Links))
 	}
 
 	// Verify stats
-	if graph.Meta.Stats.TotalNodes != 2 {
-		t.Errorf("Meta TotalNodes = %d, want 2", graph.Meta.Stats.TotalNodes)
+	if graph.Meta.Stats.TotalNodes != 1 {
+		t.Errorf("Meta TotalNodes = %d, want 1", graph.Meta.Stats.TotalNodes)
 	}
 
-	if graph.Meta.Stats.TotalEdges != 1 {
-		t.Errorf("Meta TotalEdges = %d, want 1", graph.Meta.Stats.TotalEdges)
+	if graph.Meta.Stats.TotalEdges != 0 {
+		t.Errorf("Meta TotalEdges = %d, want 0", graph.Meta.Stats.TotalEdges)
 	}
 }
 
@@ -101,64 +102,20 @@ func TestBuildGraphFromAttestationsNodeDeduplication(t *testing.T) {
 
 	graph := builder.buildGraphFromAttestations(attestations, "skills")
 
-	// Should create 3 nodes: alice, Rust, Java (alice is deduplicated)
-	if len(graph.Nodes) != 3 {
-		t.Errorf("Expected 3 nodes (alice, Rust, Java), got %d", len(graph.Nodes))
+	// Should create 1 node: alice (subject only)
+	// Rust and Java don't appear as subjects, so they're skipped (two-pass approach)
+	if len(graph.Nodes) != 1 {
+		t.Errorf("Expected 1 node (alice), got %d", len(graph.Nodes))
 	}
 
-	// Should create 2 links: alice -> Rust, alice -> Java
-	if len(graph.Links) != 2 {
-		t.Errorf("Expected 2 links, got %d", len(graph.Links))
+	// Should create 0 links (Rust/Java are not entities in this attestation set)
+	if len(graph.Links) != 0 {
+		t.Errorf("Expected 0 links, got %d", len(graph.Links))
 	}
 
-	// Verify alice node exists only once
-	aliceCount := 0
-	for _, node := range graph.Nodes {
-		if node.ID == "alice" {
-			aliceCount++
-		}
-	}
-
-	if aliceCount != 1 {
-		t.Errorf("alice should appear exactly once, appeared %d times", aliceCount)
-	}
-}
-
-// TestBuildGraphFromAttestationsLinkWeightAccumulation tests duplicate link weight increase
-func TestBuildGraphFromAttestationsLinkWeightAccumulation(t *testing.T) {
-	builder := createTestBuilder(t)
-
-	// Same relationship appears multiple times
-	attestations := []types.As{
-		{
-			Subjects:   []string{"alice"},
-			Predicates: []string{"worked_at"},
-			Contexts:   []string{"Acme Corp"},
-			Timestamp:  time.Now(),
-		},
-		{
-			Subjects:   []string{"alice"},
-			Predicates: []string{"worked_at"},
-			Contexts:   []string{"Acme Corp"},
-			Timestamp:  time.Now().Add(time.Hour),
-		},
-	}
-
-	graph := builder.buildGraphFromAttestations(attestations, "work history")
-
-	// Should create 2 nodes, 1 link
-	if len(graph.Nodes) != 2 {
-		t.Errorf("Expected 2 nodes, got %d", len(graph.Nodes))
-	}
-
-	if len(graph.Links) != 1 {
-		t.Errorf("Expected 1 link, got %d", len(graph.Links))
-	}
-
-	// Link weight should be > 1.0
-	link := graph.Links[0]
-	if link.Weight <= 1.0 {
-		t.Errorf("Link weight should be > 1.0 for duplicate relationships, got %f", link.Weight)
+	// Verify alice node exists
+	if graph.Nodes[0].ID != "alice" {
+		t.Errorf("Expected alice node, got %s", graph.Nodes[0].ID)
 	}
 }
 
@@ -206,5 +163,54 @@ func TestBuildGraphFromAttestationsLiteralValues(t *testing.T) {
 
 	if alice.Metadata["score"] != "95.5" {
 		t.Errorf("alice.Metadata[score] = %v, want 95.5", alice.Metadata["score"])
+	}
+}
+
+// TestGroupingContextsSkipped validates that grouping contexts (commit_metadata, lineage, authorship)
+// don't create nodes since they never appear as subjects. Fixes issue where these were appearing in graph.
+func TestGroupingContextsSkipped(t *testing.T) {
+	builder := createTestBuilder(t)
+
+	// Simulate git ingestion: commits with grouping contexts
+	attestations := []types.As{
+		{
+			Subjects:   []string{"abc123"},
+			Predicates: []string{"is_commit"},
+			Contexts:   []string{"commit_metadata"},
+			Timestamp:  time.Now(),
+		},
+		{
+			Subjects:   []string{"abc123"},
+			Predicates: []string{"in_lineage"},
+			Contexts:   []string{"lineage"},
+			Timestamp:  time.Now(),
+		},
+		{
+			Subjects:   []string{"abc123"},
+			Predicates: []string{"has_authorship"},
+			Contexts:   []string{"authorship"},
+			Timestamp:  time.Now(),
+		},
+	}
+
+	graph := builder.buildGraphFromAttestations(attestations, "test")
+
+	// Only abc123 should become a node (appears as subject)
+	// commit_metadata, lineage, authorship should NOT (never appear as subjects)
+	if len(graph.Nodes) != 1 {
+		t.Errorf("Expected 1 node (abc123), got %d", len(graph.Nodes))
+		for _, node := range graph.Nodes {
+			t.Logf("  Found node: %s", node.ID)
+		}
+	}
+
+	// No links should be created (grouping contexts are skipped)
+	if len(graph.Links) != 0 {
+		t.Errorf("Expected 0 links, got %d", len(graph.Links))
+	}
+
+	// Verify the commit node exists
+	if graph.Nodes[0].ID != "abc123" {
+		t.Errorf("Expected node abc123, got %s", graph.Nodes[0].ID)
 	}
 }
