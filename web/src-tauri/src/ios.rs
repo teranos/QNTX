@@ -1,30 +1,47 @@
-// iOS-specific Tauri features
-// Only compiled when building for iOS
+//! iOS-specific Tauri features
+//!
+//! This module contains placeholder implementations for iOS-specific functionality.
+//! These commands are currently registered but return errors when called.
+//!
+//! **Status**: Stub implementations for future development
+//!
+//! **Planned features**:
+//! - Biometric authentication (Face ID / Touch ID)
+//! - iOS permission management (notifications, location, etc.)
+//! - Device info detection (model, iOS version, notch/Dynamic Island)
+//!
+//! Only compiled when building for iOS (`#[cfg(target_os = "ios")]`).
 
 /// Placeholder for iOS biometric authentication
-/// Future: Integrate with Tauri plugins for Face ID / Touch ID
+///
+/// **Current behavior**: Always returns error
+///
+/// **Future**: Integrate with tauri-plugin-biometric or native iOS APIs for Face ID / Touch ID
 #[tauri::command]
-pub async fn ios_authenticate_biometric() -> Result<bool, String> {
-    // TODO: Implement using tauri-plugin-biometric or native iOS APIs
-    // For now, return placeholder response
+pub fn ios_authenticate_biometric() -> Result<bool, String> {
     println!("[ios] Biometric authentication requested (not implemented)");
     Err("Biometric authentication not yet implemented".to_string())
 }
 
 /// Check if biometric authentication is available on this device
+///
+/// **Current behavior**: Always returns false
+///
+/// **Future**: Detect if device has Face ID or Touch ID available
 #[tauri::command]
 pub fn ios_biometric_available() -> bool {
-    // TODO: Check if device has Face ID or Touch ID
-    // For now, return false
     println!("[ios] Checking biometric availability (not implemented)");
     false
 }
 
 /// Request iOS-specific permissions (e.g., notifications, location)
+///
+/// **Current behavior**: Always returns error
+///
+/// **Future**: Implement iOS permission handling via native APIs
 #[tauri::command]
-pub async fn ios_request_permissions(permission: String) -> Result<bool, String> {
+pub fn ios_request_permissions(permission: String) -> Result<bool, String> {
     println!("[ios] Permission request for: {}", permission);
-    // TODO: Implement iOS permission handling
     Err(format!(
         "Permission '{}' handling not implemented",
         permission

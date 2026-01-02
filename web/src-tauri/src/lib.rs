@@ -15,22 +15,27 @@ pub fn run() {
     ios::init();
 
     // Build mobile app (no sidecar, no desktop-only features)
-    let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_notification::init());
-
-    // Register iOS-specific commands
     #[cfg(target_os = "ios")]
     {
-        builder = builder.invoke_handler(tauri::generate_handler![
-            ios::ios_authenticate_biometric,
-            ios::ios_biometric_available,
-            ios::ios_request_permissions,
-            ios::ios_device_info,
-        ]);
+        tauri::Builder::default()
+            .plugin(tauri_plugin_shell::init())
+            .plugin(tauri_plugin_notification::init())
+            .invoke_handler(tauri::generate_handler![
+                ios::ios_authenticate_biometric,
+                ios::ios_biometric_available,
+                ios::ios_request_permissions,
+                ios::ios_device_info,
+            ])
+            .run(tauri::generate_context!())
+            .expect("error while running tauri application");
     }
 
-    builder
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    #[cfg(not(target_os = "ios"))]
+    {
+        tauri::Builder::default()
+            .plugin(tauri_plugin_shell::init())
+            .plugin(tauri_plugin_notification::init())
+            .run(tauri::generate_context!())
+            .expect("error while running tauri application");
+    }
 }
