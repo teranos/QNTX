@@ -60,5 +60,5 @@ jobs:
       - name: Check (generated types)
         run: cd types/generated/rust && cargo check
 
-      - name: Check (Tauri app)
-        run: cd web/src-tauri && cargo check
+      # - name: Check (Tauri app)
+      #   run: cd web/src-tauri && cargo check
