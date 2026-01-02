@@ -413,6 +413,10 @@ class PulsePanel {
 const pulsePanel = new PulsePanel();
 (window as any).pulsePanel = pulsePanel;
 
+export function showPulsePanel(): void {
+    pulsePanel.show();
+}
+
 export function togglePulsePanel(): void {
     pulsePanel.toggle();
 }
