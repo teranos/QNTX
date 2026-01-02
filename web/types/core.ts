@@ -95,9 +95,9 @@ export interface Node extends Omit<GeneratedNode, 'visible'> {
  * Graph link representing a relationship
  * Extends generated type with D3 simulation and UI properties
  */
-export interface Link extends Omit<GeneratedLink, 'value'> {
-  source: string | Node;  // D3 converts to Node reference
-  target: string | Node;  // D3 converts to Node reference
+export interface Link extends Omit<GeneratedLink, 'source' | 'target' | 'value'> {
+  source: string | Node;  // D3 converts string IDs to Node references during simulation
+  target: string | Node;  // D3 converts string IDs to Node references during simulation
   weight?: number;        // Alias for D3's 'value' field
   // UI properties
   selected?: boolean;
