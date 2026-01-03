@@ -2,12 +2,14 @@
  * ATS Code Block Node View with Pulse Scheduling
  *
  * Custom ProseMirror node view that adds scheduling controls to ATS blocks
+ * and real-time execution state visualization.
  */
 
 import { Node as PMNode } from "prosemirror-model";
 import { EditorView, NodeView } from "prosemirror-view";
 import type { ScheduledJobResponse } from "./types.ts";
 import { createSchedulingControls } from "./scheduling-controls.ts";
+import { subscribeATSBlock, type ATSExecutionState } from "./realtime-handlers.ts";
 
 export interface ATSNodeViewOptions {
   documentId?: string;
@@ -16,12 +18,15 @@ export interface ATSNodeViewOptions {
 
 /**
  * Custom node view for ATS code blocks with scheduling support
+ * and real-time execution state visualization.
  */
 export class ATSNodeView implements NodeView {
   dom: HTMLElement;
   contentDOM: HTMLElement;
   private schedulingControls: HTMLElement | null = null;
   private currentJob: ScheduledJobResponse | null = null;
+  private unsubscribeExecution: (() => void) | null = null;
+  private executionState: ATSExecutionState = 'idle';
 
   constructor(
     private node: PMNode,
@@ -41,10 +46,6 @@ export class ATSNodeView implements NodeView {
     `;
     this.dom.appendChild(header);
 
-    // TODO(issue #8): Add real-time execution state indicators
-    // Show block execution state (idle/running/completed/failed) via color changes
-    // Subscribe to WebSocket events: pulse_execution_started, pulse_execution_completed, pulse_execution_failed
-
     // Create content container for CodeMirror
     this.contentDOM = document.createElement("div");
     this.contentDOM.className = "ats-code-block-content";
@@ -54,10 +55,44 @@ export class ATSNodeView implements NodeView {
     const scheduledJobId = this.node.attrs.scheduledJobId;
     if (scheduledJobId) {
       this.loadScheduledJob(scheduledJobId);
+      this.subscribeToExecutionState(scheduledJobId);
     } else {
       // Show "Add Schedule" button
       this.renderSchedulingControls();
     }
+  }
+
+  /**
+   * Subscribe to execution state updates for a scheduled job
+   */
+  private subscribeToExecutionState(scheduledJobId: string): void {
+    // Unsubscribe from previous job if any
+    if (this.unsubscribeExecution) {
+      this.unsubscribeExecution();
+    }
+
+    // Subscribe to new job
+    this.unsubscribeExecution = subscribeATSBlock(scheduledJobId, (state) => {
+      this.updateExecutionState(state);
+    });
+  }
+
+  /**
+   * Update the visual execution state of the block
+   */
+  private updateExecutionState(state: ATSExecutionState): void {
+    this.executionState = state;
+
+    // Remove all execution state classes
+    this.dom.classList.remove(
+      'execution-idle',
+      'execution-running',
+      'execution-completed',
+      'execution-failed'
+    );
+
+    // Add the current state class
+    this.dom.classList.add(`execution-${state}`);
   }
 
   /**
@@ -97,6 +132,8 @@ export class ATSNodeView implements NodeView {
         this.currentJob = job;
         this.updateNodeAttributes({ scheduledJobId: job.id });
         this.options.onScheduleChange?.(job.id);
+        // Subscribe to execution state updates for the new job
+        this.subscribeToExecutionState(job.id);
       },
       onJobUpdated: (job) => {
         this.currentJob = job;
@@ -105,6 +142,13 @@ export class ATSNodeView implements NodeView {
         this.currentJob = null;
         this.updateNodeAttributes({ scheduledJobId: null });
         this.options.onScheduleChange?.(null);
+        // Unsubscribe from execution state updates
+        if (this.unsubscribeExecution) {
+          this.unsubscribeExecution();
+          this.unsubscribeExecution = null;
+        }
+        // Reset execution state to idle
+        this.updateExecutionState('idle');
         this.renderSchedulingControls();
       },
       onError: (error, context) => {
@@ -176,6 +220,12 @@ export class ATSNodeView implements NodeView {
    * Cleanup when node view is destroyed
    */
   destroy(): void {
+    // Unsubscribe from execution state updates
+    if (this.unsubscribeExecution) {
+      this.unsubscribeExecution();
+      this.unsubscribeExecution = null;
+    }
+
     if (this.schedulingControls) {
       this.schedulingControls.remove();
     }
