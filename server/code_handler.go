@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/code/github"
 )
 
 // CodeEntry represents a code file or directory in the workspace
@@ -329,4 +331,67 @@ func (s *QNTXServer) detectProjectRoot() string {
 	}
 
 	return ""
+}
+
+// HandleCodePRSuggestions returns fix suggestions for a given PR number
+// GET /api/code/github/pr/:number/suggestions
+func (s *QNTXServer) HandleCodePRSuggestions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract PR number from URL path
+	// Expected format: /api/code/github/pr/122/suggestions
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/code/github/pr/"), "/")
+	if len(parts) < 2 || parts[1] != "suggestions" {
+		http.Error(w, "Invalid URL format, expected /api/code/github/pr/:number/suggestions", http.StatusBadRequest)
+		return
+	}
+
+	prNumber, err := strconv.Atoi(parts[0])
+	if err != nil || prNumber <= 0 {
+		http.Error(w, "Invalid PR number", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch fix suggestions from GitHub PR comments
+	suggestions, err := github.FetchFixSuggestions(prNumber)
+	if err != nil {
+		s.logger.Errorw("Failed to fetch PR suggestions",
+			"pr_number", prNumber,
+			"error", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch suggestions: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return suggestions as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(suggestions); err != nil {
+		s.logger.Errorw("Failed to encode suggestions", "error", err)
+	}
+}
+
+// HandleCodePRList returns a list of open pull requests
+// GET /api/code/github/pr
+func (s *QNTXServer) HandleCodePRList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Fetch open PRs from GitHub
+	prs, err := github.FetchOpenPRs()
+	if err != nil {
+		s.logger.Errorw("Failed to fetch open PRs",
+			"error", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch PRs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return PRs as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(prs); err != nil {
+		s.logger.Errorw("Failed to encode PRs", "error", err)
+	}
 }

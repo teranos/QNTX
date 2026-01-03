@@ -43,6 +43,10 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 
 **For Claude**: When adding config options, ensure sensible defaults exist in `am/defaults.go`. Only require configuration when truly necessary.
 
+## Type Generation
+
+**NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`.
+
 ## Go Development Standards
 
 ### Code Quality
