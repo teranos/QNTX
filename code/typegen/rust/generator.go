@@ -302,6 +302,7 @@ func collectExternalTypes(result *typegen.Result) []string {
 		"i8": true, "i16": true, "i32": true, "i64": true, "i128": true, "isize": true,
 		"f32": true, "f64": true, "bool": true, "char": true, "str": true,
 		"String": true, "Vec": true, "Option": true, "Result": true, "Box": true,
+		"byte": true, // Go byte type (treated as u8, but may appear before type mapping)
 	}
 
 	// Mark all types defined in this package

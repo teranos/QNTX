@@ -10,7 +10,7 @@
  * - Binary size and structure
  */
 
-import { cp, mkdir, rm } from "fs/promises";
+import { cp, mkdir, readdir, rm } from "fs/promises";
 import { join } from "path";
 
 const sourceDir = import.meta.dir; // web/
@@ -51,12 +51,40 @@ try {
     external: [], // Bundle everything, don't externalize anything
   });
 
+  // Copy CSS first (needed to scan for files)
+  console.log(`${darkPeach}Copying CSS...${reset}`);
+  await cp(join(sourceDir, "css"), join(outputDir, "css"), { recursive: true });
+
+  // Scan CSS directory to auto-generate link tags
+  const cssFiles = await readdir(join(sourceDir, "css"));
+  const cssLinkTags = cssFiles
+    .filter(file => file.endsWith('.css'))
+    .sort() // Alphabetical order for consistency
+    .map(file => `    <link rel="stylesheet" href="/css/${file}">`)
+    .join('\n');
+
   // Copy HTML and update script reference
   console.log(`${darkPeach}Copying HTML...${reset}`);
   const htmlContent = await Bun.file(join(sourceDir, "index.html")).text();
 
   // Update the script src from /ts/main.ts to /js/main.js (the bundled output)
   let updatedHtml = htmlContent.replace('/ts/main.ts', '/js/main.js');
+
+  // Replace CSS link tags with auto-generated ones
+  // Find the section between <!-- CSS START --> and <!-- CSS END --> markers
+  const cssMarkerStart = '<!-- CSS AUTO-GENERATED - DO NOT EDIT MANUALLY -->';
+  const cssMarkerEnd = '<!-- END CSS AUTO-GENERATED -->';
+
+  if (updatedHtml.includes(cssMarkerStart)) {
+    // Replace existing auto-generated section
+    const startIdx = updatedHtml.indexOf(cssMarkerStart);
+    const endIdx = updatedHtml.indexOf(cssMarkerEnd);
+    if (endIdx > startIdx) {
+      updatedHtml = updatedHtml.substring(0, startIdx + cssMarkerStart.length) +
+        '\n' + cssLinkTags + '\n    ' +
+        updatedHtml.substring(endIdx);
+    }
+  }
 
   // Inject backend URL if provided via environment variable (for Vercel/static hosting)
   const backendUrl = process.env.BACKEND_URL;
@@ -73,10 +101,6 @@ try {
   }
 
   await Bun.write(join(outputDir, "index.html"), updatedHtml);
-
-  // Copy CSS
-  console.log(`${darkPeach}Copying CSS...${reset}`);
-  await cp(join(sourceDir, "css"), join(outputDir, "css"), { recursive: true });
 
   // Copy fonts
   console.log(`${darkPeach}Copying fonts...${reset}`);
