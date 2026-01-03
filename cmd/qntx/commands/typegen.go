@@ -37,6 +37,10 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/server",
 		"github.com/teranos/QNTX/sym",
 	},
+	"python": {
+		"github.com/teranos/QNTX/graph",
+		"github.com/teranos/QNTX/sym",
+	},
 	"markdown": {
 		"github.com/teranos/QNTX/ats/types",
 		"github.com/teranos/QNTX/code/github",

@@ -110,7 +110,7 @@ export interface PatchResult {
   /**
    * Any error during patch generation
    */
-  Error: string;
+  Error: error;
   /**
    * Database ID if saved (0 if not saved)
    */

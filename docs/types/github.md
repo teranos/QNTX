@@ -219,7 +219,7 @@ export interface FixSuggestion {
 
 ## GitHubPR
 
-**Source**: [`code/github/pr_detection.go:16`](https://github.com/teranos/QNTX/blob/main/code/github/pr_detection.go#L16)
+**Source**: [`code/github/pr_detection.go:18`](https://github.com/teranos/QNTX/blob/main/code/github/pr_detection.go#L18)
 
 
 <table>
@@ -255,7 +255,7 @@ export interface GitHubPR {
 
 ## PRInfo
 
-**Source**: [`code/github/github.go:315`](https://github.com/teranos/QNTX/blob/main/code/github/github.go#L315)
+**Source**: [`code/github/github.go:337`](https://github.com/teranos/QNTX/blob/main/code/github/github.go#L337)
 
 
 <table>
