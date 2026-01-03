@@ -184,6 +184,17 @@ class LogEntry:
     message: str
     metadata: dict[str, Any] | None = None
 
+# ParsedATSCode contains the pre-computed values for a scheduled job
+# Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#parsedatscode
+@dataclass
+class ParsedATSCode:
+    # HandlerName is the async handler to invoke (e.g., "ixgest.git")
+    handler_name: str
+    # Payload is the pre-computed JSON payload for the handler
+    payload: list[byte]
+    # SourceURL is used for deduplication (e.g., the git repo URL)
+    source_url: str
+
 # ProgressMessage represents an import progress message
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/server.md#progressmessage
 @dataclass
@@ -434,6 +445,7 @@ __all__ = [
     "ListExecutionsResponse",
     "ListScheduledJobsResponse",
     "LogEntry",
+    "ParsedATSCode",
     "ProgressMessage",
     "ProseEntry",
     "PulseExecutionCompletedMessage",

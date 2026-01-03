@@ -17,3 +17,34 @@
 .ats-code-block.ProseMirror-selectednode {
     outline-color: var(--ats-editor-border-accent);
 }
+
+/* ============================================================================
+   Execution State Indicators
+   Uses data-execution-state attribute for cleaner state management
+   ============================================================================ */
+
+/* Base wrapper styles - ensure border is visible */
+.ats-code-block-wrapper {
+    border-left: 3px solid var(--ats-editor-border-accent);
+    transition: border-color 0.2s ease;
+}
+
+/* Idle state - default styling (job scheduled, waiting for next run) */
+.ats-code-block-wrapper[data-execution-state="idle"] {
+    border-left-color: var(--ats-editor-border-accent);
+}
+
+/* Running state - blue border (execution in progress) */
+.ats-code-block-wrapper[data-execution-state="running"] {
+    border-left-color: var(--accent-blue, #3b82f6);
+}
+
+/* Completed state - green border (last execution succeeded) */
+.ats-code-block-wrapper[data-execution-state="completed"] {
+    border-left-color: var(--accent-green, #22c55e);
+}
+
+/* Failed state - red border (last execution failed) */
+.ats-code-block-wrapper[data-execution-state="failed"] {
+    border-left-color: var(--accent-red, #ef4444);
+}

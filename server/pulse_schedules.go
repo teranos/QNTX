@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/sym"
+	id "github.com/teranos/vanity-id"
 )
 
 // HandlePulseSchedules handles requests to /api/pulse/schedules
@@ -124,11 +126,6 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		"created_from_doc", req.CreatedFromDoc,
 		"remote", r.RemoteAddr)
 
-	// TODO(#60): Extract ATS code parsing - domain-specific job scheduling deferred
-	writeError(w, http.StatusNotImplemented, "ATS-based job scheduling not yet implemented in QNTX")
-	return
-
-	/*
 	// Validate request
 	if req.ATSCode == "" {
 		s.logger.Warnw(fmt.Sprintf("%s Pulse create job - missing ats_code", sym.Pulse))
@@ -152,8 +149,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	}
 
 	// Generate job ID using ASID format
-	// Format: SP (Scheduled Pulse) + vanity components from ATS code, schedule predicate, pulse context
-	jobID, err := id.GenerateASIDWithPrefix("SP", req.ATSCode, "schedule", "pulse", "qntx")
+	jobID, err := id.GenerateASID(req.ATSCode, "scheduled", "pulse", "system")
 	if err != nil {
 		s.logger.Errorw(fmt.Sprintf("%s Pulse create job - ID generation failed | ats:%s error:%v", sym.Pulse, req.ATSCode, err),
 			"error", err,
@@ -221,7 +217,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 			if err != nil || scheduledJobID == "" {
 				// No temp job exists - create temporary scheduled job for tracking
-				scheduledJobID, err = id.GenerateASIDWithPrefix("PSJ", req.ATSCode, "temp", "force-trigger", "pulse")
+				scheduledJobID, err = id.GenerateASID(req.ATSCode, "force-trigger", "pulse", "system")
 				if err != nil {
 					s.logger.Errorw("Failed to generate temp job ID for force trigger",
 						"error", err,
@@ -270,14 +266,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		}
 
 		// Step 3: Create execution record (within same transaction - guaranteed FK integrity)
-		executionID, err = id.GenerateASIDWithPrefix("PX", scheduledJobID, "execution", "force-trigger", "pulse")
-		if err != nil {
-			s.logger.Errorw("Failed to generate execution ID for force trigger",
-				"error", err,
-				"scheduled_job_id", scheduledJobID)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to generate execution ID: %v", err))
-			return
-		}
+		executionID = id.GenerateExecutionID()
 
 		_, err = tx.Exec(`
 			INSERT INTO pulse_executions (id, scheduled_job_id, async_job_id, status, started_at, created_at, updated_at)
@@ -359,7 +348,6 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		"interval_seconds", req.IntervalSeconds)
 
 	writeJSON(w, http.StatusCreated, toScheduledJobResponse(job))
-	*/
 }
 
 // handleGetSchedule retrieves a specific schedule

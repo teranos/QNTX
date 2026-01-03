@@ -26,9 +26,13 @@ func NewGitIngestionHandler(db *sql.DB, logger *zap.SugaredLogger) *GitIngestion
 
 // GitIngestionPayload defines the payload structure for git ingestion jobs
 type GitIngestionPayload struct {
-	RepositoryPath string `json:"repository_path"`
-	Actor          string `json:"actor,omitempty"`
-	Verbosity      int    `json:"verbosity"`
+	// RepositorySource can be a local path OR a URL (handler will clone if URL)
+	RepositorySource string `json:"repository_source"`
+	Actor            string `json:"actor,omitempty"`
+	Verbosity        int    `json:"verbosity"`
+	NoDeps           bool   `json:"no_deps,omitempty"`
+	// Since filters commits to only those after this timestamp or commit hash
+	Since string `json:"since,omitempty"`
 }
 
 // Name returns the handler identifier
@@ -44,14 +48,55 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 		return fmt.Errorf("failed to decode payload: %w", err)
 	}
 
-	// Create processor
+	// Resolve repository (handles URLs with auto-clone)
+	repoSource, err := ResolveRepository(payload.RepositorySource, h.logger)
+	if err != nil {
+		return fmt.Errorf("failed to resolve repository: %w", err)
+	}
+	defer repoSource.Cleanup()
+
+	repoPath := repoSource.LocalPath
+
+	if repoSource.IsCloned {
+		h.logger.Infow("Repository cloned for async processing",
+			"job_id", job.ID,
+			"source", payload.RepositorySource,
+			"temp_path", repoPath)
+	}
+
+	// Create git processor
 	processor := NewGitIxProcessor(h.db, false, payload.Actor, payload.Verbosity, h.logger)
 
-	// Create progress callback to update job progress
-	// We'll need to count commits first to set total, then update as we process
-	result, err := processor.ProcessGitRepository(payload.RepositoryPath)
+	// Set incremental filter if --since is provided
+	if payload.Since != "" {
+		if err := processor.SetSince(payload.Since); err != nil {
+			return fmt.Errorf("invalid --since value: %w", err)
+		}
+	}
+
+	// Process git repository
+	result, err := processor.ProcessGitRepository(repoPath)
 	if err != nil {
 		return fmt.Errorf("git ingestion failed: %w", err)
+	}
+
+	// Process dependencies unless disabled
+	var depsResult *DepsIngestionResult
+	if !payload.NoDeps {
+		depsProcessor := NewDepsIxProcessor(h.db, repoPath, false, payload.Actor, payload.Verbosity, h.logger)
+		depsResult, err = depsProcessor.ProcessProjectFiles()
+		if err != nil {
+			h.logger.Warnw("Dependency ingestion had errors",
+				"job_id", job.ID,
+				"error", err)
+			// Don't fail the job for deps errors
+		}
+	}
+
+	// Calculate total attestations
+	totalAttestations := result.TotalAttestations
+	if depsResult != nil {
+		totalAttestations += depsResult.TotalAttestations
 	}
 
 	// Update final progress
@@ -60,10 +105,16 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 
 	h.logger.Infow("Git ingestion completed",
 		"job_id", job.ID,
-		"repository", payload.RepositoryPath,
+		"repository", payload.RepositorySource,
 		"commits", result.CommitsProcessed,
 		"branches", result.BranchesProcessed,
-		"attestations", result.TotalAttestations)
+		"attestations", totalAttestations,
+		"deps_files", func() int {
+			if depsResult != nil {
+				return depsResult.FilesProcessed
+			}
+			return 0
+		}())
 
 	return nil
 }

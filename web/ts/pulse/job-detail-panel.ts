@@ -8,6 +8,7 @@
  */
 
 import { debugLog } from '../debug.ts';
+import { CSS } from '../css-classes.ts';
 import type { ScheduledJobResponse } from './types.ts';
 import type { Execution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
 import {
@@ -21,6 +22,13 @@ import {
 } from './execution-api.ts';
 import { forceTriggerJob } from './api.ts';
 import { showErrorDialog } from '../error-dialog.ts';
+import {
+  onExecutionStarted,
+  onExecutionCompleted,
+  onExecutionFailed,
+  onExecutionLog,
+  unixToISO,
+} from './events.ts';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;
@@ -40,20 +48,78 @@ class JobDetailPanel {
   private taskLogs: Map<string, TaskLogsResponse> = new Map();
   private loadingTasks: Set<string> = new Set(); // Track tasks currently being loaded
 
+  // Event unsubscribe functions
+  private unsubscribers: Array<() => void> = [];
+
   constructor() {
     this.initialize();
+    this.subscribeToEvents();
+  }
+
+  /**
+   * Subscribe to Pulse execution events for real-time updates
+   */
+  private subscribeToEvents(): void {
+    // Execution started
+    this.unsubscribers.push(
+      onExecutionStarted((detail) => {
+        if (!this.isShowingJob(detail.scheduledJobId)) return;
+
+        const timestamp = unixToISO(detail.timestamp);
+        this.addStartedExecution({
+          id: detail.executionId,
+          scheduled_job_id: detail.scheduledJobId,
+          status: 'running',
+          started_at: timestamp,
+          created_at: timestamp,
+          updated_at: timestamp,
+        });
+      })
+    );
+
+    // Execution completed
+    this.unsubscribers.push(
+      onExecutionCompleted((detail) => {
+        this.updateExecutionStatus(detail.executionId, {
+          status: 'completed',
+          async_job_id: detail.asyncJobId,
+          result_summary: detail.resultSummary,
+          duration_ms: detail.durationMs,
+          completed_at: unixToISO(detail.timestamp),
+        });
+      })
+    );
+
+    // Execution failed
+    this.unsubscribers.push(
+      onExecutionFailed((detail) => {
+        this.updateExecutionStatus(detail.executionId, {
+          status: 'failed',
+          error_message: detail.errorMessage,
+          duration_ms: detail.durationMs,
+          completed_at: unixToISO(detail.timestamp),
+        });
+      })
+    );
+
+    // Execution log streaming
+    this.unsubscribers.push(
+      onExecutionLog((detail) => {
+        this.appendExecutionLog(detail.executionId, detail.logChunk);
+      })
+    );
   }
 
   private initialize(): void {
     // Create overlay
     this.overlay = document.createElement('div');
-    this.overlay.className = 'panel-overlay job-detail-overlay';
+    this.overlay.className = `${CSS.PANEL.OVERLAY} job-detail-overlay`;
     this.overlay.addEventListener('click', () => this.hide());
     document.body.appendChild(this.overlay);
 
     // Create panel
     this.panel = document.createElement('div');
-    this.panel.className = 'panel-slide-left job-detail-panel';
+    this.panel.className = `${CSS.PANEL.SLIDE_LEFT} job-detail-panel`;
     document.body.appendChild(this.panel);
 
     // Close on Escape key
@@ -73,8 +139,8 @@ class JobDetailPanel {
     debugLog('[Job Detail] Showing panel for job:', job.id);
 
     // Show panel and overlay
-    this.panel.classList.add('visible');
-    this.overlay.classList.add('visible');
+    this.panel.classList.add(CSS.STATE.VISIBLE);
+    this.overlay.classList.add(CSS.STATE.VISIBLE);
     this.isVisible = true;
 
     // Load execution history
@@ -84,8 +150,8 @@ class JobDetailPanel {
   public hide(): void {
     if (!this.panel || !this.overlay) return;
 
-    this.panel.classList.remove('visible');
-    this.overlay.classList.remove('visible');
+    this.panel.classList.remove(CSS.STATE.VISIBLE);
+    this.overlay.classList.remove(CSS.STATE.VISIBLE);
     this.isVisible = false;
     this.currentJob = null;
   }
@@ -542,7 +608,7 @@ class JobDetailPanel {
     title.textContent = 'Job History';
 
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'panel-close';
+    closeBtn.className = CSS.PANEL.CLOSE;
     closeBtn.textContent = '✕';
     closeBtn.onclick = () => this.hide();
 
@@ -699,6 +765,21 @@ class JobDetailPanel {
 
     // Re-render if log viewer is showing this execution
     // (future enhancement - for now just update the data)
+  }
+
+  /**
+   * Clean up event subscriptions and DOM elements
+   */
+  public destroy(): void {
+    // Clean up event subscriptions
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+
+    // Remove DOM elements
+    this.panel?.remove();
+    this.overlay?.remove();
+    this.panel = null;
+    this.overlay = null;
   }
 }
 
