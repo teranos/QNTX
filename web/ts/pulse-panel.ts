@@ -34,6 +34,7 @@ import {
     onExecutionStarted,
     onExecutionCompleted,
     onExecutionFailed,
+    unixToISO,
 } from './pulse/events';
 
 // Global daemon status (updated via WebSocket)
@@ -70,8 +71,9 @@ class PulsePanel extends BasePanel {
                 if (!this.isVisible) return;
 
                 const job = this.jobs.get(detail.scheduledJobId);
+                const timestamp = unixToISO(detail.timestamp);
                 if (job) {
-                    job.last_run_at = new Date(detail.timestamp * 1000).toISOString();
+                    job.last_run_at = timestamp;
                 }
 
                 // Add to inline execution list if job is expanded
@@ -81,9 +83,9 @@ class PulsePanel extends BasePanel {
                         id: detail.executionId,
                         scheduled_job_id: detail.scheduledJobId,
                         status: 'running',
-                        started_at: new Date(detail.timestamp * 1000).toISOString(),
-                        created_at: new Date(detail.timestamp * 1000).toISOString(),
-                        updated_at: new Date(detail.timestamp * 1000).toISOString(),
+                        started_at: timestamp,
+                        created_at: timestamp,
+                        updated_at: timestamp,
                     } as any);
                     this.state.setExecutions(detail.scheduledJobId, executions);
                 }
@@ -98,8 +100,9 @@ class PulsePanel extends BasePanel {
                 if (!this.isVisible) return;
 
                 const job = this.jobs.get(detail.scheduledJobId);
+                const timestamp = unixToISO(detail.timestamp);
                 if (job) {
-                    job.last_run_at = new Date(detail.timestamp * 1000).toISOString();
+                    job.last_run_at = timestamp;
                 }
 
                 // Update inline execution if expanded
@@ -111,7 +114,7 @@ class PulsePanel extends BasePanel {
                             async_job_id: detail.asyncJobId,
                             result_summary: detail.resultSummary,
                             duration_ms: detail.durationMs,
-                            completed_at: new Date(detail.timestamp * 1000).toISOString(),
+                            completed_at: timestamp,
                         });
                         break;
                     }
@@ -127,8 +130,9 @@ class PulsePanel extends BasePanel {
                 if (!this.isVisible) return;
 
                 const job = this.jobs.get(detail.scheduledJobId);
+                const timestamp = unixToISO(detail.timestamp);
                 if (job) {
-                    job.last_run_at = new Date(detail.timestamp * 1000).toISOString();
+                    job.last_run_at = timestamp;
                 }
 
                 // Update inline execution if expanded
@@ -139,7 +143,7 @@ class PulsePanel extends BasePanel {
                             status: 'failed',
                             error_message: detail.errorMessage,
                             duration_ms: detail.durationMs,
-                            completed_at: new Date(detail.timestamp * 1000).toISOString(),
+                            completed_at: timestamp,
                         });
                         break;
                     }
@@ -415,6 +419,14 @@ class PulsePanel extends BasePanel {
         if (this.isVisible) {
             await this.renderSystemStatus();
         }
+    }
+
+    /**
+     * Clean up event subscriptions when panel is destroyed
+     */
+    protected onDestroy(): void {
+        this.unsubscribers.forEach(unsub => unsub());
+        this.unsubscribers = [];
     }
 }
 

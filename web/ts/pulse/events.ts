@@ -149,3 +149,15 @@ export function onExecutionLog(
     document.addEventListener(PULSE_EVENTS.EXECUTION_LOG, handler);
     return () => document.removeEventListener(PULSE_EVENTS.EXECUTION_LOG, handler);
 }
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Convert Unix timestamp (seconds) to ISO string
+ * Used throughout pulse event handlers for consistent timestamp formatting
+ */
+export function unixToISO(timestamp: number): string {
+    return new Date(timestamp * 1000).toISOString();
+}
