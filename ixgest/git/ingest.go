@@ -15,8 +15,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
 
-	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage"
+	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ixgest/types"
 	"github.com/teranos/vanity-id"
 )
@@ -412,7 +412,7 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	attestationCount++
 
 	if p.verbosity >= 5 {
-		 fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
+		fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
 			colorGreen, colorReset,
 			colorYellow, shortHash, colorReset,
 			colorCyan, "has_message", colorReset,
@@ -434,7 +434,7 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	attestationCount++
 
 	if p.verbosity >= 5 {
-		 fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
+		fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
 			colorGreen, colorReset,
 			colorYellow, shortHash, colorReset,
 			colorCyan, "committed_at", colorReset,
@@ -616,7 +616,8 @@ func extractModifiedPackages(commit *object.Commit, stats object.FileStats) []st
 
 // extractPackageDir extracts the directory containing a file as package identifier.
 // Example: "internal/ixgest/git/ingest.go" → "internal/ixgest/git"
-//          "README.md" → "." (root)
+//
+//	"README.md" → "." (root)
 func extractPackageDir(filePath string) string {
 	parts := strings.Split(filePath, "/")
 	if len(parts) == 1 {
