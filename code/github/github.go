@@ -197,7 +197,11 @@ func GetLatestWorkflowRunID(workflowFile string) (int, error) {
 		return 0, fmt.Errorf("no workflow runs found")
 	}
 
-	runID := int(runs[0]["databaseId"].(float64))
+	databaseID, ok := runs[0]["databaseId"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid databaseId type in workflow run")
+	}
+	runID := int(databaseID)
 	return runID, nil
 }
 
@@ -221,11 +225,19 @@ func MonitorWorkflowCompletion(runID int) error {
 			return fmt.Errorf("failed to parse status: %w", err)
 		}
 
-		status := result["status"].(string)
+		status, ok := result["status"].(string)
+		if !ok {
+			spinner.Fail("Invalid workflow status format")
+			return fmt.Errorf("invalid status type in workflow result")
+		}
 		elapsed := time.Since(startTime).Seconds()
 
 		if status == "completed" {
-			conclusion := result["conclusion"].(string)
+			conclusion, ok := result["conclusion"].(string)
+			if !ok {
+				spinner.Fail("Invalid workflow conclusion format")
+				return fmt.Errorf("invalid conclusion type in workflow result")
+			}
 			spinner.Success(fmt.Sprintf("Workflow completed in %.0fs", elapsed))
 
 			if conclusion != "success" {
@@ -275,13 +287,23 @@ func CheckWorkflowStatus(workflowFile string) error {
 	// Display runs in a table
 	pterm.Printf("Recent Claude Code Review runs:\n\n")
 	for i, run := range runs {
-		status := run["status"].(string)
+		status, ok := run["status"].(string)
+		if !ok {
+			continue // Skip runs with invalid status
+		}
 		conclusion := ""
 		if run["conclusion"] != nil {
-			conclusion = run["conclusion"].(string)
+			conclusion, _ = run["conclusion"].(string)
 		}
-		title := run["displayTitle"].(string)
-		runID := run["databaseId"].(float64)
+		title, ok := run["displayTitle"].(string)
+		if !ok {
+			title = "(unknown)"
+		}
+		runIDFloat, ok := run["databaseId"].(float64)
+		if !ok {
+			continue // Skip runs with invalid ID
+		}
+		runID := int(runIDFloat)
 
 		// Color code by status
 		statusStr := fmt.Sprintf("%-12s", status)
@@ -301,10 +323,10 @@ func CheckWorkflowStatus(workflowFile string) error {
 		}
 
 		pterm.Printf("%d. %s %s\n", i+1, statusStr, title)
-		pterm.Printf("   Run ID: %.0f\n", runID)
+		pterm.Printf("   Run ID: %d\n", runID)
 
 		if i == 0 && status != "completed" {
-			pterm.Info.Printf("   Watch: gh run watch %.0f\n", runID)
+			pterm.Info.Printf("   Watch: gh run watch %d\n", runID)
 		}
 	}
 

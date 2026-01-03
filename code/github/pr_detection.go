@@ -8,8 +8,10 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/internal/httpclient"
 )
 
 // GitHubPR represents a minimal GitHub PR response
@@ -55,7 +57,7 @@ func DetectCurrentPR() (int, error) {
 		req.Header.Set("Authorization", "Bearer "+cfg.Code.GitHub.Token)
 	}
 
-	client := &http.Client{}
+	client := httpclient.NewSaferClient(30 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query GitHub API: %w", err)

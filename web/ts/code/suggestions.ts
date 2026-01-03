@@ -16,6 +16,7 @@ export class CodeSuggestions {
     private panel: HTMLElement;
     private currentPR: number | null = null;
     private onNavigateToFile: (filePath: string, line: number) => void;
+    private prSelectListener: ((e: Event) => void) | null = null;
 
     constructor(options: SuggestionsOptions) {
         this.panel = options.panel;
@@ -30,6 +31,15 @@ export class CodeSuggestions {
     }
 
     /**
+     * Escape HTML to prevent XSS
+     */
+    private escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
      * Load open PRs from GitHub and populate dropdown
      */
     async loadOpenPRs(): Promise<void> {
@@ -40,8 +50,6 @@ export class CodeSuggestions {
             const response = await apiFetch('/api/code/github/pr');
             const prs: PRInfo[] = await response.json();
 
-            console.log('[Go Editor] Loaded', prs.length, 'open PRs');
-
             if (prs.length === 0) {
                 prSelect.innerHTML = '<option value="">No open PRs</option>';
                 return;
@@ -49,7 +57,7 @@ export class CodeSuggestions {
 
             // Populate dropdown with PRs
             prSelect.innerHTML = '<option value="">Select a PR...</option>' +
-                prs.map(pr => `<option value="${pr.number}">#${pr.number}: ${pr.title}</option>`).join('');
+                prs.map(pr => `<option value="${pr.number}">#${pr.number}: ${this.escapeHtml(pr.title)}</option>`).join('');
 
             // Auto-select current PR if set
             if (this.currentPR) {
@@ -57,13 +65,19 @@ export class CodeSuggestions {
                 await this.loadPRSuggestions(this.currentPR);
             }
 
+            // Remove old listener if exists
+            if (this.prSelectListener) {
+                prSelect.removeEventListener('change', this.prSelectListener);
+            }
+
             // Add change listener
-            prSelect.addEventListener('change', () => {
+            this.prSelectListener = () => {
                 const prNumber = parseInt(prSelect.value);
                 if (prNumber > 0) {
                     this.loadPRSuggestions(prNumber);
                 }
-            });
+            };
+            prSelect.addEventListener('change', this.prSelectListener);
         } catch (error) {
             console.error('[Go Editor] Failed to load open PRs:', error);
             prSelect.innerHTML = '<option value="">Failed to load PRs</option>';
@@ -101,7 +115,21 @@ export class CodeSuggestions {
             }
         } catch (error) {
             console.error('[Go Editor] Failed to load PR suggestions:', error);
-            alert(`Failed to load suggestions for PR #${prNumber}`);
+            this.showError(`Failed to load suggestions for PR #${prNumber}`);
+        }
+    }
+
+    /**
+     * Show error message in suggestions UI
+     */
+    private showError(message: string): void {
+        const listElement = this.$('#suggestions-list');
+        if (listElement) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'suggestion-error';
+            errorDiv.textContent = `Error: ${message}`;
+            listElement.innerHTML = '';
+            listElement.appendChild(errorDiv);
         }
     }
 
@@ -115,38 +143,28 @@ export class CodeSuggestions {
             return;
         }
 
-        console.log('[Go Editor] Rendering', suggestions.length, 'suggestions');
-        console.log('[Go Editor] First suggestion:', suggestions[0]);
-
         if (suggestions.length === 0) {
             listElement.innerHTML = '<div class="no-suggestions">No suggestions found for this PR</div>';
             return;
         }
 
-        const html = suggestions.map((s, idx) => {
-            const suggestionHtml = `
-                <div class="suggestion-item severity-${s.severity}" data-file="${s.file}" data-line="${s.start_line}">
+        const html = suggestions.map((s) => `
+                <div class="suggestion-item severity-${this.escapeHtml(s.severity)}" data-file="${this.escapeHtml(s.file)}" data-line="${s.start_line}">
                     <div class="suggestion-header">
-                        <span class="suggestion-id">${s.id}</span>
-                        ${s.category ? `<span class="suggestion-category">${s.category}</span>` : ''}
-                        <span class="suggestion-severity severity-badge-${s.severity}">${s.severity}</span>
+                        <span class="suggestion-id">${this.escapeHtml(s.id)}</span>
+                        ${s.category ? `<span class="suggestion-category">${this.escapeHtml(s.category)}</span>` : ''}
+                        <span class="suggestion-severity severity-badge-${this.escapeHtml(s.severity)}">${this.escapeHtml(s.severity)}</span>
                     </div>
-                    <div class="suggestion-title">${s.title || s.issue}</div>
+                    <div class="suggestion-title">${this.escapeHtml(s.title || s.issue)}</div>
                     <div class="suggestion-location">
-                        <span class="suggestion-file">${s.file}</span>
+                        <span class="suggestion-file">${this.escapeHtml(s.file)}</span>
                         <span class="suggestion-lines">Lines ${s.start_line}-${s.end_line}</span>
                     </div>
-                    <div class="suggestion-issue">${s.issue}</div>
+                    <div class="suggestion-issue">${this.escapeHtml(s.issue)}</div>
                 </div>
-            `;
-            if (idx === 0) {
-                console.log('[Go Editor] First suggestion HTML:', suggestionHtml);
-            }
-            return suggestionHtml;
-        }).join('');
+            `).join('');
 
         listElement.innerHTML = html;
-        console.log('[Go Editor] HTML set, suggestion items:', listElement.querySelectorAll('.suggestion-item').length);
 
         // Add click handlers to navigate to file
         const items = listElement.querySelectorAll('.suggestion-item');

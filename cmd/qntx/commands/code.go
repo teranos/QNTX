@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -81,8 +83,10 @@ func runCodePr(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get current branch: %w", err)
 	}
-	currentBranch := string(branchOutput)
-	currentBranch = currentBranch[:len(currentBranch)-1] // trim newline
+	currentBranch := strings.TrimSpace(string(branchOutput))
+	if currentBranch == "" {
+		return fmt.Errorf("failed to determine current branch")
+	}
 
 	// Trigger workflow via gh CLI
 	workflowCmd := exec.Command("gh", "workflow", "run", codePrWorkflow,
@@ -95,6 +99,11 @@ func runCodePr(cmd *cobra.Command, args []string) error {
 	}
 
 	pterm.Success.Printf("Workflow triggered successfully!\n")
+
+	// Wait for workflow to start (mitigate race condition where GetLatestWorkflowRunID
+	// might return a different workflow if called too quickly)
+	pterm.Info.Println("Waiting for workflow to start...")
+	time.Sleep(2 * time.Second)
 
 	// Get the workflow run ID
 	runID, err := github.GetLatestWorkflowRunID(codePrWorkflow)
