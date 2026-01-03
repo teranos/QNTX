@@ -82,6 +82,7 @@ var TypeMapping = map[string]string{
 	"float64":                "number",
 	"byte":                   "number", // Go byte is alias for uint8
 	"bool":                   "boolean",
+	"error":                  "string", // Go error serializes as error message string
 	"time.Time":              "string",
 	"time.Duration":          "number",
 	"json.RawMessage":        "unknown",

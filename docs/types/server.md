@@ -60,7 +60,7 @@ export interface ChildJobInfo {
 
 ## CodeEntry
 
-**Source**: [`server/code_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/code_handler.go#L16)
+**Source**: [`server/code_handler.go:18`](https://github.com/teranos/QNTX/blob/main/server/code_handler.go#L18)
 
 
 <table>

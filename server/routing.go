@@ -14,9 +14,11 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                      // Dev mode status
 	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                      // Browser console debugging (dev mode only)
 	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                      // Prose content tree
-	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))              // Individual prose files
-	http.HandleFunc("/api/code", s.corsMiddleware(s.HandleCode))                        // Code file tree
-	http.HandleFunc("/api/code/", s.corsMiddleware(s.HandleCodeContent))                // Individual code files
+	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))                        // Individual prose files
+	http.HandleFunc("/api/code/github/pr/", s.corsMiddleware(s.HandleCodePRSuggestions))                 // PR fix suggestions
+	http.HandleFunc("/api/code/github/pr", s.corsMiddleware(s.HandleCodePRList))                         // List open PRs
+	http.HandleFunc("/api/code", s.corsMiddleware(s.HandleCode))                                  // Code file tree
+	http.HandleFunc("/api/code/", s.corsMiddleware(s.HandleCodeContent))                          // Individual code files
 	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution)) // Individual execution (GET) and logs (GET /logs)
 	// TODO: Remove ambiguous endpoint - use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead
 	// http.HandleFunc("/api/pulse/tasks/", s.corsMiddleware(s.HandlePulseTask))
