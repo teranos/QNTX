@@ -2,6 +2,7 @@ package am
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/viper"
 )
@@ -112,17 +113,40 @@ func (c *Config) GetDatabasePath() string {
 }
 
 // GetServerAllowedOrigins returns the allowed CORS origins
+// Merges configured origins with secure defaults, ensuring critical origins
+// (localhost, 127.0.0.1, tauri) are always included even if not in config
 func (c *Config) GetServerAllowedOrigins() []string {
-	if len(c.Server.AllowedOrigins) == 0 {
-		return []string{
-			"http://localhost",
-			"https://localhost",
-			"http://127.0.0.1",
-			"https://127.0.0.1",
-			"tauri://localhost", // Allow Tauri desktop app
-		}
+	// Define secure default origins that should always be allowed
+	defaults := []string{
+		"http://localhost",
+		"https://localhost",
+		"http://127.0.0.1",
+		"https://127.0.0.1",
+		"tauri://localhost", // Allow Tauri desktop app
 	}
-	return c.Server.AllowedOrigins
+
+	// If no custom origins configured, return defaults
+	if len(c.Server.AllowedOrigins) == 0 {
+		return defaults
+	}
+
+	// Merge: Start with defaults, add custom origins (deduplicated via map)
+	originSet := make(map[string]bool)
+	for _, origin := range defaults {
+		originSet[origin] = true
+	}
+	for _, origin := range c.Server.AllowedOrigins {
+		originSet[origin] = true
+	}
+
+	// Convert map to slice and sort for deterministic output
+	merged := make([]string, 0, len(originSet))
+	for origin := range originSet {
+		merged = append(merged, origin)
+	}
+	sort.Strings(merged)
+
+	return merged
 }
 
 // GetServerLogTheme returns the log theme (default: everforest)

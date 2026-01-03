@@ -25,6 +25,7 @@ tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png"] }
 tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
 
 # Generated types from QNTX Go source (single source of truth)
 qntx-types = { path = "../../types/generated/rust" }
