@@ -30,6 +30,11 @@ import { PulsePanelState } from './pulse/panel-state';
 import * as PanelRenderer from './pulse/panel';
 import { attachPanelEventListeners } from './pulse/panel-events';
 import type { DaemonStatusMessage } from '../types/websocket';
+import {
+    onExecutionStarted,
+    onExecutionCompleted,
+    onExecutionFailed,
+} from './pulse/events';
 
 // Global daemon status (updated via WebSocket)
 let currentDaemonStatus: DaemonStatusMessage | null = null;
@@ -40,6 +45,7 @@ let pulsePanelInstance: PulsePanel | null = null;
 class PulsePanel extends BasePanel {
     private jobs: Map<string, ScheduledJobResponse> = new Map();
     private state: PulsePanelState;
+    private unsubscribers: Array<() => void> = [];
 
     constructor() {
         super({
@@ -50,7 +56,98 @@ class PulsePanel extends BasePanel {
         });
 
         this.state = new PulsePanelState();
+        this.subscribeToEvents();
         pulsePanelInstance = this;
+    }
+
+    /**
+     * Subscribe to Pulse execution events for real-time updates
+     */
+    private subscribeToEvents(): void {
+        // Execution started - update last run time and add to inline list
+        this.unsubscribers.push(
+            onExecutionStarted((detail) => {
+                if (!this.isVisible) return;
+
+                const job = this.jobs.get(detail.scheduledJobId);
+                if (job) {
+                    job.last_run_at = new Date(detail.timestamp * 1000).toISOString();
+                }
+
+                // Add to inline execution list if job is expanded
+                if (this.state.isExpanded(detail.scheduledJobId)) {
+                    const executions = this.state.getExecutions(detail.scheduledJobId) || [];
+                    executions.unshift({
+                        id: detail.executionId,
+                        scheduled_job_id: detail.scheduledJobId,
+                        status: 'running',
+                        started_at: new Date(detail.timestamp * 1000).toISOString(),
+                        created_at: new Date(detail.timestamp * 1000).toISOString(),
+                        updated_at: new Date(detail.timestamp * 1000).toISOString(),
+                    } as any);
+                    this.state.setExecutions(detail.scheduledJobId, executions);
+                }
+
+                this.render();
+            })
+        );
+
+        // Execution completed - update execution status
+        this.unsubscribers.push(
+            onExecutionCompleted((detail) => {
+                if (!this.isVisible) return;
+
+                const job = this.jobs.get(detail.scheduledJobId);
+                if (job) {
+                    job.last_run_at = new Date(detail.timestamp * 1000).toISOString();
+                }
+
+                // Update inline execution if expanded
+                for (const [_jobId, executions] of this.state.jobExecutions.entries()) {
+                    const execution = executions.find(e => e.id === detail.executionId);
+                    if (execution) {
+                        Object.assign(execution, {
+                            status: 'completed',
+                            async_job_id: detail.asyncJobId,
+                            result_summary: detail.resultSummary,
+                            duration_ms: detail.durationMs,
+                            completed_at: new Date(detail.timestamp * 1000).toISOString(),
+                        });
+                        break;
+                    }
+                }
+
+                this.render();
+            })
+        );
+
+        // Execution failed - update execution status
+        this.unsubscribers.push(
+            onExecutionFailed((detail) => {
+                if (!this.isVisible) return;
+
+                const job = this.jobs.get(detail.scheduledJobId);
+                if (job) {
+                    job.last_run_at = new Date(detail.timestamp * 1000).toISOString();
+                }
+
+                // Update inline execution if expanded
+                for (const [_jobId, executions] of this.state.jobExecutions.entries()) {
+                    const execution = executions.find(e => e.id === detail.executionId);
+                    if (execution) {
+                        Object.assign(execution, {
+                            status: 'failed',
+                            error_message: detail.errorMessage,
+                            duration_ms: detail.durationMs,
+                            completed_at: new Date(detail.timestamp * 1000).toISOString(),
+                        });
+                        break;
+                    }
+                }
+
+                this.render();
+            })
+        );
     }
 
     protected getTemplate(): string {
