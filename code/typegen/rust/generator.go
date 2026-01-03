@@ -296,6 +296,14 @@ func collectExternalTypes(result *typegen.Result) []string {
 	externalTypes := make(map[string]bool)
 	definedTypes := make(map[string]bool)
 
+	// Rust primitive types that should never be imported
+	primitiveTypes := map[string]bool{
+		"u8": true, "u16": true, "u32": true, "u64": true, "u128": true, "usize": true,
+		"i8": true, "i16": true, "i32": true, "i64": true, "i128": true, "isize": true,
+		"f32": true, "f64": true, "bool": true, "char": true, "str": true,
+		"String": true, "Vec": true, "Option": true, "Result": true, "Box": true,
+	}
+
 	// Mark all types defined in this package
 	for typeName := range result.Types {
 		definedTypes[typeName] = true
@@ -323,8 +331,8 @@ func collectExternalTypes(result *typegen.Result) []string {
 			// Extract type references from this type string
 			refs := extractTypeReferences(typeStr)
 			for _, ref := range refs {
-				// Only add if it's not defined in current package
-				if !definedTypes[ref] {
+				// Only add if it's not defined in current package and not a primitive
+				if !definedTypes[ref] && !primitiveTypes[ref] {
 					externalTypes[ref] = true
 				}
 			}
