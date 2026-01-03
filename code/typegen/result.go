@@ -48,3 +48,13 @@ func IsConstReference(value string, consts map[string]string) bool {
 	_, isConst := consts[value]
 	return isConst
 }
+
+// FormatMapEntry formats a map key or value for output.
+// If the value is a const reference, applies constTransform; otherwise quotes it.
+// This is the common pattern used by all generators for map formatting.
+func FormatMapEntry(value string, consts map[string]string, constTransform func(string) string) string {
+	if IsConstReference(value, consts) {
+		return constTransform(value)
+	}
+	return "\"" + value + "\""
+}
