@@ -14,7 +14,7 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
-use crate::{u8, Execution, Job};
+use crate::{Execution, Job};
 
 /// ChildJobInfo represents a child job summary
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#childjobinfo>"]
