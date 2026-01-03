@@ -31,13 +31,7 @@ struct ServerState {
 
 /// Helper function to send notifications with consistent error handling and logging
 fn send_notification(app: &tauri::AppHandle, title: &str, body: String, log_message: String) {
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title(title)
-        .body(body)
-        .show()
-    {
+    if let Err(e) = app.notification().builder().title(title).body(body).show() {
         eprintln!("[notification] Failed to show notification: {}", e);
     }
     println!("[notification] {}", log_message);
@@ -148,7 +142,10 @@ fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: 
         &app,
         "QNTX: Server Draining",
         body,
-        format!("Server draining: {} active, {} queued", active_jobs, queued_jobs),
+        format!(
+            "Server draining: {} active, {} queued",
+            active_jobs, queued_jobs
+        ),
     );
 }
 
