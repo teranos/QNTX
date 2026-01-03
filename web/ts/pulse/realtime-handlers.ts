@@ -98,9 +98,6 @@ import {
     PulseExecutionLogStreamMessage
 } from '../../types/websocket';
 import { toast } from '../toast';
-import type { ScheduledJobResponse } from './types';
-import type { Execution } from './execution-types';
-import type { PulsePanelState } from './panel-state';
 import {
     dispatchExecutionStarted,
     dispatchExecutionCompleted,
@@ -109,81 +106,13 @@ import {
 } from './events';
 
 // ========================================================================
-// Panel update functions (extracted from pulse-panel.ts)
-// ========================================================================
-
-/**
- * Update last run timestamp for a job
- * Returns true if job was found and updated
- */
-export function updatePanelJobLastRun(
-    jobs: Map<string, ScheduledJobResponse>,
-    jobId: string,
-    lastRunAt: string
-): boolean {
-    const job = jobs.get(jobId);
-    if (!job) return false;
-
-    // Update job data
-    job.last_run_at = lastRunAt;
-    return true;
-}
-
-/**
- * Add or update execution in panel state
- * Returns true if execution was added/updated
- */
-export function addExecutionToPanel(
-    state: PulsePanelState,
-    execution: Partial<Execution>
-): boolean {
-    if (!execution.scheduled_job_id) return false;
-
-    const jobId = execution.scheduled_job_id;
-
-    // Only add if this job is expanded
-    if (!state.isExpanded(jobId)) return false;
-
-    // Get existing executions for this job
-    const executions = state.getExecutions(jobId) || [];
-
-    // Add new execution at the start
-    executions.unshift(execution as Execution);
-    state.setExecutions(jobId, executions);
-
-    return true;
-}
-
-/**
- * Update execution status/data in panel state
- * Returns true if execution was found and updated
- */
-export function updatePanelExecutionStatus(
-    state: PulsePanelState,
-    executionId: string,
-    updates: Partial<Execution>
-): boolean {
-    // Find which job contains this execution
-    for (const [_jobId, executions] of state.jobExecutions.entries()) {
-        const execution = executions.find(e => e.id === executionId);
-        if (execution) {
-            // Update execution fields
-            Object.assign(execution, updates);
-            return true;
-        }
-    }
-    return false;
-}
-
-// ========================================================================
 // WebSocket event handlers
 // ========================================================================
 
 /**
  * Handle execution started notification
- * Updates job card "last run" time if Pulse panel is visible
- * Adds execution to detail panel list if that job's panel is open
- * Notifies ATS block subscribers to show running state
+ * - Notifies ATS block subscribers to show running state
+ * - Dispatches custom event for panels (pulse-panel, job-detail-panel)
  */
 export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage): void {
     debugLog('[Pulse Realtime] Execution started:', {
@@ -196,53 +125,20 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
     notifyATSBlockSubscribers(data.scheduled_job_id, 'running', data.execution_id);
 
     // Dispatch custom event for type-safe cross-panel communication
+    // Panels subscribe to these events directly (see pulse-panel.ts and job-detail-panel.ts)
     dispatchExecutionStarted({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
         atsCode: data.ats_code,
         timestamp: data.timestamp
     });
-
-    // Update Pulse panel job card if it exists
-    // TODO(issue #16): Remove global window access after panels migrate to custom events
-    const pulsePanel = (window as any).pulsePanel;
-    if (pulsePanel && pulsePanel.isVisible) {
-        // Update last run timestamp
-        if (updatePanelJobLastRun(pulsePanel.jobs, data.scheduled_job_id, new Date(data.timestamp * 1000).toISOString())) {
-            pulsePanel.render();
-        }
-
-        // Also add to inline execution list if job is expanded
-        if (addExecutionToPanel(pulsePanel.state, {
-            id: data.execution_id,
-            scheduled_job_id: data.scheduled_job_id,
-            status: 'running',
-            started_at: new Date(data.timestamp * 1000).toISOString(),
-            created_at: new Date(data.timestamp * 1000).toISOString(),
-            updated_at: new Date(data.timestamp * 1000).toISOString(),
-        })) {
-            pulsePanel.render();
-        }
-    }
-
-    // Update job detail panel if viewing this job
-    const jobDetailPanel = (window as any).jobDetailPanel;
-    if (jobDetailPanel && jobDetailPanel.isShowingJob(data.scheduled_job_id)) {
-        jobDetailPanel.addStartedExecution({
-            id: data.execution_id,
-            scheduled_job_id: data.scheduled_job_id,
-            status: 'running',
-            started_at: new Date(data.timestamp * 1000).toISOString(),
-            created_at: new Date(data.timestamp * 1000).toISOString(),
-            updated_at: new Date(data.timestamp * 1000).toISOString(),
-        });
-    }
 }
 
 /**
  * Handle execution failed notification
- * Updates UI and ALWAYS shows failure toast
- * Notifies ATS block subscribers to show failed state
+ * - Notifies ATS block subscribers to show failed state
+ * - Dispatches custom event for panels
+ * - Shows failure toast notification
  */
 export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): void {
     debugLog('[Pulse Realtime] Execution failed:', {
@@ -256,6 +152,7 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
     notifyATSBlockSubscribers(data.scheduled_job_id, 'failed', data.execution_id);
 
     // Dispatch custom event for type-safe cross-panel communication
+    // Panels subscribe to these events directly (see pulse-panel.ts and job-detail-panel.ts)
     dispatchExecutionFailed({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
@@ -265,51 +162,14 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
         timestamp: data.timestamp
     });
 
-    // Update Pulse panel job card
-    // TODO(issue #16): Remove global window access after panels migrate to custom events
-    const pulsePanel = (window as any).pulsePanel;
-    if (pulsePanel && pulsePanel.isVisible) {
-        let needsRender = false;
-
-        // Update last run timestamp
-        if (updatePanelJobLastRun(pulsePanel.jobs, data.scheduled_job_id, new Date(data.timestamp * 1000).toISOString())) {
-            needsRender = true;
-        }
-
-        // Also update inline execution list if job is expanded
-        if (updatePanelExecutionStatus(pulsePanel.state, data.execution_id, {
-            status: 'failed',
-            error_message: data.error_message,
-            duration_ms: data.duration_ms,
-            completed_at: new Date(data.timestamp * 1000).toISOString(),
-        })) {
-            needsRender = true;
-        }
-
-        if (needsRender) {
-            pulsePanel.render();
-        }
-    }
-
-    // Update job detail panel if viewing this job
-    const jobDetailPanel = (window as any).jobDetailPanel;
-    if (jobDetailPanel && jobDetailPanel.isShowingJob(data.scheduled_job_id)) {
-        jobDetailPanel.updateExecutionStatus(data.execution_id, {
-            status: 'failed',
-            error_message: data.error_message,
-            duration_ms: data.duration_ms,
-            completed_at: new Date(data.timestamp * 1000).toISOString(),
-        });
-    }
-
     // ALWAYS show failure toast
     toast.error(`Pulse job failed: ${data.ats_code}\n\nError: ${data.error_message}`);
 }
 
 /**
  * Handle execution completed notification
- * Updates job card and detail panel (no toast for success)
- * Notifies ATS block subscribers to show completed state
+ * - Notifies ATS block subscribers to show completed state
+ * - Dispatches custom event for panels
  */
 export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessage): void {
     debugLog('[Pulse Realtime] Execution completed:', {
@@ -323,6 +183,7 @@ export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessa
     notifyATSBlockSubscribers(data.scheduled_job_id, 'completed', data.execution_id);
 
     // Dispatch custom event for type-safe cross-panel communication
+    // Panels subscribe to these events directly (see pulse-panel.ts and job-detail-panel.ts)
     dispatchExecutionCompleted({
         scheduledJobId: data.scheduled_job_id,
         executionId: data.execution_id,
@@ -331,50 +192,11 @@ export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessa
         durationMs: data.duration_ms,
         timestamp: data.timestamp
     });
-
-    // Update Pulse panel job card
-    // TODO(issue #16): Remove global window access after panels migrate to custom events
-    const pulsePanel = (window as any).pulsePanel;
-    if (pulsePanel && pulsePanel.isVisible) {
-        let needsRender = false;
-
-        // Update last run timestamp
-        if (updatePanelJobLastRun(pulsePanel.jobs, data.scheduled_job_id, new Date(data.timestamp * 1000).toISOString())) {
-            needsRender = true;
-        }
-
-        // Also update inline execution list if job is expanded
-        if (updatePanelExecutionStatus(pulsePanel.state, data.execution_id, {
-            status: 'completed',
-            async_job_id: data.async_job_id,
-            result_summary: data.result_summary,
-            duration_ms: data.duration_ms,
-            completed_at: new Date(data.timestamp * 1000).toISOString(),
-        })) {
-            needsRender = true;
-        }
-
-        if (needsRender) {
-            pulsePanel.render();
-        }
-    }
-
-    // Update job detail panel if viewing this job
-    const jobDetailPanel = (window as any).jobDetailPanel;
-    if (jobDetailPanel && jobDetailPanel.isShowingJob(data.scheduled_job_id)) {
-        jobDetailPanel.updateExecutionStatus(data.execution_id, {
-            status: 'completed',
-            async_job_id: data.async_job_id,
-            result_summary: data.result_summary,
-            duration_ms: data.duration_ms,
-            completed_at: new Date(data.timestamp * 1000).toISOString(),
-        });
-    }
 }
 
 /**
  * Handle live log streaming
- * Only appends logs if detail panel is viewing this specific job
+ * - Dispatches custom event for panels to handle log streaming
  */
 export function handlePulseExecutionLogStream(data: PulseExecutionLogStreamMessage): void {
     debugLog('[Pulse Realtime] Log chunk received:', {
@@ -390,10 +212,6 @@ export function handlePulseExecutionLogStream(data: PulseExecutionLogStreamMessa
         logChunk: data.log_chunk
     });
 
-    // Only stream logs if detail panel is viewing this job
-    // TODO(issue #16): Remove global window access after panels migrate to custom events
-    const jobDetailPanel = (window as any).jobDetailPanel;
-    if (jobDetailPanel && jobDetailPanel.isShowingJob(data.scheduled_job_id)) {
-        jobDetailPanel.appendExecutionLog(data.execution_id, data.log_chunk);
-    }
+    // Job detail panel now subscribes to custom events directly
+    // See job-detail-panel.ts subscribeToEvents()
 }

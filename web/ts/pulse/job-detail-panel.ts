@@ -21,6 +21,12 @@ import {
 } from './execution-api.ts';
 import { forceTriggerJob } from './api.ts';
 import { showErrorDialog } from '../error-dialog.ts';
+import {
+  onExecutionStarted,
+  onExecutionCompleted,
+  onExecutionFailed,
+  onExecutionLog,
+} from './events.ts';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;
@@ -40,8 +46,65 @@ class JobDetailPanel {
   private taskLogs: Map<string, TaskLogsResponse> = new Map();
   private loadingTasks: Set<string> = new Set(); // Track tasks currently being loaded
 
+  // Event unsubscribe functions
+  private unsubscribers: Array<() => void> = [];
+
   constructor() {
     this.initialize();
+    this.subscribeToEvents();
+  }
+
+  /**
+   * Subscribe to Pulse execution events for real-time updates
+   */
+  private subscribeToEvents(): void {
+    // Execution started
+    this.unsubscribers.push(
+      onExecutionStarted((detail) => {
+        if (!this.isShowingJob(detail.scheduledJobId)) return;
+
+        this.addStartedExecution({
+          id: detail.executionId,
+          scheduled_job_id: detail.scheduledJobId,
+          status: 'running',
+          started_at: new Date(detail.timestamp * 1000).toISOString(),
+          created_at: new Date(detail.timestamp * 1000).toISOString(),
+          updated_at: new Date(detail.timestamp * 1000).toISOString(),
+        });
+      })
+    );
+
+    // Execution completed
+    this.unsubscribers.push(
+      onExecutionCompleted((detail) => {
+        this.updateExecutionStatus(detail.executionId, {
+          status: 'completed',
+          async_job_id: detail.asyncJobId,
+          result_summary: detail.resultSummary,
+          duration_ms: detail.durationMs,
+          completed_at: new Date(detail.timestamp * 1000).toISOString(),
+        });
+      })
+    );
+
+    // Execution failed
+    this.unsubscribers.push(
+      onExecutionFailed((detail) => {
+        this.updateExecutionStatus(detail.executionId, {
+          status: 'failed',
+          error_message: detail.errorMessage,
+          duration_ms: detail.durationMs,
+          completed_at: new Date(detail.timestamp * 1000).toISOString(),
+        });
+      })
+    );
+
+    // Execution log streaming
+    this.unsubscribers.push(
+      onExecutionLog((detail) => {
+        this.appendExecutionLog(detail.executionId, detail.logChunk);
+      })
+    );
   }
 
   private initialize(): void {
