@@ -43,6 +43,21 @@ fn send_notification(app: &tauri::AppHandle, title: &str, body: String, log_mess
     println!("[notification] {}", log_message);
 }
 
+/// Helper to show window, focus it, and emit an event
+fn show_window_and_emit<P: serde::Serialize + Clone>(
+    app: &tauri::AppHandle,
+    event_name: &str,
+    payload: P,
+) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Err(e) = window.emit(event_name, payload) {
+            eprintln!("[menu] Failed to emit {} event: {}", event_name, e);
+        }
+    }
+}
+
 #[tauri::command]
 fn get_server_status(state: State<ServerState>) -> serde_json::Value {
     let child = state.child.lock().unwrap();
@@ -412,61 +427,19 @@ fn main() {
                         }
                         // View menu - emit events to show panels
                         "config_panel" | "preferences" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-config-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-config-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-config-panel", ());
                         }
                         "pulse_panel" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-pulse-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-pulse-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-pulse-panel", ());
                         }
                         "prose_panel" | "documentation" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-prose-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-prose-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-prose-panel", ());
                         }
                         "code_panel" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-code-panel", ()) {
-                                    eprintln!("[menu] Failed to emit show-code-panel event: {}", e);
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-code-panel", ());
                         }
                         "hixtory_panel" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-hixtory-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-hixtory-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-hixtory-panel", ());
                         }
                         "refresh_graph" => {
                             if let Some(window) = app_handle.get_webview_window("main") {
@@ -552,14 +525,8 @@ fn main() {
                             }
                             app.exit(0);
                         } else if event.id == "preferences" {
-                            // Open preferences (config panel)
-                            if let Some(window) = app.get_webview_window("main") {
-                                // Show window if hidden
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                // Emit event to show config panel (always show, never toggle)
-                                let _ = window.emit("show-config-panel", ());
-                            }
+                            // Open preferences (config panel) - show window and emit event
+                            show_window_and_emit(app, "show-config-panel", ());
                         } else if event.id == "toggle_pulse" {
                             // Toggle Pulse daemon (emit event to frontend)
                             if let Some(window) = app.get_webview_window("main") {
