@@ -101,6 +101,12 @@ import { toast } from '../toast';
 import type { ScheduledJobResponse } from './types';
 import type { Execution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
+import {
+    dispatchExecutionStarted,
+    dispatchExecutionCompleted,
+    dispatchExecutionFailed,
+    dispatchExecutionLog
+} from './events';
 
 // ========================================================================
 // Panel update functions (extracted from pulse-panel.ts)
@@ -189,7 +195,16 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
     // Notify ATS block subscribers
     notifyATSBlockSubscribers(data.scheduled_job_id, 'running', data.execution_id);
 
+    // Dispatch custom event for type-safe cross-panel communication
+    dispatchExecutionStarted({
+        scheduledJobId: data.scheduled_job_id,
+        executionId: data.execution_id,
+        atsCode: data.ats_code,
+        timestamp: data.timestamp
+    });
+
     // Update Pulse panel job card if it exists
+    // TODO(issue #16): Remove global window access after panels migrate to custom events
     const pulsePanel = (window as any).pulsePanel;
     if (pulsePanel && pulsePanel.isVisible) {
         // Update last run timestamp
@@ -240,7 +255,18 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
     // Notify ATS block subscribers
     notifyATSBlockSubscribers(data.scheduled_job_id, 'failed', data.execution_id);
 
+    // Dispatch custom event for type-safe cross-panel communication
+    dispatchExecutionFailed({
+        scheduledJobId: data.scheduled_job_id,
+        executionId: data.execution_id,
+        errorMessage: data.error_message,
+        durationMs: data.duration_ms,
+        atsCode: data.ats_code,
+        timestamp: data.timestamp
+    });
+
     // Update Pulse panel job card
+    // TODO(issue #16): Remove global window access after panels migrate to custom events
     const pulsePanel = (window as any).pulsePanel;
     if (pulsePanel && pulsePanel.isVisible) {
         let needsRender = false;
@@ -296,7 +322,18 @@ export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessa
     // Notify ATS block subscribers
     notifyATSBlockSubscribers(data.scheduled_job_id, 'completed', data.execution_id);
 
+    // Dispatch custom event for type-safe cross-panel communication
+    dispatchExecutionCompleted({
+        scheduledJobId: data.scheduled_job_id,
+        executionId: data.execution_id,
+        asyncJobId: data.async_job_id,
+        resultSummary: data.result_summary,
+        durationMs: data.duration_ms,
+        timestamp: data.timestamp
+    });
+
     // Update Pulse panel job card
+    // TODO(issue #16): Remove global window access after panels migrate to custom events
     const pulsePanel = (window as any).pulsePanel;
     if (pulsePanel && pulsePanel.isVisible) {
         let needsRender = false;
@@ -346,7 +383,15 @@ export function handlePulseExecutionLogStream(data: PulseExecutionLogStreamMessa
         chunk_length: data.log_chunk.length
     });
 
+    // Dispatch custom event for type-safe cross-panel communication
+    dispatchExecutionLog({
+        scheduledJobId: data.scheduled_job_id,
+        executionId: data.execution_id,
+        logChunk: data.log_chunk
+    });
+
     // Only stream logs if detail panel is viewing this job
+    // TODO(issue #16): Remove global window access after panels migrate to custom events
     const jobDetailPanel = (window as any).jobDetailPanel;
     if (jobDetailPanel && jobDetailPanel.isShowingJob(data.scheduled_job_id)) {
         jobDetailPanel.appendExecutionLog(data.execution_id, data.log_chunk);
