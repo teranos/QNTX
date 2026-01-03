@@ -321,7 +321,7 @@ class GoEditorPanel extends BasePanel {
                         }]
                     }),
                     EditorView.lineWrapping,
-                    EditorView.updateListener.of((update) => {
+                    EditorView.updateListener.of((update: any) => {
                         if (update.docChanged) {
                             this.hasUnsavedChanges = true;
                             this.updateSaveIndicator();
