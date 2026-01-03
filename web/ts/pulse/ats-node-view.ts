@@ -79,20 +79,11 @@ export class ATSNodeView implements NodeView {
 
   /**
    * Update the visual execution state of the block
+   * Uses data-execution-state attribute for cleaner state management
    */
   private updateExecutionState(state: ATSExecutionState): void {
     this.executionState = state;
-
-    // Remove all execution state classes
-    this.dom.classList.remove(
-      'execution-idle',
-      'execution-running',
-      'execution-completed',
-      'execution-failed'
-    );
-
-    // Add the current state class
-    this.dom.classList.add(`execution-${state}`);
+    this.dom.dataset.executionState = state;
   }
 
   /**
