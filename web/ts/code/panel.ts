@@ -7,6 +7,7 @@
 
 import { BasePanel } from '../base-panel.ts';
 import { GoEditorNavigation } from './navigation.ts';
+import { CodeSuggestions } from './suggestions.ts';
 import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
 
@@ -27,11 +28,10 @@ class GoEditorPanel extends BasePanel {
     private hasUnsavedChanges: boolean = false;
     private isDevMode: boolean = false;
     private workspaceRoot: string = '';
-    private currentTab: 'editor' | 'suggestions' = 'editor';
-    private currentPR: number | null = null;
 
     // Components
     private navigation: GoEditorNavigation;
+    private suggestions: CodeSuggestions;
 
     // DOM elements
     private breadcrumbElement: HTMLElement | null = null;
@@ -53,6 +53,14 @@ class GoEditorPanel extends BasePanel {
         this.navigation = new GoEditorNavigation({
             onFileSelect: (path: string) => {
                 this.loadFile(path);
+            }
+        });
+
+        // Initialize suggestions with callback (panel is guaranteed to exist from BasePanel)
+        this.suggestions = new CodeSuggestions({
+            panel: this.panel!,
+            onNavigateToFile: (filePath: string, line: number) => {
+                this.openFileAtLine(filePath, line);
             }
         });
 
@@ -80,44 +88,11 @@ class GoEditorPanel extends BasePanel {
                 <button class="go-editor-tab" data-tab="suggestions">Suggestions</button>
             </div>
             <div class="prose-body">
-                <div class="prose-sidebar" id="editor-sidebar">
-                    <div class="prose-sidebar-header">
-                        <input type="text" class="prose-search go-editor-search" placeholder="Search files..." />
-                    </div>
-                    <div class="prose-recent" id="go-editor-recent">
-                        <!-- Recent files will be populated here -->
-                    </div>
-                    <div class="prose-tree" id="go-editor-tree">
-                        <!-- Tree will be populated here -->
-                    </div>
+                <div class="prose-sidebar" id="tab-sidebar">
+                    <!-- Sidebar content dynamically rendered here -->
                 </div>
-                <div class="prose-sidebar hidden" id="suggestions-sidebar">
-                    <div class="prose-sidebar-header">
-                        <input type="number" class="prose-search" id="pr-number-input" placeholder="PR number..." min="1" />
-                        <button class="btn-primary" id="load-pr-btn">Load</button>
-                    </div>
-                    <div id="pr-info" class="hidden">
-                        <div class="pr-stats">
-                            <span id="suggestion-count">0 suggestions</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="prose-content" id="editor-content">
-                    <div class="go-editor-info">
-                        <span>💡 gopls LSP</span>
-                        <span class="go-editor-info-status">Status: <span id="gopls-status" class="gopls-status-connecting">connecting...</span></span>
-                        <span class="go-editor-save-indicator hidden"></span>
-                    </div>
-                    <div class="prose-editor-container">
-                        <div id="go-editor-container" class="go-editor-container">
-                            <!-- CodeMirror will be initialized here -->
-                        </div>
-                    </div>
-                </div>
-                <div class="prose-content hidden" id="suggestions-content">
-                    <div id="suggestions-list" class="suggestions-list">
-                        <!-- Suggestions will be populated here -->
-                    </div>
+                <div class="prose-content" id="tab-content">
+                    <!-- Tab content dynamically rendered here -->
                 </div>
             </div>
         `;
@@ -136,18 +111,6 @@ class GoEditorPanel extends BasePanel {
                 const tabName = target.dataset.tab as 'editor' | 'suggestions';
                 this.switchTab(tabName);
             });
-        });
-
-        // PR suggestions loading
-        const loadBtn = this.$('#load-pr-btn');
-        loadBtn?.addEventListener('click', () => this.loadPRSuggestions());
-
-        // Load PR on Enter key in input
-        const prInput = this.$('#pr-number-input') as HTMLInputElement;
-        prInput?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.loadPRSuggestions();
-            }
         });
 
         // Save on Cmd/Ctrl+S
@@ -170,6 +133,9 @@ class GoEditorPanel extends BasePanel {
     protected async onShow(): Promise<void> {
         // Fetch dev mode status
         this.isDevMode = await fetchDevMode();
+
+        // Initialize editor tab (renders sidebar and content)
+        this.switchTab('editor');
 
         // Load navigation tree and recent files
         await this.navigation.refresh();
@@ -435,8 +401,6 @@ class GoEditorPanel extends BasePanel {
     }
 
     switchTab(tab: 'editor' | 'suggestions'): void {
-        this.currentTab = tab;
-
         // Update tab buttons
         const tabs = this.panel?.querySelectorAll('.go-editor-tab');
         tabs?.forEach(t => {
@@ -448,97 +412,86 @@ class GoEditorPanel extends BasePanel {
             }
         });
 
-        // Show/hide content
-        const editorSidebar = this.$('#editor-sidebar');
-        const suggestionsSidebar = this.$('#suggestions-sidebar');
-        const editorContent = this.$('#editor-content');
-        const suggestionsContent = this.$('#suggestions-content');
+        // Render tab content dynamically
+        const sidebar = this.$('#tab-sidebar') as HTMLElement;
+        const content = this.$('#tab-content') as HTMLElement;
+
+        if (!sidebar || !content) return;
 
         if (tab === 'editor') {
-            editorSidebar?.classList.remove('hidden');
-            suggestionsSidebar?.classList.add('hidden');
-            editorContent?.classList.remove('hidden');
-            suggestionsContent?.classList.add('hidden');
-        } else {
-            editorSidebar?.classList.add('hidden');
-            suggestionsSidebar?.classList.remove('hidden');
-            editorContent?.classList.add('hidden');
-            suggestionsContent?.classList.remove('hidden');
-        }
-    }
+            // Render editor sidebar
+            sidebar.innerHTML = `
+                <div class="prose-sidebar-header">
+                    <input type="text" class="prose-search go-editor-search" placeholder="Search files..." />
+                </div>
+                <div class="prose-recent" id="go-editor-recent">
+                    <!-- Recent files will be populated here -->
+                </div>
+                <div class="prose-tree" id="go-editor-tree">
+                    <!-- Tree will be populated here -->
+                </div>
+            `;
 
-    async loadPRSuggestions(): Promise<void> {
-        const prInput = this.$('#pr-number-input') as HTMLInputElement;
-        const prNumber = parseInt(prInput?.value || '0');
+            // Render editor content
+            content.innerHTML = `
+                <div class="go-editor-info">
+                    <span>💡 gopls LSP</span>
+                    <span class="go-editor-info-status">Status: <span id="gopls-status" class="gopls-status-connecting">connecting...</span></span>
+                    <span class="go-editor-save-indicator hidden"></span>
+                </div>
+                <div class="prose-editor-container">
+                    <div id="go-editor-container" class="go-editor-container">
+                        <!-- CodeMirror will be initialized here -->
+                    </div>
+                </div>
+            `;
 
-        if (!prNumber || prNumber <= 0) {
-            alert('Please enter a valid PR number');
-            return;
-        }
+            // Re-bind navigation and status elements after DOM change
+            this.navigation.bindElements(this.panel!);
+            this.statusElement = this.panel!.querySelector('#gopls-status');
+            this.saveIndicator = this.panel!.querySelector('.go-editor-save-indicator');
 
-        this.currentPR = prNumber;
-
-        try {
-            const response = await apiFetch(`/api/code/pr/${prNumber}/suggestions`);
-            const suggestions = await response.json();
-
-            this.renderSuggestions(suggestions);
-
-            // Show PR info
-            const prInfo = this.$('#pr-info');
-            const suggestionCount = this.$('#suggestion-count');
-            if (prInfo && suggestionCount) {
-                prInfo.classList.remove('hidden');
-                suggestionCount.textContent = `${suggestions.length} suggestion${suggestions.length !== 1 ? 's' : ''}`;
+            // Reinitialize editor if we had content
+            if (this.currentPath && this.editor) {
+                // Store current content before destroying
+                const currentContent = this.editor.state.doc.toString();
+                this.destroyEditor();
+                this.initializeEditor(currentContent);
             }
-        } catch (error) {
-            console.error('[Go Editor] Failed to load PR suggestions:', error);
-            alert(`Failed to load suggestions for PR #${prNumber}`);
-        }
-    }
-
-    renderSuggestions(suggestions: any[]): void {
-        const listElement = this.$('#suggestions-list');
-        if (!listElement) return;
-
-        if (suggestions.length === 0) {
-            listElement.innerHTML = '<div class="no-suggestions">No suggestions found for this PR</div>';
-            return;
-        }
-
-        const html = suggestions.map(s => `
-            <div class="suggestion-item severity-${s.severity}" data-file="${s.file}" data-line="${s.start_line}">
-                <div class="suggestion-header">
-                    <span class="suggestion-id">${s.id}</span>
-                    ${s.category ? `<span class="suggestion-category">${s.category}</span>` : ''}
-                    <span class="suggestion-severity severity-badge-${s.severity}">${s.severity}</span>
+        } else {
+            // Render suggestions sidebar
+            sidebar.innerHTML = `
+                <div class="prose-sidebar-header">
+                    <select class="prose-search" id="pr-select">
+                        <option value="">Loading PRs...</option>
+                    </select>
                 </div>
-                <div class="suggestion-title">${s.title || s.issue}</div>
-                <div class="suggestion-location">
-                    <span class="suggestion-file">${s.file}</span>
-                    <span class="suggestion-lines">Lines ${s.start_line}-${s.end_line}</span>
+                <div id="pr-info" class="hidden">
+                    <div class="pr-stats">
+                        <span id="suggestion-count">0 suggestions</span>
+                    </div>
                 </div>
-                <div class="suggestion-issue">${s.issue}</div>
-            </div>
-        `).join('');
+            `;
 
-        listElement.innerHTML = html;
+            // Render suggestions content with proper container structure
+            content.innerHTML = `
+                <div id="suggestions-content">
+                    <div id="suggestions-list" class="suggestions-list">
+                        <div class="no-suggestions">Select a PR to view suggestions</div>
+                    </div>
+                </div>
+            `;
 
-        // Add click handlers to navigate to file
-        const items = listElement.querySelectorAll('.suggestion-item');
-        items.forEach(item => {
-            item.addEventListener('click', () => {
-                const file = item.getAttribute('data-file');
-                const line = parseInt(item.getAttribute('data-line') || '0');
-                if (file) {
-                    this.openFileAtLine(file, line);
-                }
-            });
-        });
+            // Load open PRs into dropdown
+            this.suggestions.loadOpenPRs();
+        }
     }
 
     openFileAtLine(filePath: string, line: number): void {
-        // Load the file first
+        // Switch to editor tab FIRST (so the container exists)
+        this.switchTab('editor');
+
+        // Then load the file
         this.loadFile(filePath).then(() => {
             // Scroll to line after file loads (CodeMirror 6 API)
             if (this.editor && line > 0) {
@@ -556,9 +509,6 @@ class GoEditorPanel extends BasePanel {
                     }
                 }, 100);
             }
-
-            // Switch to editor tab AFTER loading
-            this.switchTab('editor');
         });
     }
 }
