@@ -233,7 +233,7 @@ fn main() {
                     .unwrap_or_else(|| std::path::PathBuf::from("."));
 
                 let child = match Command::new(&binary_path)
-                    .args(&["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
+                    .args(["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
                     .current_dir(&working_dir)
                     .stdout(Stdio::inherit())
                     .stderr(Stdio::inherit())
@@ -249,7 +249,7 @@ fn main() {
                             .notification()
                             .builder()
                             .title("QNTX Server Failed")
-                            .body(&format!(
+                            .body(format!(
                                 "Failed to start server: {}. Features will not work.",
                                 e
                             ))
