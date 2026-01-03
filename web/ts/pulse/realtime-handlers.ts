@@ -6,10 +6,12 @@
  * - Execution failed notifications (with toast)
  * - Execution completed notifications
  * - Live log streaming
+ * - ATS block execution state subscriptions
  *
  * Updates both:
  * - Pulse panel inline execution view (when job is expanded)
  * - Job detail panel full history (when viewing specific job)
+ * - ATS code blocks (border color based on execution state)
  *
  * TODO(#30): Future real-time improvements:
  * - Add execution progress updates (percentage completion)
@@ -19,6 +21,76 @@
  */
 
 import { debugLog } from '../debug';
+
+// ========================================================================
+// ATS Block Execution State Subscriptions
+// ========================================================================
+
+/**
+ * Execution state for ATS blocks
+ */
+export type ATSExecutionState = 'idle' | 'running' | 'completed' | 'failed';
+
+/**
+ * Subscriber callback for ATS execution state changes
+ */
+export type ATSExecutionStateCallback = (state: ATSExecutionState, executionId?: string) => void;
+
+/**
+ * Map of scheduled job ID -> subscribers
+ */
+const atsBlockSubscribers = new Map<string, Set<ATSExecutionStateCallback>>();
+
+/**
+ * Subscribe an ATS block to execution state updates for a scheduled job
+ * @param scheduledJobId - The scheduled job ID to subscribe to
+ * @param callback - Called when execution state changes
+ * @returns Unsubscribe function
+ */
+export function subscribeATSBlock(
+    scheduledJobId: string,
+    callback: ATSExecutionStateCallback
+): () => void {
+    if (!atsBlockSubscribers.has(scheduledJobId)) {
+        atsBlockSubscribers.set(scheduledJobId, new Set());
+    }
+    atsBlockSubscribers.get(scheduledJobId)!.add(callback);
+
+    debugLog('[ATS Block] Subscribed to job:', scheduledJobId);
+
+    // Return unsubscribe function
+    return () => {
+        const subscribers = atsBlockSubscribers.get(scheduledJobId);
+        if (subscribers) {
+            subscribers.delete(callback);
+            if (subscribers.size === 0) {
+                atsBlockSubscribers.delete(scheduledJobId);
+            }
+        }
+        debugLog('[ATS Block] Unsubscribed from job:', scheduledJobId);
+    };
+}
+
+/**
+ * Notify all ATS block subscribers of a state change
+ */
+function notifyATSBlockSubscribers(
+    scheduledJobId: string,
+    state: ATSExecutionState,
+    executionId?: string
+): void {
+    const subscribers = atsBlockSubscribers.get(scheduledJobId);
+    if (subscribers) {
+        debugLog('[ATS Block] Notifying', subscribers.size, 'subscribers for job:', scheduledJobId, 'state:', state);
+        for (const callback of subscribers) {
+            try {
+                callback(state, executionId);
+            } catch (error) {
+                console.error('[ATS Block] Subscriber callback error:', error);
+            }
+        }
+    }
+}
 import {
     PulseExecutionStartedMessage,
     PulseExecutionFailedMessage,
@@ -105,6 +177,7 @@ export function updatePanelExecutionStatus(
  * Handle execution started notification
  * Updates job card "last run" time if Pulse panel is visible
  * Adds execution to detail panel list if that job's panel is open
+ * Notifies ATS block subscribers to show running state
  */
 export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage): void {
     debugLog('[Pulse Realtime] Execution started:', {
@@ -112,6 +185,9 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
         execution_id: data.execution_id,
         ats_code: data.ats_code
     });
+
+    // Notify ATS block subscribers
+    notifyATSBlockSubscribers(data.scheduled_job_id, 'running', data.execution_id);
 
     // Update Pulse panel job card if it exists
     const pulsePanel = (window as any).pulsePanel;
@@ -151,6 +227,7 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
 /**
  * Handle execution failed notification
  * Updates UI and ALWAYS shows failure toast
+ * Notifies ATS block subscribers to show failed state
  */
 export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): void {
     debugLog('[Pulse Realtime] Execution failed:', {
@@ -159,6 +236,9 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
         error: data.error_message,
         duration_ms: data.duration_ms
     });
+
+    // Notify ATS block subscribers
+    notifyATSBlockSubscribers(data.scheduled_job_id, 'failed', data.execution_id);
 
     // Update Pulse panel job card
     const pulsePanel = (window as any).pulsePanel;
@@ -203,6 +283,7 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
 /**
  * Handle execution completed notification
  * Updates job card and detail panel (no toast for success)
+ * Notifies ATS block subscribers to show completed state
  */
 export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessage): void {
     debugLog('[Pulse Realtime] Execution completed:', {
@@ -211,6 +292,9 @@ export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessa
         async_job_id: data.async_job_id,
         duration_ms: data.duration_ms
     });
+
+    // Notify ATS block subscribers
+    notifyATSBlockSubscribers(data.scheduled_job_id, 'completed', data.execution_id);
 
     // Update Pulse panel job card
     const pulsePanel = (window as any).pulsePanel;

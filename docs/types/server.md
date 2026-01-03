@@ -657,6 +657,51 @@ export interface LogEntry {
 </tr>
 </table>
 
+## ParsedATSCode
+
+**Source**: [`server/ats_parser.go:21`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L21)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type ParsedATSCode struct {
+	HandlerName string
+	Payload []byte
+	SourceURL string
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface ParsedATSCode {
+  /**
+   * HandlerName is the async handler to invoke (e.g., "ixgest.git")
+   */
+  HandlerName: string;
+  /**
+   * Payload is the pre-computed JSON payload for the handler
+   */
+  Payload: byte[];
+  /**
+   * SourceURL is used for deduplication (e.g., the git repo URL)
+   */
+  SourceURL: string;
+}
+```
+
+</td>
+</tr>
+</table>
+
 ## ProgressMessage
 
 **Source**: [`server/types.go:78`](https://github.com/teranos/QNTX/blob/main/server/types.go#L78)
