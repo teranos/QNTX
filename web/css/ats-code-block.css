@@ -20,7 +20,7 @@
 
 /* ============================================================================
    Execution State Indicators
-   Shows real-time execution state via border color changes
+   Uses data-execution-state attribute for cleaner state management
    ============================================================================ */
 
 /* Base wrapper styles - ensure border is visible */
@@ -30,21 +30,21 @@
 }
 
 /* Idle state - default styling (job scheduled, waiting for next run) */
-.ats-code-block-wrapper.execution-idle {
+.ats-code-block-wrapper[data-execution-state="idle"] {
     border-left-color: var(--ats-editor-border-accent);
 }
 
 /* Running state - blue border (execution in progress) */
-.ats-code-block-wrapper.execution-running {
+.ats-code-block-wrapper[data-execution-state="running"] {
     border-left-color: var(--accent-blue, #3b82f6);
 }
 
 /* Completed state - green border (last execution succeeded) */
-.ats-code-block-wrapper.execution-completed {
+.ats-code-block-wrapper[data-execution-state="completed"] {
     border-left-color: var(--accent-green, #22c55e);
 }
 
 /* Failed state - red border (last execution failed) */
-.ats-code-block-wrapper.execution-failed {
+.ats-code-block-wrapper[data-execution-state="failed"] {
     border-left-color: var(--accent-red, #ef4444);
 }
