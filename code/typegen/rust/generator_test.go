@@ -5,6 +5,8 @@ import (
 	"go/token"
 	"strings"
 	"testing"
+
+	"github.com/teranos/QNTX/code/typegen/util"
 )
 
 // =============================================================================
@@ -30,34 +32,34 @@ func TestParseFieldTags(t *testing.T) {
 	tests := []struct {
 		name        string
 		tag         string
-		expectedTag FieldTagInfo
+		expectedTag util.FieldTagInfo
 	}{
 		{
 			name: "simple json tag",
 			tag:  `json:"field_name"`,
-			expectedTag: FieldTagInfo{
-				JSONName:   "field_name",
-				Omitempty:  false,
-				Skip:       false,
-				RustType:   "",
-				RustOption: false,
+			expectedTag: util.FieldTagInfo{
+				JSONName:       "field_name",
+				Omitempty:      false,
+				Skip:           false,
+				CustomType:     "",
+				CustomOptional: false,
 			},
 		},
 		{
 			name: "json with omitempty",
 			tag:  `json:"field_name,omitempty"`,
-			expectedTag: FieldTagInfo{
-				JSONName:   "field_name",
-				Omitempty:  true,
-				Skip:       false,
-				RustType:   "",
-				RustOption: false,
+			expectedTag: util.FieldTagInfo{
+				JSONName:       "field_name",
+				Omitempty:      true,
+				Skip:           false,
+				CustomType:     "",
+				CustomOptional: false,
 			},
 		},
 		{
 			name: "json skip",
 			tag:  `json:"-"`,
-			expectedTag: FieldTagInfo{
+			expectedTag: util.FieldTagInfo{
 				JSONName:  "-",
 				Omitempty: false,
 				Skip:      true,
@@ -66,29 +68,29 @@ func TestParseFieldTags(t *testing.T) {
 		{
 			name: "rusttype override",
 			tag:  `json:"data" rusttype:"Vec<u8>"`,
-			expectedTag: FieldTagInfo{
-				JSONName:   "data",
-				Omitempty:  false,
-				Skip:       false,
-				RustType:   "Vec<u8>",
-				RustOption: false,
+			expectedTag: util.FieldTagInfo{
+				JSONName:       "data",
+				Omitempty:      false,
+				Skip:           false,
+				CustomType:     "Vec<u8>",
+				CustomOptional: false,
 			},
 		},
 		{
 			name: "rusttype with optional",
 			tag:  `json:"name" rusttype:"String,optional"`,
-			expectedTag: FieldTagInfo{
-				JSONName:   "name",
-				Omitempty:  false,
-				Skip:       false,
-				RustType:   "String",
-				RustOption: true,
+			expectedTag: util.FieldTagInfo{
+				JSONName:       "name",
+				Omitempty:      false,
+				Skip:           false,
+				CustomType:     "String",
+				CustomOptional: true,
 			},
 		},
 		{
 			name: "rusttype skip",
 			tag:  `json:"field" rusttype:"-"`,
-			expectedTag: FieldTagInfo{
+			expectedTag: util.FieldTagInfo{
 				JSONName:  "field",
 				Omitempty: false,
 				Skip:      true,
@@ -110,11 +112,11 @@ func TestParseFieldTags(t *testing.T) {
 			if result.Skip != tt.expectedTag.Skip {
 				t.Errorf("Skip = %v, want %v", result.Skip, tt.expectedTag.Skip)
 			}
-			if result.RustType != tt.expectedTag.RustType {
-				t.Errorf("RustType = %q, want %q", result.RustType, tt.expectedTag.RustType)
+			if result.CustomType != tt.expectedTag.CustomType {
+				t.Errorf("CustomType = %q, want %q", result.CustomType, tt.expectedTag.CustomType)
 			}
-			if result.RustOption != tt.expectedTag.RustOption {
-				t.Errorf("RustOption = %v, want %v", result.RustOption, tt.expectedTag.RustOption)
+			if result.CustomOptional != tt.expectedTag.CustomOptional {
+				t.Errorf("CustomOptional = %v, want %v", result.CustomOptional, tt.expectedTag.CustomOptional)
 			}
 		})
 	}

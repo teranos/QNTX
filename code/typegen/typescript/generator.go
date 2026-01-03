@@ -11,43 +11,20 @@ import (
 	"github.com/teranos/QNTX/code/typegen/util"
 )
 
-// FieldTagInfo contains parsed struct tag information for TypeScript generation
+// FieldTagInfo extends util.FieldTagInfo with TypeScript-specific fields
 type FieldTagInfo struct {
-	JSONName   string // Field name from json tag
-	Omitempty  bool   // Has omitempty option
-	TSType     string // Custom TypeScript type from tstype tag
-	TSOptional bool   // Force optional with tstype:",optional"
-	Skip       bool   // Skip this field (json:"-" or tstype:"-")
-	Readonly   bool   // Mark field as readonly
+	util.FieldTagInfo        // Embed shared tag info
+	Readonly          bool   // Mark field as readonly (TypeScript-specific)
 }
 
 // ParseFieldTags extracts json and tstype tags from a struct field tag.
-// Exported for testing.
+// Exported for testing. Uses shared util.ParseFieldTags with TypeScript-specific extensions.
 func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
-	info := FieldTagInfo{}
-
-	// Parse JSON tag using shared utility
-	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
-		info.JSONName = jsonInfo.Name
-		info.Omitempty = jsonInfo.Omitempty
-		info.Skip = jsonInfo.Skip
-		if info.Skip {
-			return info
-		}
+	info := FieldTagInfo{
+		FieldTagInfo: util.ParseFieldTags(tag, "tstype"),
 	}
 
-	// Parse tstype tag using shared custom tag parser
-	tsType, options, skip := util.ParseCustomTag(tag, "tstype")
-	if skip {
-		info.Skip = true
-		return info
-	}
-	if tsType != "" {
-		info.TSType = tsType
-		info.TSOptional = options["optional"]
-	}
-
-	// Parse readonly tag
+	// Parse readonly tag (TypeScript-specific)
 	if tag != nil {
 		tagValue := strings.Trim(tag.Value, "`")
 		st := reflect.StructTag(tagValue)
@@ -119,6 +96,16 @@ var TypeMapping = map[string]string{
 	"NullTime":       "string | null",
 }
 
+// typeConverterConfig is the TypeScript-specific type conversion configuration
+var typeConverterConfig = &util.TypeConverterConfig{
+	TypeMapping:          TypeMapping,
+	ArrayFormat:          func(elem string) string { return elem + "[]" },
+	MapFormat:            func(key, val string) string { return fmt.Sprintf("Record<%s, %s>", key, val) },
+	StringMapUnknownType: "Record<string, unknown>",
+	UnknownType:          "unknown",
+	StringType:           "string",
+}
+
 // GenerateInterface creates a TypeScript interface from a Go struct
 func GenerateInterface(name string, structType *ast.StructType) string {
 	var sb strings.Builder
@@ -152,13 +139,13 @@ func GenerateInterface(name string, structType *ast.StructType) string {
 			}
 
 			// Determine if field is optional
-			isPointer := isPointerType(field.Type)
-			isOptional := tagInfo.Omitempty || tagInfo.TSOptional || isPointer
+			isPointer := util.IsPointerType(field.Type)
+			isOptional := tagInfo.Omitempty || tagInfo.CustomOptional || isPointer
 
 			// Get TypeScript type (tstype tag overrides inferred type)
 			var tsType string
-			if tagInfo.TSType != "" {
-				tsType = tagInfo.TSType
+			if tagInfo.CustomType != "" {
+				tsType = tagInfo.CustomType
 			} else {
 				tsType = goTypeToTS(field.Type)
 				// For pointer types without tstype override, add null union
@@ -242,63 +229,9 @@ func GenerateUnionType(name string, values []string) string {
 	return fmt.Sprintf("export type %s = %s;", name, strings.Join(parts, " | "))
 }
 
-// isPointerType checks if the AST expression represents a pointer type
-func isPointerType(expr ast.Expr) bool {
-	_, ok := expr.(*ast.StarExpr)
-	return ok
-}
-
 // goTypeToTS converts a Go AST type expression to TypeScript type string
 func goTypeToTS(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Basic type or type reference in same package
-		if ts, ok := TypeMapping[t.Name]; ok {
-			return ts
-		}
-		// Assume it's a reference to another type in the same package
-		return t.Name
-
-	case *ast.SelectorExpr:
-		// Qualified type like time.Time
-		if ident, ok := t.X.(*ast.Ident); ok {
-			fullName := ident.Name + "." + t.Sel.Name
-			if ts, ok := TypeMapping[fullName]; ok {
-				return ts
-			}
-			// Unknown qualified type
-			return t.Sel.Name
-		}
-		return "unknown"
-
-	case *ast.StarExpr:
-		// Pointer type - get the underlying type
-		return goTypeToTS(t.X)
-
-	case *ast.ArrayType:
-		// Slice or array
-		elemType := goTypeToTS(t.Elt)
-		return elemType + "[]"
-
-	case *ast.MapType:
-		// Map type
-		keyType := goTypeToTS(t.Key)
-		valType := goTypeToTS(t.Value)
-
-		// Special case for map[string]interface{}
-		if keyType == "string" && valType == "unknown" {
-			return "Record<string, unknown>"
-		}
-
-		return fmt.Sprintf("Record<%s, %s>", keyType, valType)
-
-	case *ast.InterfaceType:
-		// interface{} -> unknown
-		return "unknown"
-
-	default:
-		return "unknown"
-	}
+	return util.ConvertGoType(expr, typeConverterConfig)
 }
 
 // GenerateFile creates a complete TypeScript file from a typegen.Result
@@ -306,7 +239,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	var sb strings.Builder
 
 	sb.WriteString("/* eslint-disable */\n")
-	sb.WriteString("// Code generated by ats/typegen from Go source. DO NOT EDIT.\n")
+	sb.WriteString("// Code generated by code/typegen from Go source. DO NOT EDIT.\n")
 	sb.WriteString("// Regenerate with: make types\n")
 	sb.WriteString(fmt.Sprintf("// Source package: %s\n\n", result.PackageName))
 
@@ -430,20 +363,24 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	return sb.String()
 }
 
+// toTSComputedKey wraps a const name in brackets for computed property syntax
+func toTSComputedKey(s string) string {
+	return "[" + s + "]"
+}
+
+// identity returns the string unchanged (for TypeScript const values)
+func identity(s string) string {
+	return s
+}
+
 // formatMapKeyWithConsts formats a map key for TypeScript output.
 // Const references are wrapped in brackets, literals are quoted.
 func formatMapKeyWithConsts(key string, consts map[string]string) string {
-	if typegen.IsConstReference(key, consts) {
-		return "[" + key + "]"
-	}
-	return "\"" + key + "\""
+	return typegen.FormatMapEntry(key, consts, toTSComputedKey)
 }
 
 // formatMapValueWithConsts formats a map value for TypeScript output.
 // Const references are used as-is, literals are quoted.
 func formatMapValueWithConsts(value string, consts map[string]string) string {
-	if typegen.IsConstReference(value, consts) {
-		return value
-	}
-	return "\"" + value + "\""
+	return typegen.FormatMapEntry(value, consts, identity)
 }

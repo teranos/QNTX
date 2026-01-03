@@ -20,10 +20,10 @@
 //
 // To add support for a new language (e.g., Python):
 //
-//  1. Create package: ats/typegen/python/generator.go
+//  1. Create package: code/typegen/python/generator.go
 //  2. Implement the Generator interface (see below)
 //  3. Add language to getLanguages() in cmd/qntx/commands/typegen.go
-//  4. Add integration tests in ats/typegen/integration_test.go
+//  4. Add integration tests in code/typegen/integration_test.go
 //  5. Update docs/typegen.md with language-specific struct tags if needed
 //  6. Add file extension to getOutputConfig() in cmd/qntx/commands/typegen.go
 //
