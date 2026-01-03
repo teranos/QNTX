@@ -71,13 +71,11 @@ func (t *ASTTransformation) Validate() error {
 		if _, ok := t.Target["function"]; !ok {
 			return fmt.Errorf("rename_variable requires 'function' in target")
 		}
-		oldName, hasOldName := t.Target["old_name"]
-		variable, hasVariable := t.Target["variable"]
+		_, hasOldName := t.Target["old_name"]
+		_, hasVariable := t.Target["variable"]
 		if !hasOldName && !hasVariable {
 			return fmt.Errorf("rename_variable requires 'old_name' or 'variable' in target")
 		}
-		_ = oldName
-		_ = variable
 		if _, ok := t.Replacement["new_name"]; !ok {
 			return fmt.Errorf("rename_variable requires 'new_name' in replacement")
 		}

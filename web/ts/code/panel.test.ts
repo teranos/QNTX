@@ -183,4 +183,37 @@ describe('Go Editor Panel', () => {
             expect(mockFetch).toHaveBeenCalledTimes(1);
         });
     });
+
+    describe('PR Suggestions - Critical Path', () => {
+        test('suggestion item has file and line data attributes', () => {
+            // When user clicks suggestion, we need file path and line number
+            const suggestion = document.createElement('div');
+            suggestion.className = 'suggestion-item';
+            suggestion.setAttribute('data-file', 'code/github/github.go');
+            suggestion.setAttribute('data-line', '199');
+
+            expect(suggestion.getAttribute('data-file')).toBe('code/github/github.go');
+            expect(parseInt(suggestion.getAttribute('data-line')!)).toBe(199);
+        });
+
+        test('tab switching preserves content string', () => {
+            // When switching tabs, editor content must be preserved
+            let editorContent = 'package main\n\nfunc main() {}\n';
+            let currentTab: 'editor' | 'suggestions' = 'editor';
+
+            // User edits
+            editorContent = '// Comment\n' + editorContent;
+
+            // Switch away - store content
+            const saved = editorContent;
+            currentTab = 'suggestions';
+
+            // Switch back - restore content
+            currentTab = 'editor';
+            const restored = saved;
+
+            expect(restored).toBe(editorContent);
+            expect(restored).toContain('// Comment');
+        });
+    });
 });

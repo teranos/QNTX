@@ -28,6 +28,8 @@ class GoEditorPanel extends BasePanel {
     private hasUnsavedChanges: boolean = false;
     private isDevMode: boolean = false;
     private workspaceRoot: string = '';
+    private currentTab: 'editor' | 'suggestions' = 'editor';
+    private editorContent: string = '';
 
     // Components
     private navigation: GoEditorNavigation;
@@ -206,111 +208,129 @@ class GoEditorPanel extends BasePanel {
         }
 
         try {
-            // Import CodeMirror modules
-            const { EditorView, keymap } = await import('@codemirror/view');
-            const { EditorState } = await import('@codemirror/state');
-            const { defaultKeymap } = await import('@codemirror/commands');
-            const { oneDark } = await import('@codemirror/theme-one-dark');
-            const { autocompletion, completionKeymap } = await import('@codemirror/autocomplete');
-            const { languageServer } = await import('codemirror-languageserver');
-
-            // Import Go language support
-            let goExtension;
-            try {
-                const goModule = await import('@codemirror/lang-go');
-                goExtension = goModule.go();
-            } catch (err) {
-                console.error('[Go Editor] Failed to load Go language support:', err);
-                goExtension = [];
-            }
-
-            // Get backend URL and gopls configuration
-            const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-            const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-            const wsHost = backendUrl.replace(/^https?:\/\//, '');
-            const goplsUri = `${wsProtocol}//${wsHost}/gopls` as `ws://${string}` | `wss://${string}`;
-
-            // Fetch workspace configuration
-            let workspaceRoot = 'file:///tmp/qntx-workspace';
-            let goplsEnabled = false;
-
-            try {
-                const configResponse = await fetch(`${backendUrl}/api/config`);
-                if (configResponse.ok) {
-                    const config = await configResponse.json();
-                    goplsEnabled = config.code?.gopls?.enabled ?? false;
-
-                    if (!goplsEnabled) {
-                        console.warn('[Go Editor] gopls is disabled in config');
-                        this.updateStatus('unavailable', 'gopls disabled');
-                        throw new Error('gopls service is disabled in configuration');
-                    }
-
-                    if (config.code?.gopls?.workspace_root) {
-                        this.workspaceRoot = config.code.gopls.workspace_root;
-                        workspaceRoot = `file://${this.workspaceRoot}`;
-                    }
-                }
-            } catch (e) {
-                if (e instanceof Error && e.message.includes('disabled')) {
-                    throw e;
-                }
-                console.warn('[Go Editor] Failed to fetch config:', e);
-            }
-
-            // Use real workspace file URI for gopls
-            const documentUri = `file://${this.workspaceRoot}/${this.currentPath}`;
-
-            console.log('[Go Editor] Initializing with workspace:', workspaceRoot, 'document:', documentUri);
-
-            const container = this.$('#go-editor-container');
-            if (!container) {
-                console.error('[Go Editor] Container not found');
-                return;
-            }
-
-            // Create CodeMirror editor
-            this.editor = new EditorView({
-                state: EditorState.create({
-                    doc: content,
-                    extensions: [
-                        keymap.of([...defaultKeymap, ...completionKeymap]),
-                        goExtension,
-                        oneDark,
-                        autocompletion(),
-                        languageServer({
-                            serverUri: goplsUri,
-                            rootUri: workspaceRoot,
-                            documentUri: documentUri,
-                            languageId: 'go',
-                            workspaceFolders: [{
-                                name: 'workspace',
-                                uri: workspaceRoot
-                            }]
-                        }),
-                        EditorView.lineWrapping,
-                        EditorView.updateListener.of((update) => {
-                            if (update.docChanged) {
-                                this.hasUnsavedChanges = true;
-                                this.updateSaveIndicator();
-                            }
-                        })
-                    ]
-                }),
-                parent: container
-            });
+            const modules = await this.loadCodeMirrorModules();
+            const goplsConfig = await this.fetchGoplsConfig();
+            await this.createEditorInstance(content, modules, goplsConfig);
 
             this.hasUnsavedChanges = false;
             this.updateSaveIndicator();
             this.updateStatus('ready');
 
-            console.log('[Go Editor] Editor initialized');
+            this.log('Editor initialized');
         } catch (error) {
-            console.error('[Go Editor] Failed to initialize editor:', error);
+            this.log('Failed to initialize editor: ' + (error instanceof Error ? error.message : String(error)));
             this.updateStatus('error');
             this.showError(error instanceof Error ? error.message : String(error));
             this.editor = null;
         }
+    }
+
+    private async loadCodeMirrorModules() {
+        const { EditorView, keymap } = await import('@codemirror/view');
+        const { EditorState } = await import('@codemirror/state');
+        const { defaultKeymap } = await import('@codemirror/commands');
+        const { oneDark } = await import('@codemirror/theme-one-dark');
+        const { autocompletion, completionKeymap } = await import('@codemirror/autocomplete');
+        const { languageServer } = await import('codemirror-languageserver');
+
+        // Import Go language support
+        let goExtension;
+        try {
+            const goModule = await import('@codemirror/lang-go');
+            goExtension = goModule.go();
+        } catch (err) {
+            this.log('Failed to load Go language support: ' + err);
+            goExtension = [];
+        }
+
+        return {
+            EditorView,
+            EditorState,
+            keymap,
+            defaultKeymap,
+            completionKeymap,
+            oneDark,
+            autocompletion,
+            languageServer,
+            goExtension
+        };
+    }
+
+    private async fetchGoplsConfig() {
+        const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
+        const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
+        const wsHost = backendUrl.replace(/^https?:\/\//, '');
+        const goplsUri = `${wsProtocol}//${wsHost}/gopls` as `ws://${string}` | `wss://${string}`;
+
+        let workspaceRoot = 'file:///tmp/qntx-workspace';
+
+        try {
+            const configResponse = await fetch(`${backendUrl}/api/config`);
+            if (configResponse.ok) {
+                const config = await configResponse.json();
+                const goplsEnabled = config.code?.gopls?.enabled ?? false;
+
+                if (!goplsEnabled) {
+                    this.updateStatus('unavailable', 'gopls disabled');
+                    throw new Error('gopls service is disabled in configuration');
+                }
+
+                if (config.code?.gopls?.workspace_root) {
+                    this.workspaceRoot = config.code.gopls.workspace_root;
+                    workspaceRoot = `file://${this.workspaceRoot}`;
+                }
+            }
+        } catch (e) {
+            if (e instanceof Error && e.message.includes('disabled')) {
+                throw e;
+            }
+            this.log('Failed to fetch config, using defaults');
+        }
+
+        const documentUri = `file://${this.workspaceRoot}/${this.currentPath}`;
+
+        return { goplsUri, workspaceRoot, documentUri };
+    }
+
+    private async createEditorInstance(content: string, modules: any, goplsConfig: any): Promise<void> {
+        const container = this.$('#go-editor-container');
+        if (!container) {
+            throw new Error('Editor container not found');
+        }
+
+        const { EditorView, EditorState, keymap, defaultKeymap, completionKeymap,
+                oneDark, autocompletion, languageServer, goExtension } = modules;
+        const { goplsUri, workspaceRoot, documentUri } = goplsConfig;
+
+        this.editor = new EditorView({
+            state: EditorState.create({
+                doc: content,
+                extensions: [
+                    keymap.of([...defaultKeymap, ...completionKeymap]),
+                    goExtension,
+                    oneDark,
+                    autocompletion(),
+                    languageServer({
+                        serverUri: goplsUri,
+                        rootUri: workspaceRoot,
+                        documentUri: documentUri,
+                        languageId: 'go',
+                        workspaceFolders: [{
+                            name: 'workspace',
+                            uri: workspaceRoot
+                        }]
+                    }),
+                    EditorView.lineWrapping,
+                    EditorView.updateListener.of((update) => {
+                        if (update.docChanged) {
+                            this.hasUnsavedChanges = true;
+                            this.updateSaveIndicator();
+                        }
+                    })
+                ]
+            }),
+            parent: container
+        });
     }
 
     async saveContent(): Promise<void> {
@@ -373,19 +393,31 @@ class GoEditorPanel extends BasePanel {
         this.statusElement.textContent = message || config.message;
     }
 
-    showStatus(message: string): void {
+    private log(message: string): void {
         console.log('[Go Editor]', message);
+    }
+
+    showStatus(message: string): void {
+        this.log(message);
     }
 
     showError(message: string): void {
         const container = this.$('#go-editor-container');
         if (container) {
-            container.innerHTML = `
-                <div class="go-editor-error">
-                    <h3>Error</h3>
-                    <p>${message}</p>
-                </div>
-            `;
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'go-editor-error';
+
+            const heading = document.createElement('h3');
+            heading.textContent = 'Error';
+
+            const para = document.createElement('p');
+            para.textContent = message;
+
+            errorDiv.appendChild(heading);
+            errorDiv.appendChild(para);
+
+            container.innerHTML = '';
+            container.appendChild(errorDiv);
         }
     }
 
@@ -400,7 +432,76 @@ class GoEditorPanel extends BasePanel {
         }
     }
 
-    switchTab(tab: 'editor' | 'suggestions'): void {
+    private getEditorSidebarTemplate(): string {
+        return `
+            <div class="prose-sidebar-header">
+                <input type="text" class="prose-search go-editor-search" placeholder="Search files..." />
+            </div>
+            <div class="prose-recent" id="go-editor-recent">
+                <!-- Recent files will be populated here -->
+            </div>
+            <div class="prose-tree" id="go-editor-tree">
+                <!-- Tree will be populated here -->
+            </div>
+        `;
+    }
+
+    private getEditorContentTemplate(): string {
+        return `
+            <div class="go-editor-info">
+                <span>💡 gopls LSP</span>
+                <span class="go-editor-info-status">Status: <span id="gopls-status" class="gopls-status-connecting">connecting...</span></span>
+                <span class="go-editor-save-indicator hidden"></span>
+            </div>
+            <div class="prose-editor-container">
+                <div id="go-editor-container" class="go-editor-container">
+                    <!-- CodeMirror will be initialized here -->
+                </div>
+            </div>
+        `;
+    }
+
+    private getSuggestionsSidebarTemplate(): string {
+        return `
+            <div class="prose-sidebar-header">
+                <select class="prose-search" id="pr-select">
+                    <option value="">Loading PRs...</option>
+                </select>
+            </div>
+            <div id="pr-info" class="hidden">
+                <div class="pr-stats">
+                    <span id="suggestion-count">0 suggestions</span>
+                </div>
+            </div>
+        `;
+    }
+
+    private getSuggestionsContentTemplate(): string {
+        return `
+            <div id="suggestions-content">
+                <div id="suggestions-list" class="suggestions-list">
+                    <div class="no-suggestions">Select a PR to view suggestions</div>
+                </div>
+            </div>
+        `;
+    }
+
+    private bindStatusElements(): void {
+        this.statusElement = this.panel!.querySelector('#gopls-status');
+        this.saveIndicator = this.panel!.querySelector('.go-editor-save-indicator');
+    }
+
+    async switchTab(tab: 'editor' | 'suggestions'): Promise<void> {
+        // Don't switch if already on this tab
+        if (tab === this.currentTab) return;
+
+        // Store editor content before switching away from editor tab
+        if (this.currentTab === 'editor' && this.editor) {
+            this.editorContent = this.editor.state.doc.toString();
+        }
+
+        this.currentTab = tab;
+
         // Update tab buttons
         const tabs = this.panel?.querySelectorAll('.go-editor-tab');
         tabs?.forEach(t => {
@@ -419,68 +520,21 @@ class GoEditorPanel extends BasePanel {
         if (!sidebar || !content) return;
 
         if (tab === 'editor') {
-            // Render editor sidebar
-            sidebar.innerHTML = `
-                <div class="prose-sidebar-header">
-                    <input type="text" class="prose-search go-editor-search" placeholder="Search files..." />
-                </div>
-                <div class="prose-recent" id="go-editor-recent">
-                    <!-- Recent files will be populated here -->
-                </div>
-                <div class="prose-tree" id="go-editor-tree">
-                    <!-- Tree will be populated here -->
-                </div>
-            `;
-
-            // Render editor content
-            content.innerHTML = `
-                <div class="go-editor-info">
-                    <span>💡 gopls LSP</span>
-                    <span class="go-editor-info-status">Status: <span id="gopls-status" class="gopls-status-connecting">connecting...</span></span>
-                    <span class="go-editor-save-indicator hidden"></span>
-                </div>
-                <div class="prose-editor-container">
-                    <div id="go-editor-container" class="go-editor-container">
-                        <!-- CodeMirror will be initialized here -->
-                    </div>
-                </div>
-            `;
+            sidebar.innerHTML = this.getEditorSidebarTemplate();
+            content.innerHTML = this.getEditorContentTemplate();
 
             // Re-bind navigation and status elements after DOM change
             this.navigation.bindElements(this.panel!);
-            this.statusElement = this.panel!.querySelector('#gopls-status');
-            this.saveIndicator = this.panel!.querySelector('.go-editor-save-indicator');
+            this.bindStatusElements();
 
-            // Reinitialize editor if we had content
-            if (this.currentPath && this.editor) {
-                // Store current content before destroying
-                const currentContent = this.editor.state.doc.toString();
+            // Reinitialize editor with preserved content
+            if (this.currentPath && this.editorContent) {
                 this.destroyEditor();
-                this.initializeEditor(currentContent);
+                await this.initializeEditor(this.editorContent);
             }
         } else {
-            // Render suggestions sidebar
-            sidebar.innerHTML = `
-                <div class="prose-sidebar-header">
-                    <select class="prose-search" id="pr-select">
-                        <option value="">Loading PRs...</option>
-                    </select>
-                </div>
-                <div id="pr-info" class="hidden">
-                    <div class="pr-stats">
-                        <span id="suggestion-count">0 suggestions</span>
-                    </div>
-                </div>
-            `;
-
-            // Render suggestions content with proper container structure
-            content.innerHTML = `
-                <div id="suggestions-content">
-                    <div id="suggestions-list" class="suggestions-list">
-                        <div class="no-suggestions">Select a PR to view suggestions</div>
-                    </div>
-                </div>
-            `;
+            sidebar.innerHTML = this.getSuggestionsSidebarTemplate();
+            content.innerHTML = this.getSuggestionsContentTemplate();
 
             // Load open PRs into dropdown
             this.suggestions.loadOpenPRs();
