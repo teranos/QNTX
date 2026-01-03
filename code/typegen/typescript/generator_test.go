@@ -18,8 +18,8 @@ func TestParseFieldTags_JSONOnly(t *testing.T) {
 	if !info.Omitempty {
 		t.Error("Expected Omitempty to be true")
 	}
-	if info.TSType != "" {
-		t.Errorf("Expected empty TSType, got '%s'", info.TSType)
+	if info.CustomType != "" {
+		t.Errorf("Expected empty CustomType, got '%s'", info.CustomType)
 	}
 }
 
@@ -31,8 +31,8 @@ func TestParseFieldTags_TSTypeOverride(t *testing.T) {
 	if info.JSONName != "field" {
 		t.Errorf("Expected JSONName 'field', got '%s'", info.JSONName)
 	}
-	if info.TSType != "CustomType" {
-		t.Errorf("Expected TSType 'CustomType', got '%s'", info.TSType)
+	if info.CustomType != "CustomType" {
+		t.Errorf("Expected CustomType 'CustomType', got '%s'", info.CustomType)
 	}
 }
 
@@ -41,8 +41,8 @@ func TestParseFieldTags_TSTypeWithUnion(t *testing.T) {
 	tag := createTag(`json:"nullable" tstype:"string | null"`)
 	info := ParseFieldTags(tag)
 
-	if info.TSType != "string | null" {
-		t.Errorf("Expected TSType 'string | null', got '%s'", info.TSType)
+	if info.CustomType != "string | null" {
+		t.Errorf("Expected CustomType 'string | null', got '%s'", info.CustomType)
 	}
 }
 
@@ -51,11 +51,11 @@ func TestParseFieldTags_TSTypeOptional(t *testing.T) {
 	tag := createTag(`json:"opt" tstype:"number,optional"`)
 	info := ParseFieldTags(tag)
 
-	if info.TSType != "number" {
-		t.Errorf("Expected TSType 'number', got '%s'", info.TSType)
+	if info.CustomType != "number" {
+		t.Errorf("Expected CustomType 'number', got '%s'", info.CustomType)
 	}
-	if !info.TSOptional {
-		t.Error("Expected TSOptional to be true")
+	if !info.CustomOptional {
+		t.Error("Expected CustomOptional to be true")
 	}
 }
 
@@ -83,7 +83,7 @@ func TestParseFieldTags_NilTag(t *testing.T) {
 	// Test nil tag (no struct tags)
 	info := ParseFieldTags(nil)
 
-	if info.JSONName != "" || info.TSType != "" || info.Skip || info.Readonly {
+	if info.JSONName != "" || info.CustomType != "" || info.Skip || info.Readonly {
 		t.Error("Expected empty FieldTagInfo for nil tag")
 	}
 }

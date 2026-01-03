@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/code/typegen"
 	"github.com/teranos/QNTX/code/typegen/markdown"
+	"github.com/teranos/QNTX/code/typegen/python"
 	"github.com/teranos/QNTX/code/typegen/rust"
 	"github.com/teranos/QNTX/code/typegen/typescript"
 )
@@ -67,7 +68,7 @@ var TypegenCmd = &cobra.Command{
 	Long: `Generate type definitions from Go structs for multiple target languages.
 
 This command parses Go source code and generates corresponding type definitions.
-Supported languages: TypeScript (more coming in v1.0.0: Python, Rust, Dart)
+Supported languages: TypeScript, Python, Rust, Markdown (coming: Dart)
 
 It handles:
   - Struct types → interfaces/classes
@@ -131,7 +132,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	defer func() { typegenOutput = originalOutput }()
 
 	// Generate all types to temp directory
-	languages := []string{"typescript", "rust", "markdown"}
+	languages := []string{"typescript", "python", "rust", "markdown"}
 
 	for _, lang := range languages {
 		packages := getDefaultPackages(lang)
@@ -198,7 +199,7 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript", "rust", "markdown"} // TypeScript, Rust, + Markdown docs
+		return []string{"typescript", "python", "rust", "markdown"} // All supported languages
 	case "typescript", "ts":
 		return []string{"typescript"}
 	case "markdown", "md":
@@ -237,6 +238,9 @@ type genResult struct {
 	packageName string
 	output      string
 	typeNames   []string
+	constNames  []string
+	arrayNames  []string
+	mapNames    []string
 }
 
 // generateForLanguage generates types for a specific language
@@ -250,7 +254,9 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		gen = markdown.NewGenerator()
 	case "rust":
 		gen = rust.NewGenerator()
-	case "python", "dart":
+	case "python":
+		gen = python.NewGenerator()
+	case "dart":
 		fmt.Printf("⚠ %s generator not yet implemented (coming in v1.0.0)\n", lang)
 		return nil
 	default:
@@ -303,6 +309,21 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		}
 	}
 
+	// Generate __init__.py for Python
+	// Only generate when processing all default packages to avoid partial indices
+	if outputDir != "" && lang == "python" && generateIndex {
+		exports := convertToPythonPackageExports(results)
+		if err := python.GenerateInitFile(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate __init__.py: %w", err)
+		}
+		if err := python.GeneratePyProjectToml(outputDir); err != nil {
+			return fmt.Errorf("failed to generate pyproject.toml: %w", err)
+		}
+		if err := python.GenerateReadme(outputDir, exports); err != nil {
+			return fmt.Errorf("failed to generate README.md: %w", err)
+		}
+	}
+
 	// Generate README.md index for markdown documentation
 	// Only generate when processing all default packages to avoid partial indices
 	if outputDir != "" && lang == "markdown" && generateIndex {
@@ -337,10 +358,28 @@ func generateTypesForPackages(packages []string, gen typegen.Generator) ([]genRe
 			typeToPackage[name] = result.PackageName
 		}
 
+		constNames := make([]string, 0, len(result.Consts))
+		for name := range result.Consts {
+			constNames = append(constNames, name)
+		}
+
+		arrayNames := make([]string, 0, len(result.Arrays))
+		for name := range result.Arrays {
+			arrayNames = append(arrayNames, name)
+		}
+
+		mapNames := make([]string, 0, len(result.Maps))
+		for name := range result.Maps {
+			mapNames = append(mapNames, name)
+		}
+
 		results = append(results, genResult{
 			packageName: result.PackageName,
 			output:      output,
 			typeNames:   typeNames,
+			constNames:  constNames,
+			arrayNames:  arrayNames,
+			mapNames:    mapNames,
 		})
 	}
 
@@ -397,7 +436,12 @@ func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) 
 			fmt.Println(res.output)
 		} else {
 			// Write to file
-			filename := res.packageName + fileExt
+			// Handle Python keyword conflict: async -> async_
+			filename := res.packageName
+			if lang == "python" && filename == "async" {
+				filename = "async_"
+			}
+			filename = filename + fileExt
 			outputPath := filepath.Join(outputDir, filename)
 
 			// Create directory if needed
@@ -441,6 +485,21 @@ func convertToRustPackageExports(results []genResult) []rust.PackageExport {
 		exports[i] = rust.PackageExport{
 			PackageName: res.packageName,
 			TypeNames:   res.typeNames,
+		}
+	}
+	return exports
+}
+
+// convertToPythonPackageExports converts genResults to Python PackageExports
+func convertToPythonPackageExports(results []genResult) []python.PackageExport {
+	exports := make([]python.PackageExport, len(results))
+	for i, res := range results {
+		exports[i] = python.PackageExport{
+			PackageName: res.packageName,
+			TypeNames:   res.typeNames,
+			ConstNames:  res.constNames,
+			ArrayNames:  res.arrayNames,
+			MapNames:    res.mapNames,
 		}
 	}
 	return exports
