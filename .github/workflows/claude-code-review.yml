@@ -1,0 +1,102 @@
+name: Claude Code Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number to analyze'
+        required: true
+        type: number
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to analyze PR
+
+      - name: Generate GitHub App token for Claude
+        id: app-token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.QNTX_APP_ID }}
+          private_key: ${{ secrets.QNTX_APP_PRIVATE_KEY }}
+
+#      - name: Run Claude Code Review
+#        id: claude-review
+#        uses: anthropics/claude-code-action@v1
+#        with:
+#          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#          prompt: |
+#            REPO: ${{ github.repository }}
+#            PR NUMBER: ${{ github.event.pull_request.number }}
+#
+#            Please review this pull request and provide feedback on:
+#            - Code quality and best practices
+#            - Potential bugs or issues
+#            - Performance considerations
+#            - Security concerns
+#            - Test coverage
+#            
+#            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+#
+#            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+#          
+#          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+#          # or https://docs.claude.com/en/docs/claude-code/sdk#command-line for available options
+#          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
+      - name: Generate QNTX Fix Suggestions
+        id: qntx-fix-suggestions
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ inputs.pr_number }}
+
+            Your task is to analyze this pull request and output a machine readable list of concrete code fixes for the `qntx code` CLI.
+
+            Use `gh pr diff` and `gh pr view` with your Bash tool to inspect the pull request and identify high impact issues:
+            - Potential bugs or correctness issues
+            - Security concerns
+            - Performance issues
+            - Clear code quality problems
+
+            Then post a single PR comment whose entire content is exactly one fenced block in this format:
+
+            ```qntx-fix
+            [
+              {
+                "id": "FIX-1",
+                "title": "Short human description of the issue",
+                "file": "path/from/repo/root.go",
+                "start_line": 123,
+                "end_line": 130,
+                "issue": "One sentence description of what is wrong.",
+                "severity": "low" | "medium" | "high",
+                "patch": ""
+              }
+            ]
+            ```
+
+            Requirements for the qntx-fix block:
+            - The comment must contain only that fenced block and nothing else.
+            - Always output a JSON array. Use [] if there are no suggestions.
+            - Use ids FIX-1, FIX-2, FIX-3 in descending priority order.
+            - Include at most 10 suggestions.
+            - Use 1 based line numbers that match the current version in the PR.
+            - Use `"patch": ""` unless you are very confident in a unified diff patch.
+            - Do not write any text before or after the fenced block.
+
+            Finally, use `gh pr comment` with your Bash tool to post that fenced block as a comment on the pull request.
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
