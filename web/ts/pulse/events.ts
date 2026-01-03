@@ -5,8 +5,6 @@
  * Replaces global window object access with event-based messaging.
  */
 
-import type { Execution } from './execution-types';
-
 // ============================================================================
 // Event Names
 // ============================================================================

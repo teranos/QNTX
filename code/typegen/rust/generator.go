@@ -59,6 +59,7 @@ var TypeMapping = map[string]string{
 	"uint64":                 "u64",
 	"float32":                "f32",
 	"float64":                "f64",
+	"byte":                   "u8", // Go byte is alias for uint8
 	"bool":                   "bool",
 	"time.Time":              "String", // RFC3339 string
 	"time.Duration":          "i64",    // Milliseconds

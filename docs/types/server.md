@@ -690,7 +690,7 @@ export interface ParsedATSCode {
   /**
    * Payload is the pre-computed JSON payload for the handler
    */
-  Payload: byte[];
+  Payload: number[];
   /**
    * SourceURL is used for deduplication (e.g., the git repo URL)
    */
