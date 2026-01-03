@@ -538,21 +538,27 @@ class GoEditorPanel extends BasePanel {
     }
 
     openFileAtLine(filePath: string, line: number): void {
-        // Switch to editor tab
-        this.switchTab('editor');
-
-        // Load the file
+        // Load the file first
         this.loadFile(filePath).then(() => {
-            // Scroll to line after file loads
+            // Scroll to line after file loads (CodeMirror 6 API)
             if (this.editor && line > 0) {
                 setTimeout(() => {
-                    const lineHandle = this.editor.getLineHandle(line - 1); // 0-indexed
-                    if (lineHandle) {
-                        this.editor.scrollIntoView({ line: line - 1, ch: 0 }, 200);
-                        this.editor.setCursor({ line: line - 1, ch: 0 });
+                    try {
+                        // CodeMirror 6: Use dispatch to scroll to position
+                        const pos = this.editor.state.doc.line(line).from;
+                        this.editor.dispatch({
+                            selection: { anchor: pos, head: pos },
+                            scrollIntoView: true
+                        });
+                        this.editor.focus();
+                    } catch (err) {
+                        console.warn('[Go Editor] Failed to scroll to line:', err);
                     }
                 }, 100);
             }
+
+            // Switch to editor tab AFTER loading
+            this.switchTab('editor');
         });
     }
 }
