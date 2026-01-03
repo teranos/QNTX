@@ -5,8 +5,24 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "shell:allow-spawn",
-    "shell:allow-execute",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "bin/qntx",
+          "sidecar": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "bin/qntx",
+          "sidecar": true
+        }
+      ]
+    },
     "notification:default",
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",

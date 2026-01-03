@@ -5,7 +5,6 @@ use qntx_types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
-use tauri_plugin_shell::ShellExt;
 
 // Desktop-only features (menu bar, tray, autostart)
 #[cfg(not(target_os = "ios"))]
@@ -26,8 +25,31 @@ use qntx_types::{
 const SERVER_PORT: &str = "877";
 
 struct ServerState {
-    child: Arc<Mutex<Option<tauri_plugin_shell::process::CommandChild>>>,
+    child: Arc<Mutex<Option<std::process::Child>>>,
     port: String,
+}
+
+/// Helper function to send notifications with consistent error handling and logging
+fn send_notification(app: &tauri::AppHandle, title: &str, body: String, log_message: String) {
+    if let Err(e) = app.notification().builder().title(title).body(body).show() {
+        eprintln!("[notification] Failed to show notification: {}", e);
+    }
+    println!("[notification] {}", log_message);
+}
+
+/// Helper to show window, focus it, and emit an event
+fn show_window_and_emit<P: serde::Serialize + Clone>(
+    app: &tauri::AppHandle,
+    event_name: &str,
+    payload: P,
+) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Err(e) = window.emit(event_name, payload) {
+            eprintln!("[menu] Failed to emit {} event: {}", event_name, e);
+        }
+    }
 }
 
 #[tauri::command]
@@ -67,19 +89,11 @@ fn notify_job_completed(
         .map(|ms| format!(" in {:.1}s", ms as f64 / 1000.0))
         .unwrap_or_default();
 
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Job Completed")
-        .body(format!("{}{}", handler_name, duration_text))
-        .show()
-    {
-        eprintln!("[notification] Failed to show job completion: {}", e);
-    }
-
-    println!(
-        "[notification] Job completed: {} ({})",
-        handler_name, job_id
+    send_notification(
+        &app,
+        "QNTX: Job Completed",
+        format!("{}{}", handler_name, duration_text),
+        format!("Job completed: {} ({})", handler_name, job_id),
     );
 }
 
@@ -93,43 +107,23 @@ fn notify_job_failed(
 ) {
     let error_text = error.unwrap_or_else(|| "Unknown error".to_string());
 
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Job Failed")
-        .body(format!("{}: {}", handler_name, error_text))
-        .show()
-    {
-        eprintln!("[notification] Failed to show job failure: {}", e);
-    }
-
-    println!(
-        "[notification] Job failed: {} ({}) - {}",
-        handler_name, job_id, error_text
+    send_notification(
+        &app,
+        "QNTX: Job Failed",
+        format!("{}: {}", handler_name, error_text),
+        format!("Job failed: {} ({}) - {}", handler_name, job_id, error_text),
     );
 }
 
 /// Send a native notification for storage warnings
 #[tauri::command]
 fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f64) {
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Storage Warning")
-        .body(format!(
-            "{} is at {:.0}% capacity",
-            actor,
-            fill_percent * 100.0
-        ))
-        .show()
-    {
-        eprintln!("[notification] Failed to show storage warning: {}", e);
-    }
-
-    println!(
-        "[notification] Storage warning: {} at {:.0}%",
-        actor,
-        fill_percent * 100.0
+    let percent = fill_percent * 100.0;
+    send_notification(
+        &app,
+        "QNTX: Storage Warning",
+        format!("{} is at {:.0}% capacity", actor, percent),
+        format!("Storage warning: {} at {:.0}%", actor, percent),
     );
 }
 
@@ -144,42 +138,39 @@ fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: 
         "Preparing for shutdown...".to_string()
     };
 
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Server Draining")
-        .body(&body)
-        .show()
-    {
-        eprintln!("[notification] Failed to show server draining: {}", e);
-    }
-
-    println!(
-        "[notification] Server draining: {} active, {} queued",
-        active_jobs, queued_jobs
+    send_notification(
+        &app,
+        "QNTX: Server Draining",
+        body,
+        format!(
+            "Server draining: {} active, {} queued",
+            active_jobs, queued_jobs
+        ),
     );
 }
 
 /// Send a native notification when server stops
 #[tauri::command]
 fn notify_server_stopped(app: tauri::AppHandle) {
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Server Stopped")
-        .body("The QNTX server has stopped")
-        .show()
-    {
-        eprintln!("[notification] Failed to show server stopped: {}", e);
-    }
-
-    println!("[notification] Server stopped");
+    send_notification(
+        &app,
+        "QNTX: Server Stopped",
+        "The QNTX server has stopped".to_string(),
+        "Server stopped".to_string(),
+    );
 }
 
 fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // When another instance tries to start, just show the existing window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }));
 
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
@@ -194,35 +185,69 @@ fn main() {
         .setup(|app| {
             #[cfg(not(target_os = "ios"))]
             {
-                // Desktop only: Start QNTX server as sidecar
-                let sidecar_command = app
-                    .shell()
-                    .sidecar("qntx")
-                    .expect("failed to create qntx sidecar command");
+                // Desktop only: Start QNTX server
+                // Note: Using std::process::Command directly instead of Tauri's sidecar system
+                // because Tauri v2's sidecar has output streaming issues in dev mode
+                use std::process::{Command, Stdio};
 
-                let (mut rx, child) = sidecar_command
+                // Set working directory to project root (two levels up from src-tauri)
+                let project_root = std::env::current_dir()
+                    .ok()
+                    .and_then(|d| d.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf()));
+
+                // Construct platform-specific binary name (e.g., qntx-aarch64-apple-darwin)
+                let arch = std::env::consts::ARCH;
+                let target_triple = match std::env::consts::OS {
+                    "macos" => format!("{}-apple-darwin", arch),
+                    "linux" => format!("{}-unknown-linux-gnu", arch),
+                    "windows" => format!("{}-pc-windows-msvc", arch),
+                    os => format!("{}-unknown-{}", arch, os), // Fallback
+                };
+                let binary_name = format!("qntx-{}", target_triple);
+                let binary_path = if let Some(root) = &project_root {
+                    root.join("web/src-tauri/bin").join(&binary_name)
+                } else {
+                    std::path::PathBuf::from("./bin").join(&binary_name)
+                };
+
+                // Determine working directory: prefer project root, fallback to current dir or "."
+                let working_dir = project_root
+                    .as_ref()
+                    .cloned()
+                    .or_else(|| std::env::current_dir().ok())
+                    .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+                let child = match Command::new(&binary_path)
                     .args(["server", "--port", SERVER_PORT, "--dev", "--no-browser"])
+                    .current_dir(&working_dir)
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
                     .spawn()
-                    .expect("Failed to spawn qntx server");
+                {
+                    Ok(child) => child,
+                    Err(e) => {
+                        eprintln!("[error] Failed to spawn qntx server: {}", e);
+                        eprintln!("[error] The QNTX server will not be available.");
 
-                // Log server output
-                tauri::async_runtime::spawn(async move {
-                    while let Some(event) = rx.recv().await {
-                        match event {
-                            tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                                print!("[qntx] {}", String::from_utf8_lossy(&line));
-                            }
-                            tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                                eprint!("[qntx] {}", String::from_utf8_lossy(&line));
-                            }
-                            tauri_plugin_shell::process::CommandEvent::Terminated(status) => {
-                                eprintln!("[qntx] Server terminated: {:?}", status);
-                                break;
-                            }
-                            _ => {}
-                        }
+                        // Notify user about server failure
+                        let _ = app
+                            .notification()
+                            .builder()
+                            .title("QNTX Server Failed")
+                            .body(format!(
+                                "Failed to start server: {}. Features will not work.",
+                                e
+                            ))
+                            .show();
+
+                        // Store empty server state and continue without server
+                        app.manage(ServerState {
+                            child: Arc::new(Mutex::new(None)),
+                            port: SERVER_PORT.to_string(),
+                        });
+                        return Ok(());
                     }
-                });
+                };
 
                 // Store server state (desktop has running sidecar)
                 app.manage(ServerState {
@@ -399,61 +424,19 @@ fn main() {
                         }
                         // View menu - emit events to show panels
                         "config_panel" | "preferences" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-config-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-config-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-config-panel", ());
                         }
                         "pulse_panel" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-pulse-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-pulse-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-pulse-panel", ());
                         }
                         "prose_panel" | "documentation" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-prose-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-prose-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-prose-panel", ());
                         }
                         "code_panel" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-code-panel", ()) {
-                                    eprintln!("[menu] Failed to emit show-code-panel event: {}", e);
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-code-panel", ());
                         }
                         "hixtory_panel" => {
-                            if let Some(window) = app_handle.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                if let Err(e) = window.emit("show-hixtory-panel", ()) {
-                                    eprintln!(
-                                        "[menu] Failed to emit show-hixtory-panel event: {}",
-                                        e
-                                    );
-                                }
-                            }
+                            show_window_and_emit(app_handle, "show-hixtory-panel", ());
                         }
                         "refresh_graph" => {
                             if let Some(window) = app_handle.get_webview_window("main") {
@@ -533,20 +516,14 @@ fn main() {
                             // Stop server and quit
                             if let Some(state) = app.try_state::<ServerState>() {
                                 let mut child = state.child.lock().unwrap();
-                                if let Some(process) = child.take() {
+                                if let Some(mut process) = child.take() {
                                     let _ = process.kill();
                                 }
                             }
                             app.exit(0);
                         } else if event.id == "preferences" {
-                            // Open preferences (config panel)
-                            if let Some(window) = app.get_webview_window("main") {
-                                // Show window if hidden
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                                // Emit event to show config panel (always show, never toggle)
-                                let _ = window.emit("show-config-panel", ());
-                            }
+                            // Open preferences (config panel) - show window and emit event
+                            show_window_and_emit(app, "show-config-panel", ());
                         } else if event.id == "toggle_pulse" {
                             // Toggle Pulse daemon (emit event to frontend)
                             if let Some(window) = app.get_webview_window("main") {
