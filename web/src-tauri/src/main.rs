@@ -243,6 +243,18 @@ fn main() {
                     Err(e) => {
                         eprintln!("[error] Failed to spawn qntx server: {}", e);
                         eprintln!("[error] The QNTX server will not be available.");
+
+                        // Notify user about server failure
+                        let _ = app
+                            .notification()
+                            .builder()
+                            .title("QNTX Server Failed")
+                            .body(&format!(
+                                "Failed to start server: {}. Features will not work.",
+                                e
+                            ))
+                            .show();
+
                         // Store empty server state and continue without server
                         app.manage(ServerState {
                             child: Arc::new(Mutex::new(None)),
