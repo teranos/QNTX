@@ -57,8 +57,10 @@ Examples:
   qntx ix git .                                          # Ingest current repository
   qntx ix git /path/to/repository                        # Ingest specific repository
   qntx ix git https://github.com/user/repo               # Ingest from URL (shallow clone)
-  qntx ix git git@github.com:user/repo.git               # SSH URL also supported
+  qntx ix git https://github.com/user/repo --async       # Queue URL ingestion as background job
   qntx ix git . --dry-run                                # Preview what would be ingested
+  qntx ix git . --since 2025-01-01                       # Incremental: only commits after date
+  qntx ix git . --since abc1234                          # Incremental: only commits after hash
   qntx ix git . --verbose                                # Show detailed output for all commits
   qntx ix git . --actor "ixgest-git@myuser"              # Custom actor
   qntx ix git . --no-deps                                # Skip dependency ingestion
@@ -81,8 +83,9 @@ After ingestion:
 		verbosity, _ := cmd.Flags().GetCount("verbose")
 		asyncMode, _ := cmd.Flags().GetBool("async")
 		noDeps, _ := cmd.Flags().GetBool("no-deps")
+		since, _ := cmd.Flags().GetString("since")
 
-		return runIxGit(cmd, repoPath, dryRun, actor, verbosity, asyncMode, noDeps)
+		return runIxGit(cmd, repoPath, dryRun, actor, verbosity, asyncMode, noDeps, since)
 	},
 }
 
@@ -93,10 +96,11 @@ func init() {
 	IxGitCmd.Flags().Bool("dry-run", false, "Preview what would be ingested without writing to database")
 	IxGitCmd.Flags().Bool("async", false, "Run as background pulse job (allows pause/resume, progress tracking)")
 	IxGitCmd.Flags().Bool("no-deps", false, "Skip dependency ingestion (go.mod, Cargo.toml, etc.)")
+	IxGitCmd.Flags().String("since", "", "Only ingest commits after this timestamp or commit hash (e.g., 2025-01-01, abc1234)")
 }
 
 // runIxGit handles git repository processing and attestation generation
-func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, verbosity int, asyncMode bool, noDeps bool) error {
+func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, verbosity int, asyncMode bool, noDeps bool, since string) error {
 	useJSON := qntxdisplay.ShouldOutputJSON(cmd)
 
 	// Load config and open database
@@ -133,25 +137,24 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 		if dryRun {
 			return fmt.Errorf("--async and --dry-run cannot be used together")
 		}
-		// Note: async mode with URLs would need the repo to persist
-		// For now, only support local paths in async mode
-		if repoSource.IsCloned {
-			return fmt.Errorf("--async mode is not supported with repository URLs (clone would be cleaned up)")
-		}
-		return runIxGitAsync(database, repoPath, actor, verbosity, useJSON)
+		// For async mode, pass the original input - the worker will clone if needed
+		repoSource.Cleanup() // Clean up any sync clone, worker will handle its own
+		return runIxGitAsync(database, repoInput, actor, verbosity, noDeps, since, useJSON)
 	}
 
 	// Synchronous mode (original behavior)
-	return runIxGitSync(cmd, database, repoPath, repoSource.OriginalInput, dryRun, actor, verbosity, noDeps, useJSON)
+	return runIxGitSync(cmd, database, repoPath, repoSource.OriginalInput, dryRun, actor, verbosity, noDeps, since, useJSON)
 }
 
 // runIxGitAsync creates an async pulse job for git ingestion
-func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity int, useJSON bool) error {
+func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity int, noDeps bool, since string, useJSON bool) error {
 	// Create payload
 	payload := git.GitIngestionPayload{
-		RepositoryPath: repoPath,
-		Actor:          actor,
-		Verbosity:      verbosity,
+		RepositorySource: repoSource,
+		Actor:            actor,
+		Verbosity:        verbosity,
+		NoDeps:           noDeps,
+		Since:            since,
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
@@ -161,7 +164,7 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 	// Create job (we don't know total operations yet, will update during execution)
 	job, err := async.NewJobWithPayload(
 		"ixgest.git",
-		repoPath,
+		repoSource,
 		payloadJSON,
 		0,   // Total operations unknown until we scan the repo
 		0.0, // No cost for git ingestion
@@ -181,7 +184,7 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 		return qntxdisplay.OutputJSON(map[string]interface{}{
 			"job_id":     job.ID,
 			"status":     "queued",
-			"repository": repoPath,
+			"repository": repoSource,
 		})
 	}
 
@@ -193,7 +196,7 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 }
 
 // runIxGitSync runs git ingestion synchronously (original behavior)
-func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, originalInput string, dryRun bool, actor string, verbosity int, noDeps bool, useJSON bool) error {
+func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, originalInput string, dryRun bool, actor string, verbosity int, noDeps bool, since string, useJSON bool) error {
 
 	if !useJSON {
 		pterm.DefaultHeader.WithFullWidth().Printf("%s Git IX - Attestation Generation", sym.IX)
@@ -206,6 +209,9 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 
 		pterm.Info.Printf("%s Processing repository: %s", sym.IX, originalInput)
 		pterm.Info.Printf("%s Actor: %s", sym.IX, actor)
+		if since != "" {
+			pterm.Info.Printf("%s Since: %s (incremental mode)", sym.IX, since)
+		}
 		if verbosity > 0 {
 			pterm.Info.Printf("Verbosity level: %d", verbosity)
 		}
@@ -214,6 +220,13 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 
 	// Create git processor with global logger
 	processor := git.NewGitIxProcessor(database, dryRun, actor, verbosity, logger.Logger)
+
+	// Set incremental filter if --since is provided
+	if since != "" {
+		if err := processor.SetSince(since); err != nil {
+			return err
+		}
+	}
 
 	// Create a spinner for processing (only in non-JSON mode)
 	var spinner *pterm.SpinnerPrinter
