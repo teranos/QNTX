@@ -10,42 +10,10 @@ import (
 	"github.com/teranos/QNTX/code/typegen/util"
 )
 
-// FieldTagInfo contains parsed struct tag information for Rust generation
-type FieldTagInfo struct {
-	JSONName   string // Field name from json tag
-	Omitempty  bool   // Has omitempty option (maps to Option<T>)
-	RustType   string // Custom Rust type from rusttype tag
-	RustOption bool   // Force Option<T> with rusttype:",optional"
-	Skip       bool   // Skip this field (json:"-" or rusttype:"-")
-}
-
 // ParseFieldTags extracts json and rusttype tags from a struct field tag.
-// Exported for testing.
-func ParseFieldTags(tag *ast.BasicLit) FieldTagInfo {
-	info := FieldTagInfo{}
-
-	// Parse JSON tag using shared utility
-	if jsonInfo := util.ParseJSONTag(tag); jsonInfo != nil {
-		info.JSONName = jsonInfo.Name
-		info.Omitempty = jsonInfo.Omitempty
-		info.Skip = jsonInfo.Skip
-		if info.Skip {
-			return info
-		}
-	}
-
-	// Parse rusttype tag using shared custom tag parser
-	rustType, options, skip := util.ParseCustomTag(tag, "rusttype")
-	if skip {
-		info.Skip = true
-		return info
-	}
-	if rustType != "" {
-		info.RustType = rustType
-		info.RustOption = options["optional"]
-	}
-
-	return info
+// Exported for testing. Uses shared util.ParseFieldTags internally.
+func ParseFieldTags(tag *ast.BasicLit) util.FieldTagInfo {
+	return util.ParseFieldTags(tag, "rusttype")
 }
 
 // Generator implements typegen.Generator for Rust
@@ -107,6 +75,16 @@ var TypeMapping = map[string]string{
 	"NullTime":       "Option<String>",
 }
 
+// typeConverterConfig is the Rust-specific type conversion configuration
+var typeConverterConfig = &util.TypeConverterConfig{
+	TypeMapping:          TypeMapping,
+	ArrayFormat:          func(elem string) string { return "Vec<" + elem + ">" },
+	MapFormat:            func(key, val string) string { return fmt.Sprintf("std::collections::HashMap<%s, %s>", key, val) },
+	StringMapUnknownType: "serde_json::Map<String, serde_json::Value>",
+	UnknownType:          "serde_json::Value",
+	StringType:           "String",
+}
+
 // GenerateStruct creates a Rust struct from a Go struct
 func GenerateStruct(name string, structType *ast.StructType) string {
 	var sb strings.Builder
@@ -141,13 +119,13 @@ func GenerateStruct(name string, structType *ast.StructType) string {
 			}
 
 			// Determine if field is optional
-			isPointer := isPointerType(field.Type)
-			isOptional := tagInfo.Omitempty || tagInfo.RustOption || isPointer
+			isPointer := util.IsPointerType(field.Type)
+			isOptional := tagInfo.Omitempty || tagInfo.CustomOptional || isPointer
 
 			// Get Rust type (rusttype tag overrides inferred type)
 			var rustType string
-			if tagInfo.RustType != "" {
-				rustType = tagInfo.RustType
+			if tagInfo.CustomType != "" {
+				rustType = tagInfo.CustomType
 			} else {
 				rustType = goTypeToRust(field.Type)
 				// For pointer types without rusttype override, wrap in Option
@@ -245,63 +223,9 @@ func GenerateEnum(name string, values []string) string {
 	return sb.String()
 }
 
-// isPointerType checks if the AST expression represents a pointer type
-func isPointerType(expr ast.Expr) bool {
-	_, ok := expr.(*ast.StarExpr)
-	return ok
-}
-
 // goTypeToRust converts a Go AST type expression to Rust type string
 func goTypeToRust(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Basic type or type reference in same package
-		if rs, ok := TypeMapping[t.Name]; ok {
-			return rs
-		}
-		// Assume it's a reference to another type in the same package
-		return t.Name
-
-	case *ast.SelectorExpr:
-		// Qualified type like time.Time
-		if ident, ok := t.X.(*ast.Ident); ok {
-			fullName := ident.Name + "." + t.Sel.Name
-			if rs, ok := TypeMapping[fullName]; ok {
-				return rs
-			}
-			// Unknown qualified type
-			return t.Sel.Name
-		}
-		return "serde_json::Value"
-
-	case *ast.StarExpr:
-		// Pointer type - get the underlying type
-		return goTypeToRust(t.X)
-
-	case *ast.ArrayType:
-		// Slice or array
-		elemType := goTypeToRust(t.Elt)
-		return "Vec<" + elemType + ">"
-
-	case *ast.MapType:
-		// Map type
-		keyType := goTypeToRust(t.Key)
-		valType := goTypeToRust(t.Value)
-
-		// Special case for map[string]interface{}
-		if keyType == "String" && valType == "serde_json::Value" {
-			return "serde_json::Map<String, serde_json::Value>"
-		}
-
-		return fmt.Sprintf("std::collections::HashMap<%s, %s>", keyType, valType)
-
-	case *ast.InterfaceType:
-		// interface{} -> serde_json::Value
-		return "serde_json::Value"
-
-	default:
-		return "serde_json::Value"
-	}
+	return util.ConvertGoType(expr, typeConverterConfig)
 }
 
 // Rust keywords that need raw identifier prefix (r#)
@@ -335,15 +259,6 @@ func toRustConstIdent(s string) string {
 	return strings.ToUpper(snakeCase)
 }
 
-// sortedKeys returns map keys as a sorted slice
-func sortedKeys[K ~string, V any](m map[K]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, string(k))
-	}
-	sort.Strings(keys)
-	return keys
-}
 
 // extractTypeReferences extracts all type names referenced in Rust type strings
 // For example: "Option<Job>" -> ["Job"], "Vec<Execution>" -> ["Execution"]
@@ -430,7 +345,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	var sb strings.Builder
 
 	// Header with generation metadata
-	sb.WriteString("// Code generated by ats/typegen from Go source. DO NOT EDIT.\n")
+	sb.WriteString("// Code generated by code/typegen from Go source. DO NOT EDIT.\n")
 	sb.WriteString("// Regenerate with: make types\n")
 	sb.WriteString(fmt.Sprintf("// Source package: %s\n", result.PackageName))
 
@@ -474,7 +389,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	// Generate const declarations (untyped consts)
 	if len(result.Consts) > 0 {
-		for _, name := range sortedKeys(result.Consts) {
+		for _, name := range util.SortedKeys(result.Consts) {
 			value := result.Consts[name]
 			rustName := toRustConstIdent(name)
 			sb.WriteString(fmt.Sprintf("pub const %s: &str = \"%s\";\n", rustName, value))
@@ -483,7 +398,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	}
 
 	// Sort type names for deterministic output
-	names := sortedKeys(result.Types)
+	names := util.SortedKeys(result.Types)
 	for i, name := range names {
 		// Add Go doc comment if available (appears above the struct/type)
 		if docComment, hasComment := result.TypeComments[name]; hasComment && docComment != "" {
@@ -519,7 +434,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("\n")
 		}
 
-		for _, name := range sortedKeys(result.Arrays) {
+		for _, name := range util.SortedKeys(result.Arrays) {
 			elements := result.Arrays[name]
 
 			// Check if all elements are const references
@@ -561,7 +476,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("\n")
 		}
 
-		for _, name := range sortedKeys(result.Maps) {
+		for _, name := range util.SortedKeys(result.Maps) {
 			mapData := result.Maps[name]
 
 			// For Rust, we'll use lazy_static for const maps (uppercase)
@@ -571,7 +486,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 			sb.WriteString("        let mut m = std::collections::HashMap::new();\n")
 
 			// Sort map keys for deterministic output
-			for _, key := range sortedKeys(mapData) {
+			for _, key := range util.SortedKeys(mapData) {
 				value := mapData[key]
 				keyStr := formatMapKey(key, result.Consts)
 				valueStr := formatMapValue(value, result.Consts)
@@ -593,16 +508,10 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 // formatMapKey formats a map key for Rust output
 func formatMapKey(key string, consts map[string]string) string {
-	if typegen.IsConstReference(key, consts) {
-		return toRustConstIdent(key)
-	}
-	return "\"" + key + "\""
+	return typegen.FormatMapEntry(key, consts, toRustConstIdent)
 }
 
 // formatMapValue formats a map value for Rust output
 func formatMapValue(value string, consts map[string]string) string {
-	if typegen.IsConstReference(value, consts) {
-		return toRustConstIdent(value)
-	}
-	return "\"" + value + "\""
+	return typegen.FormatMapEntry(value, consts, toRustConstIdent)
 }
