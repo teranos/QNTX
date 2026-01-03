@@ -14,7 +14,7 @@
 #![allow(clippy::all)]
 #![allow(unused_imports)]
 
-use crate::{byte, Execution, Job};
+use crate::{u8, Execution, Job};
 
 /// ChildJobInfo represents a child job summary
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#childjobinfo>"]
@@ -222,7 +222,7 @@ pub struct ParsedATSCode {
     /// HandlerName is the async handler to invoke (e.g., "ixgest.git")
     pub handler_name: String,
     /// Payload is the pre-computed JSON payload for the handler
-    pub payload: Vec<byte>,
+    pub payload: Vec<u8>,
     /// SourceURL is used for deduplication (e.g., the git repo URL)
     pub source_url: String,
 }

@@ -26,7 +26,6 @@ export class ATSNodeView implements NodeView {
   private schedulingControls: HTMLElement | null = null;
   private currentJob: ScheduledJobResponse | null = null;
   private unsubscribeExecution: (() => void) | null = null;
-  private executionState: ATSExecutionState = 'idle';
 
   constructor(
     private node: PMNode,
@@ -79,10 +78,9 @@ export class ATSNodeView implements NodeView {
 
   /**
    * Update the visual execution state of the block
-   * Uses data-execution-state attribute for cleaner state management
+   * Uses data-execution-state attribute for CSS-based state visualization
    */
   private updateExecutionState(state: ATSExecutionState): void {
-    this.executionState = state;
     this.dom.dataset.executionState = state;
   }
 
