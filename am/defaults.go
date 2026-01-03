@@ -2,6 +2,7 @@ package am
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/spf13/viper"
 )
@@ -138,15 +139,13 @@ func (c *Config) GetServerAllowedOrigins() []string {
 		originSet[origin] = true
 	}
 
-	// Convert map back to sorted slice for deterministic output
+	// Convert map to slice and sort for deterministic output
 	merged := make([]string, 0, len(originSet))
 	for origin := range originSet {
 		merged = append(merged, origin)
 	}
+	sort.Strings(merged)
 
-	// Sort for deterministic order (makes testing easier, logs more readable)
-	// Not using sort package to avoid import, but manual sort is fine for small lists
-	// Actually, let's just return unsorted - order doesn't matter for CORS
 	return merged
 }
 
