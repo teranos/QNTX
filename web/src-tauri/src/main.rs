@@ -29,6 +29,20 @@ struct ServerState {
     port: String,
 }
 
+/// Helper function to send notifications with consistent error handling and logging
+fn send_notification(app: &tauri::AppHandle, title: &str, body: String, log_message: String) {
+    if let Err(e) = app
+        .notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+    {
+        eprintln!("[notification] Failed to show notification: {}", e);
+    }
+    println!("[notification] {}", log_message);
+}
+
 #[tauri::command]
 fn get_server_status(state: State<ServerState>) -> serde_json::Value {
     let child = state.child.lock().unwrap();
@@ -66,19 +80,11 @@ fn notify_job_completed(
         .map(|ms| format!(" in {:.1}s", ms as f64 / 1000.0))
         .unwrap_or_default();
 
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Job Completed")
-        .body(format!("{}{}", handler_name, duration_text))
-        .show()
-    {
-        eprintln!("[notification] Failed to show job completion: {}", e);
-    }
-
-    println!(
-        "[notification] Job completed: {} ({})",
-        handler_name, job_id
+    send_notification(
+        &app,
+        "QNTX: Job Completed",
+        format!("{}{}", handler_name, duration_text),
+        format!("Job completed: {} ({})", handler_name, job_id),
     );
 }
 
@@ -92,43 +98,23 @@ fn notify_job_failed(
 ) {
     let error_text = error.unwrap_or_else(|| "Unknown error".to_string());
 
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Job Failed")
-        .body(format!("{}: {}", handler_name, error_text))
-        .show()
-    {
-        eprintln!("[notification] Failed to show job failure: {}", e);
-    }
-
-    println!(
-        "[notification] Job failed: {} ({}) - {}",
-        handler_name, job_id, error_text
+    send_notification(
+        &app,
+        "QNTX: Job Failed",
+        format!("{}: {}", handler_name, error_text),
+        format!("Job failed: {} ({}) - {}", handler_name, job_id, error_text),
     );
 }
 
 /// Send a native notification for storage warnings
 #[tauri::command]
 fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f64) {
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Storage Warning")
-        .body(format!(
-            "{} is at {:.0}% capacity",
-            actor,
-            fill_percent * 100.0
-        ))
-        .show()
-    {
-        eprintln!("[notification] Failed to show storage warning: {}", e);
-    }
-
-    println!(
-        "[notification] Storage warning: {} at {:.0}%",
-        actor,
-        fill_percent * 100.0
+    let percent = fill_percent * 100.0;
+    send_notification(
+        &app,
+        "QNTX: Storage Warning",
+        format!("{} is at {:.0}% capacity", actor, percent),
+        format!("Storage warning: {} at {:.0}%", actor, percent),
     );
 }
 
@@ -143,36 +129,23 @@ fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: 
         "Preparing for shutdown...".to_string()
     };
 
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Server Draining")
-        .body(&body)
-        .show()
-    {
-        eprintln!("[notification] Failed to show server draining: {}", e);
-    }
-
-    println!(
-        "[notification] Server draining: {} active, {} queued",
-        active_jobs, queued_jobs
+    send_notification(
+        &app,
+        "QNTX: Server Draining",
+        body,
+        format!("Server draining: {} active, {} queued", active_jobs, queued_jobs),
     );
 }
 
 /// Send a native notification when server stops
 #[tauri::command]
 fn notify_server_stopped(app: tauri::AppHandle) {
-    if let Err(e) = app
-        .notification()
-        .builder()
-        .title("QNTX: Server Stopped")
-        .body("The QNTX server has stopped")
-        .show()
-    {
-        eprintln!("[notification] Failed to show server stopped: {}", e);
-    }
-
-    println!("[notification] Server stopped");
+    send_notification(
+        &app,
+        "QNTX: Server Stopped",
+        "The QNTX server has stopped".to_string(),
+        "Server stopped".to_string(),
+    );
 }
 
 fn main() {
