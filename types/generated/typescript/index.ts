@@ -23,6 +23,21 @@ export type {
   Tracker,
 } from './budget';
 
+// Types from graph
+export type {
+  AxGraphBuilder,
+  Claim,
+  Graph,
+  Link,
+  Meta,
+  Node,
+  NodeTypeInfo,
+  RelationshipDefinition,
+  RelationshipTypeInfo,
+  Stats,
+  TypeDefinition,
+} from './graph';
+
 // Types from schedule
 export type {
   Execution,
