@@ -213,6 +213,21 @@ export interface LogEntry {
   metadata?: Record<string, unknown>;
 }
 
+export interface ParsedATSCode {
+  /**
+   * HandlerName is the async handler to invoke (e.g., "ixgest.git")
+   */
+  HandlerName: string;
+  /**
+   * Payload is the pre-computed JSON payload for the handler
+   */
+  Payload: number[];
+  /**
+   * SourceURL is used for deduplication (e.g., the git repo URL)
+   */
+  SourceURL: string;
+}
+
 export interface ProgressMessage {
   /**
    * "import_progress"

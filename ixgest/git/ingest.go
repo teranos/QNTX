@@ -15,8 +15,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
 
-	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage"
+	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ixgest/types"
 	"github.com/teranos/vanity-id"
 )
@@ -48,6 +48,9 @@ type GitIxProcessor struct {
 	defaultActor string // Used for repo-level attestations (branches)
 	verbosity    int
 	logger       *zap.SugaredLogger
+	since        string // Filter: only process commits after this timestamp or hash
+	sinceTime    *time.Time
+	sinceHash    string
 }
 
 // GitProcessingResult represents the result of git processing
@@ -99,6 +102,41 @@ func NewGitIxProcessor(db *sql.DB, dryRun bool, actor string, verbosity int, log
 		verbosity:    verbosity,
 		logger:       logger,
 	}
+}
+
+// SetSince configures the processor to only ingest commits after the given
+// timestamp or commit hash. Supports:
+//   - RFC3339 timestamps: "2025-01-01T00:00:00Z"
+//   - Date strings: "2025-01-01"
+//   - Commit hashes: "abc1234" (7+ chars)
+func (p *GitIxProcessor) SetSince(since string) error {
+	if since == "" {
+		return nil
+	}
+	p.since = since
+
+	// Try parsing as RFC3339 timestamp
+	if t, err := time.Parse(time.RFC3339, since); err == nil {
+		p.sinceTime = &t
+		p.logger.Infow("Filtering commits since timestamp", "since", t.Format(time.RFC3339))
+		return nil
+	}
+
+	// Try parsing as date (YYYY-MM-DD)
+	if t, err := time.Parse("2006-01-02", since); err == nil {
+		p.sinceTime = &t
+		p.logger.Infow("Filtering commits since date", "since", t.Format("2006-01-02"))
+		return nil
+	}
+
+	// Assume it's a commit hash (7+ characters)
+	if len(since) >= 7 {
+		p.sinceHash = since
+		p.logger.Infow("Filtering commits since hash", "since", since)
+		return nil
+	}
+
+	return fmt.Errorf("invalid --since value: %q (use RFC3339 timestamp, date, or commit hash)", since)
 }
 
 // ProcessGitRepository processes a git repository and generates attestations
@@ -242,6 +280,32 @@ func (p *GitIxProcessor) processBranches(repo *git.Repository) ([]GitBranchResul
 func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult, error) {
 	var results []GitCommitResult
 
+	// If filtering by hash, resolve to timestamp first
+	if p.sinceHash != "" && p.sinceTime == nil {
+		sinceCommit, err := repo.CommitObject(plumbing.NewHash(p.sinceHash))
+		if err != nil {
+			// Try as short hash by iterating
+			commitIter, _ := repo.CommitObjects()
+			_ = commitIter.ForEach(func(c *object.Commit) error {
+				if strings.HasPrefix(c.Hash.String(), p.sinceHash) {
+					t := c.Author.When
+					p.sinceTime = &t
+					return fmt.Errorf("found") // Break iteration
+				}
+				return nil
+			})
+			commitIter.Close()
+		} else {
+			t := sinceCommit.Author.When
+			p.sinceTime = &t
+		}
+		if p.sinceTime != nil {
+			p.logger.Infow("Resolved commit hash to timestamp",
+				"hash", p.sinceHash,
+				"timestamp", p.sinceTime.Format(time.RFC3339))
+		}
+	}
+
 	// Get commit iterator
 	commitIter, err := repo.CommitObjects()
 	if err != nil {
@@ -251,6 +315,7 @@ func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult
 
 	// Track progress with adaptive intervals based on verbosity
 	processedCount := 0
+	skippedCount := 0
 	var progressInterval int
 	switch {
 	case p.verbosity >= 3:
@@ -265,6 +330,14 @@ func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult
 
 	// Process each commit
 	err = commitIter.ForEach(func(commit *object.Commit) error {
+		// Filter by --since if set
+		if p.sinceTime != nil {
+			if !commit.Author.When.After(*p.sinceTime) {
+				skippedCount++
+				return nil // Skip commits at or before the since time
+			}
+		}
+
 		commitResult, err := p.processCommit(commit)
 		if err != nil {
 			return fmt.Errorf("failed to process commit %s: %w", commit.Hash.String()[:7], err)
@@ -301,6 +374,12 @@ func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult
 
 	if err != nil {
 		return nil, err
+	}
+
+	if skippedCount > 0 {
+		p.logger.Infow("Skipped commits before --since cutoff",
+			"skipped", skippedCount,
+			"processed", processedCount)
 	}
 
 	return results, nil
@@ -412,7 +491,7 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	attestationCount++
 
 	if p.verbosity >= 5 {
-		 fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
+		fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
 			colorGreen, colorReset,
 			colorYellow, shortHash, colorReset,
 			colorCyan, "has_message", colorReset,
@@ -434,7 +513,7 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	attestationCount++
 
 	if p.verbosity >= 5 {
-		 fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
+		fmt.Printf("    %s✓%s %s%s%s %s%s%s %s%s%s\n",
 			colorGreen, colorReset,
 			colorYellow, shortHash, colorReset,
 			colorCyan, "committed_at", colorReset,
@@ -616,7 +695,8 @@ func extractModifiedPackages(commit *object.Commit, stats object.FileStats) []st
 
 // extractPackageDir extracts the directory containing a file as package identifier.
 // Example: "internal/ixgest/git/ingest.go" → "internal/ixgest/git"
-//          "README.md" → "." (root)
+//
+//	"README.md" → "." (root)
 func extractPackageDir(filePath string) string {
 	parts := strings.Split(filePath, "/")
 	if len(parts) == 1 {
