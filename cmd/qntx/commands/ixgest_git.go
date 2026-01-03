@@ -19,12 +19,16 @@ import (
 
 // IxGitCmd represents the ix git command
 var IxGitCmd = &cobra.Command{
-	Use:   "git <repository-path>",
+	Use:   "git <repository-path-or-url>",
 	Short: sym.IX + " Process git repository history and generate attestations",
 	Long: sym.IX + ` Process git repository history and generate comprehensive attestations in the Ask System.
 
-This command ingests git commit history, branches, and relationships into qntx's attestation
-system, allowing you to visualize and query your development timeline through the web UI.
+This command ingests git commit history, branches, dependencies, and relationships into qntx's
+attestation system, allowing you to visualize and query your development timeline through the web UI.
+
+REPOSITORY SOURCES:
+  - Local path: . or /path/to/repository
+  - Remote URL: https://github.com/user/repo (auto-cloned, shallow, cleaned up after)
 
 The git ingestion creates attestations for:
 - Commits: "HASH is_commit HASH"
@@ -35,17 +39,31 @@ The git ingestion creates attestations for:
 - Branch pointers: "BRANCH points_to HASH"
 - File modifications: "FILENAME modified_in HASH" (inverted to avoid bounded storage limits)
 
+DEPENDENCY INGESTION (automatic):
+When project files are detected, dependencies are also ingested:
+- go.mod/go.sum: Go modules and locked versions
+- Cargo.toml/Cargo.lock: Rust crates
+- package.json: npm/bun dependencies
+- flake.nix/flake.lock: Nix flake inputs
+- pyproject.toml/requirements.txt: Python packages
+
 After ingestion, you can:
 1. Query git history using as: "qntx as 611f667" or "qntx as authored_by alice"
 2. Visualize the commit graph in the web UI
 3. Explore development evolution over time
+4. Query dependencies: "qntx as 'go.mod requires'"
 
 Examples:
   qntx ix git .                                          # Ingest current repository
   qntx ix git /path/to/repository                        # Ingest specific repository
+  qntx ix git https://github.com/user/repo               # Ingest from URL (shallow clone)
+  qntx ix git https://github.com/user/repo --async       # Queue URL ingestion as background job
   qntx ix git . --dry-run                                # Preview what would be ingested
+  qntx ix git . --since 2025-01-01                       # Incremental: only commits after date
+  qntx ix git . --since abc1234                          # Incremental: only commits after hash
   qntx ix git . --verbose                                # Show detailed output for all commits
   qntx ix git . --actor "ixgest-git@myuser"              # Custom actor
+  qntx ix git . --no-deps                                # Skip dependency ingestion
 
 After ingestion:
   qntx as 611f667                                        # Query specific commit
@@ -54,6 +72,8 @@ After ingestion:
   qntx as committed_at "2025-11"                         # Commits in November 2025
   qntx as 'is modified_in of "611f667"'                  # Files modified in commit
   qntx as 'internal/ixgest/git/ingest.go modified_in'    # Commits modifying file
+  qntx as 'go.mod requires'                              # List Go dependencies
+  qntx as 'Cargo.toml depends_on'                        # List Rust dependencies
   qntx web                                               # Visualize in web UI`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,8 +82,10 @@ After ingestion:
 		actor, _ := cmd.Flags().GetString("actor")
 		verbosity, _ := cmd.Flags().GetCount("verbose")
 		asyncMode, _ := cmd.Flags().GetBool("async")
+		noDeps, _ := cmd.Flags().GetBool("no-deps")
+		since, _ := cmd.Flags().GetString("since")
 
-		return runIxGit(cmd, repoPath, dryRun, actor, verbosity, asyncMode)
+		return runIxGit(cmd, repoPath, dryRun, actor, verbosity, asyncMode, noDeps, since)
 	},
 }
 
@@ -73,10 +95,12 @@ func init() {
 	IxGitCmd.Flags().Bool("json", false, "Output results in JSON format")
 	IxGitCmd.Flags().Bool("dry-run", false, "Preview what would be ingested without writing to database")
 	IxGitCmd.Flags().Bool("async", false, "Run as background pulse job (allows pause/resume, progress tracking)")
+	IxGitCmd.Flags().Bool("no-deps", false, "Skip dependency ingestion (go.mod, Cargo.toml, etc.)")
+	IxGitCmd.Flags().String("since", "", "Only ingest commits after this timestamp or commit hash (e.g., 2025-01-01, abc1234)")
 }
 
 // runIxGit handles git repository processing and attestation generation
-func runIxGit(cmd *cobra.Command, repoPath string, dryRun bool, actor string, verbosity int, asyncMode bool) error {
+func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, verbosity int, asyncMode bool, noDeps bool, since string) error {
 	useJSON := qntxdisplay.ShouldOutputJSON(cmd)
 
 	// Load config and open database
@@ -91,25 +115,46 @@ func runIxGit(cmd *cobra.Command, repoPath string, dryRun bool, actor string, ve
 	}
 	defer database.Close()
 
+	// Resolve repository (handles URLs with auto-clone)
+	if !useJSON && git.IsRepoURL(repoInput) {
+		pterm.Info.Printf("%s Detected repository URL, cloning...", sym.IX)
+	}
+
+	repoSource, err := git.ResolveRepository(repoInput, logger.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to resolve repository: %w", err)
+	}
+	defer repoSource.Cleanup()
+
+	repoPath := repoSource.LocalPath
+
+	if !useJSON && repoSource.IsCloned {
+		pterm.Success.Printf("%s Repository cloned to temporary directory", sym.IX)
+	}
+
 	// Handle async mode
 	if asyncMode {
 		if dryRun {
 			return fmt.Errorf("--async and --dry-run cannot be used together")
 		}
-		return runIxGitAsync(database, repoPath, actor, verbosity, useJSON)
+		// For async mode, pass the original input - the worker will clone if needed
+		repoSource.Cleanup() // Clean up any sync clone, worker will handle its own
+		return runIxGitAsync(database, repoInput, actor, verbosity, noDeps, since, useJSON)
 	}
 
 	// Synchronous mode (original behavior)
-	return runIxGitSync(cmd, database, repoPath, dryRun, actor, verbosity, useJSON)
+	return runIxGitSync(cmd, database, repoPath, repoSource.OriginalInput, dryRun, actor, verbosity, noDeps, since, useJSON)
 }
 
 // runIxGitAsync creates an async pulse job for git ingestion
-func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity int, useJSON bool) error {
+func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity int, noDeps bool, since string, useJSON bool) error {
 	// Create payload
 	payload := git.GitIngestionPayload{
-		RepositoryPath: repoPath,
-		Actor:          actor,
-		Verbosity:      verbosity,
+		RepositorySource: repoSource,
+		Actor:            actor,
+		Verbosity:        verbosity,
+		NoDeps:           noDeps,
+		Since:            since,
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
@@ -119,10 +164,10 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 	// Create job (we don't know total operations yet, will update during execution)
 	job, err := async.NewJobWithPayload(
 		"ixgest.git",
-		repoPath,
+		repoSource,
 		payloadJSON,
-		0,    // Total operations unknown until we scan the repo
-		0.0,  // No cost for git ingestion
+		0,   // Total operations unknown until we scan the repo
+		0.0, // No cost for git ingestion
 		actor,
 	)
 	if err != nil {
@@ -139,7 +184,7 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 		return qntxdisplay.OutputJSON(map[string]interface{}{
 			"job_id":     job.ID,
 			"status":     "queued",
-			"repository": repoPath,
+			"repository": repoSource,
 		})
 	}
 
@@ -151,7 +196,7 @@ func runIxGitAsync(database *sql.DB, repoPath string, actor string, verbosity in
 }
 
 // runIxGitSync runs git ingestion synchronously (original behavior)
-func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun bool, actor string, verbosity int, useJSON bool) error {
+func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, originalInput string, dryRun bool, actor string, verbosity int, noDeps bool, since string, useJSON bool) error {
 
 	if !useJSON {
 		pterm.DefaultHeader.WithFullWidth().Printf("%s Git IX - Attestation Generation", sym.IX)
@@ -162,8 +207,11 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 			pterm.Println()
 		}
 
-		pterm.Info.Printf("%s Processing repository: %s", sym.IX, repoPath)
+		pterm.Info.Printf("%s Processing repository: %s", sym.IX, originalInput)
 		pterm.Info.Printf("%s Actor: %s", sym.IX, actor)
+		if since != "" {
+			pterm.Info.Printf("%s Since: %s (incremental mode)", sym.IX, since)
+		}
 		if verbosity > 0 {
 			pterm.Info.Printf("Verbosity level: %d", verbosity)
 		}
@@ -172,6 +220,13 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 
 	// Create git processor with global logger
 	processor := git.NewGitIxProcessor(database, dryRun, actor, verbosity, logger.Logger)
+
+	// Set incremental filter if --since is provided
+	if since != "" {
+		if err := processor.SetSince(since); err != nil {
+			return err
+		}
+	}
 
 	// Create a spinner for processing (only in non-JSON mode)
 	var spinner *pterm.SpinnerPrinter
@@ -200,11 +255,39 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 		return err
 	}
 
+	// Process dependencies unless --no-deps is specified
+	var depsResult *git.DepsIngestionResult
+	if !noDeps {
+		if !useJSON {
+			spinner, _ = pterm.DefaultSpinner.Start("Detecting and processing project dependencies...")
+		}
+
+		depsProcessor := git.NewDepsIxProcessor(database, repoPath, dryRun, actor, verbosity, logger.Logger)
+		depsResult, err = depsProcessor.ProcessProjectFiles()
+
+		if !useJSON && spinner != nil {
+			spinner.Stop()
+		}
+
+		if err != nil {
+			// Don't fail the whole operation for deps errors, just warn
+			if !useJSON {
+				pterm.Warning.Printf("Failed to process some dependencies: %v", err)
+			}
+		}
+	}
+
 	// Calculate processing time
 	processingTime := time.Since(startTime)
 
 	if useJSON {
-		return qntxdisplay.OutputJSON(result)
+		// Combine results for JSON output
+		combined := map[string]interface{}{
+			"git":             result,
+			"dependencies":    depsResult,
+			"processing_time": processingTime.String(),
+		}
+		return qntxdisplay.OutputJSON(combined)
 	}
 
 	// Non-JSON output
@@ -212,11 +295,38 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 	pterm.Success.Printf("%s Git repository processing completed!", sym.IX)
 	pterm.Println()
 
-	// Display statistics
-	pterm.Info.Printf("Statistics:")
+	// Display git statistics
+	pterm.Info.Printf("Git Statistics:")
 	pterm.Printf("  Commits processed: %d", result.CommitsProcessed)
 	pterm.Printf("  Branches processed: %d", result.BranchesProcessed)
-	pterm.Printf("  Total attestations: %d", result.TotalAttestations)
+	pterm.Printf("  Git attestations: %d", result.TotalAttestations)
+
+	// Display dependency statistics
+	if depsResult != nil && depsResult.FilesDetected > 0 {
+		pterm.Println()
+		pterm.Info.Printf("Dependency Statistics:")
+		pterm.Printf("  Project files detected: %d", depsResult.FilesDetected)
+		pterm.Printf("  Files processed: %d", depsResult.FilesProcessed)
+		pterm.Printf("  Dependency attestations: %d", depsResult.TotalAttestations)
+
+		if verbosity > 0 {
+			for _, pf := range depsResult.ProjectFiles {
+				if pf.Error != "" {
+					pterm.Printf("    %s: error - %s", pf.Type, pf.Error)
+				} else {
+					pterm.Printf("    %s: %d attestations", pf.Type, pf.AttestationCount)
+				}
+			}
+		}
+	}
+
+	totalAttestations := result.TotalAttestations
+	if depsResult != nil {
+		totalAttestations += depsResult.TotalAttestations
+	}
+
+	pterm.Println()
+	pterm.Printf("  Total attestations: %d", totalAttestations)
 	pterm.Printf("  Processing time: %s", processingTime.Round(time.Millisecond))
 	pterm.Println()
 
@@ -256,6 +366,9 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, dryRun 
 		pterm.Printf("  Find by author: qntx as authored_by <author-name>")
 		pterm.Printf("  Temporal queries: qntx as committed_at \"2025-11\"")
 		pterm.Printf("  File evolution: qntx as 'path/to/file.go modified_in'")
+		if depsResult != nil && depsResult.FilesProcessed > 0 {
+			pterm.Printf("  Query dependencies: qntx as 'go.mod requires'")
+		}
 		pterm.Printf("  Visualize in web UI: qntx web")
 	}
 

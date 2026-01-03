@@ -19,6 +19,8 @@
  * - insertAfter: '' (default) appends panel to document.body
  */
 
+import { CSS } from './css-classes.ts';
+
 export interface PanelConfig {
     id: string;
     classes?: string[];
@@ -71,7 +73,7 @@ export abstract class BasePanel {
 
     protected createOverlay(): HTMLElement {
         const overlay = document.createElement('div');
-        overlay.className = `panel-overlay ${this.config.id}-overlay`;
+        overlay.className = `${CSS.PANEL.OVERLAY} ${this.config.id}-overlay`;
 
         if (this.config.closeOnOverlayClick) {
             overlay.addEventListener('click', () => this.hide());
@@ -85,7 +87,7 @@ export abstract class BasePanel {
         const panel = document.createElement('div');
         panel.id = this.config.id;
         // Start panels hidden by default
-        panel.className = `${this.config.classes.join(' ')} hidden`;
+        panel.className = `${this.config.classes.join(' ')} ${CSS.STATE.HIDDEN}`;
         return panel;
     }
 
@@ -104,7 +106,7 @@ export abstract class BasePanel {
 
     private attachCommonListeners(): void {
         // Close button - using specific class selector for safety
-        const closeBtn = this.panel?.querySelector('.panel-close');
+        const closeBtn = this.panel?.querySelector(`.${CSS.PANEL.CLOSE}`);
         closeBtn?.addEventListener('click', () => this.hide());
 
         // Escape key
@@ -140,12 +142,7 @@ export abstract class BasePanel {
         // Allow subclass to prevent show (e.g., unsaved changes check)
         if (!await this.beforeShow()) return;
 
-        this.panel.classList.add('visible');
-        this.panel.classList.remove('hidden');
-        this.overlay?.classList.add('visible');
-        this.overlay?.classList.remove('hidden');
-        this.isVisible = true;
-
+        this.setVisibility(true);
         await this.onShow();
     }
 
@@ -155,13 +152,20 @@ export abstract class BasePanel {
         // Allow subclass to prevent hide (e.g., unsaved changes prompt)
         if (!this.beforeHide()) return;
 
-        this.panel.classList.remove('visible');
-        this.panel.classList.add('hidden');
-        this.overlay?.classList.remove('visible');
-        this.overlay?.classList.add('hidden');
-        this.isVisible = false;
-
+        this.setVisibility(false);
         this.onHide();
+    }
+
+    /**
+     * Set visibility state for panel and overlay
+     * Handles both CSS class toggling and internal state
+     */
+    protected setVisibility(visible: boolean): void {
+        this.panel?.classList.toggle(CSS.STATE.VISIBLE, visible);
+        this.panel?.classList.toggle(CSS.STATE.HIDDEN, !visible);
+        this.overlay?.classList.toggle(CSS.STATE.VISIBLE, visible);
+        this.overlay?.classList.toggle(CSS.STATE.HIDDEN, !visible);
+        this.isVisible = visible;
     }
 
     public toggle(): void {

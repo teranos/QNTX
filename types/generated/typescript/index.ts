@@ -59,6 +59,7 @@ export type {
   ListExecutionsResponse,
   ListScheduledJobsResponse,
   LogEntry,
+  ParsedATSCode,
   ProgressMessage,
   ProseEntry,
   PulseExecutionCompletedMessage,

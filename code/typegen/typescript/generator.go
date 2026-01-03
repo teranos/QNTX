@@ -80,6 +80,7 @@ var TypeMapping = map[string]string{
 	"uint64":                 "number",
 	"float32":                "number",
 	"float64":                "number",
+	"byte":                   "number", // Go byte is alias for uint8
 	"bool":                   "boolean",
 	"time.Time":              "string",
 	"time.Duration":          "number",

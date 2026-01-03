@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -328,9 +329,59 @@ func stringPtr(s string) *string {
 	return &s
 }
 
+// resolvePayloadLastRun checks if the payload contains "since":"last_run" and
+// replaces it with the actual last_run_at timestamp from the scheduled job.
+// This enables incremental processing for scheduled jobs.
+func (t *Ticker) resolvePayloadLastRun(scheduled *Job) []byte {
+	if scheduled.Payload == nil || len(scheduled.Payload) == 0 {
+		return scheduled.Payload
+	}
+
+	// Check if payload contains "last_run" (quick check before parsing)
+	if !strings.Contains(string(scheduled.Payload), `"last_run"`) {
+		return scheduled.Payload
+	}
+
+	// Parse payload to check/modify since field
+	var payloadMap map[string]interface{}
+	if err := json.Unmarshal(scheduled.Payload, &payloadMap); err != nil {
+		// Can't parse - return original
+		return scheduled.Payload
+	}
+
+	since, ok := payloadMap["since"].(string)
+	if !ok || since != "last_run" {
+		return scheduled.Payload
+	}
+
+	// Resolve last_run to actual timestamp
+	if scheduled.LastRunAt != nil {
+		payloadMap["since"] = *scheduled.LastRunAt
+		t.logger.Debugw(sym.Pulse+" Resolved --since last_run to timestamp",
+			"job_id", scheduled.ID,
+			"last_run_at", *scheduled.LastRunAt)
+	} else {
+		// No last run - remove since filter (process all)
+		delete(payloadMap, "since")
+		t.logger.Debugw(sym.Pulse+" No last_run_at, removing --since filter (first run)",
+			"job_id", scheduled.ID)
+	}
+
+	// Re-serialize
+	resolved, err := json.Marshal(payloadMap)
+	if err != nil {
+		return scheduled.Payload
+	}
+	return resolved
+}
+
 // enqueueAsyncJob creates and enqueues an async job from the scheduled job.
 // This is domain-agnostic - it uses the pre-computed handler_name and payload.
 // Jobs must have HandlerName and Payload set at creation time by the application.
+//
+// Special handling for "since":"last_run" in payload:
+// If the payload contains this value, it will be resolved to the actual
+// last_run_at timestamp from the scheduled job, enabling incremental processing.
 func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 	// Require pre-computed handler - jobs should be created by the application
 	// with handler_name and payload populated
@@ -339,7 +390,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 	}
 
 	handlerName := scheduled.HandlerName
-	payload := scheduled.Payload
+	payload := t.resolvePayloadLastRun(scheduled)
 	sourceURL := scheduled.SourceURL
 
 	// Check for existing active job with same source URL (deduplication)
