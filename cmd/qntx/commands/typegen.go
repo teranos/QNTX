@@ -19,7 +19,9 @@ import (
 var languagePackages = map[string][]string{
 	"typescript": {
 		"github.com/teranos/QNTX/ats/types",
-		"github.com/teranos/QNTX/graph", // Frontend graph visualization
+		"github.com/teranos/QNTX/code/ast",    // AST transformation types
+		"github.com/teranos/QNTX/code/github", // GitHub PR integration types
+		"github.com/teranos/QNTX/graph",       // Frontend graph visualization
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
@@ -37,6 +39,7 @@ var languagePackages = map[string][]string{
 	},
 	"markdown": {
 		"github.com/teranos/QNTX/ats/types",
+		"github.com/teranos/QNTX/code/github",
 		"github.com/teranos/QNTX/graph",
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",

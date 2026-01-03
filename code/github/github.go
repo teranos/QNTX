@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -308,4 +309,59 @@ func CheckWorkflowStatus(workflowFile string) error {
 	}
 
 	return nil
+}
+
+// PRInfo contains basic information about a pull request
+type PRInfo struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	Author string `json:"author"`
+	State  string `json:"state"`
+}
+
+// FetchOpenPRs fetches a list of open pull requests using gh CLI
+func FetchOpenPRs() ([]PRInfo, error) {
+	cmd := exec.Command("gh", "pr", "list",
+		"--state", "open",
+		"--limit", "20",
+		"--json", "number,title,author,state")
+
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("gh command failed: %s", string(exitErr.Stderr))
+		}
+		return nil, err
+	}
+
+	var prs []struct {
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		Author struct {
+			Login string `json:"login"`
+		} `json:"author"`
+		State string `json:"state"`
+	}
+
+	if err := json.Unmarshal(output, &prs); err != nil {
+		return nil, fmt.Errorf("failed to parse PR list: %w", err)
+	}
+
+	// Convert to simplified PRInfo format
+	result := make([]PRInfo, len(prs))
+	for i, pr := range prs {
+		result[i] = PRInfo{
+			Number: pr.Number,
+			Title:  pr.Title,
+			Author: pr.Author.Login,
+			State:  pr.State,
+		}
+	}
+
+	// Sort by PR number descending (newest first)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Number > result[j].Number
+	})
+
+	return result, nil
 }

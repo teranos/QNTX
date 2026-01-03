@@ -334,7 +334,7 @@ func (s *QNTXServer) detectProjectRoot() string {
 }
 
 // HandleCodePRSuggestions returns fix suggestions for a given PR number
-// GET /api/code/pr/:number/suggestions
+// GET /api/code/github/pr/:number/suggestions
 func (s *QNTXServer) HandleCodePRSuggestions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -342,10 +342,10 @@ func (s *QNTXServer) HandleCodePRSuggestions(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Extract PR number from URL path
-	// Expected format: /api/code/pr/122/suggestions
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/code/pr/"), "/")
+	// Expected format: /api/code/github/pr/122/suggestions
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/code/github/pr/"), "/")
 	if len(parts) < 2 || parts[1] != "suggestions" {
-		http.Error(w, "Invalid URL format, expected /api/code/pr/:number/suggestions", http.StatusBadRequest)
+		http.Error(w, "Invalid URL format, expected /api/code/github/pr/:number/suggestions", http.StatusBadRequest)
 		return
 	}
 
@@ -369,5 +369,29 @@ func (s *QNTXServer) HandleCodePRSuggestions(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(suggestions); err != nil {
 		s.logger.Errorw("Failed to encode suggestions", "error", err)
+	}
+}
+
+// HandleCodePRList returns a list of open pull requests
+// GET /api/code/github/pr
+func (s *QNTXServer) HandleCodePRList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Fetch open PRs from GitHub
+	prs, err := github.FetchOpenPRs()
+	if err != nil {
+		s.logger.Errorw("Failed to fetch open PRs",
+			"error", err)
+		http.Error(w, fmt.Sprintf("Failed to fetch PRs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return PRs as JSON
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(prs); err != nil {
+		s.logger.Errorw("Failed to encode PRs", "error", err)
 	}
 }
