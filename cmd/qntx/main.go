@@ -53,6 +53,7 @@ func init() {
 	// Add commands
 	rootCmd.AddCommand(commands.AmCmd)
 	rootCmd.AddCommand(commands.AsCmd)
+	rootCmd.AddCommand(commands.CodeCmd)
 	rootCmd.AddCommand(commands.DbCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.IxCmd)
