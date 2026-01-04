@@ -2,32 +2,40 @@ package grpc
 
 import (
 	"database/sql"
+	"encoding/json"
+	"strconv"
+	"strings"
 
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 )
 
 // RemoteServiceRegistry provides service access for external plugins.
 // External plugins receive this registry with endpoints to connect back to QNTX.
+// Services are accessed via gRPC clients that connect to the endpoints.
 type RemoteServiceRegistry struct {
-	dbEndpoint       string
 	atsStoreEndpoint string
+	queueEndpoint    string
+	authToken        string
 	config           map[string]string
 	logger           *zap.SugaredLogger
+	atsStoreClient   ats.AttestationStore // Lazy-initialized gRPC client
+	queueClient      plugin.QueueService  // Lazy-initialized gRPC client
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
 func NewRemoteServiceRegistry(
-	dbEndpoint string,
 	atsStoreEndpoint string,
+	queueEndpoint string,
+	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
 ) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
-		dbEndpoint:       dbEndpoint,
 		atsStoreEndpoint: atsStoreEndpoint,
+		queueEndpoint:    queueEndpoint,
+		authToken:        authToken,
 		config:           config,
 		logger:           logger,
 	}
@@ -56,18 +64,32 @@ func (r *RemoteServiceRegistry) Config(domain string) plugin.Config {
 	}
 }
 
-// ATSStore returns nil - external plugins use gRPC for attestation operations.
-func (r *RemoteServiceRegistry) ATSStore() *storage.SQLStore {
-	// External plugins should use the gRPC attestation service
-	r.logger.Warn("ATSStore() called on remote plugin - use gRPC attestation service")
-	return nil
+// ATSStore returns a gRPC client for ATSStore operations.
+// The client is lazy-initialized on first access.
+func (r *RemoteServiceRegistry) ATSStore() ats.AttestationStore {
+	if r.atsStoreClient == nil && r.atsStoreEndpoint != "" {
+		client, err := NewRemoteATSStore(r.atsStoreEndpoint, r.authToken, r.logger)
+		if err != nil {
+			r.logger.Errorw("Failed to create ATSStore client", "error", err)
+			return nil
+		}
+		r.atsStoreClient = client
+	}
+	return r.atsStoreClient
 }
 
-// Queue returns nil - external plugins use gRPC for queue operations.
-func (r *RemoteServiceRegistry) Queue() *async.Queue {
-	// External plugins should use the gRPC queue service
-	r.logger.Warn("Queue() called on remote plugin - use gRPC queue service")
-	return nil
+// Queue returns a gRPC client for Queue operations.
+// The client is lazy-initialized on first access.
+func (r *RemoteServiceRegistry) Queue() plugin.QueueService {
+	if r.queueClient == nil && r.queueEndpoint != "" {
+		client, err := NewRemoteQueue(r.queueEndpoint, r.authToken, r.logger)
+		if err != nil {
+			r.logger.Errorw("Failed to create Queue client", "error", err)
+			return nil
+		}
+		r.queueClient = client
+	}
+	return r.queueClient
 }
 
 // remoteConfig provides configuration for remote plugins.
@@ -81,18 +103,38 @@ func (c *remoteConfig) GetString(key string) string {
 }
 
 func (c *remoteConfig) GetInt(key string) int {
-	// TODO: Implement proper integer parsing
+	val, ok := c.config[key]
+	if !ok {
+		return 0
+	}
+	// Try to parse as int
+	if intVal, err := strconv.Atoi(val); err == nil {
+		return intVal
+	}
+	// Try to parse as float and convert
+	if floatVal, err := strconv.ParseFloat(val, 64); err == nil {
+		return int(floatVal)
+	}
 	return 0
 }
 
 func (c *remoteConfig) GetBool(key string) bool {
 	val := c.config[key]
-	return val == "true" || val == "1"
+	return val == "true" || val == "1" || val == "yes" || val == "on"
 }
 
 func (c *remoteConfig) GetStringSlice(key string) []string {
-	// TODO: Implement proper slice parsing
-	return nil
+	val, ok := c.config[key]
+	if !ok {
+		return nil
+	}
+	// Try to parse as JSON array
+	var slice []string
+	if err := json.Unmarshal([]byte(val), &slice); err == nil {
+		return slice
+	}
+	// If not JSON, treat as comma-separated
+	return strings.Split(val, ",")
 }
 
 func (c *remoteConfig) Get(key string) interface{} {

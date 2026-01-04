@@ -11,8 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/ats"
 	"go.uber.org/zap"
 )
 
@@ -616,25 +615,25 @@ func TestRegistry_Concurrency(t *testing.T) {
 
 type mockServiceRegistry struct {
 	db    *sql.DB
-	store *storage.SQLStore
-	queue *async.Queue
+	store ats.AttestationStore
+	queue QueueService
 }
 
 func newMockServiceRegistry() *mockServiceRegistry {
 	return &mockServiceRegistry{
 		db:    &sql.DB{},
-		store: &storage.SQLStore{},
-		queue: &async.Queue{},
+		store: nil,
+		queue: nil,
 	}
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB                { return m.db }
-func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger {
+func (m *mockServiceRegistry) Database() *sql.DB                         { return m.db }
+func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger   {
 	return zap.NewNop().Sugar()
 }
-func (m *mockServiceRegistry) Config(domain string) Config { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() *storage.SQLStore { return m.store }
-func (m *mockServiceRegistry) Queue() *async.Queue         { return m.queue }
+func (m *mockServiceRegistry) Config(domain string) Config               { return &mockConfig{} }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore            { return m.store }
+func (m *mockServiceRegistry) Queue() QueueService                       { return m.queue }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -137,11 +138,28 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		}
 	}
 
+	// Get service endpoints from the service registry if available
+	// These will be empty strings if services aren't running
+	atsStoreEndpoint := ""
+	queueEndpoint := ""
+	authToken := ""
+
+	// Try to extract endpoints from config (passed by PluginManager)
+	if ep := pluginConfig.GetString("_ats_store_endpoint"); ep != "" {
+		atsStoreEndpoint = ep
+	}
+	if ep := pluginConfig.GetString("_queue_endpoint"); ep != "" {
+		queueEndpoint = ep
+	}
+	if token := pluginConfig.GetString("_auth_token"); token != "" {
+		authToken = token
+	}
+
 	req := &protocol.InitializeRequest{
-		// TODO: Expose QNTX service endpoints for plugin callbacks
-		// DatabaseEndpoint:  "",
-		// AtsStoreEndpoint: "",
-		Config: config,
+		AtsStoreEndpoint: atsStoreEndpoint,
+		QueueEndpoint:    queueEndpoint,
+		AuthToken:        authToken,
+		Config:           config,
 	}
 
 	_, err := c.client.Initialize(ctx, req)
@@ -149,7 +167,11 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		return fmt.Errorf("failed to initialize remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
 	}
 
-	c.logger.Infow("Remote plugin initialized", "name", c.metadata.Name)
+	c.logger.Infow("Remote plugin initialized",
+		"name", c.metadata.Name,
+		"ats_store", atsStoreEndpoint != "",
+		"queue", queueEndpoint != "",
+	)
 	return nil
 }
 
@@ -264,13 +286,122 @@ type wsProxyHandler struct {
 	logger *zap.SugaredLogger
 }
 
+var wsUpgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // TODO: Implement proper origin validation
+	},
+}
+
 // ServeWS handles WebSocket upgrade and proxies to remote plugin.
 func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement WebSocket proxying via gRPC streaming
-	// This requires establishing a bidirectional gRPC stream and bridging
-	// WebSocket messages to gRPC messages
-	h.logger.Warn("WebSocket proxying not yet implemented")
-	http.Error(w, "WebSocket proxying not implemented", http.StatusNotImplemented)
+	// Upgrade HTTP connection to WebSocket
+	wsConn, err := wsUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		h.logger.Errorw("WebSocket upgrade failed", "error", err)
+		return
+	}
+	defer wsConn.Close()
+
+	// Establish bidirectional gRPC stream
+	ctx := r.Context()
+	stream, err := h.client.client.HandleWebSocket(ctx)
+	if err != nil {
+		h.logger.Errorw("Failed to establish gRPC stream", "error", err)
+		wsConn.WriteMessage(websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseInternalServerErr, "Failed to connect to plugin"))
+		return
+	}
+
+	h.logger.Info("WebSocket connection established, bridging to gRPC stream")
+
+	// Send CONNECT message to plugin
+	if err := stream.Send(&protocol.WebSocketMessage{
+		Type: protocol.WebSocketMessage_CONNECT,
+		Data: []byte{},
+	}); err != nil {
+		h.logger.Errorw("Failed to send CONNECT message", "error", err)
+		return
+	}
+
+	// Bridge WebSocket and gRPC stream bidirectionally
+	errChan := make(chan error, 2)
+
+	// WebSocket -> gRPC stream
+	go func() {
+		defer func() {
+			stream.Send(&protocol.WebSocketMessage{
+				Type: protocol.WebSocketMessage_CLOSE,
+				Data: []byte{},
+			})
+		}()
+
+		for {
+			messageType, data, err := wsConn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+					h.logger.Errorw("WebSocket read error", "error", err)
+				}
+				errChan <- err
+				return
+			}
+
+			h.logger.Debugw("WebSocket -> gRPC", "type", messageType, "size", len(data))
+
+			// Convert WebSocket message to protocol message
+			protoMsg := &protocol.WebSocketMessage{
+				Type: protocol.WebSocketMessage_DATA,
+				Data: data,
+			}
+
+			// Send to gRPC stream
+			if err := stream.Send(protoMsg); err != nil {
+				h.logger.Errorw("Failed to send to gRPC stream", "error", err)
+				errChan <- err
+				return
+			}
+		}
+	}()
+
+	// gRPC stream -> WebSocket
+	go func() {
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				if err != io.EOF {
+					h.logger.Errorw("gRPC stream read error", "error", err)
+				}
+				errChan <- err
+				return
+			}
+
+			h.logger.Debugw("gRPC -> WebSocket", "type", msg.Type, "size", len(msg.Data))
+
+			// Handle CLOSE message from plugin
+			if msg.Type == protocol.WebSocketMessage_CLOSE {
+				wsConn.WriteMessage(websocket.CloseMessage,
+					websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				errChan <- io.EOF
+				return
+			}
+
+			// Send DATA message to WebSocket client
+			if msg.Type == protocol.WebSocketMessage_DATA {
+				if err := wsConn.WriteMessage(websocket.TextMessage, msg.Data); err != nil {
+					h.logger.Errorw("WebSocket write error", "error", err)
+					errChan <- err
+					return
+				}
+			}
+		}
+	}()
+
+	// Wait for error from either direction
+	err = <-errChan
+	if err != nil && err != io.EOF {
+		h.logger.Errorw("WebSocket proxy error", "error", err)
+	}
+
+	h.logger.Info("WebSocket connection closed")
 }
 
 // Health returns the remote plugin's health status.
