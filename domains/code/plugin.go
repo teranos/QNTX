@@ -82,12 +82,7 @@ func (p *Plugin) Commands() []*cobra.Command {
 
 // RegisterHTTP registers HTTP handlers for the code domain
 func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
-	// TODO: Register handlers for:
-	// - /api/code/ - Code file tree and content
-	// - /api/code/github/pr - PR integration
-	// - /api/code/github/pr/:number/suggestions - Fix suggestions
-
-	return nil
+	return p.registerHTTPHandlers(mux)
 }
 
 // RegisterWebSocket registers WebSocket handlers for the code domain
