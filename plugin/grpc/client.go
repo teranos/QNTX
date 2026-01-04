@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/teranos/QNTX/domains"
-	"github.com/teranos/QNTX/domains/grpc/protocol"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

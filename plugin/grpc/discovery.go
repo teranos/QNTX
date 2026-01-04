@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/teranos/QNTX/domains"
+	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 )
 

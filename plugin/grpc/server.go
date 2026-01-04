@@ -19,8 +19,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/teranos/QNTX/domains"
-	"github.com/teranos/QNTX/domains/grpc/protocol"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -277,7 +277,7 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 }
 
 // HandleWebSocket handles a WebSocket connection via gRPC streaming.
-func (s *PluginServer) HandleWebSocket(stream grpc.BidiStreamingServer[protocol.WebSocketMessage, protocol.WebSocketMessage]) error {
+func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_HandleWebSocketServer) error {
 	// WebSocket handling via gRPC streaming
 	// This bridges WebSocket connections to the plugin's WebSocket handlers
 	for {
