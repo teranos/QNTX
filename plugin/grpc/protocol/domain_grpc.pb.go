@@ -23,10 +23,6 @@ type DomainPluginServiceClient interface {
 	Initialize(ctx context.Context, in *InitializeRequest, opts ...grpc.CallOption) (*Empty, error)
 	// Shutdown shuts down the plugin
 	Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
-	// Commands returns CLI command definitions
-	Commands(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*CommandsResponse, error)
-	// ExecuteCommand executes a CLI command
-	ExecuteCommand(ctx context.Context, in *ExecuteCommandRequest, opts ...grpc.CallOption) (*ExecuteCommandResponse, error)
 	// HandleHTTP handles an HTTP request
 	HandleHTTP(ctx context.Context, in *HTTPRequest, opts ...grpc.CallOption) (*HTTPResponse, error)
 	// HandleWebSocket handles a WebSocket connection (bidirectional streaming)
@@ -64,24 +60,6 @@ func (c *domainPluginServiceClient) Initialize(ctx context.Context, in *Initiali
 func (c *domainPluginServiceClient) Shutdown(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, "/protocol.DomainPluginService/Shutdown", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *domainPluginServiceClient) Commands(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*CommandsResponse, error) {
-	out := new(CommandsResponse)
-	err := c.cc.Invoke(ctx, "/protocol.DomainPluginService/Commands", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *domainPluginServiceClient) ExecuteCommand(ctx context.Context, in *ExecuteCommandRequest, opts ...grpc.CallOption) (*ExecuteCommandResponse, error) {
-	out := new(ExecuteCommandResponse)
-	err := c.cc.Invoke(ctx, "/protocol.DomainPluginService/ExecuteCommand", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -147,10 +125,6 @@ type DomainPluginServiceServer interface {
 	Initialize(context.Context, *InitializeRequest) (*Empty, error)
 	// Shutdown shuts down the plugin
 	Shutdown(context.Context, *Empty) (*Empty, error)
-	// Commands returns CLI command definitions
-	Commands(context.Context, *Empty) (*CommandsResponse, error)
-	// ExecuteCommand executes a CLI command
-	ExecuteCommand(context.Context, *ExecuteCommandRequest) (*ExecuteCommandResponse, error)
 	// HandleHTTP handles an HTTP request
 	HandleHTTP(context.Context, *HTTPRequest) (*HTTPResponse, error)
 	// HandleWebSocket handles a WebSocket connection (bidirectional streaming)
@@ -172,12 +146,6 @@ func (UnimplementedDomainPluginServiceServer) Initialize(context.Context, *Initi
 }
 func (UnimplementedDomainPluginServiceServer) Shutdown(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
-}
-func (UnimplementedDomainPluginServiceServer) Commands(context.Context, *Empty) (*CommandsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Commands not implemented")
-}
-func (UnimplementedDomainPluginServiceServer) ExecuteCommand(context.Context, *ExecuteCommandRequest) (*ExecuteCommandResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ExecuteCommand not implemented")
 }
 func (UnimplementedDomainPluginServiceServer) HandleHTTP(context.Context, *HTTPRequest) (*HTTPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HandleHTTP not implemented")
@@ -251,42 +219,6 @@ func _DomainPluginService_Shutdown_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DomainPluginServiceServer).Shutdown(ctx, req.(*Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DomainPluginService_Commands_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DomainPluginServiceServer).Commands(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/protocol.DomainPluginService/Commands",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DomainPluginServiceServer).Commands(ctx, req.(*Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DomainPluginService_ExecuteCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ExecuteCommandRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DomainPluginServiceServer).ExecuteCommand(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/protocol.DomainPluginService/ExecuteCommand",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DomainPluginServiceServer).ExecuteCommand(ctx, req.(*ExecuteCommandRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -368,14 +300,6 @@ var _DomainPluginService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Shutdown",
 			Handler:    _DomainPluginService_Shutdown_Handler,
-		},
-		{
-			MethodName: "Commands",
-			Handler:    _DomainPluginService_Commands_Handler,
-		},
-		{
-			MethodName: "ExecuteCommand",
-			Handler:    _DomainPluginService_ExecuteCommand_Handler,
 		},
 		{
 			MethodName: "HandleHTTP",

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/storage"
@@ -33,7 +32,6 @@ type mockPlugin struct {
 	initError      error
 	shutdownError  error
 	healthStatus   pluginpkg.HealthStatus
-	commands       []*cobra.Command
 	httpHandlers   map[string]http.HandlerFunc
 }
 
@@ -69,10 +67,6 @@ func (p *mockPlugin) Initialize(ctx context.Context, services pluginpkg.ServiceR
 func (p *mockPlugin) Shutdown(ctx context.Context) error {
 	p.shutdownCalled = true
 	return p.shutdownError
-}
-
-func (p *mockPlugin) Commands() []*cobra.Command {
-	return p.commands
 }
 
 func (p *mockPlugin) RegisterHTTP(mux *http.ServeMux) error {
@@ -309,50 +303,6 @@ func TestPluginServer_HandleHTTP_NotFound(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, int32(404), resp.StatusCode)
-}
-
-func TestPluginServer_Commands(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	plugin := newMockPlugin()
-	plugin.commands = []*cobra.Command{
-		{
-			Use:   "test",
-			Short: "Test command",
-		},
-	}
-	server := NewPluginServer(plugin, logger)
-
-	resp, err := server.Commands(context.Background(), &protocol.Empty{})
-	require.NoError(t, err)
-
-	assert.Len(t, resp.Commands, 1)
-	assert.Equal(t, "test", resp.Commands[0].Name)
-	assert.Equal(t, "Test command", resp.Commands[0].Description)
-}
-
-func TestPluginServer_Commands_WithSubcommands(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-	plugin := newMockPlugin()
-
-	rootCmd := &cobra.Command{
-		Use:   "root",
-		Short: "Root command",
-	}
-	subCmd := &cobra.Command{
-		Use:   "sub",
-		Short: "Sub command",
-	}
-	rootCmd.AddCommand(subCmd)
-	plugin.commands = []*cobra.Command{rootCmd}
-
-	server := NewPluginServer(plugin, logger)
-
-	resp, err := server.Commands(context.Background(), &protocol.Empty{})
-	require.NoError(t, err)
-
-	assert.Len(t, resp.Commands, 1)
-	assert.Equal(t, "root", resp.Commands[0].Name)
-	assert.Contains(t, resp.Commands[0].Subcommands, "sub")
 }
 
 // =============================================================================
@@ -596,9 +546,6 @@ func TestPluginClientServer_FullIntegration(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.commands = []*cobra.Command{
-		{Use: "test", Short: "Test command"},
-	}
 	plugin.httpHandlers["/api/mock/data"] = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
@@ -625,12 +572,7 @@ func TestPluginClientServer_FullIntegration(t *testing.T) {
 	health := proxy.Health(context.Background())
 	assert.True(t, health.Healthy)
 
-	// Test 4: Commands
-	cmds := proxy.Commands()
-	// Commands are cached during Initialize
-	assert.NotNil(t, cmds)
-
-	// Test 5: Shutdown
+	// Test 4: Shutdown
 	err = proxy.Shutdown(context.Background())
 	require.NoError(t, err)
 }

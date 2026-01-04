@@ -11,7 +11,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/plugin"
 )
 
@@ -53,29 +52,6 @@ func (p *Plugin) Shutdown(ctx context.Context) error {
 	logger.Info("Code domain plugin shutting down")
 
 	return nil
-}
-
-// Commands returns CLI commands for the code domain
-func (p *Plugin) Commands() []*cobra.Command {
-	// Root command for code domain
-	codeCmd := &cobra.Command{
-		Use:   "code",
-		Short: "Software development tools",
-		Long:  "Code domain provides git ingestion, GitHub integration, language servers, and code editing",
-	}
-
-	// IX subcommand group
-	ixCmd := &cobra.Command{
-		Use:   "ix",
-		Short: "Data ingestion commands",
-	}
-	ixCmd.AddCommand(p.buildIxGitCommand())
-	codeCmd.AddCommand(ixCmd)
-
-	// Future: Add vcs commands (GitHub PR management, repository operations)
-	// Future: Add langserver commands (gopls diagnostics, code actions)
-
-	return []*cobra.Command{codeCmd}
 }
 
 // RegisterHTTP registers HTTP handlers for the code domain
