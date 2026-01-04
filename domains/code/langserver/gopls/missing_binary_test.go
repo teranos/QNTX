@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/code/gopls"
+	"github.com/teranos/QNTX/domains/code/langserver/gopls"
 	"github.com/teranos/QNTX/logger"
 )
 

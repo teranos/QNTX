@@ -10,7 +10,7 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
-	"github.com/teranos/QNTX/code/gopls"
+	"github.com/teranos/QNTX/domains/code/langserver/gopls"
 	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/graph"
