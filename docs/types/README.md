@@ -19,7 +19,7 @@ Auto-generated documentation showing Go source code alongside TypeScript type de
 
 ### Server
 
-- **[server](./server.md)** - WebSocket message types for real-time updates (30 types)
+- **[server](./server.md)** - WebSocket message types for real-time updates (29 types)
 
 ## Usage
 

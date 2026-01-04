@@ -15,10 +15,27 @@ func (s *QNTXServer) setupHTTPRoutes() {
 				continue
 			}
 
+			// Register HTTP handlers
 			if err := plugin.RegisterHTTP(mux); err != nil {
 				s.logger.Errorw("Failed to register HTTP handlers for plugin",
 					"plugin", name,
 					"error", err)
+			}
+
+			// Register WebSocket handlers
+			wsHandlers, err := plugin.RegisterWebSocket()
+			if err != nil {
+				s.logger.Errorw("Failed to register WebSocket handlers for plugin",
+					"plugin", name,
+					"error", err)
+			} else {
+				// Register each WebSocket handler
+				for path, handler := range wsHandlers {
+					// Capture handler in local variable for closure
+					wsHandler := handler
+					http.HandleFunc(path, s.corsMiddleware(wsHandler.ServeWS))
+					s.logger.Infow("Registered WebSocket handler", "plugin", name, "path", path)
+				}
 			}
 		}
 	}
@@ -30,9 +47,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))          // Custom WebSocket protocol (graph updates, logs, etc.)
-	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket))    // ATS LSP protocol (completions, hover, semantic tokens)
-	http.HandleFunc("/gopls", s.corsMiddleware(s.HandleGoplsWebSocket)) // gopls LSP protocol (Go code intelligence)
+	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))       // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
 	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))

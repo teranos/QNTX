@@ -1,20 +1,36 @@
-package server
+package qntxcode
 
 import (
 	"net/http"
 
+	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	glspserver "github.com/tliron/glsp/server"
 )
 
-// HandleGoplsWebSocket upgrades HTTP to WebSocket and serves gopls LSP protocol
-func (s *QNTXServer) HandleGoplsWebSocket(w http.ResponseWriter, r *http.Request) {
-	s.logger.Infow("gopls WebSocket connection request", "remote", r.RemoteAddr)
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Origin validation is handled by server CORS middleware
+		return true
+	},
+}
+
+// goplsWebSocketHandler implements plugin.WebSocketHandler for gopls LSP
+type goplsWebSocketHandler struct {
+	plugin *Plugin
+}
+
+// ServeWS handles gopls WebSocket connections
+func (h *goplsWebSocketHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
+	logger := h.plugin.services.Logger("code.gopls")
+	logger.Infow("gopls WebSocket connection request", "remote", r.RemoteAddr)
 
 	// Check if gopls service is available
-	if s.goplsService == nil {
-		s.logger.Warnw("gopls service not available (disabled or failed to initialize)")
+	if h.plugin.goplsService == nil {
+		logger.Warnw("gopls service not available (disabled or failed to initialize)")
 		http.Error(w, "gopls service not available", http.StatusServiceUnavailable)
 		return
 	}
@@ -22,12 +38,12 @@ func (s *QNTXServer) HandleGoplsWebSocket(w http.ResponseWriter, r *http.Request
 	// Upgrade HTTP to WebSocket
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.logger.Errorw("Failed to upgrade WebSocket for gopls", "error", err)
+		logger.Errorw("Failed to upgrade WebSocket for gopls", "error", err)
 		return
 	}
 
 	// Create GLSP handler wrapping our gopls service
-	glspHandler := gopls.NewGLSPHandler(s.goplsService, s.logger)
+	glspHandler := gopls.NewGLSPHandler(h.plugin.goplsService, logger)
 
 	// Create protocol handler
 	protocolHandler := protocol.Handler{
@@ -47,11 +63,11 @@ func (s *QNTXServer) HandleGoplsWebSocket(w http.ResponseWriter, r *http.Request
 	// Create GLSP server
 	glspServer := glspserver.NewServer(&protocolHandler, "gopls Language Server (qntx)", false)
 
-	s.logger.Infow("Serving gopls GLSP over WebSocket", "remote", r.RemoteAddr)
+	logger.Infow("Serving gopls GLSP over WebSocket", "remote", r.RemoteAddr)
 
 	// Serve GLSP over this WebSocket connection
 	// This blocks until the connection closes
 	glspServer.ServeWebSocket(conn)
 
-	s.logger.Infow("gopls WebSocket connection closed", "remote", r.RemoteAddr)
+	logger.Infow("gopls WebSocket connection closed", "remote", r.RemoteAddr)
 }

@@ -58,44 +58,6 @@ export interface ChildJobInfo {
 </tr>
 </table>
 
-## CodeEntry
-
-**Source**: [`server/code_handler.go:18`](https://github.com/teranos/QNTX/blob/main/server/code_handler.go#L18)
-
-
-<table>
-<tr>
-<th>Go Source</th>
-<th>TypeScript</th>
-</tr>
-<tr>
-<td>
-
-```go
-type CodeEntry struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
-	IsDir bool `json:"isDir"`
-	Children []CodeEntry `json:"children,omitempty"`
-}
-```
-
-</td>
-<td>
-
-```typescript
-export interface CodeEntry {
-  name: string;
-  path: string;
-  isDir: boolean;
-  children?: CodeEntry[];
-}
-```
-
-</td>
-</tr>
-</table>
-
 ## CompleteMessage
 
 **Source**: [`server/types.go:94`](https://github.com/teranos/QNTX/blob/main/server/types.go#L94)
