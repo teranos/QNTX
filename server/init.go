@@ -161,7 +161,8 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 
 		// Initialize plugins with services
 		store := storage.NewSQLStore(db, serverLogger)
-		services := domains.NewServiceRegistry(db, serverLogger, store, &simpleConfigProvider{})
+		queue := daemon.GetQueue()
+		services := domains.NewServiceRegistry(db, serverLogger, store, &simpleConfigProvider{}, queue)
 
 		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
 			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)

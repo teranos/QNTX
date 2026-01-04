@@ -335,7 +335,7 @@ func TestFinancePlugin_Initialize(t *testing.T) {
     store := storage.NewSQLStore(db, logger)
     config := &mockConfig{}
 
-    services := domains.NewServiceRegistry(db, logger, store, config)
+    services := domains.NewServiceRegistry(db, logger, store, config, queue)
 
     plugin := NewPlugin()
     err := plugin.Initialize(context.Background(), services)

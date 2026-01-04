@@ -58,7 +58,7 @@ func (p *Plugin) runIxGit(ctx any, repoSource string, asyncMode bool, dryRun boo
 	}
 
 	if asyncMode {
-		return p.runIxGitAsync(database, logger, repoSource, actor, verbosity, since, noDeps)
+		return p.runIxGitAsync(logger, repoSource, actor, verbosity, since, noDeps)
 	}
 
 	return p.runIxGitSync(database, logger, store, repoSource, actor, verbosity, since, noDeps, dryRun)
@@ -101,7 +101,7 @@ func (p *Plugin) runIxGitSync(database *sql.DB, logger *zap.SugaredLogger, store
 }
 
 // runIxGitAsync queues async git ingestion job
-func (p *Plugin) runIxGitAsync(database *sql.DB, logger *zap.SugaredLogger, repoSource string, actor string, verbosity int, since string, noDeps bool) error {
+func (p *Plugin) runIxGitAsync(logger *zap.SugaredLogger, repoSource string, actor string, verbosity int, since string, noDeps bool) error {
 	// Create payload
 	payload := map[string]interface{}{
 		"repo_url":  repoSource,
@@ -116,8 +116,12 @@ func (p *Plugin) runIxGitAsync(database *sql.DB, logger *zap.SugaredLogger, repo
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
+	// Generate unique job ID
+	jobID := fmt.Sprintf("job_%d", time.Now().UnixNano())
+
 	// Create job
 	job := &async.Job{
+		ID:          jobID,
 		HandlerName: "ixgest.git",
 		Payload:     payloadJSON,
 		Source:      fmt.Sprintf("cli:ix-git:%s", repoSource),
@@ -130,14 +134,9 @@ func (p *Plugin) runIxGitAsync(database *sql.DB, logger *zap.SugaredLogger, repo
 		UpdatedAt: time.Now(),
 	}
 
-	// Insert job
-	query := `INSERT INTO pulse_jobs (id, handler_name, payload, source, status, progress_current, progress_total, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-
-	jobID := fmt.Sprintf("job_%d", time.Now().UnixNano())
-	_, err = database.Exec(query, jobID, job.HandlerName, job.Payload, job.Source, job.Status,
-		job.Progress.Current, job.Progress.Total, job.CreatedAt, job.UpdatedAt)
-	if err != nil {
+	// Enqueue job via Pulse queue API
+	queue := p.services.Queue()
+	if err := queue.Enqueue(job); err != nil {
 		return fmt.Errorf("failed to queue job: %w", err)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 )
 
@@ -21,6 +22,9 @@ type ServiceRegistry interface {
 
 	// ATSStore returns the attestation storage interface
 	ATSStore() *storage.SQLStore
+
+	// Queue returns the Pulse async job queue
+	Queue() *async.Queue
 }
 
 // Config provides access to plugin configuration
@@ -50,6 +54,7 @@ type DefaultServiceRegistry struct {
 	logger *zap.SugaredLogger
 	store  *storage.SQLStore
 	config ConfigProvider
+	queue  *async.Queue
 }
 
 // ConfigProvider provides configuration for plugins
@@ -59,12 +64,13 @@ type ConfigProvider interface {
 }
 
 // NewServiceRegistry creates a new service registry
-func NewServiceRegistry(db *sql.DB, logger *zap.SugaredLogger, store *storage.SQLStore, config ConfigProvider) ServiceRegistry {
+func NewServiceRegistry(db *sql.DB, logger *zap.SugaredLogger, store *storage.SQLStore, config ConfigProvider, queue *async.Queue) ServiceRegistry {
 	return &DefaultServiceRegistry{
 		db:     db,
 		logger: logger,
 		store:  store,
 		config: config,
+		queue:  queue,
 	}
 }
 
@@ -86,4 +92,9 @@ func (r *DefaultServiceRegistry) Config(domain string) Config {
 // ATSStore returns the attestation storage interface
 func (r *DefaultServiceRegistry) ATSStore() *storage.SQLStore {
 	return r.store
+}
+
+// Queue returns the Pulse async job queue
+func (r *DefaultServiceRegistry) Queue() *async.Queue {
+	return r.queue
 }
