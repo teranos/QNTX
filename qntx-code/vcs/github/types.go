@@ -5,7 +5,7 @@ package github
 import (
 	"time"
 
-	"github.com/teranos/QNTX/domains/code/ast"
+	"github.com/teranos/QNTX/qntx-code/ast"
 )
 
 // FixSuggestion represents a single code fix suggestion from AI code review.
