@@ -1,11 +1,11 @@
-// Package code provides the built-in code domain plugin for QNTX.
+// Package qntxcode provides the built-in code domain plugin for QNTX.
 //
 // The code domain includes:
 //   - Ixgest: Git repository and dependency ingestion
 //   - VCS: GitHub PR workflow integration
 //   - Language Server: gopls for Go code intelligence
 //   - UI: Code editor and browser
-package code
+package qntxcode
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 
 // Plugin is the code domain plugin implementation
 type Plugin struct {
-	services domains.ServiceRegistry
+	services plugin.ServiceRegistry
 }
 
 // NewPlugin creates a new code domain plugin
@@ -26,8 +26,8 @@ func NewPlugin() *Plugin {
 }
 
 // Metadata returns information about the code domain plugin
-func (p *Plugin) Metadata() domains.Metadata {
-	return domains.Metadata{
+func (p *Plugin) Metadata() plugin.Metadata {
+	return plugin.Metadata{
 		Name:        "code",
 		Version:     "0.1.0",
 		QNTXVersion: ">= 0.1.0",
@@ -38,7 +38,7 @@ func (p *Plugin) Metadata() domains.Metadata {
 }
 
 // Initialize initializes the code domain plugin
-func (p *Plugin) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
+func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	p.services = services
 
 	logger := services.Logger("code")
@@ -84,8 +84,8 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 }
 
 // RegisterWebSocket registers WebSocket handlers for the code domain
-func (p *Plugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
-	handlers := make(map[string]domains.WebSocketHandler)
+func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
+	handlers := make(map[string]plugin.WebSocketHandler)
 
 	// Issue #127: Integrate plugin WebSocket handlers into server
 	// - /gopls - gopls language server protocol
@@ -94,11 +94,11 @@ func (p *Plugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error
 }
 
 // Health returns the health status of the code domain plugin
-func (p *Plugin) Health(ctx context.Context) domains.HealthStatus {
+func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	// Issue #131: Implement health checks for code domain plugin
 	// Should verify: gopls service, database connectivity, optional GitHub API
 
-	return domains.HealthStatus{
+	return plugin.HealthStatus{
 		Healthy: true,
 		Message: "Code domain operational",
 		Details: make(map[string]interface{}),

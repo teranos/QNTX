@@ -51,7 +51,7 @@ type QNTXServer struct {
 	wsCore        *wslogs.WebSocketCore
 	consoleBuffer *ConsoleBuffer        // Browser console log buffer for debugging (dev mode only)
 	initialQuery  string                // Pre-loaded Ax query to execute on client connection
-	pluginRegistry *domains.Registry    // Domain plugin registry
+	pluginRegistry *plugin.Registry    // Domain plugin registry
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown

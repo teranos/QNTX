@@ -37,7 +37,7 @@ func main() {
 	flag.Parse()
 
 	if *version {
-		plugin := code.NewPlugin()
+		plugin := qntxcode.NewPlugin()
 		meta := plugin.Metadata()
 		fmt.Printf("qntx-code-plugin %s\n", meta.Version)
 		fmt.Printf("QNTX Version: %s\n", meta.QNTXVersion)
@@ -55,7 +55,7 @@ func main() {
 	}
 
 	// Create the code domain plugin
-	plugin := code.NewPlugin()
+	plugin := qntxcode.NewPlugin()
 
 	// Create the gRPC server wrapper
 	server := plugingrpc.NewPluginServer(plugin, logger)

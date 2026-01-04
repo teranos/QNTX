@@ -229,7 +229,7 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 
 // GetPlugin returns a connected plugin as a DomainPlugin.
 // The returned plugin can be registered with the Registry like any built-in plugin.
-func (m *PluginManager) GetPlugin(name string) (domains.DomainPlugin, bool) {
+func (m *PluginManager) GetPlugin(name string) (plugin.DomainPlugin, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -241,11 +241,11 @@ func (m *PluginManager) GetPlugin(name string) (domains.DomainPlugin, bool) {
 
 // GetAllPlugins returns all connected plugins as DomainPlugin instances.
 // These can be registered with the Registry alongside built-in plugins.
-func (m *PluginManager) GetAllPlugins() []domains.DomainPlugin {
+func (m *PluginManager) GetAllPlugins() []plugin.DomainPlugin {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	plugins := make([]domains.DomainPlugin, 0, len(m.plugins))
+	plugins := make([]plugin.DomainPlugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
 		plugins = append(plugins, p.client)
 	}

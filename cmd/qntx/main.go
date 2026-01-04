@@ -73,11 +73,11 @@ func init() {
 // initializePluginRegistry sets up the domain plugin registry
 func initializePluginRegistry() {
 	// Create registry with QNTX version
-	registry := domains.NewRegistry("0.1.0")
-	domains.SetDefaultRegistry(registry)
+	registry := plugin.NewRegistry("0.1.0")
+	plugin.SetDefaultRegistry(registry)
 
 	// Register built-in code domain plugin
-	codePlugin := code.NewPlugin()
+	codePlugin := qntxcode.NewPlugin()
 	if err := registry.Register(codePlugin); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to register code plugin: %v\n", err)
 		os.Exit(1)
@@ -86,7 +86,7 @@ func initializePluginRegistry() {
 
 // addPluginCommands adds commands from all registered plugins
 func addPluginCommands() {
-	registry := domains.GetDefaultRegistry()
+	registry := plugin.GetDefaultRegistry()
 	if registry == nil {
 		return
 	}

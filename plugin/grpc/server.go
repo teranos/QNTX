@@ -30,8 +30,8 @@ import (
 type PluginServer struct {
 	protocol.UnimplementedDomainPluginServiceServer
 
-	plugin   domains.DomainPlugin
-	services domains.ServiceRegistry
+	plugin   plugin.DomainPlugin
+	services plugin.ServiceRegistry
 	logger   *zap.SugaredLogger
 
 	// HTTP mux for handling HTTP requests via gRPC
@@ -42,7 +42,7 @@ type PluginServer struct {
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
-func NewPluginServer(plugin domains.DomainPlugin, logger *zap.SugaredLogger) *PluginServer {
+func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *PluginServer {
 	return &PluginServer{
 		plugin:   plugin,
 		logger:   logger,
