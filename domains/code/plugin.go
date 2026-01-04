@@ -49,10 +49,8 @@ func (p *Plugin) Initialize(ctx context.Context, services domains.ServiceRegistr
 
 // Shutdown shuts down the code domain plugin
 func (p *Plugin) Shutdown(ctx context.Context) error {
-	if p.services != nil {
-		logger := p.services.Logger("code")
-		logger.Info("Code domain plugin shutting down")
-	}
+	logger := p.services.Logger("code")
+	logger.Info("Code domain plugin shutting down")
 
 	return nil
 }
@@ -74,8 +72,8 @@ func (p *Plugin) Commands() []*cobra.Command {
 	ixCmd.AddCommand(p.buildIxGitCommand())
 	codeCmd.AddCommand(ixCmd)
 
-	// TODO: Add vcs commands
-	// TODO: Add langserver commands
+	// Future: Add vcs commands (GitHub PR management, repository operations)
+	// Future: Add langserver commands (gopls diagnostics, code actions)
 
 	return []*cobra.Command{codeCmd}
 }
@@ -89,7 +87,7 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 func (p *Plugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
 	handlers := make(map[string]domains.WebSocketHandler)
 
-	// TODO: Register WebSocket handlers for:
+	// Issue #127: Integrate plugin WebSocket handlers into server
 	// - /gopls - gopls language server protocol
 
 	return handlers, nil
@@ -97,10 +95,8 @@ func (p *Plugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error
 
 // Health returns the health status of the code domain plugin
 func (p *Plugin) Health(ctx context.Context) domains.HealthStatus {
-	// TODO: Check health of:
-	// - gopls service
-	// - GitHub API connectivity
-	// - Database access
+	// Issue #131: Implement health checks for code domain plugin
+	// Should verify: gopls service, database connectivity, optional GitHub API
 
 	return domains.HealthStatus{
 		Healthy: true,

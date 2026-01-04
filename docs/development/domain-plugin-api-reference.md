@@ -384,6 +384,7 @@ type ServiceRegistry interface {
     Logger(domain string) *zap.SugaredLogger
     Config(domain string) Config
     ATSStore() *storage.SQLStore
+    Queue() *async.Queue
 }
 ```
 
@@ -487,6 +488,46 @@ filter := &types.AxFilter{
 }
 results, err := store.Query(ctx, filter)
 ```
+
+### Queue()
+
+Returns the Pulse async job queue for enqueueing background jobs.
+
+```go
+func (s ServiceRegistry) Queue() *async.Queue
+```
+
+**Use Cases**:
+- Queue long-running operations (git ingestion, analysis tasks)
+- Defer work to background workers with progress tracking
+- Integrate with Pulse job system instead of direct database manipulation
+
+**Example**:
+```go
+queue := p.services.Queue()
+
+// Create job
+job := &async.Job{
+    ID:          fmt.Sprintf("job_%d", time.Now().UnixNano()),
+    HandlerName: "ixgest.git",
+    Payload:     payloadJSON,
+    Source:      fmt.Sprintf("cli:ix-git:%s", repoURL),
+    Status:      async.JobStatusQueued,
+    Progress: async.Progress{
+        Current: 0,
+        Total:   100,
+    },
+    CreatedAt: time.Now(),
+    UpdatedAt: time.Now(),
+}
+
+// Enqueue job via Pulse API
+if err := queue.Enqueue(job); err != nil {
+    return fmt.Errorf("failed to queue job: %w", err)
+}
+```
+
+**Important**: Always use `Queue()` instead of direct SQL manipulation of `pulse_jobs` table. This ensures proper job lifecycle management, subscriber notifications, and integration with the Pulse system.
 
 ## Plugin Lifecycle
 

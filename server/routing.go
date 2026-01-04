@@ -24,10 +24,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	}
 
 	// Register plugin handlers with CORS middleware
-	http.HandleFunc("/api/code/github/pr/", s.corsMiddleware(mux.ServeHTTP))
-	http.HandleFunc("/api/code/github/pr", s.corsMiddleware(mux.ServeHTTP))
-	http.HandleFunc("/api/code", s.corsMiddleware(mux.ServeHTTP))
-	http.HandleFunc("/api/code/", s.corsMiddleware(mux.ServeHTTP))
+	// Single handler for all /api/code/* routes - mux handles internal routing
+	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
+	http.HandleFunc("/api/code/", corsPluginHandler) // Matches all /api/code/* paths
+	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
 
 	// Core QNTX handlers
 	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))          // Custom WebSocket protocol (graph updates, logs, etc.)
