@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
@@ -200,15 +201,12 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 			// Most headers use comma separation (RFC 7230)
 			if key == "Set-Cookie" {
 				// Set-Cookie is special: plugins should handle multiple values
-				// For now, join with semicolon (not ideal but preserves data)
+				// For now, only pass first value (not ideal but protocol limitation)
 				headers[key] = values[0] // TODO: Protocol should support repeated values
 				c.logger.Warnw("Multi-value header truncated", "header", key, "values", len(values))
 			} else {
-				// Standard comma-separated joining
-				headers[key] = values[0] // Join with comma for standard headers
-				for i := 1; i < len(values); i++ {
-					headers[key] += ", " + values[i]
-				}
+				// Join with comma per RFC 7230
+				headers[key] = strings.Join(values, ", ")
 			}
 		}
 	}
