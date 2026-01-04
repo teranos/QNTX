@@ -83,17 +83,17 @@ func (p *Plugin) runIxGitSync(database *sql.DB, logger *zap.SugaredLogger, store
 	}
 
 	// Display results
-	pterm.Success.Printf("Git ingestion completed: %d attestations created\n", result.AttestationsCreated)
+	pterm.Success.Printf("Git ingestion completed: %d attestations created\n", result.TotalAttestations)
 
 	// Process dependencies if not disabled
 	if !noDeps {
 		depsProcessor := git.NewDepsIxProcessor(database, repoSrc.LocalPath, dryRun, actor, verbosity, logger)
 
-		depsResult, err := depsProcessor.ProcessDependencies()
+		depsResult, err := depsProcessor.ProcessProjectFiles()
 		if err != nil {
 			pterm.Warning.Printf("Dependency ingestion failed: %v\n", err)
-		} else if depsResult != nil && depsResult.AttestationsCreated > 0 {
-			pterm.Success.Printf("Dependencies ingested: %d attestations created\n", depsResult.AttestationsCreated)
+		} else if depsResult != nil && depsResult.TotalAttestations > 0 {
+			pterm.Success.Printf("Dependencies ingested: %d attestations created\n", depsResult.TotalAttestations)
 		}
 	}
 
@@ -119,7 +119,7 @@ func (p *Plugin) runIxGitAsync(database *sql.DB, logger *zap.SugaredLogger, repo
 	// Create job
 	job := &async.Job{
 		HandlerName: "ixgest.git",
-		Payload:     string(payloadJSON),
+		Payload:     payloadJSON,
 		Source:      fmt.Sprintf("cli:ix-git:%s", repoSource),
 		Status:      async.JobStatusQueued,
 		Progress: async.Progress{
