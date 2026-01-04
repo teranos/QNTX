@@ -25,7 +25,7 @@ type ExternalDomainProxy struct {
 	client   protocol.DomainPluginServiceClient
 	logger   *zap.SugaredLogger
 	addr     string
-	metadata domains.Metadata
+	metadata plugin.Metadata
 
 	// Cached command definitions
 	commands []*protocol.CommandDefinition
@@ -63,7 +63,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		return nil, fmt.Errorf("failed to get plugin metadata: %w", err)
 	}
 
-	proxy.metadata = domains.Metadata{
+	proxy.metadata = plugin.Metadata{
 		Name:        metaResp.Name,
 		Version:     metaResp.Version,
 		QNTXVersion: metaResp.QntxVersion,
@@ -87,12 +87,12 @@ func (c *ExternalDomainProxy) Close() error {
 }
 
 // Metadata returns the plugin's metadata (cached from connection).
-func (c *ExternalDomainProxy) Metadata() domains.Metadata {
+func (c *ExternalDomainProxy) Metadata() plugin.Metadata {
 	return c.metadata
 }
 
 // Initialize initializes the remote plugin.
-func (c *ExternalDomainProxy) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
+func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	// Build config map from service registry
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
@@ -305,9 +305,9 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 }
 
 // RegisterWebSocket returns WebSocket handlers that proxy to the remote plugin.
-func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
+func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
 	// Return a proxy WebSocket handler
-	handlers := make(map[string]domains.WebSocketHandler)
+	handlers := make(map[string]plugin.WebSocketHandler)
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
@@ -334,10 +334,10 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health returns the remote plugin's health status.
-func (c *ExternalDomainProxy) Health(ctx context.Context) domains.HealthStatus {
+func (c *ExternalDomainProxy) Health(ctx context.Context) plugin.HealthStatus {
 	resp, err := c.client.Health(ctx, &protocol.Empty{})
 	if err != nil {
-		return domains.HealthStatus{
+		return plugin.HealthStatus{
 			Healthy: false,
 			Message: fmt.Sprintf("Failed to check plugin health: %v", err),
 			Details: map[string]interface{}{
@@ -351,7 +351,7 @@ func (c *ExternalDomainProxy) Health(ctx context.Context) domains.HealthStatus {
 		details[key] = value
 	}
 
-	return domains.HealthStatus{
+	return plugin.HealthStatus{
 		Healthy: resp.Healthy,
 		Message: resp.Message,
 		Details: details,
@@ -359,4 +359,4 @@ func (c *ExternalDomainProxy) Health(ctx context.Context) domains.HealthStatus {
 }
 
 // Verify ExternalDomainProxy implements DomainPlugin
-var _ domains.DomainPlugin = (*ExternalDomainProxy)(nil)
+var _ plugin.DomainPlugin = (*ExternalDomainProxy)(nil)

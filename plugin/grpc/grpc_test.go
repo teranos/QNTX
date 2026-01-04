@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/plugin"
+	pluginpkg "github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
@@ -32,14 +32,14 @@ type mockPlugin struct {
 	shutdownCalled bool
 	initError      error
 	shutdownError  error
-	healthStatus   domains.HealthStatus
+	healthStatus   pluginpkg.HealthStatus
 	commands       []*cobra.Command
 	httpHandlers   map[string]http.HandlerFunc
 }
 
 func newMockPlugin() *mockPlugin {
 	return &mockPlugin{
-		healthStatus: domains.HealthStatus{
+		healthStatus: pluginpkg.HealthStatus{
 			Healthy: true,
 			Message: "Mock plugin healthy",
 			Details: map[string]interface{}{
@@ -50,8 +50,8 @@ func newMockPlugin() *mockPlugin {
 	}
 }
 
-func (p *mockPlugin) Metadata() domains.Metadata {
-	return domains.Metadata{
+func (p *mockPlugin) Metadata() pluginpkg.Metadata {
+	return pluginpkg.Metadata{
 		Name:        "mock",
 		Version:     "1.0.0",
 		QNTXVersion: ">= 0.1.0",
@@ -61,7 +61,7 @@ func (p *mockPlugin) Metadata() domains.Metadata {
 	}
 }
 
-func (p *mockPlugin) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
+func (p *mockPlugin) Initialize(ctx context.Context, services pluginpkg.ServiceRegistry) error {
 	p.initCalled = true
 	return p.initError
 }
@@ -86,11 +86,11 @@ func (p *mockPlugin) RegisterHTTP(mux *http.ServeMux) error {
 	return nil
 }
 
-func (p *mockPlugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
+func (p *mockPlugin) RegisterWebSocket() (map[string]pluginpkg.WebSocketHandler, error) {
 	return nil, nil
 }
 
-func (p *mockPlugin) Health(ctx context.Context) domains.HealthStatus {
+func (p *mockPlugin) Health(ctx context.Context) pluginpkg.HealthStatus {
 	return p.healthStatus
 }
 
@@ -101,7 +101,7 @@ type mockServiceRegistry struct {
 
 func (m *mockServiceRegistry) Database() *sql.DB              { return nil }
 func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger { return m.logger }
-func (m *mockServiceRegistry) Config(domain string) domains.Config     { return &mockConfig{} }
+func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config     { return &mockConfig{} }
 func (m *mockServiceRegistry) ATSStore() *storage.SQLStore            { return nil }
 func (m *mockServiceRegistry) Queue() *async.Queue                     { return nil }
 
@@ -115,7 +115,7 @@ func (c *mockConfig) Get(key string) interface{}         { return nil }
 func (c *mockConfig) Set(key string, value interface{})  {}
 
 // startTestServer starts a gRPC server for testing and returns its address
-func startTestServer(t *testing.T, plugin domains.DomainPlugin) (string, func()) {
+func startTestServer(t *testing.T, plugin pluginpkg.DomainPlugin) (string, func()) {
 	t.Helper()
 	logger := zaptest.NewLogger(t).Sugar()
 	server := NewPluginServer(plugin, logger)
@@ -177,7 +177,7 @@ func TestPluginServer_Health(t *testing.T) {
 func TestPluginServer_Health_Unhealthy(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.healthStatus = domains.HealthStatus{
+	plugin.healthStatus = pluginpkg.HealthStatus{
 		Healthy: false,
 		Message: "Plugin is unhealthy",
 		Details: map[string]interface{}{
@@ -404,7 +404,7 @@ func TestExternalDomainProxy_Health_Unhealthy(t *testing.T) {
 	}
 
 	plugin := newMockPlugin()
-	plugin.healthStatus = domains.HealthStatus{
+	plugin.healthStatus = pluginpkg.HealthStatus{
 		Healthy: false,
 		Message: "Database connection failed",
 	}
@@ -501,7 +501,7 @@ func TestExternalDomainProxy_RegisterHTTP(t *testing.T) {
 
 func TestExternalDomainProxy_ImplementsDomainPlugin(t *testing.T) {
 	// Compile-time check that ExternalDomainProxy implements DomainPlugin
-	var _ domains.DomainPlugin = (*ExternalDomainProxy)(nil)
+	var _ pluginpkg.DomainPlugin = (*ExternalDomainProxy)(nil)
 }
 
 // =============================================================================

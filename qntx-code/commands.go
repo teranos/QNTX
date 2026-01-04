@@ -1,4 +1,4 @@
-package code
+package qntxcode
 
 import (
 	"database/sql"
