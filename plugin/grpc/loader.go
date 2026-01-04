@@ -82,7 +82,8 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 
 		for _, candidate := range candidates {
 			if fileInfo, err := os.Stat(candidate); err == nil {
-				// Check if executable
+				// Check if executable (Unix-specific: checks permission bits)
+				// Issue #137: This doesn't work on Windows where executability is by extension
 				if fileInfo.Mode()&0111 == 0 {
 					logger.Debugw("Found plugin binary but not executable",
 						"plugin", name,
