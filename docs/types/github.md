@@ -8,7 +8,7 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## CachedPatch
 
-**Source**: [`code/github/types.go:60`](https://github.com/teranos/QNTX/blob/main/code/github/types.go#L60)
+**Source**: [`domains/code/vcs/github/types.go:60`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/types.go#L60)
 
 
 <table>
@@ -73,7 +73,7 @@ export interface CachedPatch {
 
 ## FixContext
 
-**Source**: [`code/github/types.go:29`](https://github.com/teranos/QNTX/blob/main/code/github/types.go#L29)
+**Source**: [`domains/code/vcs/github/types.go:29`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/types.go#L29)
 
 
 <table>
@@ -118,7 +118,7 @@ export interface FixContext {
 
 ## FixResult
 
-**Source**: [`code/github/types.go:38`](https://github.com/teranos/QNTX/blob/main/code/github/types.go#L38)
+**Source**: [`domains/code/vcs/github/types.go:38`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/types.go#L38)
 
 
 <table>
@@ -163,7 +163,7 @@ export interface FixResult {
 
 ## FixSuggestion
 
-**Source**: [`code/github/types.go:13`](https://github.com/teranos/QNTX/blob/main/code/github/types.go#L13)
+**Source**: [`domains/code/vcs/github/types.go:13`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/types.go#L13)
 
 
 <table>
@@ -219,7 +219,7 @@ export interface FixSuggestion {
 
 ## GitHubPR
 
-**Source**: [`code/github/pr_detection.go:18`](https://github.com/teranos/QNTX/blob/main/code/github/pr_detection.go#L18)
+**Source**: [`domains/code/vcs/github/pr_detection.go:18`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/pr_detection.go#L18)
 
 
 <table>
@@ -255,7 +255,7 @@ export interface GitHubPR {
 
 ## PRInfo
 
-**Source**: [`code/github/github.go:337`](https://github.com/teranos/QNTX/blob/main/code/github/github.go#L337)
+**Source**: [`domains/code/vcs/github/github.go:337`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/github.go#L337)
 
 
 <table>
@@ -293,7 +293,7 @@ export interface PRInfo {
 
 ## PatchResult
 
-**Source**: [`code/github/types.go:50`](https://github.com/teranos/QNTX/blob/main/code/github/types.go#L50)
+**Source**: [`domains/code/vcs/github/types.go:50`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/types.go#L50)
 
 
 <table>
@@ -343,7 +343,7 @@ export interface PatchResult {
 
 ## StalenessInfo
 
-**Source**: [`code/github/types.go:72`](https://github.com/teranos/QNTX/blob/main/code/github/types.go#L72)
+**Source**: [`domains/code/vcs/github/types.go:72`](https://github.com/teranos/QNTX/blob/main/domains/code/vcs/github/types.go#L72)
 
 
 <table>

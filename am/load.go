@@ -208,6 +208,18 @@ func GetFloat64(key string) float64 {
 	return v.GetFloat64(key)
 }
 
+// GetStringSlice returns a configuration value as string slice using dot notation
+func GetStringSlice(key string) []string {
+	v := initViper()
+	return v.GetStringSlice(key)
+}
+
+// Set sets a configuration value using dot notation (runtime override)
+func Set(key string, value interface{}) {
+	v := initViper()
+	v.Set(key, value)
+}
+
 // GetDatabasePath returns the configured database path
 func GetDatabasePath() (string, error) {
 	// Check for DB_PATH environment variable first (for dev mode override)

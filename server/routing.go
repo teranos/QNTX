@@ -4,6 +4,32 @@ import "net/http"
 
 // setupHTTPRoutes configures all HTTP handlers
 func (s *QNTXServer) setupHTTPRoutes() {
+	// Create a custom ServeMux for plugins
+	mux := http.NewServeMux()
+
+	// Register domain plugin handlers
+	if s.pluginRegistry != nil {
+		for _, name := range s.pluginRegistry.List() {
+			plugin, ok := s.pluginRegistry.Get(name)
+			if !ok {
+				continue
+			}
+
+			if err := plugin.RegisterHTTP(mux); err != nil {
+				s.logger.Errorw("Failed to register HTTP handlers for plugin",
+					"plugin", name,
+					"error", err)
+			}
+		}
+	}
+
+	// Register plugin handlers with CORS middleware
+	// Single handler for all /api/code/* routes - mux handles internal routing
+	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
+	http.HandleFunc("/api/code/", corsPluginHandler) // Matches all /api/code/* paths
+	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
+
+	// Core QNTX handlers
 	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))          // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket))    // ATS LSP protocol (completions, hover, semantic tokens)
 	http.HandleFunc("/gopls", s.corsMiddleware(s.HandleGoplsWebSocket)) // gopls LSP protocol (Go code intelligence)
@@ -11,21 +37,15 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))
 	http.HandleFunc("/api/config", s.corsMiddleware(s.HandleConfig))
-	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                      // Dev mode status
-	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                      // Browser console debugging (dev mode only)
-	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                      // Prose content tree
-	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))                        // Individual prose files
-	http.HandleFunc("/api/code/github/pr/", s.corsMiddleware(s.HandleCodePRSuggestions))                 // PR fix suggestions
-	http.HandleFunc("/api/code/github/pr", s.corsMiddleware(s.HandleCodePRList))                         // List open PRs
-	http.HandleFunc("/api/code", s.corsMiddleware(s.HandleCode))                                  // Code file tree
-	http.HandleFunc("/api/code/", s.corsMiddleware(s.HandleCodeContent))                          // Individual code files
-	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution)) // Individual execution (GET) and logs (GET /logs)
-	// TODO: Remove ambiguous endpoint - use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead
-	// http.HandleFunc("/api/pulse/tasks/", s.corsMiddleware(s.HandlePulseTask))
-	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))   // Individual schedule (GET/PATCH/DELETE)
-	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))   // List/create schedules (GET/POST)
-	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))             // Individual async job and sub-resources (GET)
-	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))             // List async jobs (GET)
+	http.HandleFunc("/api/dev", s.corsMiddleware(s.HandleDevMode))                       // Dev mode status
+	http.HandleFunc("/api/debug", s.corsMiddleware(s.HandleDebug))                       // Browser console debugging (dev mode only)
+	http.HandleFunc("/api/prose", s.corsMiddleware(s.HandleProse))                       // Prose content tree
+	http.HandleFunc("/api/prose/", s.corsMiddleware(s.HandleProseContent))               // Individual prose files
+	http.HandleFunc("/api/pulse/executions/", s.corsMiddleware(s.HandlePulseExecution))  // Individual execution (GET) and logs (GET /logs)
+	http.HandleFunc("/api/pulse/schedules/", s.corsMiddleware(s.HandlePulseSchedule))    // Individual schedule (GET/PATCH/DELETE)
+	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))    // List/create schedules (GET/POST)
+	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))              // Individual async job and sub-resources (GET)
+	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))              // List async jobs (GET)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 

@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/teranos/QNTX/code/gopls"
+	"github.com/teranos/QNTX/domains/code/langserver/gopls"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	glspserver "github.com/tliron/glsp/server"
 )

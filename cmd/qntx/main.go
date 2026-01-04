@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
+	"github.com/teranos/QNTX/domains"
+	"github.com/teranos/QNTX/domains/code"
 	"github.com/teranos/QNTX/logger"
 )
 
@@ -47,19 +49,59 @@ Examples:
 }
 
 func init() {
+	// Initialize domain plugin registry
+	initializePluginRegistry()
+
 	// Add global flags
 	rootCmd.PersistentFlags().CountP("verbose", "v", "Increase output verbosity (repeat for more detail: -v, -vv, -vvv)")
 
 	// Add commands
 	rootCmd.AddCommand(commands.AmCmd)
 	rootCmd.AddCommand(commands.AsCmd)
-	rootCmd.AddCommand(commands.CodeCmd)
+	// CodeCmd now provided by code domain plugin
 	rootCmd.AddCommand(commands.DbCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.IxCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
 	rootCmd.AddCommand(commands.TypegenCmd)
 	rootCmd.AddCommand(commands.VersionCmd)
+
+	// Add domain plugin commands
+	addPluginCommands()
+}
+
+// initializePluginRegistry sets up the domain plugin registry
+func initializePluginRegistry() {
+	// Create registry with QNTX version
+	registry := domains.NewRegistry("0.1.0")
+	domains.SetDefaultRegistry(registry)
+
+	// Register built-in code domain plugin
+	codePlugin := code.NewPlugin()
+	if err := registry.Register(codePlugin); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to register code plugin: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// addPluginCommands adds commands from all registered plugins
+func addPluginCommands() {
+	registry := domains.GetDefaultRegistry()
+	if registry == nil {
+		return
+	}
+
+	for _, name := range registry.List() {
+		plugin, ok := registry.Get(name)
+		if !ok {
+			continue
+		}
+
+		// Add plugin commands to root
+		for _, cmd := range plugin.Commands() {
+			rootCmd.AddCommand(cmd)
+		}
+	}
 }
 
 func main() {
