@@ -49,7 +49,7 @@ func (r *RemoteServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 }
 
 // Config returns plugin-specific configuration.
-func (r *RemoteServiceRegistry) Config(domain string) domains.Config {
+func (r *RemoteServiceRegistry) Config(domain string) plugin.Config {
 	return &remoteConfig{
 		domain: domain,
 		config: r.config,

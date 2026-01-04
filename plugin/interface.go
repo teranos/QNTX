@@ -1,4 +1,4 @@
-// Package domains provides the plugin architecture for QNTX domain extensions.
+// Package plugin provides the plugin architecture for QNTX domain extensions.
 //
 // A domain plugin represents a complete functional area (e.g., code, biotech, finance).
 // Each domain provides CLI commands, HTTP endpoints, WebSocket handlers, and lifecycle management.
@@ -13,7 +13,7 @@
 //   - code: Software development (git ingestion, GitHub PRs, language servers, code editor)
 //   - biotech: Bioinformatics (sequence analysis, protein folding, genomics)
 //   - finance: Financial analysis (market data, risk modeling, portfolio optimization)
-package domains
+package plugin
 
 import (
 	"context"
