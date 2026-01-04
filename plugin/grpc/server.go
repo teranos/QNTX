@@ -102,12 +102,12 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 
 	// Initialize the plugin
 	if err := s.plugin.Initialize(ctx, s.services); err != nil {
-		return nil, fmt.Errorf("plugin initialization failed: %w", err)
+		return nil, fmt.Errorf("plugin %s initialization failed: %w", s.plugin.Metadata().Name, err)
 	}
 
 	// Register HTTP handlers
 	if err := s.plugin.RegisterHTTP(s.httpMux); err != nil {
-		return nil, fmt.Errorf("HTTP registration failed: %w", err)
+		return nil, fmt.Errorf("HTTP registration failed for plugin %s: %w", s.plugin.Metadata().Name, err)
 	}
 
 	// Build command registry
@@ -144,7 +144,7 @@ func (s *PluginServer) registerCommand(prefix string, cmd *cobra.Command) {
 // Shutdown shuts down the plugin.
 func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
 	if err := s.plugin.Shutdown(ctx); err != nil {
-		return nil, fmt.Errorf("plugin shutdown failed: %w", err)
+		return nil, fmt.Errorf("plugin %s shutdown failed: %w", s.plugin.Metadata().Name, err)
 	}
 	return &protocol.Empty{}, nil
 }
