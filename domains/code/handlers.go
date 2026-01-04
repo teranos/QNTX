@@ -10,10 +10,69 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/domains/code/vcs/github"
 )
+
+var (
+	workspaceRootOnce sync.Once
+	cachedWorkspaceRoot string
+	workspaceRootErr error
+)
+
+// getWorkspaceRoot returns the validated absolute workspace root path
+func getWorkspaceRoot() (string, error) {
+	workspaceRootOnce.Do(func() {
+		workspaceRoot := am.GetString("code.gopls.workspace_root")
+		if workspaceRoot == "" || workspaceRoot == "." {
+			cwd, err := os.Getwd()
+			if err != nil {
+				workspaceRootErr = fmt.Errorf("failed to determine workspace: %w", err)
+				return
+			}
+			workspaceRoot = cwd
+		}
+
+		// Convert to absolute path and validate it exists
+		absPath, err := filepath.Abs(workspaceRoot)
+		if err != nil {
+			workspaceRootErr = fmt.Errorf("failed to resolve workspace path: %w", err)
+			return
+		}
+
+		info, err := os.Stat(absPath)
+		if err != nil {
+			workspaceRootErr = fmt.Errorf("workspace path does not exist: %w", err)
+			return
+		}
+		if !info.IsDir() {
+			workspaceRootErr = fmt.Errorf("workspace path is not a directory: %s", absPath)
+			return
+		}
+
+		cachedWorkspaceRoot = filepath.Clean(absPath)
+	})
+
+	return cachedWorkspaceRoot, workspaceRootErr
+}
+
+// validateCodePath validates a code path is safe and within workspace
+func validateCodePath(codePath, workspaceRoot string) (string, error) {
+	// Clean the path
+	cleanPath := filepath.Clean(codePath)
+
+	// Build absolute path
+	absPath := filepath.Join(workspaceRoot, cleanPath)
+
+	// Ensure the result is still within workspace (防止 path traversal)
+	if !strings.HasPrefix(absPath, filepath.Clean(workspaceRoot)+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path escapes workspace: %s", codePath)
+	}
+
+	return cleanPath, nil
+}
 
 // registerHTTPHandlers registers all HTTP handlers for the code domain
 func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
@@ -47,15 +106,26 @@ func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
 
 // handleCodeContent serves or updates code file content
 func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
+	logger := p.services.Logger("code")
+
 	codePath := strings.TrimPrefix(r.URL.Path, "/api/code/")
 	if codePath == "" {
 		http.Error(w, "Empty path", http.StatusBadRequest)
 		return
 	}
 
-	// Validate path
-	cleanPath := filepath.Clean(codePath)
-	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) {
+	// Get validated workspace root (Issue #2)
+	workspaceRoot, err := getWorkspaceRoot()
+	if err != nil {
+		logger.Errorw("Failed to get workspace root", "error", err)
+		http.Error(w, "Workspace configuration error", http.StatusInternalServerError)
+		return
+	}
+
+	// Validate path for security (Issue #1)
+	cleanPath, err := validateCodePath(codePath, workspaceRoot)
+	if err != nil {
+		logger.Warnw("Path validation failed", "path", codePath, "error", err)
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
@@ -67,10 +137,15 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		p.serveCodeFile(w, cleanPath)
+		p.serveCodeFile(w, r, cleanPath, workspaceRoot)
 	case http.MethodPut:
-		// TODO: Check dev mode
-		p.saveCodeFile(w, r, cleanPath)
+		// Issue #5: Check dev mode before allowing file writes
+		if !am.GetBool("server.dev_mode") {
+			logger.Warnw("File write attempt in production mode", "path", cleanPath)
+			http.Error(w, "File editing only available in dev mode", http.StatusForbidden)
+			return
+		}
+		p.saveCodeFile(w, r, cleanPath, workspaceRoot)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -78,6 +153,8 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 
 // handlePRSuggestions returns PR fix suggestions
 func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
+	logger := p.services.Logger("code")
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -98,7 +175,9 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	suggestions, err := github.FetchFixSuggestions(prNumber)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch suggestions: %v", err), http.StatusInternalServerError)
+		// Issue #6: Add error logging with context
+		logger.Errorw("Failed to fetch PR suggestions", "pr", prNumber, "error", err)
+		http.Error(w, "Failed to fetch suggestions", http.StatusInternalServerError)
 		return
 	}
 
@@ -108,6 +187,8 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 
 // handlePRList returns list of open PRs
 func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
+	logger := p.services.Logger("code")
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -115,7 +196,9 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 
 	prs, err := github.FetchOpenPRs()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch PRs: %v", err), http.StatusInternalServerError)
+		// Issue #6: Add error logging with context
+		logger.Errorw("Failed to fetch open PRs", "error", err)
+		http.Error(w, "Failed to fetch PRs", http.StatusInternalServerError)
 		return
 	}
 
@@ -125,13 +208,10 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 
 // buildCodeTree builds the code file tree
 func (p *Plugin) buildCodeTree() ([]CodeEntry, error) {
-	workspaceRoot := am.GetString("code.gopls.workspace_root")
-	if workspaceRoot == "" || workspaceRoot == "." {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		workspaceRoot = cwd
+	// Issue #2: Use validated workspace root
+	workspaceRoot, err := getWorkspaceRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workspace root: %w", err)
 	}
 
 	return p.buildCodeTreeFromFS(workspaceRoot, "")
@@ -190,11 +270,8 @@ func (p *Plugin) buildCodeTreeFromFS(basePath, relPath string) ([]CodeEntry, err
 }
 
 // serveCodeFile serves a code file
-func (p *Plugin) serveCodeFile(w http.ResponseWriter, codePath string) {
-	workspaceRoot := am.GetString("code.gopls.workspace_root")
-	if workspaceRoot == "" {
-		workspaceRoot = "."
-	}
+func (p *Plugin) serveCodeFile(w http.ResponseWriter, r *http.Request, codePath string, workspaceRoot string) {
+	logger := p.services.Logger("code")
 
 	fullPath := filepath.Join(workspaceRoot, codePath)
 	content, err := os.ReadFile(fullPath)
@@ -202,6 +279,8 @@ func (p *Plugin) serveCodeFile(w http.ResponseWriter, codePath string) {
 		if os.IsNotExist(err) {
 			http.Error(w, "File not found", http.StatusNotFound)
 		} else {
+			// Issue #6: Add error logging with context
+			logger.Errorw("Failed to read file", "path", codePath, "error", err)
 			http.Error(w, "Failed to read file", http.StatusInternalServerError)
 		}
 		return
@@ -211,14 +290,9 @@ func (p *Plugin) serveCodeFile(w http.ResponseWriter, codePath string) {
 	w.Write(content)
 }
 
-// saveCodeFile saves a code file
-func (p *Plugin) saveCodeFile(w http.ResponseWriter, r *http.Request, codePath string) {
-	// TODO: Check dev mode from config
-
-	workspaceRoot := am.GetString("code.gopls.workspace_root")
-	if workspaceRoot == "" {
-		workspaceRoot = "."
-	}
+// saveCodeFile saves a code file (dev mode only, validated by caller)
+func (p *Plugin) saveCodeFile(w http.ResponseWriter, r *http.Request, codePath string, workspaceRoot string) {
+	logger := p.services.Logger("code")
 
 	fullPath := filepath.Join(workspaceRoot, codePath)
 
@@ -227,12 +301,15 @@ func (p *Plugin) saveCodeFile(w http.ResponseWriter, r *http.Request, codePath s
 		var err error
 		content, err = io.ReadAll(r.Body)
 		if err != nil {
+			logger.Errorw("Failed to read request body", "path", codePath, "error", err)
 			http.Error(w, "Failed to read body", http.StatusBadRequest)
 			return
 		}
 	}
 
 	if err := os.WriteFile(fullPath, content, 0644); err != nil {
+		// Issue #6: Add error logging with context
+		logger.Errorw("Failed to write file", "path", codePath, "error", err)
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
