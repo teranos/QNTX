@@ -74,8 +74,8 @@ go mod init github.com/myorg/qntx-myplugin
 ### 2. Add Dependencies
 
 ```bash
-go get github.com/teranos/QNTX/domains
-go get github.com/teranos/QNTX/domains/grpc
+go get github.com/teranos/QNTX/plugin
+go get github.com/teranos/QNTX/plugin/grpc
 go get google.golang.org/grpc
 ```
 
@@ -90,7 +90,7 @@ import (
     "net/http"
 
     "github.com/spf13/cobra"
-    "github.com/teranos/QNTX/domains"
+    "github.com/teranos/QNTX/plugin"
 )
 
 type MyPlugin struct {
@@ -168,7 +168,7 @@ import (
     "os/signal"
     "syscall"
 
-    plugingrpc "github.com/teranos/QNTX/domains/grpc"
+    plugingrpc "github.com/teranos/QNTX/plugin/grpc"
     "go.uber.org/zap"
 )
 

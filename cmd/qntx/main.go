@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
-	"github.com/teranos/QNTX/domains"
-	"github.com/teranos/QNTX/domains/code"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/qntx-code"
 	"github.com/teranos/QNTX/logger"
 )
 
