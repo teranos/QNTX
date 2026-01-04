@@ -18,7 +18,7 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          vendorHash = "sha256-/5ZUMjk/VGCWu12n3xg+XvQCdsY84vpcNXqqkPV0dCE=";
+          vendorHash = "sha256-W2SPkC8HMfzgldH+kiEJVzIDdKHMY0gicsDJpoC02kM=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
