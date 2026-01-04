@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/code/typegen"
-	"github.com/teranos/QNTX/code/typegen/markdown"
-	"github.com/teranos/QNTX/code/typegen/python"
-	"github.com/teranos/QNTX/code/typegen/rust"
-	"github.com/teranos/QNTX/code/typegen/typescript"
+	"github.com/teranos/QNTX/typegen"
+	"github.com/teranos/QNTX/typegen/markdown"
+	"github.com/teranos/QNTX/typegen/python"
+	"github.com/teranos/QNTX/typegen/rust"
+	"github.com/teranos/QNTX/typegen/typescript"
 )
 
 // Package lists per language target

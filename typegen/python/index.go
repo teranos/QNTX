@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/code/typegen/util"
+	"github.com/teranos/QNTX/typegen/util"
 )
 
 // PackageExport represents a package and its exported types for __init__.py

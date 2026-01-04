@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"testing"
 
-	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/typegen"
 )
 
 func TestParseFieldTags_JSONOnly(t *testing.T) {
