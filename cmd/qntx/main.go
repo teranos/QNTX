@@ -52,6 +52,12 @@ Examples:
 }
 
 func init() {
+	// Initialize logger early for plugin loading
+	// Use silent mode to avoid cluttering output during init
+	if err := logger.Initialize(true); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize logger: %v\n", err)
+	}
+
 	// Initialize domain plugin registry
 	initializePluginRegistry()
 
@@ -79,17 +85,16 @@ func initializePluginRegistry() {
 	registry := plugin.NewRegistry("0.1.0")
 	plugin.SetDefaultRegistry(registry)
 
+	// Initialize logger for plugin loading
+	pluginLogger := logger.Logger.Named("plugin-loader")
+
 	// Load configuration to determine which plugins to load
 	cfg, err := am.Load()
 	if err != nil {
 		// If config fails to load, warn but continue with no plugins
-		fmt.Fprintf(os.Stderr, "Warning: Failed to load configuration, no plugins will be loaded: %v\n", err)
-		logger.Logger.Named("plugin-loader").Infow("No plugins loaded - QNTX running in minimal core mode")
+		pluginLogger.Warnw("Failed to load configuration, no plugins will be loaded", "error", err)
 		return
 	}
-
-	// Initialize logger for plugin loading
-	pluginLogger := logger.Logger.Named("plugin-loader")
 
 	// If no plugins enabled, run in minimal mode
 	if len(cfg.Plugin.Enabled) == 0 {
@@ -103,7 +108,7 @@ func initializePluginRegistry() {
 
 	manager, err := grpc.LoadPluginsFromConfig(ctx, cfg, pluginLogger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load plugins from configuration: %v\n", err)
+		pluginLogger.Errorw("Failed to load plugins from configuration", "error", err)
 		os.Exit(1)
 	}
 
@@ -111,25 +116,15 @@ func initializePluginRegistry() {
 	loadedPlugins := manager.GetAllPlugins()
 	for _, p := range loadedPlugins {
 		if err := registry.Register(p); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to register plugin %s: %v\n", p.Metadata().Name, err)
+			pluginLogger.Errorw("Failed to register plugin",
+				"plugin", p.Metadata().Name,
+				"error", err,
+			)
 			os.Exit(1)
 		}
 		pluginLogger.Infow("Registered plugin with registry",
 			"plugin", p.Metadata().Name,
 			"version", p.Metadata().Version,
-		)
-	}
-
-	// Log summary
-	if len(loadedPlugins) == 0 {
-		pluginLogger.Warnw("No plugins loaded despite being enabled - check plugin paths",
-			"enabled", cfg.Plugin.Enabled,
-			"paths", cfg.Plugin.Paths,
-		)
-	} else {
-		pluginLogger.Infow("Plugin loading complete",
-			"loaded", len(loadedPlugins),
-			"enabled", len(cfg.Plugin.Enabled),
 		)
 	}
 }
