@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/code/typegen"
-	"github.com/teranos/QNTX/code/typegen/typescript"
+	"github.com/teranos/QNTX/typegen"
+	"github.com/teranos/QNTX/typegen/typescript"
 )
 
 // Generator implements typegen.Generator for Markdown documentation

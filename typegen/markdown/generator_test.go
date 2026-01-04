@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teranos/QNTX/code/typegen"
+	"github.com/teranos/QNTX/typegen"
 )
 
 func TestGenerateUnionType_SingleChar(t *testing.T) {

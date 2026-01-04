@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/teranos/QNTX/code/typegen"
-	"github.com/teranos/QNTX/code/typegen/util"
+	"github.com/teranos/QNTX/typegen"
+	"github.com/teranos/QNTX/typegen/util"
 )
 
 // FieldTagInfo extends util.FieldTagInfo with TypeScript-specific fields
