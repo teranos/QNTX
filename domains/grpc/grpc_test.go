@@ -124,7 +124,7 @@ func TestPluginClientServer_Integration(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Connect client
-	client, err := NewPluginClient(addr, logger)
+	client, err := NewExternalDomainProxy(addr, logger)
 	require.NoError(t, err)
 	defer client.Close()
 

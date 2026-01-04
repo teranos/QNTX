@@ -15,31 +15,51 @@ This guide explains how to develop external QNTX domain plugins that run as sepa
 
 ## Overview
 
-External plugins provide the same functionality as built-in plugins but run in separate processes. This enables:
+There is **one plugin interface**: `DomainPlugin`. Both built-in and external plugins implement the same interface:
+
+- **Built-in plugins**: Implement `DomainPlugin` directly (e.g., `code.Plugin`)
+- **External plugins**: `ExternalDomainProxy` implements `DomainPlugin` by proxying gRPC calls to a sidecar process
+
+From the Registry's perspective, there is no difference. This enables:
 
 - **Process isolation**: Plugin crashes don't crash QNTX
-- **Language agnostic**: Plugins can be written in any gRPC-compatible language
+- **Language agnostic**: External plugins can be written in any gRPC-compatible language
 - **Independent deployment**: Update plugins without rebuilding QNTX
-- **Third-party plugins**: Private or commercial plugins
+- **Unified API**: Same interface for all plugins
 
 ## Architecture
 
 ```
-┌─────────────────┐         gRPC          ┌──────────────────┐
-│                 │ ◄──────────────────► │                  │
-│   QNTX Server   │    DomainPluginService │  External Plugin │
-│                 │                        │  (separate process)│
-└─────────────────┘                        └──────────────────┘
-       │                                          │
-       │ ServiceRegistry                          │ PluginServer
-       ▼                                          ▼
-┌─────────────────┐                        ┌──────────────────┐
-│ - Database      │                        │ - DomainPlugin   │
-│ - ATSStore      │                        │   implementation │
-│ - Logger        │                        │ - HTTP handlers  │
-│ - Config        │                        │ - CLI commands   │
-└─────────────────┘                        └──────────────────┘
+                        ┌─────────────────────────────────────┐
+                        │           domains.Registry          │
+                        │   (treats all plugins identically)  │
+                        └─────────────────────────────────────┘
+                                         │
+                    ┌────────────────────┼────────────────────┐
+                    │                    │                    │
+                    ▼                    ▼                    ▼
+         ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+         │   code.Plugin    │  │ finance.Plugin   │  │ExternalDomainProxy│
+         │   (built-in)     │  │   (built-in)     │  │    (adapter)      │
+         │                  │  │                  │  │                   │
+         │ implements       │  │ implements       │  │ implements        │
+         │ DomainPlugin     │  │ DomainPlugin     │  │ DomainPlugin      │
+         └──────────────────┘  └──────────────────┘  └─────────┬─────────┘
+                                                               │ gRPC
+                                                               ▼
+                                                     ┌──────────────────┐
+                                                     │  External Plugin │
+                                                     │ (sidecar process)│
+                                                     │                  │
+                                                     │ PluginServer     │
+                                                     │ wraps DomainPlugin│
+                                                     └──────────────────┘
 ```
+
+The `ExternalDomainProxy` is simply an adapter that:
+1. Implements `DomainPlugin` interface
+2. Translates method calls to gRPC requests
+3. Sends requests to a sidecar process running `PluginServer`
 
 ## Quick Start
 
@@ -190,9 +210,27 @@ go build -o qntx-myplugin .
 ./qntx-myplugin --port 9001
 ```
 
-### 6. Configure QNTX
+### 6. Register with QNTX
 
-Create `~/.qntx/am.plugins.toml`:
+The `PluginManager` loads external plugins and returns `DomainPlugin` instances that can be registered with the Registry:
+
+```go
+// In QNTX server initialization
+manager := grpc.NewPluginManager(logger)
+
+// Load external plugins from config
+configs := []grpc.PluginConfig{
+    {Name: "myplugin", Enabled: true, Address: "localhost:9001"},
+}
+manager.LoadPlugins(ctx, configs)
+
+// Get plugins as DomainPlugin instances and register them
+for _, plugin := range manager.GetAllPlugins() {
+    registry.Register(plugin)  // Same API as built-in plugins
+}
+```
+
+Or configure via `~/.qntx/am.plugins.toml`:
 
 ```toml
 [[plugins]]
@@ -201,7 +239,7 @@ enabled = true
 address = "localhost:9001"
 ```
 
-Or for auto-start:
+For auto-start:
 
 ```toml
 [[plugins]]

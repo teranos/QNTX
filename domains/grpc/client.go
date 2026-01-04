@@ -16,9 +16,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// PluginClient is a gRPC client that implements DomainPlugin by proxying to a remote plugin.
-// QNTX uses this to communicate with external plugins running in separate processes.
-type PluginClient struct {
+// ExternalDomainProxy implements DomainPlugin by proxying to a remote gRPC process.
+// This is the adapter that allows external plugins to be used identically to built-in plugins.
+// From the Registry's perspective, there is no difference between a built-in plugin
+// and an ExternalDomainProxy - both implement DomainPlugin.
+type ExternalDomainProxy struct {
 	conn     *grpc.ClientConn
 	client   protocol.DomainPluginServiceClient
 	logger   *zap.SugaredLogger
@@ -29,8 +31,10 @@ type PluginClient struct {
 	commands []*protocol.CommandDefinition
 }
 
-// NewPluginClient creates a new gRPC client connection to an external plugin.
-func NewPluginClient(addr string, logger *zap.SugaredLogger) (*PluginClient, error) {
+// NewExternalDomainProxy creates a new proxy to an external plugin running at the given address.
+// The returned proxy implements DomainPlugin and can be registered with the Registry
+// just like any built-in plugin.
+func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDomainProxy, error) {
 	// Create gRPC connection with retry and timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -45,7 +49,7 @@ func NewPluginClient(addr string, logger *zap.SugaredLogger) (*PluginClient, err
 
 	client := protocol.NewDomainPluginServiceClient(conn)
 
-	pc := &PluginClient{
+	proxy := &ExternalDomainProxy{
 		conn:   conn,
 		client: client,
 		logger: logger,
@@ -59,7 +63,7 @@ func NewPluginClient(addr string, logger *zap.SugaredLogger) (*PluginClient, err
 		return nil, fmt.Errorf("failed to get plugin metadata: %w", err)
 	}
 
-	pc.metadata = domains.Metadata{
+	proxy.metadata = domains.Metadata{
 		Name:        metaResp.Name,
 		Version:     metaResp.Version,
 		QNTXVersion: metaResp.QntxVersion,
@@ -69,26 +73,26 @@ func NewPluginClient(addr string, logger *zap.SugaredLogger) (*PluginClient, err
 	}
 
 	logger.Infow("Connected to external plugin",
-		"name", pc.metadata.Name,
-		"version", pc.metadata.Version,
+		"name", proxy.metadata.Name,
+		"version", proxy.metadata.Version,
 		"address", addr,
 	)
 
-	return pc, nil
+	return proxy, nil
 }
 
 // Close closes the gRPC connection.
-func (c *PluginClient) Close() error {
+func (c *ExternalDomainProxy) Close() error {
 	return c.conn.Close()
 }
 
 // Metadata returns the plugin's metadata (cached from connection).
-func (c *PluginClient) Metadata() domains.Metadata {
+func (c *ExternalDomainProxy) Metadata() domains.Metadata {
 	return c.metadata
 }
 
 // Initialize initializes the remote plugin.
-func (c *PluginClient) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
+func (c *ExternalDomainProxy) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
 	// Build config map from service registry
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
@@ -127,7 +131,7 @@ func (c *PluginClient) Initialize(ctx context.Context, services domains.ServiceR
 }
 
 // Shutdown shuts down the remote plugin.
-func (c *PluginClient) Shutdown(ctx context.Context) error {
+func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 	_, err := c.client.Shutdown(ctx, &protocol.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to shutdown remote plugin: %w", err)
@@ -136,7 +140,7 @@ func (c *PluginClient) Shutdown(ctx context.Context) error {
 }
 
 // Commands returns CLI commands that proxy to the remote plugin.
-func (c *PluginClient) Commands() []*cobra.Command {
+func (c *ExternalDomainProxy) Commands() []*cobra.Command {
 	if len(c.commands) == 0 {
 		return nil
 	}
@@ -150,7 +154,7 @@ func (c *PluginClient) Commands() []*cobra.Command {
 }
 
 // buildCobraCommand creates a Cobra command that proxies execution to the remote plugin.
-func (c *PluginClient) buildCobraCommand(def *protocol.CommandDefinition) *cobra.Command {
+func (c *ExternalDomainProxy) buildCobraCommand(def *protocol.CommandDefinition) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   def.Name,
 		Short: def.Description,
@@ -200,7 +204,7 @@ func (c *PluginClient) buildCobraCommand(def *protocol.CommandDefinition) *cobra
 }
 
 // executeRemoteCommand executes a command on the remote plugin.
-func (c *PluginClient) executeRemoteCommand(cmd *cobra.Command, args []string) error {
+func (c *ExternalDomainProxy) executeRemoteCommand(cmd *cobra.Command, args []string) error {
 	// Collect flags
 	flags := make(map[string]string)
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -236,7 +240,7 @@ func (c *PluginClient) executeRemoteCommand(cmd *cobra.Command, args []string) e
 }
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
-func (c *PluginClient) RegisterHTTP(mux *http.ServeMux) error {
+func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
 	// Register a catch-all handler for the plugin's namespace
 	namespace := fmt.Sprintf("/api/%s/", c.metadata.Name)
 
@@ -249,7 +253,7 @@ func (c *PluginClient) RegisterHTTP(mux *http.ServeMux) error {
 }
 
 // proxyHTTPRequest forwards an HTTP request to the remote plugin.
-func (c *PluginClient) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) {
+func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) {
 	// Read request body
 	var body []byte
 	if r.Body != nil {
@@ -301,7 +305,7 @@ func (c *PluginClient) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) 
 }
 
 // RegisterWebSocket returns WebSocket handlers that proxy to the remote plugin.
-func (c *PluginClient) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
+func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
 	// Return a proxy WebSocket handler
 	handlers := make(map[string]domains.WebSocketHandler)
 
@@ -316,7 +320,7 @@ func (c *PluginClient) RegisterWebSocket() (map[string]domains.WebSocketHandler,
 
 // wsProxyHandler proxies WebSocket connections to the remote plugin.
 type wsProxyHandler struct {
-	client *PluginClient
+	client *ExternalDomainProxy
 	logger *zap.SugaredLogger
 }
 
@@ -330,7 +334,7 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health returns the remote plugin's health status.
-func (c *PluginClient) Health(ctx context.Context) domains.HealthStatus {
+func (c *ExternalDomainProxy) Health(ctx context.Context) domains.HealthStatus {
 	resp, err := c.client.Health(ctx, &protocol.Empty{})
 	if err != nil {
 		return domains.HealthStatus{
@@ -354,5 +358,5 @@ func (c *PluginClient) Health(ctx context.Context) domains.HealthStatus {
 	}
 }
 
-// Verify PluginClient implements DomainPlugin
-var _ domains.DomainPlugin = (*PluginClient)(nil)
+// Verify ExternalDomainProxy implements DomainPlugin
+var _ domains.DomainPlugin = (*ExternalDomainProxy)(nil)
