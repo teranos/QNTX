@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -164,18 +163,6 @@ func (s *QNTXServer) Stop() error {
 		s.logger.Infow("Stopping daemon workers")
 		s.daemon.Stop()
 		s.logger.Infow("Daemon stopped")
-	}
-
-	// Stop gopls service
-	if s.goplsService != nil {
-		s.logger.Infow("Stopping gopls service")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.goplsService.Shutdown(ctx); err != nil {
-			s.logger.Warnw("Failed to shutdown gopls cleanly", "error", err)
-		} else {
-			s.logger.Infow("gopls service stopped")
-		}
 	}
 
 	// Close all client connections BEFORE cancelling context
