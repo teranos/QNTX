@@ -3,10 +3,12 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/hashicorp/go-getter"
 	"github.com/teranos/QNTX/am"
 	"go.uber.org/zap"
 )
@@ -55,10 +57,18 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 
 // discoverPlugin finds a plugin binary in the configured search paths.
 func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger) (PluginConfig, error) {
-	// Expand ~ in paths
+	// Expand and validate paths using go-getter's detection
 	expandedPaths := make([]string, 0, len(searchPaths))
 	for _, path := range searchPaths {
-		expandedPaths = append(expandedPaths, expandPath(path))
+		expanded, err := expandAndValidatePath(path)
+		if err != nil {
+			logger.Warnw("Invalid search path, skipping",
+				"path", path,
+				"error", err,
+			)
+			continue
+		}
+		expandedPaths = append(expandedPaths, expanded)
 	}
 
 	// Search for plugin binary
@@ -99,27 +109,51 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 	return PluginConfig{}, fmt.Errorf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
 }
 
-// expandPath expands ~ to user home directory.
-// Only expands paths starting with ~/ (e.g., ~/foo/bar)
-// Paths like ~user or ~foo are returned unchanged.
-func expandPath(path string) string {
-	if path == "~" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return path
-		}
-		return home
+// expandAndValidatePath safely expands and validates a path using go-getter.
+// Handles ~, relative paths, and validates the result is a valid filesystem path.
+func expandAndValidatePath(path string) (string, error) {
+	// Use go-getter's detection to safely handle paths
+	// This handles ~, relative paths, and more
+	detected, err := getter.Detect(path, filepath.Dir(path), getter.Detectors)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
 	}
 
-	// Only expand if path starts with ~/
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return path
-		}
-		return filepath.Join(home, path[2:])
+	// Parse the detected URL/path
+	u, err := url.Parse(detected)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse path: %w", err)
 	}
 
-	// Return unchanged for ~user, ~foo, or any other pattern
-	return path
+	// For file:// URLs, extract the path
+	if u.Scheme == "file" {
+		return u.Path, nil
+	}
+
+	// For local paths (no scheme or empty scheme), use as-is
+	if u.Scheme == "" {
+		// If path starts with ~, expand it manually as fallback
+		if strings.HasPrefix(path, "~/") {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("failed to get home directory: %w", err)
+			}
+			return filepath.Join(home, path[2:]), nil
+		}
+		if path == "~" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("failed to get home directory: %w", err)
+			}
+			return home, nil
+		}
+		// Make absolute
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to make absolute path: %w", err)
+		}
+		return abs, nil
+	}
+
+	return "", fmt.Errorf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
 }
