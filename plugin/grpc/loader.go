@@ -100,19 +100,26 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 }
 
 // expandPath expands ~ to user home directory.
+// Only expands paths starting with ~/ (e.g., ~/foo/bar)
+// Paths like ~user or ~foo are returned unchanged.
 func expandPath(path string) string {
-	if !strings.HasPrefix(path, "~") {
-		return path
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-
 	if path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
 		return home
 	}
 
-	return filepath.Join(home, path[2:])
+	// Only expand if path starts with ~/
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[2:])
+	}
+
+	// Return unchanged for ~user, ~foo, or any other pattern
+	return path
 }
