@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/domains"
 	"go.uber.org/zap"
 )
 
@@ -52,7 +53,7 @@ type PluginManager struct {
 // managedPlugin tracks a running plugin.
 type managedPlugin struct {
 	config  PluginConfig
-	client  *PluginClient
+	client  *ExternalDomainProxy
 	process *os.Process
 	port    int
 }
@@ -128,7 +129,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 
 	// Connect to the plugin
-	client, err := NewPluginClient(addr, m.logger)
+	client, err := NewExternalDomainProxy(addr, m.logger)
 	if err != nil {
 		if process != nil {
 			process.Kill()
@@ -226,8 +227,9 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 	return fmt.Errorf("timeout waiting for plugin at %s", addr)
 }
 
-// GetPlugin returns a connected plugin client.
-func (m *PluginManager) GetPlugin(name string) (*PluginClient, bool) {
+// GetPlugin returns a connected plugin as a DomainPlugin.
+// The returned plugin can be registered with the Registry like any built-in plugin.
+func (m *PluginManager) GetPlugin(name string) (domains.DomainPlugin, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -237,16 +239,17 @@ func (m *PluginManager) GetPlugin(name string) (*PluginClient, bool) {
 	return nil, false
 }
 
-// GetAllPlugins returns all connected plugin clients.
-func (m *PluginManager) GetAllPlugins() []*PluginClient {
+// GetAllPlugins returns all connected plugins as DomainPlugin instances.
+// These can be registered with the Registry alongside built-in plugins.
+func (m *PluginManager) GetAllPlugins() []domains.DomainPlugin {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	clients := make([]*PluginClient, 0, len(m.plugins))
+	plugins := make([]domains.DomainPlugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
-		clients = append(clients, p.client)
+		plugins = append(plugins, p.client)
 	}
-	return clients
+	return plugins
 }
 
 // Shutdown stops all managed plugins.
