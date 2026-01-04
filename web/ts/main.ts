@@ -32,7 +32,25 @@ import './prose/panel.ts';
 import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
-import type { MessageHandlers } from '../types/websocket';
+import type {
+    MessageHandlers,
+    VersionMessage,
+    LogsMessage,
+    ImportProgressMessage,
+    ImportStatsMessage,
+    ImportCompleteMessage,
+    UsageUpdateMessage,
+    ParseResponseMessage,
+    DaemonStatusMessage,
+    JobUpdateMessage,
+    PulseExecutionStartedMessage,
+    PulseExecutionFailedMessage,
+    PulseExecutionCompletedMessage,
+    PulseExecutionLogStreamMessage,
+    StorageWarningMessage,
+    StorageEvictionMessage,
+    GraphDataMessage
+} from '../types/websocket';
 
 // Extend window interface for global functions
 declare global {
@@ -44,21 +62,15 @@ declare global {
     }
 }
 
-// Version info interface
-interface VersionInfo {
-    version: string;
-    commit: string;
-    build_time?: string;
-}
-
 // TIMING: Track when main.js module starts executing
-console.log('[TIMING] main.js module start:', Date.now() - performance.timing.navigationStart, 'ms');
+const navStart = performance.timeOrigin || Date.now();
+console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
 
 // Handle version info from server
-function handleVersion(data: VersionInfo): void {
+function handleVersion(data: VersionMessage): void {
     // Cache build info for error toasts
     import('./toast').then(({ cacheBuildInfo }) => {
         cacheBuildInfo(data);
@@ -109,7 +121,7 @@ function handleVersion(data: VersionInfo): void {
 // Initialize the application
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
-    console.log('[TIMING] init() called:', Date.now() - performance.timing.navigationStart, 'ms');
+    console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Initialize console reporter (dev mode only)
@@ -140,26 +152,26 @@ async function init(): Promise<void> {
     }
 
     // Set up WebSocket with message handlers
-    console.log('[TIMING] Calling connectWebSocket():', Date.now() - performance.timing.navigationStart, 'ms');
+    console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
     const handlers: MessageHandlers = {
-        'version': handleVersion as any,
-        'logs': handleLogBatch as any,
-        'import_progress': handleImportProgress as any,
-        'import_stats': handleImportStats as any,
-        'import_complete': handleImportComplete as any,
-        'usage_update': handleUsageUpdate as any,
-        'parse_response': handleParseResponse as any,
-        'daemon_status': handleDaemonStatus as any,
-        'job_update': handleJobUpdate as any,
-        'pulse_execution_started': handlePulseExecutionStarted as any,
-        'pulse_execution_failed': handlePulseExecutionFailed as any,
-        'pulse_execution_completed': handlePulseExecutionCompleted as any,
-        'pulse_execution_log_stream': handlePulseExecutionLogStream as any,
-        'storage_warning': handleStorageWarning as any,
-        'storage_eviction': handleStorageEviction as any,
-        '_default': updateGraph as any  // Default handler for graph data
+        'version': handleVersion,
+        'logs': handleLogBatch,
+        'import_progress': handleImportProgress,
+        'import_stats': handleImportStats,
+        'import_complete': handleImportComplete,
+        'usage_update': handleUsageUpdate,
+        'parse_response': handleParseResponse,
+        'daemon_status': handleDaemonStatus,
+        'job_update': handleJobUpdate,
+        'pulse_execution_started': handlePulseExecutionStarted,
+        'pulse_execution_failed': handlePulseExecutionFailed,
+        'pulse_execution_completed': handlePulseExecutionCompleted,
+        'pulse_execution_log_stream': handlePulseExecutionLogStream,
+        'storage_warning': handleStorageWarning,
+        'storage_eviction': handleStorageEviction,
+        '_default': updateGraph
     };
 
     connectWebSocket(handlers);
