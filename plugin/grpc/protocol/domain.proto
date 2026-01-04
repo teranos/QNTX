@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package protocol;
 
-option go_package = "github.com/teranos/QNTX/domains/grpc/protocol";
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // DomainPluginService is the gRPC service for external domain plugins
 service DomainPluginService {
@@ -14,12 +14,6 @@ service DomainPluginService {
 
   // Shutdown shuts down the plugin
   rpc Shutdown(Empty) returns (Empty);
-
-  // Commands returns CLI command definitions
-  rpc Commands(Empty) returns (CommandsResponse);
-
-  // ExecuteCommand executes a CLI command
-  rpc ExecuteCommand(ExecuteCommandRequest) returns (ExecuteCommandResponse);
 
   // HandleHTTP handles an HTTP request
   rpc HandleHTTP(HTTPRequest) returns (HTTPResponse);
@@ -49,37 +43,6 @@ message InitializeRequest {
 
   // Plugin-specific config
   map<string, string> config = 3;
-}
-
-message CommandsResponse {
-  repeated CommandDefinition commands = 1;
-}
-
-message CommandDefinition {
-  string name = 1;
-  string description = 2;
-  repeated string subcommands = 3;
-  repeated FlagDefinition flags = 4;
-}
-
-message FlagDefinition {
-  string name = 1;
-  string short = 2;
-  string description = 3;
-  string type = 4; // "string", "int", "bool", etc.
-  string default_value = 5;
-}
-
-message ExecuteCommandRequest {
-  string command = 1;
-  repeated string args = 2;
-  map<string, string> flags = 3;
-}
-
-message ExecuteCommandResponse {
-  int32 exit_code = 1;
-  string stdout = 2;
-  string stderr = 3;
 }
 
 message HTTPRequest {

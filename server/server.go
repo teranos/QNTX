@@ -10,8 +10,8 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
-	"github.com/teranos/QNTX/domains"
-	"github.com/teranos/QNTX/domains/code/langserver/gopls"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/pulse/async"
@@ -51,7 +51,7 @@ type QNTXServer struct {
 	wsCore        *wslogs.WebSocketCore
 	consoleBuffer *ConsoleBuffer        // Browser console log buffer for debugging (dev mode only)
 	initialQuery  string                // Pre-loaded Ax query to execute on client connection
-	pluginRegistry *domains.Registry    // Domain plugin registry
+	pluginRegistry *plugin.Registry    // Domain plugin registry
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown

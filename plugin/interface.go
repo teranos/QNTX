@@ -1,7 +1,7 @@
-// Package domains provides the plugin architecture for QNTX domain extensions.
+// Package plugin provides the plugin architecture for QNTX domain extensions.
 //
 // A domain plugin represents a complete functional area (e.g., code, biotech, finance).
-// Each domain provides CLI commands, HTTP endpoints, WebSocket handlers, and lifecycle management.
+// Each domain provides HTTP endpoints, WebSocket handlers, and lifecycle management.
 //
 // Architecture:
 //   - Built-in domains compiled into QNTX binary
@@ -13,13 +13,11 @@
 //   - code: Software development (git ingestion, GitHub PRs, language servers, code editor)
 //   - biotech: Bioinformatics (sequence analysis, protein folding, genomics)
 //   - finance: Financial analysis (market data, risk modeling, portfolio optimization)
-package domains
+package plugin
 
 import (
 	"context"
 	"net/http"
-
-	"github.com/spf13/cobra"
 )
 
 // DomainPlugin defines the interface that all domain plugins must implement.
@@ -34,10 +32,6 @@ type DomainPlugin interface {
 
 	// Shutdown is called when QNTX is shutting down
 	Shutdown(ctx context.Context) error
-
-	// Commands returns CLI commands for this domain
-	// These will be registered under: qntx <domain-name> <subcommand>
-	Commands() []*cobra.Command
 
 	// RegisterHTTP registers HTTP handlers for this domain
 	// Handlers will be mounted at: /api/<domain-name>/*
