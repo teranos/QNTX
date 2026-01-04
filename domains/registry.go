@@ -173,37 +173,58 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 	return nil
 }
 
-// Global registry instance
-var defaultRegistry *Registry
+// Global registry instance (Issue #4: Thread-safe initialization)
+var (
+	defaultRegistry *Registry
+	registryOnce    sync.Once
+	registryMu      sync.RWMutex
+)
 
-// SetDefaultRegistry sets the global registry
+// SetDefaultRegistry sets the global registry (Issue #4: Thread-safe with sync.Once)
 func SetDefaultRegistry(registry *Registry) {
+	registryMu.Lock()
+	defer registryMu.Unlock()
+
+	if defaultRegistry != nil {
+		panic("default registry already initialized - call SetDefaultRegistry only once")
+	}
 	defaultRegistry = registry
 }
 
-// GetDefaultRegistry returns the global registry
+// GetDefaultRegistry returns the global registry (Issue #4: Thread-safe read)
 func GetDefaultRegistry() *Registry {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
 	return defaultRegistry
 }
 
-// Register registers a plugin with the global registry
+// Register registers a plugin with the global registry (Issue #4: Thread-safe)
 func Register(plugin DomainPlugin) error {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+
 	if defaultRegistry == nil {
 		return fmt.Errorf("default registry not initialized")
 	}
 	return defaultRegistry.Register(plugin)
 }
 
-// Get retrieves a plugin from the global registry
+// Get retrieves a plugin from the global registry (Issue #4: Thread-safe)
 func Get(name string) (DomainPlugin, bool) {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+
 	if defaultRegistry == nil {
 		return nil, false
 	}
 	return defaultRegistry.Get(name)
 }
 
-// List returns all plugin names from the global registry
+// List returns all plugin names from the global registry (Issue #4: Thread-safe)
 func List() []string {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+
 	if defaultRegistry == nil {
 		return nil
 	}
