@@ -66,8 +66,14 @@ func (p *Plugin) Commands() []*cobra.Command {
 		Long:  "Code domain provides git ingestion, GitHub integration, language servers, and code editing",
 	}
 
-	// Add subcommands
-	// TODO: Add ixgest commands
+	// IX subcommand group
+	ixCmd := &cobra.Command{
+		Use:   "ix",
+		Short: "Data ingestion commands",
+	}
+	ixCmd.AddCommand(p.buildIxGitCommand())
+	codeCmd.AddCommand(ixCmd)
+
 	// TODO: Add vcs commands
 	// TODO: Add langserver commands
 
