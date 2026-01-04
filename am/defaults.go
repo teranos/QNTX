@@ -73,6 +73,13 @@ func SetDefaults(v *viper.Viper) {
 		"tauri://localhost", // Allow Tauri desktop app
 	})
 	v.SetDefault("server.log_theme", "everforest")
+
+	// Plugin configuration defaults
+	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)
+	v.SetDefault("plugin.paths", []string{
+		"~/.qntx/plugins", // User-level plugins
+		"./plugins",       // Project-level plugins
+	})
 }
 
 // BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables

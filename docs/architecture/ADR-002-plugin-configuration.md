@@ -1,105 +1,104 @@
 # ADR-002: Plugin Configuration Management
 
-**Status:** Accepted
+**Status:** Accepted (Updated 2026-01-04)
 **Date:** 2026-01-04
 **Deciders:** QNTX Core Team
 
 ## Context
 
-Domain plugins need configuration (API keys, workspace paths, feature flags). We need a strategy that:
+Domain plugins need configuration for:
+1. **Discovery**: Where to find plugin binaries
+2. **Selection**: Which plugins to load (explicit opt-in)
+3. **Plugin-specific settings**: API keys, workspace paths, feature flags
 
-1. Keeps plugin config isolated from core QNTX config
-2. Works with QNTX's "works out of the box" philosophy (sensible defaults)
-3. Supports both built-in and external plugins
-4. Allows per-plugin configuration without bloating main config file
+Requirements:
+- Works with QNTX's "minimal core" philosophy (no plugins by default)
+- Simple, centralized configuration in `am.toml`
+- Supports plugin discovery from filesystem
+- Plugin-specific config without bloating main config
 
 ## Decision
 
-### Configuration File Structure
+### Configuration Model: Whitelist + Discovery Paths
 
-Each plugin gets its own configuration file:
+Plugins are configured via a single `[plugin]` section in `am.toml`:
 
-```
-~/.qntx/am.toml           # Core QNTX config (server, database, pulse)
-~/.qntx/am.code.toml      # Code domain plugin config
-~/.qntx/am.finance.toml   # Finance domain plugin (future)
-~/.qntx/am.biotech.toml   # Biotech domain plugin (future)
-```
-
-### Configuration Scope
-
-**Core `am.toml`** (QNTX infrastructure):
 ```toml
+[plugin]
+enabled = ["code"]                      # Whitelist of plugins to load
+paths = ["~/.qntx/plugins", "./plugins"] # Where to search for binaries
+```
+
+**Key principles:**
+- **No plugins by default**: Empty `enabled` list means minimal core mode
+- **Explicit opt-in**: Users must add plugin name to `enabled` list
+- **Automatic discovery**: QNTX searches configured paths for binaries
+- **Fail-soft**: Missing plugins log warning, don't prevent startup
+
+### Plugin Discovery
+
+QNTX searches for plugin binaries using common naming conventions:
+
+```
+~/.qntx/plugins/qntx-code-plugin    # Preferred naming
+~/.qntx/plugins/qntx-code           # Alternative
+~/.qntx/plugins/code                # Fallback
+./plugins/qntx-code-plugin          # Project-level plugins
+```
+
+Discovery algorithm:
+1. For each plugin in `enabled` list (e.g., `"code"`)
+2. Search each path in `paths` for binaries matching:
+   - `qntx-{name}-plugin`
+   - `qntx-{name}`
+   - `{name}`
+3. Verify binary is executable
+4. Load first match via gRPC
+
+### Plugin-Specific Configuration
+
+Plugin-specific settings remain in `am.toml` under domain namespace:
+
+```toml
+# Core QNTX configuration
 [database]
 path = "qntx.db"
 
 [server]
 port = 877
-dev_mode = false
 
 [pulse]
 workers = 4
-daily_budget_usd = 10.0
-```
 
-**Plugin `am.<domain>.toml`** (domain-specific):
-```toml
-# am.code.toml
-[gopls]
+# Plugin configuration
+[plugin]
+enabled = ["code"]
+paths = ["~/.qntx/plugins"]
+
+# Code plugin specific settings
+[code.gopls]
 enabled = true
 workspace_root = "."
 
-[github]
-api_token = "ghp_..."  # Optional, from environment preferred
-
-[editor]
-max_file_size_mb = 10
+[code.github]
+# API token preferably from environment: QNTX_CODE_GITHUB_TOKEN
 ```
 
-### Configuration Loading
+### Configuration Access in Plugins
 
-```go
-// Plugin receives Config interface
-type Config interface {
-    GetString(key string) string
-    GetInt(key string) int
-    GetBool(key string) bool
-    GetStringSlice(key string) []string
-    Get(key string) interface{}
-    Set(key string, value interface{})  // Runtime overrides
-}
-
-// Implementation reads from am.<domain>.toml
-config := services.Config("code")
-workspace := config.GetString("gopls.workspace_root")  // Reads am.code.toml
-```
-
-### Key Namespacing
-
-Within plugin config file, use flat dot notation:
-```toml
-# am.code.toml
-gopls.workspace_root = "."           # Not [code.gopls]
-github.api_token = "ghp_..."         # Not [code.github]
-```
-
-Rationale: Domain is already clear from filename, nesting is redundant.
-
-### Default Values
-
-Plugins must work without configuration file:
+Plugins receive `Config` interface via `ServiceRegistry`:
 
 ```go
 func (p *Plugin) Initialize(ctx context.Context, services ServiceRegistry) error {
-    config := services.Config("code")
+    config := services.Config("code")  // Gets [code.*] section from am.toml
 
     // Provide sensible defaults
     workspace := config.GetString("gopls.workspace_root")
     if workspace == "" {
-        workspace = "."  // Current directory default
+        workspace = "."  // Default to current directory
     }
 
-    // Optional features gracefully degrade
+    // Optional features degrade gracefully
     apiToken := config.GetString("github.api_token")
     if apiToken == "" {
         p.logger.Warn("GitHub API token not configured, PR integration disabled")
@@ -108,99 +107,218 @@ func (p *Plugin) Initialize(ctx context.Context, services ServiceRegistry) error
 }
 ```
 
-### Environment Variable Override
+### Environment Variable Overrides
 
-Sensitive values (API keys, tokens) should prefer environment variables:
+Sensitive values should prefer environment variables:
 
-```go
-// Check env first, fall back to config file
-apiToken := os.Getenv("GITHUB_API_TOKEN")
-if apiToken == "" {
-    apiToken = config.GetString("github.api_token")
-}
+```bash
+# .env or shell
+export QNTX_CODE_GITHUB_TOKEN="ghp_..."
+export QNTX_DATABASE_PATH="custom.db"
 ```
 
-Config file pattern:
+Environment variables follow pattern: `QNTX_{DOMAIN}_{KEY}`
+
+Configuration precedence:
+1. Environment variables (highest priority)
+2. `am.toml` values
+3. Plugin defaults (lowest priority)
+
+## Configuration Examples
+
+### Minimal Core (No Plugins)
+
 ```toml
-# am.code.toml
-github.api_token = "${GITHUB_API_TOKEN}"  # Reference env var
+# am.toml - minimal QNTX
+[database]
+path = "qntx.db"
+
+[server]
+port = 877
+
+# No [plugin] section = no plugins loaded
+```
+
+QNTX runs with only:
+- ATS (attestation system)
+- Database (⊔)
+- Pulse (꩜ async jobs)
+- Server (graph visualization)
+
+### Code Plugin Enabled
+
+```toml
+[plugin]
+enabled = ["code"]
+paths = ["~/.qntx/plugins", "./plugins"]
+
+[code.gopls]
+enabled = true
+workspace_root = "."
+```
+
+### Multiple Plugins
+
+```toml
+[plugin]
+enabled = ["code", "finance", "biotech"]
+paths = ["~/.qntx/plugins"]
+
+[code.gopls]
+workspace_root = "/workspace/main-repo"
+
+[finance]
+api_key = "${FINANCE_API_KEY}"
+
+[biotech.ncbi]
+api_key = "${NCBI_API_KEY}"
+email = "researcher@example.com"
 ```
 
 ## Consequences
 
 ### Positive
 
-✅ **Isolation**: Plugin config changes don't clutter core `am.toml`
-✅ **Discovery**: `ls ~/.qntx/am.*.toml` shows all installed plugins
-✅ **Optional**: Plugins work without config (zero-config philosophy maintained)
-✅ **Security**: Sensitive tokens in separate files (easier to `.gitignore` per plugin)
+✅ **Minimal by default**: No plugins loaded unless explicitly configured
+✅ **Simple discovery**: Just drop binary in `~/.qntx/plugins/` and add to enabled list
+✅ **Centralized config**: All configuration in one `am.toml` file
+✅ **Flexible paths**: Support both user-level (`~/.qntx/plugins`) and project-level (`./plugins`)
+✅ **Optional**: QNTX works without any plugins (minimal core mode)
+✅ **Standard naming**: Common conventions make plugin binaries discoverable
 
 ### Negative
 
-⚠️ **File proliferation**: Multiple config files instead of one
-⚠️ **Discovery complexity**: Need to document where each setting lives
+⚠️ **Manual installation**: Users must download/build plugin binaries
+⚠️ **Path management**: Users must ensure binaries are in configured paths
+⚠️ **No version management**: No automatic plugin updates (manual for now)
 
 ### Neutral
 
-- Config file precedence: `am.<domain>.toml` > `am.toml` > defaults
-- Built-in plugins (code) follow same pattern as external plugins
+- Plugin configuration lives in same file as core config (domain-namespaced)
+- Discovery is filesystem-based (simple but requires manual binary management)
+- Future: Could add plugin registry/marketplace for automatic installation
 
 ## Implementation
 
-### Configuration Provider
+### Configuration Schema
 
 ```go
-// server/init.go
-type simpleConfigProvider struct{}
-
-func (p *simpleConfigProvider) GetPluginConfig(domain string) domains.Config {
-    return &simpleConfig{domain: domain}
+// am/am.go
+type Config struct {
+    Plugin PluginConfig `mapstructure:"plugin"`
+    // ... other config sections
 }
 
-type simpleConfig struct {
-    domain string
-}
-
-func (c *simpleConfig) GetString(key string) string {
-    // Try am.<domain>.toml first
-    domainFile := fmt.Sprintf("am.%s.toml", c.domain)
-    if fileExists(domainFile) {
-        if val := readFromFile(domainFile, key); val != "" {
-            return val
-        }
-    }
-
-    // Fall back to am.toml with domain prefix
-    return am.GetString(c.domain + "." + key)
+type PluginConfig struct {
+    Enabled []string `mapstructure:"enabled"` // Whitelist of plugins
+    Paths   []string `mapstructure:"paths"`   // Search paths
 }
 ```
 
-### Configuration Discovery
+### Plugin Discovery
 
-Plugins can be discovered by scanning for `am.*.toml` files:
+```go
+// plugin/grpc/loader.go
+func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.SugaredLogger) (*PluginManager, error) {
+    manager := NewPluginManager(logger)
 
+    if len(cfg.Plugin.Enabled) == 0 {
+        logger.Infow("No plugins enabled - QNTX running in minimal core mode")
+        return manager, nil
+    }
+
+    // Discover plugins from configured paths
+    for _, pluginName := range cfg.Plugin.Enabled {
+        pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
+        if err != nil {
+            logger.Warnw("Failed to discover plugin", "plugin", pluginName, "error", err)
+            continue
+        }
+
+        // Load plugin via gRPC
+        if err := manager.LoadPlugins(ctx, []PluginConfig{pluginConfig}); err != nil {
+            return nil, err
+        }
+    }
+
+    return manager, nil
+}
+```
+
+### Binary Naming Conventions
+
+Plugins should use these naming conventions for discoverability:
+
+| Pattern | Example | Priority |
+|---------|---------|----------|
+| `qntx-{domain}-plugin` | `qntx-code-plugin` | Preferred |
+| `qntx-{domain}` | `qntx-code` | Alternative |
+| `{domain}` | `code` | Fallback |
+
+All binaries must be:
+- Executable (`chmod +x`)
+- Located in one of the configured search paths
+- Implement gRPC plugin protocol
+
+## Migration Path
+
+### From Phase 2 (Built-in Plugins)
+
+Before Phase 3:
+```go
+// main.go - hardcoded
+codePlugin := qntxcode.NewPlugin()
+registry.Register(codePlugin)
+```
+
+After Phase 3:
+```toml
+# am.toml
+[plugin]
+enabled = ["code"]
+paths = ["~/.qntx/plugins"]
+```
+
+```go
+// main.go - discovery
+manager, _ := grpc.LoadPluginsFromConfig(ctx, cfg, logger)
+for _, plugin := range manager.GetAllPlugins() {
+    registry.Register(plugin)
+}
+```
+
+### Future: Plugin Marketplace (Phase 5+)
+
+Potential future enhancements:
 ```bash
-$ ls ~/.qntx/am.*.toml
-am.code.toml
-am.finance.toml
+$ qntx plugin install code
+Downloading qntx-code-plugin v0.2.0...
+Installing to ~/.qntx/plugins/qntx-code-plugin
+Added to am.toml: plugin.enabled = ["code"]
 
 $ qntx plugin list
-code     (v0.1.0) - Software development domain [enabled]
-finance  (v0.2.0) - Financial analysis domain [enabled]
+code     v0.2.0  [enabled]   Software development domain
+finance  v0.1.0  [available] Financial analysis domain
+biotech  -       [available] Bioinformatics domain
 ```
 
 ## Alternatives Considered
 
-### Single am.toml with [plugins.*] sections
-- **Rejected**: Bloats main config, unclear ownership
+### Individual am.<domain>.toml Files
+**Rejected**: File proliferation, unclear which plugins are enabled, harder to manage
 
-### Plugin-managed config (no am integration)
-- **Rejected**: Breaks QNTX's unified config philosophy
+### Plugin Registry Service
+**Rejected**: Too complex for Phase 3, adds external dependency
 
-### Database-stored config
-- **Rejected**: Can't configure DB access itself, chicken-egg problem
+### Automatic Plugin Discovery (No Whitelist)
+**Rejected**: Security risk (auto-loading unknown binaries), against minimal core principle
+
+### Go Plugin (.so files)
+**Rejected**: Platform-specific, fragile across Go versions, build complexity
 
 ## Related
 
 - [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
-- [QNTX Configuration Guide](../../CLAUDE.md#configuration-am-package)
+- [ADR-003: Plugin Communication Patterns](./ADR-003-plugin-communication.md)
+- PR #136: Phase 3 - Plugin Discovery and Optional Loading
+- Issue #135: Phase 4 - Extract qntx-code to Separate Repository

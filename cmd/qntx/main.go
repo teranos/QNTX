@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
-	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/qntx-code"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc"
 )
 
 var rootCmd = &cobra.Command{
@@ -49,6 +52,12 @@ Examples:
 }
 
 func init() {
+	// Initialize logger early for plugin loading
+	// Use silent mode to avoid cluttering output during init
+	if err := logger.Initialize(true); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize logger: %v\n", err)
+	}
+
 	// Initialize domain plugin registry
 	initializePluginRegistry()
 
@@ -70,17 +79,53 @@ func init() {
 	addPluginCommands()
 }
 
-// initializePluginRegistry sets up the domain plugin registry
+// initializePluginRegistry sets up the domain plugin registry with plugin discovery
 func initializePluginRegistry() {
 	// Create registry with QNTX version
 	registry := plugin.NewRegistry("0.1.0")
 	plugin.SetDefaultRegistry(registry)
 
-	// Register built-in code domain plugin
-	codePlugin := qntxcode.NewPlugin()
-	if err := registry.Register(codePlugin); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to register code plugin: %v\n", err)
+	// Initialize logger for plugin loading
+	pluginLogger := logger.Logger.Named("plugin-loader")
+
+	// Load configuration to determine which plugins to load
+	cfg, err := am.Load()
+	if err != nil {
+		// If config fails to load, warn but continue with no plugins
+		pluginLogger.Warnw("Failed to load configuration, no plugins will be loaded", "error", err)
+		return
+	}
+
+	// If no plugins enabled, run in minimal mode
+	if len(cfg.Plugin.Enabled) == 0 {
+		pluginLogger.Infow("No plugins enabled - QNTX running in minimal core mode")
+		return
+	}
+
+	// Load plugins from configuration
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	manager, err := grpc.LoadPluginsFromConfig(ctx, cfg, pluginLogger)
+	if err != nil {
+		pluginLogger.Errorw("Failed to load plugins from configuration", "error", err)
 		os.Exit(1)
+	}
+
+	// Register loaded plugins with registry
+	loadedPlugins := manager.GetAllPlugins()
+	for _, p := range loadedPlugins {
+		if err := registry.Register(p); err != nil {
+			pluginLogger.Errorw("Failed to register plugin",
+				"plugin", p.Metadata().Name,
+				"error", err,
+			)
+			os.Exit(1)
+		}
+		pluginLogger.Infow("Registered plugin with registry",
+			"plugin", p.Metadata().Name,
+			"version", p.Metadata().Version,
+		)
 	}
 }
 

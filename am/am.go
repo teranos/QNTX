@@ -10,6 +10,7 @@ type Config struct {
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
 	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
+	Plugin         PluginConfig         `mapstructure:"plugin"`
 }
 
 // DatabaseConfig configures the SQLite database
@@ -145,6 +146,12 @@ type OpenRouterConfig struct {
 // AxConfig configures the attestation query system
 type AxConfig struct {
 	DefaultActor string `mapstructure:"default_actor"`
+}
+
+// PluginConfig configures the domain plugin system
+type PluginConfig struct {
+	Enabled []string `mapstructure:"enabled"` // Whitelist of enabled plugins (e.g., ["code"])
+	Paths   []string `mapstructure:"paths"`   // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
 }
 
 // File system constants

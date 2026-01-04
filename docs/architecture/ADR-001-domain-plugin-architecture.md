@@ -17,6 +17,16 @@ QNTX initially had software development functionality (git ingestion, GitHub int
 
 We adopt a **domain plugin architecture** where functional domains are implemented as plugins with:
 
+### Minimal Core Philosophy
+
+QNTX core is minimal and runs without any plugins:
+- **Core components**: ATS (attestation system), Database (⊔), Pulse (꩜), Server
+- **All domains are plugins**: Code, finance, legal, biotech, etc. are external plugins
+- **Optional by default**: No plugins enabled in default configuration
+- **Explicit opt-in**: Users configure which plugins to load via `am.toml`
+
+This ensures QNTX core remains focused on infrastructure, not domain logic.
+
 ### Plugin Boundary
 
 - **One plugin per domain** (code, biotech, finance, legal, etc.)
@@ -26,23 +36,24 @@ We adopt a **domain plugin architecture** where functional domains are implement
 
 ### Unified Plugin Model
 
-There is **one interface**: `DomainPlugin`. Two implementations:
+All plugins are **external** - standalone binaries loaded at runtime via gRPC:
 
-- **Built-in plugins**: Implement `DomainPlugin` directly (compiled into QNTX)
-- **External plugins**: `ExternalDomainProxy` adapter implements `DomainPlugin` by proxying gRPC calls to sidecar processes
+- Plugins implement `DomainPlugin` interface inside their own binaries
+- `ExternalDomainProxy` adapter implements `DomainPlugin` by proxying gRPC calls to plugin processes
+- `PluginServer` wrapper exposes plugin's `DomainPlugin` implementation via gRPC
 
 From the Registry's perspective, all plugins are identical:
 ```go
-// Both work the same way
-registry.Register(code.NewPlugin())           // Built-in
-registry.Register(externalProxy)              // External (via gRPC)
+// All plugins registered the same way
+registry.Register(externalProxy)  // Loaded via gRPC from ~/.qntx/plugins/
 ```
 
-External plugins:
-- Are standalone binaries with their own repos
-- Communicate via gRPC (using `PluginServer` wrapper)
-- Have separate config files (`am.<domain>.toml`)
+Plugin characteristics:
+- Standalone binaries with their own repositories
+- Communicate via gRPC only (using `PluginServer` wrapper)
+- Configured via main `am.toml` file (whitelist model)
 - Run in separate processes for isolation
+- Discovered from configured search paths
 
 ### Interface Contract
 
@@ -66,9 +77,10 @@ type DomainPlugin interface {
 
 ### Failure Handling
 
-- **Fail-fast initialization**: Server refuses to start if any plugin fails to initialize
+- **Optional by default**: QNTX runs in minimal core mode without any plugins
+- **Warning on failure**: If enabled plugin fails to load, log warning and continue without it
 - **Runtime error notification**: Plugin errors broadcast to UI for user awareness
-- Rationale: Clear failure signals prevent silent degradation; plugins are essential features
+- Rationale: Minimal core philosophy - plugins are optional enhancements, not essential features
 
 ### Versioning
 
@@ -100,29 +112,35 @@ type DomainPlugin interface {
 
 ### Neutral
 
-- Built-in plugins (code domain) use same DomainPlugin interface for consistency
-- Code domain serves as reference implementation and architecture validation
+- Code domain (qntx-code-plugin) serves as reference implementation
+- First-party plugins maintained by QNTX team follow same patterns as third-party plugins
 
 ## Implementation Plan
 
-### Phase 1: Internal Plugin API (Completed)
+### Phase 1: Restructure to plugin/ (Completed - PR #130)
 - ✅ DomainPlugin interface and Registry
 - ✅ ServiceRegistry for dependency injection
-- ✅ Code domain as built-in plugin
-- ✅ CLI, HTTP, and config integration
+- ✅ Moved domains → plugin, code → qntx-code
+- ✅ HTTP and WebSocket handler registration
 
-### Phase 2: gRPC Transport (Completed)
-- ✅ Generate Go code from `domains/grpc/protocol/domain.proto`
-- ✅ `ExternalDomainProxy` adapter (implements DomainPlugin via gRPC)
-- ✅ `PluginServer` wrapper (exposes DomainPlugin via gRPC)
-- ✅ `PluginManager` for plugin discovery and process management
-- ✅ Code domain as standalone binary (`cmd/plugins/code`)
-- ✅ Plugin development documentation
+### Phase 2: Decouple Server Handlers (Completed - PR #134)
+- ✅ Migrated gopls lifecycle to qntx-code plugin
+- ✅ Server dynamically registers plugin WebSocket handlers
+- ✅ Removed server code dependencies (350+ lines)
+- ✅ Server now domain-agnostic
 
-### Phase 3: Third-Party Plugins (Future)
-- Publish plugin development guide
-- Release QNTX plugin SDK
-- Support community plugins (biotech, finance, legal)
+### Phase 3: Plugin Discovery and Optional Loading (Completed - PR #136)
+- ✅ Plugin configuration via `am.toml` (whitelist model)
+- ✅ Plugin discovery from configured search paths
+- ✅ Removed all built-in plugin fallbacks
+- ✅ QNTX runs in minimal core mode without plugins
+- ✅ gRPC-only communication (no Go plugin .so files)
+
+### Phase 4: Extract to Separate Repository (Planned - Issue #135)
+- Create `teranos/qntx-code-plugin` repository
+- Extract `qntx-code/` from QNTX monorepo
+- Distribute plugin binaries via GitHub releases
+- Plugin development guide and documentation
 
 ## Alternatives Considered
 
