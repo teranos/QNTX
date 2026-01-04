@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/plugin"
@@ -91,21 +93,55 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	// Build config map from service registry
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
-	// Note: We can only pass string configuration values via gRPC
-	// Complex configuration would need to be serialized
+
+	// Pass common configuration keys to plugin
+	// Note: Config interface doesn't support enumerating all keys, so we manually
+	// specify known configuration keys. Plugins that need custom config should
+	// document their keys.
+	//
+	// TODO: Add AllSettings() method to Config interface for complete config passing
+
+	// String configuration
+	stringKeys := []string{
+		"workspace_root", "api_token", "base_url", "model",
+		"github.token", "gopls.workspace_root",
+	}
+	for _, key := range stringKeys {
+		if val := pluginConfig.GetString(key); val != "" {
+			config[key] = val
+		}
+	}
+
+	// Boolean configuration
+	boolKeys := []string{"enabled", "gopls.enabled"}
+	for _, key := range boolKeys {
+		// Always pass boolean values (even false) to avoid ambiguity
+		config[key] = fmt.Sprintf("%v", pluginConfig.GetBool(key))
+	}
+
+	// Integer configuration
+	intKeys := []string{"context_size", "timeout_seconds"}
+	for _, key := range intKeys {
+		if val := pluginConfig.GetInt(key); val != 0 {
+			config[key] = fmt.Sprintf("%d", val)
+		}
+	}
+
+	// String slice configuration (JSON-encoded)
+	sliceKeys := []string{"allowed_domains", "blocked_domains"}
+	for _, key := range sliceKeys {
+		if slice := pluginConfig.GetStringSlice(key); len(slice) > 0 {
+			if jsonBytes, err := json.Marshal(slice); err == nil {
+				config[key] = string(jsonBytes)
+			}
+		}
+	}
 
 	req := &protocol.InitializeRequest{
 		// TODO: Expose QNTX service endpoints for plugin callbacks
 		// DatabaseEndpoint:  "",
 		// AtsStoreEndpoint: "",
 		Config: config,
-	}
-
-	// Add common configuration keys
-	for _, key := range []string{"workspace_root", "api_token", "enabled"} {
-		if val := pluginConfig.GetString(key); val != "" {
-			config[key] = val
-		}
 	}
 
 	_, err := c.client.Initialize(ctx, req)
@@ -153,9 +189,26 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Build headers map
+	// Note: HTTP allows multiple values per header (e.g., Accept, Cookie)
+	// Since protobuf HTTPRequest uses map<string, string>, we join multiple
+	// values with commas per RFC 7230. Exception: Set-Cookie should use semicolons.
 	headers := make(map[string]string)
-	for key := range r.Header {
-		headers[key] = r.Header.Get(key)
+	for key, values := range r.Header {
+		if len(values) == 1 {
+			headers[key] = values[0]
+		} else if len(values) > 1 {
+			// Join multiple values according to HTTP spec
+			// Most headers use comma separation (RFC 7230)
+			if key == "Set-Cookie" {
+				// Set-Cookie is special: plugins should handle multiple values
+				// For now, only pass first value (not ideal but protocol limitation)
+				headers[key] = values[0] // TODO: Protocol should support repeated values
+				c.logger.Warnw("Multi-value header truncated", "header", key, "values", len(values))
+			} else {
+				// Join with comma per RFC 7230
+				headers[key] = strings.Join(values, ", ")
+			}
+		}
 	}
 
 	// Create gRPC request
@@ -222,7 +275,16 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 // Health returns the remote plugin's health status.
 func (c *ExternalDomainProxy) Health(ctx context.Context) plugin.HealthStatus {
-	resp, err := c.client.Health(ctx, &protocol.Empty{})
+	// Add explicit timeout for health checks to prevent hanging
+	// Use provided context's deadline if set, otherwise default to 5 seconds
+	healthCtx := ctx
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		healthCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+	}
+
+	resp, err := c.client.Health(healthCtx, &protocol.Empty{})
 	if err != nil {
 		return plugin.HealthStatus{
 			Healthy: false,
