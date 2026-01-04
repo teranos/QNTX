@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
@@ -33,6 +34,10 @@ type PluginServer struct {
 
 	// HTTP mux for handling HTTP requests via gRPC
 	httpMux *http.ServeMux
+
+	// initOnce ensures Initialize is only executed once
+	initOnce sync.Once
+	initErr  error
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
@@ -84,23 +89,34 @@ func (s *PluginServer) Metadata(ctx context.Context, _ *protocol.Empty) (*protoc
 }
 
 // Initialize initializes the plugin with configuration.
+// This method is idempotent - concurrent calls will block until the first completes.
 func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeRequest) (*protocol.Empty, error) {
-	// Create a remote service registry that connects back to QNTX
-	s.services = NewRemoteServiceRegistry(
-		req.DatabaseEndpoint,
-		req.AtsStoreEndpoint,
-		req.Config,
-		s.logger,
-	)
+	// Use sync.Once to ensure initialization happens exactly once,
+	// even under concurrent access
+	s.initOnce.Do(func() {
+		// Create a remote service registry that connects back to QNTX
+		s.services = NewRemoteServiceRegistry(
+			req.DatabaseEndpoint,
+			req.AtsStoreEndpoint,
+			req.Config,
+			s.logger,
+		)
 
-	// Initialize the plugin
-	if err := s.plugin.Initialize(ctx, s.services); err != nil {
-		return nil, fmt.Errorf("plugin %s initialization failed: %w", s.plugin.Metadata().Name, err)
-	}
+		// Initialize the plugin
+		if err := s.plugin.Initialize(ctx, s.services); err != nil {
+			s.initErr = fmt.Errorf("plugin %s initialization failed: %w", s.plugin.Metadata().Name, err)
+			return
+		}
 
-	// Register HTTP handlers
-	if err := s.plugin.RegisterHTTP(s.httpMux); err != nil {
-		return nil, fmt.Errorf("HTTP registration failed for plugin %s: %w", s.plugin.Metadata().Name, err)
+		// Register HTTP handlers
+		if err := s.plugin.RegisterHTTP(s.httpMux); err != nil {
+			s.initErr = fmt.Errorf("HTTP registration failed for plugin %s: %w", s.plugin.Metadata().Name, err)
+			return
+		}
+	})
+
+	if s.initErr != nil {
+		return nil, s.initErr
 	}
 
 	return &protocol.Empty{}, nil

@@ -79,14 +79,22 @@ func (r *Registry) GetAll() map[string]DomainPlugin {
 	return result
 }
 
+// snapshotPlugins creates a thread-safe snapshot of all plugins.
+// This allows operations on plugins without holding the registry lock.
+func (r *Registry) snapshotPlugins() map[string]DomainPlugin {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	snapshot := make(map[string]DomainPlugin, len(r.plugins))
+	for name, plugin := range r.plugins {
+		snapshot[name] = plugin
+	}
+	return snapshot
+}
+
 // InitializeAll initializes all registered plugins
 func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) error {
-	r.mu.RLock()
-	plugins := make(map[string]DomainPlugin, len(r.plugins))
-	for name, plugin := range r.plugins {
-		plugins[name] = plugin
-	}
-	r.mu.RUnlock()
+	plugins := r.snapshotPlugins()
 
 	// Initialize plugins in sorted order for determinism
 	names := make([]string, 0, len(plugins))
@@ -106,12 +114,7 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 
 // ShutdownAll shuts down all registered plugins
 func (r *Registry) ShutdownAll(ctx context.Context) error {
-	r.mu.RLock()
-	plugins := make(map[string]DomainPlugin, len(r.plugins))
-	for name, plugin := range r.plugins {
-		plugins[name] = plugin
-	}
-	r.mu.RUnlock()
+	plugins := r.snapshotPlugins()
 
 	// Shutdown in reverse order
 	names := make([]string, 0, len(plugins))
@@ -176,11 +179,11 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 // Global registry instance (Issue #4: Thread-safe initialization)
 var (
 	defaultRegistry *Registry
-	registryOnce    sync.Once
 	registryMu      sync.RWMutex
 )
 
-// SetDefaultRegistry sets the global registry (Issue #4: Thread-safe with sync.Once)
+// SetDefaultRegistry sets the global registry (Issue #4: Thread-safe)
+// Panics if called more than once. The mutex ensures thread-safe check-and-set.
 func SetDefaultRegistry(registry *Registry) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
