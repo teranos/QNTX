@@ -8,7 +8,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/domains/code/vcs/github"
+	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
 
 // CodeCmd represents the code command

@@ -147,7 +147,7 @@ import (
     "net/http"
 
     "github.com/spf13/cobra"
-    "github.com/teranos/QNTX/domains"
+    "github.com/teranos/QNTX/plugin"
 )
 
 type Plugin struct {
@@ -222,7 +222,7 @@ Update import paths:
 import "github.com/teranos/QNTX/finance/analysis"
 
 // After
-import "github.com/teranos/QNTX/domains/finance/analysis"
+import "github.com/teranos/QNTX/plugin/finance/analysis"
 ```
 
 ### Step 4: Implement CLI Commands
@@ -277,7 +277,7 @@ func (p *Plugin) handleStocks(w http.ResponseWriter, r *http.Request) {
 
 **`cmd/qntx/main.go`**:
 ```go
-import "github.com/teranos/QNTX/domains/finance"
+import "github.com/teranos/QNTX/plugin/finance"
 
 func initializePluginRegistry() {
     registry := domains.NewRegistry("0.1.0")

@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"strings"
 
-	ixgit "github.com/teranos/QNTX/domains/code/ixgest/git"
+	ixgit "github.com/teranos/QNTX/qntx-code/ixgest/git"
 )
 
 // ParsedATSCode contains the pre-computed values for a scheduled job

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/domains"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 )

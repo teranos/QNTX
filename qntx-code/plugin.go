@@ -12,7 +12,7 @@ import (
 	"net/http"
 
 	"github.com/spf13/cobra"
-	"github.com/teranos/QNTX/domains"
+	"github.com/teranos/QNTX/plugin"
 )
 
 // Plugin is the code domain plugin implementation

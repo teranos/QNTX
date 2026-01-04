@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/domains/code/ixgest/git"
+	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"

@@ -168,8 +168,8 @@ proto: ## Generate Go code from protobuf definitions
 	@echo "Generating gRPC code from proto files..."
 	@protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		domains/grpc/protocol/domain.proto
-	@echo "✓ Proto files generated in domains/grpc/protocol/"
+		plugin/grpc/protocol/domain.proto
+	@echo "✓ Proto files generated in plugin/grpc/protocol/"
 
 plugins: ## Build external plugin binaries
 	@echo "Building external plugins..."

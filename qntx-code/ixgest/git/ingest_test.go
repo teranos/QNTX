@@ -48,7 +48,7 @@ func TestGitIxProcessor_IsGitRepository(t *testing.T) {
 	}{
 		{
 			name:     "valid git repository",
-			path:     "../../../..",
+			path:     "../../..",
 			expected: true,
 		},
 		{
