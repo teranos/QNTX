@@ -65,7 +65,6 @@ export type {
 // Types from server
 export type {
   ChildJobInfo,
-  CodeEntry,
   CompleteMessage,
   ConsoleLog,
   CreateScheduledJobRequest,

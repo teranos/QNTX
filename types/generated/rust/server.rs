@@ -36,18 +36,6 @@ pub struct ChildJobInfo {
     pub completed_at: Option<String>,
 }
 
-/// CodeEntry represents a code file or directory in the workspace
-#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#codeentry>"]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CodeEntry {
-    pub name: String,
-    pub path: String,
-    #[serde(rename = "isDir")]
-    pub is_dir: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub children: Option<Vec<CodeEntry>>,
-}
-
 /// CompleteMessage represents import completion
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#completemessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
