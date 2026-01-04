@@ -1,0 +1,115 @@
+// Package code provides the built-in code domain plugin for QNTX.
+//
+// The code domain includes:
+//   - Ixgest: Git repository and dependency ingestion
+//   - VCS: GitHub PR workflow integration
+//   - Language Server: gopls for Go code intelligence
+//   - UI: Code editor and browser
+package code
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/domains"
+)
+
+// Plugin is the code domain plugin implementation
+type Plugin struct {
+	services domains.ServiceRegistry
+}
+
+// NewPlugin creates a new code domain plugin
+func NewPlugin() *Plugin {
+	return &Plugin{}
+}
+
+// Metadata returns information about the code domain plugin
+func (p *Plugin) Metadata() domains.Metadata {
+	return domains.Metadata{
+		Name:        "code",
+		Version:     "0.1.0",
+		QNTXVersion: ">= 0.1.0",
+		Description: "Software development domain (git, GitHub, gopls, code editor)",
+		Author:      "QNTX Team",
+		License:     "MIT",
+	}
+}
+
+// Initialize initializes the code domain plugin
+func (p *Plugin) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
+	p.services = services
+
+	logger := services.Logger("code")
+	logger.Info("Code domain plugin initialized")
+
+	return nil
+}
+
+// Shutdown shuts down the code domain plugin
+func (p *Plugin) Shutdown(ctx context.Context) error {
+	if p.services != nil {
+		logger := p.services.Logger("code")
+		logger.Info("Code domain plugin shutting down")
+	}
+
+	return nil
+}
+
+// Commands returns CLI commands for the code domain
+func (p *Plugin) Commands() []*cobra.Command {
+	// Root command for code domain
+	codeCmd := &cobra.Command{
+		Use:   "code",
+		Short: "Software development tools",
+		Long:  "Code domain provides git ingestion, GitHub integration, language servers, and code editing",
+	}
+
+	// Add subcommands
+	// TODO: Add ixgest commands
+	// TODO: Add vcs commands
+	// TODO: Add langserver commands
+
+	return []*cobra.Command{codeCmd}
+}
+
+// RegisterHTTP registers HTTP handlers for the code domain
+func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
+	// TODO: Register handlers for:
+	// - /api/code/ - Code file tree and content
+	// - /api/code/github/pr - PR integration
+	// - /api/code/github/pr/:number/suggestions - Fix suggestions
+
+	return nil
+}
+
+// RegisterWebSocket registers WebSocket handlers for the code domain
+func (p *Plugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
+	handlers := make(map[string]domains.WebSocketHandler)
+
+	// TODO: Register WebSocket handlers for:
+	// - /gopls - gopls language server protocol
+
+	return handlers, nil
+}
+
+// Health returns the health status of the code domain plugin
+func (p *Plugin) Health(ctx context.Context) domains.HealthStatus {
+	// TODO: Check health of:
+	// - gopls service
+	// - GitHub API connectivity
+	// - Database access
+
+	return domains.HealthStatus{
+		Healthy: true,
+		Message: "Code domain operational",
+		Details: make(map[string]interface{}),
+	}
+}
+
+// Register the code domain plugin on import
+func init() {
+	// Plugin will be registered when the registry is initialized
+	// This is done in main.go after creating the registry
+}
