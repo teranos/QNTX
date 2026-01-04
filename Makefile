@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install
+.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -163,3 +163,22 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 	@TARGET=$$(rustc -vV | grep host | cut -d' ' -f2) && \
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
+
+proto: ## Generate Go code from protobuf definitions
+	@echo "Generating gRPC code from proto files..."
+	@protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		plugin/grpc/protocol/domain.proto
+	@echo "✓ Proto files generated in plugin/grpc/protocol/"
+
+plugins: ## Build external plugin binaries
+	@echo "Building external plugins..."
+	@go build -o bin/qntx-code-plugin ./cmd/plugins/code
+	@echo "✓ qntx-code-plugin built in bin/"
+
+plugins-install: plugins ## Install plugins to ~/.qntx/plugins/
+	@echo "Installing plugins to $(PREFIX)/plugins..."
+	@mkdir -p $(PREFIX)/plugins
+	@cp bin/qntx-code-plugin $(PREFIX)/plugins/
+	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
+	@echo "✓ Plugins installed to $(PREFIX)/plugins/"

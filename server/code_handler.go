@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/domains/code/vcs/github"
+	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
 
 // CodeEntry represents a code file or directory in the workspace

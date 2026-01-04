@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package protocol;
 
-option go_package = "github.com/teranos/QNTX/domains/grpc/protocol";
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
 // DomainPluginService is the gRPC service for external domain plugins
 service DomainPluginService {
