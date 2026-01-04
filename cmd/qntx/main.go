@@ -84,24 +84,12 @@ func initializePluginRegistry() {
 	}
 }
 
-// addPluginCommands adds commands from all registered plugins
+// addPluginCommands was used to add commands from all registered plugins.
+// This is no longer needed as plugin commands are not integrated into the CLI.
+// External plugins should provide their own CLI binaries.
+// Built-in domain functionality is exposed via the server API.
 func addPluginCommands() {
-	registry := plugin.GetDefaultRegistry()
-	if registry == nil {
-		return
-	}
-
-	for _, name := range registry.List() {
-		plugin, ok := registry.Get(name)
-		if !ok {
-			continue
-		}
-
-		// Add plugin commands to root
-		for _, cmd := range plugin.Commands() {
-			rootCmd.AddCommand(cmd)
-		}
-	}
+	// No-op: Plugin commands are no longer registered
 }
 
 func main() {

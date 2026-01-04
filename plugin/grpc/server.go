@@ -15,10 +15,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -36,18 +33,14 @@ type PluginServer struct {
 
 	// HTTP mux for handling HTTP requests via gRPC
 	httpMux *http.ServeMux
-
-	// Command registry for CLI execution
-	commands map[string]*cobra.Command
 }
 
 // NewPluginServer creates a new gRPC server wrapper for a DomainPlugin.
 func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *PluginServer {
 	return &PluginServer{
-		plugin:   plugin,
-		logger:   logger,
-		httpMux:  http.NewServeMux(),
-		commands: make(map[string]*cobra.Command),
+		plugin:  plugin,
+		logger:  logger,
+		httpMux: http.NewServeMux(),
 	}
 }
 
@@ -110,35 +103,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		return nil, fmt.Errorf("HTTP registration failed for plugin %s: %w", s.plugin.Metadata().Name, err)
 	}
 
-	// Build command registry
-	for _, cmd := range s.plugin.Commands() {
-		s.registerCommand("", cmd)
-	}
-
 	return &protocol.Empty{}, nil
-}
-
-// registerCommand recursively registers commands in the command map.
-func (s *PluginServer) registerCommand(prefix string, cmd *cobra.Command) {
-	name := cmd.Use
-	if prefix != "" {
-		name = prefix + " " + cmd.Use
-	}
-	// Strip arguments from command name (e.g., "ix git <repo>" -> "ix git")
-	parts := strings.Fields(name)
-	cmdPath := strings.Join(parts, " ")
-	for i, p := range parts {
-		if strings.HasPrefix(p, "<") || strings.HasPrefix(p, "[") {
-			cmdPath = strings.Join(parts[:i], " ")
-			break
-		}
-	}
-
-	s.commands[cmdPath] = cmd
-
-	for _, sub := range cmd.Commands() {
-		s.registerCommand(cmdPath, sub)
-	}
 }
 
 // Shutdown shuts down the plugin.
@@ -147,93 +112,6 @@ func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protoc
 		return nil, fmt.Errorf("plugin %s shutdown failed: %w", s.plugin.Metadata().Name, err)
 	}
 	return &protocol.Empty{}, nil
-}
-
-// Commands returns CLI command definitions.
-func (s *PluginServer) Commands(ctx context.Context, _ *protocol.Empty) (*protocol.CommandsResponse, error) {
-	cmds := s.plugin.Commands()
-	response := &protocol.CommandsResponse{
-		Commands: make([]*protocol.CommandDefinition, 0, len(cmds)),
-	}
-
-	for _, cmd := range cmds {
-		def := s.buildCommandDefinition(cmd)
-		response.Commands = append(response.Commands, def)
-	}
-
-	return response, nil
-}
-
-// buildCommandDefinition recursively builds command definitions.
-func (s *PluginServer) buildCommandDefinition(cmd *cobra.Command) *protocol.CommandDefinition {
-	def := &protocol.CommandDefinition{
-		Name:        cmd.Use,
-		Description: cmd.Short,
-		Subcommands: make([]string, 0),
-		Flags:       make([]*protocol.FlagDefinition, 0),
-	}
-
-	// Add subcommand names
-	for _, sub := range cmd.Commands() {
-		def.Subcommands = append(def.Subcommands, sub.Use)
-	}
-
-	// Add flag definitions
-	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		flagDef := &protocol.FlagDefinition{
-			Name:         flag.Name,
-			Short:        flag.Shorthand,
-			Description:  flag.Usage,
-			Type:         flag.Value.Type(),
-			DefaultValue: flag.DefValue,
-		}
-		def.Flags = append(def.Flags, flagDef)
-	})
-
-	return def
-}
-
-// ExecuteCommand executes a CLI command.
-func (s *PluginServer) ExecuteCommand(ctx context.Context, req *protocol.ExecuteCommandRequest) (*protocol.ExecuteCommandResponse, error) {
-	// Find the command
-	cmd, ok := s.commands[req.Command]
-	if !ok {
-		return &protocol.ExecuteCommandResponse{
-			ExitCode: 1,
-			Stderr:   fmt.Sprintf("command not found: %s", req.Command),
-		}, nil
-	}
-
-	// Set up output capture
-	var stdout, stderr bytes.Buffer
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-
-	// Set flags from request
-	for name, value := range req.Flags {
-		if err := cmd.Flags().Set(name, value); err != nil {
-			return &protocol.ExecuteCommandResponse{
-				ExitCode: 1,
-				Stderr:   fmt.Sprintf("invalid flag %s: %v", name, err),
-			}, nil
-		}
-	}
-
-	// Execute command
-	cmd.SetArgs(req.Args)
-	err := cmd.ExecuteContext(ctx)
-
-	exitCode := int32(0)
-	if err != nil {
-		exitCode = 1
-		stderr.WriteString(err.Error())
-	}
-
-	return &protocol.ExecuteCommandResponse{
-		ExitCode: exitCode,
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-	}, nil
 }
 
 // HandleHTTP handles an HTTP request via gRPC.

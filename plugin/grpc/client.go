@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -26,9 +24,6 @@ type ExternalDomainProxy struct {
 	logger   *zap.SugaredLogger
 	addr     string
 	metadata plugin.Metadata
-
-	// Cached command definitions
-	commands []*protocol.CommandDefinition
 }
 
 // NewExternalDomainProxy creates a new proxy to an external plugin running at the given address.
@@ -118,14 +113,6 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		return fmt.Errorf("failed to initialize remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
 	}
 
-	// Cache command definitions
-	cmdResp, err := c.client.Commands(ctx, &protocol.Empty{})
-	if err != nil {
-		c.logger.Warnw("Failed to fetch plugin commands", "error", err)
-	} else {
-		c.commands = cmdResp.Commands
-	}
-
 	c.logger.Infow("Remote plugin initialized", "name", c.metadata.Name)
 	return nil
 }
@@ -137,108 +124,6 @@ func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("failed to shutdown remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
 	}
 	return c.conn.Close()
-}
-
-// Commands returns CLI commands that proxy to the remote plugin.
-func (c *ExternalDomainProxy) Commands() []*cobra.Command {
-	if len(c.commands) == 0 {
-		return nil
-	}
-
-	cmds := make([]*cobra.Command, 0, len(c.commands))
-	for _, cmdDef := range c.commands {
-		cmd := c.buildCobraCommand(cmdDef)
-		cmds = append(cmds, cmd)
-	}
-	return cmds
-}
-
-// buildCobraCommand creates a Cobra command that proxies execution to the remote plugin.
-func (c *ExternalDomainProxy) buildCobraCommand(def *protocol.CommandDefinition) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   def.Name,
-		Short: def.Description,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.executeRemoteCommand(cmd, args)
-		},
-	}
-
-	// Add flags
-	for _, flagDef := range def.Flags {
-		switch flagDef.Type {
-		case "bool":
-			defaultVal := flagDef.DefaultValue == "true"
-			if flagDef.Short != "" {
-				cmd.Flags().BoolP(flagDef.Name, flagDef.Short, defaultVal, flagDef.Description)
-			} else {
-				cmd.Flags().Bool(flagDef.Name, defaultVal, flagDef.Description)
-			}
-		case "int":
-			// TODO: Parse default value
-			if flagDef.Short != "" {
-				cmd.Flags().IntP(flagDef.Name, flagDef.Short, 0, flagDef.Description)
-			} else {
-				cmd.Flags().Int(flagDef.Name, 0, flagDef.Description)
-			}
-		default: // string
-			if flagDef.Short != "" {
-				cmd.Flags().StringP(flagDef.Name, flagDef.Short, flagDef.DefaultValue, flagDef.Description)
-			} else {
-				cmd.Flags().String(flagDef.Name, flagDef.DefaultValue, flagDef.Description)
-			}
-		}
-	}
-
-	// Recursively add subcommands
-	for _, subName := range def.Subcommands {
-		// Find the subcommand definition
-		for _, subDef := range c.commands {
-			if subDef.Name == subName {
-				cmd.AddCommand(c.buildCobraCommand(subDef))
-				break
-			}
-		}
-	}
-
-	return cmd
-}
-
-// executeRemoteCommand executes a command on the remote plugin.
-func (c *ExternalDomainProxy) executeRemoteCommand(cmd *cobra.Command, args []string) error {
-	// Collect flags
-	flags := make(map[string]string)
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if f.Changed {
-			flags[f.Name] = f.Value.String()
-		}
-	})
-
-	req := &protocol.ExecuteCommandRequest{
-		Command: cmd.Use,
-		Args:    args,
-		Flags:   flags,
-	}
-
-	resp, err := c.client.ExecuteCommand(context.Background(), req)
-	if err != nil {
-		return fmt.Errorf("remote command execution failed (plugin=%s, command=%s, args=%v): %w",
-			c.metadata.Name, req.Command, req.Args, err)
-	}
-
-	// Write output
-	if resp.Stdout != "" {
-		cmd.OutOrStdout().Write([]byte(resp.Stdout))
-	}
-	if resp.Stderr != "" {
-		cmd.ErrOrStderr().Write([]byte(resp.Stderr))
-	}
-
-	if resp.ExitCode != 0 {
-		return fmt.Errorf("command exited with code %d (plugin=%s, command=%s, args=%v)",
-			resp.ExitCode, c.metadata.Name, req.Command, req.Args)
-	}
-
-	return nil
 }
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
