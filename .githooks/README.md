@@ -12,6 +12,16 @@ Automatically pulls the latest changes when checking out to the `main` branch.
 - When you run `git checkout main`, it automatically runs `git pull` afterward
 - Ensures your local main branch stays in sync with remote
 
+### pre-commit
+
+Automatically updates Nix vendorHash when Go dependencies change.
+
+**What it does:**
+- Detects when `go.mod` or `go.sum` are being committed
+- Runs `update-nix-hash.sh` to calculate correct vendorHash
+- Updates `flake.nix` and stages it automatically
+- Prevents CI failures from outdated vendorHash
+
 ## Installation
 
 To install the hooks, run from the repository root:
