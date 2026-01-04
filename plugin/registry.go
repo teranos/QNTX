@@ -179,11 +179,11 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 // Global registry instance (Issue #4: Thread-safe initialization)
 var (
 	defaultRegistry *Registry
-	registryOnce    sync.Once
 	registryMu      sync.RWMutex
 )
 
-// SetDefaultRegistry sets the global registry (Issue #4: Thread-safe with sync.Once)
+// SetDefaultRegistry sets the global registry (Issue #4: Thread-safe)
+// Panics if called more than once. The mutex ensures thread-safe check-and-set.
 func SetDefaultRegistry(registry *Registry) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
