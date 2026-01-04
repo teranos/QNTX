@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
-	"github.com/teranos/QNTX/domains"
-	"github.com/teranos/QNTX/domains/code"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/qntx-code"
 	"github.com/teranos/QNTX/logger"
 )
 
@@ -73,35 +73,23 @@ func init() {
 // initializePluginRegistry sets up the domain plugin registry
 func initializePluginRegistry() {
 	// Create registry with QNTX version
-	registry := domains.NewRegistry("0.1.0")
-	domains.SetDefaultRegistry(registry)
+	registry := plugin.NewRegistry("0.1.0")
+	plugin.SetDefaultRegistry(registry)
 
 	// Register built-in code domain plugin
-	codePlugin := code.NewPlugin()
+	codePlugin := qntxcode.NewPlugin()
 	if err := registry.Register(codePlugin); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to register code plugin: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-// addPluginCommands adds commands from all registered plugins
+// addPluginCommands was used to add commands from all registered plugins.
+// This is no longer needed as plugin commands are not integrated into the CLI.
+// External plugins should provide their own CLI binaries.
+// Built-in domain functionality is exposed via the server API.
 func addPluginCommands() {
-	registry := domains.GetDefaultRegistry()
-	if registry == nil {
-		return
-	}
-
-	for _, name := range registry.List() {
-		plugin, ok := registry.Get(name)
-		if !ok {
-			continue
-		}
-
-		// Add plugin commands to root
-		for _, cmd := range plugin.Commands() {
-			rootCmd.AddCommand(cmd)
-		}
-	}
+	// No-op: Plugin commands are no longer registered
 }
 
 func main() {

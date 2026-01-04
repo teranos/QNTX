@@ -24,12 +24,25 @@ We adopt a **domain plugin architecture** where functional domains are implement
 - Plugins are **isolated** - they communicate only via shared database (attestations)
 - No direct plugin-to-plugin method calls or dependencies
 
-### Development Model
+### Unified Plugin Model
 
-- **Standalone binaries**: Plugins are separate Go projects with their own repos
-- **gRPC communication**: QNTX discovers plugins via config, connects via gRPC
-- **Separate config files**: Each plugin gets `am.<domain>.toml` configuration file
-- **Process isolation**: External plugins run in separate processes
+There is **one interface**: `DomainPlugin`. Two implementations:
+
+- **Built-in plugins**: Implement `DomainPlugin` directly (compiled into QNTX)
+- **External plugins**: `ExternalDomainProxy` adapter implements `DomainPlugin` by proxying gRPC calls to sidecar processes
+
+From the Registry's perspective, all plugins are identical:
+```go
+// Both work the same way
+registry.Register(code.NewPlugin())           // Built-in
+registry.Register(externalProxy)              // External (via gRPC)
+```
+
+External plugins:
+- Are standalone binaries with their own repos
+- Communicate via gRPC (using `PluginServer` wrapper)
+- Have separate config files (`am.<domain>.toml`)
+- Run in separate processes for isolation
 
 ### Interface Contract
 
@@ -98,11 +111,13 @@ type DomainPlugin interface {
 - ✅ Code domain as built-in plugin
 - ✅ CLI, HTTP, and config integration
 
-### Phase 2: Code Domain Externalization (Next)
-- Move code domain to external binary (validates gRPC architecture)
-- Implement gRPC protocol from domains/grpc/protocol/domain.proto
-- Test process isolation and error handling
-- Document plugin development workflow
+### Phase 2: gRPC Transport (Completed)
+- ✅ Generate Go code from `domains/grpc/protocol/domain.proto`
+- ✅ `ExternalDomainProxy` adapter (implements DomainPlugin via gRPC)
+- ✅ `PluginServer` wrapper (exposes DomainPlugin via gRPC)
+- ✅ `PluginManager` for plugin discovery and process management
+- ✅ Code domain as standalone binary (`cmd/plugins/code`)
+- ✅ Plugin development documentation
 
 ### Phase 3: Third-Party Plugins (Future)
 - Publish plugin development guide

@@ -1,4 +1,4 @@
-package code
+package qntxcode
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/domains/code/vcs/github"
+	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
 
 var (

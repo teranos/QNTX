@@ -11,8 +11,8 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/domains"
-	"github.com/teranos/QNTX/domains/code/langserver/gopls"
+	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -155,14 +155,14 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	server.state.Store(int32(ServerStateRunning)) // GRACE Phase 4: Initialize to running
 
 	// Initialize domain plugin registry
-	pluginRegistry := domains.GetDefaultRegistry()
+	pluginRegistry := plugin.GetDefaultRegistry()
 	if pluginRegistry != nil {
 		server.pluginRegistry = pluginRegistry
 
 		// Initialize plugins with services
 		store := storage.NewSQLStore(db, serverLogger)
 		queue := daemon.GetQueue()
-		services := domains.NewServiceRegistry(db, serverLogger, store, &simpleConfigProvider{}, queue)
+		services := plugin.NewServiceRegistry(db, serverLogger, store, &simpleConfigProvider{}, queue)
 
 		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
 			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)
@@ -367,11 +367,11 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 // simpleConfigProvider provides plugin configuration
 type simpleConfigProvider struct{}
 
-func (p *simpleConfigProvider) GetPluginConfig(domain string) domains.Config {
+func (p *simpleConfigProvider) GetPluginConfig(domain string) plugin.Config {
 	return &simpleConfig{domain: domain}
 }
 
-// simpleConfig implements domains.Config using am package
+// simpleConfig implements plugin.Config using am package
 type simpleConfig struct {
 	domain string
 }
