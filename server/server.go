@@ -10,13 +10,14 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/domains"
 	"github.com/teranos/QNTX/domains/code/langserver/gopls"
-	"github.com/teranos/QNTX/server/wslogs"
-	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/graph"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
 )
 
@@ -48,8 +49,9 @@ type QNTXServer struct {
 	logger        *zap.SugaredLogger
 	logTransport  *wslogs.Transport
 	wsCore        *wslogs.WebSocketCore
-	consoleBuffer *ConsoleBuffer // Browser console log buffer for debugging (dev mode only)
-	initialQuery  string         // Pre-loaded Ax query to execute on client connection
+	consoleBuffer *ConsoleBuffer        // Browser console log buffer for debugging (dev mode only)
+	initialQuery  string                // Pre-loaded Ax query to execute on client connection
+	pluginRegistry *domains.Registry    // Domain plugin registry
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
