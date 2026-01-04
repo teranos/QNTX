@@ -32,6 +32,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 
 	// Discover plugins from configured paths
 	var pluginConfigs []PluginConfig
+	var failedPlugins []string
 	for _, pluginName := range cfg.Plugin.Enabled {
 		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
@@ -40,6 +41,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 				"error", err,
 				"paths", cfg.Plugin.Paths,
 			)
+			failedPlugins = append(failedPlugins, pluginName)
 			continue
 		}
 		pluginConfigs = append(pluginConfigs, pluginConfig)
@@ -50,6 +52,20 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
 			return nil, fmt.Errorf("failed to load plugins: %w", err)
 		}
+	}
+
+	// Log summary of discovery results
+	if len(failedPlugins) > 0 {
+		logger.Warnw("Some enabled plugins failed to load",
+			"enabled", len(cfg.Plugin.Enabled),
+			"loaded", len(pluginConfigs),
+			"failed", failedPlugins,
+		)
+	} else if len(pluginConfigs) > 0 {
+		logger.Infow("Plugin discovery complete",
+			"enabled", len(cfg.Plugin.Enabled),
+			"loaded", len(pluginConfigs),
+		)
 	}
 
 	return manager, nil
@@ -113,9 +129,29 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 // expandAndValidatePath safely expands and validates a path using go-getter.
 // Handles ~, relative paths, and validates the result is a valid filesystem path.
 func expandAndValidatePath(path string) (string, error) {
+	// Handle tilde expansion first (go-getter doesn't do this)
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		path = filepath.Join(home, path[2:])
+	} else if path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		return home, nil
+	}
+
+	// Get current working directory for resolving relative paths
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "."
+	}
+
 	// Use go-getter's detection to safely handle paths
-	// This handles ~, relative paths, and more
-	detected, err := getter.Detect(path, filepath.Dir(path), getter.Detectors)
+	detected, err := getter.Detect(path, pwd, getter.Detectors)
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
 	}
@@ -131,24 +167,8 @@ func expandAndValidatePath(path string) (string, error) {
 		return u.Path, nil
 	}
 
-	// For local paths (no scheme or empty scheme), use as-is
+	// For local paths (no scheme or empty scheme), make absolute
 	if u.Scheme == "" {
-		// If path starts with ~, expand it manually as fallback
-		if strings.HasPrefix(path, "~/") {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return "", fmt.Errorf("failed to get home directory: %w", err)
-			}
-			return filepath.Join(home, path[2:]), nil
-		}
-		if path == "~" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return "", fmt.Errorf("failed to get home directory: %w", err)
-			}
-			return home, nil
-		}
-		// Make absolute
 		abs, err := filepath.Abs(path)
 		if err != nil {
 			return "", fmt.Errorf("failed to make absolute path: %w", err)
