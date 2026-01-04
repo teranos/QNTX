@@ -414,8 +414,11 @@ func TestCrash_PartialFailure(t *testing.T) {
 	err := manager.LoadPlugins(context.Background(), configs)
 	require.NoError(t, err)
 
-	plugins := manager.GetAllPlugins()
-	require.Len(t, plugins, 2)
+	// Get plugins by name to avoid non-deterministic map iteration order
+	plugin1Proxy, ok := manager.GetPlugin("plugin1")
+	require.True(t, ok, "plugin1 should be loaded")
+	plugin2Proxy, ok := manager.GetPlugin("plugin2")
+	require.True(t, ok, "plugin2 should be loaded")
 
 	// Crash first plugin
 	cleanup1()
@@ -425,11 +428,11 @@ func TestCrash_PartialFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	health := plugins[1].Health(ctx)
+	health := plugin2Proxy.Health(ctx)
 	assert.True(t, health.Healthy, "Healthy plugin should remain operational")
 
 	// First plugin should fail
-	health = plugins[0].Health(ctx)
+	health = plugin1Proxy.Health(ctx)
 	assert.False(t, health.Healthy, "Crashed plugin should report unhealthy")
 }
 
