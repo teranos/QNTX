@@ -11,11 +11,6 @@ Domain plugin providing software development tools for QNTX.
 - **Language Server** (`langserver/gopls/`) - Go code intelligence via gopls
 - **AST Transformations** (`ast/`) - Code transformation and analysis
 
-## Commands
-
-- `qntx code ix git <repo>` - Ingest git repository
-- `qntx code pr` - Trigger GitHub PR review
-
 ## HTTP Endpoints
 
 - `/api/code` - Code file tree
