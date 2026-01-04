@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/domains/grpc/protocol";
+
+// DomainPluginService is the gRPC service for external domain plugins
+service DomainPluginService {
+  // Metadata returns plugin metadata
+  rpc Metadata(Empty) returns (MetadataResponse);
+
+  // Initialize initializes the plugin
+  rpc Initialize(InitializeRequest) returns (Empty);
+
+  // Shutdown shuts down the plugin
+  rpc Shutdown(Empty) returns (Empty);
+
+  // Commands returns CLI command definitions
+  rpc Commands(Empty) returns (CommandsResponse);
+
+  // ExecuteCommand executes a CLI command
+  rpc ExecuteCommand(ExecuteCommandRequest) returns (ExecuteCommandResponse);
+
+  // HandleHTTP handles an HTTP request
+  rpc HandleHTTP(HTTPRequest) returns (HTTPResponse);
+
+  // HandleWebSocket handles a WebSocket connection (bidirectional streaming)
+  rpc HandleWebSocket(stream WebSocketMessage) returns (stream WebSocketMessage);
+
+  // Health checks plugin health
+  rpc Health(Empty) returns (HealthResponse);
+}
+
+message Empty {}
+
+message MetadataResponse {
+  string name = 1;
+  string version = 2;
+  string qntx_version = 3;
+  string description = 4;
+  string author = 5;
+  string license = 6;
+}
+
+message InitializeRequest {
+  // Service endpoints the plugin can call back to
+  string database_endpoint = 1;
+  string ats_store_endpoint = 2;
+
+  // Plugin-specific config
+  map<string, string> config = 3;
+}
+
+message CommandsResponse {
+  repeated CommandDefinition commands = 1;
+}
+
+message CommandDefinition {
+  string name = 1;
+  string description = 2;
+  repeated string subcommands = 3;
+  repeated FlagDefinition flags = 4;
+}
+
+message FlagDefinition {
+  string name = 1;
+  string short = 2;
+  string description = 3;
+  string type = 4; // "string", "int", "bool", etc.
+  string default_value = 5;
+}
+
+message ExecuteCommandRequest {
+  string command = 1;
+  repeated string args = 2;
+  map<string, string> flags = 3;
+}
+
+message ExecuteCommandResponse {
+  int32 exit_code = 1;
+  string stdout = 2;
+  string stderr = 3;
+}
+
+message HTTPRequest {
+  string method = 1;
+  string path = 2;
+  map<string, string> headers = 3;
+  bytes body = 4;
+}
+
+message HTTPResponse {
+  int32 status_code = 1;
+  map<string, string> headers = 2;
+  bytes body = 3;
+}
+
+message WebSocketMessage {
+  enum Type {
+    CONNECT = 0;
+    DATA = 1;
+    CLOSE = 2;
+  }
+
+  Type type = 1;
+  bytes data = 2;
+}
+
+message HealthResponse {
+  bool healthy = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}

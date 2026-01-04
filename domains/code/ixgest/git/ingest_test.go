@@ -48,7 +48,7 @@ func TestGitIxProcessor_IsGitRepository(t *testing.T) {
 	}{
 		{
 			name:     "valid git repository",
-			path:     "../..",
+			path:     "../../../..",
 			expected: true,
 		},
 		{
@@ -107,13 +107,13 @@ func TestGitIxProcessor_TruncateMessage(t *testing.T) {
 // TestGitIxProcessor_CommitAttestations tests attestation generation for a specific commit
 func TestGitIxProcessor_CommitAttestations(t *testing.T) {
 	// Skip if not in a git repository
-	if _, err := os.Stat("../../.git"); os.IsNotExist(err) {
+	if _, err := os.Stat("../../../../.git"); os.IsNotExist(err) {
 		t.Skip("Not in a git repository, skipping test")
 	}
 
 	db := qntxtest.CreateTestDB(t)
 
-	repo, err := git.PlainOpen("../..")
+	repo, err := git.PlainOpen("../../../..")
 	require.NoError(t, err, "Failed to open repository")
 
 	// Get HEAD commit
