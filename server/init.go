@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
@@ -12,7 +11,6 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
-	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -26,8 +24,7 @@ import (
 // serverDependencies holds all dependencies created for QNTXServer
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service   // Language service for ATS LSP features
-	goplsService  *gopls.Service // Language service for Go code intelligence
+	langService   *lsp.Service // Language service for ATS LSP features
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
@@ -133,7 +130,6 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		dbPath:        dbPath,
 		builder:       deps.builder,
 		langService:   deps.langService,
-		goplsService:  deps.goplsService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
 		daemon:        daemon, // Use daemon with server context
@@ -241,7 +237,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	langService := lsp.NewService(symbolIndex)
 	serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
 
-	// Load configuration for gopls and daemon setup
+	// Load configuration for daemon setup
 	cfgStart := time.Now()
 	cfg, err := appcfg.Load()
 	if err != nil {
@@ -250,40 +246,6 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 		cfg = &appcfg.Config{} // Will use default values
 	}
 	serverLogger.Debugw("Config loaded", "duration_ms", time.Since(cfgStart).Milliseconds())
-
-	// Create gopls service for Go code intelligence (if enabled)
-	var goplsService *gopls.Service
-	if cfg.Code.Gopls.Enabled {
-		workspaceRoot := cfg.Code.Gopls.WorkspaceRoot
-		if workspaceRoot == "" || workspaceRoot == "." {
-			// Convert to absolute path
-			if absPath, err := filepath.Abs("."); err == nil {
-				workspaceRoot = absPath
-			} else {
-				workspaceRoot = "."
-			}
-		}
-		goplsService, err = gopls.NewService(gopls.Config{
-			WorkspaceRoot: workspaceRoot,
-			Logger:        serverLogger,
-		})
-		if err != nil {
-			serverLogger.Warnw("Failed to create gopls service, Go code intelligence disabled", "error", err)
-			goplsService = nil
-		} else {
-			// Initialize gopls service
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := goplsService.Initialize(ctx); err != nil {
-				serverLogger.Warnw("Failed to initialize gopls, Go code intelligence disabled", "error", err)
-				goplsService = nil
-			} else {
-				serverLogger.Infow(fmt.Sprintf("gopls service initialized (workspace: %s)", workspaceRoot))
-			}
-		}
-	} else {
-		serverLogger.Debugw("gopls service disabled in config")
-	}
 
 	// Create usage tracker for AI model usage and cost monitoring
 	usageTracker := tracker.NewUsageTracker(db, verbosity)
@@ -307,7 +269,6 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	return &serverDependencies{
 		builder:       builder,
 		langService:   langService,
-		goplsService:  goplsService,
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,

@@ -9,14 +9,18 @@ package qntxcode
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 )
 
 // Plugin is the code domain plugin implementation
 type Plugin struct {
-	services plugin.ServiceRegistry
+	services     plugin.ServiceRegistry
+	goplsService *gopls.Service // Go language server for code intelligence
 }
 
 // NewPlugin creates a new code domain plugin
@@ -39,18 +43,58 @@ func (p *Plugin) Metadata() plugin.Metadata {
 // Initialize initializes the code domain plugin
 func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	p.services = services
-
 	logger := services.Logger("code")
-	logger.Info("Code domain plugin initialized")
 
+	// Initialize gopls service for Go code intelligence
+	config := services.Config("code")
+	workspaceRoot := config.GetString("gopls.workspace_root")
+	if workspaceRoot == "" {
+		workspaceRoot = "."
+	}
+
+	goplsService, err := gopls.NewService(gopls.Config{
+		WorkspaceRoot: workspaceRoot,
+		Logger:        logger,
+	})
+	if err != nil {
+		logger.Warnw("Failed to create gopls service, Go code intelligence disabled", "error", err)
+		p.goplsService = nil
+	} else {
+		// Initialize gopls with timeout
+		initCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		if err := goplsService.Initialize(initCtx); err != nil {
+			logger.Warnw("Failed to initialize gopls, Go code intelligence disabled", "error", err)
+			p.goplsService = nil
+		} else {
+			p.goplsService = goplsService
+			logger.Infow(fmt.Sprintf("gopls service initialized (workspace: %s)", workspaceRoot))
+		}
+	}
+
+	logger.Info("Code domain plugin initialized")
 	return nil
 }
 
 // Shutdown shuts down the code domain plugin
 func (p *Plugin) Shutdown(ctx context.Context) error {
 	logger := p.services.Logger("code")
-	logger.Info("Code domain plugin shutting down")
 
+	// Shutdown gopls service
+	if p.goplsService != nil {
+		logger.Info("Stopping gopls service")
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		if err := p.goplsService.Shutdown(shutdownCtx); err != nil {
+			logger.Warnw("Failed to shutdown gopls cleanly", "error", err)
+		} else {
+			logger.Info("gopls service stopped")
+		}
+	}
+
+	logger.Info("Code domain plugin shutting down")
 	return nil
 }
 
@@ -63,8 +107,8 @@ func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
 func (p *Plugin) RegisterWebSocket() (map[string]plugin.WebSocketHandler, error) {
 	handlers := make(map[string]plugin.WebSocketHandler)
 
-	// Issue #127: Integrate plugin WebSocket handlers into server
-	// - /gopls - gopls language server protocol
+	// Register gopls language server WebSocket handler
+	handlers["/gopls"] = &goplsWebSocketHandler{plugin: p}
 
 	return handlers, nil
 }
