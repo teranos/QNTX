@@ -37,11 +37,24 @@ message MetadataResponse {
 }
 
 message InitializeRequest {
-  // Service endpoints the plugin can call back to
+  // Service endpoints the plugin can call back to QNTX core
+  // Format: "host:port" for TCP (e.g., "localhost:50051")
+  //         "unix:///path/to/socket" for Unix domain sockets
+  //
+  // database_endpoint: gRPC endpoint for DatabaseService
+  // Provides: SQL query execution, database operations
+  // Currently unimplemented - see issue #138
   string database_endpoint = 1;
+
+  // ats_store_endpoint: gRPC endpoint for ATSStoreService
+  // Provides: Attestation creation, querying, and management
+  // Currently unimplemented - see issue #138
   string ats_store_endpoint = 2;
 
-  // Plugin-specific config
+  // Plugin-specific configuration values
+  // Simple types (string, int, bool) passed as string representations
+  // Complex types (maps, slices) JSON-encoded as strings
+  // Plugins should parse and validate values appropriate to their schema
   map<string, string> config = 3;
 }
 
