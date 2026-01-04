@@ -60,7 +60,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	metaResp, err := client.Metadata(ctx, &protocol.Empty{})
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("failed to get plugin metadata: %w", err)
+		return nil, fmt.Errorf("failed to get plugin metadata from %s: %w", addr, err)
 	}
 
 	proxy.metadata = plugin.Metadata{
@@ -115,7 +115,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 
 	_, err := c.client.Initialize(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to initialize remote plugin: %w", err)
+		return fmt.Errorf("failed to initialize remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
 	}
 
 	// Cache command definitions
@@ -134,7 +134,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 	_, err := c.client.Shutdown(ctx, &protocol.Empty{})
 	if err != nil {
-		return fmt.Errorf("failed to shutdown remote plugin: %w", err)
+		return fmt.Errorf("failed to shutdown remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
 	}
 	return c.conn.Close()
 }
@@ -221,7 +221,8 @@ func (c *ExternalDomainProxy) executeRemoteCommand(cmd *cobra.Command, args []st
 
 	resp, err := c.client.ExecuteCommand(context.Background(), req)
 	if err != nil {
-		return fmt.Errorf("remote command execution failed: %w", err)
+		return fmt.Errorf("remote command execution failed (plugin=%s, command=%s, args=%v): %w",
+			c.metadata.Name, req.Command, req.Args, err)
 	}
 
 	// Write output
@@ -233,7 +234,8 @@ func (c *ExternalDomainProxy) executeRemoteCommand(cmd *cobra.Command, args []st
 	}
 
 	if resp.ExitCode != 0 {
-		return fmt.Errorf("command exited with code %d", resp.ExitCode)
+		return fmt.Errorf("command exited with code %d (plugin=%s, command=%s, args=%v)",
+			resp.ExitCode, c.metadata.Name, req.Command, req.Args)
 	}
 
 	return nil

@@ -76,7 +76,8 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		}
 
 		if err := m.loadPlugin(ctx, config); err != nil {
-			return fmt.Errorf("failed to load plugin %s: %w", config.Name, err)
+			return fmt.Errorf("failed to load plugin %s (binary=%s, address=%s): %w",
+				config.Name, config.Binary, config.Address, err)
 		}
 	}
 	return nil
@@ -108,14 +109,16 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		var err error
 		process, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
-			return fmt.Errorf("failed to launch plugin: %w", err)
+			return fmt.Errorf("failed to launch plugin %s (binary=%s, port=%d): %w",
+				config.Name, config.Binary, port, err)
 		}
 		m.logger.Infow("Launched plugin process", "name", config.Name, "port", port, "pid", process.Pid)
 
 		// Wait for plugin to be ready
 		if err := m.waitForPlugin(ctx, addr, 30*time.Second); err != nil {
 			process.Kill()
-			return fmt.Errorf("plugin failed to start: %w", err)
+			return fmt.Errorf("plugin %s failed to start (binary=%s, addr=%s, pid=%d): %w",
+				config.Name, config.Binary, addr, process.Pid, err)
 		}
 	} else if config.Binary != "" {
 		// Binary specified but auto_start is false
@@ -134,7 +137,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if process != nil {
 			process.Kill()
 		}
-		return fmt.Errorf("failed to connect to plugin: %w", err)
+		return fmt.Errorf("failed to connect to plugin %s at %s: %w", config.Name, addr, err)
 	}
 
 	m.plugins[config.Name] = &managedPlugin{
@@ -171,14 +174,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	if !filepath.IsAbs(binary) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
+			return nil, fmt.Errorf("failed to get home directory for plugin %s: %w", config.Name, err)
 		}
 		binary = filepath.Join(home, ".qntx", "plugins", binary)
 	}
 
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
-		return nil, fmt.Errorf("plugin binary not found: %s", binary)
+		return nil, fmt.Errorf("plugin binary not found for %s: %s", config.Name, binary)
 	}
 
 	// Build command arguments
@@ -197,7 +200,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	cmd.Stderr = &pluginLogger{logger: m.logger, name: config.Name, level: "error"}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start plugin: %w", err)
+		return nil, fmt.Errorf("failed to start plugin %s (binary=%s, args=%v): %w",
+			config.Name, binary, args, err)
 	}
 
 	return cmd.Process, nil
