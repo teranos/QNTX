@@ -20,13 +20,6 @@ export interface ChildJobInfo {
   completed_at?: string | null;
 }
 
-export interface CodeEntry {
-  name: string;
-  path: string;
-  isDir: boolean;
-  children?: CodeEntry[];
-}
-
 export interface CompleteMessage {
   /**
    * "import_complete"
