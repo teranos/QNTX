@@ -156,13 +156,24 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 }
 
 // allocatePort finds the next available port for a plugin.
+// Uses deterministic iteration to ensure consistent port allocation.
 func (m *PluginManager) allocatePort() int {
 	port := m.basePort
+
+	// Collect all allocated ports and find max deterministically
+	// Map iteration is non-deterministic in Go, so we track the max explicitly
+	maxPort := m.basePort - 1
 	for _, p := range m.plugins {
-		if p.port >= port {
-			port = p.port + 1
+		if p.port > maxPort {
+			maxPort = p.port
 		}
 	}
+
+	// Next port is one after the current maximum
+	if maxPort >= m.basePort {
+		port = maxPort + 1
+	}
+
 	return port
 }
 
