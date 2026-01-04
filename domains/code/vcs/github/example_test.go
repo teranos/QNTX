@@ -3,7 +3,7 @@ package github_test
 import (
 	"fmt"
 
-	"github.com/teranos/QNTX/code/github"
+	"github.com/teranos/QNTX/domains/code/vcs/github"
 )
 
 // Example demonstrates parsing fix suggestions from PR comments

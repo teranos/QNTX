@@ -11,13 +11,14 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/code/gopls"
-	"github.com/teranos/QNTX/server/wslogs"
+	"github.com/teranos/QNTX/domains"
+	"github.com/teranos/QNTX/domains/code/langserver/gopls"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
+	"github.com/teranos/QNTX/server/wslogs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -152,6 +153,24 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	server.verbosity.Store(int32(verbosity))
 	server.graphLimit.Store(1000) // Default graph node limit
 	server.state.Store(int32(ServerStateRunning)) // GRACE Phase 4: Initialize to running
+
+	// Initialize domain plugin registry
+	pluginRegistry := domains.GetDefaultRegistry()
+	if pluginRegistry != nil {
+		server.pluginRegistry = pluginRegistry
+
+		// Initialize plugins with services
+		store := storage.NewSQLStore(db, serverLogger)
+		queue := daemon.GetQueue()
+		services := domains.NewServiceRegistry(db, serverLogger, store, &simpleConfigProvider{}, queue)
+
+		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
+			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)
+			// Continue anyway - plugins are optional
+		} else {
+			serverLogger.Infow("Domain plugins initialized", "count", len(pluginRegistry.List()))
+		}
+	}
 
 	// Create ticker with server as broadcaster for real-time execution updates
 	ticker := schedule.NewTickerWithContext(ctx, scheduleStore, daemon.GetQueue(), daemon, server, tickerCfg, serverLogger)
@@ -343,4 +362,40 @@ func setupConfigWatcher(server *QNTXServer, db *sql.DB, serverLogger *zap.Sugare
 	// Start watching for changes
 	configWatcher.Start()
 	serverLogger.Infow("Config watcher started", "path", configPath)
+}
+
+// simpleConfigProvider provides plugin configuration
+type simpleConfigProvider struct{}
+
+func (p *simpleConfigProvider) GetPluginConfig(domain string) domains.Config {
+	return &simpleConfig{domain: domain}
+}
+
+// simpleConfig implements domains.Config using am package
+type simpleConfig struct {
+	domain string
+}
+
+func (c *simpleConfig) GetString(key string) string {
+	return appcfg.GetString(c.domain + "." + key)
+}
+
+func (c *simpleConfig) GetInt(key string) int {
+	return appcfg.GetInt(c.domain + "." + key)
+}
+
+func (c *simpleConfig) GetBool(key string) bool {
+	return appcfg.GetBool(c.domain + "." + key)
+}
+
+func (c *simpleConfig) GetStringSlice(key string) []string {
+	return appcfg.GetStringSlice(c.domain + "." + key)
+}
+
+func (c *simpleConfig) Get(key string) interface{} {
+	return appcfg.Get(c.domain + "." + key)
+}
+
+func (c *simpleConfig) Set(key string, value interface{}) {
+	appcfg.Set(c.domain+"."+key, value)
 }
