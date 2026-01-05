@@ -248,6 +248,10 @@
     font-family: var(--font-mono, monospace);
 }
 
+.plugin-path-label {
+    color: #666;
+}
+
 /* Plugin message (health status message) */
 .plugin-message {
     margin-top: 12px;

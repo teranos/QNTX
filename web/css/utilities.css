@@ -84,7 +84,7 @@
 /* Animation utilities */
 .u-transition-none { transition: none !important; }
 .u-animate-none { animation: none !important; }
-.u-animate-fadeout { animation: fadeOut 0.3s ease-out !important; }
+.u-animate-fadeout { animation: fadeOut 0.3s ease-out !important; } /* Requires fadeOut animation from core.css */
 
 /* Flex utilities */
 .u-flex-center {

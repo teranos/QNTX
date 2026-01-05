@@ -9,7 +9,6 @@
  */
 
 import { BasePanel } from './base-panel.ts';
-import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import { debugLog } from './debug.ts';
 
@@ -91,16 +90,16 @@ class WebscraperPanel extends BasePanel {
                 </div>
 
                 <!-- Status Section -->
-                <div id="scraper-status" class="scraper-status hidden">
+                <div id="scraper-status" class="scraper-status u-hidden">
                     <div class="scraper-status-text"></div>
-                    <div class="scraper-progress hidden">
+                    <div class="scraper-progress u-hidden">
                         <div class="scraper-progress-bar"></div>
                     </div>
                 </div>
 
                 <!-- Results Section -->
                 <div id="scraper-results" class="scraper-results">
-                    <h4 class="scraper-results-title hidden">Results</h4>
+                    <h4 class="scraper-results-title u-hidden">Results</h4>
                     <div class="scraper-results-content"></div>
                 </div>
 
@@ -268,7 +267,7 @@ class WebscraperPanel extends BasePanel {
         const statusText = this.$('.scraper-status-text');
 
         if (statusEl && statusText) {
-            statusEl.classList.remove('hidden');
+            statusEl.classList.remove('u-hidden');
             statusText.textContent = message;
             statusEl.className = `scraper-status scraper-status-${type}`;
         }
@@ -277,14 +276,14 @@ class WebscraperPanel extends BasePanel {
     private showProgress(): void {
         const progress = this.$('.scraper-progress');
         if (progress) {
-            progress.classList.remove('hidden');
+            progress.classList.remove('u-hidden');
         }
     }
 
     private hideProgress(): void {
         const progress = this.$('.scraper-progress');
         if (progress) {
-            progress.classList.add('hidden');
+            progress.classList.add('u-hidden');
         }
     }
 
@@ -295,7 +294,7 @@ class WebscraperPanel extends BasePanel {
         if (!resultsContent) return;
 
         // Show title
-        resultsTitle?.classList.remove('hidden');
+        resultsTitle?.classList.remove('u-hidden');
 
         // Create result card
         const card = document.createElement('div');
