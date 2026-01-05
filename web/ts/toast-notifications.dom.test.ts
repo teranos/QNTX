@@ -9,8 +9,8 @@ describe('Toast Notification Lifecycle', () => {
     beforeEach(() => {
         // Reset DOM and timers
         document.body.innerHTML = '';
+        jest.useFakeTimers();
         jest.clearAllTimers();
-        jest.useRealTimers();
     });
 
     afterEach(() => {
