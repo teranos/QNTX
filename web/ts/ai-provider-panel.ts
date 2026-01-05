@@ -20,6 +20,7 @@ interface ConfigResponse {
 
 class AIProviderPanel extends BasePanel {
     private appConfig: ConfigResponse | null = null;
+    private ollamaAvailable: boolean = false;
 
     constructor() {
         super({
@@ -51,10 +52,27 @@ class AIProviderPanel extends BasePanel {
                     <button id="provider-ollama-btn" class="provider-btn">
                         <span class="provider-icon">🖥️</span>
                         <span class="provider-name">Ollama</span>
-                        <span class="provider-detail">Local GPU/CPU</span>
+                        <span class="provider-detail" id="ollama-status">Local GPU/CPU</span>
                     </button>
                 </div>
-                <div id="ollama-model-selector" class="ollama-model-selector hidden">
+                <div id="openrouter-config" class="provider-config">
+                    <div class="api-key-section">
+                        <label for="openrouter-api-key">OpenRouter API Key:</label>
+                        <div class="api-key-input-group">
+                            <input
+                                type="password"
+                                id="openrouter-api-key"
+                                class="api-key-input"
+                                placeholder="sk-or-v1-..."
+                                autocomplete="off"
+                            />
+                            <button id="openrouter-key-toggle" class="api-key-toggle" title="Show/Hide">👁</button>
+                            <button id="openrouter-key-save" class="api-key-save" title="Save">💾</button>
+                        </div>
+                        <div class="api-key-hint">Get your key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></div>
+                    </div>
+                </div>
+                <div id="ollama-model-selector" class="ollama-model-selector provider-config hidden">
                     <label for="ollama-model-select">Model:</label>
                     <select id="ollama-model-select">
                         <option value="llama3.2:3b">llama3.2:3b (3B, very fast)</option>
@@ -83,11 +101,34 @@ class AIProviderPanel extends BasePanel {
             const target = e.target as HTMLSelectElement;
             this.updateOllamaModel(target.value);
         });
+
+        // OpenRouter API key handling
+        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
+        const keyToggle = this.$('#openrouter-key-toggle');
+        const keySave = this.$('#openrouter-key-save');
+
+        keyToggle?.addEventListener('click', () => {
+            if (keyInput) {
+                keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+                if (keyToggle.textContent) {
+                    keyToggle.textContent = keyInput.type === 'password' ? '👁' : '👁‍🗨';
+                }
+            }
+        });
+
+        keySave?.addEventListener('click', () => this.saveOpenRouterKey());
+        keyInput?.addEventListener('keypress', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                this.saveOpenRouterKey();
+            }
+        });
     }
 
     protected async onShow(): Promise<void> {
         await this.fetchConfig();
         this.setupProviderButtons();
+        await this.loadOpenRouterKey();
+        await this.checkOllamaStatus();
     }
 
     private async fetchConfig(): Promise<void> {
@@ -180,15 +221,18 @@ class AIProviderPanel extends BasePanel {
         const openrouterBtn = this.$('#provider-openrouter-btn');
         const ollamaBtn = this.$('#provider-ollama-btn');
         const modelSelector = this.$('#ollama-model-selector');
+        const openrouterConfig = this.$('#openrouter-config');
 
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
             ollamaBtn?.classList.remove('active');
             modelSelector?.classList.add('hidden');
+            openrouterConfig?.classList.remove('hidden');
         } else {
             openrouterBtn?.classList.remove('active');
             ollamaBtn?.classList.add('active');
             modelSelector?.classList.remove('hidden');
+            openrouterConfig?.classList.add('hidden');
         }
     }
 
@@ -222,6 +266,92 @@ class AIProviderPanel extends BasePanel {
         }
 
         return response.json();
+    }
+
+    private async loadOpenRouterKey(): Promise<void> {
+        if (!this.appConfig?.settings) return;
+
+        // Find the OpenRouter API key setting
+        const keySetting = this.appConfig.settings.find(s => s.key === 'openrouter.api_key');
+        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
+
+        if (keyInput && keySetting?.value) {
+            const keyValue = keySetting.value as string;
+            // Show masked version of key (first 10 chars + ...)
+            if (keyValue.length > 10) {
+                keyInput.placeholder = keyValue.substring(0, 10) + '...(configured)';
+            }
+        }
+    }
+
+    private async saveOpenRouterKey(): Promise<void> {
+        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
+        if (!keyInput) return;
+
+        const apiKey = keyInput.value.trim();
+        if (!apiKey) {
+            this.updateStatus('Please enter an API key', 'warning');
+            return;
+        }
+
+        // Basic validation for OpenRouter key format
+        if (!apiKey.startsWith('sk-or-')) {
+            this.updateStatus('Invalid key format (should start with sk-or-)', 'error');
+            return;
+        }
+
+        try {
+            await this.updateConfig({
+                'openrouter.api_key': apiKey
+            });
+
+            this.updateStatus('API key saved successfully', 'success');
+            keyInput.value = ''; // Clear the input
+            keyInput.placeholder = apiKey.substring(0, 10) + '...(configured)';
+        } catch (error) {
+            console.error('[AI Provider Panel] Failed to save API key:', error);
+            this.updateStatus('Failed to save API key', 'error');
+        }
+    }
+
+    private async checkOllamaStatus(): Promise<void> {
+        try {
+            // Try to connect to Ollama API
+            const response = await fetch('http://localhost:11434/api/tags', {
+                method: 'GET',
+                signal: AbortSignal.timeout(2000), // 2 second timeout
+            });
+
+            this.ollamaAvailable = response.ok;
+
+            const ollamaBtn = this.$('#provider-ollama-btn');
+            const ollamaStatus = this.$('#ollama-status');
+
+            if (this.ollamaAvailable) {
+                ollamaBtn?.classList.remove('ollama-unavailable');
+                if (ollamaStatus) {
+                    ollamaStatus.textContent = 'Local GPU/CPU';
+                }
+            } else {
+                ollamaBtn?.classList.add('ollama-unavailable');
+                if (ollamaStatus) {
+                    ollamaStatus.textContent = 'Offline';
+                }
+            }
+        } catch (error) {
+            // Ollama is not running or unreachable
+            this.ollamaAvailable = false;
+
+            const ollamaBtn = this.$('#provider-ollama-btn');
+            const ollamaStatus = this.$('#ollama-status');
+
+            ollamaBtn?.classList.add('ollama-unavailable');
+            if (ollamaStatus) {
+                ollamaStatus.textContent = 'Offline';
+            }
+
+            console.log('[AI Provider Panel] Ollama not available:', error);
+        }
     }
 }
 

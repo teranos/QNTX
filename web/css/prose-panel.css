@@ -12,11 +12,11 @@
     transition: opacity 0.3s ease;
 }
 
-.prose-overlay.hidden {
+.prose-overlay[data-visibility="hidden"] {
     display: none;
 }
 
-.prose-overlay.visible {
+.prose-overlay[data-visibility="visible"] {
     display: block;
 }
 
@@ -37,12 +37,12 @@
     transition: transform 0.3s ease;
 }
 
-.prose-panel.hidden {
+.prose-panel[data-visibility="hidden"] {
     pointer-events: none;
     transform: translateX(100%);
 }
 
-.prose-panel.visible {
+.prose-panel[data-visibility="visible"] {
     pointer-events: auto;
     transform: translateX(0);
 }
