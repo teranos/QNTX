@@ -120,7 +120,7 @@ func (c *remoteConfig) GetInt(key string) int {
 
 func (c *remoteConfig) GetBool(key string) bool {
 	val := c.config[key]
-	return val == "true" || val == "1" || val == "yes" || val == "on"
+	return val == "true" || val == "1"
 }
 
 func (c *remoteConfig) GetStringSlice(key string) []string {
