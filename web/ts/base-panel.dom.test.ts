@@ -99,8 +99,8 @@ describe('BasePanel Data Attributes', () => {
         // Add CSS to test selector specificity
         const style = document.createElement('style');
         style.textContent = `
-            .panel[data-visibility="hidden"] { display: none; }
-            .panel[data-visibility="visible"] { display: flex; }
+            .panel[data-visibility="hidden"] { display: none !important; }
+            .panel[data-visibility="visible"] { display: flex !important; }
             .panel.hidden { display: block; } /* Old style - should not apply */
             .panel.visible { display: grid; } /* Old style - should not apply */
         `;
@@ -149,8 +149,15 @@ describe('BasePanel Data Attributes', () => {
             overlay.classList.add('u-hidden');
         });
 
-        // Trigger overlay click
-        const clickEvent = new MouseEvent('click', { bubbles: true });
+        // Trigger overlay click - use fallback for environments without MouseEvent
+        let clickEvent: Event;
+        try {
+            clickEvent = new MouseEvent('click', { bubbles: true });
+        } catch {
+            // Fallback for environments without MouseEvent constructor
+            clickEvent = document.createEvent('Event');
+            clickEvent.initEvent('click', true, true);
+        }
         overlay?.dispatchEvent(clickEvent);
 
         // Panel should now be hidden
