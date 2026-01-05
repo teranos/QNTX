@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins
+.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,9 +6,9 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: ## Build QNTX CLI binary
-	@echo "Building QNTX CLI..."
-	@go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-fuzzy ## Build QNTX CLI binary (with Rust fuzzy optimization)
+	@echo "Building QNTX CLI with Rust fuzzy optimization..."
+	@go build -tags rustfuzzy -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
@@ -97,6 +97,10 @@ test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
 	@echo "Running TypeScript tests..."
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
 	@cd web && bun test
 	@echo "✓ All tests complete"
 
@@ -108,12 +112,17 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
 	@echo "Running TypeScript tests..."
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
 	@cd web && bun test
 	@echo "✓ All tests complete"
 
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist
 	@rm -rf web/node_modules
+	@rm -rf plugins/qntx-fuzzy/target
 
 install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
 	@echo "Installing qntx to $(PREFIX)/bin..."
@@ -182,3 +191,29 @@ plugins-install: plugins ## Install plugins to ~/.qntx/plugins/
 	@cp bin/qntx-code-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
 	@echo "✓ Plugins installed to $(PREFIX)/plugins/"
+
+# Rust fuzzy matching library (ax segment optimization)
+rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
+	@echo "Building Rust fuzzy matching library..."
+	@cd ats/ax/fuzzy-ax && cargo build --release --lib
+	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
+	@echo "  Static:  libqntx_fuzzy.a"
+	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
+
+rust-fuzzy-test: ## Run Rust fuzzy matching tests
+	@echo "Running Rust fuzzy matching tests..."
+	@cd ats/ax/fuzzy-ax && cargo test --lib
+	@echo "✓ All Rust tests passed"
+
+rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
+	@echo "Checking Rust fuzzy matching code..."
+	@cd ats/ax/fuzzy-ax && cargo fmt --check
+	@cd ats/ax/fuzzy-ax && cargo clippy --lib -- -D warnings
+	@echo "✓ Rust code checks passed"
+
+rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rust)
+	@echo "Running Rust fuzzy integration tests..."
+	@export DYLD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$DYLD_LIBRARY_PATH && \
+		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
+		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
+	@echo "✓ Integration tests passed"
