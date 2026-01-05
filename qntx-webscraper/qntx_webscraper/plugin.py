@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from concurrent import futures
-from dataclasses import asdict
 
 import grpc
 
