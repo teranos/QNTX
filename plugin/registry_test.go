@@ -627,26 +627,26 @@ func newMockServiceRegistry() *mockServiceRegistry {
 	}
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB                         { return m.db }
-func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger   {
+func (m *mockServiceRegistry) Database() *sql.DB { return m.db }
+func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 	return zap.NewNop().Sugar()
 }
-func (m *mockServiceRegistry) Config(domain string) Config               { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() ats.AttestationStore            { return m.store }
-func (m *mockServiceRegistry) Queue() QueueService                       { return m.queue }
+func (m *mockServiceRegistry) Config(domain string) Config    { return &mockConfig{} }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore { return m.store }
+func (m *mockServiceRegistry) Queue() QueueService            { return m.queue }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)
 
 type mockConfig struct{}
 
-func (m *mockConfig) GetString(key string) string         { return "" }
-func (m *mockConfig) GetInt(key string) int                { return 0 }
-func (m *mockConfig) GetBool(key string) bool              { return false }
-func (m *mockConfig) GetStringSlice(key string) []string   { return nil }
-func (m *mockConfig) Get(key string) interface{}           { return nil }
-func (m *mockConfig) Set(key string, value interface{})    {}
-func (m *mockConfig) GetKeys() []string                    { return []string{} }
+func (m *mockConfig) GetString(key string) string        { return "" }
+func (m *mockConfig) GetInt(key string) int              { return 0 }
+func (m *mockConfig) GetBool(key string) bool            { return false }
+func (m *mockConfig) GetStringSlice(key string) []string { return nil }
+func (m *mockConfig) Get(key string) interface{}         { return nil }
+func (m *mockConfig) Set(key string, value interface{})  {}
+func (m *mockConfig) GetKeys() []string                   { return []string{} }
 
 // Verify mockConfig implements Config
 var _ Config = (*mockConfig)(nil)
@@ -677,3 +677,200 @@ func (t *trackingPlugin) Shutdown(ctx context.Context) error {
 
 // Verify trackingPlugin implements DomainPlugin
 var _ DomainPlugin = (*trackingPlugin)(nil)
+
+// =============================================================================
+// Pausable Mock Plugin
+// =============================================================================
+
+type pausableMockPlugin struct {
+	*mockPlugin
+	paused      bool
+	pauseError  error
+	resumeError error
+	mu          sync.Mutex
+}
+
+func newPausableMockPlugin(name string) *pausableMockPlugin {
+	return &pausableMockPlugin{
+		mockPlugin: newMockPlugin(name),
+	}
+}
+
+func (p *pausableMockPlugin) Pause(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.pauseError != nil {
+		return p.pauseError
+	}
+	p.paused = true
+	return nil
+}
+
+func (p *pausableMockPlugin) Resume(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.resumeError != nil {
+		return p.resumeError
+	}
+	p.paused = false
+	return nil
+}
+
+func (p *pausableMockPlugin) IsPaused() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.paused
+}
+
+// Verify pausableMockPlugin implements PausablePlugin
+var _ PausablePlugin = (*pausableMockPlugin)(nil)
+
+// =============================================================================
+// Pause/Resume Tests
+// =============================================================================
+
+func TestRegistry_Pause(t *testing.T) {
+	t.Run("pause pausable plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0")
+		plugin := newPausableMockPlugin("pausable")
+		require.NoError(t, registry.Register(plugin))
+
+		ctx := context.Background()
+		services := newMockServiceRegistry()
+		require.NoError(t, registry.InitializeAll(ctx, services))
+
+		// Initially running
+		state, ok := registry.GetState("pausable")
+		require.True(t, ok)
+		assert.Equal(t, StateRunning, state)
+
+		// Pause
+		err := registry.Pause(ctx, "pausable")
+		require.NoError(t, err)
+
+		state, _ = registry.GetState("pausable")
+		assert.Equal(t, StatePaused, state)
+		assert.True(t, plugin.IsPaused())
+	})
+
+	t.Run("pause non-existent plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0")
+		ctx := context.Background()
+
+		err := registry.Pause(ctx, "nonexistent")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("pause non-pausable plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0")
+		plugin := newMockPlugin("regular")
+		require.NoError(t, registry.Register(plugin))
+
+		ctx := context.Background()
+		services := newMockServiceRegistry()
+		require.NoError(t, registry.InitializeAll(ctx, services))
+
+		err := registry.Pause(ctx, "regular")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "does not support pause/resume")
+	})
+
+	t.Run("pause already paused plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0")
+		plugin := newPausableMockPlugin("pausable")
+		require.NoError(t, registry.Register(plugin))
+
+		ctx := context.Background()
+		services := newMockServiceRegistry()
+		require.NoError(t, registry.InitializeAll(ctx, services))
+
+		require.NoError(t, registry.Pause(ctx, "pausable"))
+		err := registry.Pause(ctx, "pausable")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not running")
+	})
+}
+
+func TestRegistry_Resume(t *testing.T) {
+	t.Run("resume paused plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0")
+		plugin := newPausableMockPlugin("pausable")
+		require.NoError(t, registry.Register(plugin))
+
+		ctx := context.Background()
+		services := newMockServiceRegistry()
+		require.NoError(t, registry.InitializeAll(ctx, services))
+		require.NoError(t, registry.Pause(ctx, "pausable"))
+
+		err := registry.Resume(ctx, "pausable")
+		require.NoError(t, err)
+
+		state, _ := registry.GetState("pausable")
+		assert.Equal(t, StateRunning, state)
+		assert.False(t, plugin.IsPaused())
+	})
+
+	t.Run("resume non-paused plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0")
+		plugin := newPausableMockPlugin("pausable")
+		require.NoError(t, registry.Register(plugin))
+
+		ctx := context.Background()
+		services := newMockServiceRegistry()
+		require.NoError(t, registry.InitializeAll(ctx, services))
+
+		err := registry.Resume(ctx, "pausable")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not paused")
+	})
+}
+
+func TestRegistry_IsPausable(t *testing.T) {
+	registry := NewRegistry("1.0.0")
+
+	pausable := newPausableMockPlugin("pausable")
+	regular := newMockPlugin("regular")
+
+	require.NoError(t, registry.Register(pausable))
+	require.NoError(t, registry.Register(regular))
+
+	assert.True(t, registry.IsPausable("pausable"))
+	assert.False(t, registry.IsPausable("regular"))
+	assert.False(t, registry.IsPausable("nonexistent"))
+}
+
+func TestRegistry_GetState(t *testing.T) {
+	registry := NewRegistry("1.0.0")
+	plugin := newMockPlugin("test")
+	require.NoError(t, registry.Register(plugin))
+
+	// Initially stopped
+	state, ok := registry.GetState("test")
+	assert.True(t, ok)
+	assert.Equal(t, StateStopped, state)
+
+	// After init, running
+	ctx := context.Background()
+	services := newMockServiceRegistry()
+	require.NoError(t, registry.InitializeAll(ctx, services))
+
+	state, ok = registry.GetState("test")
+	assert.True(t, ok)
+	assert.Equal(t, StateRunning, state)
+
+	// Non-existent
+	_, ok = registry.GetState("nonexistent")
+	assert.False(t, ok)
+}
+
+func TestRegistry_GetAllStates(t *testing.T) {
+	registry := NewRegistry("1.0.0")
+	require.NoError(t, registry.Register(newMockPlugin("plugin1")))
+	require.NoError(t, registry.Register(newMockPlugin("plugin2")))
+
+	states := registry.GetAllStates()
+	assert.Len(t, states, 2)
+	assert.Equal(t, StateStopped, states["plugin1"])
+	assert.Equal(t, StateStopped, states["plugin2"])
+}

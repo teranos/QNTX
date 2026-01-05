@@ -81,7 +81,7 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 			Subjects:   []string{item.GetSubject()},
 			Predicates: []string{item.GetPredicate()}, // Predicate is the verb/relationship
 			Contexts:   []string{item.GetObject()},    // Context holds the value/object
-			Actors:     []string{actor},                // Self-certifying: ASID vouches for itself
+			Actors:     []string{actor},               // Self-certifying: ASID vouches for itself
 			Timestamp:  time.Now(),
 			Source:     bp.source,
 			Attributes: make(map[string]interface{}),
