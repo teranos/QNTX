@@ -80,6 +80,10 @@ func SetDefaults(v *viper.Viper) {
 		"~/.qntx/plugins", // User-level plugins
 		"./plugins",       // Project-level plugins
 	})
+	v.SetDefault("plugin.websocket.keepalive.enabled", true)
+	v.SetDefault("plugin.websocket.keepalive.ping_interval_secs", 30)
+	v.SetDefault("plugin.websocket.keepalive.pong_timeout_secs", 60)
+	v.SetDefault("plugin.websocket.keepalive.reconnect_attempts", 3)
 }
 
 // BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables
