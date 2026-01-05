@@ -32,7 +32,7 @@ import { uiState } from './ui-state.ts';
 import { debugLog } from './debug.ts';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'plugins';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'plugins' | 'scraper';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -42,6 +42,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'prose') return Prose;
     if (cmd === 'go') return 'Go';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
+    if (cmd === 'scraper') return '🕷️'; // Spider emoji for web scraping
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -71,11 +72,11 @@ function initializeSymbolPalette(): void {
         // Tooltips now handled purely via CSS ::after pseudo-element
 
         // Add keyboard navigation with arrow keys
-        cell.addEventListener('keydown', (e: KeyboardEvent) => {
-            const target = e.target as HTMLElement;
+        cell.addEventListener('keydown', (e: Event) => {
+            const keyEvent = e as KeyboardEvent;
             let nextElement: Element | null = null;
 
-            switch(e.key) {
+            switch(keyEvent.key) {
                 case 'ArrowRight':
                 case 'ArrowDown':
                     nextElement = cmdCells[index + 1] || cmdCells[0]; // Wrap to first
@@ -212,6 +213,10 @@ function handleSymbolClick(e: Event): void {
             // Plugins - show installed domain plugins
             showPluginPanel();
             break;
+        case 'scraper':
+            // Web Scraper - show scraping panel
+            showWebscraperPanel();
+            break;
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -275,6 +280,14 @@ async function showGoEditor(): Promise<void> {
 async function showPluginPanel(): Promise<void> {
     const { togglePluginPanel } = await import('./plugin-panel.js');
     togglePluginPanel();
+}
+
+/**
+ * Show webscraper panel - UI for web scraping operations
+ */
+async function showWebscraperPanel(): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.toggle();
 }
 
 /**
