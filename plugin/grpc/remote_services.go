@@ -3,9 +3,11 @@ package grpc
 import (
 	"database/sql"
 	"encoding/json"
-	"strconv"
+	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/spf13/viper"
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
@@ -58,10 +60,7 @@ func (r *RemoteServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 
 // Config returns plugin-specific configuration.
 func (r *RemoteServiceRegistry) Config(domain string) plugin.Config {
-	return &remoteConfig{
-		domain: domain,
-		config: r.config,
-	}
+	return newRemoteConfig(domain, r.config)
 }
 
 // ATSStore returns a gRPC client for ATSStore operations.
@@ -92,57 +91,118 @@ func (r *RemoteServiceRegistry) Queue() plugin.QueueService {
 	return r.queueClient
 }
 
-// remoteConfig provides configuration for remote plugins.
+// remoteConfig provides configuration for remote plugins using viper for parsing.
 type remoteConfig struct {
 	domain string
-	config map[string]string
+	viper  *viper.Viper
+}
+
+// newRemoteConfig creates a new remoteConfig with viper backing
+func newRemoteConfig(domain string, config map[string]string) *remoteConfig {
+	v := viper.New()
+
+	// Load all config values into viper
+	for key, value := range config {
+		v.Set(key, value)
+	}
+
+	return &remoteConfig{
+		domain: domain,
+		viper:  v,
+	}
 }
 
 func (c *remoteConfig) GetString(key string) string {
-	return c.config[key]
+	return c.viper.GetString(key)
 }
 
 func (c *remoteConfig) GetInt(key string) int {
-	val, ok := c.config[key]
-	if !ok {
-		return 0
-	}
-	// Try to parse as int
-	if intVal, err := strconv.Atoi(val); err == nil {
-		return intVal
-	}
-	// Try to parse as float and convert
-	if floatVal, err := strconv.ParseFloat(val, 64); err == nil {
-		return int(floatVal)
-	}
-	return 0
+	return c.viper.GetInt(key)
 }
 
 func (c *remoteConfig) GetBool(key string) bool {
-	val := c.config[key]
-	return val == "true" || val == "1"
+	// First try viper's native bool parsing
+	// Viper accepts: 1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False
+	if val := c.viper.Get(key); val != nil {
+		// Check if it's already a bool
+		if b, ok := val.(bool); ok {
+			return b
+		}
+
+		// If it's a string, check for additional permissive values
+		if s, ok := val.(string); ok {
+			lower := strings.ToLower(s)
+			// Additional permissive values
+			if lower == "yes" || lower == "y" || lower == "on" {
+				return true
+			}
+			if lower == "no" || lower == "n" || lower == "off" {
+				return false
+			}
+		}
+	}
+
+	// Fall back to viper's GetBool for standard parsing
+	return c.viper.GetBool(key)
 }
 
 func (c *remoteConfig) GetStringSlice(key string) []string {
-	val, ok := c.config[key]
-	if !ok {
+	val := c.viper.Get(key)
+	if val == nil {
 		return nil
 	}
-	// Try to parse as JSON array
-	var slice []string
-	if err := json.Unmarshal([]byte(val), &slice); err == nil {
+
+	// If it's already a slice, return it
+	if slice, ok := val.([]string); ok {
 		return slice
 	}
-	// If not JSON, treat as comma-separated
-	return strings.Split(val, ",")
+
+	// If it's an interface slice, convert to string slice
+	if slice, ok := val.([]interface{}); ok {
+		result := make([]string, len(slice))
+		for i, v := range slice {
+			result[i] = fmt.Sprintf("%v", v)
+		}
+		return result
+	}
+
+	// If it's a string, check if it's JSON array or CSV
+	if str, ok := val.(string); ok {
+		if str == "" {
+			return nil
+		}
+
+		// Try parsing as JSON array first
+		if strings.HasPrefix(str, "[") {
+			var slice []string
+			if err := json.Unmarshal([]byte(str), &slice); err == nil {
+				return slice
+			}
+		}
+
+		// Otherwise split by comma
+		parts := strings.Split(str, ",")
+		// Trim spaces from each part
+		for i, part := range parts {
+			parts[i] = strings.TrimSpace(part)
+		}
+		return parts
+	}
+
+	return nil
 }
 
 func (c *remoteConfig) Get(key string) interface{} {
-	return c.config[key]
+	return c.viper.Get(key)
 }
 
 func (c *remoteConfig) Set(key string, value interface{}) {
-	if s, ok := value.(string); ok {
-		c.config[key] = s
-	}
+	c.viper.Set(key, value)
+}
+
+// GetKeys returns all available configuration keys
+func (c *remoteConfig) GetKeys() []string {
+	keys := c.viper.AllKeys()
+	sort.Strings(keys)
+	return keys
 }
