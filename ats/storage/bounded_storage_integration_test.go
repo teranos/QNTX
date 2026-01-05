@@ -6,10 +6,10 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/ats/storage/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/storage/testutil"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestBoundedStorage_16PerActorContext verifies that only 16 attestations

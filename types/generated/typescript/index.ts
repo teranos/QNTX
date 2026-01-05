@@ -78,6 +78,8 @@ export type {
   ListScheduledJobsResponse,
   LogEntry,
   ParsedATSCode,
+  PluginHealthMessage,
+  PluginInfo,
   ProgressMessage,
   ProseEntry,
   PulseExecutionCompletedMessage,

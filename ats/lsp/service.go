@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/teranos/QNTX/ats/parser"
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // Service provides language intelligence for ATS queries

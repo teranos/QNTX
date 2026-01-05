@@ -110,26 +110,26 @@ type UsageUpdateMessage struct {
 
 // JobUpdateMessage represents async IX job update
 type JobUpdateMessage struct {
-	Type     string                 `json:"type"`                      // "job_update"
-	Job      *async.Job             `json:"job" tstype:"Job | null"`   // Full job details (from pulse/async)
-	Metadata map[string]interface{} `json:"metadata"`                  // Additional metadata
+	Type     string                 `json:"type"`                    // "job_update"
+	Job      *async.Job             `json:"job" tstype:"Job | null"` // Full job details (from pulse/async)
+	Metadata map[string]interface{} `json:"metadata"`                // Additional metadata
 }
 
 // DaemonStatusMessage represents daemon status update
 type DaemonStatusMessage struct {
-	Type                string  `json:"type"`                  // "daemon_status"
-	Running             bool    `json:"running"`               // Is daemon running
-	ActiveJobs          int     `json:"active_jobs"`           // Number of active jobs
-	QueuedJobs          int     `json:"queued_jobs"`           // Number of queued jobs
-	LoadPercent         float64 `json:"load_percent"`          // CPU/processing load (0-100)
-	BudgetDaily         float64 `json:"budget_daily"`          // Daily budget spent
-	BudgetWeekly        float64 `json:"budget_weekly"`         // Weekly budget spent
-	BudgetMonthly       float64 `json:"budget_monthly"`        // Monthly budget spent
-	BudgetDailyLimit    float64 `json:"budget_daily_limit"`    // Daily budget limit (config)
-	BudgetWeeklyLimit   float64 `json:"budget_weekly_limit"`   // Weekly budget limit (config)
-	BudgetMonthlyLimit  float64 `json:"budget_monthly_limit"`  // Monthly budget limit (config)
-	ServerState         string  `json:"server_state"`          // GRACE Phase 4: "running", "draining", "stopped"
-	Timestamp           int64   `json:"timestamp"`             // Unix timestamp
+	Type               string  `json:"type"`                 // "daemon_status"
+	Running            bool    `json:"running"`              // Is daemon running
+	ActiveJobs         int     `json:"active_jobs"`          // Number of active jobs
+	QueuedJobs         int     `json:"queued_jobs"`          // Number of queued jobs
+	LoadPercent        float64 `json:"load_percent"`         // CPU/processing load (0-100)
+	BudgetDaily        float64 `json:"budget_daily"`         // Daily budget spent
+	BudgetWeekly       float64 `json:"budget_weekly"`        // Weekly budget spent
+	BudgetMonthly      float64 `json:"budget_monthly"`       // Monthly budget spent
+	BudgetDailyLimit   float64 `json:"budget_daily_limit"`   // Daily budget limit (config)
+	BudgetWeeklyLimit  float64 `json:"budget_weekly_limit"`  // Weekly budget limit (config)
+	BudgetMonthlyLimit float64 `json:"budget_monthly_limit"` // Monthly budget limit (config)
+	ServerState        string  `json:"server_state"`         // GRACE Phase 4: "running", "draining", "stopped"
+	Timestamp          int64   `json:"timestamp"`            // Unix timestamp
 }
 
 // LLMStreamMessage represents streaming LLM output
@@ -195,4 +195,15 @@ type StorageWarningMessage struct {
 	FillPercent   float64 `json:"fill_percent"`    // Percentage full (0.0-1.0)
 	TimeUntilFull string  `json:"time_until_full"` // Human-readable time until hitting limit
 	Timestamp     int64   `json:"timestamp"`       // Unix timestamp
+}
+
+// PluginHealthMessage represents a plugin health status update
+// Broadcast when plugin state changes (pause/resume) or health check fails
+type PluginHealthMessage struct {
+	Type      string `json:"type"`       // "plugin_health"
+	Name      string `json:"name"`       // Plugin name
+	Healthy   bool   `json:"healthy"`    // Current health status
+	State     string `json:"state"`      // "running", "paused", "stopped"
+	Message   string `json:"message"`    // Status message
+	Timestamp int64  `json:"timestamp"`  // Unix timestamp
 }

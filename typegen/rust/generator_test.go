@@ -343,11 +343,11 @@ func TestToRustIdent(t *testing.T) {
 		expected string
 	}{
 		{"normal", "normal"},
-		{"type", "r#type"},     // Rust keyword
-		{"match", "r#match"},   // Rust keyword
-		{"async", "r#async"},   // Rust keyword
-		{"as", "r#as"},         // Rust keyword
-		{"self", "r#self"},     // Rust keyword
+		{"type", "r#type"},   // Rust keyword
+		{"match", "r#match"}, // Rust keyword
+		{"async", "r#async"}, // Rust keyword
+		{"as", "r#as"},       // Rust keyword
+		{"self", "r#self"},   // Rust keyword
 		{"not_keyword", "not_keyword"},
 	}
 
@@ -367,8 +367,8 @@ func TestToRustConstIdent(t *testing.T) {
 		expected string
 	}{
 		{"PascalCase", "PASCAL_CASE"},
-		{"as", "r#AS"},         // Keyword in snake_case form
-		{"type", "r#TYPE"},     // Keyword
+		{"as", "r#AS"},     // Keyword in snake_case form
+		{"type", "r#TYPE"}, // Keyword
 		{"NotKeyword", "NOT_KEYWORD"},
 	}
 
