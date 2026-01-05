@@ -1,0 +1,28 @@
+[package]
+name = "qntx-fuzzy"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance fuzzy matching library for QNTX (CGO)"
+license = "MIT"
+authors = ["QNTX Contributors"]
+
+[dependencies]
+# String similarity algorithms
+strsim = "0.11"           # Levenshtein, Jaro-Winkler, etc.
+
+# Utilities
+parking_lot = "0.12"      # Fast RwLock for thread safety
+ahash = "0.8"             # Fast hashing for vocabulary change detection
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[lib]
+name = "qntx_fuzzy"
+path = "src/lib.rs"
+# cdylib for shared library (.so/.dylib/.dll)
+# staticlib for static library (.a/.lib)
+# rlib for Rust library (tests)
+crate-type = ["cdylib", "staticlib", "rlib"]
