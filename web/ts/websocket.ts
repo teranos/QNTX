@@ -243,7 +243,7 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  */
 function updateConnectionStatus(connected: boolean): void {
     const statusText = document.getElementById('status-text') as HTMLElement | null;
-    const logPanel = document.getElementById('log-panel') as HTMLElement | null;
+    const systemDrawer = document.getElementById('system-drawer') as HTMLElement | null;
 
     if (statusText) {
         statusText.textContent = connected ? 'Connected' : 'Disconnected - Reconnecting...';

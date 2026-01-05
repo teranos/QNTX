@@ -1,7 +1,8 @@
-// Log panel for system logs
+// System drawer for logs, progress, and system output
 
 import { MAX_LOGS, state } from './config.ts';
 import { sendMessage } from './websocket.ts';
+import { CSS } from './css-classes.ts';
 import type { LogMessage, LogBatchData } from '../types/core';
 
 // Make this a module
@@ -134,7 +135,7 @@ function showToast(msg: LogMessage): void {
 
     // Auto-remove after 5 seconds
     setTimeout(() => {
-        toast.style.animation = 'fadeOut 0.3s ease-out';
+        toast.classList.add('u-animate-fadeout');
         setTimeout(() => {
             if (container.contains(toast)) {
                 container.removeChild(toast);
@@ -158,7 +159,7 @@ function updateDownloadButton(): void {
 }
 
 // Initialize log panel event listeners
-export function initLogPanel(): void {
+export function initSystemDrawer(): void {
     // Verbosity selector
     const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
     if (verbositySelect) {
@@ -185,12 +186,17 @@ export function initLogPanel(): void {
             // Don't toggle if clicking on buttons
             if (target.tagName === 'BUTTON' || target.tagName === 'SELECT') return;
 
-            const panel = document.getElementById('log-panel') as HTMLElement | null;
+            const panel = document.getElementById('system-drawer') as HTMLElement | null;
             const toggleBtn = document.getElementById('toggle-logs') as HTMLElement | null;
 
             if (panel && toggleBtn) {
-                panel.classList.toggle('collapsed');
-                toggleBtn.textContent = panel.classList.contains('collapsed') ? '▲' : '▼';
+                const isCollapsed = panel.classList.contains(CSS.STATE.COLLAPSED);
+                if (isCollapsed) {
+                    panel.classList.remove(CSS.STATE.COLLAPSED);
+                } else {
+                    panel.classList.add(CSS.STATE.COLLAPSED);
+                }
+                toggleBtn.textContent = panel.classList.contains(CSS.STATE.COLLAPSED) ? '▲' : '▼';
             }
         });
     }
