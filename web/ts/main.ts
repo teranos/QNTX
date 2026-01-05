@@ -32,7 +32,7 @@ import './prose/panel.ts';
 import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
-import type { MessageHandlers } from '../types/websocket';
+import type { MessageHandlers, VersionMessage } from '../types/websocket';
 
 // Extend window interface for global functions
 declare global {
@@ -44,21 +44,15 @@ declare global {
     }
 }
 
-// Version info interface
-interface VersionInfo {
-    version: string;
-    commit: string;
-    build_time?: string;
-}
-
 // TIMING: Track when main.js module starts executing
-console.log('[TIMING] main.js module start:', Date.now() - performance.timing.navigationStart, 'ms');
+const navStart = performance.timeOrigin || Date.now();
+console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
 
 // Handle version info from server
-function handleVersion(data: VersionInfo): void {
+function handleVersion(data: VersionMessage): void {
     // Cache build info for error toasts
     import('./toast').then(({ cacheBuildInfo }) => {
         cacheBuildInfo(data);
@@ -109,7 +103,7 @@ function handleVersion(data: VersionInfo): void {
 // Initialize the application
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
-    console.log('[TIMING] init() called:', Date.now() - performance.timing.navigationStart, 'ms');
+    console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Initialize console reporter (dev mode only)
@@ -140,26 +134,29 @@ async function init(): Promise<void> {
     }
 
     // Set up WebSocket with message handlers
-    console.log('[TIMING] Calling connectWebSocket():', Date.now() - performance.timing.navigationStart, 'ms');
+    console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
+    // Note: Some handlers use internal types that differ from websocket message types.
+    // Using 'unknown' intermediate cast where types don't overlap sufficiently.
+    // TODO: Align handler signatures with MessageHandlers interface.
     const handlers: MessageHandlers = {
-        'version': handleVersion as any,
-        'logs': handleLogBatch as any,
-        'import_progress': handleImportProgress as any,
-        'import_stats': handleImportStats as any,
-        'import_complete': handleImportComplete as any,
-        'usage_update': handleUsageUpdate as any,
-        'parse_response': handleParseResponse as any,
-        'daemon_status': handleDaemonStatus as any,
-        'job_update': handleJobUpdate as any,
-        'pulse_execution_started': handlePulseExecutionStarted as any,
-        'pulse_execution_failed': handlePulseExecutionFailed as any,
-        'pulse_execution_completed': handlePulseExecutionCompleted as any,
-        'pulse_execution_log_stream': handlePulseExecutionLogStream as any,
-        'storage_warning': handleStorageWarning as any,
-        'storage_eviction': handleStorageEviction as any,
-        '_default': updateGraph as any  // Default handler for graph data
+        'version': handleVersion,
+        'logs': handleLogBatch as unknown as MessageHandlers['logs'],
+        'import_progress': handleImportProgress as MessageHandlers['import_progress'],
+        'import_stats': handleImportStats as MessageHandlers['import_stats'],
+        'import_complete': handleImportComplete as MessageHandlers['import_complete'],
+        'usage_update': handleUsageUpdate as unknown as MessageHandlers['usage_update'],
+        'parse_response': handleParseResponse as MessageHandlers['parse_response'],
+        'daemon_status': handleDaemonStatus as MessageHandlers['daemon_status'],
+        'job_update': handleJobUpdate as MessageHandlers['job_update'],
+        'pulse_execution_started': handlePulseExecutionStarted as MessageHandlers['pulse_execution_started'],
+        'pulse_execution_failed': handlePulseExecutionFailed as MessageHandlers['pulse_execution_failed'],
+        'pulse_execution_completed': handlePulseExecutionCompleted as MessageHandlers['pulse_execution_completed'],
+        'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
+        'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
+        'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
+        '_default': updateGraph as unknown as MessageHandlers['_default']
     };
 
     connectWebSocket(handlers);
