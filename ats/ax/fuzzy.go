@@ -36,6 +36,11 @@ func (fm *FuzzyMatcher) Backend() MatcherBackend {
 	return MatcherBackendGo
 }
 
+// SetLogger is a no-op for the Go matcher (no logging implemented)
+func (fm *FuzzyMatcher) SetLogger(logger interface{}) {
+	// Go implementation doesn't use logging yet
+}
+
 // FindMatches finds predicates that match the query using fuzzy logic
 func (fm *FuzzyMatcher) FindMatches(queryPredicate string, allPredicates []string) []string {
 	if strings.TrimSpace(queryPredicate) == "" {

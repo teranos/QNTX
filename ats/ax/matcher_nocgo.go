@@ -27,3 +27,13 @@ func (m *CGOMatcher) FindMatches(queryPredicate string, allPredicates []string) 
 func (m *CGOMatcher) FindContextMatches(queryContext string, allContexts []string) []string {
 	return nil
 }
+
+// Backend returns the matcher backend type (stub implementation)
+func (m *CGOMatcher) Backend() MatcherBackend {
+	return MatcherBackendGo // Stub returns Go since it's not actually available
+}
+
+// SetLogger is a no-op for the stub
+func (m *CGOMatcher) SetLogger(logger interface{}) {
+	// No-op for stub
+}
