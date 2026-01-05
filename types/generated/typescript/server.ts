@@ -555,6 +555,21 @@ export interface StorageWarningMessage {
   timestamp: number;
 }
 
+export interface SystemCapabilitiesMessage {
+  /**
+   * "system_capabilities"
+   */
+  type: string;
+  /**
+   * "rust" or "go" - which fuzzy matching implementation is active
+   */
+  fuzzy_backend: string;
+  /**
+   * true if using Rust (optimized), false if Go fallback
+   */
+  fuzzy_optimized: boolean;
+}
+
 export interface TaskInfo {
   task_id: string;
   log_count: number;

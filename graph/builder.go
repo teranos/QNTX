@@ -30,3 +30,8 @@ func NewAxGraphBuilder(db *sql.DB, verbosity int, logger *zap.SugaredLogger) (*A
 		logger:    logger.Named("graph.builder"),
 	}, nil
 }
+
+// FuzzyBackend returns the current fuzzy matching backend (rust or go)
+func (b *AxGraphBuilder) FuzzyBackend() ax.MatcherBackend {
+	return b.executor.FuzzyBackend()
+}
