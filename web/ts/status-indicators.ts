@@ -154,9 +154,12 @@ class StatusIndicatorManager {
 
         const text = indicator.querySelector('.status-text') as HTMLElement;
 
+        // Preserve clickable class if it was set
+        const wasClickable = indicator.classList.contains('clickable');
+
         // Remove all state classes
         indicator.className = 'status-indicator';
-        if (indicator.classList.contains('clickable')) {
+        if (wasClickable) {
             indicator.classList.add('clickable');
         }
 
