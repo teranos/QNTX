@@ -4,29 +4,31 @@ import grpc
 
 from . import atsstore_pb2 as atsstore__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = "1.76.0"
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
 try:
     from grpc._utilities import first_version_is_lower
-    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+
+    _version_not_supported = first_version_is_lower(
+        GRPC_VERSION, GRPC_GENERATED_VERSION
+    )
 except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
     raise RuntimeError(
-        f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in atsstore_pb2_grpc.py depends on'
-        + f' grpcio>={GRPC_GENERATED_VERSION}.'
-        + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
-        + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
+        f"The grpc package installed is at version {GRPC_VERSION},"
+        + " but the generated code in atsstore_pb2_grpc.py depends on"
+        + f" grpcio>={GRPC_GENERATED_VERSION}."
+        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
+        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
     )
 
 
 class ATSStoreServiceStub(object):
-    """ATSStoreService provides attestation storage operations for external plugins
-    """
+    """ATSStoreService provides attestation storage operations for external plugins"""
 
     def __init__(self, channel):
         """Constructor.
@@ -35,109 +37,112 @@ class ATSStoreServiceStub(object):
             channel: A grpc.Channel.
         """
         self.CreateAttestation = channel.unary_unary(
-                '/protocol.ATSStoreService/CreateAttestation',
-                request_serializer=atsstore__pb2.CreateAttestationRequest.SerializeToString,
-                response_deserializer=atsstore__pb2.CreateAttestationResponse.FromString,
-                _registered_method=True)
+            "/protocol.ATSStoreService/CreateAttestation",
+            request_serializer=atsstore__pb2.CreateAttestationRequest.SerializeToString,
+            response_deserializer=atsstore__pb2.CreateAttestationResponse.FromString,
+            _registered_method=True,
+        )
         self.AttestationExists = channel.unary_unary(
-                '/protocol.ATSStoreService/AttestationExists',
-                request_serializer=atsstore__pb2.AttestationExistsRequest.SerializeToString,
-                response_deserializer=atsstore__pb2.AttestationExistsResponse.FromString,
-                _registered_method=True)
+            "/protocol.ATSStoreService/AttestationExists",
+            request_serializer=atsstore__pb2.AttestationExistsRequest.SerializeToString,
+            response_deserializer=atsstore__pb2.AttestationExistsResponse.FromString,
+            _registered_method=True,
+        )
         self.GenerateAndCreateAttestation = channel.unary_unary(
-                '/protocol.ATSStoreService/GenerateAndCreateAttestation',
-                request_serializer=atsstore__pb2.GenerateAttestationRequest.SerializeToString,
-                response_deserializer=atsstore__pb2.GenerateAttestationResponse.FromString,
-                _registered_method=True)
+            "/protocol.ATSStoreService/GenerateAndCreateAttestation",
+            request_serializer=atsstore__pb2.GenerateAttestationRequest.SerializeToString,
+            response_deserializer=atsstore__pb2.GenerateAttestationResponse.FromString,
+            _registered_method=True,
+        )
         self.GetAttestations = channel.unary_unary(
-                '/protocol.ATSStoreService/GetAttestations',
-                request_serializer=atsstore__pb2.GetAttestationsRequest.SerializeToString,
-                response_deserializer=atsstore__pb2.GetAttestationsResponse.FromString,
-                _registered_method=True)
+            "/protocol.ATSStoreService/GetAttestations",
+            request_serializer=atsstore__pb2.GetAttestationsRequest.SerializeToString,
+            response_deserializer=atsstore__pb2.GetAttestationsResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class ATSStoreServiceServicer(object):
-    """ATSStoreService provides attestation storage operations for external plugins
-    """
+    """ATSStoreService provides attestation storage operations for external plugins"""
 
     def CreateAttestation(self, request, context):
-        """CreateAttestation creates a new attestation
-        """
+        """CreateAttestation creates a new attestation"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def AttestationExists(self, request, context):
-        """AttestationExists checks if an attestation exists by ID
-        """
+        """AttestationExists checks if an attestation exists by ID"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def GenerateAndCreateAttestation(self, request, context):
-        """GenerateAndCreateAttestation generates an attestation ID and creates it
-        """
+        """GenerateAndCreateAttestation generates an attestation ID and creates it"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def GetAttestations(self, request, context):
-        """GetAttestations queries attestations with filters
-        """
+        """GetAttestations queries attestations with filters"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_ATSStoreServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'CreateAttestation': grpc.unary_unary_rpc_method_handler(
-                    servicer.CreateAttestation,
-                    request_deserializer=atsstore__pb2.CreateAttestationRequest.FromString,
-                    response_serializer=atsstore__pb2.CreateAttestationResponse.SerializeToString,
-            ),
-            'AttestationExists': grpc.unary_unary_rpc_method_handler(
-                    servicer.AttestationExists,
-                    request_deserializer=atsstore__pb2.AttestationExistsRequest.FromString,
-                    response_serializer=atsstore__pb2.AttestationExistsResponse.SerializeToString,
-            ),
-            'GenerateAndCreateAttestation': grpc.unary_unary_rpc_method_handler(
-                    servicer.GenerateAndCreateAttestation,
-                    request_deserializer=atsstore__pb2.GenerateAttestationRequest.FromString,
-                    response_serializer=atsstore__pb2.GenerateAttestationResponse.SerializeToString,
-            ),
-            'GetAttestations': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetAttestations,
-                    request_deserializer=atsstore__pb2.GetAttestationsRequest.FromString,
-                    response_serializer=atsstore__pb2.GetAttestationsResponse.SerializeToString,
-            ),
+        "CreateAttestation": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateAttestation,
+            request_deserializer=atsstore__pb2.CreateAttestationRequest.FromString,
+            response_serializer=atsstore__pb2.CreateAttestationResponse.SerializeToString,
+        ),
+        "AttestationExists": grpc.unary_unary_rpc_method_handler(
+            servicer.AttestationExists,
+            request_deserializer=atsstore__pb2.AttestationExistsRequest.FromString,
+            response_serializer=atsstore__pb2.AttestationExistsResponse.SerializeToString,
+        ),
+        "GenerateAndCreateAttestation": grpc.unary_unary_rpc_method_handler(
+            servicer.GenerateAndCreateAttestation,
+            request_deserializer=atsstore__pb2.GenerateAttestationRequest.FromString,
+            response_serializer=atsstore__pb2.GenerateAttestationResponse.SerializeToString,
+        ),
+        "GetAttestations": grpc.unary_unary_rpc_method_handler(
+            servicer.GetAttestations,
+            request_deserializer=atsstore__pb2.GetAttestationsRequest.FromString,
+            response_serializer=atsstore__pb2.GetAttestationsResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'protocol.ATSStoreService', rpc_method_handlers)
+        "protocol.ATSStoreService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('protocol.ATSStoreService', rpc_method_handlers)
+    server.add_registered_method_handlers(
+        "protocol.ATSStoreService", rpc_method_handlers
+    )
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class ATSStoreService(object):
-    """ATSStoreService provides attestation storage operations for external plugins
-    """
+    """ATSStoreService provides attestation storage operations for external plugins"""
 
     @staticmethod
-    def CreateAttestation(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def CreateAttestation(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.ATSStoreService/CreateAttestation',
+            "/protocol.ATSStoreService/CreateAttestation",
             atsstore__pb2.CreateAttestationRequest.SerializeToString,
             atsstore__pb2.CreateAttestationResponse.FromString,
             options,
@@ -148,23 +153,26 @@ class ATSStoreService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def AttestationExists(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def AttestationExists(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.ATSStoreService/AttestationExists',
+            "/protocol.ATSStoreService/AttestationExists",
             atsstore__pb2.AttestationExistsRequest.SerializeToString,
             atsstore__pb2.AttestationExistsResponse.FromString,
             options,
@@ -175,23 +183,26 @@ class ATSStoreService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def GenerateAndCreateAttestation(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def GenerateAndCreateAttestation(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.ATSStoreService/GenerateAndCreateAttestation',
+            "/protocol.ATSStoreService/GenerateAndCreateAttestation",
             atsstore__pb2.GenerateAttestationRequest.SerializeToString,
             atsstore__pb2.GenerateAttestationResponse.FromString,
             options,
@@ -202,23 +213,26 @@ class ATSStoreService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def GetAttestations(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def GetAttestations(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.ATSStoreService/GetAttestations',
+            "/protocol.ATSStoreService/GetAttestations",
             atsstore__pb2.GetAttestationsRequest.SerializeToString,
             atsstore__pb2.GetAttestationsResponse.FromString,
             options,
@@ -229,4 +243,5 @@ class ATSStoreService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )

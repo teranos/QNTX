@@ -21,7 +21,9 @@ from .atsstore import ATSStoreClient, AttestationCommand, AttestationFilter
 
 class SSRFError(ValueError):
     """Raised when a URL is blocked due to SSRF protection."""
+
     pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +263,9 @@ class WebScraper:
 
         # Robots.txt and rate limiting
         self.respect_robots = respect_robots
-        self.robots_checker = RobotsChecker(user_agent, timeout) if respect_robots else None
+        self.robots_checker = (
+            RobotsChecker(user_agent, timeout) if respect_robots else None
+        )
         self.rate_limiter = RateLimiter(rate_limit) if rate_limit > 0 else None
 
     def _check_robots(self, url: str) -> bool:
@@ -325,11 +329,15 @@ class WebScraper:
                     resolved = socket.gethostbyname(hostname)
                     ip = ipaddress.ip_address(resolved)
                     if ip.is_private or ip.is_loopback or ip.is_link_local:
-                        raise SSRFError(f"Hostname {hostname} resolves to blocked IP: {resolved}")
+                        raise SSRFError(
+                            f"Hostname {hostname} resolves to blocked IP: {resolved}"
+                        )
                 except socket.gaierror:
                     pass  # Can't resolve, let request handle it
 
-    def _fetch_with_size_limit(self, url: str, expected_content_types: list[str] | None = None) -> bytes:
+    def _fetch_with_size_limit(
+        self, url: str, expected_content_types: list[str] | None = None
+    ) -> bytes:
         """Fetch URL with size limit and optional content-type validation.
 
         Args:
@@ -355,7 +363,9 @@ class WebScraper:
         # Check content length header
         content_length = response.headers.get("Content-Length")
         if content_length and int(content_length) > self.max_response_size:
-            raise ValueError(f"Response too large: {content_length} bytes (max: {self.max_response_size})")
+            raise ValueError(
+                f"Response too large: {content_length} bytes (max: {self.max_response_size})"
+            )
 
         # Read with size limit
         content = b""
@@ -446,7 +456,9 @@ class WebScraper:
                     alt=img.get("alt", ""),
                     title=img.get("title", ""),
                     width=int(img["width"]) if img.get("width", "").isdigit() else None,
-                    height=int(img["height"]) if img.get("height", "").isdigit() else None,
+                    height=(
+                        int(img["height"]) if img.get("height", "").isdigit() else None
+                    ),
                 )
             )
         return images
@@ -708,7 +720,11 @@ class WebScraper:
             if not include_external and link.is_external:
                 continue
 
-            predicate = self.PREDICATE_EXTERNAL_LINK if link.is_external else self.PREDICATE_LINKS_TO
+            predicate = (
+                self.PREDICATE_EXTERNAL_LINK
+                if link.is_external
+                else self.PREDICATE_LINKS_TO
+            )
             attributes = {"source": "qntx-webscraper"}
             if link.anchor_text:
                 attributes["anchor_text"] = link.anchor_text
@@ -757,7 +773,13 @@ class WebScraper:
 
         try:
             content = self._fetch_with_size_limit(
-                url, expected_content_types=["application/rss", "application/atom", "application/xml", "text/xml"]
+                url,
+                expected_content_types=[
+                    "application/rss",
+                    "application/atom",
+                    "application/xml",
+                    "text/xml",
+                ],
             )
         except (requests.RequestException, ValueError) as e:
             return FeedResult(
@@ -814,7 +836,8 @@ class WebScraper:
                     link=item.findtext("link", ""),
                     description=item.findtext("description", ""),
                     published=item.findtext("pubDate", ""),
-                    author=item.findtext("author", "") or item.findtext("{http://purl.org/dc/elements/1.1/}creator", ""),
+                    author=item.findtext("author", "")
+                    or item.findtext("{http://purl.org/dc/elements/1.1/}creator", ""),
                     guid=item.findtext("guid", ""),
                     categories=categories,
                 )
@@ -856,7 +879,9 @@ class WebScraper:
             content_el = entry.find("atom:content", ns) or entry.find("content")
             published_el = entry.find("atom:published", ns) or entry.find("published")
             updated_el = entry.find("atom:updated", ns) or entry.find("updated")
-            author_el = entry.find("atom:author/atom:name", ns) or entry.find("author/name")
+            author_el = entry.find("atom:author/atom:name", ns) or entry.find(
+                "author/name"
+            )
             id_el = entry.find("atom:id", ns) or entry.find("id")
 
             categories = []
@@ -978,7 +1003,9 @@ class WebScraper:
         try:
             root = etree.fromstring(content)
         except etree.XMLSyntaxError as e:
-            return SitemapResult(url=url, urls=[], sitemaps=[], error=f"Invalid XML: {e}")
+            return SitemapResult(
+                url=url, urls=[], sitemaps=[], error=f"Invalid XML: {e}"
+            )
 
         # Handle namespace
         ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -998,9 +1025,15 @@ class WebScraper:
             if not loc:
                 continue
 
-            lastmod = url_el.findtext("sm:lastmod", "", ns) or url_el.findtext("lastmod", "")
-            changefreq = url_el.findtext("sm:changefreq", "", ns) or url_el.findtext("changefreq", "")
-            priority_str = url_el.findtext("sm:priority", "", ns) or url_el.findtext("priority", "")
+            lastmod = url_el.findtext("sm:lastmod", "", ns) or url_el.findtext(
+                "lastmod", ""
+            )
+            changefreq = url_el.findtext("sm:changefreq", "", ns) or url_el.findtext(
+                "changefreq", ""
+            )
+            priority_str = url_el.findtext("sm:priority", "", ns) or url_el.findtext(
+                "priority", ""
+            )
 
             try:
                 priority = float(priority_str) if priority_str else 0.5
@@ -1081,7 +1114,9 @@ class WebScraper:
                 att = self.ats_client.generate_and_create(cmd)
                 attestation_ids.append(att.id)
 
-        logger.info(f"Created {len(attestation_ids)} attestations from {len(results)} sitemaps")
+        logger.info(
+            f"Created {len(attestation_ids)} attestations from {len(results)} sitemaps"
+        )
         return results, attestation_ids
 
     # ==================== Crawling ====================
@@ -1103,7 +1138,9 @@ class WebScraper:
             # with our webscraper predicates
             filter = AttestationFilter(
                 subjects=[url],
-                predicates=[self.PREDICATE_HAS_TITLE],  # If we have a title, we crawled it
+                predicates=[
+                    self.PREDICATE_HAS_TITLE
+                ],  # If we have a title, we crawled it
                 limit=1,  # We only need to know if any exist
             )
             results = self.ats_client.get_attestations(filter)

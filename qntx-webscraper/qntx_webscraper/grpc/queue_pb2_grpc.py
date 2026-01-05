@@ -4,29 +4,31 @@ import grpc
 
 from . import queue_pb2 as queue__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = "1.76.0"
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
 try:
     from grpc._utilities import first_version_is_lower
-    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+
+    _version_not_supported = first_version_is_lower(
+        GRPC_VERSION, GRPC_GENERATED_VERSION
+    )
 except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
     raise RuntimeError(
-        f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in queue_pb2_grpc.py depends on'
-        + f' grpcio>={GRPC_GENERATED_VERSION}.'
-        + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
-        + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
+        f"The grpc package installed is at version {GRPC_VERSION},"
+        + " but the generated code in queue_pb2_grpc.py depends on"
+        + f" grpcio>={GRPC_GENERATED_VERSION}."
+        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
+        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
     )
 
 
 class QueueServiceStub(object):
-    """QueueService provides async job queue operations for external plugins
-    """
+    """QueueService provides async job queue operations for external plugins"""
 
     def __init__(self, channel):
         """Constructor.
@@ -35,109 +37,110 @@ class QueueServiceStub(object):
             channel: A grpc.Channel.
         """
         self.Enqueue = channel.unary_unary(
-                '/protocol.QueueService/Enqueue',
-                request_serializer=queue__pb2.EnqueueRequest.SerializeToString,
-                response_deserializer=queue__pb2.EnqueueResponse.FromString,
-                _registered_method=True)
+            "/protocol.QueueService/Enqueue",
+            request_serializer=queue__pb2.EnqueueRequest.SerializeToString,
+            response_deserializer=queue__pb2.EnqueueResponse.FromString,
+            _registered_method=True,
+        )
         self.GetJob = channel.unary_unary(
-                '/protocol.QueueService/GetJob',
-                request_serializer=queue__pb2.GetJobRequest.SerializeToString,
-                response_deserializer=queue__pb2.GetJobResponse.FromString,
-                _registered_method=True)
+            "/protocol.QueueService/GetJob",
+            request_serializer=queue__pb2.GetJobRequest.SerializeToString,
+            response_deserializer=queue__pb2.GetJobResponse.FromString,
+            _registered_method=True,
+        )
         self.UpdateJob = channel.unary_unary(
-                '/protocol.QueueService/UpdateJob',
-                request_serializer=queue__pb2.UpdateJobRequest.SerializeToString,
-                response_deserializer=queue__pb2.UpdateJobResponse.FromString,
-                _registered_method=True)
+            "/protocol.QueueService/UpdateJob",
+            request_serializer=queue__pb2.UpdateJobRequest.SerializeToString,
+            response_deserializer=queue__pb2.UpdateJobResponse.FromString,
+            _registered_method=True,
+        )
         self.ListJobs = channel.unary_unary(
-                '/protocol.QueueService/ListJobs',
-                request_serializer=queue__pb2.ListJobsRequest.SerializeToString,
-                response_deserializer=queue__pb2.ListJobsResponse.FromString,
-                _registered_method=True)
+            "/protocol.QueueService/ListJobs",
+            request_serializer=queue__pb2.ListJobsRequest.SerializeToString,
+            response_deserializer=queue__pb2.ListJobsResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class QueueServiceServicer(object):
-    """QueueService provides async job queue operations for external plugins
-    """
+    """QueueService provides async job queue operations for external plugins"""
 
     def Enqueue(self, request, context):
-        """Enqueue adds a new job to the queue
-        """
+        """Enqueue adds a new job to the queue"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def GetJob(self, request, context):
-        """GetJob retrieves a job by ID
-        """
+        """GetJob retrieves a job by ID"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def UpdateJob(self, request, context):
-        """UpdateJob updates a job's status and progress
-        """
+        """UpdateJob updates a job's status and progress"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def ListJobs(self, request, context):
-        """ListJobs lists jobs with optional status filter
-        """
+        """ListJobs lists jobs with optional status filter"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_QueueServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Enqueue': grpc.unary_unary_rpc_method_handler(
-                    servicer.Enqueue,
-                    request_deserializer=queue__pb2.EnqueueRequest.FromString,
-                    response_serializer=queue__pb2.EnqueueResponse.SerializeToString,
-            ),
-            'GetJob': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetJob,
-                    request_deserializer=queue__pb2.GetJobRequest.FromString,
-                    response_serializer=queue__pb2.GetJobResponse.SerializeToString,
-            ),
-            'UpdateJob': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateJob,
-                    request_deserializer=queue__pb2.UpdateJobRequest.FromString,
-                    response_serializer=queue__pb2.UpdateJobResponse.SerializeToString,
-            ),
-            'ListJobs': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListJobs,
-                    request_deserializer=queue__pb2.ListJobsRequest.FromString,
-                    response_serializer=queue__pb2.ListJobsResponse.SerializeToString,
-            ),
+        "Enqueue": grpc.unary_unary_rpc_method_handler(
+            servicer.Enqueue,
+            request_deserializer=queue__pb2.EnqueueRequest.FromString,
+            response_serializer=queue__pb2.EnqueueResponse.SerializeToString,
+        ),
+        "GetJob": grpc.unary_unary_rpc_method_handler(
+            servicer.GetJob,
+            request_deserializer=queue__pb2.GetJobRequest.FromString,
+            response_serializer=queue__pb2.GetJobResponse.SerializeToString,
+        ),
+        "UpdateJob": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateJob,
+            request_deserializer=queue__pb2.UpdateJobRequest.FromString,
+            response_serializer=queue__pb2.UpdateJobResponse.SerializeToString,
+        ),
+        "ListJobs": grpc.unary_unary_rpc_method_handler(
+            servicer.ListJobs,
+            request_deserializer=queue__pb2.ListJobsRequest.FromString,
+            response_serializer=queue__pb2.ListJobsResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'protocol.QueueService', rpc_method_handlers)
+        "protocol.QueueService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('protocol.QueueService', rpc_method_handlers)
+    server.add_registered_method_handlers("protocol.QueueService", rpc_method_handlers)
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class QueueService(object):
-    """QueueService provides async job queue operations for external plugins
-    """
+    """QueueService provides async job queue operations for external plugins"""
 
     @staticmethod
-    def Enqueue(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def Enqueue(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.QueueService/Enqueue',
+            "/protocol.QueueService/Enqueue",
             queue__pb2.EnqueueRequest.SerializeToString,
             queue__pb2.EnqueueResponse.FromString,
             options,
@@ -148,23 +151,26 @@ class QueueService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def GetJob(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def GetJob(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.QueueService/GetJob',
+            "/protocol.QueueService/GetJob",
             queue__pb2.GetJobRequest.SerializeToString,
             queue__pb2.GetJobResponse.FromString,
             options,
@@ -175,23 +181,26 @@ class QueueService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def UpdateJob(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def UpdateJob(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.QueueService/UpdateJob',
+            "/protocol.QueueService/UpdateJob",
             queue__pb2.UpdateJobRequest.SerializeToString,
             queue__pb2.UpdateJobResponse.FromString,
             options,
@@ -202,23 +211,26 @@ class QueueService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def ListJobs(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def ListJobs(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.QueueService/ListJobs',
+            "/protocol.QueueService/ListJobs",
             queue__pb2.ListJobsRequest.SerializeToString,
             queue__pb2.ListJobsResponse.FromString,
             options,
@@ -229,4 +241,5 @@ class QueueService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )

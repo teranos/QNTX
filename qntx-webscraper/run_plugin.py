@@ -13,8 +13,7 @@ from qntx_webscraper.grpc import domain_pb2_grpc
 from qntx_webscraper.plugin import WebScraperPlugin
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ def serve(port: int = 50052):
     plugin = WebScraperPlugin()
     domain_pb2_grpc.add_DomainPluginServiceServicer_to_server(plugin, server)
 
-    server.add_insecure_port(f'[::]:{port}')
+    server.add_insecure_port(f"[::]:{port}")
     server.start()
 
     logger.info(f"QNTX WebScraper plugin server started on port {port}")
@@ -45,18 +44,15 @@ def serve(port: int = 50052):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Run QNTX WebScraper plugin')
+    parser = argparse.ArgumentParser(description="Run QNTX WebScraper plugin")
     parser.add_argument(
-        '--port',
-        type=int,
-        default=50052,
-        help='Port to listen on (default: 50052)'
+        "--port", type=int, default=50052, help="Port to listen on (default: 50052)"
     )
     parser.add_argument(
-        '--log-level',
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
-        default='INFO',
-        help='Logging level (default: INFO)'
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Logging level (default: INFO)",
     )
 
     args = parser.parse_args()
@@ -67,5 +63,5 @@ def main():
     serve(args.port)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

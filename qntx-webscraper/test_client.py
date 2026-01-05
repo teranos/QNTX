@@ -5,9 +5,10 @@ import json
 import grpc
 from qntx_webscraper.grpc import domain_pb2, domain_pb2_grpc
 
+
 def test_plugin():
     # Connect to the plugin
-    channel = grpc.insecure_channel('localhost:50052')
+    channel = grpc.insecure_channel("localhost:50052")
     stub = domain_pb2_grpc.DomainPluginServiceStub(channel)
 
     # 1. Get metadata
@@ -29,7 +30,7 @@ def test_plugin():
             "respect_robots": "false",  # Disable for testing
             "rate_limit": "10.0",
             "allow_private_ips": "true",  # Allow for testing
-        }
+        },
     )
     stub.Initialize(init_req)
     print("  Initialized successfully")
@@ -47,7 +48,7 @@ def test_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "https://example.com"}).encode()
+        body=json.dumps({"url": "https://example.com"}).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
@@ -61,6 +62,7 @@ def test_plugin():
 
     print("\nTest completed!")
     channel.close()
+
 
 if __name__ == "__main__":
     test_plugin()

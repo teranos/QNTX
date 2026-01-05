@@ -5,9 +5,11 @@ import json
 import grpc
 from qntx_webscraper.grpc import domain_pb2, domain_pb2_grpc
 
+
 def pretty_print_json(data):
     """Pretty print JSON data."""
     print(json.dumps(data, indent=2))
+
 
 def demo_plugin():
     # Connect to the plugin
@@ -15,7 +17,7 @@ def demo_plugin():
     print("QNTX WebScraper Plugin Demo")
     print("=" * 60)
 
-    channel = grpc.insecure_channel('localhost:50052')
+    channel = grpc.insecure_channel("localhost:50052")
     stub = domain_pb2_grpc.DomainPluginServiceStub(channel)
 
     # 1. Get metadata
@@ -40,7 +42,7 @@ def demo_plugin():
             "rate_limit": "5.0",
             "allow_private_ips": "true",
             "max_response_size": str(5 * 1024 * 1024),  # 5MB
-        }
+        },
     )
     stub.Initialize(init_req)
     print("✓ Plugin initialized with demo configuration")
@@ -56,7 +58,7 @@ def demo_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "https://example.com"}).encode()
+        body=json.dumps({"url": "https://example.com"}).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
@@ -64,9 +66,9 @@ def demo_plugin():
         data = json.loads(response.body)
         print(f"✓ Title: {data.get('title', '')}")
         print(f"✓ Links found: {len(data.get('links', []))}")
-        if data.get('links'):
+        if data.get("links"):
             print("  Sample links:")
-            for link in data['links'][:3]:
+            for link in data["links"][:3]:
                 print(f"    - {link.get('target_url', '')}")
     else:
         print(f"✗ Error: {response.body.decode()}")
@@ -82,7 +84,7 @@ def demo_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "https://www.python.org"}).encode()
+        body=json.dumps({"url": "https://www.python.org"}).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
@@ -91,17 +93,17 @@ def demo_plugin():
         print(f"✓ Title: {data.get('title', '')[:50]}...")
         print(f"✓ Links: {len(data.get('links', []))}")
 
-        meta = data.get('meta', {})
-        if meta.get('description'):
+        meta = data.get("meta", {})
+        if meta.get("description"):
             print(f"✓ Description: {meta['description'][:80]}...")
-        if meta.get('og_title'):
+        if meta.get("og_title"):
             print(f"✓ Open Graph Title: {meta['og_title']}")
 
-        images = data.get('images', [])
+        images = data.get("images", [])
         if images:
             print(f"✓ Images found: {len(images)}")
 
-        headings = data.get('headings', {})
+        headings = data.get("headings", {})
         if headings:
             print("✓ Headings structure:")
             for level, texts in headings.items():
@@ -120,7 +122,9 @@ def demo_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "http://feeds.bbci.co.uk/news/technology/rss.xml"}).encode()
+        body=json.dumps(
+            {"url": "http://feeds.bbci.co.uk/news/technology/rss.xml"}
+        ).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
@@ -128,13 +132,13 @@ def demo_plugin():
         data = json.loads(response.body)
         print(f"✓ Feed Title: {data.get('title', '')}")
         print(f"✓ Feed Type: {data.get('feed_type', '')}")
-        items = data.get('items', [])
+        items = data.get("items", [])
         print(f"✓ Items: {len(items)}")
         if items:
             print("  Latest items:")
             for item in items[:3]:
                 print(f"    - {item.get('title', '')[:60]}...")
-                if item.get('published'):
+                if item.get("published"):
                     print(f"      Published: {item['published']}")
     else:
         print(f"✗ Error: {response.body.decode()}")
@@ -150,21 +154,21 @@ def demo_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "https://www.python.org/sitemap.xml"}).encode()
+        body=json.dumps({"url": "https://www.python.org/sitemap.xml"}).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
     if response.status_code == 200:
         data = json.loads(response.body)
-        urls = data.get('urls', [])
-        nested = data.get('sitemaps', [])
+        urls = data.get("urls", [])
+        nested = data.get("sitemaps", [])
         print(f"✓ URLs found: {len(urls)}")
         print(f"✓ Nested sitemaps: {len(nested)}")
         if urls:
             print("  Sample URLs:")
             for url in urls[:3]:
                 print(f"    - {url.get('loc', '')}")
-                if url.get('lastmod'):
+                if url.get("lastmod"):
                     print(f"      Last modified: {url['lastmod']}")
     else:
         print(f"✗ Error: {response.body.decode()}")
@@ -188,7 +192,7 @@ def demo_plugin():
             "rate_limit": "5.0",
             "allow_private_ips": "false",  # Disable for security test
             "max_response_size": str(5 * 1024 * 1024),
-        }
+        },
     )
     stub.Initialize(init_req)
 
@@ -198,13 +202,13 @@ def demo_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "http://localhost:8080"}).encode()
+        body=json.dumps({"url": "http://localhost:8080"}).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
     if response.status_code == 200:
         data = json.loads(response.body)
-        if data.get('error'):
+        if data.get("error"):
             print(f"✓ SSRF Protection working: {data['error']}")
         else:
             print("✗ Warning: localhost was not blocked!")
@@ -219,13 +223,13 @@ def demo_plugin():
         headers=[
             domain_pb2.HTTPHeader(name="Content-Type", values=["application/json"])
         ],
-        body=json.dumps({"url": "http://169.254.169.254/latest/meta-data"}).encode()
+        body=json.dumps({"url": "http://169.254.169.254/latest/meta-data"}).encode(),
     )
 
     response = stub.HandleHTTP(http_req)
     if response.status_code == 200:
         data = json.loads(response.body)
-        if data.get('error'):
+        if data.get("error"):
             print(f"✓ Cloud metadata blocking working: {data['error']}")
         else:
             print("✗ Warning: cloud metadata endpoint was not blocked!")
@@ -237,6 +241,7 @@ def demo_plugin():
     # Shutdown
     stub.Shutdown(domain_pb2.Empty())
     channel.close()
+
 
 if __name__ == "__main__":
     try:

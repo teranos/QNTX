@@ -97,7 +97,9 @@ class ATSStoreClient:
             actors=attestation.actors,
             timestamp=attestation.timestamp or int(time.time()),
             source=attestation.source,
-            attributes_json=json.dumps(attestation.attributes) if attestation.attributes else "",
+            attributes_json=(
+                json.dumps(attestation.attributes) if attestation.attributes else ""
+            ),
             created_at=attestation.created_at or int(time.time()),
         )
 
@@ -132,7 +134,9 @@ class ATSStoreClient:
             contexts=command.contexts,
             actors=command.actors,
             timestamp=command.timestamp,
-            attributes_json=json.dumps(command.attributes) if command.attributes else "",
+            attributes_json=(
+                json.dumps(command.attributes) if command.attributes else ""
+            ),
         )
 
         request = atsstore_pb2.GenerateAttestationRequest(
@@ -153,7 +157,9 @@ class ATSStoreClient:
             actors=list(proto_as.actors),
             timestamp=proto_as.timestamp,
             source=proto_as.source,
-            attributes=json.loads(proto_as.attributes_json) if proto_as.attributes_json else {},
+            attributes=(
+                json.loads(proto_as.attributes_json) if proto_as.attributes_json else {}
+            ),
             created_at=proto_as.created_at,
         )
 
@@ -213,7 +219,11 @@ class ATSStoreClient:
                 actors=list(proto_as.actors),
                 timestamp=proto_as.timestamp,
                 source=proto_as.source,
-                attributes=json.loads(proto_as.attributes_json) if proto_as.attributes_json else {},
+                attributes=(
+                    json.loads(proto_as.attributes_json)
+                    if proto_as.attributes_json
+                    else {}
+                ),
                 created_at=proto_as.created_at,
             )
             for proto_as in response.attestations

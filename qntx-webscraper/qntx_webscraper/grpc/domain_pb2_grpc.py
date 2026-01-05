@@ -4,29 +4,31 @@ import grpc
 
 from . import domain_pb2 as domain__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = "1.76.0"
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
 try:
     from grpc._utilities import first_version_is_lower
-    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+
+    _version_not_supported = first_version_is_lower(
+        GRPC_VERSION, GRPC_GENERATED_VERSION
+    )
 except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
     raise RuntimeError(
-        f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in domain_pb2_grpc.py depends on'
-        + f' grpcio>={GRPC_GENERATED_VERSION}.'
-        + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
-        + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
+        f"The grpc package installed is at version {GRPC_VERSION},"
+        + " but the generated code in domain_pb2_grpc.py depends on"
+        + f" grpcio>={GRPC_GENERATED_VERSION}."
+        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
+        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
     )
 
 
 class DomainPluginServiceStub(object):
-    """DomainPluginService is the gRPC service for external domain plugins
-    """
+    """DomainPluginService is the gRPC service for external domain plugins"""
 
     def __init__(self, channel):
         """Constructor.
@@ -35,143 +37,146 @@ class DomainPluginServiceStub(object):
             channel: A grpc.Channel.
         """
         self.Metadata = channel.unary_unary(
-                '/protocol.DomainPluginService/Metadata',
-                request_serializer=domain__pb2.Empty.SerializeToString,
-                response_deserializer=domain__pb2.MetadataResponse.FromString,
-                _registered_method=True)
+            "/protocol.DomainPluginService/Metadata",
+            request_serializer=domain__pb2.Empty.SerializeToString,
+            response_deserializer=domain__pb2.MetadataResponse.FromString,
+            _registered_method=True,
+        )
         self.Initialize = channel.unary_unary(
-                '/protocol.DomainPluginService/Initialize',
-                request_serializer=domain__pb2.InitializeRequest.SerializeToString,
-                response_deserializer=domain__pb2.Empty.FromString,
-                _registered_method=True)
+            "/protocol.DomainPluginService/Initialize",
+            request_serializer=domain__pb2.InitializeRequest.SerializeToString,
+            response_deserializer=domain__pb2.Empty.FromString,
+            _registered_method=True,
+        )
         self.Shutdown = channel.unary_unary(
-                '/protocol.DomainPluginService/Shutdown',
-                request_serializer=domain__pb2.Empty.SerializeToString,
-                response_deserializer=domain__pb2.Empty.FromString,
-                _registered_method=True)
+            "/protocol.DomainPluginService/Shutdown",
+            request_serializer=domain__pb2.Empty.SerializeToString,
+            response_deserializer=domain__pb2.Empty.FromString,
+            _registered_method=True,
+        )
         self.HandleHTTP = channel.unary_unary(
-                '/protocol.DomainPluginService/HandleHTTP',
-                request_serializer=domain__pb2.HTTPRequest.SerializeToString,
-                response_deserializer=domain__pb2.HTTPResponse.FromString,
-                _registered_method=True)
+            "/protocol.DomainPluginService/HandleHTTP",
+            request_serializer=domain__pb2.HTTPRequest.SerializeToString,
+            response_deserializer=domain__pb2.HTTPResponse.FromString,
+            _registered_method=True,
+        )
         self.HandleWebSocket = channel.stream_stream(
-                '/protocol.DomainPluginService/HandleWebSocket',
-                request_serializer=domain__pb2.WebSocketMessage.SerializeToString,
-                response_deserializer=domain__pb2.WebSocketMessage.FromString,
-                _registered_method=True)
+            "/protocol.DomainPluginService/HandleWebSocket",
+            request_serializer=domain__pb2.WebSocketMessage.SerializeToString,
+            response_deserializer=domain__pb2.WebSocketMessage.FromString,
+            _registered_method=True,
+        )
         self.Health = channel.unary_unary(
-                '/protocol.DomainPluginService/Health',
-                request_serializer=domain__pb2.Empty.SerializeToString,
-                response_deserializer=domain__pb2.HealthResponse.FromString,
-                _registered_method=True)
+            "/protocol.DomainPluginService/Health",
+            request_serializer=domain__pb2.Empty.SerializeToString,
+            response_deserializer=domain__pb2.HealthResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class DomainPluginServiceServicer(object):
-    """DomainPluginService is the gRPC service for external domain plugins
-    """
+    """DomainPluginService is the gRPC service for external domain plugins"""
 
     def Metadata(self, request, context):
-        """Metadata returns plugin metadata
-        """
+        """Metadata returns plugin metadata"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def Initialize(self, request, context):
-        """Initialize initializes the plugin
-        """
+        """Initialize initializes the plugin"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def Shutdown(self, request, context):
-        """Shutdown shuts down the plugin
-        """
+        """Shutdown shuts down the plugin"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def HandleHTTP(self, request, context):
-        """HandleHTTP handles an HTTP request
-        """
+        """HandleHTTP handles an HTTP request"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def HandleWebSocket(self, request_iterator, context):
-        """HandleWebSocket handles a WebSocket connection (bidirectional streaming)
-        """
+        """HandleWebSocket handles a WebSocket connection (bidirectional streaming)"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def Health(self, request, context):
-        """Health checks plugin health
-        """
+        """Health checks plugin health"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_DomainPluginServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Metadata': grpc.unary_unary_rpc_method_handler(
-                    servicer.Metadata,
-                    request_deserializer=domain__pb2.Empty.FromString,
-                    response_serializer=domain__pb2.MetadataResponse.SerializeToString,
-            ),
-            'Initialize': grpc.unary_unary_rpc_method_handler(
-                    servicer.Initialize,
-                    request_deserializer=domain__pb2.InitializeRequest.FromString,
-                    response_serializer=domain__pb2.Empty.SerializeToString,
-            ),
-            'Shutdown': grpc.unary_unary_rpc_method_handler(
-                    servicer.Shutdown,
-                    request_deserializer=domain__pb2.Empty.FromString,
-                    response_serializer=domain__pb2.Empty.SerializeToString,
-            ),
-            'HandleHTTP': grpc.unary_unary_rpc_method_handler(
-                    servicer.HandleHTTP,
-                    request_deserializer=domain__pb2.HTTPRequest.FromString,
-                    response_serializer=domain__pb2.HTTPResponse.SerializeToString,
-            ),
-            'HandleWebSocket': grpc.stream_stream_rpc_method_handler(
-                    servicer.HandleWebSocket,
-                    request_deserializer=domain__pb2.WebSocketMessage.FromString,
-                    response_serializer=domain__pb2.WebSocketMessage.SerializeToString,
-            ),
-            'Health': grpc.unary_unary_rpc_method_handler(
-                    servicer.Health,
-                    request_deserializer=domain__pb2.Empty.FromString,
-                    response_serializer=domain__pb2.HealthResponse.SerializeToString,
-            ),
+        "Metadata": grpc.unary_unary_rpc_method_handler(
+            servicer.Metadata,
+            request_deserializer=domain__pb2.Empty.FromString,
+            response_serializer=domain__pb2.MetadataResponse.SerializeToString,
+        ),
+        "Initialize": grpc.unary_unary_rpc_method_handler(
+            servicer.Initialize,
+            request_deserializer=domain__pb2.InitializeRequest.FromString,
+            response_serializer=domain__pb2.Empty.SerializeToString,
+        ),
+        "Shutdown": grpc.unary_unary_rpc_method_handler(
+            servicer.Shutdown,
+            request_deserializer=domain__pb2.Empty.FromString,
+            response_serializer=domain__pb2.Empty.SerializeToString,
+        ),
+        "HandleHTTP": grpc.unary_unary_rpc_method_handler(
+            servicer.HandleHTTP,
+            request_deserializer=domain__pb2.HTTPRequest.FromString,
+            response_serializer=domain__pb2.HTTPResponse.SerializeToString,
+        ),
+        "HandleWebSocket": grpc.stream_stream_rpc_method_handler(
+            servicer.HandleWebSocket,
+            request_deserializer=domain__pb2.WebSocketMessage.FromString,
+            response_serializer=domain__pb2.WebSocketMessage.SerializeToString,
+        ),
+        "Health": grpc.unary_unary_rpc_method_handler(
+            servicer.Health,
+            request_deserializer=domain__pb2.Empty.FromString,
+            response_serializer=domain__pb2.HealthResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'protocol.DomainPluginService', rpc_method_handlers)
+        "protocol.DomainPluginService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('protocol.DomainPluginService', rpc_method_handlers)
+    server.add_registered_method_handlers(
+        "protocol.DomainPluginService", rpc_method_handlers
+    )
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class DomainPluginService(object):
-    """DomainPluginService is the gRPC service for external domain plugins
-    """
+    """DomainPluginService is the gRPC service for external domain plugins"""
 
     @staticmethod
-    def Metadata(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def Metadata(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.DomainPluginService/Metadata',
+            "/protocol.DomainPluginService/Metadata",
             domain__pb2.Empty.SerializeToString,
             domain__pb2.MetadataResponse.FromString,
             options,
@@ -182,23 +187,26 @@ class DomainPluginService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def Initialize(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def Initialize(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.DomainPluginService/Initialize',
+            "/protocol.DomainPluginService/Initialize",
             domain__pb2.InitializeRequest.SerializeToString,
             domain__pb2.Empty.FromString,
             options,
@@ -209,23 +217,26 @@ class DomainPluginService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def Shutdown(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def Shutdown(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.DomainPluginService/Shutdown',
+            "/protocol.DomainPluginService/Shutdown",
             domain__pb2.Empty.SerializeToString,
             domain__pb2.Empty.FromString,
             options,
@@ -236,23 +247,26 @@ class DomainPluginService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def HandleHTTP(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def HandleHTTP(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.DomainPluginService/HandleHTTP',
+            "/protocol.DomainPluginService/HandleHTTP",
             domain__pb2.HTTPRequest.SerializeToString,
             domain__pb2.HTTPResponse.FromString,
             options,
@@ -263,23 +277,26 @@ class DomainPluginService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def HandleWebSocket(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def HandleWebSocket(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.stream_stream(
             request_iterator,
             target,
-            '/protocol.DomainPluginService/HandleWebSocket',
+            "/protocol.DomainPluginService/HandleWebSocket",
             domain__pb2.WebSocketMessage.SerializeToString,
             domain__pb2.WebSocketMessage.FromString,
             options,
@@ -290,23 +307,26 @@ class DomainPluginService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def Health(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def Health(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/protocol.DomainPluginService/Health',
+            "/protocol.DomainPluginService/Health",
             domain__pb2.Empty.SerializeToString,
             domain__pb2.HealthResponse.FromString,
             options,
@@ -317,4 +337,5 @@ class DomainPluginService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
