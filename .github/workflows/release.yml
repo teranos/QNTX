@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - 'feat/cross-compilation-releases'  # Testing branch - remove before merge
   workflow_dispatch:
 
 jobs:
