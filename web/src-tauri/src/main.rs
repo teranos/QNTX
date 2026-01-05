@@ -160,6 +160,34 @@ fn notify_server_stopped(app: tauri::AppHandle) {
     );
 }
 
+/// Set taskbar progress indicator (Windows feature, works on other platforms too)
+/// - state: "none" | "normal" | "indeterminate" | "paused" | "error"
+/// - progress: Optional percentage (0-100), only used for "normal" state
+#[tauri::command]
+fn set_taskbar_progress(app: tauri::AppHandle, state: String, progress: Option<u64>) {
+    use tauri::window::ProgressBarState;
+    use tauri::window::ProgressBarStatus;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let status = match state.as_str() {
+            "normal" => ProgressBarStatus::Normal,
+            "indeterminate" => ProgressBarStatus::Indeterminate,
+            "paused" => ProgressBarStatus::Paused,
+            "error" => ProgressBarStatus::Error,
+            _ => ProgressBarStatus::None,
+        };
+
+        let progress_state = ProgressBarState {
+            status: Some(status),
+            progress,
+        };
+
+        if let Err(e) = window.set_progress_bar(progress_state) {
+            eprintln!("[taskbar] Failed to set progress bar: {}", e);
+        }
+    }
+}
+
 fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -599,7 +627,8 @@ fn main() {
             notify_job_failed,
             notify_storage_warning,
             notify_server_draining,
-            notify_server_stopped
+            notify_server_stopped,
+            set_taskbar_progress
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
