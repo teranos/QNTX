@@ -11,6 +11,7 @@
 
 import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
+import { toast } from './toast';
 
 interface PluginInfo {
     name: string;
@@ -264,7 +265,7 @@ class PluginPanel extends BasePanel {
             console.log('[Plugin Panel] Plugin paused:', name);
         } catch (error) {
             console.error('[Plugin Panel] Failed to pause plugin:', error);
-            alert(`Failed to pause plugin: ${error}`);
+            toast.error(`Failed to pause plugin: ${error}`);
         }
     }
 
@@ -286,7 +287,7 @@ class PluginPanel extends BasePanel {
             console.log('[Plugin Panel] Plugin resumed:', name);
         } catch (error) {
             console.error('[Plugin Panel] Failed to resume plugin:', error);
-            alert(`Failed to resume plugin: ${error}`);
+            toast.error(`Failed to resume plugin: ${error}`);
         }
     }
 
