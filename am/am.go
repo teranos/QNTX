@@ -15,8 +15,8 @@ type Config struct {
 
 // DatabaseConfig configures the SQLite database
 type DatabaseConfig struct {
-	Path           string                `mapstructure:"path"`
-	BoundedStorage BoundedStorageConfig  `mapstructure:"bounded_storage"`
+	Path           string               `mapstructure:"path"`
+	BoundedStorage BoundedStorageConfig `mapstructure:"bounded_storage"`
 }
 
 // BoundedStorageConfig configures storage limits for attestations
@@ -28,7 +28,7 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           int      `mapstructure:"port"`             // Server port (default: 877)
+	Port           int      `mapstructure:"port"` // Server port (default: 877)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
 }
@@ -61,7 +61,7 @@ type PulseConfig struct {
 	WeeklyBudgetUSD       float64 `mapstructure:"weekly_budget_usd"`        // Weekly spending limit in USD
 	MonthlyBudgetUSD      float64 `mapstructure:"monthly_budget_usd"`       // Monthly spending limit in USD
 	CostPerScoreUSD       float64 `mapstructure:"cost_per_score_usd"`       // Estimated cost per operation
-	MaxCallsPerMinute     int     `mapstructure:"max_calls_per_minute"`      // Rate limit for API calls
+	MaxCallsPerMinute     int     `mapstructure:"max_calls_per_minute"`     // Rate limit for API calls
 	PauseOnBudgetExceeded bool    `mapstructure:"pause_on_budget_exceeded"` // Pause jobs when budget exceeded (vs fail them)
 }
 
@@ -137,10 +137,10 @@ type LocalInferenceConfig struct {
 
 // OpenRouterConfig configures OpenRouter.ai API access
 type OpenRouterConfig struct {
-	APIKey      string  `mapstructure:"api_key"`      // OpenRouter API key
-	Model       string  `mapstructure:"model"`        // Default model (e.g., "openai/gpt-4o-mini")
-	Temperature float64 `mapstructure:"temperature"`  // Sampling temperature (default: 0.2)
-	MaxTokens   int     `mapstructure:"max_tokens"`   // Maximum tokens per request (default: 1000)
+	APIKey      string  `mapstructure:"api_key"`     // OpenRouter API key
+	Model       string  `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
+	Temperature float64 `mapstructure:"temperature"` // Sampling temperature (default: 0.2)
+	MaxTokens   int     `mapstructure:"max_tokens"`  // Maximum tokens per request (default: 1000)
 }
 
 // AxConfig configures the attestation query system

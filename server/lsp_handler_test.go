@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestGLSPHandlerLifecycle tests the complete LSP lifecycle: Initialize → Initialized → Shutdown

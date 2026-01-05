@@ -10,7 +10,7 @@ import (
 // ConsoleLog represents a browser console message
 type ConsoleLog struct {
 	Timestamp time.Time `json:"timestamp"`
-	Level     string    `json:"level"`     // error, warn, info, debug
+	Level     string    `json:"level"` // error, warn, info, debug
 	Message   string    `json:"message"`
 	Stack     string    `json:"stack,omitempty"`
 	URL       string    `json:"url,omitempty"`

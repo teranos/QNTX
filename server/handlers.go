@@ -19,11 +19,11 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/server/wslogs"
-	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/wslogs"
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		id:      fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
 		graphView: &GraphViewState{ // Phase 2: Initialize graph visibility state
 			hiddenNodeTypes:   make(map[string]bool), // Empty = show all types initially
-			hideIsolatedNodes: false,                  // Show isolated nodes by default
+			hideIsolatedNodes: false,                 // Show isolated nodes by default
 		},
 	}
 

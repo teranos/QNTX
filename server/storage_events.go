@@ -73,14 +73,14 @@ func (p *StorageEventsPoller) pollEvents() {
 	eventsProcessed := 0
 	for rows.Next() {
 		var (
-			id              int64
-			eventType       string
-			actor           sql.NullString
-			context         sql.NullString
-			entity          sql.NullString
-			deletionsCount  int
-			limitValue      sql.NullInt64
-			timestamp       string
+			id             int64
+			eventType      string
+			actor          sql.NullString
+			context        sql.NullString
+			entity         sql.NullString
+			deletionsCount int
+			limitValue     sql.NullInt64
+			timestamp      string
 		)
 
 		if err := rows.Scan(&id, &eventType, &actor, &context, &entity, &deletionsCount, &limitValue, &timestamp); err != nil {
@@ -156,14 +156,14 @@ func (p *StorageEventsPoller) broadcastWarning(actor, context string, current, l
 
 	// Broadcast using existing storage_warning message type
 	msg := map[string]interface{}{
-		"type":           "storage_warning",
-		"actor":          actor,
-		"context":        context,
-		"current":        current,
-		"limit":          limit,
-		"fill_percent":   fillPercent,
+		"type":            "storage_warning",
+		"actor":           actor,
+		"context":         context,
+		"current":         current,
+		"limit":           limit,
+		"fill_percent":    fillPercent,
 		"time_until_full": "unknown", // Could be calculated if needed
-		"timestamp":      time.Now().Unix(),
+		"timestamp":       time.Now().Unix(),
 	}
 
 	p.server.broadcastMessage(msg)

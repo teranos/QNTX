@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/teranos/QNTX/server/wslogs"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // WebSocket timeout constants following Gorilla best practices
@@ -123,9 +123,9 @@ type Client struct {
 	sendLog   chan *wslogs.Batch
 	sendMsg   chan interface{} // Generic message channel for ix progress/errors
 	id        string
-	closeOnce sync.Once        // Defensive: Prevents double-close panics
-	graphView *GraphViewState  // Phase 2: Client's graph visibility preferences
-	lastQuery string           // Phase 2: Last executed query for re-rendering with new visibility
+	closeOnce sync.Once       // Defensive: Prevents double-close panics
+	graphView *GraphViewState // Phase 2: Client's graph visibility preferences
+	lastQuery string          // Phase 2: Last executed query for re-rendering with new visibility
 }
 
 // readPump handles reading messages from the WebSocket connection
