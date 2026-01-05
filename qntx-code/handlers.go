@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
 
@@ -181,6 +182,9 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create attestation for PR suggestions fetch
+	p.attestPRAction(prNumber, "fetched-suggestions", len(suggestions))
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(suggestions)
 }
@@ -201,6 +205,9 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to fetch PRs", http.StatusInternalServerError)
 		return
 	}
+
+	// Create attestation for PR list fetch
+	p.attestPRListFetch(len(prs))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(prs)
@@ -286,6 +293,9 @@ func (p *Plugin) serveCodeFile(w http.ResponseWriter, r *http.Request, codePath 
 		return
 	}
 
+	// Create attestation for file access
+	p.attestFileAccess(codePath, "read")
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write(content)
 }
@@ -314,6 +324,9 @@ func (p *Plugin) saveCodeFile(w http.ResponseWriter, r *http.Request, codePath s
 		return
 	}
 
+	// Create attestation for file modification
+	p.attestFileAccess(codePath, "write")
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -323,4 +336,65 @@ type CodeEntry struct {
 	Path     string      `json:"path"`
 	IsDir    bool        `json:"isDir"`
 	Children []CodeEntry `json:"children,omitempty"`
+}
+
+// attestFileAccess creates an attestation for file read/write operations
+func (p *Plugin) attestFileAccess(filePath, operation string) {
+	store := p.services.ATSStore()
+	if store == nil {
+		return
+	}
+
+	cmd := &types.AsCommand{
+		Subjects:   []string{filePath},
+		Predicates: []string{operation},
+		Contexts:   []string{"code-domain"},
+	}
+	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		logger := p.services.Logger("code")
+		logger.Debugw("Failed to create file access attestation", "path", filePath, "op", operation, "error", err)
+	}
+}
+
+// attestPRAction creates an attestation for PR-related actions
+func (p *Plugin) attestPRAction(prNumber int, action string, count int) {
+	store := p.services.ATSStore()
+	if store == nil {
+		return
+	}
+
+	prID := fmt.Sprintf("pr-%d", prNumber)
+	cmd := &types.AsCommand{
+		Subjects:   []string{prID},
+		Predicates: []string{action},
+		Contexts:   []string{"github"},
+		Attributes: map[string]interface{}{
+			"count": count,
+		},
+	}
+	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		logger := p.services.Logger("code")
+		logger.Debugw("Failed to create PR attestation", "pr", prNumber, "action", action, "error", err)
+	}
+}
+
+// attestPRListFetch creates an attestation for fetching the PR list
+func (p *Plugin) attestPRListFetch(count int) {
+	store := p.services.ATSStore()
+	if store == nil {
+		return
+	}
+
+	cmd := &types.AsCommand{
+		Subjects:   []string{"github-prs"},
+		Predicates: []string{"listed"},
+		Contexts:   []string{"code-domain"},
+		Attributes: map[string]interface{}{
+			"count": count,
+		},
+	}
+	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		logger := p.services.Logger("code")
+		logger.Debugw("Failed to create PR list attestation", "error", err)
+	}
 }
