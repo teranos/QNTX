@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,6 +71,28 @@ func TestOpen(t *testing.T) {
 		// Verify file was created
 		_, err = os.Stat(dbPath)
 		assert.NoError(t, err)
+	})
+
+	t.Run("errors include stack traces from errors package", func(t *testing.T) {
+		// Try to open database at an invalid path that will fail
+		invalidPath := "/proc/invalid/cannot/create/db.sqlite"
+
+		db, err := Open(invalidPath, nil)
+		require.Error(t, err)
+		require.Nil(t, db)
+
+		// Verify error has stack trace from errors.Wrap
+		stackTrace := errors.GetReportableStackTrace(err)
+		require.NotNil(t, stackTrace, "errors from Open should have stack traces")
+
+		// Verify detailed formatting includes stack trace with our wrapped context
+		detailed := fmt.Sprintf("%+v", err)
+		assert.Contains(t, detailed, "connection.go", "stack trace should reference source file")
+		assert.Contains(t, detailed, "stack trace:", "detailed format should show stack trace section")
+		assert.Contains(t, detailed, "db.Open", "stack should show db.Open function")
+
+		// Verify we wrapped the error - it fails at WAL mode setup for this path
+		assert.Contains(t, detailed, "failed to enable WAL mode", "error should include our wrapped context")
 	})
 
 }
