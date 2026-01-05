@@ -20,6 +20,11 @@ func (qb *queryBuilder) addClause(clause string, args ...interface{}) {
 	qb.args = append(qb.args, args...)
 }
 
+// build returns the WHERE clauses joined with AND
+func (qb *queryBuilder) build() string {
+	return strings.Join(qb.whereClauses, " AND ")
+}
+
 // buildSubjectFilter creates LIKE clauses for subject matching (OR logic)
 func (qb *queryBuilder) buildSubjectFilter(subjects []string) {
 	if len(subjects) == 0 {
