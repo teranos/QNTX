@@ -268,6 +268,22 @@ func (m *PluginManager) GetAllPlugins() []plugin.DomainPlugin {
 	return plugins
 }
 
+// ConfigureWebSocket sets WebSocket configuration on all loaded plugins.
+// This should be called after LoadPlugins to configure keepalive and origin validation.
+func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig WebSocketConfig) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, p := range m.plugins {
+		p.client.SetWebSocketConfig(keepalive, wsConfig)
+	}
+	m.logger.Infow("WebSocket configuration applied to plugins",
+		"keepalive_enabled", keepalive.Enabled,
+		"ping_interval", keepalive.PingInterval,
+		"allowed_origins_count", len(wsConfig.AllowedOrigins),
+	)
+}
+
 // Shutdown stops all managed plugins.
 func (m *PluginManager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
