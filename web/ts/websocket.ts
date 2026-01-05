@@ -242,12 +242,10 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  * @param connected - Whether the WebSocket is connected
  */
 function updateConnectionStatus(connected: boolean): void {
-    const statusText = document.getElementById('status-text') as HTMLElement | null;
-    const systemDrawer = document.getElementById('system-drawer') as HTMLElement | null;
-
-    if (statusText) {
-        statusText.textContent = connected ? 'Connected' : 'Disconnected - Reconnecting...';
-    }
+    // Update status indicator using the new system
+    import('./status-indicators.ts').then(({ statusIndicators }) => {
+        statusIndicators.handleConnectionStatus(connected);
+    });
 
     if (connected) {
         // Remove desaturation/dimming from entire UI
