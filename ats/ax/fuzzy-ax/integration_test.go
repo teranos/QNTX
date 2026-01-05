@@ -1,20 +1,23 @@
 //go:build integration && rustfuzzy
 
-package qntxfuzzy_test
+package fuzzyax_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/teranos/QNTX/ats/ax"
-	cgo "github.com/teranos/QNTX/plugins/qntx-fuzzy/cgo"
+	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"
 )
 
 // TestBooksFuzzyMatching tests fuzzy matching with book-related attestations
 func TestBooksFuzzyMatching(t *testing.T) {
 	// Create Rust engine via CGO
-	engine := cgo.NewFuzzyEngine()
-	defer engine.Free()
+	engine, err := fuzzyax.NewFuzzyEngine()
+	if err != nil {
+		t.Fatalf("Failed to create fuzzy engine: %v", err)
+	}
+	defer engine.Close()
 
 	// Book-related predicates (what we say about books/authors)
 	predicates := []string{
@@ -165,8 +168,11 @@ func TestBooksFuzzyMatching(t *testing.T) {
 
 // TestBookCollectorWorkflow simulates a book collector's attestation workflow
 func TestBookCollectorWorkflow(t *testing.T) {
-	engine := cgo.NewFuzzyEngine()
-	defer engine.Free()
+	engine, err := fuzzyax.NewFuzzyEngine()
+	if err != nil {
+		t.Fatalf("Failed to create fuzzy engine: %v", err)
+	}
+	defer engine.Close()
 
 	// A book collector's vocabulary evolves over time
 	// Start with basic predicates
@@ -260,8 +266,11 @@ func TestBookCollectorWorkflow(t *testing.T) {
 
 // TestAuthorDiscovery tests finding authors with various query patterns
 func TestAuthorDiscovery(t *testing.T) {
-	engine := cgo.NewFuzzyEngine()
-	defer engine.Free()
+	engine, err := fuzzyax.NewFuzzyEngine()
+	if err != nil {
+		t.Fatalf("Failed to create fuzzy engine: %v", err)
+	}
+	defer engine.Close()
 
 	// Famous computer science authors
 	authors := []string{
@@ -358,8 +367,11 @@ func TestAuthorDiscovery(t *testing.T) {
 
 // BenchmarkBookQueries benchmarks typical book-related queries
 func BenchmarkBookQueries(b *testing.B) {
-	engine := cgo.NewFuzzyEngine()
-	defer engine.Free()
+	engine, err := fuzzyax.NewFuzzyEngine()
+	if err != nil {
+		b.Fatalf("Failed to create fuzzy engine: %v", err)
+	}
+	defer engine.Close()
 
 	// Large book catalog
 	books := make([]string, 10000)
