@@ -53,8 +53,8 @@ Examples:
 
 func init() {
 	// Initialize logger early for plugin loading
-	// Use silent mode to avoid cluttering output during init
-	if err := logger.Initialize(true); err != nil {
+	// Use human-readable output for better UX
+	if err := logger.Initialize(false); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize logger: %v\n", err)
 	}
 
