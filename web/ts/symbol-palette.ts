@@ -42,7 +42,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'prose') return Prose;
     if (cmd === 'go') return 'Go';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
-    if (cmd === 'scraper') return '⬇'; // Downward arrow for content extraction
+    if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
     return CommandToSymbol[cmd] || cmd;
 }
 
