@@ -36,7 +36,10 @@ jobs:
         run: git config --global --add safe.directory /__w/QNTX/QNTX
 
       - name: Install protoc
-        run: apt update && apt install -y protobuf-compiler
+        run: |
+          curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip
+          unzip protoc-25.1-linux-x86_64.zip -d /usr/local
+          protoc --version
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
