@@ -23,7 +23,9 @@
   pointer-events: none;
 }
 
-.panel-slide-left.visible {
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.panel-slide-left.visible,
+.panel-slide-left[data-visibility="visible"] {
   transform: translateX(0);
   opacity: 1;
   pointer-events: auto;
@@ -43,7 +45,9 @@
   transition: opacity 0.3s ease;
 }
 
-.panel-overlay.visible {
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.panel-overlay.visible,
+.panel-overlay[data-visibility="visible"] {
   opacity: 1;
   pointer-events: auto;
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -17,7 +18,7 @@ func TestSmartClassifier_EvolutionDetection(t *testing.T) {
 	classifier := NewSmartClassifier(config)
 
 	// NEO's progression from awakening to The One - classic evolution pattern
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "NEO",
 			Predicate: "programmer",
@@ -57,7 +58,7 @@ func TestSmartClassifier_SimultaneousVerification(t *testing.T) {
 
 	now := time.Now()
 	// TRINITY's pilot skills verified by multiple independent sources
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "TRINITY",
 			Predicate: "pilot",
@@ -96,7 +97,7 @@ func TestSmartClassifier_HumanSupersession(t *testing.T) {
 	classifier := NewSmartClassifier(config)
 
 	// Morpheus (human) overrides automated Matrix classification
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "TANK",
 			Predicate: "operator",
@@ -135,7 +136,7 @@ func TestSmartClassifier_DifferentContexts(t *testing.T) {
 	classifier := NewSmartClassifier(config)
 
 	// NIOBE holds different roles in different contexts - both valid
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "NIOBE",
 			Predicate: "captain",
@@ -175,7 +176,7 @@ func TestSmartClassifier_RequiresReview(t *testing.T) {
 
 	// CYPHER's loyalty: demonstrates why decentralized verification matters
 	// - untrusted sources create ambiguity that requires human judgment
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "CYPHER",
 			Predicate: "resistance_member",
@@ -211,7 +212,7 @@ func TestSmartClassifier_ConfidenceScoring(t *testing.T) {
 	classifier := NewSmartClassifier(config)
 
 	// High confidence: LINK's skills verified by multiple trusted sources
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "LINK",
 			Predicate: "operator",
@@ -237,7 +238,7 @@ func TestSmartClassifier_ConfidenceScoring(t *testing.T) {
 	}
 
 	// Low confidence: old data from unverified Matrix surveillance
-	lowConfidenceClaims := []IndividualClaim{
+	lowConfidenceClaims := []ats.IndividualClaim{
 		{
 			Subject:   "DOZER",
 			Predicate: "engineer",
@@ -260,7 +261,7 @@ func TestSmartClassifier_ActorHierarchy(t *testing.T) {
 	classifier := NewSmartClassifier(config)
 
 	// ZEE's profession assessment from different actor types
-	claims := []IndividualClaim{
+	claims := []ats.IndividualClaim{
 		{
 			Subject:   "ZEE",
 			Predicate: "engineer",
@@ -330,7 +331,7 @@ func TestSmartClassifier_ClassifyConflicts(t *testing.T) {
 	classifier := NewSmartClassifier(config)
 
 	// Multiple conflict scenarios from The Attestation Chronicles
-	claimGroups := map[string][]IndividualClaim{
+	claimGroups := map[string][]ats.IndividualClaim{
 		"NEO|profession|MATRIX": {
 			{
 				Subject:   "NEO",
