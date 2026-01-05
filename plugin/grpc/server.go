@@ -206,8 +206,9 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 			// This demonstrates bidirectional streaming working correctly
 			// Real plugins would process the data and respond appropriately
 			echoMsg := &protocol.WebSocketMessage{
-				Type: protocol.WebSocketMessage_DATA,
-				Data: msg.Data,
+				Type:      protocol.WebSocketMessage_DATA,
+				Data:      msg.Data,
+				Timestamp: msg.Timestamp,
 			}
 
 			if err := stream.Send(echoMsg); err != nil {
@@ -215,12 +216,33 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 				return err
 			}
 
+		case protocol.WebSocketMessage_PING:
+			s.logger.Debug("WebSocket PING received, sending PONG")
+			// Respond with PONG, echoing back the timestamp for latency measurement
+			pongMsg := &protocol.WebSocketMessage{
+				Type:      protocol.WebSocketMessage_PONG,
+				Timestamp: msg.Timestamp,
+			}
+			if err := stream.Send(pongMsg); err != nil {
+				s.logger.Errorw("Failed to send PONG message", "error", err)
+				return err
+			}
+
+		case protocol.WebSocketMessage_PONG:
+			s.logger.Debug("WebSocket PONG received")
+			// PONG received, connection is alive
+			// Client-side keepalive handler processes latency
+
+		case protocol.WebSocketMessage_ERROR:
+			s.logger.Errorw("WebSocket ERROR received", "error", string(msg.Data))
+			// Log the error and continue, let the connection decide if it should close
+
 		case protocol.WebSocketMessage_CLOSE:
 			s.logger.Info("WebSocket CLOSE message received")
 			// Send CLOSE acknowledgment
 			closeMsg := &protocol.WebSocketMessage{
-				Type: protocol.WebSocketMessage_CLOSE,
-				Data: []byte{},
+				Type:      protocol.WebSocketMessage_CLOSE,
+				Timestamp: msg.Timestamp,
 			}
 			if err := stream.Send(closeMsg); err != nil {
 				s.logger.Errorw("Failed to send CLOSE message", "error", err)

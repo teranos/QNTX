@@ -150,8 +150,22 @@ type AxConfig struct {
 
 // PluginConfig configures the domain plugin system
 type PluginConfig struct {
-	Enabled []string `mapstructure:"enabled"` // Whitelist of enabled plugins (e.g., ["code"])
-	Paths   []string `mapstructure:"paths"`   // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
+	Enabled   []string              `mapstructure:"enabled"`   // Whitelist of enabled plugins (e.g., ["code"])
+	Paths     []string              `mapstructure:"paths"`     // Plugin search paths (e.g., ["~/.qntx/plugins", "./plugins"])
+	WebSocket PluginWebSocketConfig `mapstructure:"websocket"` // WebSocket configuration
+}
+
+// PluginWebSocketConfig configures WebSocket keepalive behavior
+type PluginWebSocketConfig struct {
+	Keepalive PluginKeepaliveConfig `mapstructure:"keepalive"`
+}
+
+// PluginKeepaliveConfig configures WebSocket keepalive behavior
+type PluginKeepaliveConfig struct {
+	Enabled           bool `mapstructure:"enabled"`            // Enable keepalive (default: true)
+	PingIntervalSecs  int  `mapstructure:"ping_interval_secs"` // Seconds between PING messages (default: 30)
+	PongTimeoutSecs   int  `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (default: 60)
+	ReconnectAttempts int  `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (default: 3)
 }
 
 // File system constants

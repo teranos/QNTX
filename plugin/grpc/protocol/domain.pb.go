@@ -31,6 +31,9 @@ const (
 	WebSocketMessage_CONNECT WebSocketMessage_Type = 0
 	WebSocketMessage_DATA    WebSocketMessage_Type = 1
 	WebSocketMessage_CLOSE   WebSocketMessage_Type = 2
+	WebSocketMessage_PING    WebSocketMessage_Type = 3
+	WebSocketMessage_PONG    WebSocketMessage_Type = 4
+	WebSocketMessage_ERROR   WebSocketMessage_Type = 5
 )
 
 // Enum value maps for WebSocketMessage_Type.
@@ -39,11 +42,17 @@ var (
 		0: "CONNECT",
 		1: "DATA",
 		2: "CLOSE",
+		3: "PING",
+		4: "PONG",
+		5: "ERROR",
 	}
 	WebSocketMessage_Type_value = map[string]int32{
 		"CONNECT": 0,
 		"DATA":    1,
 		"CLOSE":   2,
+		"PING":    3,
+		"PONG":    4,
+		"ERROR":   5,
 	}
 )
 
@@ -476,8 +485,10 @@ type WebSocketMessage struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Type WebSocketMessage_Type `protobuf:"varint,1,opt,name=type,proto3,enum=protocol.WebSocketMessage_Type" json:"type,omitempty"`
-	Data []byte                `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Type      WebSocketMessage_Type `protobuf:"varint,1,opt,name=type,proto3,enum=protocol.WebSocketMessage_Type" json:"type,omitempty"`
+	Data      []byte                `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Headers   map[string]string     `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Timestamp int64                 `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
 func (x *WebSocketMessage) Reset() {
@@ -524,6 +535,20 @@ func (x *WebSocketMessage) GetData() []byte {
 		return x.Data
 	}
 	return nil
+}
+
+func (x *WebSocketMessage) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *WebSocketMessage) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
 }
 
 type HealthResponse struct {
