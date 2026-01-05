@@ -260,7 +260,6 @@ func toRustConstIdent(s string) string {
 	return strings.ToUpper(snakeCase)
 }
 
-
 // extractTypeReferences extracts all type names referenced in Rust type strings
 // For example: "Option<Job>" -> ["Job"], "Vec<Execution>" -> ["Execution"]
 func extractTypeReferences(rustType string) []string {

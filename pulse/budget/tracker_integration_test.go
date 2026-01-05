@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // insertUsageRecord inserts a record into ai_model_usage table for testing

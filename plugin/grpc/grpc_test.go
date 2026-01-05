@@ -93,11 +93,11 @@ type mockServiceRegistry struct {
 	logger *zap.SugaredLogger
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB                         { return nil }
-func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger   { return m.logger }
-func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config     { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() ats.AttestationStore            { return nil }
-func (m *mockServiceRegistry) Queue() pluginpkg.QueueService             { return nil }
+func (m *mockServiceRegistry) Database() *sql.DB                       { return nil }
+func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger { return m.logger }
+func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config   { return &mockConfig{} }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore          { return nil }
+func (m *mockServiceRegistry) Queue() pluginpkg.QueueService           { return nil }
 
 type mockConfig struct{}
 
@@ -107,7 +107,7 @@ func (c *mockConfig) GetBool(key string) bool            { return false }
 func (c *mockConfig) GetStringSlice(key string) []string { return nil }
 func (c *mockConfig) Get(key string) interface{}         { return nil }
 func (c *mockConfig) Set(key string, value interface{})  {}
-func (c *mockConfig) GetKeys() []string                   { return []string{} }
+func (c *mockConfig) GetKeys() []string                  { return []string{} }
 
 // startTestServer starts a gRPC server for testing and returns its address
 func startTestServer(t *testing.T, plugin pluginpkg.DomainPlugin) (string, func()) {
