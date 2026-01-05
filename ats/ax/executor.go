@@ -50,7 +50,7 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 		opts.QueryExpander = &ats.NoOpQueryExpander{}
 	}
 	if opts.Matcher == nil {
-		opts.Matcher = NewFuzzyMatcher()
+		opts.Matcher = NewDefaultMatcher()
 	}
 
 	return &AxExecutor{
