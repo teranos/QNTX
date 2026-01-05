@@ -115,16 +115,20 @@ func initializePluginRegistry() {
 	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
 	for _, p := range loadedPlugins {
+		meta := p.Metadata()
 		if err := registry.Register(p); err != nil {
-			pluginLogger.Errorw("Failed to register plugin",
-				"plugin", p.Metadata().Name,
-				"error", err,
+			pluginLogger.Errorw("Plugin registration failed",
+				"plugin", meta.Name,
+				"version", meta.Version,
+				"error", err.Error(),
+				"reason", "plugin may already be registered or have conflicting routes",
 			)
 			os.Exit(1)
 		}
-		pluginLogger.Infow("Registered plugin with registry",
-			"plugin", p.Metadata().Name,
-			"version", p.Metadata().Version,
+		pluginLogger.Infow("Plugin registered successfully",
+			"plugin", meta.Name,
+			"version", meta.Version,
+			"description", meta.Description,
 		)
 	}
 }
