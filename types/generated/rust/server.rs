@@ -105,7 +105,7 @@ pub struct DaemonStatusMessage {
     pub budget_weekly_limit: f64,
     /// Monthly budget limit (config)
     pub budget_monthly_limit: f64,
-    /// GRACE Phase 4: "running", "draining", "stopped"
+    /// Opening/Closing Phase 4: "running", "draining", "stopped"
     pub server_state: String,
     /// Unix timestamp
     pub timestamp: i64,
