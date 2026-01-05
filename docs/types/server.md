@@ -664,6 +664,118 @@ export interface ParsedATSCode {
 </tr>
 </table>
 
+## PluginHealthMessage
+
+**Source**: [`server/types.go:202`](https://github.com/teranos/QNTX/blob/main/server/types.go#L202)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type PluginHealthMessage struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+	Healthy bool `json:"healthy"`
+	State string `json:"state"`
+	Message string `json:"message"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface PluginHealthMessage {
+  /**
+   * "plugin_health"
+   */
+  type: string;
+  /**
+   * Plugin name
+   */
+  name: string;
+  /**
+   * Current health status
+   */
+  healthy: boolean;
+  /**
+   * "running", "paused", "stopped"
+   */
+  state: string;
+  /**
+   * Status message
+   */
+  message: string;
+  /**
+   * Unix timestamp
+   */
+  timestamp: number;
+}
+```
+
+</td>
+</tr>
+</table>
+
+## PluginInfo
+
+**Source**: [`server/handlers.go:599`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L599)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type PluginInfo struct {
+	Name string `json:"name"`
+	Version string `json:"version"`
+	QNTXVersion string `json:"qntx_version,omitempty"`
+	Description string `json:"description"`
+	Author string `json:"author,omitempty"`
+	License string `json:"license,omitempty"`
+	Healthy bool `json:"healthy"`
+	Message string `json:"message,omitempty"`
+	Details map[string]interface{} `json:"details,omitempty"`
+	State string `json:"state"`
+	Pausable bool `json:"pausable"`
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface PluginInfo {
+  name: string;
+  version: string;
+  qntx_version?: string;
+  description: string;
+  author?: string;
+  license?: string;
+  healthy: boolean;
+  message?: string;
+  details?: Record<string, unknown>;
+  state: string;
+  pausable: boolean;
+}
+```
+
+</td>
+</tr>
+</table>
+
 ## ProgressMessage
 
 **Source**: [`server/types.go:78`](https://github.com/teranos/QNTX/blob/main/server/types.go#L78)

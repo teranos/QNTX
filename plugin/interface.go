@@ -74,6 +74,34 @@ type WebSocketHandler interface {
 // HealthStatus represents the health of a domain plugin
 type HealthStatus struct {
 	Healthy bool
+	Paused  bool // True if plugin is intentionally paused (not a failure)
 	Message string
 	Details map[string]interface{}
+}
+
+// PluginState represents the current state of a plugin
+type PluginState string
+
+const (
+	// StateRunning indicates the plugin is active and processing requests
+	StateRunning PluginState = "running"
+	// StatePaused indicates the plugin is temporarily suspended
+	StatePaused PluginState = "paused"
+	// StateStopped indicates the plugin has been shut down
+	StateStopped PluginState = "stopped"
+)
+
+// PausablePlugin is an optional interface for plugins that support pause/resume.
+// Plugins that implement this interface can be paused and resumed at runtime
+// without a full shutdown/restart cycle.
+type PausablePlugin interface {
+	DomainPlugin
+
+	// Pause temporarily suspends the plugin's operations.
+	// The plugin should stop processing new requests but maintain its state.
+	// HTTP endpoints may return 503 Service Unavailable while paused.
+	Pause(ctx context.Context) error
+
+	// Resume restores the plugin to active operation after a pause.
+	Resume(ctx context.Context) error
 }
