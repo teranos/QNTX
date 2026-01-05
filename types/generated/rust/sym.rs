@@ -30,21 +30,21 @@ pub const PULSE_CLOSE: &str = "❀";
 pub const PULSE_OPEN: &str = "✿";
 pub const SO: &str = "⟶";
 
-pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, r#AS, IS, OF, BY, AT, SO];
+pub const PALETTE_ORDER: &[&str] = &[I, AM, IX, AX, BY, AT, SO];
 
 lazy_static::lazy_static! {
     pub static ref COMMAND_DESCRIPTIONS: std::collections::HashMap<&'static str, &'static str> = {
         let mut m = std::collections::HashMap::new();
-        m.insert("am", "Structure — QNTX's internal understanding");
+        m.insert("am", "Configuration — System settings and state");
         m.insert("as", "Assert — Emit an attestation");
-        m.insert("at", "Event — Temporal marker/moment");
-        m.insert("ax", "Expand — Surface related context");
-        m.insert("by", "Actor — Catalyst/origin of action");
+        m.insert("at", "Temporal — Time marker/moment");
+        m.insert("ax", "Expand — Query and surface related context");
+        m.insert("by", "Actor — Origin of action (creator/source/user)");
         m.insert("i", "Self — Your vantage point into QNTX");
-        m.insert("is", "Identity — Subject/equivalence");
+        m.insert("is", "Identity — Subject/equivalence in attestations");
         m.insert("ix", "Ingest — Import external data");
-        m.insert("of", "Membership — Element-of/belonging");
-        m.insert("so", "Therefore — Consequent action");
+        m.insert("of", "Membership — Element-of/belonging in attestations");
+        m.insert("so", "Therefore — Consequent action/trigger");
         m
     };
 }
