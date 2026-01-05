@@ -91,3 +91,46 @@ jobs:
             docker tag ghcr.io/teranos/qntx:latest ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-${{ matrix.arch }}
             docker push ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-${{ matrix.arch }}
           fi
+
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: build-push
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_version=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_version=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push multi-arch manifest for latest
+        run: |
+          docker manifest create ghcr.io/teranos/qntx:latest \
+            ghcr.io/teranos/qntx:latest-amd64 \
+            ghcr.io/teranos/qntx:latest-arm64
+
+          docker manifest push ghcr.io/teranos/qntx:latest
+
+      - name: Create and push multi-arch manifest for version tag
+        if: steps.version.outputs.has_version == 'true'
+        run: |
+          docker manifest create ghcr.io/teranos/qntx:${{ steps.version.outputs.version }} \
+            ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-amd64 \
+            ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-arm64
+
+          docker manifest push ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
