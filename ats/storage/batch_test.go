@@ -15,9 +15,9 @@ type mockItem struct {
 	meta      map[string]string
 }
 
-func (m *mockItem) GetSubject() string       { return m.subject }
-func (m *mockItem) GetPredicate() string     { return m.predicate }
-func (m *mockItem) GetObject() string        { return m.object }
+func (m *mockItem) GetSubject() string         { return m.subject }
+func (m *mockItem) GetPredicate() string       { return m.predicate }
+func (m *mockItem) GetObject() string          { return m.object }
 func (m *mockItem) GetMeta() map[string]string { return m.meta }
 
 // Ensure mockItem implements AttestationItem

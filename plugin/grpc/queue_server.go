@@ -211,11 +211,11 @@ func protoToJob(proto *protocol.Job) (*async.Job, error) {
 	}
 
 	job := &async.Job{
-		ID:           proto.Id,
-		HandlerName:  proto.HandlerName,
-		Payload:      proto.Payload,
-		Source:       proto.Source,
-		Status:       async.JobStatus(proto.Status),
+		ID:          proto.Id,
+		HandlerName: proto.HandlerName,
+		Payload:     proto.Payload,
+		Source:      proto.Source,
+		Status:      async.JobStatus(proto.Status),
 		Progress: async.Progress{
 			Current: int(proto.Progress.Current),
 			Total:   int(proto.Progress.Total),

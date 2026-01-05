@@ -82,64 +82,64 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 				}
 			}
 
-		// Create or update object node (if context is an entity)
-		// Two-pass approach: contexts that appear as subjects are entities
-		// Grouping labels (commit_metadata, lineage, authorship) never appear as subjects
-		if !isLiteralValue(claim.Context) {
-			objectID := normalizeNodeID(claim.Context)
+			// Create or update object node (if context is an entity)
+			// Two-pass approach: contexts that appear as subjects are entities
+			// Grouping labels (commit_metadata, lineage, authorship) never appear as subjects
+			if !isLiteralValue(claim.Context) {
+				objectID := normalizeNodeID(claim.Context)
 
-			// Only create node and link if context appears as a subject elsewhere (is an entity)
-			if subjectSet[objectID] {
+				// Only create node and link if context appears as a subject elsewhere (is an entity)
+				if subjectSet[objectID] {
 
-				// Determine object node type
-				objectNodeType, objectTypeSource := b.determineNodeType(
-					claim.Context,
-					objectID,
-					claim.Predicate,
-					claim.Context,
-					nodeTypeMap,
-				)
+					// Determine object node type
+					objectNodeType, objectTypeSource := b.determineNodeType(
+						claim.Context,
+						objectID,
+						claim.Predicate,
+						claim.Context,
+						nodeTypeMap,
+					)
 
-				if _, exists := nodeMap[objectID]; !exists {
-					nodeMap[objectID] = &Node{
-						ID:         objectID,
-						Type:       objectNodeType,
-						TypeSource: objectTypeSource,
-						Label:      claim.Context,
-						Visible:    true,
-						Group:      0, // Group assigned from type definitions
-						Metadata: map[string]interface{}{
-							"original_id": claim.Context,
-						},
+					if _, exists := nodeMap[objectID]; !exists {
+						nodeMap[objectID] = &Node{
+							ID:         objectID,
+							Type:       objectNodeType,
+							TypeSource: objectTypeSource,
+							Label:      claim.Context,
+							Visible:    true,
+							Group:      0, // Group assigned from type definitions
+							Metadata: map[string]interface{}{
+								"original_id": claim.Context,
+							},
+						}
+					}
+
+					// Create link
+					linkID := fmt.Sprintf("%s_%s_%s", subjectID, claim.Predicate, objectID)
+					if _, exists := linkMap[linkID]; !exists {
+						linkMap[linkID] = &Link{
+							Source: subjectID,
+							Target: objectID,
+							Type:   claim.Predicate,
+							Weight: defaultLinkWeight,
+							Label:  claim.Predicate,
+						}
+					} else {
+						// Increase weight for duplicate relationships
+						linkMap[linkID].Weight += linkWeightIncrement
 					}
 				}
-
-				// Create link
-				linkID := fmt.Sprintf("%s_%s_%s", subjectID, claim.Predicate, objectID)
-				if _, exists := linkMap[linkID]; !exists {
-					linkMap[linkID] = &Link{
-						Source: subjectID,
-						Target: objectID,
-						Type:   claim.Predicate,
-						Weight: defaultLinkWeight,
-						Label:  claim.Predicate,
-					}
-				} else {
-					// Increase weight for duplicate relationships
-					linkMap[linkID].Weight += linkWeightIncrement
+				// else: context is a grouping label (doesn't appear as subject) - skip entirely
+			} else {
+				// For literal values, add as metadata to the subject node
+				node := nodeMap[subjectID]
+				if node.Metadata == nil {
+					node.Metadata = make(map[string]interface{})
 				}
+				node.Metadata[claim.Predicate] = claim.Context
 			}
-			// else: context is a grouping label (doesn't appear as subject) - skip entirely
-		} else {
-			// For literal values, add as metadata to the subject node
-			node := nodeMap[subjectID]
-			if node.Metadata == nil {
-				node.Metadata = make(map[string]interface{})
-			}
-			node.Metadata[claim.Predicate] = claim.Context
 		}
 	}
-}
 
 	// Convert maps to slices with deterministic ordering
 	// Sort by ID for consistent output across runs
