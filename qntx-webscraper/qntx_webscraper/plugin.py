@@ -536,8 +536,11 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
         )
 
     def Health(self, request, context):
-        """Check plugin health."""
-        healthy = self.scraper is not None
+        """Check plugin health.
+
+        Plugin is always healthy - Initialize() is called separately.
+        """
+        healthy = True  # Plugin server is running
         details = {}
 
         if self.ats_client:
