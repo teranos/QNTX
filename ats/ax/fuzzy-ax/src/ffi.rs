@@ -310,16 +310,19 @@ pub extern "C" fn fuzzy_engine_find_matches(
 
     let mut c_matches: Vec<RustMatchC> = Vec::with_capacity(matches.len());
     for m in matches {
+        // Handle null bytes gracefully - return error instead of panicking
+        let value_cstr = match CString::new(m.value) {
+            Ok(cs) => cs,
+            Err(_) => return RustMatchResultC::error("match value contains null bytes"),
+        };
+        let strategy_cstr = match CString::new(m.strategy) {
+            Ok(cs) => cs,
+            Err(_) => return RustMatchResultC::error("strategy name contains null bytes"),
+        };
         c_matches.push(RustMatchC {
-            // Safe: value and strategy come from Rust engine (not user input)
-            // Panic here indicates a bug in the engine
-            value: CString::new(m.value)
-                .expect("match value should not contain null bytes")
-                .into_raw(),
+            value: value_cstr.into_raw(),
             score: m.score,
-            strategy: CString::new(m.strategy)
-                .expect("strategy name should not contain null bytes")
-                .into_raw(),
+            strategy: strategy_cstr.into_raw(),
         });
     }
 
