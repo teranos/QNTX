@@ -89,6 +89,13 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	s.register <- client
 
+	// Send system capabilities on connection (inform client of available optimizations)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.sendSystemCapabilitiesToClient(client)
+	}()
+
 	// Send active jobs on connection (so hard refresh shows current jobs)
 	s.wg.Add(1)
 	go func() {

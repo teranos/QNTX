@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# QNTX pre-commit hook - Go formatting
+#
+# This hook runs gofmt on all staged Go files to ensure consistent formatting.
+# Unlike the Nix-based pre-commit hooks, this runs locally and has network access
+# for downloading Go modules if needed.
+
+set -e
+
+# Get list of staged Go files
+STAGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+
+if [ -z "$STAGED_GO_FILES" ]; then
+  exit 0
+fi
+
+# Check if gofmt is available
+if ! command -v gofmt &> /dev/null; then
+  echo "Error: gofmt not found. Please install Go toolchain."
+  exit 1
+fi
+
+# Run gofmt on staged files
+echo "Running gofmt on staged Go files..."
+UNFORMATTED_FILES=""
+
+for FILE in $STAGED_GO_FILES; do
+  # Check if file needs formatting
+  if ! gofmt -l "$FILE" | grep -q .; then
+    continue
+  fi
+
+  # Format the file
+  gofmt -w "$FILE"
+
+  # Re-stage the formatted file
+  git add "$FILE"
+
+  UNFORMATTED_FILES="$UNFORMATTED_FILES\n  - $FILE"
+done
+
+if [ -n "$UNFORMATTED_FILES" ]; then
+  echo -e "Formatted and re-staged Go files:$UNFORMATTED_FILES"
+fi
+
+echo "✓ Go formatting check passed"
+exit 0
