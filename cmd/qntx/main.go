@@ -117,19 +117,12 @@ func initializePluginRegistry() {
 	for _, p := range loadedPlugins {
 		meta := p.Metadata()
 		if err := registry.Register(p); err != nil {
-			pluginLogger.Errorw("Plugin registration failed",
-				"plugin", meta.Name,
-				"version", meta.Version,
-				"error", err.Error(),
-				"reason", "plugin may already be registered or have conflicting routes",
-			)
+			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (may be duplicate or route conflict)",
+				meta.Name, meta.Version, err.Error())
 			os.Exit(1)
 		}
-		pluginLogger.Infow("Plugin registered successfully",
-			"plugin", meta.Name,
-			"version", meta.Version,
-			"description", meta.Description,
-		)
+		pluginLogger.Infof("Registered '%s' plugin v%s - %s",
+			meta.Name, meta.Version, meta.Description)
 	}
 }
 

@@ -34,23 +34,12 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 	var pluginConfigs []PluginConfig
 	var failedPlugins []string
 	for _, pluginName := range cfg.Plugin.Enabled {
-		logger.Infow("Searching for plugin binary",
-			"plugin", pluginName,
-			"search_paths", cfg.Plugin.Paths,
-		)
+		logger.Infof("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
 
 		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
-			logger.Warnw("Plugin discovery failed - binary not found or not executable",
-				"plugin", pluginName,
-				"error", err.Error(),
-				"searched_paths", cfg.Plugin.Paths,
-				"tried_names", []string{
-					fmt.Sprintf("qntx-%s-plugin", pluginName),
-					fmt.Sprintf("qntx-%s", pluginName),
-					pluginName,
-				},
-			)
+			logger.Warnf("Plugin '%s' not found - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]",
+				pluginName, cfg.Plugin.Paths, pluginName, pluginName, pluginName)
 			failedPlugins = append(failedPlugins, pluginName)
 			continue
 		}
@@ -135,11 +124,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 					continue
 				}
 
-				logger.Infow("Found plugin binary",
-					"plugin", name,
-					"binary_path", candidate,
-					"executable", true,
-				)
+				logger.Infof("Found '%s' plugin binary: %s", name, candidate)
 
 				return PluginConfig{
 					Name:      name,
