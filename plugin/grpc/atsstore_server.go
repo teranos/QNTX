@@ -245,9 +245,25 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 		Limit: int(proto.Limit),
 	}
 
-	// AttestationFilter only supports single Actor, use first if provided
+	// Convert proto arrays to filter fields
+	if len(proto.Subjects) > 0 {
+		filter.Subjects = proto.Subjects
+	}
+
+	if len(proto.Predicates) > 0 {
+		filter.Predicates = proto.Predicates
+	}
+
+	if len(proto.Contexts) > 0 {
+		filter.Contexts = proto.Contexts
+	}
+
 	if len(proto.Actors) > 0 {
-		filter.Actor = proto.Actors[0]
+		filter.Actors = proto.Actors
+		// Maintain backwards compatibility - set single Actor field if only one provided
+		if len(proto.Actors) == 1 {
+			filter.Actor = proto.Actors[0]
+		}
 	}
 
 	if proto.TimeStart != 0 {
@@ -259,9 +275,6 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 		t := time.Unix(proto.TimeEnd, 0)
 		filter.TimeEnd = &t
 	}
-
-	// TODO: ats.AttestationFilter doesn't support Subjects, Predicates, Contexts filtering yet
-	// These fields in the proto are for future expansion
 
 	return filter
 }

@@ -30,7 +30,46 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	// Build WHERE clause based on filters
 	whereClauses := []string{}
 
-	if filters.Actor != "" {
+	// Handle subjects filter - match any subject in the filter list
+	if len(filters.Subjects) > 0 {
+		subjectConditions := []string{}
+		for _, subject := range filters.Subjects {
+			subjectConditions = append(subjectConditions, "json_extract(subjects, '$') LIKE ?")
+			args = append(args, "%\""+subject+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(subjectConditions, " OR ")+")")
+	}
+
+	// Handle predicates filter - match any predicate in the filter list
+	if len(filters.Predicates) > 0 {
+		predicateConditions := []string{}
+		for _, predicate := range filters.Predicates {
+			predicateConditions = append(predicateConditions, "json_extract(predicates, '$') LIKE ?")
+			args = append(args, "%\""+predicate+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(predicateConditions, " OR ")+")")
+	}
+
+	// Handle contexts filter - match any context in the filter list
+	if len(filters.Contexts) > 0 {
+		contextConditions := []string{}
+		for _, context := range filters.Contexts {
+			contextConditions = append(contextConditions, "json_extract(contexts, '$') LIKE ?")
+			args = append(args, "%\""+context+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(contextConditions, " OR ")+")")
+	}
+
+	// Handle actors filter - match any actor in the filter list
+	if len(filters.Actors) > 0 {
+		actorConditions := []string{}
+		for _, actor := range filters.Actors {
+			actorConditions = append(actorConditions, "json_extract(actors, '$') LIKE ?")
+			args = append(args, "%\""+actor+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(actorConditions, " OR ")+")")
+	} else if filters.Actor != "" {
+		// Backwards compatibility: support single Actor field
 		whereClauses = append(whereClauses, "json_extract(actors, '$') LIKE ?")
 		args = append(args, "%\""+filters.Actor+"\"%")
 	}
