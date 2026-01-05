@@ -340,7 +340,10 @@ pub extern "C" fn fuzzy_match_result_free(result: RustMatchResultC) {
 
         // Free the array itself
         unsafe {
-            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(result.matches, result.matches_len));
+            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                result.matches,
+                result.matches_len,
+            ));
         }
     }
 }
@@ -390,10 +393,7 @@ pub extern "C" fn fuzzy_string_free(s: *mut c_char) {
 // ============================================================================
 
 /// Convert a C string array to Vec<String>
-fn convert_string_array(
-    arr: *const *const c_char,
-    len: usize,
-) -> Result<Vec<String>, String> {
+fn convert_string_array(arr: *const *const c_char, len: usize) -> Result<Vec<String>, String> {
     let slice = unsafe { slice::from_raw_parts(arr, len) };
     let mut result = Vec::with_capacity(len);
 
@@ -445,13 +445,8 @@ mod tests {
         ];
         let pred_ptrs: Vec<*const c_char> = predicates.iter().map(|s| s.as_ptr()).collect();
 
-        let rebuild_result = fuzzy_engine_rebuild_index(
-            engine,
-            pred_ptrs.as_ptr(),
-            pred_ptrs.len(),
-            ptr::null(),
-            0,
-        );
+        let rebuild_result =
+            fuzzy_engine_rebuild_index(engine, pred_ptrs.as_ptr(), pred_ptrs.len(), ptr::null(), 0);
         assert!(rebuild_result.success);
         fuzzy_rebuild_result_free(rebuild_result);
 

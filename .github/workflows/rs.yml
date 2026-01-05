@@ -7,6 +7,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
+      - 'plugins/qntx-fuzzy/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
+      - 'plugins/qntx-fuzzy/Cargo.toml'
   workflow_dispatch:
 
 jobs:
@@ -39,6 +41,7 @@ jobs:
           workspaces: |
             types/generated/rust
             web/src-tauri
+            plugins/qntx-fuzzy
 
       - name: Check formatting (generated types)
         run: cd types/generated/rust && cargo fmt --check
@@ -62,3 +65,18 @@ jobs:
 
       # - name: Check (Tauri app)
       #   run: cd web/src-tauri && cargo check
+
+      # qntx-fuzzy plugin checks
+      - name: Check formatting (qntx-fuzzy)
+        run: cd plugins/qntx-fuzzy && cargo fmt --check
+
+      - name: Clippy (qntx-fuzzy)
+        run: cd plugins/qntx-fuzzy && cargo clippy --lib --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test (qntx-fuzzy)
+        run: cd plugins/qntx-fuzzy && cargo test --lib
+
+      - name: Build release (qntx-fuzzy)
+        run: cd plugins/qntx-fuzzy && cargo build --release --lib
