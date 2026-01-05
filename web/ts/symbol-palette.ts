@@ -29,6 +29,7 @@ import {
     CommandToSymbol,
 } from '@generated/sym.js';
 import { uiState } from './ui-state.ts';
+import { debugLog } from './debug.ts';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go';
@@ -88,7 +89,7 @@ function setActiveModality(cmd: string): void {
         activeCell.classList.add('active');
     }
 
-    console.log(`[Symbol Palette] Modality set to: ${cmd}`);
+    debugLog(`[Symbol Palette] Modality set to: ${cmd}`);
 }
 
 // Export for use by other modules
@@ -104,7 +105,7 @@ function handleSymbolClick(e: Event): void {
     if (!cmd) return;
 
     const symbol = getSymbol(cmd);
-    console.log(`[Symbol Palette] ${symbol} (${cmd}) clicked`);
+    debugLog(`[Symbol Palette] ${symbol} (${cmd}) clicked`);
 
     // Set as active modality (color inversion)
     setActiveModality(cmd);
@@ -184,7 +185,7 @@ function activateSearchMode(mode: string): void {
     if (queryInput) {
         queryInput.focus();
         queryInput.select();
-        console.log(`[Symbol Palette] ${getSymbol(mode)} search mode activated`);
+        debugLog(`[Symbol Palette] ${getSymbol(mode)} search mode activated`);
     }
 }
 
@@ -235,7 +236,7 @@ async function activateIngestMode(mode: string): Promise<void> {
     // Show job list panel (IMPLEMENTED)
     const { toggleJobList } = await import('./hixtory-panel.js');
     toggleJobList();
-    console.log(`[Symbol Palette] ${getSymbol(mode)} ingest mode - showing job list`);
+    debugLog(`[Symbol Palette] ${getSymbol(mode)} ingest mode - showing job list`);
 }
 
 /**
@@ -250,7 +251,7 @@ function activateAttestationMode(mode: string): void {
             queryInput.value = 'is ';
             queryInput.selectionStart = queryInput.value.length;
         }
-        console.log(`[Symbol Palette] ${getSymbol(mode)} attestation mode activated`);
+        debugLog(`[Symbol Palette] ${getSymbol(mode)} attestation mode activated`);
     }
 }
 
@@ -274,7 +275,7 @@ function insertSegment(segment: string): void {
     queryInput.value = text.substring(0, start) + newSegment + text.substring(end);
     queryInput.selectionStart = queryInput.selectionEnd = start + newSegment.length;
 
-    console.log(`[Symbol Palette] ${getSymbol(segment)} segment inserted`);
+    debugLog(`[Symbol Palette] ${getSymbol(segment)} segment inserted`);
 }
 
 /**
@@ -287,7 +288,7 @@ function insertSegment(segment: string): void {
  * Currently logs intent; actual implementation will emerge as use cases clarify.
  */
 function handleSoCommand(_cmd: string): void {
-    console.log(`[Symbol Palette] ${SO} (so/therefore) - consequent action triggered`);
+    debugLog(`[Symbol Palette] ${SO} (so/therefore) - consequent action triggered`);
 
     // Placeholder for future implementation
     // Possible behaviors:
