@@ -25,11 +25,15 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     sed -i '' 's/^import atsstore_pb2/from . import atsstore_pb2/' "$OUT_DIR"/*_pb2_grpc.py
     sed -i '' 's/^import domain_pb2/from . import domain_pb2/' "$OUT_DIR"/*_pb2_grpc.py
     sed -i '' 's/^import queue_pb2/from . import queue_pb2/' "$OUT_DIR"/*_pb2_grpc.py
+    # Remove unused warnings import
+    sed -i '' '/^import warnings$/d' "$OUT_DIR"/*_pb2_grpc.py
 else
     # Linux doesn't require empty string
     sed -i 's/^import atsstore_pb2/from . import atsstore_pb2/' "$OUT_DIR"/*_pb2_grpc.py
     sed -i 's/^import domain_pb2/from . import domain_pb2/' "$OUT_DIR"/*_pb2_grpc.py
     sed -i 's/^import queue_pb2/from . import queue_pb2/' "$OUT_DIR"/*_pb2_grpc.py
+    # Remove unused warnings import
+    sed -i '/^import warnings$/d' "$OUT_DIR"/*_pb2_grpc.py
 fi
 
 echo "Generated Python gRPC stubs in $OUT_DIR"
