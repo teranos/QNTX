@@ -77,11 +77,13 @@ function openBudgetConfigPanel(): void {
         });
 
     // Show overlay
-    overlay.style.display = 'flex';
+    overlay.classList.remove('u-hidden');
+    overlay.classList.add('u-flex');
 
     // Handle close
     const closeHandler = () => {
-        overlay.style.display = 'none';
+        overlay.classList.remove('u-flex');
+        overlay.classList.add('u-hidden');
     };
 
     closeBtn?.addEventListener('click', closeHandler, { once: true });
@@ -101,6 +103,7 @@ function openBudgetConfigPanel(): void {
             monthly_budget: parseFloat(monthlyInput.value) || 30.0
         });
 
-        overlay.style.display = 'none';
+        overlay.classList.remove('u-flex');
+        overlay.classList.add('u-hidden');
     };
 }
