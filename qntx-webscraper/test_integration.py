@@ -13,14 +13,12 @@ import json
 import threading
 import time
 from concurrent import futures
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import grpc
 
-from qntx_webscraper.grpc import atsstore_pb2, atsstore_pb2_grpc
-from qntx_webscraper.grpc import domain_pb2
+from qntx_webscraper.grpc import atsstore_pb2, atsstore_pb2_grpc, domain_pb2
 from qntx_webscraper.plugin import WebScraperPlugin
-
 
 # ==================== Mock HTTP Server ====================
 

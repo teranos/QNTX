@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Security tests for SSRF vulnerabilities."""
 
-import sys
 import socket
-from qntx_webscraper.scraper import WebScraper, SSRFError
+import sys
+
+from qntx_webscraper.scraper import SSRFError, WebScraper
 
 
 def test_ssrf_protection():

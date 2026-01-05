@@ -2,7 +2,8 @@
 
 import pytest
 import responses
-from qntx_webscraper.scraper import WebScraper, SSRFError
+
+from qntx_webscraper.scraper import SSRFError, WebScraper
 
 
 class TestSSRFProtection:
