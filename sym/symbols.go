@@ -2,38 +2,40 @@
 // These symbols are stable across UI, CLI, and documentation.
 package sym
 
-// Canonical symbols for QNTX SEG operations.
-// These should stay stable across UI, CLI and docs.
+// Primary SEG operators - these have UI components and commands
 const (
-	I  = "⍟" // self / operator vantage point
-	AM = "≡" // AM structure / internal interpretation
-	IX = "⨳" // ingest / import
-	AX = "⋈" // expand / contextual surfacing
-	AS = "+" // assert / emit .ats
-	IS = "=" // identity / equivalence
-	OF = "∈" // membership / element-of / belonging
-	BY = "⌬" // actor / catalyst / origin of action
-	AT = "✦" // event / temporal marker
-	SO = "⟶" // therefore / consequent action / trigger
+	I  = "⍟" // self - your vantage point into QNTX
+	AM = "≡" // am - configuration and system settings
+	IX = "⨳" // ix - ingest/import external data
+	AX = "⋈" // ax - expand/query, contextual surfacing
+	BY = "⌬" // by - actor/catalyst/origin (all forms: creator, source, user)
+	AT = "✦" // at - temporal marker/moment
+	SO = "⟶" // so - therefore/consequent action
 
-	// System symbols (not SEG operators)
-	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management
-	PulseOpen  = "✿" // Graceful start
-	PulseClose = "❀" // Graceful shutdown
-	DB         = "⊔" // Database: material retention substrate (square cup)
+	// Attestation building blocks (not UI elements)
+	// These are fundamental components of the attestation pattern:
+	// "subject IS predicate OF context BY actor AT time"
+	AS = "+" // as - assert/emit an attestation
+	IS = "=" // is - identity/equivalence in attestations
+	OF = "∈" // of - membership/belonging in attestations
+	// TODO: Consider alternative typeable symbol for OF
+
+	// System infrastructure symbols
+	Pulse      = "꩜" // Pulse system: async jobs, rate limiting, budget management (always prefix logs)
+	PulseOpen  = "✿" // Graceful startup with orphaned job recovery
+	PulseClose = "❀" // Graceful shutdown with checkpoint preservation
+	DB         = "⊔" // Database/storage layer
 	Prose      = "▣" // Documentation and prose content
 )
 
 // PaletteOrder defines the canonical ordering for UI controls,
 // shortcuts, selection bars, etc.
+// Only includes primary SEG operators (not attestation building blocks)
 var PaletteOrder = []string{
 	I,
 	AM,
 	IX,
 	AX,
-	AS,
-	IS,
-	OF,
 	BY,
 	AT,
 	SO,
@@ -41,45 +43,52 @@ var PaletteOrder = []string{
 
 // SymbolToCommand maps symbols to their text command equivalents
 // for dual-mode acceptance (backwards compatibility)
+// Includes both primary SEG operators and attestation building blocks
 var SymbolToCommand = map[string]string{
+	// Primary SEG operators
 	I:  "i",
 	AM: "am",
 	IX: "ix",
 	AX: "ax",
-	AS: "as",
-	IS: "is",
-	OF: "of",
 	BY: "by",
 	AT: "at",
 	SO: "so",
+	// Attestation building blocks
+	AS: "as",
+	IS: "is",
+	OF: "of",
 }
 
 // CommandToSymbol maps text commands to their canonical symbols
 // for normalization and display purposes
 var CommandToSymbol = map[string]string{
+	// Primary SEG operators
 	"i":  I,
 	"am": AM,
 	"ix": IX,
 	"ax": AX,
-	"as": AS,
-	"is": IS,
-	"of": OF,
 	"by": BY,
 	"at": AT,
 	"so": SO,
+	// Attestation building blocks
+	"as": AS,
+	"is": IS,
+	"of": OF,
 }
 
 // CommandDescriptions provides human-readable explanations
 // for tooltip hover states
 var CommandDescriptions = map[string]string{
+	// Primary SEG operators
 	"i":  "Self — Your vantage point into QNTX",
-	"am": "Structure — QNTX's internal understanding",
+	"am": "Configuration — System settings and state",
 	"ix": "Ingest — Import external data",
-	"ax": "Expand — Surface related context",
+	"ax": "Expand — Query and surface related context",
+	"by": "Actor — Origin of action (creator/source/user)",
+	"at": "Temporal — Time marker/moment",
+	"so": "Therefore — Consequent action/trigger",
+	// Attestation building blocks
 	"as": "Assert — Emit an attestation",
-	"is": "Identity — Subject/equivalence",
-	"of": "Membership — Element-of/belonging",
-	"by": "Actor — Catalyst/origin of action",
-	"at": "Event — Temporal marker/moment",
-	"so": "Therefore — Consequent action",
+	"is": "Identity — Subject/equivalence in attestations",
+	"of": "Membership — Element-of/belonging in attestations",
 }

@@ -94,9 +94,9 @@ type JobHandler interface {
 
 **Generic Architecture:**
 - No JobType enum - handlers identified by string name
-- No JobMetadata struct - payloads are handler-specific JSON
+- JobMetadata exists for phase tracking in two-phase jobs (ingest/aggregate patterns)
 - Domain packages define their own payload types
-- Infrastructure (async package) is fully domain-agnostic
+- Infrastructure (async package) is domain-agnostic with minimal job coordination support
 
 ### Configuration
 
