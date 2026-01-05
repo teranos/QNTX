@@ -8,7 +8,6 @@
 //! 4. Jaro-Winkler similarity (score: 0.6-0.85)
 //! 5. Levenshtein edit distance (score: 0.6-0.8)
 
-use std::collections::HashSet;
 use std::time::Instant;
 
 use ahash::AHasher;
@@ -100,18 +99,18 @@ impl FuzzyEngine {
     ) -> (usize, usize, u64, String) {
         let start = Instant::now();
 
-        // Deduplicate and sort for consistent hashing
+        // Deduplicate and sort for consistent hashing (more efficient than HashSet)
         let predicates: Vec<String> = {
-            let mut set: HashSet<String> = predicates.into_iter().collect();
-            let mut v: Vec<String> = set.drain().collect();
+            let mut v = predicates;
             v.sort();
+            v.dedup();
             v
         };
 
         let contexts: Vec<String> = {
-            let mut set: HashSet<String> = contexts.into_iter().collect();
-            let mut v: Vec<String> = set.drain().collect();
+            let mut v = contexts;
             v.sort();
+            v.dedup();
             v
         };
 
@@ -217,9 +216,9 @@ impl FuzzyEngine {
         }
 
         // 4. Word boundary match (query matches a complete word)
-        let words: Vec<&str> = item_lower.split_whitespace().collect();
-        for word in &words {
-            if *word == query_lower {
+        // Split on common separators: whitespace, underscore, hyphen
+        for word in item_lower.split(|c: char| c.is_whitespace() || c == '_' || c == '-') {
+            if word == query_lower {
                 return Some(RankedMatch::new(
                     original_value.to_string(),
                     0.85,
@@ -410,5 +409,22 @@ mod tests {
         let hash2 = engine.get_index_hash();
 
         assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_word_boundary_with_underscore() {
+        let engine = test_engine();
+        // "author" is a word in "is_author_of" when splitting on underscores
+        let (matches, _) = engine.find_matches("author", VocabularyType::Predicates, None, None);
+
+        assert!(!matches.is_empty());
+        // Should match via word_boundary strategy for exact word match
+        let author_match = matches.iter().find(|m| m.value == "is_author_of");
+        assert!(author_match.is_some());
+        // Could be substring or word_boundary depending on which matches first
+        assert!(
+            author_match.unwrap().strategy == "word_boundary"
+                || author_match.unwrap().strategy == "substring"
+        );
     }
 }

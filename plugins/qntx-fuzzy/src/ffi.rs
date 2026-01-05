@@ -20,9 +20,6 @@
 //! All public FFI functions handle null pointer checks internally.
 //! The caller is responsible for passing valid pointers as documented.
 
-// FFI functions intentionally take raw pointers and handle safety internally
-#![allow(clippy::not_unsafe_ptr_arg_deref)]
-
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
@@ -122,6 +119,7 @@ pub extern "C" fn fuzzy_engine_new() -> *mut FuzzyEngine {
 /// - `engine` must not be used after this call
 /// - Safe to call with NULL (no-op)
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_engine_free(engine: *mut FuzzyEngine) {
     if !engine.is_null() {
         unsafe {
@@ -151,6 +149,7 @@ pub extern "C" fn fuzzy_engine_free(engine: *mut FuzzyEngine) {
 /// - `engine` must be valid
 /// - String arrays must contain valid pointers for their stated lengths
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_engine_rebuild_index(
     engine: *const FuzzyEngine,
     predicates: *const *const c_char,
@@ -233,6 +232,7 @@ pub extern "C" fn fuzzy_rebuild_result_free(result: RustRebuildResultC) {
 /// - `engine` must be valid
 /// - `query` must be a valid null-terminated string
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_engine_find_matches(
     engine: *const FuzzyEngine,
     query: *const c_char,
@@ -357,6 +357,7 @@ pub extern "C" fn fuzzy_match_result_free(result: RustMatchResultC) {
 /// # Returns
 /// Null-terminated hash string. Caller must free with `fuzzy_string_free`.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_engine_get_hash(engine: *const FuzzyEngine) -> *mut c_char {
     if engine.is_null() {
         return ptr::null_mut();
@@ -370,6 +371,7 @@ pub extern "C" fn fuzzy_engine_get_hash(engine: *const FuzzyEngine) -> *mut c_ch
 
 /// Check if the engine index is ready (has vocabulary).
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_engine_is_ready(engine: *const FuzzyEngine) -> bool {
     if engine.is_null() {
         return false;
@@ -380,6 +382,7 @@ pub extern "C" fn fuzzy_engine_is_ready(engine: *const FuzzyEngine) -> bool {
 
 /// Free a string returned by FFI functions.
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_string_free(s: *mut c_char) {
     if !s.is_null() {
         unsafe {
