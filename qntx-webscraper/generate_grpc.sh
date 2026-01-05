@@ -19,8 +19,9 @@ python -m grpc_tools.protoc \
     "$PROTO_DIR/queue.proto"
 
 # Fix imports in generated files (protoc generates absolute imports)
-sed -i 's/^import atsstore_pb2/from . import atsstore_pb2/' "$OUT_DIR"/*_pb2_grpc.py
-sed -i 's/^import domain_pb2/from . import domain_pb2/' "$OUT_DIR"/*_pb2_grpc.py
-sed -i 's/^import queue_pb2/from . import queue_pb2/' "$OUT_DIR"/*_pb2_grpc.py
+# Use sed -i '' for macOS compatibility
+sed -i '' 's/^import atsstore_pb2/from . import atsstore_pb2/' "$OUT_DIR"/*_pb2_grpc.py
+sed -i '' 's/^import domain_pb2/from . import domain_pb2/' "$OUT_DIR"/*_pb2_grpc.py
+sed -i '' 's/^import queue_pb2/from . import queue_pb2/' "$OUT_DIR"/*_pb2_grpc.py
 
 echo "Generated Python gRPC stubs in $OUT_DIR"
