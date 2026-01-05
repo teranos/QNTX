@@ -60,8 +60,8 @@ var TypeMapping = map[string]string{
 	"float32":                "float",
 	"float64":                "float",
 	"bool":                   "bool",
-	"time.Time":              "str",  // ISO8601/RFC3339 string
-	"time.Duration":          "int",  // Nanoseconds as int
+	"time.Time":              "str", // ISO8601/RFC3339 string
+	"time.Duration":          "int", // Nanoseconds as int
 	"json.RawMessage":        "Any",
 	"map[string]interface{}": "dict[str, Any]",
 	// SQL nullable types - map to Optional

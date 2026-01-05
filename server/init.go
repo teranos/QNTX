@@ -10,10 +10,10 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
-	"github.com/teranos/QNTX/plugin"
-	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/plugin"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -148,7 +148,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		cancel:        cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
-	server.graphLimit.Store(1000) // Default graph node limit
+	server.graphLimit.Store(1000)                 // Default graph node limit
 	server.state.Store(int32(ServerStateRunning)) // GRACE Phase 4: Initialize to running
 
 	// Initialize domain plugin registry

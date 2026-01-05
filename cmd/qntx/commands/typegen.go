@@ -19,9 +19,9 @@ import (
 var languagePackages = map[string][]string{
 	"typescript": {
 		"github.com/teranos/QNTX/ats/types",
-		"github.com/teranos/QNTX/qntx-code/ast",    // AST transformation types
+		"github.com/teranos/QNTX/qntx-code/ast",        // AST transformation types
 		"github.com/teranos/QNTX/qntx-code/vcs/github", // GitHub PR integration types
-		"github.com/teranos/QNTX/graph",       // Frontend graph visualization
+		"github.com/teranos/QNTX/graph",                // Frontend graph visualization
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
