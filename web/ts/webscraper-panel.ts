@@ -205,9 +205,24 @@ class WebscraperPanel extends BasePanel {
             this.handleScraperResponse(data);
         } catch (error) {
             console.error('Scraping failed:', error);
+
+            let errorMessage = 'Unknown error occurred';
+            if (error instanceof Error) {
+                // Check for plugin connection issues
+                if (error.message.includes('404')) {
+                    errorMessage = 'Plugin endpoint not found - webscraper plugin may not be running or configured correctly';
+                } else if (error.message.includes('502') || error.message.includes('503')) {
+                    errorMessage = 'Cannot connect to webscraper plugin - check plugin status in Plugin Panel';
+                } else if (error.message.includes('Network')) {
+                    errorMessage = 'Network error - check if QNTX server is running';
+                } else {
+                    errorMessage = error.message;
+                }
+            }
+
             this.handleScraperResponse({
                 url: url,
-                error: error instanceof Error ? error.message : 'Unknown error occurred'
+                error: errorMessage
             });
         }
 

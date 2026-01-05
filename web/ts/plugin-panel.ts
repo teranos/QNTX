@@ -222,6 +222,9 @@ class PluginPanel extends BasePanel {
                     ${plugin.license ? `<span class="plugin-license" title="License">&#128196; ${this.escapeHtml(plugin.license)}</span>` : ''}
                     ${plugin.qntx_version ? `<span class="plugin-qntx-version" title="QNTX Version Requirement">&#8805; ${this.escapeHtml(plugin.qntx_version)}</span>` : ''}
                 </div>
+                <div class="plugin-path panel-code" title="Plugin configuration path">
+                    <span style="color: #666;">Path:</span> ~/.qntx/plugins/${this.escapeHtml(plugin.name)}.toml
+                </div>
                 ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
                 ${plugin.message ? `<div class="plugin-message ${plugin.healthy ? '' : 'plugin-message-error'}">${this.escapeHtml(plugin.message)}</div>` : ''}
                 ${this.renderDetails(plugin.details)}
