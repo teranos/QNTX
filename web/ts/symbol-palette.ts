@@ -32,7 +32,7 @@ import { uiState } from './ui-state.ts';
 import { debugLog } from './debug.ts';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'plugins';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -41,6 +41,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'pulse') return Pulse;
     if (cmd === 'prose') return Prose;
     if (cmd === 'go') return 'Go';
+    if (cmd === 'plugins') return '\u2699'; // Gear symbol
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -172,6 +173,10 @@ function handleSymbolClick(e: Event): void {
             // Go - show Go code editor with gopls integration
             showGoEditor();
             break;
+        case 'plugins':
+            // Plugins - show installed domain plugins
+            showPluginPanel();
+            break;
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -227,6 +232,14 @@ async function showProsePanel(): Promise<void> {
 async function showGoEditor(): Promise<void> {
     const { toggleGoEditor } = await import('./code/panel.js');
     toggleGoEditor();
+}
+
+/**
+ * Show plugin panel - displays installed domain plugins and their status
+ */
+async function showPluginPanel(): Promise<void> {
+    const { togglePluginPanel } = await import('./plugin-panel.js');
+    togglePluginPanel();
 }
 
 /**
