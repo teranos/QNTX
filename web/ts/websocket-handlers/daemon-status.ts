@@ -5,7 +5,7 @@
 
 import type { DaemonStatusMessage } from '../../types/websocket';
 import { toast } from '../toast';
-import { uiState } from '../ui-state.js';
+import { uiState } from '../ui-state.ts';
 
 const BUDGET_WARNING_THRESHOLD = 0.80; // Warn at 80% of budget
 

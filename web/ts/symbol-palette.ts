@@ -28,7 +28,7 @@ import {
     Pulse, Prose,
     CommandToSymbol,
 } from '@generated/sym.js';
-import { uiState } from './ui-state.js';
+import { uiState } from './ui-state.ts';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go';
