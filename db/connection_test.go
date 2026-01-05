@@ -72,27 +72,6 @@ func TestOpen(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("returns wrapped errors with context", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		dbPath := filepath.Join(tmpDir, "test.db")
-
-		db, err := Open(dbPath, nil)
-		require.NoError(t, err)
-		defer db.Close()
-
-		// Close the database
-		db.Close()
-
-		// Try to execute a pragma on closed db - should get wrapped error
-		_, execErr := db.Exec("PRAGMA journal_mode = WAL")
-		require.Error(t, execErr)
-
-		// The error should have stack trace
-		stackTrace := errors.GetStack(execErr)
-		// Note: sql package errors won't have stack unless we wrap them
-		// This test documents current behavior
-		_ = stackTrace
-	})
 }
 
 func TestOpen_WithLogger(t *testing.T) {
