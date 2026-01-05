@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import re
+import socket
 import time
 from dataclasses import dataclass, field
 from typing import Iterator
@@ -16,6 +18,11 @@ from bs4 import BeautifulSoup
 from lxml import etree
 
 from .atsstore import ATSStoreClient, AttestationCommand
+
+
+class SSRFError(ValueError):
+    """Raised when a URL is blocked due to SSRF protection."""
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +224,13 @@ class WebScraper:
     PREDICATE_FEED_CONTAINS = "feed_contains"
     PREDICATE_SITEMAP_CONTAINS = "sitemap_contains"
 
+    # Cloud metadata endpoints to block (SSRF protection)
+    BLOCKED_METADATA_HOSTS = {
+        "169.254.169.254",  # AWS/GCP/Azure metadata
+        "metadata.google.internal",
+        "metadata.goog",
+    }
+
     def __init__(
         self,
         ats_client: ATSStoreClient | None = None,
@@ -224,6 +238,8 @@ class WebScraper:
         timeout: int = 30,
         respect_robots: bool = True,
         rate_limit: float = 1.0,  # requests per second
+        max_response_size: int = 10 * 1024 * 1024,  # 10MB default
+        allow_private_ips: bool = False,  # SSRF protection
     ):
         """Initialize the scraper.
 
@@ -233,10 +249,14 @@ class WebScraper:
             timeout: Request timeout in seconds
             respect_robots: Whether to check robots.txt before scraping
             rate_limit: Maximum requests per second per domain
+            max_response_size: Maximum response size in bytes (default 10MB)
+            allow_private_ips: Allow scraping private/internal IPs (default False for SSRF protection)
         """
         self.ats_client = ats_client
         self.user_agent = user_agent
         self.timeout = timeout
+        self.max_response_size = max_response_size
+        self.allow_private_ips = allow_private_ips
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": user_agent})
 
@@ -258,6 +278,94 @@ class WebScraper:
         """Apply rate limiting for this URL's domain."""
         if self.rate_limiter:
             self.rate_limiter.wait(url)
+
+    def _validate_url(self, url: str) -> None:
+        """Validate URL is safe to fetch (SSRF protection).
+
+        Args:
+            url: The URL to validate
+
+        Raises:
+            SSRFError: If the URL is blocked for security reasons
+        """
+        parsed = urlparse(url)
+
+        # Only allow http/https
+        if parsed.scheme not in ("http", "https"):
+            raise SSRFError(f"Unsupported scheme: {parsed.scheme}")
+
+        hostname = parsed.hostname
+        if not hostname:
+            raise SSRFError("URL has no hostname")
+
+        # Block localhost/loopback (unless allow_private_ips is set)
+        if not self.allow_private_ips:
+            if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+                raise SSRFError(f"Cannot scrape localhost: {hostname}")
+
+        # Block cloud metadata endpoints (always blocked - security critical)
+        if hostname.lower() in self.BLOCKED_METADATA_HOSTS:
+            raise SSRFError(f"Cannot scrape cloud metadata endpoint: {hostname}")
+
+        # Check if hostname is an IP address
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if not self.allow_private_ips:
+                if ip.is_private:
+                    raise SSRFError(f"Cannot scrape private IP: {hostname}")
+                if ip.is_loopback:
+                    raise SSRFError(f"Cannot scrape loopback IP: {hostname}")
+                if ip.is_link_local:
+                    raise SSRFError(f"Cannot scrape link-local IP: {hostname}")
+                if ip.is_reserved:
+                    raise SSRFError(f"Cannot scrape reserved IP: {hostname}")
+        except ValueError:
+            # Not an IP address, resolve hostname and check
+            if not self.allow_private_ips:
+                try:
+                    resolved = socket.gethostbyname(hostname)
+                    ip = ipaddress.ip_address(resolved)
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        raise SSRFError(f"Hostname {hostname} resolves to blocked IP: {resolved}")
+                except socket.gaierror:
+                    pass  # Can't resolve, let request handle it
+
+    def _fetch_with_size_limit(self, url: str, expected_content_types: list[str] | None = None) -> bytes:
+        """Fetch URL with size limit and optional content-type validation.
+
+        Args:
+            url: The URL to fetch
+            expected_content_types: List of expected content-type substrings (e.g., ["text/html", "application/xhtml"])
+
+        Returns:
+            Response content as bytes
+
+        Raises:
+            ValueError: If response is too large or wrong content type
+            requests.RequestException: If request fails
+        """
+        response = self.session.get(url, timeout=self.timeout, stream=True)
+        response.raise_for_status()
+
+        # Validate content type if specified
+        if expected_content_types:
+            content_type = response.headers.get("Content-Type", "").lower()
+            if not any(ct in content_type for ct in expected_content_types):
+                logger.warning(f"Unexpected Content-Type for {url}: {content_type}")
+
+        # Check content length header
+        content_length = response.headers.get("Content-Length")
+        if content_length and int(content_length) > self.max_response_size:
+            raise ValueError(f"Response too large: {content_length} bytes (max: {self.max_response_size})")
+
+        # Read with size limit
+        content = b""
+        for chunk in response.iter_content(chunk_size=8192):
+            content += chunk
+            if len(content) > self.max_response_size:
+                raise ValueError(f"Response exceeded {self.max_response_size} bytes")
+
+        return content
 
     def _extract_meta(self, soup: BeautifulSoup, url: str) -> ExtractedMeta:
         """Extract metadata from the page."""
@@ -389,6 +497,19 @@ class WebScraper:
         Returns:
             ScrapeResult with extracted content
         """
+        # SSRF protection
+        try:
+            self._validate_url(url)
+        except SSRFError as e:
+            logger.warning(f"SSRF blocked: {e}")
+            return ScrapeResult(
+                url=url,
+                title="",
+                links=[],
+                status_code=0,
+                error=str(e),
+            )
+
         # Check robots.txt
         if not self._check_robots(url):
             return ScrapeResult(
@@ -403,19 +524,20 @@ class WebScraper:
         self._rate_limit(url)
 
         try:
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
-        except requests.RequestException as e:
+            content = self._fetch_with_size_limit(
+                url, expected_content_types=["text/html", "application/xhtml"]
+            )
+        except (requests.RequestException, ValueError) as e:
             logger.error(f"Failed to fetch {url}: {e}")
             return ScrapeResult(
                 url=url,
                 title="",
                 links=[],
-                status_code=getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0,
+                status_code=0,
                 error=str(e),
             )
 
-        soup = BeautifulSoup(response.content, "lxml")
+        soup = BeautifulSoup(content, "lxml")
         title = soup.title.string if soup.title else ""
         source_domain = urlparse(url).netloc
 
@@ -450,7 +572,7 @@ class WebScraper:
             url=url,
             title=title or "",
             links=links,
-            status_code=response.status_code,
+            status_code=200,  # Success if we got here
         )
 
         # Extended extraction
@@ -618,12 +740,27 @@ class WebScraper:
         Returns:
             FeedResult with parsed items
         """
+        # SSRF protection
+        try:
+            self._validate_url(url)
+        except SSRFError as e:
+            logger.warning(f"SSRF blocked: {e}")
+            return FeedResult(
+                url=url,
+                title="",
+                description="",
+                items=[],
+                feed_type="unknown",
+                error=str(e),
+            )
+
         self._rate_limit(url)
 
         try:
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
-        except requests.RequestException as e:
+            content = self._fetch_with_size_limit(
+                url, expected_content_types=["application/rss", "application/atom", "application/xml", "text/xml"]
+            )
+        except (requests.RequestException, ValueError) as e:
             return FeedResult(
                 url=url,
                 title="",
@@ -634,7 +771,7 @@ class WebScraper:
             )
 
         try:
-            root = etree.fromstring(response.content)
+            root = etree.fromstring(content)
         except etree.XMLSyntaxError as e:
             return FeedResult(
                 url=url,
@@ -823,16 +960,24 @@ class WebScraper:
         Returns:
             SitemapResult with parsed URLs
         """
+        # SSRF protection
+        try:
+            self._validate_url(url)
+        except SSRFError as e:
+            logger.warning(f"SSRF blocked: {e}")
+            return SitemapResult(url=url, urls=[], sitemaps=[], error=str(e))
+
         self._rate_limit(url)
 
         try:
-            response = self.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
-        except requests.RequestException as e:
+            content = self._fetch_with_size_limit(
+                url, expected_content_types=["application/xml", "text/xml"]
+            )
+        except (requests.RequestException, ValueError) as e:
             return SitemapResult(url=url, urls=[], sitemaps=[], error=str(e))
 
         try:
-            root = etree.fromstring(response.content)
+            root = etree.fromstring(content)
         except etree.XMLSyntaxError as e:
             return SitemapResult(url=url, urls=[], sitemaps=[], error=f"Invalid XML: {e}")
 
@@ -912,10 +1057,10 @@ class WebScraper:
             if result.error:
                 continue
 
-            # Queue nested sitemaps
+            # Queue nested sitemaps (avoid duplicates in queue)
             if follow_nested:
                 for nested in result.sitemaps:
-                    if nested not in processed:
+                    if nested not in processed and nested not in to_process:
                         to_process.append(nested)
 
             # Create attestations for URLs
