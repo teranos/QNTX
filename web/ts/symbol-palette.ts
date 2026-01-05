@@ -66,9 +66,44 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeSymbolPalette(): void {
     const cmdCells = document.querySelectorAll('.palette-cell');
 
-    cmdCells.forEach(cell => {
+    cmdCells.forEach((cell, index) => {
         cell.addEventListener('click', handleSymbolClick);
         // Tooltips now handled purely via CSS ::after pseudo-element
+
+        // Add keyboard navigation with arrow keys
+        cell.addEventListener('keydown', (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            let nextElement: Element | null = null;
+
+            switch(e.key) {
+                case 'ArrowRight':
+                case 'ArrowDown':
+                    nextElement = cmdCells[index + 1] || cmdCells[0]; // Wrap to first
+                    break;
+                case 'ArrowLeft':
+                case 'ArrowUp':
+                    nextElement = cmdCells[index - 1] || cmdCells[cmdCells.length - 1]; // Wrap to last
+                    break;
+                case 'Home':
+                    nextElement = cmdCells[0];
+                    break;
+                case 'End':
+                    nextElement = cmdCells[cmdCells.length - 1];
+                    break;
+            }
+
+            if (nextElement && nextElement instanceof HTMLElement) {
+                e.preventDefault();
+                nextElement.focus();
+            }
+        });
+
+        // Set tabindex for first element to enable keyboard entry
+        if (index === 0) {
+            cell.setAttribute('tabindex', '0');
+        } else {
+            cell.setAttribute('tabindex', '-1');
+        }
     });
 }
 
