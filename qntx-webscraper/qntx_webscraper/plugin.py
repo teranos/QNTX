@@ -66,8 +66,11 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
             timeout=int(self.config.get("timeout", "30")),
             respect_robots=self.config.get("respect_robots", "true").lower() == "true",
             rate_limit=float(self.config.get("rate_limit", "1.0")),
-            max_response_size=int(self.config.get("max_response_size", str(10 * 1024 * 1024))),
-            allow_private_ips=self.config.get("allow_private_ips", "false").lower() == "true",
+            max_response_size=int(
+                self.config.get("max_response_size", str(10 * 1024 * 1024))
+            ),
+            allow_private_ips=self.config.get("allow_private_ips", "false").lower()
+            == "true",
         )
 
         logger.info("Webscraper plugin initialized successfully")
@@ -213,8 +216,7 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
                 for img in result.images[:20]  # Limit to 20
             ]
             response_data["structured_data"] = [
-                {"type": sd.type, "data": sd.data}
-                for sd in result.structured_data
+                {"type": sd.type, "data": sd.data} for sd in result.structured_data
             ]
             response_data["headings"] = result.headings
 
@@ -504,19 +506,25 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
 
         jobs = self.pulse_client.list_jobs(status=status, limit=limit)
 
-        return self._json_response(200, {
-            "jobs": [
-                {
-                    "id": j.id,
-                    "handler": j.handler_name,
-                    "status": j.status,
-                    "progress": {"current": j.progress.current, "total": j.progress.total},
-                    "error": j.error,
-                    "created_at": j.created_at,
-                }
-                for j in jobs
-            ]
-        })
+        return self._json_response(
+            200,
+            {
+                "jobs": [
+                    {
+                        "id": j.id,
+                        "handler": j.handler_name,
+                        "status": j.status,
+                        "progress": {
+                            "current": j.progress.current,
+                            "total": j.progress.total,
+                        },
+                        "error": j.error,
+                        "created_at": j.created_at,
+                    }
+                    for j in jobs
+                ]
+            },
+        )
 
     # ==================== WebSocket & Health ====================
 
@@ -544,7 +552,11 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
 
         if self.scraper:
             details["respect_robots"] = str(self.scraper.respect_robots)
-            details["rate_limit"] = str(self.scraper.rate_limiter.min_interval if self.scraper.rate_limiter else 0)
+            details["rate_limit"] = str(
+                self.scraper.rate_limiter.min_interval
+                if self.scraper.rate_limiter
+                else 0
+            )
 
         return domain_pb2.HealthResponse(
             healthy=healthy,
@@ -566,7 +578,9 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
             body=body,
         )
 
-    def _error_response(self, status_code: int, message: str) -> domain_pb2.HTTPResponse:
+    def _error_response(
+        self, status_code: int, message: str
+    ) -> domain_pb2.HTTPResponse:
         """Create an error HTTP response."""
         return self._json_response(status_code, {"error": message})
 

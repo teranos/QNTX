@@ -18,20 +18,16 @@ def test_ssrf_protection():
         "http://127.0.0.1/admin",
         "http://[::1]/admin",
         "http://0.0.0.0/admin",
-
         # Private IPs
         "http://192.168.1.1/admin",
         "http://10.0.0.1/admin",
         "http://172.16.0.1/admin",
-
         # Cloud metadata endpoints - CRITICAL
         "http://169.254.169.254/latest/meta-data",
         "http://metadata.google.internal/computeMetadata/v1/",
         "http://metadata.goog/computeMetadata/v1/",
-
         # DNS rebinding attempts
         "http://1.1.1.1.xip.io/",  # May resolve to 1.1.1.1
-
         # File URLs
         "file:///etc/passwd",
         "file:///c:/windows/system32/config/sam",
@@ -87,10 +83,14 @@ def test_dns_resolution_check():
             # If our hostname resolves to a private IP, it should be blocked
             try:
                 scraper._validate_url(f"http://{test_hostname}/test")
-                print(f"❌ Failed to block hostname {test_hostname} resolving to {local_ip}")
+                print(
+                    f"❌ Failed to block hostname {test_hostname} resolving to {local_ip}"
+                )
                 sys.exit(1)
             except SSRFError:
-                print(f"✓ Blocked hostname {test_hostname} resolving to private IP {local_ip}")
+                print(
+                    f"✓ Blocked hostname {test_hostname} resolving to private IP {local_ip}"
+                )
     except Exception as e:
         print(f"⚠ DNS resolution test skipped: {e}")
 
