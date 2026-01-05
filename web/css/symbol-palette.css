@@ -13,7 +13,7 @@
     margin-bottom: 4px;
 }
 
-/* Symbol Cell - Symbol-first design */
+/* Symbol Cell - Symbol-first design (now using button elements) */
 .palette-cell {
     padding: 8px 4px;
     text-align: center;
@@ -25,6 +25,9 @@
     transition: all 0.15s ease;
     position: relative;
     font-weight: 400;
+    /* Reset button defaults */
+    font-family: inherit;
+    line-height: inherit;
 }
 
 /* Tooltip on hover - shows text label */
@@ -126,5 +129,20 @@
     /* Hide tooltip completely on small screens */
     .palette-cell::after {
         display: none;
+    }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .palette-cell {
+        transition: none;
+    }
+
+    .palette-cell::after {
+        transition: none;
+    }
+
+    .palette-cell:active {
+        transform: none;
     }
 }
