@@ -11,10 +11,12 @@ import type {
     DaemonStatusMessage,
     LLMStreamMessage,
     StorageWarningMessage,
-    PluginHealthMessage
+    PluginHealthMessage,
+    SystemCapabilitiesMessage
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
+import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -183,6 +185,25 @@ export function connectWebSocket(handlers: MessageHandlers): void {
             const handler = messageHandlers['plugin_health'];
             if (handler) {
                 handler(healthData);
+            }
+            return;
+        }
+
+        // Handle system capabilities (sent once on connect)
+        // Informs client about available optimizations (e.g., Rust fuzzy matching)
+        if (data.type === 'system_capabilities') {
+            const capData = data as SystemCapabilitiesMessage;
+            console.log('⚙️  System capabilities:', {
+                fuzzy_backend: capData.fuzzy_backend,
+                fuzzy_optimized: capData.fuzzy_optimized ? 'optimized' : 'fallback'
+            });
+
+            // Handle capability-based UI updates
+            handleSystemCapabilities(capData);
+
+            const handler = messageHandlers['system_capabilities'];
+            if (handler) {
+                handler(capData);
             }
             return;
         }

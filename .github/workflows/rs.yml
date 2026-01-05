@@ -7,6 +7,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
+      - 'ats/ax/fuzzy-ax/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
+      - 'ats/ax/fuzzy-ax/Cargo.toml'
   workflow_dispatch:
 
 jobs:
@@ -39,6 +41,7 @@ jobs:
           workspaces: |
             types/generated/rust
             web/src-tauri
+            ats/ax/fuzzy-ax
 
       - name: Check formatting (generated types)
         run: cd types/generated/rust && cargo fmt --check
@@ -62,3 +65,25 @@ jobs:
 
       # - name: Check (Tauri app)
       #   run: cd web/src-tauri && cargo check
+
+      # fuzzy-ax (Rust fuzzy matching for ax segment)
+      - name: Check formatting (fuzzy-ax)
+        run: cd ats/ax/fuzzy-ax && cargo fmt --check
+
+      - name: Clippy (fuzzy-ax)
+        run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test (fuzzy-ax)
+        run: cd ats/ax/fuzzy-ax && cargo test --lib
+
+      - name: Build release (fuzzy-ax)
+        run: cd ats/ax/fuzzy-ax && cargo build --release --lib
+
+      - name: Test CGO integration (fuzzy-ax)
+        run: |
+          cd ats/ax/fuzzy-ax && cargo build --release --lib
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+          cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
