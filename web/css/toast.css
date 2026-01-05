@@ -27,6 +27,7 @@
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(51, 51, 51, 0.5);
+    border-radius: 4px;
     box-shadow:
         0 0 20px rgba(0, 0, 0, 0.8),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -92,19 +93,22 @@
     font-size: 11px;
 }
 
-/* Close button */
+/* Close button - minimum 24x24 touch target */
 .toast-close {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: 8px;
+    right: 8px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid #333;
+    border-radius: 4px;
     color: #666;
-    font-size: 16px;
+    font-size: 18px;
     cursor: pointer;
     padding: 0;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
+    min-width: 24px;
+    min-height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -190,4 +194,19 @@
 
 [data-theme="light"] .toast-close:hover {
     color: #1a1a1a;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        transition: none;
+    }
+
+    .toast-dismissing {
+        transition: none;
+    }
+
+    .toast-close {
+        transition: none;
+    }
 }

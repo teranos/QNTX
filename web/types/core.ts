@@ -20,6 +20,19 @@ export type GraphData = Graph;
 export type GraphMeta = Meta;
 
 // ============================================================================
+// Build Information
+// ============================================================================
+
+/**
+ * Server build information
+ */
+export interface BuildInfo {
+  version: string;
+  commit: string;
+  build_time?: string;
+}
+
+// ============================================================================
 // State Management Types
 // ============================================================================
 
