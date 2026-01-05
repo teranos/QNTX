@@ -215,6 +215,46 @@ pub struct ParsedATSCode {
     pub source_url: String,
 }
 
+/// PluginHealthMessage represents a plugin health status update
+/// Broadcast when plugin state changes (pause/resume) or health check fails
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#pluginhealthmessage>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PluginHealthMessage {
+    /// "plugin_health"
+    pub r#type: String,
+    /// Plugin name
+    pub name: String,
+    /// Current health status
+    pub healthy: bool,
+    /// "running", "paused", "stopped"
+    pub state: String,
+    /// Status message
+    pub message: String,
+    /// Unix timestamp
+    pub timestamp: i64,
+}
+
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#plugininfo>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PluginInfo {
+    pub name: String,
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qntx_version: Option<String>,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    pub healthy: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Map<String, serde_json::Value>>,
+    pub state: String,
+    pub pausable: bool,
+}
+
 /// ProgressMessage represents an import progress message
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#progressmessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
