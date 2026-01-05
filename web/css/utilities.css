@@ -43,6 +43,9 @@
 .u-underline { text-decoration: underline !important; }
 .u-no-underline { text-decoration: none !important; }
 
+/* Color inheritance */
+.u-color-inherit { color: inherit !important; }
+
 /* Opacity utilities */
 .u-opacity-0 { opacity: 0 !important; }
 .u-opacity-25 { opacity: 0.25 !important; }
@@ -81,6 +84,7 @@
 /* Animation utilities */
 .u-transition-none { transition: none !important; }
 .u-animate-none { animation: none !important; }
+.u-animate-fadeout { animation: fadeOut 0.3s ease-out !important; }
 
 /* Flex utilities */
 .u-flex-center {

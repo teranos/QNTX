@@ -17,6 +17,7 @@ export function handleImportProgress(data: ImportProgressData): void {
 
     if (data.current && data.total) {
         const percent = Math.round((data.current / data.total) * 100);
+        // Inline style required here for dynamic percentage calculation
         fill.style.width = percent + '%';
         details.textContent = 'Processing ' + data.current + ' of ' + data.total;
     }
@@ -48,7 +49,8 @@ export function handleImportComplete(data: ImportCompleteData): void {
     const fill = document.getElementById('progress-fill');
 
     if (fill) {
-        fill.style.width = '100%';
+        fill.classList.remove('u-w-0', 'u-w-25', 'u-w-50', 'u-w-75');
+        fill.classList.add('u-w-100');
     }
     if (status) {
         status.textContent = data.message || 'Import complete!';
@@ -115,7 +117,10 @@ function handleFileUpload(files: FileList | File[]): void {
 
             if (importProgress) importProgress.classList.add('active');
             if (importStatus) importStatus.textContent = 'Uploading ' + filename + '...';
-            if (progressFill) progressFill.style.width = '0%';
+            if (progressFill) {
+                progressFill.classList.remove('u-w-25', 'u-w-50', 'u-w-75', 'u-w-100');
+                progressFill.classList.add('u-w-0');
+            }
         };
 
         reader.readAsText(file);
@@ -134,7 +139,8 @@ export function initQueryFileDrop(): void {
     dropZone.addEventListener('dragover', (e: DragEvent) => {
         e.preventDefault();
         dropZone.classList.add('dragging');
-        dropIndicator.style.display = 'flex';
+        dropIndicator.classList.remove('u-hidden');
+        dropIndicator.classList.add('u-flex');
     });
 
     // Drag leave
@@ -142,7 +148,7 @@ export function initQueryFileDrop(): void {
         // Only remove if we're really leaving the drop zone
         if (e.target === dropZone) {
             dropZone.classList.remove('dragging');
-            dropIndicator.style.display = 'none';
+            dropIndicator.classList.add('u-hidden');
         }
     });
 

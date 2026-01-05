@@ -28,8 +28,8 @@
         display: none;
     }
 
-    /* Log panel - move to top */
-    #log-panel {
+    /* System drawer - move to top */
+    #system-drawer {
         top: 0;
         bottom: auto;
         border-top: none;

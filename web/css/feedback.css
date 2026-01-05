@@ -1,7 +1,7 @@
 /* Feedback Styles - Logs, Toasts, Progress */
 
-/* Log Panel */
-#log-panel {
+/* System Drawer (formerly Log Panel) */
+#system-drawer {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -15,7 +15,7 @@
     transition: max-height 0.3s ease-in-out;
 }
 
-#log-panel.collapsed {
+#system-drawer.collapsed {
     max-height: 32px;
 }
 
@@ -94,7 +94,7 @@
     overflow: hidden;
 }
 
-#log-panel.collapsed #log-panels-container {
+#system-drawer.collapsed #log-panels-container {
     display: none;
 }
 
@@ -477,7 +477,7 @@ body.connecting .status-dot {
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-    #log-panel {
+    #system-drawer {
         transition: none;
     }
 

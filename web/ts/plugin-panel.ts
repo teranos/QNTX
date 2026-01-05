@@ -322,7 +322,13 @@ class PluginPanel extends BasePanel {
             const name = card.querySelector('.plugin-name')?.textContent || '';
             const desc = card.querySelector('.plugin-description')?.textContent || '';
             const matches = name.toLowerCase().includes(search) || desc.toLowerCase().includes(search);
-            htmlCard.style.display = matches ? 'block' : 'none';
+            if (matches) {
+                htmlCard.classList.remove('u-hidden');
+                htmlCard.classList.add('u-block');
+            } else {
+                htmlCard.classList.remove('u-block');
+                htmlCard.classList.add('u-hidden');
+            }
         });
     }
 }
