@@ -62,13 +62,18 @@ jobs:
         run: |
           echo "Building twice to verify reproducibility..."
           nix build .#ci-image --rebuild --out-link result-1
-          nix build .#ci-image --rebuild --out-link result-2
+          HASH1=$(nix-hash --type sha256 result-1)
+          rm result-1
 
-          # Compare the two builds
-          if diff -r result-1 result-2; then
-            echo "✓ Build is reproducible - outputs are identical"
+          nix build .#ci-image --rebuild --out-link result-2
+          HASH2=$(nix-hash --type sha256 result-2)
+
+          if [ "$HASH1" = "$HASH2" ]; then
+            echo "✓ Build is reproducible - hashes match: $HASH1"
           else
-            echo "✗ Build is NOT reproducible - outputs differ"
+            echo "✗ Build is NOT reproducible"
+            echo "First build:  $HASH1"
+            echo "Second build: $HASH2"
             exit 1
           fi
 
