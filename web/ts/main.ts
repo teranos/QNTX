@@ -14,6 +14,7 @@ import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
+import { statusIndicators } from './status-indicators.ts';
 import {
     handlePulseExecutionStarted,
     handlePulseExecutionFailed,
@@ -164,6 +165,9 @@ async function init(): Promise<void> {
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
     initSystemDrawer();
+
+    // Initialize status indicators (connection, pulse daemon, etc.)
+    statusIndicators.init();
 
     // Initialize CodeMirror editor (replaces textarea)
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
