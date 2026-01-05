@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 )
@@ -61,6 +62,7 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	if err != nil {
 		logger.Warnw("Failed to create gopls service, Go code intelligence disabled", "error", err)
 		p.goplsService = nil
+		p.attestGoplsStatus("failed", workspaceRoot, err.Error())
 	} else {
 		// Initialize gopls with timeout
 		initCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -69,9 +71,11 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 		if err := goplsService.Initialize(initCtx); err != nil {
 			logger.Warnw("Failed to initialize gopls, Go code intelligence disabled", "error", err)
 			p.goplsService = nil
+			p.attestGoplsStatus("failed", workspaceRoot, err.Error())
 		} else {
 			p.goplsService = goplsService
 			logger.Infow(fmt.Sprintf("gopls service initialized (workspace: %s)", workspaceRoot))
+			p.attestGoplsStatus("initialized", workspaceRoot, "")
 		}
 	}
 
@@ -175,6 +179,32 @@ func (p *Plugin) Resume(ctx context.Context) error {
 // IsPaused returns whether the plugin is currently paused
 func (p *Plugin) IsPaused() bool {
 	return p.paused
+}
+
+// attestGoplsStatus creates an attestation for gopls initialization status
+func (p *Plugin) attestGoplsStatus(status, workspace, errMsg string) {
+	store := p.services.ATSStore()
+	if store == nil {
+		return
+	}
+
+	attrs := map[string]interface{}{
+		"workspace": workspace,
+	}
+	if errMsg != "" {
+		attrs["error"] = errMsg
+	}
+
+	cmd := &types.AsCommand{
+		Subjects:   []string{"gopls"},
+		Predicates: []string{status},
+		Contexts:   []string{"code-domain"},
+		Attributes: attrs,
+	}
+	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		logger := p.services.Logger("code")
+		logger.Debugw("Failed to create gopls status attestation", "status", status, "error", err)
+	}
 }
 
 // Register the code domain plugin on import
