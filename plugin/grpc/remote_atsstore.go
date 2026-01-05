@@ -125,12 +125,23 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 
 // GetAttestations retrieves attestations via gRPC.
 func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+	protoFilter := &protocol.AttestationFilter{
+		Actors:     filter.Actors,
+		Subjects:   filter.Subjects,
+		Predicates: filter.Predicates,
+		Contexts:   filter.Contexts,
+		Limit:      int32(filter.Limit),
+	}
+	if filter.TimeStart != nil {
+		protoFilter.TimeStart = filter.TimeStart.Unix()
+	}
+	if filter.TimeEnd != nil {
+		protoFilter.TimeEnd = filter.TimeEnd.Unix()
+	}
+
 	req := &protocol.GetAttestationsRequest{
 		AuthToken: r.authToken,
-		Filter: &protocol.AttestationFilter{
-			Actors: []string{filter.Actor}, // Note: proto supports multiple, filter supports one
-			Limit:  int32(filter.Limit),
-		},
+		Filter:    protoFilter,
 	}
 
 	resp, err := r.client.GetAttestations(context.Background(), req)
