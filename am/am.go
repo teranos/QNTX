@@ -5,7 +5,6 @@ type Config struct {
 	Database       DatabaseConfig       `mapstructure:"database"`
 	Server         ServerConfig         `mapstructure:"server"`
 	Pulse          PulseConfig          `mapstructure:"pulse"`
-	REPL           REPLConfig           `mapstructure:"repl"`
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
 	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
@@ -69,44 +68,6 @@ type PulseConfig struct {
 type HTTPDomainLimit struct {
 	MaxRequestsPerMinute   int `mapstructure:"max_requests_per_minute"`
 	DelayBetweenRequestsMS int `mapstructure:"delay_between_requests_ms"`
-}
-
-// REPLConfig configures the interactive REPL
-type REPLConfig struct {
-	Search   REPLSearchConfig   `mapstructure:"search"`
-	Display  REPLDisplayConfig  `mapstructure:"display"`
-	Timeouts REPLTimeoutsConfig `mapstructure:"timeouts"`
-	History  REPLHistoryConfig  `mapstructure:"history"`
-}
-
-// REPLSearchConfig configures REPL search behavior
-type REPLSearchConfig struct {
-	DebounceMs       int `mapstructure:"debounce_ms"`
-	ResultLimit      int `mapstructure:"result_limit"`
-	ExactMatchScore  int `mapstructure:"exact_match_score"`
-	PrefixMatchScore int `mapstructure:"prefix_match_score"`
-	ContainsScore    int `mapstructure:"contains_score"`
-	BaseResultScore  int `mapstructure:"base_result_score"`
-	LengthBonusScore int `mapstructure:"length_bonus_score"`
-}
-
-// REPLDisplayConfig configures REPL display settings
-type REPLDisplayConfig struct {
-	MaxLines    int `mapstructure:"max_lines"`
-	BufferLimit int `mapstructure:"buffer_limit"`
-	TargetFPS   int `mapstructure:"target_fps"`
-}
-
-// REPLTimeoutsConfig configures REPL timeout settings
-type REPLTimeoutsConfig struct {
-	CommandSeconds  int `mapstructure:"command_seconds"`
-	DatabaseSeconds int `mapstructure:"database_seconds"`
-}
-
-// REPLHistoryConfig configures REPL history behavior
-type REPLHistoryConfig struct {
-	ResultLimit   int `mapstructure:"result_limit"`
-	ChannelBuffer int `mapstructure:"channel_buffer"`
 }
 
 // CodeConfig configures the code review system

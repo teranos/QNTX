@@ -62,6 +62,9 @@ type Config interface {
 
 	// Set sets a configuration value (for runtime overrides)
 	Set(key string, value interface{})
+
+	// GetKeys returns all available configuration keys (sorted)
+	GetKeys() []string
 }
 
 // DefaultServiceRegistry is the standard implementation of ServiceRegistry

@@ -44,25 +44,6 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("pulse.monthly_budget_usd", 15.0)             // Default $15/month limit
 	v.SetDefault("pulse.cost_per_score_usd", 0.002)            // Default $0.002 per operation
 
-	// REPL configuration defaults
-	v.SetDefault("repl.search.debounce_ms", 50)        // Search debounce delay
-	v.SetDefault("repl.search.result_limit", 10)       // Max search results to show
-	v.SetDefault("repl.search.exact_match_score", 100) // Score for exact matches
-	v.SetDefault("repl.search.prefix_match_score", 50) // Score for prefix matches
-	v.SetDefault("repl.search.contains_score", 25)     // Score for substring matches
-	v.SetDefault("repl.search.base_result_score", 50)  // Base score for search results
-	v.SetDefault("repl.search.length_bonus_score", 50) // Maximum length bonus
-
-	v.SetDefault("repl.display.max_lines", 10)      // Max lines in preview mode
-	v.SetDefault("repl.display.buffer_limit", 2000) // Max chars per result buffer
-	v.SetDefault("repl.display.target_fps", 60)     // Target FPS for rendering
-
-	v.SetDefault("repl.timeouts.command_seconds", 30)  // Command execution timeout
-	v.SetDefault("repl.timeouts.database_seconds", 10) // Database query timeout
-
-	v.SetDefault("repl.history.result_limit", 100)   // Max results in history
-	v.SetDefault("repl.history.channel_buffer", 100) // Channel buffer size
-
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultGraphPort)
 	v.SetDefault("server.allowed_origins", []string{
@@ -166,60 +147,6 @@ func (c *Config) GetServerLogTheme() string {
 		return "everforest"
 	}
 	return c.Server.LogTheme
-}
-
-// GetREPLConfig returns the REPL configuration with defaults applied
-func (c *Config) GetREPLConfig() REPLConfig {
-	cfg := c.REPL
-
-	// Apply defaults for zero values
-	if cfg.Search.DebounceMs == 0 {
-		cfg.Search.DebounceMs = 50
-	}
-	if cfg.Search.ResultLimit == 0 {
-		cfg.Search.ResultLimit = 10
-	}
-	if cfg.Search.ExactMatchScore == 0 {
-		cfg.Search.ExactMatchScore = 100
-	}
-	if cfg.Search.PrefixMatchScore == 0 {
-		cfg.Search.PrefixMatchScore = 50
-	}
-	if cfg.Search.ContainsScore == 0 {
-		cfg.Search.ContainsScore = 25
-	}
-	if cfg.Search.BaseResultScore == 0 {
-		cfg.Search.BaseResultScore = 50
-	}
-	if cfg.Search.LengthBonusScore == 0 {
-		cfg.Search.LengthBonusScore = 50
-	}
-
-	if cfg.Display.MaxLines == 0 {
-		cfg.Display.MaxLines = 10
-	}
-	if cfg.Display.BufferLimit == 0 {
-		cfg.Display.BufferLimit = 2000
-	}
-	if cfg.Display.TargetFPS == 0 {
-		cfg.Display.TargetFPS = 60
-	}
-
-	if cfg.Timeouts.CommandSeconds == 0 {
-		cfg.Timeouts.CommandSeconds = 30
-	}
-	if cfg.Timeouts.DatabaseSeconds == 0 {
-		cfg.Timeouts.DatabaseSeconds = 10
-	}
-
-	if cfg.History.ResultLimit == 0 {
-		cfg.History.ResultLimit = 100
-	}
-	if cfg.History.ChannelBuffer == 0 {
-		cfg.History.ChannelBuffer = 100
-	}
-
-	return cfg
 }
 
 // String returns a string representation of the config
