@@ -202,3 +202,10 @@ rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
 	@cd plugins/qntx-fuzzy && cargo fmt --check
 	@cd plugins/qntx-fuzzy && cargo clippy --lib -- -D warnings
 	@echo "✓ Rust code checks passed"
+
+rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rust)
+	@echo "Running Rust fuzzy integration tests..."
+	@export DYLD_LIBRARY_PATH=$(PWD)/target/release:$$DYLD_LIBRARY_PATH && \
+		export LD_LIBRARY_PATH=$(PWD)/target/release:$$LD_LIBRARY_PATH && \
+		go test -tags "integration rustfuzzy" -v ./plugins/qntx-fuzzy/...
+	@echo "✓ Integration tests passed"
