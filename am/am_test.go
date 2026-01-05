@@ -227,4 +227,3 @@ func TestGetDatabasePath(t *testing.T) {
 		t.Errorf("expected default path 'qntx.db', got %q", path)
 	}
 }
-
