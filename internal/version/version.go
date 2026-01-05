@@ -31,9 +31,8 @@ type Info struct {
 
 // Get returns the current version information
 func Get() Info {
-	// Detect which fuzzy matcher is available
-	matcher := ax.NewDefaultMatcher()
-	backend := string(matcher.Backend())
+	// Detect which fuzzy matcher is available (without creating instance)
+	backend := string(ax.DetectBackend())
 
 	return Info{
 		CommitHash:   CommitHash,

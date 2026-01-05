@@ -42,5 +42,16 @@ func NewDefaultMatcher() Matcher {
 	return NewFuzzyMatcher()
 }
 
+// DetectBackend returns which fuzzy backend is available without
+// creating a matcher instance. This is more efficient than creating
+// a matcher just to check the backend.
+func DetectBackend() MatcherBackend {
+	// Check if CGO matcher is available (build tag check)
+	if _, err := NewCGOMatcher(); err == nil {
+		return MatcherBackendRust
+	}
+	return MatcherBackendGo
+}
+
 // Ensure FuzzyMatcher implements Matcher
 var _ Matcher = (*FuzzyMatcher)(nil)
