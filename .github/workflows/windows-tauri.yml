@@ -18,6 +18,9 @@ jobs:
   tauri-check:
     name: Tauri Check (Windows)
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repository
@@ -32,10 +35,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Build frontend
-        run: |
-          cd web
-          bun install
-          bun run build
+        run: make web
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -43,12 +43,12 @@ jobs:
           go-version: '1.23'
 
       - name: Build qntx CLI (sidecar dependency)
-        run: go build -o bin/qntx.exe ./cmd/qntx
+        run: make cli
 
       - name: Prepare Tauri sidecars
         run: |
-          New-Item -ItemType Directory -Force -Path web/src-tauri/bin
-          Copy-Item bin/qntx.exe web/src-tauri/bin/qntx-x86_64-pc-windows-msvc.exe
+          mkdir -p web/src-tauri/bin
+          cp bin/qntx web/src-tauri/bin/qntx-x86_64-pc-windows-msvc.exe
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
