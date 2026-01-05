@@ -193,6 +193,7 @@ def run_test():
             "timeout": "10",
             "respect_robots": "true",
             "rate_limit": "10.0",  # Fast for testing
+            "allow_private_ips": "true",  # Allow localhost for testing
         },
     )
     plugin.Initialize(init_request, None)

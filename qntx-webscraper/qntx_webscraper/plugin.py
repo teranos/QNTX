@@ -67,6 +67,8 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
             timeout=int(self.config.get("timeout", "30")),
             respect_robots=self.config.get("respect_robots", "true").lower() == "true",
             rate_limit=float(self.config.get("rate_limit", "1.0")),
+            max_response_size=int(self.config.get("max_response_size", str(10 * 1024 * 1024))),
+            allow_private_ips=self.config.get("allow_private_ips", "false").lower() == "true",
         )
 
         logger.info("Webscraper plugin initialized successfully")
