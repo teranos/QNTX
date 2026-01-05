@@ -13,8 +13,8 @@ import (
 func TestMarkSettingsFromSource(t *testing.T) {
 	t.Run("Flat settings", func(t *testing.T) {
 		settings := map[string]interface{}{
-			"workers":               1,
-			"daily_budget_usd":      3.0,
+			"workers":                 1,
+			"daily_budget_usd":        3.0,
 			"ticker_interval_seconds": 1,
 		}
 
