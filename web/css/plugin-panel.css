@@ -237,6 +237,21 @@
     gap: 4px;
 }
 
+/* Plugin path display */
+.plugin-path {
+    font-size: 11px;
+    padding: 6px 8px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-family: var(--font-mono, monospace);
+}
+
+.plugin-path-label {
+    color: #666;
+}
+
 /* Plugin message (health status message) */
 .plugin-message {
     margin-top: 12px;
