@@ -726,7 +726,7 @@ export interface PluginHealthMessage {
 
 ## PluginInfo
 
-**Source**: [`server/handlers.go:599`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L599)
+**Source**: [`server/handlers.go:606`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L606)
 
 
 <table>
@@ -1433,6 +1433,51 @@ export interface StorageWarningMessage {
    * Unix timestamp
    */
   timestamp: number;
+}
+```
+
+</td>
+</tr>
+</table>
+
+## SystemCapabilitiesMessage
+
+**Source**: [`server/types.go:213`](https://github.com/teranos/QNTX/blob/main/server/types.go#L213)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type SystemCapabilitiesMessage struct {
+	Type string `json:"type"`
+	FuzzyBackend string `json:"fuzzy_backend"`
+	FuzzyOptimized bool `json:"fuzzy_optimized"`
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface SystemCapabilitiesMessage {
+  /**
+   * "system_capabilities"
+   */
+  type: string;
+  /**
+   * "rust" or "go" - which fuzzy matching implementation is active
+   */
+  fuzzy_backend: string;
+  /**
+   * true if using Rust (optimized), false if Go fallback
+   */
+  fuzzy_optimized: boolean;
 }
 ```
 
