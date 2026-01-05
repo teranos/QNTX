@@ -22,9 +22,9 @@ package fuzzyax
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
-#cgo linux LDFLAGS: -L${SRCDIR}/../target/release -lqntx_fuzzy -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../target/release -lqntx_fuzzy -lpthread -ldl -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../target/release -lqntx_fuzzy -lws2_32 -luserenv
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lws2_32 -luserenv
 
 #include "fuzzy_engine.h"
 #include <stdlib.h>
