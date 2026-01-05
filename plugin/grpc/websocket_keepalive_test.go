@@ -14,6 +14,13 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
+// skipIfShort skips keepalive tests in short mode as they require timing operations
+func skipIfShort(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping keepalive test in short mode - requires timing operations")
+	}
+}
+
 // =============================================================================
 // KeepaliveConfig Tests
 // =============================================================================
@@ -136,6 +143,7 @@ func TestKeepaliveMetrics_RecordReconnect(t *testing.T) {
 }
 
 func TestKeepaliveMetrics_ConnectionUptime(t *testing.T) {
+	skipIfShort(t)
 	metrics := NewKeepaliveMetrics()
 
 	// Initial uptime should be very small
@@ -169,6 +177,7 @@ func TestKeepaliveMetrics_LatencySampleLimit(t *testing.T) {
 }
 
 func TestKeepaliveMetrics_ConcurrentAccess(t *testing.T) {
+	skipIfShort(t)
 	metrics := NewKeepaliveMetrics()
 	var wg sync.WaitGroup
 
@@ -213,6 +222,7 @@ func TestKeepaliveMetrics_ConcurrentAccess(t *testing.T) {
 // =============================================================================
 
 func TestKeepaliveHandler_StartStop(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		Enabled:      true,
@@ -290,6 +300,7 @@ func TestKeepaliveHandler_HandlePing(t *testing.T) {
 }
 
 func TestKeepaliveHandler_HandlePong(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	handler := NewKeepaliveHandler(DefaultKeepaliveConfig(), logger)
 
@@ -408,6 +419,7 @@ func TestKeepaliveHandler_HandleMessage(t *testing.T) {
 }
 
 func TestKeepaliveHandler_CheckTimeout(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		Enabled:     true,
@@ -434,6 +446,7 @@ func TestKeepaliveHandler_CheckTimeout(t *testing.T) {
 }
 
 func TestKeepaliveHandler_ConnectWithRetry_Success(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		ReconnectAttempts: 3,
@@ -455,6 +468,7 @@ func TestKeepaliveHandler_ConnectWithRetry_Success(t *testing.T) {
 }
 
 func TestKeepaliveHandler_ConnectWithRetry_SuccessAfterFailures(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		ReconnectAttempts: 5,
@@ -478,6 +492,7 @@ func TestKeepaliveHandler_ConnectWithRetry_SuccessAfterFailures(t *testing.T) {
 }
 
 func TestKeepaliveHandler_ConnectWithRetry_AllFail(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		ReconnectAttempts: 3,
@@ -499,6 +514,7 @@ func TestKeepaliveHandler_ConnectWithRetry_AllFail(t *testing.T) {
 }
 
 func TestKeepaliveHandler_ConnectWithRetry_ContextCanceled(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		ReconnectAttempts: 10,
@@ -527,6 +543,7 @@ func TestKeepaliveHandler_ConnectWithRetry_ContextCanceled(t *testing.T) {
 }
 
 func TestKeepaliveHandler_MultipleStartStopCycles(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		Enabled:      true,
@@ -603,6 +620,7 @@ func TestKeepaliveHandler_DoubleStopSafe(t *testing.T) {
 // =============================================================================
 
 func TestKeepaliveHandler_Integration_PingPongFlow(t *testing.T) {
+	skipIfShort(t)
 	logger := zaptest.NewLogger(t).Sugar()
 	config := KeepaliveConfig{
 		Enabled:      true,

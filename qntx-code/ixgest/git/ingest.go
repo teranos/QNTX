@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	atstypes "github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ixgest/types"
@@ -43,7 +44,7 @@ const (
 // Actor strategy: Use per-PR actors like "pr-{number}@github"
 type GitIxProcessor struct {
 	db           *sql.DB
-	store        *storage.SQLStore
+	store        ats.AttestationStore // Interface for attestation storage (supports plugin callbacks)
 	dryRun       bool
 	defaultActor string // Used for repo-level attestations (branches)
 	verbosity    int
@@ -89,7 +90,9 @@ type GitBranchResult struct {
 	Attestations     []string `json:"attestations,omitempty"`
 }
 
-// NewGitIxProcessor creates a new git ix processor
+// NewGitIxProcessor creates a new git ix processor with database connection.
+// This constructor creates an SQLStore internally - use NewGitIxProcessorWithStore
+// for plugin integration with service callbacks.
 func NewGitIxProcessor(db *sql.DB, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *GitIxProcessor {
 	if actor == "" {
 		actor = "ixgest-git@repo" // Used for repo-level attestations (branches)
@@ -97,6 +100,22 @@ func NewGitIxProcessor(db *sql.DB, dryRun bool, actor string, verbosity int, log
 	return &GitIxProcessor{
 		db:           db,
 		store:        storage.NewSQLStore(db, logger),
+		dryRun:       dryRun,
+		defaultActor: actor,
+		verbosity:    verbosity,
+		logger:       logger,
+	}
+}
+
+// NewGitIxProcessorWithStore creates a new git ix processor with an existing AttestationStore.
+// This allows plugin integration where the store comes from ServiceRegistry.ATSStore().
+func NewGitIxProcessorWithStore(store ats.AttestationStore, dryRun bool, actor string, verbosity int, logger *zap.SugaredLogger) *GitIxProcessor {
+	if actor == "" {
+		actor = "ixgest-git@repo"
+	}
+	return &GitIxProcessor{
+		db:           nil, // Not needed when store is provided directly
+		store:        store,
 		dryRun:       dryRun,
 		defaultActor: actor,
 		verbosity:    verbosity,
