@@ -10,9 +10,11 @@ import type {
     JobUpdateMessage,
     DaemonStatusMessage,
     LLMStreamMessage,
-    StorageWarningMessage
+    StorageWarningMessage,
+    PluginHealthMessage
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
+import { handlePluginHealth } from './websocket-handlers/plugin-health';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -165,6 +167,22 @@ export function connectWebSocket(handlers: MessageHandlers): void {
             const handler = messageHandlers['storage_warning'];
             if (handler) {
                 handler(warningData);
+            }
+            return;
+        }
+
+        // Handle plugin health updates
+        // Backend broadcasts when plugin state changes (pause/resume) or health check fails
+        if (data.type === 'plugin_health') {
+            const healthData = data as PluginHealthMessage;
+            console.log('🔌 Plugin health:', healthData.name, healthData.state, healthData.healthy ? 'healthy' : 'unhealthy');
+
+            // Handle toast notification and indicator update
+            handlePluginHealth(healthData);
+
+            const handler = messageHandlers['plugin_health'];
+            if (handler) {
+                handler(healthData);
             }
             return;
         }

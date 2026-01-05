@@ -1,8 +1,8 @@
 package async
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"fmt"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"sync"
 	"testing"
 	"time"

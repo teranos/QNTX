@@ -60,7 +60,8 @@ export type MessageType =
   | 'pulse_execution_completed'
   | 'pulse_execution_log_stream'
   | 'storage_warning'
-  | 'storage_eviction';
+  | 'storage_eviction'
+  | 'plugin_health';
 
 // ============================================================================
 // Base Message Interface
@@ -377,6 +378,18 @@ export interface StorageEvictionMessage extends BaseMessage {
   message: string;
 }
 
+/**
+ * Plugin health update notification
+ * Sent when plugin state changes (pause/resume) or health check fails
+ */
+export interface PluginHealthMessage extends BaseMessage {
+  type: 'plugin_health';
+  name: string;
+  healthy: boolean;
+  state: 'running' | 'paused' | 'stopped';
+  message: string;
+}
+
 // ============================================================================
 // Type Definitions for Parse Components
 // ============================================================================
@@ -462,7 +475,8 @@ export type WebSocketMessage =
   | PulseExecutionCompletedMessage
   | PulseExecutionLogStreamMessage
   | StorageWarningMessage
-  | StorageEvictionMessage;
+  | StorageEvictionMessage
+  | PluginHealthMessage;
 
 // ============================================================================
 // Message Handler Types
@@ -502,6 +516,7 @@ export interface MessageHandlers {
   pulse_execution_log_stream?: MessageHandler<PulseExecutionLogStreamMessage>;
   storage_warning?: MessageHandler<StorageWarningMessage>;
   storage_eviction?: MessageHandler<StorageEvictionMessage>;
+  plugin_health?: MessageHandler<PluginHealthMessage>;
   _default?: MessageHandler<BaseMessage>;
 }
 
