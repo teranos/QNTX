@@ -323,10 +323,14 @@ github.com/tklauser/numcpus v0.6.1 h1:ng9scYS7az0Bk4OZLvrNXNSAO2Pxr1XXRAPyjhIx+F
 github.com/tklauser/numcpus v0.6.1/go.mod h1:1XfjsgE2zo8GVw7POkMbHENHzVg3GzmoZ9fESEdAacY=
 github.com/tliron/commonlog v0.2.8 h1:vpKrEsZX4nlneC9673pXpeKqv3cFLxwpzNEZF1qiaQQ=
 github.com/tliron/commonlog v0.2.8/go.mod h1:HgQZrJEuiKLLRvUixtPWGcmTmWWtKkCtywF6x9X5Spw=
+github.com/tliron/commonlog v0.2.15 h1:vukJpUFLsHapH9kvxfPXZmp4hV3fB1nPMdDsmTJnJCo=
+github.com/tliron/commonlog v0.2.15/go.mod h1:+K652hPl5OyLV7vy85F/YMAVPcQ6yOfXHG6uaX890dM=
 github.com/tliron/glsp v0.2.2 h1:IKPfwpE8Lu8yB6Dayta+IyRMAbTVunudeauEgjXBt+c=
 github.com/tliron/glsp v0.2.2/go.mod h1:GMVWDNeODxHzmDPvYbYTCs7yHVaEATfYtXiYJ9w1nBg=
 github.com/tliron/kutil v0.3.11 h1:kongR0dhrrn9FR/3QRFoUfQe27t78/xQvrU9aXIy5bk=
 github.com/tliron/kutil v0.3.11/go.mod h1:4IqOAAdpJuDxYbJxMv4nL8LSH0mPofSrdwIv8u99PDc=
+github.com/tliron/kutil v0.3.22 h1:PkXmz+YOb5qD++/4dRWfK9FWmvtnH048mybeTVvvD54=
+github.com/tliron/kutil v0.3.22/go.mod h1:2iSIhOnOe1reqczZQy6TauVHhItsq6xRLV2rVBvodpk=
 github.com/ulikunitz/xz v0.5.15 h1:9DNdB5s+SgV3bQ2ApL10xRc35ck0DuIX/isZvIk+ubY=
 github.com/ulikunitz/xz v0.5.15/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
 github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=
