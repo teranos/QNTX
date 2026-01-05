@@ -17,6 +17,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache Nix store
+        uses: actions/cache@v4
+        with:
+          path: /nix/store
+          key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-keys: |
+            nix-${{ runner.os }}-
+
       - name: Install Nix
         uses: cachix/install-nix-action@v26
         with:
@@ -48,6 +56,20 @@ jobs:
             echo "has_version=true" >> $GITHUB_OUTPUT
           else
             echo "has_version=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify reproducible build
+        run: |
+          echo "Building twice to verify reproducibility..."
+          nix build .#ci-image --rebuild --out-link result-1
+          nix build .#ci-image --rebuild --out-link result-2
+
+          # Compare the two builds
+          if diff -r result-1 result-2; then
+            echo "✓ Build is reproducible - outputs are identical"
+          else
+            echo "✗ Build is NOT reproducible - outputs differ"
+            exit 1
           fi
 
       - name: Tag and push

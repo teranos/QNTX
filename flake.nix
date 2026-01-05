@@ -2,14 +2,48 @@
   description = "QNTX container image";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pin to stable release channel for reproducibility
+    # Update to newer releases (24.11, 25.05, etc.) as needed
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
+    pre-commit-hooks = {
+      url = "github:cachix/pre-commit-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # Pre-commit hooks configuration
+        pre-commit-check = pre-commit-hooks.lib.${system}.run {
+          src = ./.;
+          hooks = {
+            # Nix formatting
+            nixpkgs-fmt.enable = true;
+
+            # Go formatting
+            gofmt.enable = true;
+            govet.enable = true;
+
+            # Custom hook for vendorHash validation
+            vendorHash-check = {
+              enable = true;
+              name = "Nix vendorHash validation";
+              entry = "${pkgs.writeShellScript "vendorHash-check" ''
+                # Check if go.mod or go.sum changed
+                if git diff --cached --name-only | grep -qE '^go\.(mod|sum)$'; then
+                  echo "⚠️  go.mod or go.sum changed - remember to update flake.nix vendorHash!"
+                  echo "Run: .githooks/update-nix-hash.sh"
+                fi
+              ''}";
+              files = "\\.(mod|sum)$";
+              pass_filenames = false;
+            };
+          };
+        };
 
         # Build QNTX binary with Nix
         qntx = pkgs.buildGoModule {
@@ -28,10 +62,11 @@
           subPackages = [ "cmd/qntx" ];
         };
 
-        # CI image with Go + Rust toolchain + prebuilt QNTX binary
-        ciImage = pkgs.dockerTools.buildLayeredImage {
+        # Helper function to build CI image for specific architecture
+        mkCiImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
+          architecture = arch;
 
           contents = [
             # Prebuilt QNTX binary
@@ -98,22 +133,39 @@
           };
         };
 
+        # Architecture detection for Docker images
+        dockerArch = if system == "x86_64-linux" then "amd64"
+                     else if system == "aarch64-linux" then "arm64"
+                     else "amd64";
+
+        # CI image with detected architecture
+        ciImage = mkCiImage dockerArch;
+
       in
       {
         packages = {
           ci-image = ciImage;
+          ci-image-amd64 = mkCiImage "amd64";
+          ci-image-arm64 = mkCiImage "arm64";
           default = ciImage;
         };
 
         # Development shell with same tools
         devShells.default = pkgs.mkShell {
+          inherit (pre-commit-check) shellHook;
+
           buildInputs = [
             pkgs.go
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
             pkgs.sqlite
-          ];
+          ] ++ pre-commit-check.enabledPackages;
+        };
+
+        # Expose pre-commit checks
+        checks = {
+          pre-commit = pre-commit-check;
         };
       }
     );
