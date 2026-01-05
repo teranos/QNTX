@@ -52,3 +52,7 @@ required-features = ["grpc"]
 [lib]
 name = "qntx_fuzzy"
 path = "src/lib.rs"
+# cdylib for shared library (.so/.dylib/.dll)
+# staticlib for static library (.a/.lib)
+# rlib for Rust library (tests)
+crate-type = ["cdylib", "staticlib", "rlib"]

@@ -24,6 +24,9 @@
 
 pub mod engine;
 
+// FFI module for C/CGO integration
+pub mod ffi;
+
 #[cfg(feature = "grpc")]
 pub mod proto {
     tonic::include_proto!("qntx.fuzzy");
@@ -34,3 +37,6 @@ pub mod service;
 
 // Re-export main types
 pub use engine::{EngineConfig, FuzzyEngine, RankedMatch, VocabularyType};
+
+// Re-export FFI types for C consumers
+pub use ffi::{RustMatchC, RustMatchResultC, RustRebuildResultC};
