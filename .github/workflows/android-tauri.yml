@@ -68,3 +68,8 @@ jobs:
         run: cd web/src-tauri && cargo check --lib --target x86_64-linux-android
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+
+      - name: Check (Android x86)
+        run: cd web/src-tauri && cargo check --lib --target i686-linux-android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
