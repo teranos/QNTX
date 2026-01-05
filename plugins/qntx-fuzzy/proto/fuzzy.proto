@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package qntx.fuzzy;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol/fuzzy";
+
+// FuzzyMatchService provides high-performance fuzzy matching for QNTX
+// Maintains an in-memory index of predicates and contexts for fast lookups
+service FuzzyMatchService {
+  // RebuildIndex rebuilds the fuzzy index with new vocabulary
+  // Called on startup and when vocabulary changes are detected
+  rpc RebuildIndex(RebuildIndexRequest) returns (RebuildIndexResponse);
+
+  // FindMatches finds vocabulary items matching a query
+  // Uses multiple strategies: exact, prefix, substring, edit distance, phonetic
+  rpc FindMatches(FindMatchesRequest) returns (FindMatchesResponse);
+
+  // BatchMatch processes multiple queries in parallel
+  rpc BatchMatch(BatchMatchRequest) returns (BatchMatchResponse);
+
+  // GetStats returns index statistics for monitoring
+  rpc GetStats(StatsRequest) returns (StatsResponse);
+
+  // Health check for service readiness
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// VocabularyType specifies which vocabulary to search
+enum VocabularyType {
+  PREDICATES = 0;
+  CONTEXTS = 1;
+}
+
+message RebuildIndexRequest {
+  repeated string predicates = 1;
+  repeated string contexts = 2;
+}
+
+message RebuildIndexResponse {
+  int64 predicate_count = 1;
+  int64 context_count = 2;
+  int64 build_time_ms = 3;
+  string index_hash = 4;  // Hash for change detection
+}
+
+message FindMatchesRequest {
+  string query = 1;
+  VocabularyType vocabulary_type = 2;
+  int32 limit = 3;           // Max results (default: 20)
+  double min_score = 4;      // Minimum similarity score 0.0-1.0 (default: 0.6)
+  bool include_strategy = 5; // Include which strategy matched
+}
+
+message FindMatchesResponse {
+  repeated RankedMatch matches = 1;
+  int64 search_time_us = 2;  // Microseconds
+}
+
+message RankedMatch {
+  string value = 1;
+  double score = 2;       // 0.0 to 1.0
+  string strategy = 3;    // exact, prefix, substring, jaro_winkler, levenshtein
+}
+
+message BatchMatchRequest {
+  repeated FindMatchesRequest queries = 1;
+}
+
+message BatchMatchResponse {
+  repeated FindMatchesResponse results = 1;
+  int64 total_time_us = 2;
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  int64 predicate_count = 1;
+  int64 context_count = 2;
+  string index_hash = 3;
+  int64 queries_served = 4;
+  int64 avg_query_time_us = 5;
+  int64 uptime_seconds = 6;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string message = 2;
+  bool index_ready = 3;
+}
