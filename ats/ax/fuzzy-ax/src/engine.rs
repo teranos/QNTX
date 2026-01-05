@@ -149,7 +149,7 @@ impl FuzzyEngine {
         let limit = limit.unwrap_or(self.config.max_results);
         let min_score = min_score.unwrap_or(self.config.min_score);
 
-        let query_lower = query.to_lowercase().trim().to_string();
+        let query_lower = query.trim().to_lowercase();
         if query_lower.is_empty() {
             return (Vec::new(), start.elapsed().as_micros() as u64);
         }
@@ -216,10 +216,8 @@ impl FuzzyEngine {
         }
 
         // 4. Substring match
-        if item_lower.contains(query_lower) {
+        if let Some(pos) = item_lower.find(query_lower) {
             // Score based on position (earlier = better)
-            // Safe to unwrap: contains() returned true, so find() must succeed
-            let pos = item_lower.find(query_lower).unwrap();
             let pos_penalty = (pos as f64 / item_lower.len() as f64) * 0.1;
             let score = 0.75 - pos_penalty;
             return Some(RankedMatch::new(
@@ -426,5 +424,232 @@ mod tests {
         // Now that word_boundary is checked first, it should always be word_boundary
         assert_eq!(author_match.unwrap().strategy, "word_boundary");
         assert_eq!(author_match.unwrap().score, 0.85);
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn test_empty_query() {
+        let engine = test_engine();
+        let (matches, _) = engine.find_matches("", VocabularyType::Predicates, None, None);
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_whitespace_only_query() {
+        let engine = test_engine();
+        let (matches, _) = engine.find_matches("   ", VocabularyType::Predicates, None, None);
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_empty_vocabulary() {
+        let engine = FuzzyEngine::new();
+        // Don't rebuild index - vocabulary is empty
+        let (matches, _) = engine.find_matches("test", VocabularyType::Predicates, None, None);
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_case_insensitive_matching() {
+        let engine = test_engine();
+        let (matches, _) = engine.find_matches("WORKS_AT", VocabularyType::Predicates, None, None);
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "works_at");
+        assert_eq!(matches[0].strategy, "exact");
+    }
+
+    // ========================================================================
+    // Unicode tests
+    // ========================================================================
+
+    #[test]
+    fn test_unicode_cjk_substring() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "日本語プログラミング".to_string(),
+                "中文编程".to_string(),
+                "한국어코딩".to_string(),
+            ],
+            vec![],
+        );
+
+        // Substring match for Japanese
+        let (matches, _) = engine.find_matches("日本", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "日本語プログラミング");
+        assert_eq!(matches[0].strategy, "prefix"); // "日本" is prefix of "日本語..."
+
+        // Substring match for Chinese
+        let (matches, _) = engine.find_matches("编程", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "中文编程");
+    }
+
+    #[test]
+    fn test_unicode_accented_chars() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "café_owner".to_string(),
+                "naïve_implementation".to_string(),
+                "résumé_parser".to_string(),
+            ],
+            vec![],
+        );
+
+        // Exact substring with accents
+        let (matches, _) = engine.find_matches("café", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "café_owner");
+
+        // Word boundary with accents
+        let (matches, _) =
+            engine.find_matches("naïve", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "naïve_implementation");
+    }
+
+    #[test]
+    fn test_unicode_emoji() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "rocket_🚀_launch".to_string(),
+                "heart_❤️_react".to_string(),
+            ],
+            vec![],
+        );
+
+        let (matches, _) =
+            engine.find_matches("rocket", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "rocket_🚀_launch");
+    }
+
+    #[test]
+    fn test_unicode_mixed_script() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![],
+            vec![
+                "Tokyo 東京".to_string(),
+                "Москва Moscow".to_string(),
+                "Αθήνα Athens".to_string(),
+            ],
+        );
+
+        // Search English part of mixed context
+        let (matches, _) = engine.find_matches("Tokyo", VocabularyType::Contexts, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "Tokyo 東京");
+
+        // Search non-Latin part
+        let (matches, _) = engine.find_matches("東京", VocabularyType::Contexts, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "Tokyo 東京");
+
+        // Search Cyrillic
+        let (matches, _) =
+            engine.find_matches("Москва", VocabularyType::Contexts, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "Москва Moscow");
+    }
+
+    #[test]
+    fn test_unicode_case_folding() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "GROSSE_strasse".to_string(), // German ß
+                "İstanbul_city".to_string(),  // Turkish İ (dotted I)
+            ],
+            vec![],
+        );
+
+        // Standard case folding
+        let (matches, _) =
+            engine.find_matches("grosse", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+    }
+
+    // ========================================================================
+    // Boundary and stress tests
+    // ========================================================================
+
+    #[test]
+    fn test_single_char_query() {
+        let engine = test_engine();
+        // Single char should match via substring but skip fuzzy (min_fuzzy_length=3)
+        let (matches, _) = engine.find_matches("a", VocabularyType::Predicates, Some(10), Some(0.5));
+        // Should find items containing 'a'
+        assert!(matches.iter().any(|m| m.value.contains('a')));
+    }
+
+    #[test]
+    fn test_very_long_query() {
+        let engine = test_engine();
+        let long_query = "a".repeat(500);
+        let (matches, _) =
+            engine.find_matches(&long_query, VocabularyType::Predicates, None, None);
+        // Should return empty, not panic
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_special_regex_chars() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "match.*pattern".to_string(),
+                "test[0-9]+".to_string(),
+                "foo|bar".to_string(),
+            ],
+            vec![],
+        );
+
+        // These should be treated as literal strings, not regex
+        let (matches, _) =
+            engine.find_matches(".*", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert!(matches.iter().any(|m| m.value == "match.*pattern"));
+    }
+
+    #[test]
+    fn test_hyphen_word_boundary() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "user-defined-type".to_string(),
+                "pre-processing".to_string(),
+                "re-implementation".to_string(),
+            ],
+            vec![],
+        );
+
+        // Word boundary should split on hyphens
+        let (matches, _) =
+            engine.find_matches("defined", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].strategy, "word_boundary");
+    }
+
+    #[test]
+    fn test_duplicate_vocabulary_items() {
+        let engine = FuzzyEngine::new();
+        let (pred_count, _, _, _) = engine.rebuild_index(
+            vec![
+                "duplicate".to_string(),
+                "duplicate".to_string(),
+                "duplicate".to_string(),
+                "unique".to_string(),
+            ],
+            vec![],
+        );
+        // Duplicates should be removed during rebuild
+        assert_eq!(pred_count, 2);
     }
 }
