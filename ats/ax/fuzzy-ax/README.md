@@ -22,8 +22,10 @@ This is **not a plugin** - it's a performance-critical component compiled direct
 - Thread-safe concurrent access via RwLock
 - No network overhead, no separate process
 - Memory-safe FFI interface
-- Compiled into QNTX binary when available
-- Graceful fallback to Go implementation if Rust unavailable
+- Compiled into QNTX binary with `-tags rustfuzzy`
+- **Automatic fallback**: Without the `rustfuzzy` build tag, QNTX uses a Go-based substring matcher
+  - No build errors, just reduced fuzzy match quality
+  - Web UI shows striped pattern on ax button to indicate fallback mode
 
 ## Building
 
@@ -92,19 +94,14 @@ go test -tags rustfuzzy ./ats/ax/...
 
 ## Performance
 
-Expected improvements over Go implementation:
+The Rust implementation provides several advantages over the Go fallback:
 
-| Vocabulary Size | Go (substring) | Rust (multi-strategy) | Improvement |
-|-----------------|----------------|----------------------|-------------|
-| 1K items | ~1ms | ~0.05ms | 20x |
-| 10K items | ~10ms | ~0.3ms | 33x |
-| 100K items | ~100ms | ~3ms | 33x |
+- **Typo tolerance**: Levenshtein distance for character-level edits
+- **Better ranking**: Multiple strategies (exact, prefix, substring, Jaro-Winkler, Levenshtein)
+- **Word boundary detection**: Critical for predicates like `is_author_of`
+- **Consistent scoring**: Normalized 0.0-1.0 scores across all match types
 
-Additional benefits:
-- Typo tolerance via Levenshtein distance
-- Better ranking via multiple strategies
-- Word boundary detection (important for predicates like `is_author_of`)
-- Consistent scoring across all match types
+Formal benchmarks are tracked in [issue #XXX](https://github.com/teranos/QNTX/issues/XXX).
 
 ## Files
 
