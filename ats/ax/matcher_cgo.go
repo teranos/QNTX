@@ -147,7 +147,8 @@ func (m *CGOMatcher) syncPredicates(predicates []string) {
 	hash := hashStrings(predicates)
 
 	m.mu.RLock()
-	needsRebuild := hash != m.predicateHash
+	// Check both hash and length to avoid hash collisions
+	needsRebuild := hash != m.predicateHash || len(predicates) != len(m.predicates)
 	m.mu.RUnlock()
 
 	if !needsRebuild {
@@ -158,7 +159,7 @@ func (m *CGOMatcher) syncPredicates(predicates []string) {
 	defer m.mu.Unlock()
 
 	// Double-check after acquiring write lock
-	if hash == m.predicateHash {
+	if hash == m.predicateHash && len(predicates) == len(m.predicates) {
 		return
 	}
 
@@ -190,7 +191,8 @@ func (m *CGOMatcher) syncContexts(contexts []string) {
 	hash := hashStrings(contexts)
 
 	m.mu.RLock()
-	needsRebuild := hash != m.contextHash
+	// Check both hash and length to avoid hash collisions
+	needsRebuild := hash != m.contextHash || len(contexts) != len(m.contexts)
 	m.mu.RUnlock()
 
 	if !needsRebuild {
@@ -201,7 +203,7 @@ func (m *CGOMatcher) syncContexts(contexts []string) {
 	defer m.mu.Unlock()
 
 	// Double-check after acquiring write lock
-	if hash == m.contextHash {
+	if hash == m.contextHash && len(contexts) == len(m.contexts) {
 		return
 	}
 

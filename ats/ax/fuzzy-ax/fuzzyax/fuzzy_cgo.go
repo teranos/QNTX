@@ -107,7 +107,8 @@ func (f *FuzzyEngine) RebuildIndex(predicates, contexts []string) (*RebuildResul
 	var cContexts **C.char
 
 	if len(predicates) > 0 {
-		cPredicates = (**C.char)(C.malloc(C.size_t(len(predicates)) * C.size_t(unsafe.Sizeof(uintptr(0)))))
+		// Use correct type size for pointer allocation
+		cPredicates = (**C.char)(C.malloc(C.size_t(len(predicates)) * C.size_t(unsafe.Sizeof((*C.char)(nil)))))
 		predicateSlice := unsafe.Slice(cPredicates, len(predicates))
 		for i, p := range predicates {
 			predicateSlice[i] = C.CString(p)
@@ -121,7 +122,8 @@ func (f *FuzzyEngine) RebuildIndex(predicates, contexts []string) (*RebuildResul
 	}
 
 	if len(contexts) > 0 {
-		cContexts = (**C.char)(C.malloc(C.size_t(len(contexts)) * C.size_t(unsafe.Sizeof(uintptr(0)))))
+		// Use correct type size for pointer allocation
+		cContexts = (**C.char)(C.malloc(C.size_t(len(contexts)) * C.size_t(unsafe.Sizeof((*C.char)(nil)))))
 		contextSlice := unsafe.Slice(cContexts, len(contexts))
 		for i, c := range contexts {
 			contextSlice[i] = C.CString(c)
