@@ -4,6 +4,16 @@ This directory contains git hooks for the QNTX repository.
 
 ## Available Hooks
 
+### pre-commit
+
+Runs Go formatting checks on staged files.
+
+**What it does:**
+- Automatically runs `gofmt` on all staged Go files
+- Formats files and re-stages them if needed
+- Works locally outside Nix sandbox (has network access for Go modules)
+- Ensures consistent Go code formatting before commits
+
 ### post-checkout
 
 Automatically pulls the latest changes when checking out to the `main` branch.
@@ -17,22 +27,25 @@ Automatically pulls the latest changes when checking out to the `main` branch.
 Updates Nix vendorHash when Go dependencies change.
 
 **Usage:**
-- Called automatically by Nix pre-commit hooks (via `nix develop`)
-- Can also be run manually: `./.githooks/update-nix-hash.sh`
+- Can be run manually: `./.githooks/update-nix-hash.sh`
 - Detects correct vendorHash by building with empty hash
 - Updates `flake.nix` automatically
 
 ## Installation
 
-**Nix-based pre-commit hooks** (recommended):
-```bash
-nix develop  # Automatically installs all pre-commit hooks
-```
-
-Includes: nixpkgs-fmt, gofmt, govet, and vendorHash auto-update.
-
-**Manual installation** (for non-Nix hooks like post-checkout):
+**Local Git hooks** (recommended for local development):
 ```bash
 # Set git hooks directory (Git 2.9+)
 git config core.hooksPath .githooks
 ```
+
+This enables:
+- `pre-commit`: Go formatting checks
+- `post-checkout`: Auto-pull on main branch
+
+**Nix-based pre-commit hooks** (CI environment):
+```bash
+nix develop  # Automatically installs pre-commit hooks in Nix shell
+```
+
+Note: Nix hooks run in a sandbox without network access. The local Git hooks (above) are recommended for development as they support Go module downloads.
