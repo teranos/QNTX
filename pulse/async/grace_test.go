@@ -1,10 +1,10 @@
 package async
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"encoding/json"
 	"fmt"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 
