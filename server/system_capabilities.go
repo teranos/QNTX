@@ -1,21 +1,12 @@
 package server
 
 import (
-	"time"
-
 	"github.com/teranos/QNTX/ats/ax"
 )
 
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
 // This informs the frontend about available optimizations (e.g., Rust fuzzy matching).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
-	// Small delay to ensure client is fully registered
-	select {
-	case <-time.After(50 * time.Millisecond):
-	case <-s.ctx.Done():
-		return
-	}
-
 	// Get fuzzy backend from the AxGraphBuilder
 	fuzzyBackend := s.builder.FuzzyBackend()
 	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust)
@@ -28,6 +19,7 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	}
 
 	// Send to client via generic message channel
+	// Use non-blocking send to handle case where client disconnects before we send
 	select {
 	case client.sendMsg <- msg:
 		s.logger.Debugw("Sent system capabilities to client",
@@ -37,8 +29,10 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 		)
 	case <-s.ctx.Done():
 		return
-	case <-time.After(2 * time.Second):
-		s.logger.Warnw("Timeout sending system capabilities to client",
+	default:
+		// Client disconnected or channel full
+		// This is expected during rapid connect/disconnect scenarios
+		s.logger.Debugw("Client channel unavailable for system capabilities",
 			"client_id", client.id,
 		)
 	}
