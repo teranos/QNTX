@@ -160,6 +160,8 @@
         # Expose pre-commit checks
         checks = {
           pre-commit = pre-commit-check;
+          qntx-build = qntx;  # Ensure QNTX builds
+          ci-image = ciImage;  # Ensure image builds
         };
       }
     );
