@@ -34,12 +34,22 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 	var pluginConfigs []PluginConfig
 	var failedPlugins []string
 	for _, pluginName := range cfg.Plugin.Enabled {
+		logger.Infow("Searching for plugin binary",
+			"plugin", pluginName,
+			"search_paths", cfg.Plugin.Paths,
+		)
+
 		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
-			logger.Warnw("Failed to discover plugin",
+			logger.Warnw("Plugin discovery failed - binary not found or not executable",
 				"plugin", pluginName,
-				"error", err,
-				"paths", cfg.Plugin.Paths,
+				"error", err.Error(),
+				"searched_paths", cfg.Plugin.Paths,
+				"tried_names", []string{
+					fmt.Sprintf("qntx-%s-plugin", pluginName),
+					fmt.Sprintf("qntx-%s", pluginName),
+					pluginName,
+				},
 			)
 			failedPlugins = append(failedPlugins, pluginName)
 			continue
@@ -125,9 +135,10 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 					continue
 				}
 
-				logger.Infow("Discovered plugin binary",
+				logger.Infow("Found plugin binary",
 					"plugin", name,
-					"path", candidate,
+					"binary_path", candidate,
+					"executable", true,
 				)
 
 				return PluginConfig{
