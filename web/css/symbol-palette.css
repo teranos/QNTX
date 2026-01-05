@@ -146,3 +146,40 @@
         transform: none;
     }
 }
+
+/* Degraded State - diagonal stripes for performance fallback */
+.palette-cell.degraded {
+    background: repeating-linear-gradient(
+        45deg,
+        #f8f8f8,
+        #f8f8f8 4px,
+        #e8e8e8 4px,
+        #e8e8e8 8px
+    );
+    border-color: #ccc;
+    cursor: help;
+}
+
+.palette-cell.degraded:hover {
+    background: repeating-linear-gradient(
+        45deg,
+        #e8e8e8,
+        #e8e8e8 4px,
+        #d8d8d8 4px,
+        #d8d8d8 8px
+    );
+    border-color: #aaa;
+}
+
+/* Active degraded state */
+.palette-cell.degraded.active {
+    background: repeating-linear-gradient(
+        45deg,
+        #333,
+        #333 4px,
+        #000 4px,
+        #000 8px
+    );
+    color: #fff;
+    border-color: #000;
+}
