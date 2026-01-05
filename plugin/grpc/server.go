@@ -139,9 +139,11 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	// Set headers
-	for key, value := range req.Headers {
-		httpReq.Header.Set(key, value)
+	// Set headers (support multi-value headers)
+	for _, header := range req.Headers {
+		for _, value := range header.Values {
+			httpReq.Header.Add(header.Name, value)
+		}
 	}
 
 	// Create a response recorder
@@ -159,9 +161,13 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	headers := make(map[string]string)
-	for key := range result.Header {
-		headers[key] = result.Header.Get(key)
+	// Build response headers (preserve multi-value headers like Set-Cookie)
+	headers := make([]*protocol.HTTPHeader, 0, len(result.Header))
+	for name, values := range result.Header {
+		headers = append(headers, &protocol.HTTPHeader{
+			Name:   name,
+			Values: values,
+		})
 	}
 
 	return &protocol.HTTPResponse{
