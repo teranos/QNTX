@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// ATSStoreService provides attestation storage operations for external plugins
+service ATSStoreService {
+  // CreateAttestation creates a new attestation
+  rpc CreateAttestation(CreateAttestationRequest) returns (CreateAttestationResponse);
+
+  // AttestationExists checks if an attestation exists by ID
+  rpc AttestationExists(AttestationExistsRequest) returns (AttestationExistsResponse);
+
+  // GenerateAndCreateAttestation generates an attestation ID and creates it
+  rpc GenerateAndCreateAttestation(GenerateAttestationRequest) returns (GenerateAttestationResponse);
+
+  // GetAttestations queries attestations with filters
+  rpc GetAttestations(GetAttestationsRequest) returns (GetAttestationsResponse);
+}
+
+// Attestation represents a complete attestation
+message Attestation {
+  string id = 1;
+  repeated string subjects = 2;
+  repeated string predicates = 3;
+  repeated string contexts = 4;
+  repeated string actors = 5;
+  int64 timestamp = 6;       // Unix timestamp in seconds
+  string source = 7;
+  string attributes_json = 8; // JSON-encoded map[string]interface{}
+  int64 created_at = 9;       // Unix timestamp in seconds
+}
+
+// AttestationCommand is used for creating attestations
+message AttestationCommand {
+  repeated string subjects = 1;
+  repeated string predicates = 2;
+  repeated string contexts = 3;
+  repeated string actors = 4;
+  int64 timestamp = 5;        // Unix timestamp in seconds (optional, 0 = now)
+  string attributes_json = 6; // JSON-encoded map[string]interface{}
+}
+
+// AttestationFilter for querying attestations
+message AttestationFilter {
+  repeated string subjects = 1;
+  repeated string predicates = 2;
+  repeated string contexts = 3;
+  repeated string actors = 4;
+  int64 time_start = 5;       // Unix timestamp in seconds (optional)
+  int64 time_end = 6;         // Unix timestamp in seconds (optional)
+  int32 limit = 7;            // Maximum results (0 = no limit)
+}
+
+message CreateAttestationRequest {
+  string auth_token = 1;      // Simple token-based auth
+  Attestation attestation = 2;
+}
+
+message CreateAttestationResponse {
+  bool success = 1;
+  string error = 2;           // Empty if success
+}
+
+message AttestationExistsRequest {
+  string auth_token = 1;
+  string id = 2;
+}
+
+message AttestationExistsResponse {
+  bool exists = 1;
+}
+
+message GenerateAttestationRequest {
+  string auth_token = 1;
+  AttestationCommand command = 2;
+}
+
+message GenerateAttestationResponse {
+  bool success = 1;
+  string error = 2;
+  Attestation attestation = 3; // The created attestation with generated ID
+}
+
+message GetAttestationsRequest {
+  string auth_token = 1;
+  AttestationFilter filter = 2;
+}
+
+message GetAttestationsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated Attestation attestations = 3;
+}

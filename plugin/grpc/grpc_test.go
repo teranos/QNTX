@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	pluginpkg "github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
-	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
@@ -93,11 +93,11 @@ type mockServiceRegistry struct {
 	logger *zap.SugaredLogger
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB              { return nil }
-func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger { return m.logger }
+func (m *mockServiceRegistry) Database() *sql.DB                         { return nil }
+func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger   { return m.logger }
 func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config     { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() *storage.SQLStore            { return nil }
-func (m *mockServiceRegistry) Queue() *async.Queue                     { return nil }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore            { return nil }
+func (m *mockServiceRegistry) Queue() pluginpkg.QueueService             { return nil }
 
 type mockConfig struct{}
 
@@ -460,7 +460,7 @@ func TestExternalDomainProxy_ImplementsDomainPlugin(t *testing.T) {
 
 func TestRemoteServiceRegistry_Database(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
 
 	// Should return nil and log warning
 	db := registry.Database()
@@ -469,7 +469,7 @@ func TestRemoteServiceRegistry_Database(t *testing.T) {
 
 func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
 
 	// Should return nil and log warning
 	store := registry.ATSStore()
@@ -478,7 +478,7 @@ func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 
 func TestRemoteServiceRegistry_Queue(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
 
 	// Should return nil and log warning
 	queue := registry.Queue()
@@ -487,7 +487,7 @@ func TestRemoteServiceRegistry_Queue(t *testing.T) {
 
 func TestRemoteServiceRegistry_Logger(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
 
 	pluginLogger := registry.Logger("test")
 	assert.NotNil(t, pluginLogger)
@@ -500,7 +500,7 @@ func TestRemoteServiceRegistry_Config(t *testing.T) {
 		"enabled": "true",
 		"count":   "42",
 	}
-	registry := NewRemoteServiceRegistry("", "", config, logger)
+	registry := NewRemoteServiceRegistry("", "", "", config, logger)
 
 	cfg := registry.Config("test")
 	assert.Equal(t, "value1", cfg.GetString("key1"))
@@ -839,4 +839,84 @@ func TestDiscoverPlugins_EmptyDir(t *testing.T) {
 	configs, err := DiscoverPlugins("/nonexistent/path")
 	require.NoError(t, err)
 	assert.Empty(t, configs)
+}
+
+// TestPluginServer_WebSocketStreaming tests WebSocket bidirectional streaming
+func TestPluginServer_WebSocketStreaming(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	logger := zaptest.NewLogger(t).Sugar()
+	plugin := newMockPlugin()
+
+	addr, cleanup := startTestServer(t, plugin)
+	defer cleanup()
+
+	// Create external domain proxy
+	proxy, err := NewExternalDomainProxy(addr, logger)
+	require.NoError(t, err)
+	defer proxy.Close()
+
+	// Initialize plugin
+	services := &mockServiceRegistry{logger: logger}
+	err = proxy.Initialize(context.Background(), services)
+	require.NoError(t, err)
+
+	// Establish gRPC stream directly to test the HandleWebSocket implementation
+	stream, err := proxy.client.HandleWebSocket(context.Background())
+	require.NoError(t, err)
+
+	// Send CONNECT message
+	err = stream.Send(&protocol.WebSocketMessage{
+		Type: protocol.WebSocketMessage_CONNECT,
+		Data: []byte{},
+	})
+	require.NoError(t, err)
+
+	// Send test data
+	testMessage := []byte("Hello from WebSocket client")
+	err = stream.Send(&protocol.WebSocketMessage{
+		Type: protocol.WebSocketMessage_DATA,
+		Data: testMessage,
+	})
+	require.NoError(t, err)
+
+	// Receive echoed data (server echoes back)
+	msg, err := stream.Recv()
+	require.NoError(t, err)
+	assert.Equal(t, protocol.WebSocketMessage_DATA, msg.Type)
+	assert.Equal(t, testMessage, msg.Data)
+
+	// Send multiple messages to test bidirectional streaming
+	for i := 0; i < 5; i++ {
+		testMsg := []byte(fmt.Sprintf("Message %d", i))
+		err = stream.Send(&protocol.WebSocketMessage{
+			Type: protocol.WebSocketMessage_DATA,
+			Data: testMsg,
+		})
+		require.NoError(t, err)
+
+		// Receive echo
+		msg, err := stream.Recv()
+		require.NoError(t, err)
+		assert.Equal(t, protocol.WebSocketMessage_DATA, msg.Type)
+		assert.Equal(t, testMsg, msg.Data)
+	}
+
+	// Send CLOSE message
+	err = stream.Send(&protocol.WebSocketMessage{
+		Type: protocol.WebSocketMessage_CLOSE,
+		Data: []byte{},
+	})
+	require.NoError(t, err)
+
+	// Receive CLOSE acknowledgment
+	msg, err = stream.Recv()
+	require.NoError(t, err)
+	assert.Equal(t, protocol.WebSocketMessage_CLOSE, msg.Type)
+
+	// Close the stream
+	err = stream.CloseSend()
+	require.NoError(t, err)
 }
