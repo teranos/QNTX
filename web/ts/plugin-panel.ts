@@ -22,6 +22,8 @@ interface PluginInfo {
     healthy: boolean;
     message?: string;
     details?: Record<string, unknown>;
+    state: 'running' | 'paused' | 'stopped';
+    pausable: boolean;
 }
 
 interface PluginsResponse {
@@ -66,13 +68,36 @@ class PluginPanel extends BasePanel {
             this.filterPlugins(target.value);
         });
 
-        // Refresh button click handler (event delegation)
+        // Button click handlers (event delegation)
         const content = this.$('.plugin-panel-content');
         content?.addEventListener('click', async (e: Event) => {
             const target = e.target as HTMLElement;
+
+            // Refresh button
             if (target.closest('.plugin-refresh-btn')) {
                 await this.fetchPlugins();
                 this.render();
+                return;
+            }
+
+            // Pause button
+            const pauseBtn = target.closest('.plugin-pause-btn') as HTMLElement | null;
+            if (pauseBtn) {
+                const pluginName = pauseBtn.dataset.plugin;
+                if (pluginName) {
+                    await this.pausePlugin(pluginName);
+                }
+                return;
+            }
+
+            // Resume button
+            const resumeBtn = target.closest('.plugin-resume-btn') as HTMLElement | null;
+            if (resumeBtn) {
+                const pluginName = resumeBtn.dataset.plugin;
+                if (pluginName) {
+                    await this.resumePlugin(pluginName);
+                }
+                return;
             }
         });
     }
@@ -156,6 +181,20 @@ class PluginPanel extends BasePanel {
         const statusIcon = plugin.healthy ? '&#10003;' : '&#10007;';
         const statusText = plugin.healthy ? 'Healthy' : 'Unhealthy';
 
+        // State badge
+        const stateClass = this.getStateClass(plugin.state);
+        const stateIcon = this.getStateIcon(plugin.state);
+
+        // Control buttons (only for pausable plugins)
+        let controls = '';
+        if (plugin.pausable) {
+            if (plugin.state === 'running') {
+                controls = `<button class="panel-btn panel-btn-sm plugin-pause-btn" data-plugin="${plugin.name}" title="Pause plugin">&#10074;&#10074; Pause</button>`;
+            } else if (plugin.state === 'paused') {
+                controls = `<button class="panel-btn panel-btn-sm plugin-resume-btn" data-plugin="${plugin.name}" title="Resume plugin">&#9654; Resume</button>`;
+            }
+        }
+
         return `
             <div class="panel-card plugin-card" data-plugin="${plugin.name}">
                 <div class="plugin-card-header">
@@ -163,9 +202,15 @@ class PluginPanel extends BasePanel {
                         <span class="plugin-name">${this.escapeHtml(plugin.name)}</span>
                         <span class="plugin-version panel-code">${this.escapeHtml(plugin.version)}</span>
                     </div>
-                    <div class="plugin-status ${statusClass}">
-                        <span class="plugin-status-icon">${statusIcon}</span>
-                        <span class="plugin-status-text">${statusText}</span>
+                    <div class="plugin-badges">
+                        <div class="plugin-state ${stateClass}">
+                            <span class="plugin-state-icon">${stateIcon}</span>
+                            <span class="plugin-state-text">${plugin.state}</span>
+                        </div>
+                        <div class="plugin-status ${statusClass}">
+                            <span class="plugin-status-icon">${statusIcon}</span>
+                            <span class="plugin-status-text">${statusText}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="plugin-description">
@@ -176,10 +221,73 @@ class PluginPanel extends BasePanel {
                     ${plugin.license ? `<span class="plugin-license" title="License">&#128196; ${this.escapeHtml(plugin.license)}</span>` : ''}
                     ${plugin.qntx_version ? `<span class="plugin-qntx-version" title="QNTX Version Requirement">&#8805; ${this.escapeHtml(plugin.qntx_version)}</span>` : ''}
                 </div>
+                ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
                 ${plugin.message ? `<div class="plugin-message ${plugin.healthy ? '' : 'plugin-message-error'}">${this.escapeHtml(plugin.message)}</div>` : ''}
                 ${this.renderDetails(plugin.details)}
             </div>
         `;
+    }
+
+    private getStateClass(state: string): string {
+        switch (state) {
+            case 'running': return 'plugin-state-running';
+            case 'paused': return 'plugin-state-paused';
+            case 'stopped': return 'plugin-state-stopped';
+            default: return '';
+        }
+    }
+
+    private getStateIcon(state: string): string {
+        switch (state) {
+            case 'running': return '&#9654;'; // Play icon
+            case 'paused': return '&#10074;&#10074;'; // Pause icon
+            case 'stopped': return '&#9632;'; // Stop icon
+            default: return '';
+        }
+    }
+
+    private async pausePlugin(name: string): Promise<void> {
+        try {
+            console.log('[Plugin Panel] Pausing plugin:', name);
+            const response = await apiFetch(`/api/plugins/${name}/pause`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to pause: ${errorText}`);
+            }
+
+            // Refresh the list to show updated state
+            await this.fetchPlugins();
+            this.render();
+            console.log('[Plugin Panel] Plugin paused:', name);
+        } catch (error) {
+            console.error('[Plugin Panel] Failed to pause plugin:', error);
+            alert(`Failed to pause plugin: ${error}`);
+        }
+    }
+
+    private async resumePlugin(name: string): Promise<void> {
+        try {
+            console.log('[Plugin Panel] Resuming plugin:', name);
+            const response = await apiFetch(`/api/plugins/${name}/resume`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to resume: ${errorText}`);
+            }
+
+            // Refresh the list to show updated state
+            await this.fetchPlugins();
+            this.render();
+            console.log('[Plugin Panel] Plugin resumed:', name);
+        } catch (error) {
+            console.error('[Plugin Panel] Failed to resume plugin:', error);
+            alert(`Failed to resume plugin: ${error}`);
+        }
     }
 
     private renderDetails(details?: Record<string, unknown>): string {
