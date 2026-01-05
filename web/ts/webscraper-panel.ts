@@ -58,10 +58,10 @@ class WebscraperPanel extends BasePanel {
                     <label for="scraper-url" class="scraper-label">URL to Scrape:</label>
                     <div class="scraper-input-group">
                         <input
-                            type="url"
+                            type="text"
                             id="scraper-url"
                             class="scraper-url-input"
-                            placeholder="https://example.com/article"
+                            placeholder="example.com or https://example.com"
                             autocomplete="url"
                         />
                         <button id="scraper-submit" class="scraper-submit-btn">
@@ -137,11 +137,16 @@ class WebscraperPanel extends BasePanel {
 
     private async handleScrape(): Promise<void> {
         const urlInput = this.$<HTMLInputElement>('#scraper-url');
-        const url = urlInput?.value.trim();
+        let url = urlInput?.value.trim();
 
         if (!url) {
             toast.error('Please enter a URL to scrape');
             return;
+        }
+
+        // Add protocol if missing
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            url = 'https://' + url;
         }
 
         // Validate URL
