@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/ats/types"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // setupResolutionTestDB creates a test database with real schema and resolution-specific fixtures
