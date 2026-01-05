@@ -4,11 +4,7 @@
  * Shows errors with server build details to help debugging
  */
 
-interface BuildInfo {
-    version: string;
-    commit: string;
-    build_time?: string;
-}
+import type { BuildInfo } from '../types/core';
 
 let cachedBuildInfo: BuildInfo | null = null;
 

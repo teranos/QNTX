@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// QueueService provides async job queue operations for external plugins
+service QueueService {
+  // Enqueue adds a new job to the queue
+  rpc Enqueue(EnqueueRequest) returns (EnqueueResponse);
+
+  // GetJob retrieves a job by ID
+  rpc GetJob(GetJobRequest) returns (GetJobResponse);
+
+  // UpdateJob updates a job's status and progress
+  rpc UpdateJob(UpdateJobRequest) returns (UpdateJobResponse);
+
+  // ListJobs lists jobs with optional status filter
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+}
+
+// Job represents an async operation
+message Job {
+  string id = 1;
+  string handler_name = 2;     // "data.batch-import", "bio.sequence-align"
+  bytes payload = 3;            // Handler-specific data (JSON)
+  string source = 4;            // For deduplication and logging
+  string status = 5;            // queued, running, paused, completed, failed, cancelled
+  Progress progress = 6;
+  double cost_estimate = 7;
+  double cost_actual = 8;
+  PulseState pulse_state = 9;
+  string error = 10;
+  string parent_job_id = 11;
+  int32 retry_count = 12;
+  int64 created_at = 13;        // Unix timestamp in seconds
+  int64 started_at = 14;        // Unix timestamp in seconds (0 if not started)
+  int64 completed_at = 15;      // Unix timestamp in seconds (0 if not completed)
+}
+
+message Progress {
+  int32 current = 1;
+  int32 total = 2;
+}
+
+message PulseState {
+  int32 calls_this_minute = 1;
+  int32 calls_remaining = 2;
+  double spend_today = 3;
+  double spend_this_month = 4;
+  double budget_remaining = 5;
+  bool is_paused = 6;
+  string pause_reason = 7;
+}
+
+message EnqueueRequest {
+  string auth_token = 1;
+  Job job = 2;
+}
+
+message EnqueueResponse {
+  bool success = 1;
+  string error = 2;
+  string job_id = 3;            // The created job ID
+}
+
+message GetJobRequest {
+  string auth_token = 1;
+  string job_id = 2;
+}
+
+message GetJobResponse {
+  bool success = 1;
+  string error = 2;
+  Job job = 3;
+}
+
+message UpdateJobRequest {
+  string auth_token = 1;
+  Job job = 2;
+}
+
+message UpdateJobResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ListJobsRequest {
+  string auth_token = 1;
+  string status = 2;            // Optional status filter (empty = all)
+  int32 limit = 3;              // Maximum results (0 = default 100)
+}
+
+message ListJobsResponse {
+  bool success = 1;
+  string error = 2;
+  repeated Job jobs = 3;
+}
