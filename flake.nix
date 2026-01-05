@@ -25,19 +25,10 @@
             # Nix formatting
             nixpkgs-fmt.enable = true;
 
-            # Go formatting
-            gofmt.enable = true;
-            govet.enable = true;
-
-            # Auto-update vendorHash when go.mod/go.sum changes
-            # Disabled in CI due to network restrictions in Nix sandbox
-            # vendorHash-update = {
-            #   enable = true;
-            #   name = "Update Nix vendorHash";
-            #   entry = "${./.githooks/update-nix-hash.sh}";
-            #   files = "\\.(mod|sum)$";
-            #   pass_filenames = false;
-            # };
+            # Go hooks disabled - require network access to download modules
+            # which isn't available in Nix sandbox. Use local git hooks instead.
+            # gofmt.enable = true;
+            # govet.enable = true;
           };
         };
 
