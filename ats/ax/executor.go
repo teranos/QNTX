@@ -16,7 +16,7 @@ import (
 // AxExecutor executes ask queries against attestation storage
 type AxExecutor struct {
 	queryStore     ats.AttestationQueryStore
-	fuzzy          *FuzzyMatcher
+	fuzzy          Matcher
 	classifier     *classification.SmartClassifier
 	aliasResolver  *alias.Resolver
 	entityResolver ats.EntityResolver
@@ -37,6 +37,7 @@ type AxExecutorOptions struct {
 	EntityResolver ats.EntityResolver // Optional entity ID resolution (default: NoOpEntityResolver)
 	QueryExpander  ats.QueryExpander  // Optional query expansion (default: NoOpQueryExpander)
 	Logger         *zap.SugaredLogger // Optional logger for debug output (default: nil, no logging)
+	Matcher        Matcher            // Optional fuzzy matcher (default: FuzzyMatcher, can use CGOMatcher)
 }
 
 // NewAxExecutorWithOptions creates an executor with custom options.
@@ -48,10 +49,13 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 	if opts.QueryExpander == nil {
 		opts.QueryExpander = &ats.NoOpQueryExpander{}
 	}
+	if opts.Matcher == nil {
+		opts.Matcher = NewFuzzyMatcher()
+	}
 
 	return &AxExecutor{
 		queryStore:     queryStore,
-		fuzzy:          NewFuzzyMatcher(),
+		fuzzy:          opts.Matcher,
 		classifier:     classification.NewSmartClassifier(classification.DefaultTemporalConfig()),
 		aliasResolver:  aliasResolver,
 		entityResolver: opts.EntityResolver,

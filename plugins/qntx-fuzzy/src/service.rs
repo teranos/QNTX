@@ -35,7 +35,8 @@ impl FuzzyService {
 
     fn record_query(&self, time_us: u64) {
         self.queries_served.fetch_add(1, Ordering::Relaxed);
-        self.total_query_time_us.fetch_add(time_us, Ordering::Relaxed);
+        self.total_query_time_us
+            .fetch_add(time_us, Ordering::Relaxed);
     }
 
     fn convert_vocab_type(vt: i32) -> EngineVocabType {
@@ -104,9 +105,9 @@ impl FuzzyMatchService for FuzzyService {
             None
         };
 
-        let (matches, search_time) =
-            self.engine
-                .find_matches(&req.query, vocab_type, limit, min_score);
+        let (matches, search_time) = self
+            .engine
+            .find_matches(&req.query, vocab_type, limit, min_score);
 
         self.record_query(search_time);
 
@@ -198,11 +199,7 @@ impl FuzzyMatchService for FuzzyService {
         let queries = self.queries_served.load(Ordering::Relaxed);
         let total_time = self.total_query_time_us.load(Ordering::Relaxed);
 
-        let avg_time = if queries > 0 {
-            total_time / queries
-        } else {
-            0
-        };
+        let avg_time = if queries > 0 { total_time / queries } else { 0 };
 
         Ok(Response::new(StatsResponse {
             predicate_count: pred_count as i64,

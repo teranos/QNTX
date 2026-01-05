@@ -157,12 +157,8 @@ impl FuzzyEngine {
 
         // Get the appropriate vocabulary
         let (vocabulary, vocabulary_lower) = match vocabulary_type {
-            VocabularyType::Predicates => {
-                (self.predicates.read(), self.predicates_lower.read())
-            }
-            VocabularyType::Contexts => {
-                (self.contexts.read(), self.contexts_lower.read())
-            }
+            VocabularyType::Predicates => (self.predicates.read(), self.predicates_lower.read()),
+            VocabularyType::Contexts => (self.contexts.read(), self.contexts_lower.read()),
         };
 
         let mut matches = Vec::new();
@@ -370,7 +366,8 @@ mod tests {
     fn test_levenshtein_typo() {
         let engine = test_engine();
         // "wroks_at" is 1 edit from "works_at"
-        let (matches, _) = engine.find_matches("wroks_at", VocabularyType::Predicates, None, Some(0.5));
+        let (matches, _) =
+            engine.find_matches("wroks_at", VocabularyType::Predicates, None, Some(0.5));
 
         assert!(!matches.is_empty());
         assert!(matches.iter().any(|m| m.value == "works_at"));

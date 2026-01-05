@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins
+.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -114,6 +114,7 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 clean: ## Clean build artifacts
 	@rm -rf internal/server/dist
 	@rm -rf web/node_modules
+	@rm -rf plugins/qntx-fuzzy/target
 
 install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom/path)
 	@echo "Installing qntx to $(PREFIX)/bin..."
@@ -182,3 +183,22 @@ plugins-install: plugins ## Install plugins to ~/.qntx/plugins/
 	@cp bin/qntx-code-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
 	@echo "✓ Plugins installed to $(PREFIX)/plugins/"
+
+# Rust fuzzy matching library
+rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
+	@echo "Building Rust fuzzy matching library..."
+	@cd plugins/qntx-fuzzy && cargo build --release --lib
+	@echo "✓ libqntx_fuzzy built in plugins/qntx-fuzzy/target/release/"
+	@echo "  Static:  libqntx_fuzzy.a"
+	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
+
+rust-fuzzy-test: ## Run Rust fuzzy matching tests
+	@echo "Running Rust fuzzy matching tests..."
+	@cd plugins/qntx-fuzzy && cargo test --lib
+	@echo "✓ All Rust tests passed"
+
+rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
+	@echo "Checking Rust fuzzy matching code..."
+	@cd plugins/qntx-fuzzy && cargo fmt --check
+	@cd plugins/qntx-fuzzy && cargo clippy --lib -- -D warnings
+	@echo "✓ Rust code checks passed"
