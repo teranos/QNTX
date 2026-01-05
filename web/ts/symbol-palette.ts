@@ -22,8 +22,25 @@
  * - Backwards compatible with existing text-based workflows
  */
 
-// Make this a module by exporting something
-export {};
+// Import generated symbol constants and mappings from Go source
+import {
+    SO,
+    Pulse, Prose,
+    CommandToSymbol,
+} from '@generated/sym.js';
+
+// Valid palette commands (derived from generated mappings + UI-only commands)
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go';
+
+/**
+ * Get symbol for a command, with fallback for UI-only commands
+ */
+function getSymbol(cmd: string): string {
+    if (cmd === 'pulse') return Pulse;
+    if (cmd === 'prose') return Prose;
+    if (cmd === 'go') return 'Go';
+    return CommandToSymbol[cmd] || cmd;
+}
 
 // Track current modality
 let currentModality: string = 'ax'; // Default to 'ax' modality
@@ -82,11 +99,12 @@ window.setActiveModality = setActiveModality;
  */
 function handleSymbolClick(e: Event): void {
     const target = e.target as HTMLElement;
-    const cmd = target.dataset.cmd;
+    const cmd = target.dataset.cmd as PaletteCommand | undefined;
 
     if (!cmd) return;
 
-    console.log(`[Symbol Palette] Clicked: ${cmd}`);
+    const symbol = getSymbol(cmd);
+    console.log(`[Symbol Palette] ${symbol} (${cmd}) clicked`);
 
     // Set as active modality (color inversion)
     setActiveModality(cmd);
@@ -95,41 +113,39 @@ function handleSymbolClick(e: Event): void {
     switch(cmd) {
         case 'i':
             // Self - operator vantage point
-            console.log(`[Symbol Palette] i (self) - self introspection`);
-            activateSearchMode('i');
+            activateSearchMode(cmd);
             break;
         case 'am':
             // Configuration - system configuration introspection
-            console.log(`[Symbol Palette] am (config) - showing configuration`);
             showConfigPanel();
             break;
         case 'ax':
             // Expand - show ax command explorer
             if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle('ax');
+                window.commandExplorerPanel.toggle(cmd);
             } else {
-                activateSearchMode('ax');
+                activateSearchMode(cmd);
             }
             break;
         case 'ix':
             // Ingest - show running IX jobs
-            activateIngestMode('ix');
+            activateIngestMode(cmd);
             break;
         case 'as':
             // Assert - show query history
             if (window.commandExplorerPanel) {
-                window.commandExplorerPanel.toggle('as');
+                window.commandExplorerPanel.toggle(cmd);
             } else {
-                activateAttestationMode('as');
+                activateAttestationMode(cmd);
             }
             break;
         case 'is':
             // Identity - insert segment
-            insertSegment('is');
+            insertSegment(cmd);
             break;
         case 'of':
             // Membership - insert segment
-            insertSegment('of');
+            insertSegment(cmd);
             break;
         case 'by':
             // Actor - show AI provider panel
@@ -137,25 +153,22 @@ function handleSymbolClick(e: Event): void {
             break;
         case 'at':
             // Event - insert segment
-            insertSegment('at');
+            insertSegment(cmd);
             break;
         case 'so':
             // Therefore - consequent action/trigger
-            handleSoCommand('so');
+            handleSoCommand(cmd);
             break;
         case 'pulse':
             // Pulse - show scheduled jobs panel
-            console.log(`[Symbol Palette] pulse - showing scheduled jobs`);
             showPulsePanel();
             break;
         case 'prose':
             // Prose - show documentation panel
-            console.log(`[Symbol Palette] prose - showing documentation`);
             showProsePanel();
             break;
         case 'go':
             // Go - show Go code editor with gopls integration
-            console.log(`[Symbol Palette] go - showing Go code editor`);
             showGoEditor();
             break;
         default:
@@ -171,7 +184,7 @@ function activateSearchMode(mode: string): void {
     if (queryInput) {
         queryInput.focus();
         queryInput.select();
-        console.log(`[Symbol Palette] Activated ${mode} search mode`);
+        console.log(`[Symbol Palette] ${getSymbol(mode)} search mode activated`);
     }
 }
 
@@ -222,7 +235,7 @@ async function activateIngestMode(mode: string): Promise<void> {
     // Show job list panel (IMPLEMENTED)
     const { toggleJobList } = await import('./hixtory-panel.js');
     toggleJobList();
-    console.log(`[Symbol Palette] Activated ${mode} ingest mode - showing job list`);
+    console.log(`[Symbol Palette] ${getSymbol(mode)} ingest mode - showing job list`);
 }
 
 /**
@@ -237,7 +250,7 @@ function activateAttestationMode(mode: string): void {
             queryInput.value = 'is ';
             queryInput.selectionStart = queryInput.value.length;
         }
-        console.log(`[Symbol Palette] Activated ${mode} attestation mode`);
+        console.log(`[Symbol Palette] ${getSymbol(mode)} attestation mode activated`);
     }
 }
 
@@ -261,7 +274,7 @@ function insertSegment(segment: string): void {
     queryInput.value = text.substring(0, start) + newSegment + text.substring(end);
     queryInput.selectionStart = queryInput.selectionEnd = start + newSegment.length;
 
-    console.log(`[Symbol Palette] Inserted segment: "${segment}"`);
+    console.log(`[Symbol Palette] ${getSymbol(segment)} segment inserted`);
 }
 
 /**
@@ -273,9 +286,8 @@ function insertSegment(segment: string): void {
  * Intentionally unfinalized. Behavior depends on selection context.
  * Currently logs intent; actual implementation will emerge as use cases clarify.
  */
-function handleSoCommand(mode: string): void {
-    console.log(`[Symbol Palette] ⟶ (so/therefore) - consequent action triggered`);
-    console.log(`[Symbol Palette] Context: ${mode}`);
+function handleSoCommand(_cmd: string): void {
+    console.log(`[Symbol Palette] ${SO} (so/therefore) - consequent action triggered`);
 
     // Placeholder for future implementation
     // Possible behaviors:
