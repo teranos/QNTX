@@ -94,10 +94,11 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	// Use sync.Once to ensure initialization happens exactly once,
 	// even under concurrent access
 	s.initOnce.Do(func() {
-		// Create a remote service registry that connects back to QNTX
+		// Create a remote service registry with service endpoints
 		s.services = NewRemoteServiceRegistry(
-			req.DatabaseEndpoint,
 			req.AtsStoreEndpoint,
+			req.QueueEndpoint,
+			req.AuthToken,
 			req.Config,
 			s.logger,
 		)
@@ -171,26 +172,53 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 }
 
 // HandleWebSocket handles a WebSocket connection via gRPC streaming.
+// This implementation provides a simple echo server that demonstrates
+// bidirectional streaming between client and plugin.
 func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_HandleWebSocketServer) error {
-	// WebSocket handling via gRPC streaming
-	// This bridges WebSocket connections to the plugin's WebSocket handlers
+	s.logger.Debug("WebSocket stream established via gRPC")
+
 	for {
 		msg, err := stream.Recv()
 		if err == io.EOF {
+			s.logger.Debug("WebSocket stream EOF")
 			return nil
 		}
 		if err != nil {
+			s.logger.Errorw("WebSocket stream receive error", "error", err)
 			return err
 		}
 
 		switch msg.Type {
 		case protocol.WebSocketMessage_CONNECT:
-			s.logger.Debug("WebSocket connection established via gRPC")
+			s.logger.Info("WebSocket CONNECT message received")
+			// Connection established, ready to receive data
+
 		case protocol.WebSocketMessage_DATA:
-			// TODO: Route to appropriate WebSocket handler
-			s.logger.Debugw("WebSocket data received", "size", len(msg.Data))
+			s.logger.Debugw("WebSocket DATA received", "size", len(msg.Data))
+
+			// Echo the message back
+			// This demonstrates bidirectional streaming working correctly
+			// Real plugins would process the data and respond appropriately
+			echoMsg := &protocol.WebSocketMessage{
+				Type: protocol.WebSocketMessage_DATA,
+				Data: msg.Data,
+			}
+
+			if err := stream.Send(echoMsg); err != nil {
+				s.logger.Errorw("Failed to send WebSocket message", "error", err)
+				return err
+			}
+
 		case protocol.WebSocketMessage_CLOSE:
-			s.logger.Debug("WebSocket connection closed")
+			s.logger.Info("WebSocket CLOSE message received")
+			// Send CLOSE acknowledgment
+			closeMsg := &protocol.WebSocketMessage{
+				Type: protocol.WebSocketMessage_CLOSE,
+				Data: []byte{},
+			}
+			if err := stream.Send(closeMsg); err != nil {
+				s.logger.Errorw("Failed to send CLOSE message", "error", err)
+			}
 			return nil
 		}
 	}
