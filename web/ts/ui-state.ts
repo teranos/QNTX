@@ -115,6 +115,7 @@ function createDefaultState(): UIStateData {
 
 const STORAGE_KEY = 'qntx-ui-state';
 const STORAGE_VERSION = 1;
+const MAX_SUBSCRIBER_FAILURES = 3;
 
 /**
  * Centralized UI state manager
@@ -123,6 +124,8 @@ class UIState {
     private state: UIStateData;
     private subscribers: Map<keyof UIStateData, Set<StateSubscriber<any>>> = new Map();
     private globalSubscribers: Set<GlobalSubscriber> = new Set();
+    // Track consecutive failures per subscriber for auto-unsubscribe
+    private subscriberFailures: WeakMap<Function, number> = new WeakMap();
 
     constructor() {
         this.state = this.loadFromStorage() || createDefaultState();
@@ -295,25 +298,55 @@ class UIState {
         };
 
         // Notify key-specific subscribers
-        this.subscribers.get(key)?.forEach(callback => {
-            try {
-                callback(value, key);
-            } catch (e) {
-                console.error(`[UIState] Subscriber error for ${key}:`, e);
+        const keySubscribers = this.subscribers.get(key);
+        if (keySubscribers) {
+            for (const callback of keySubscribers) {
+                if (!this.safeNotify(callback, () => callback(value, key), String(key))) {
+                    keySubscribers.delete(callback);
+                }
             }
-        });
+        }
 
         // Notify global subscribers
-        this.globalSubscribers.forEach(callback => {
-            try {
-                callback(this.state, key);
-            } catch (e) {
-                console.error('[UIState] Global subscriber error:', e);
+        for (const callback of this.globalSubscribers) {
+            if (!this.safeNotify(callback, () => callback(this.state, key), 'global')) {
+                this.globalSubscribers.delete(callback);
             }
-        });
+        }
 
         // Persist to localStorage
         this.saveToStorage();
+    }
+
+    /**
+     * Safely notify a subscriber with failure tracking
+     * Returns false if subscriber should be removed (too many failures)
+     */
+    private safeNotify(
+        callback: Function,
+        invoke: () => void,
+        context: string
+    ): boolean {
+        try {
+            invoke();
+            // Reset failure count on success
+            this.subscriberFailures.delete(callback);
+            return true;
+        } catch (e) {
+            const failures = (this.subscriberFailures.get(callback) ?? 0) + 1;
+            this.subscriberFailures.set(callback, failures);
+
+            if (failures >= MAX_SUBSCRIBER_FAILURES) {
+                console.error(
+                    `[UIState] Subscriber for ${context} failed ${failures} times, auto-unsubscribing:`,
+                    e
+                );
+                return false;
+            }
+
+            console.error(`[UIState] Subscriber error for ${context} (${failures}/${MAX_SUBSCRIBER_FAILURES}):`, e);
+            return true;
+        }
     }
 
     // ========================================================================
