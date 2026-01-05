@@ -119,6 +119,7 @@ class MockHTTPHandler(BaseHTTPRequestHandler):
 
 # ==================== Mock ATSStore ====================
 
+
 class MockATSStoreService(atsstore_pb2_grpc.ATSStoreServiceServicer):
     """Mock ATSStore that records created attestations."""
 
@@ -217,7 +218,9 @@ def run_test():
     print(f"    Status: {response.status_code}")
     print(f"    Title: {result.get('title')}")
     print(f"    Links: {len(result.get('links', []))}")
-    print(f"    Meta description: {result.get('meta', {}).get('description', '')[:50]}...")
+    print(
+        f"    Meta description: {result.get('meta', {}).get('description', '')[:50]}..."
+    )
     print(f"    Meta author: {result.get('meta', {}).get('author')}")
     print(f"    Images: {len(result.get('images', []))}")
     print(f"    Structured data: {len(result.get('structured_data', []))}")
@@ -228,11 +231,13 @@ def run_test():
     request = domain_pb2.HTTPRequest(
         method="POST",
         path="/scrape-and-attest",
-        body=json.dumps({
-            "url": "http://localhost:8888/test",
-            "actor": "integration-test",
-            "extract_all": True,
-        }).encode(),
+        body=json.dumps(
+            {
+                "url": "http://localhost:8888/test",
+                "actor": "integration-test",
+                "extract_all": True,
+            }
+        ).encode(),
     )
     response = plugin.HandleHTTP(request, None)
     result = json.loads(response.body.decode())
@@ -260,10 +265,12 @@ def run_test():
     request = domain_pb2.HTTPRequest(
         method="POST",
         path="/feed-and-attest",
-        body=json.dumps({
-            "url": "http://localhost:8888/feed.xml",
-            "actor": "feed-test",
-        }).encode(),
+        body=json.dumps(
+            {
+                "url": "http://localhost:8888/feed.xml",
+                "actor": "feed-test",
+            }
+        ).encode(),
     )
     response = plugin.HandleHTTP(request, None)
     result = json.loads(response.body.decode())
@@ -287,10 +294,12 @@ def run_test():
     request = domain_pb2.HTTPRequest(
         method="POST",
         path="/sitemap-and-attest",
-        body=json.dumps({
-            "url": "http://localhost:8888/sitemap.xml",
-            "actor": "sitemap-test",
-        }).encode(),
+        body=json.dumps(
+            {
+                "url": "http://localhost:8888/sitemap.xml",
+                "actor": "sitemap-test",
+            }
+        ).encode(),
     )
     response = plugin.HandleHTTP(request, None)
     result = json.loads(response.body.decode())

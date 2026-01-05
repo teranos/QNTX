@@ -22,10 +22,10 @@ class TestSSRFProtection:
         """Test that private IPs are blocked."""
         scraper = WebScraper(allow_private_ips=False)
 
-        with pytest.raises(SSRFError, match="private IP"):
+        with pytest.raises(SSRFError, match="blocked IP"):
             scraper._validate_url("http://192.168.1.1/test")
 
-        with pytest.raises(SSRFError, match="private IP"):
+        with pytest.raises(SSRFError, match="blocked IP"):
             scraper._validate_url("http://10.0.0.1/test")
 
     def test_blocks_cloud_metadata(self):
@@ -61,7 +61,7 @@ class TestResponseSizeLimits:
             "https://example.com/large",
             body="x" * 200,  # 200 bytes
             status=200,
-            headers={"Content-Type": "text/html"}
+            headers={"Content-Type": "text/html"},
         )
 
         with pytest.raises(ValueError, match="exceeded.*bytes"):
@@ -77,13 +77,12 @@ class TestResponseSizeLimits:
             "https://example.com/json",
             json={"test": "data"},
             status=200,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
 
         # Should log warning but not fail
         content = scraper._fetch_with_size_limit(
-            "https://example.com/json",
-            expected_content_types=["text/html"]
+            "https://example.com/json", expected_content_types=["text/html"]
         )
         assert content  # Should still return content
 
@@ -109,7 +108,7 @@ class TestWebScraping:
             "https://example.com/test",
             body=html,
             status=200,
-            headers={"Content-Type": "text/html"}
+            headers={"Content-Type": "text/html"},
         )
 
         scraper = WebScraper(respect_robots=False)
@@ -144,7 +143,7 @@ class TestWebScraping:
             "https://example.com/test",
             body=html,
             status=200,
-            headers={"Content-Type": "text/html"}
+            headers={"Content-Type": "text/html"},
         )
 
         scraper = WebScraper(respect_robots=False)
@@ -186,7 +185,7 @@ class TestFeedParsing:
             "https://example.com/feed.rss",
             body=rss,
             status=200,
-            headers={"Content-Type": "application/rss+xml"}
+            headers={"Content-Type": "application/rss+xml"},
         )
 
         scraper = WebScraper()
