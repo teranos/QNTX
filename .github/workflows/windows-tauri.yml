@@ -43,7 +43,7 @@ jobs:
           go-version: '1.23'
 
       - name: Build qntx CLI (sidecar dependency)
-        run: make cli
+        run: make cli-nocgo  # Windows: CGO disabled due to MinGW/MSVC toolchain incompatibility
 
       - name: Prepare Tauri sidecars
         run: |

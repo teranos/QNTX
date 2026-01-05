@@ -1,4 +1,4 @@
-.PHONY: cli web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
+.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -9,6 +9,10 @@ QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 cli: rust-fuzzy ## Build QNTX CLI binary (with Rust fuzzy optimization)
 	@echo "Building QNTX CLI with Rust fuzzy optimization..."
 	@go build -tags rustfuzzy -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+
+cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
+	@echo "Building QNTX CLI (pure Go, no CGO)..."
+	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
