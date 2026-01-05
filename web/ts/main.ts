@@ -32,25 +32,7 @@ import './prose/panel.ts';
 import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
-import type {
-    MessageHandlers,
-    VersionMessage,
-    LogsMessage,
-    ImportProgressMessage,
-    ImportStatsMessage,
-    ImportCompleteMessage,
-    UsageUpdateMessage,
-    ParseResponseMessage,
-    DaemonStatusMessage,
-    JobUpdateMessage,
-    PulseExecutionStartedMessage,
-    PulseExecutionFailedMessage,
-    PulseExecutionCompletedMessage,
-    PulseExecutionLogStreamMessage,
-    StorageWarningMessage,
-    StorageEvictionMessage,
-    GraphDataMessage
-} from '../types/websocket';
+import type { MessageHandlers, VersionMessage } from '../types/websocket';
 
 // Extend window interface for global functions
 declare global {
@@ -155,23 +137,25 @@ async function init(): Promise<void> {
     console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
+    // Note: Some handlers use internal types that differ from websocket message types.
+    // Type casts are needed until handler signatures are aligned with MessageHandlers.
     const handlers: MessageHandlers = {
         'version': handleVersion,
-        'logs': handleLogBatch,
-        'import_progress': handleImportProgress,
-        'import_stats': handleImportStats,
-        'import_complete': handleImportComplete,
-        'usage_update': handleUsageUpdate,
-        'parse_response': handleParseResponse,
-        'daemon_status': handleDaemonStatus,
-        'job_update': handleJobUpdate,
-        'pulse_execution_started': handlePulseExecutionStarted,
-        'pulse_execution_failed': handlePulseExecutionFailed,
-        'pulse_execution_completed': handlePulseExecutionCompleted,
-        'pulse_execution_log_stream': handlePulseExecutionLogStream,
-        'storage_warning': handleStorageWarning,
-        'storage_eviction': handleStorageEviction,
-        '_default': updateGraph
+        'logs': handleLogBatch as MessageHandlers['logs'],
+        'import_progress': handleImportProgress as MessageHandlers['import_progress'],
+        'import_stats': handleImportStats as MessageHandlers['import_stats'],
+        'import_complete': handleImportComplete as MessageHandlers['import_complete'],
+        'usage_update': handleUsageUpdate as MessageHandlers['usage_update'],
+        'parse_response': handleParseResponse as MessageHandlers['parse_response'],
+        'daemon_status': handleDaemonStatus as MessageHandlers['daemon_status'],
+        'job_update': handleJobUpdate as MessageHandlers['job_update'],
+        'pulse_execution_started': handlePulseExecutionStarted as MessageHandlers['pulse_execution_started'],
+        'pulse_execution_failed': handlePulseExecutionFailed as MessageHandlers['pulse_execution_failed'],
+        'pulse_execution_completed': handlePulseExecutionCompleted as MessageHandlers['pulse_execution_completed'],
+        'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
+        'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
+        'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
+        '_default': updateGraph as MessageHandlers['_default']
     };
 
     connectWebSocket(handlers);
