@@ -272,7 +272,7 @@ func TestFuzzyContextMatching(t *testing.T) {
 			},
 		},
 		{
-			query: "svc",
+			query:    "svc",
 			expected: []string{}, // No abbreviation support
 		},
 		{

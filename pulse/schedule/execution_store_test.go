@@ -1,15 +1,14 @@
 package schedule
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"fmt"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 )
 
 func TestCreateExecution(t *testing.T) {

@@ -227,6 +227,3 @@ func (c *Config) String() string {
 	return fmt.Sprintf("Config{Database: %s, Server: {LogTheme: %s}, Pulse: {Workers: %d}}",
 		c.Database.Path, c.Server.LogTheme, c.Pulse.Workers)
 }
-
-
-

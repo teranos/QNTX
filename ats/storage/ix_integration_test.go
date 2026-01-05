@@ -19,8 +19,8 @@
 package storage
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"database/sql"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 

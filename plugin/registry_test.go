@@ -627,25 +627,25 @@ func newMockServiceRegistry() *mockServiceRegistry {
 	}
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB                         { return m.db }
-func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger   {
+func (m *mockServiceRegistry) Database() *sql.DB { return m.db }
+func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger {
 	return zap.NewNop().Sugar()
 }
-func (m *mockServiceRegistry) Config(domain string) Config               { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() ats.AttestationStore            { return m.store }
-func (m *mockServiceRegistry) Queue() QueueService                       { return m.queue }
+func (m *mockServiceRegistry) Config(domain string) Config    { return &mockConfig{} }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore { return m.store }
+func (m *mockServiceRegistry) Queue() QueueService            { return m.queue }
 
 // Verify mockServiceRegistry implements ServiceRegistry
 var _ ServiceRegistry = (*mockServiceRegistry)(nil)
 
 type mockConfig struct{}
 
-func (m *mockConfig) GetString(key string) string         { return "" }
-func (m *mockConfig) GetInt(key string) int                { return 0 }
-func (m *mockConfig) GetBool(key string) bool              { return false }
-func (m *mockConfig) GetStringSlice(key string) []string   { return nil }
-func (m *mockConfig) Get(key string) interface{}           { return nil }
-func (m *mockConfig) Set(key string, value interface{})    {}
+func (m *mockConfig) GetString(key string) string        { return "" }
+func (m *mockConfig) GetInt(key string) int              { return 0 }
+func (m *mockConfig) GetBool(key string) bool            { return false }
+func (m *mockConfig) GetStringSlice(key string) []string { return nil }
+func (m *mockConfig) Get(key string) interface{}         { return nil }
+func (m *mockConfig) Set(key string, value interface{})  {}
 
 // Verify mockConfig implements Config
 var _ Config = (*mockConfig)(nil)

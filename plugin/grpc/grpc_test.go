@@ -93,11 +93,11 @@ type mockServiceRegistry struct {
 	logger *zap.SugaredLogger
 }
 
-func (m *mockServiceRegistry) Database() *sql.DB                         { return nil }
-func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger   { return m.logger }
-func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config     { return &mockConfig{} }
-func (m *mockServiceRegistry) ATSStore() ats.AttestationStore            { return nil }
-func (m *mockServiceRegistry) Queue() pluginpkg.QueueService             { return nil }
+func (m *mockServiceRegistry) Database() *sql.DB                       { return nil }
+func (m *mockServiceRegistry) Logger(domain string) *zap.SugaredLogger { return m.logger }
+func (m *mockServiceRegistry) Config(domain string) pluginpkg.Config   { return &mockConfig{} }
+func (m *mockServiceRegistry) ATSStore() ats.AttestationStore          { return nil }
+func (m *mockServiceRegistry) Queue() pluginpkg.QueueService           { return nil }
 
 type mockConfig struct{}
 

@@ -10,10 +10,10 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
-	"github.com/teranos/QNTX/plugin"
-	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/plugin"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -25,33 +25,33 @@ import (
 
 // QNTXServer provides live-updating graph visualization for Ax queries
 type QNTXServer struct {
-	db            *sql.DB
-	dbPath        string // Database file path (for display in banner)
-	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service          // Language service for ATS LSP features
-	usageTracker  *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
-	budgetTracker *budget.Tracker       // Budget tracking for Pulse daemon
-	daemon            *async.WorkerPool      // Background job processor (daemon)
-	ticker            *schedule.Ticker       // Pulse ticker for scheduled jobs
-	configWatcher     *am.ConfigWatcher      // Config watcher for auto-reload on config changes
-	storageEventsPoller *StorageEventsPoller // Poller for storage events (warnings/evictions)
-	clients       map[*Client]bool
-	broadcast     chan *graph.Graph
-	register      chan *Client
-	unregister    chan *Client
-	mu            sync.RWMutex
-	lastGraph     *graph.Graph        // Cache last broadcast graph for reconnecting clients
-	lastStatus    *cachedDaemonStatus // Cache last daemon status for change detection
-	lastUsage     *cachedUsageStats   // Cache last usage stats for change detection
-	verbosity     atomic.Int32        // Thread-safe verbosity level (fixes Issue #64)
-	graphLimit    atomic.Int32        // Thread-safe graph node limit (default 1000)
-	logger        *zap.SugaredLogger
-	logTransport  *wslogs.Transport
-	wsCore        *wslogs.WebSocketCore
-	consoleBuffer *ConsoleBuffer        // Browser console log buffer for debugging (dev mode only)
-	initialQuery  string                // Pre-loaded Ax query to execute on client connection
-	pluginRegistry *plugin.Registry    // Domain plugin registry
-	servicesManager *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+	db                  *sql.DB
+	dbPath              string // Database file path (for display in banner)
+	builder             *graph.AxGraphBuilder
+	langService         *lsp.Service          // Language service for ATS LSP features
+	usageTracker        *tracker.UsageTracker // Cached usage tracker (eliminates 172k+ allocations/day)
+	budgetTracker       *budget.Tracker       // Budget tracking for Pulse daemon
+	daemon              *async.WorkerPool     // Background job processor (daemon)
+	ticker              *schedule.Ticker      // Pulse ticker for scheduled jobs
+	configWatcher       *am.ConfigWatcher     // Config watcher for auto-reload on config changes
+	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
+	clients             map[*Client]bool
+	broadcast           chan *graph.Graph
+	register            chan *Client
+	unregister          chan *Client
+	mu                  sync.RWMutex
+	lastGraph           *graph.Graph        // Cache last broadcast graph for reconnecting clients
+	lastStatus          *cachedDaemonStatus // Cache last daemon status for change detection
+	lastUsage           *cachedUsageStats   // Cache last usage stats for change detection
+	verbosity           atomic.Int32        // Thread-safe verbosity level (fixes Issue #64)
+	graphLimit          atomic.Int32        // Thread-safe graph node limit (default 1000)
+	logger              *zap.SugaredLogger
+	logTransport        *wslogs.Transport
+	wsCore              *wslogs.WebSocketCore
+	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
+	initialQuery        string                      // Pre-loaded Ax query to execute on client connection
+	pluginRegistry      *plugin.Registry            // Domain plugin registry
+	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
