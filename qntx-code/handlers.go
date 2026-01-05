@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	workspaceRootOnce sync.Once
+	workspaceRootOnce   sync.Once
 	cachedWorkspaceRoot string
-	workspaceRootErr error
+	workspaceRootErr    error
 )
 
 // getWorkspaceRoot returns the validated absolute workspace root path
