@@ -11,9 +11,9 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
 	qntxdisplay "github.com/teranos/QNTX/display"
-	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/sym"
 )
 

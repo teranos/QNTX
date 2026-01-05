@@ -98,10 +98,10 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 
 		// Count events by type
 		var (
-			hasEvents         bool
-			actorContextCount int
+			hasEvents          bool
+			actorContextCount  int
 			actorContextsCount int
-			entityActorsCount int
+			entityActorsCount  int
 		)
 
 		fmt.Printf("Recent Storage Enforcement Events (last %d):\n", statsLimitFlag)

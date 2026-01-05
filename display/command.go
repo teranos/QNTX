@@ -3,8 +3,8 @@ package display
 import (
 	"fmt"
 
-	"github.com/teranos/QNTX/ai/llm"
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/ai/llm"
 )
 
 // ShouldOutputJSON determines if a command should output JSON based on flags and LLM detection

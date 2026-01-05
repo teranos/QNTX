@@ -47,7 +47,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))       // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
 	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
@@ -62,6 +62,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))    // List/create schedules (GET/POST)
 	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))              // Individual async job and sub-resources (GET)
 	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))              // List async jobs (GET)
+	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))             // Plugin actions: pause/resume (POST)
+	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                   // List installed plugins (GET)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 
