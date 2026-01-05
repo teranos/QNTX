@@ -1,27 +1,33 @@
 package git
 
 // Repository source resolution for QNTX git ingestion.
-// Handles both local paths and remote URLs with automatic cloning.
+// Uses hashicorp/go-getter for flexible source handling including:
+//   - Local paths
+//   - Git URLs (https, ssh, git://)
+//   - GitHub/GitLab shorthand (github.com/user/repo)
+//   - Archives (zip, tar.gz) with auto-extraction
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"os"
-	"regexp"
+	"path/filepath"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
+	"github.com/hashicorp/go-getter"
 	"go.uber.org/zap"
 )
 
 // RepoSource represents a resolved repository source
 type RepoSource struct {
-	// LocalPath is the path to the local repository (either original or cloned)
+	// LocalPath is the path to the local repository (either original or fetched)
 	LocalPath string
 	// OriginalInput is the original input (URL or path)
 	OriginalInput string
-	// IsCloned indicates if the repo was cloned from a remote URL
+	// IsCloned indicates if the repo was fetched from a remote source
 	IsCloned bool
-	// TempDir is the temporary directory used for cloning (empty if not cloned)
+	// TempDir is the temporary directory used for fetching (empty if local)
 	TempDir string
 	// cleanup function to call when done with the repo
 	cleanup func()
@@ -36,144 +42,83 @@ func (r *RepoSource) Cleanup() {
 	}
 }
 
-// IsRepoURL checks if the input looks like a git repository URL.
+// ResolveRepository resolves an input to a local repository using go-getter.
 // Supports:
-//   - HTTPS URLs: https://github.com/user/repo, https://github.com/user/repo.git
-//   - SSH URLs: git@github.com:user/repo.git
-//   - Git protocol: git://github.com/user/repo.git
-func IsRepoURL(input string) bool {
-	// HTTPS URLs
-	if strings.HasPrefix(input, "https://") || strings.HasPrefix(input, "http://") {
-		return isGitHostURL(input)
-	}
-
-	// SSH URLs (git@host:path)
-	if strings.HasPrefix(input, "git@") {
-		return true
-	}
-
-	// Git protocol
-	if strings.HasPrefix(input, "git://") {
-		return true
-	}
-
-	return false
-}
-
-// isGitHostURL checks if an HTTP(S) URL is a known git host or ends with .git
-func isGitHostURL(url string) bool {
-	// Common git hosting providers
-	knownHosts := []string{
-		"github.com",
-		"gitlab.com",
-		"bitbucket.org",
-		"codeberg.org",
-		"sr.ht",
-		"gitea.com",
-	}
-
-	lowered := strings.ToLower(url)
-	for _, host := range knownHosts {
-		if strings.Contains(lowered, host) {
-			return true
-		}
-	}
-
-	// Check for .git suffix
-	if strings.HasSuffix(url, ".git") {
-		return true
-	}
-
-	return false
-}
-
-// NormalizeRepoURL ensures the URL is in a format go-git can clone.
-// Adds .git suffix if missing for GitHub/GitLab URLs.
-func NormalizeRepoURL(url string) string {
-	// Already has .git suffix
-	if strings.HasSuffix(url, ".git") {
-		return url
-	}
-
-	// Remove trailing slash
-	url = strings.TrimSuffix(url, "/")
-
-	// For HTTPS URLs to known hosts, append .git
-	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") {
-		// GitHub, GitLab, etc. work better with .git suffix
-		if isGitHostURL(url) {
-			return url + ".git"
-		}
-	}
-
-	return url
-}
-
-// ExtractRepoName extracts a clean repository name from a URL or path.
-// Used for display and temp directory naming.
-func ExtractRepoName(input string) string {
-	// Remove .git suffix
-	input = strings.TrimSuffix(input, ".git")
-
-	// Handle SSH URLs (git@github.com:user/repo)
-	if strings.HasPrefix(input, "git@") {
-		// Extract path after the colon
-		if idx := strings.Index(input, ":"); idx != -1 {
-			input = input[idx+1:]
-		}
-	}
-
-	// Handle HTTPS/HTTP URLs
-	if strings.HasPrefix(input, "https://") || strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "git://") {
-		// Extract path from URL
-		re := regexp.MustCompile(`^(?:https?|git)://[^/]+/(.+)$`)
-		if matches := re.FindStringSubmatch(input); len(matches) > 1 {
-			input = matches[1]
-		}
-	}
-
-	// Get last path component as repo name
-	parts := strings.Split(input, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-
-	return input
-}
-
-// ResolveRepository resolves an input (URL or local path) to a local repository.
-// For URLs, performs a shallow clone to a temporary directory.
+//   - Local paths: /path/to/repo, ./relative/path, ~/home/path
+//   - Git URLs: https://github.com/user/repo, git@github.com:user/repo.git
+//   - GitHub shorthand: github.com/user/repo (auto-detected by go-getter)
+//   - Archives: https://example.com/repo.tar.gz (auto-extracted)
+//
 // Returns a RepoSource that must be cleaned up when done.
 func ResolveRepository(input string, logger *zap.SugaredLogger) (*RepoSource, error) {
-	source := &RepoSource{
-		OriginalInput: input,
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "."
 	}
 
-	// Check if input is a URL
-	if IsRepoURL(input) {
-		return cloneRepository(input, logger)
+	// Use go-getter's detection to identify source type
+	detected, err := getter.Detect(input, pwd, getter.Detectors)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect source type: %w", err)
 	}
 
-	// Local path - verify it's a git repository
-	if !IsGitRepository(input) {
-		return nil, fmt.Errorf("not a git repository: %s", input)
+	logger.Debugw("go-getter detected source",
+		"input", input,
+		"detected", detected,
+	)
+
+	// Parse the detected URL to determine if it's local or remote
+	parsedURL, err := url.Parse(detected)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse detected URL: %w", err)
 	}
 
-	source.LocalPath = input
-	source.IsCloned = false
-	source.cleanup = func() {} // No cleanup needed for local repos
+	// For file:// URLs or local paths, use directly
+	if parsedURL.Scheme == "file" || parsedURL.Scheme == "" {
+		localPath := input
+		if parsedURL.Scheme == "file" {
+			localPath = parsedURL.Path
+		}
 
-	return source, nil
+		// Handle tilde expansion
+		if strings.HasPrefix(localPath, "~/") {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return nil, fmt.Errorf("failed to expand home directory: %w", err)
+			}
+			localPath = filepath.Join(home, localPath[2:])
+		}
+
+		// Make absolute
+		if !filepath.IsAbs(localPath) {
+			localPath = filepath.Join(pwd, localPath)
+		}
+
+		// Verify it's a git repository
+		if !IsGitRepository(localPath) {
+			return nil, fmt.Errorf("not a git repository: %s", localPath)
+		}
+
+		return &RepoSource{
+			LocalPath:     localPath,
+			OriginalInput: input,
+			IsCloned:      false,
+			cleanup:       func() {}, // No cleanup needed for local repos
+		}, nil
+	}
+
+	// Remote source - fetch to temp directory
+	return fetchRepository(input, detected, logger)
 }
 
-// cloneRepository clones a remote repository to a temporary directory.
-func cloneRepository(url string, logger *zap.SugaredLogger) (*RepoSource, error) {
-	// Normalize the URL
-	normalizedURL := NormalizeRepoURL(url)
-	repoName := ExtractRepoName(url)
+// fetchRepository fetches a remote repository using go-getter.
+func fetchRepository(input, detected string, logger *zap.SugaredLogger) (*RepoSource, error) {
+	// Extract repo name for temp directory naming
+	repoName := extractRepoName(input)
 
-	logger.Infow("Cloning repository",
-		"url", normalizedURL,
+	logger.Infow("Fetching repository",
+		"input", input,
+		"detected", detected,
 		"repo_name", repoName,
 	)
 
@@ -183,36 +128,90 @@ func cloneRepository(url string, logger *zap.SugaredLogger) (*RepoSource, error)
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Clone with shallow depth
-	logger.Infow("Performing shallow clone",
-		"destination", tempDir,
-		"depth", 1,
-	)
-
-	_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
-		URL:   normalizedURL,
-		Depth: 1, // Shallow clone
-		// Note: For public repos only, no auth needed
-	})
-
-	if err != nil {
-		// Cleanup temp dir on error
-		os.RemoveAll(tempDir)
-		return nil, fmt.Errorf("failed to clone repository: %w", err)
+	// Configure go-getter client
+	client := &getter.Client{
+		Ctx:  context.Background(),
+		Src:  detected,
+		Dst:  tempDir,
+		Mode: getter.ClientModeDir,
+		// Use default getters which include git, http, s3, gcs, etc.
+		Getters: getter.Getters,
 	}
 
-	logger.Infow("Clone completed",
+	logger.Infow("Fetching with go-getter",
+		"destination", tempDir,
+	)
+
+	if err := client.Get(); err != nil {
+		// Cleanup temp dir on error
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("failed to fetch repository: %w", err)
+	}
+
+	// Verify the result is a git repository
+	if !IsGitRepository(tempDir) {
+		os.RemoveAll(tempDir)
+		return nil, fmt.Errorf("fetched content is not a git repository")
+	}
+
+	logger.Infow("Fetch completed",
 		"destination", tempDir,
 	)
 
 	return &RepoSource{
 		LocalPath:     tempDir,
-		OriginalInput: url,
+		OriginalInput: input,
 		IsCloned:      true,
 		TempDir:       tempDir,
 		cleanup: func() {
-			logger.Debugw("Cleaning up cloned repository", "path", tempDir)
+			logger.Debugw("Cleaning up fetched repository", "path", tempDir)
 			os.RemoveAll(tempDir)
 		},
 	}, nil
+}
+
+// extractRepoName extracts a clean repository name from a URL or path.
+// Used for temp directory naming.
+func extractRepoName(input string) string {
+	// Remove common suffixes
+	input = strings.TrimSuffix(input, ".git")
+	input = strings.TrimSuffix(input, "/")
+
+	// Handle various URL formats
+	if strings.Contains(input, "/") {
+		parts := strings.Split(input, "/")
+		// Return last non-empty component
+		for i := len(parts) - 1; i >= 0; i-- {
+			if parts[i] != "" {
+				return sanitizeRepoName(parts[i])
+			}
+		}
+	}
+
+	return sanitizeRepoName(input)
+}
+
+// sanitizeRepoName removes or replaces characters not safe for directory names.
+func sanitizeRepoName(name string) string {
+	// Remove common prefixes that aren't part of the repo name
+	name = strings.TrimPrefix(name, "git@")
+
+	// Replace unsafe characters
+	replacer := strings.NewReplacer(
+		":", "-",
+		"@", "-",
+		" ", "-",
+	)
+	name = replacer.Replace(name)
+
+	// Limit length
+	if len(name) > 50 {
+		name = name[:50]
+	}
+
+	if name == "" {
+		name = "repo"
+	}
+
+	return name
 }
