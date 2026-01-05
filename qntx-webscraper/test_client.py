@@ -2,7 +2,9 @@
 """Test client for the QNTX webscraper plugin."""
 
 import json
+
 import grpc
+
 from qntx_webscraper.grpc import domain_pb2, domain_pb2_grpc
 
 
