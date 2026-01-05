@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/plugin"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
@@ -158,7 +159,28 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		// Initialize plugins with services
 		store := storage.NewSQLStore(db, serverLogger)
 		queue := daemon.GetQueue()
-		services := plugin.NewServiceRegistry(db, serverLogger, store, &simpleConfigProvider{}, queue)
+
+		// Start gRPC services for external plugins (Issue #138)
+		// These services allow external plugins to call back to QNTX core
+		servicesManager := grpcplugin.NewServicesManager(serverLogger)
+		endpoints, err := servicesManager.Start(ctx, store, queue)
+		if err != nil {
+			serverLogger.Warnw("Failed to start plugin services, external plugins will not have service access", "error", err)
+			endpoints = nil
+		} else {
+			serverLogger.Infow("Plugin services started",
+				"ats_store", endpoints.ATSStoreAddress,
+				"queue", endpoints.QueueAddress,
+			)
+		}
+
+		// Wrap config provider to inject service endpoints for external plugins
+		configProvider := &pluginConfigProvider{
+			base:      &simpleConfigProvider{},
+			endpoints: endpoints,
+		}
+
+		services := plugin.NewServiceRegistry(db, serverLogger, store, configProvider, queue)
 
 		if err := pluginRegistry.InitializeAll(ctx, services); err != nil {
 			serverLogger.Errorw("Failed to initialize domain plugins", "error", err)
@@ -166,6 +188,9 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		} else {
 			serverLogger.Infow("Domain plugins initialized", "count", len(pluginRegistry.List()))
 		}
+
+		// Store services manager for shutdown
+		server.servicesManager = servicesManager
 	}
 
 	// Create ticker with server as broadcaster for real-time execution updates
@@ -359,4 +384,70 @@ func (c *simpleConfig) Get(key string) interface{} {
 
 func (c *simpleConfig) Set(key string, value interface{}) {
 	appcfg.Set(c.domain+"."+key, value)
+}
+
+// pluginConfigProvider wraps a base config provider to inject service endpoints
+type pluginConfigProvider struct {
+	base      plugin.ConfigProvider
+	endpoints *grpcplugin.ServiceEndpoints
+}
+
+func (p *pluginConfigProvider) GetPluginConfig(domain string) plugin.Config {
+	baseConfig := p.base.GetPluginConfig(domain)
+	return &pluginConfigWithEndpoints{
+		base:      baseConfig,
+		endpoints: p.endpoints,
+	}
+}
+
+// pluginConfigWithEndpoints wraps a plugin config to inject service endpoints
+type pluginConfigWithEndpoints struct {
+	base      plugin.Config
+	endpoints *grpcplugin.ServiceEndpoints
+}
+
+func (c *pluginConfigWithEndpoints) GetString(key string) string {
+	// Inject service endpoints for external plugins (Issue #138)
+	if c.endpoints != nil {
+		switch key {
+		case "_ats_store_endpoint":
+			return c.endpoints.ATSStoreAddress
+		case "_queue_endpoint":
+			return c.endpoints.QueueAddress
+		case "_auth_token":
+			return c.endpoints.AuthToken
+		}
+	}
+	return c.base.GetString(key)
+}
+
+func (c *pluginConfigWithEndpoints) GetInt(key string) int {
+	return c.base.GetInt(key)
+}
+
+func (c *pluginConfigWithEndpoints) GetBool(key string) bool {
+	return c.base.GetBool(key)
+}
+
+func (c *pluginConfigWithEndpoints) GetStringSlice(key string) []string {
+	return c.base.GetStringSlice(key)
+}
+
+func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
+	// Inject service endpoints for external plugins
+	if c.endpoints != nil {
+		switch key {
+		case "_ats_store_endpoint":
+			return c.endpoints.ATSStoreAddress
+		case "_queue_endpoint":
+			return c.endpoints.QueueAddress
+		case "_auth_token":
+			return c.endpoints.AuthToken
+		}
+	}
+	return c.base.Get(key)
+}
+
+func (c *pluginConfigWithEndpoints) Set(key string, value interface{}) {
+	c.base.Set(key, value)
 }
