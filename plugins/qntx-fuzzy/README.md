@@ -132,6 +132,10 @@ Additional capabilities:
 
 ## Architecture
 
+Two integration options are available:
+
+### Option 1: gRPC (Separate Process)
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    QNTX Core (Go)                       │
@@ -143,17 +147,102 @@ Additional capabilities:
                                       ▼
 ┌─────────────────────────────────────────────────────────┐
 │              qntx-fuzzy (Rust Plugin)                   │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  FuzzyMatchService (tonic gRPC)                   │  │
-│  └──────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  FuzzyEngine                                      │  │
-│  │  - Multi-strategy matching                       │  │
-│  │  - In-memory vocabulary index                    │  │
-│  │  - Thread-safe with parking_lot::RwLock          │  │
-│  └──────────────────────────────────────────────────┘  │
+│  FuzzyMatchService (tonic) → FuzzyEngine                │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**Pros**: Process isolation, easy updates, language agnostic
+**Cons**: ~100μs latency per call
+
+### Option 2: CGO (Linked Library)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    QNTX Core (Go)                       │
+│  ┌────────────────┐    ┌───────────────────────────┐   │
+│  │  AxExecutor    │───►│ cgo.FuzzyEngine (CGO)     │   │
+│  └────────────────┘    └───────────┬───────────────┘   │
+│                                    │ FFI (direct call) │
+│                        ┌───────────▼───────────────┐   │
+│                        │ libqntx_fuzzy.so/.a       │   │
+│                        │ (Rust library)            │   │
+│                        └───────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Pros**: ~1-5μs latency, single binary
+**Cons**: Requires CGO, more complex build
+
+## CGO Integration
+
+For lowest latency, link the Rust library directly via CGO:
+
+### Building the Library
+
+```bash
+cd plugins/qntx-fuzzy
+cargo build --release --lib
+
+# Creates:
+#   target/release/libqntx_fuzzy.so   (Linux shared)
+#   target/release/libqntx_fuzzy.a    (Linux static)
+#   target/release/libqntx_fuzzy.dylib (macOS)
+```
+
+### Using from Go
+
+```go
+import "github.com/teranos/QNTX/plugins/qntx-fuzzy/cgo"
+
+// Create engine (links with Rust library)
+engine, err := cgo.NewFuzzyEngine()
+if err != nil {
+    log.Fatal(err)
+}
+defer engine.Close()
+
+// Build index
+result, err := engine.RebuildIndex(predicates, contexts)
+fmt.Printf("Indexed %d predicates in %dms\n",
+    result.PredicateCount, result.BuildTimeMs)
+
+// Find matches
+matches, timeUs, err := engine.FindMatches(
+    "author",
+    cgo.VocabPredicates,
+    20,   // limit
+    0.6,  // min score
+)
+
+for _, m := range matches {
+    fmt.Printf("  %s (%.2f, %s)\n", m.Value, m.Score, m.Strategy)
+}
+```
+
+### CGO Build Requirements
+
+Ensure the library path is set correctly:
+
+```bash
+# Option 1: Set library path at runtime
+export LD_LIBRARY_PATH=/path/to/QNTX/target/release:$LD_LIBRARY_PATH
+
+# Option 2: Install system-wide
+sudo cp target/release/libqntx_fuzzy.so /usr/local/lib/
+sudo ldconfig
+
+# Option 3: Static linking (larger binary, no runtime dependency)
+# Use the .a file instead of .so
+```
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `include/fuzzy_engine.h` | C header for FFI functions |
+| `src/ffi.rs` | Rust FFI implementation |
+| `cgo/fuzzy_cgo.go` | Go CGO wrapper |
+| `target/release/libqntx_fuzzy.*` | Compiled libraries |
 
 ## Development
 
