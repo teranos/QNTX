@@ -138,14 +138,15 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
     // Note: Some handlers use internal types that differ from websocket message types.
-    // Type casts are needed until handler signatures are aligned with MessageHandlers.
+    // Using 'unknown' intermediate cast where types don't overlap sufficiently.
+    // TODO: Align handler signatures with MessageHandlers interface.
     const handlers: MessageHandlers = {
         'version': handleVersion,
-        'logs': handleLogBatch as MessageHandlers['logs'],
+        'logs': handleLogBatch as unknown as MessageHandlers['logs'],
         'import_progress': handleImportProgress as MessageHandlers['import_progress'],
         'import_stats': handleImportStats as MessageHandlers['import_stats'],
         'import_complete': handleImportComplete as MessageHandlers['import_complete'],
-        'usage_update': handleUsageUpdate as MessageHandlers['usage_update'],
+        'usage_update': handleUsageUpdate as unknown as MessageHandlers['usage_update'],
         'parse_response': handleParseResponse as MessageHandlers['parse_response'],
         'daemon_status': handleDaemonStatus as MessageHandlers['daemon_status'],
         'job_update': handleJobUpdate as MessageHandlers['job_update'],
@@ -155,7 +156,7 @@ async function init(): Promise<void> {
         'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
         'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
         'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
-        '_default': updateGraph as MessageHandlers['_default']
+        '_default': updateGraph as unknown as MessageHandlers['_default']
     };
 
     connectWebSocket(handlers);
