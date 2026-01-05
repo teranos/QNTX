@@ -7,6 +7,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/storage"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -277,6 +278,46 @@ func TestGitIxProcessor_NewGitIxProcessor(t *testing.T) {
 			assert.Equal(t, db, processor.db)
 			assert.False(t, processor.dryRun)
 			assert.Equal(t, 0, processor.verbosity)
+		})
+	}
+}
+
+// TestGitIxProcessor_NewGitIxProcessorWithStore tests the store-based constructor
+func TestGitIxProcessor_NewGitIxProcessorWithStore(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	store := storage.NewSQLStore(db, nil)
+
+	tests := []struct {
+		name          string
+		actor         string
+		expectedActor string
+		dryRun        bool
+		verbosity     int
+	}{
+		{
+			name:          "with custom actor",
+			actor:         "plugin@test",
+			expectedActor: "plugin@test",
+			dryRun:        false,
+			verbosity:     2,
+		},
+		{
+			name:          "with empty actor (default)",
+			actor:         "",
+			expectedActor: "ixgest-git@repo",
+			dryRun:        true,
+			verbosity:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			processor := NewGitIxProcessorWithStore(store, tt.dryRun, tt.actor, tt.verbosity, nil)
+			assert.Equal(t, tt.expectedActor, processor.defaultActor)
+			assert.Nil(t, processor.db, "db should be nil when using store constructor")
+			assert.NotNil(t, processor.store, "store should not be nil")
+			assert.Equal(t, tt.dryRun, processor.dryRun)
+			assert.Equal(t, tt.verbosity, processor.verbosity)
 		})
 	}
 }
