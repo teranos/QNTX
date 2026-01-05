@@ -53,6 +53,11 @@ func NewAxExecutorWithOptions(queryStore ats.AttestationQueryStore, aliasResolve
 		opts.Matcher = NewDefaultMatcher()
 	}
 
+	// Pass logger to matcher if available
+	if opts.Logger != nil {
+		opts.Matcher.SetLogger(opts.Logger)
+	}
+
 	return &AxExecutor{
 		queryStore:     queryStore,
 		fuzzy:          opts.Matcher,

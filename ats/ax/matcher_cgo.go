@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"
+	"go.uber.org/zap"
 )
 
 // To enable CGO fuzzy matching, build with:
@@ -17,6 +18,7 @@ import (
 // It maintains an internal index that is rebuilt when the vocabulary changes.
 type CGOMatcher struct {
 	engine *fuzzyax.FuzzyEngine
+	logger *zap.SugaredLogger
 
 	mu             sync.RWMutex
 	predicates     []string
@@ -51,6 +53,13 @@ func (m *CGOMatcher) Backend() MatcherBackend {
 	return MatcherBackendRust
 }
 
+// SetLogger sets the logger for debug output
+func (m *CGOMatcher) SetLogger(logger interface{}) {
+	if l, ok := logger.(*zap.SugaredLogger); ok {
+		m.logger = l
+	}
+}
+
 // FindMatches finds predicates that match the query using the Rust fuzzy engine.
 // The vocabulary is synced to the Rust engine if it has changed.
 func (m *CGOMatcher) FindMatches(queryPredicate string, allPredicates []string) []string {
@@ -62,13 +71,34 @@ func (m *CGOMatcher) FindMatches(queryPredicate string, allPredicates []string) 
 	m.syncPredicates(allPredicates)
 
 	// Query the Rust engine
-	matches, err := m.engine.FindPredicateMatches(queryPredicate)
+	matches, searchTimeUs, err := m.engine.FindMatches(queryPredicate, fuzzyax.VocabPredicates, 20, 0.6)
 	if err != nil {
-		// Fall back to empty on error (could log here)
+		if m.logger != nil {
+			m.logger.Errorw("rust fuzzy match failed",
+				"query", queryPredicate,
+				"error", err,
+			)
+		}
 		return nil
 	}
 
-	return matches
+	if m.logger != nil && len(matches) > 0 {
+		m.logger.Debugw("rust fuzzy match",
+			"query", queryPredicate,
+			"matches", len(matches),
+			"time_us", searchTimeUs,
+			"top_match", matches[0].Value,
+			"top_score", matches[0].Score,
+			"strategy", matches[0].Strategy,
+		)
+	}
+
+	// Extract just the values
+	values := make([]string, len(matches))
+	for i, match := range matches {
+		values[i] = match.Value
+	}
+	return values
 }
 
 // FindContextMatches finds contexts that match the query using the Rust fuzzy engine.
@@ -82,12 +112,34 @@ func (m *CGOMatcher) FindContextMatches(queryContext string, allContexts []strin
 	m.syncContexts(allContexts)
 
 	// Query the Rust engine
-	matches, err := m.engine.FindContextMatches(queryContext)
+	matches, searchTimeUs, err := m.engine.FindMatches(queryContext, fuzzyax.VocabContexts, 20, 0.6)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Errorw("rust fuzzy context match failed",
+				"query", queryContext,
+				"error", err,
+			)
+		}
 		return nil
 	}
 
-	return matches
+	if m.logger != nil && len(matches) > 0 {
+		m.logger.Debugw("rust fuzzy context match",
+			"query", queryContext,
+			"matches", len(matches),
+			"time_us", searchTimeUs,
+			"top_match", matches[0].Value,
+			"top_score", matches[0].Score,
+			"strategy", matches[0].Strategy,
+		)
+	}
+
+	// Extract just the values
+	values := make([]string, len(matches))
+	for i, match := range matches {
+		values[i] = match.Value
+	}
+	return values
 }
 
 // syncPredicates rebuilds the predicate index if the vocabulary has changed.
@@ -113,7 +165,24 @@ func (m *CGOMatcher) syncPredicates(predicates []string) {
 	// Rebuild index with new predicates, keeping existing contexts
 	m.predicates = predicates
 	m.predicateHash = hash
-	_, _ = m.engine.RebuildIndex(m.predicates, m.contexts)
+
+	result, err := m.engine.RebuildIndex(m.predicates, m.contexts)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Errorw("failed to rebuild rust fuzzy index",
+				"predicate_count", len(m.predicates),
+				"context_count", len(m.contexts),
+				"error", err,
+			)
+		}
+	} else if m.logger != nil {
+		m.logger.Debugw("rebuilt rust fuzzy predicate index",
+			"predicate_count", result.PredicateCount,
+			"context_count", result.ContextCount,
+			"build_time_ms", result.BuildTimeMs,
+			"index_hash", result.IndexHash,
+		)
+	}
 }
 
 // syncContexts rebuilds the context index if the vocabulary has changed.
@@ -139,7 +208,24 @@ func (m *CGOMatcher) syncContexts(contexts []string) {
 	// Rebuild index with new contexts, keeping existing predicates
 	m.contexts = contexts
 	m.contextHash = hash
-	_, _ = m.engine.RebuildIndex(m.predicates, m.contexts)
+
+	result, err := m.engine.RebuildIndex(m.predicates, m.contexts)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Errorw("failed to rebuild rust fuzzy index",
+				"predicate_count", len(m.predicates),
+				"context_count", len(m.contexts),
+				"error", err,
+			)
+		}
+	} else if m.logger != nil {
+		m.logger.Debugw("rebuilt rust fuzzy context index",
+			"predicate_count", result.PredicateCount,
+			"context_count", result.ContextCount,
+			"build_time_ms", result.BuildTimeMs,
+			"index_hash", result.IndexHash,
+		)
+	}
 }
 
 // hashStrings computes a simple hash of a string slice for change detection.

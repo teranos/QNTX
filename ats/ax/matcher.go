@@ -24,6 +24,10 @@ type Matcher interface {
 
 	// Backend returns which implementation is being used (go or rust)
 	Backend() MatcherBackend
+
+	// SetLogger sets an optional logger for debug output.
+	// Implementations may ignore this if logging is not supported.
+	SetLogger(logger interface{})
 }
 
 // NewDefaultMatcher creates the best available matcher implementation.
