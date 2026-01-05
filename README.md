@@ -16,6 +16,10 @@ Data → Graph → Knowledge → Intelligence → Action
 
 QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)**
 
+## Installation
+
+See [Installation Guide](docs/installation.md) for all installation methods including Nix, Docker, and building from source.
+
 ## Segments
 
 - **꩜** pulse - continuous compute (heartbeat)
