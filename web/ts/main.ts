@@ -2,8 +2,9 @@
 
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
-import { handleLogBatch, initLogPanel } from './log-panel.ts';
+import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
+import { CSS } from './css-classes.ts';
 import { updateGraph, initGraphResize } from './graph-renderer.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -79,8 +80,7 @@ function handleVersion(data: VersionMessage): void {
         const commitLink = document.createElement('a');
         commitLink.href = `https://github.com/teranos/QNTX/commit/${data.commit}`;
         commitLink.target = '_blank';
-        commitLink.style.color = 'inherit';
-        commitLink.style.textDecoration = 'none';
+        commitLink.classList.add('u-color-inherit', 'u-no-underline');
         commitLink.textContent = commitShort;
 
         buildHash.appendChild(commitLink);
@@ -162,8 +162,8 @@ async function init(): Promise<void> {
     connectWebSocket(handlers);
 
     // Initialize UI components
-    if (window.logLoaderStep) window.logLoaderStep('Initializing log panel...');
-    initLogPanel();
+    if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
+    initSystemDrawer();
 
     // Initialize CodeMirror editor (replaces textarea)
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
@@ -247,10 +247,15 @@ async function init(): Promise<void> {
         });
 
         listen('toggle-logs', () => {
-            // Toggle log panel visibility
-            const logPanel = document.getElementById('log-panel');
-            if (logPanel) {
-                logPanel.classList.toggle('collapsed');
+            // Toggle system drawer visibility
+            const systemDrawer = document.getElementById('system-drawer');
+            if (systemDrawer) {
+                const isCollapsed = systemDrawer.classList.contains(CSS.STATE.COLLAPSED);
+                if (isCollapsed) {
+                    systemDrawer.classList.remove(CSS.STATE.COLLAPSED);
+                } else {
+                    systemDrawer.classList.add(CSS.STATE.COLLAPSED);
+                }
             }
         });
 
