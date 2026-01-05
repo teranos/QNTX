@@ -29,8 +29,9 @@ func normalizeNodeID(id string) string {
 //   - Couples infrastructure to domain assumptions
 //
 // SOLUTION: Literal values should be attested explicitly:
-//   as alice age 30 with literal=true
-//   as alice email "alice@example.com" with literal=true
+//
+//	as alice age 30 with literal=true
+//	as alice email "alice@example.com" with literal=true
 //
 // This makes literal vs entity distinction:
 //   - Explicit and transparent (in attestations, not code)

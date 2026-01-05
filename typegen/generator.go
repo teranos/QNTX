@@ -10,11 +10,11 @@
 //
 // # Design Decisions
 //
-// - Two-pass import resolution: First pass generates all types, second pass adds cross-package
-//   imports. This prevents circular dependencies and ensures deterministic output.
-// - Generators implement a common interface for extensibility
-// - Deterministic output (sorted maps) enables CI validation via git diff
-// - Excluded types list prevents generation of internal implementation details
+//   - Two-pass import resolution: First pass generates all types, second pass adds cross-package
+//     imports. This prevents circular dependencies and ensures deterministic output.
+//   - Generators implement a common interface for extensibility
+//   - Deterministic output (sorted maps) enables CI validation via git diff
+//   - Excluded types list prevents generation of internal implementation details
 //
 // # Implementing a New Generator
 //
