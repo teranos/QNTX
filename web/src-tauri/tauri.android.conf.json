@@ -1,9 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "externalBin": null
+    "externalBin": null,
+    "android": {
+      "minSdkVersion": 24
+    }
   },
   "app": {
-    "trayIcon": null
+    "trayIcon": null,
+    "security": {
+      "csp": null
+    }
   }
 }
