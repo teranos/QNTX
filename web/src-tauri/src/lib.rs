@@ -39,6 +39,8 @@ pub fn run() {
 
     #[cfg(target_os = "android")]
     {
+        // NOTE: tauri_plugin_notification requires POST_NOTIFICATIONS permission on Android 13+
+        // Ensure android_request_permissions is called before sending notifications
         tauri::Builder::default()
             .plugin(tauri_plugin_shell::init())
             .plugin(tauri_plugin_notification::init())
