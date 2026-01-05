@@ -19,10 +19,11 @@ type CheckResult struct {
 // Returns a CheckResult indicating which files differ.
 //
 // Directory structure expected:
-//   tempDir/typescript/   -> compares with types/generated/typescript/
-//   tempDir/python/       -> compares with types/generated/python/
-//   tempDir/rust/         -> compares with types/generated/rust/ (ignores metadata)
-//   tempDir/markdown/     -> compares with docs/types/
+//
+//	tempDir/typescript/   -> compares with types/generated/typescript/
+//	tempDir/python/       -> compares with types/generated/python/
+//	tempDir/rust/         -> compares with types/generated/rust/ (ignores metadata)
+//	tempDir/markdown/     -> compares with docs/types/
 func CompareDirectories(tempDir string) (*CheckResult, error) {
 	differences := make(map[string][]string)
 

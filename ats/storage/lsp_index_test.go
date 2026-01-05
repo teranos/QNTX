@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage/testutil"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestNewSymbolIndex_Success tests successful index creation
@@ -188,14 +188,14 @@ func TestGetSubjectCompletions(t *testing.T) {
 		wantCount int
 		wantEmpty bool
 	}{
-		{"al", 3, false},         // Matches "alice", "alicia", "alex" (2-char minimum)
-		{"ali", 2, false},        // Matches "alice", "alicia"
-		{"alex", 1, false},       // Matches "alex"
-		{"bob", 1, false},        // Matches "bob"
-		{"bar", 1, false},        // Matches "barbara"
-		{"xyz", 0, false},        // No matches
-		{"", 0, true},            // Empty prefix
-		{"a", 0, true},           // Less than 2 chars
+		{"al", 3, false},   // Matches "alice", "alicia", "alex" (2-char minimum)
+		{"ali", 2, false},  // Matches "alice", "alicia"
+		{"alex", 1, false}, // Matches "alex"
+		{"bob", 1, false},  // Matches "bob"
+		{"bar", 1, false},  // Matches "barbara"
+		{"xyz", 0, false},  // No matches
+		{"", 0, true},      // Empty prefix
+		{"a", 0, true},     // Less than 2 chars
 	}
 
 	for _, tt := range tests {
