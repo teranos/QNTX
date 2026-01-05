@@ -81,3 +81,18 @@
 #theme-toggle:active {
     transform: scale(0.95);
 }
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    #theme-toggle {
+        transition: none;
+    }
+
+    #theme-toggle:hover {
+        transform: none;
+    }
+
+    #theme-toggle:active {
+        transform: none;
+    }
+}
