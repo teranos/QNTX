@@ -30,6 +30,27 @@ export type {
   Tracker,
 } from './budget';
 
+// Types from git
+export type {
+  CargoLock,
+  CargoToml,
+  DepsIngestionResult,
+  DepsIxProcessor,
+  FlakeLock,
+  GitBranchResult,
+  GitCommitResult,
+  GitIngestionHandler,
+  GitIngestionPayload,
+  GitIxProcessor,
+  GitProcessingResult,
+  GoPackageInfo,
+  PackageJSON,
+  ProjectFile,
+  ProjectFileResult,
+  PyprojectToml,
+  RepoSource,
+} from './git';
+
 // Types from github
 export type {
   CachedPatch,
