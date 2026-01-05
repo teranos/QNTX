@@ -184,28 +184,28 @@ plugins-install: plugins ## Install plugins to ~/.qntx/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
 	@echo "✓ Plugins installed to $(PREFIX)/plugins/"
 
-# Rust fuzzy matching library
+# Rust fuzzy matching library (ax segment optimization)
 rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
 	@echo "Building Rust fuzzy matching library..."
-	@cd plugins/qntx-fuzzy && cargo build --release --lib
-	@echo "✓ libqntx_fuzzy built in plugins/qntx-fuzzy/target/release/"
+	@cd ats/ax/fuzzy-ax && cargo build --release --lib
+	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
 	@echo "  Static:  libqntx_fuzzy.a"
 	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."
-	@cd plugins/qntx-fuzzy && cargo test --lib
+	@cd ats/ax/fuzzy-ax && cargo test --lib
 	@echo "✓ All Rust tests passed"
 
 rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
 	@echo "Checking Rust fuzzy matching code..."
-	@cd plugins/qntx-fuzzy && cargo fmt --check
-	@cd plugins/qntx-fuzzy && cargo clippy --lib -- -D warnings
+	@cd ats/ax/fuzzy-ax && cargo fmt --check
+	@cd ats/ax/fuzzy-ax && cargo clippy --lib -- -D warnings
 	@echo "✓ Rust code checks passed"
 
 rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rust)
 	@echo "Running Rust fuzzy integration tests..."
-	@export DYLD_LIBRARY_PATH=$(PWD)/target/release:$$DYLD_LIBRARY_PATH && \
-		export LD_LIBRARY_PATH=$(PWD)/target/release:$$LD_LIBRARY_PATH && \
-		go test -tags "integration rustfuzzy" -v ./plugins/qntx-fuzzy/...
+	@export DYLD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$DYLD_LIBRARY_PATH && \
+		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
+		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
 	@echo "✓ Integration tests passed"

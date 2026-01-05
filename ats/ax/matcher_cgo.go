@@ -5,18 +5,18 @@ package ax
 import (
 	"sync"
 
-	"github.com/teranos/QNTX/plugins/qntx-fuzzy/cgo"
+	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"
 )
 
 // To enable CGO fuzzy matching, build with:
 //   go build -tags rustfuzzy
 // And ensure libqntx_fuzzy is in the library path:
-//   export LD_LIBRARY_PATH=/path/to/QNTX/target/release:$LD_LIBRARY_PATH
+//   export LD_LIBRARY_PATH=/path/to/QNTX/ats/ax/fuzzy-ax/target/release:$LD_LIBRARY_PATH
 
 // CGOMatcher wraps the Rust FuzzyEngine via CGO and implements the Matcher interface.
 // It maintains an internal index that is rebuilt when the vocabulary changes.
 type CGOMatcher struct {
-	engine *cgo.FuzzyEngine
+	engine *fuzzyax.FuzzyEngine
 
 	mu             sync.RWMutex
 	predicates     []string
@@ -28,7 +28,7 @@ type CGOMatcher struct {
 // NewCGOMatcher creates a new CGO-backed fuzzy matcher.
 // Returns an error if the Rust library cannot be loaded.
 func NewCGOMatcher() (*CGOMatcher, error) {
-	engine, err := cgo.NewFuzzyEngine()
+	engine, err := fuzzyax.NewFuzzyEngine()
 	if err != nil {
 		return nil, err
 	}
