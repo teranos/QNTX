@@ -202,21 +202,9 @@ impl FuzzyEngine {
             return Some(RankedMatch::new(original_value.to_string(), 0.9, "prefix"));
         }
 
-        // 3. Substring match
-        if item_lower.contains(query_lower) {
-            // Score based on position (earlier = better)
-            let pos = item_lower.find(query_lower).unwrap_or(0);
-            let pos_penalty = (pos as f64 / item_lower.len() as f64) * 0.1;
-            let score = 0.75 - pos_penalty;
-            return Some(RankedMatch::new(
-                original_value.to_string(),
-                score.max(0.65),
-                "substring",
-            ));
-        }
-
-        // 4. Word boundary match (query matches a complete word)
+        // 3. Word boundary match (query matches a complete word)
         // Split on common separators: whitespace, underscore, hyphen
+        // Check this BEFORE substring to get better scoring
         for word in item_lower.split(|c: char| c.is_whitespace() || c == '_' || c == '-') {
             if word == query_lower {
                 return Some(RankedMatch::new(
@@ -225,6 +213,20 @@ impl FuzzyEngine {
                     "word_boundary",
                 ));
             }
+        }
+
+        // 4. Substring match
+        if item_lower.contains(query_lower) {
+            // Score based on position (earlier = better)
+            // Safe to unwrap: contains() returned true, so find() must succeed
+            let pos = item_lower.find(query_lower).unwrap();
+            let pos_penalty = (pos as f64 / item_lower.len() as f64) * 0.1;
+            let score = 0.75 - pos_penalty;
+            return Some(RankedMatch::new(
+                original_value.to_string(),
+                score.max(0.65),
+                "substring",
+            ));
         }
 
         // For short queries, skip expensive fuzzy matching
@@ -421,10 +423,8 @@ mod tests {
         // Should match via word_boundary strategy for exact word match
         let author_match = matches.iter().find(|m| m.value == "is_author_of");
         assert!(author_match.is_some());
-        // Could be substring or word_boundary depending on which matches first
-        assert!(
-            author_match.unwrap().strategy == "word_boundary"
-                || author_match.unwrap().strategy == "substring"
-        );
+        // Now that word_boundary is checked first, it should always be word_boundary
+        assert_eq!(author_match.unwrap().strategy, "word_boundary");
+        assert_eq!(author_match.unwrap().score, 0.85);
     }
 }
