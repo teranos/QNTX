@@ -196,3 +196,14 @@ type StorageWarningMessage struct {
 	TimeUntilFull string  `json:"time_until_full"` // Human-readable time until hitting limit
 	Timestamp     int64   `json:"timestamp"`       // Unix timestamp
 }
+
+// PluginHealthMessage represents a plugin health status update
+// Broadcast when plugin state changes (pause/resume) or health check fails
+type PluginHealthMessage struct {
+	Type      string `json:"type"`       // "plugin_health"
+	Name      string `json:"name"`       // Plugin name
+	Healthy   bool   `json:"healthy"`    // Current health status
+	State     string `json:"state"`      // "running", "paused", "stopped"
+	Message   string `json:"message"`    // Status message
+	Timestamp int64  `json:"timestamp"`  // Unix timestamp
+}
