@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -210,27 +209,14 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	// Build headers map
-	// Note: HTTP allows multiple values per header (e.g., Accept, Cookie)
-	// Since protobuf HTTPRequest uses map<string, string>, we join multiple
-	// values with commas per RFC 7230. Exception: Set-Cookie should use semicolons.
-	headers := make(map[string]string)
-	for key, values := range r.Header {
-		if len(values) == 1 {
-			headers[key] = values[0]
-		} else if len(values) > 1 {
-			// Join multiple values according to HTTP spec
-			// Most headers use comma separation (RFC 7230)
-			if key == "Set-Cookie" {
-				// Set-Cookie is special: plugins should handle multiple values
-				// For now, only pass first value (not ideal but protocol limitation)
-				headers[key] = values[0] // TODO: Protocol should support repeated values
-				c.logger.Warnw("Multi-value header truncated", "header", key, "values", len(values))
-			} else {
-				// Join with comma per RFC 7230
-				headers[key] = strings.Join(values, ", ")
-			}
-		}
+	// Convert HTTP headers to protocol format
+	// HTTP headers can have multiple values (e.g., Set-Cookie, Accept)
+	headers := make([]*protocol.HTTPHeader, 0, len(r.Header))
+	for name, values := range r.Header {
+		headers = append(headers, &protocol.HTTPHeader{
+			Name:   name,
+			Values: values,
+		})
 	}
 
 	// Create gRPC request
@@ -255,8 +241,11 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Write response headers
-	for key, value := range resp.Headers {
-		w.Header().Set(key, value)
+	// Support multi-value headers (e.g., Set-Cookie)
+	for _, header := range resp.Headers {
+		for _, value := range header.Values {
+			w.Header().Add(header.Name, value)
+		}
 	}
 
 	// Write status and body
@@ -275,10 +264,12 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	keepaliveHandler := NewKeepaliveHandler(DefaultKeepaliveConfig(), c.logger)
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
+	// TODO: Load WebSocket config from plugin manifest
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
+		wsConfig:  DefaultWebSocketConfig(),
 	}
 
 	return handlers, nil
@@ -290,10 +281,12 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 
 	keepaliveHandler := NewKeepaliveHandler(config, c.logger)
 
+	// TODO: Load WebSocket config from plugin manifest
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
+		wsConfig:  DefaultWebSocketConfig(),
 	}
 
 	return handlers, nil
@@ -304,18 +297,22 @@ type wsProxyHandler struct {
 	client    *ExternalDomainProxy
 	logger    *zap.SugaredLogger
 	keepalive *KeepaliveHandler
-}
-
-var wsUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // TODO: Implement proper origin validation
-	},
+	wsConfig  WebSocketConfig
 }
 
 // ServeWS handles WebSocket upgrade and proxies to remote plugin.
 func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
+	// Add security headers before upgrade
+	AddSecurityHeaders(w)
+
+	// Create upgrader with origin validation
+	upgrader := websocket.Upgrader{
+		CheckOrigin:  CreateOriginChecker(h.wsConfig, h.logger),
+		Subprotocols: []string{"qntx-plugin-v1"},
+	}
+
 	// Upgrade HTTP connection to WebSocket
-	wsConn, err := wsUpgrader.Upgrade(w, r, nil)
+	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Errorw("WebSocket upgrade failed", "error", err)
 		return
