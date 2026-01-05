@@ -66,9 +66,18 @@ type AliasResolver interface {
 
 // AttestationFilter represents filters for querying attestations
 type AttestationFilter struct {
-	Actor     string     // Filter by specific actor
+	// Identity filters - any match within the array is included
+	Subjects   []string   // Filter by subjects (any match)
+	Predicates []string   // Filter by predicates (any match)
+	Contexts   []string   // Filter by contexts (any match)
+	Actors     []string   // Filter by actors (any match)
+	Actor      string     // Deprecated: single actor filter (use Actors instead)
+
+	// Temporal filters
 	TimeStart *time.Time // Temporal range start
 	TimeEnd   *time.Time // Temporal range end
+
+	// Result limits
 	Limit     int        // Maximum results
 }
 
