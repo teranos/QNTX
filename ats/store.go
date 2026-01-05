@@ -66,7 +66,6 @@ type AliasResolver interface {
 
 // AttestationFilter represents filters for querying attestations
 type AttestationFilter struct {
-	Actor      string     // Filter by specific actor (deprecated: use Actors)
 	Actors     []string   // Filter by actors (OR logic)
 	Subjects   []string   // Filter by subjects (OR logic)
 	Predicates []string   // Filter by predicates (OR logic)
