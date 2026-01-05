@@ -61,7 +61,8 @@ export type MessageType =
   | 'pulse_execution_log_stream'
   | 'storage_warning'
   | 'storage_eviction'
-  | 'plugin_health';
+  | 'plugin_health'
+  | 'system_capabilities';
 
 // ============================================================================
 // Base Message Interface
@@ -390,6 +391,16 @@ export interface PluginHealthMessage extends BaseMessage {
   message: string;
 }
 
+/**
+ * System capabilities notification
+ * Sent once on WebSocket connection to inform client of available optimizations
+ */
+export interface SystemCapabilitiesMessage extends BaseMessage {
+  type: 'system_capabilities';
+  fuzzy_backend: 'go' | 'rust';
+  fuzzy_optimized: boolean;
+}
+
 // ============================================================================
 // Type Definitions for Parse Components
 // ============================================================================
@@ -476,7 +487,8 @@ export type WebSocketMessage =
   | PulseExecutionLogStreamMessage
   | StorageWarningMessage
   | StorageEvictionMessage
-  | PluginHealthMessage;
+  | PluginHealthMessage
+  | SystemCapabilitiesMessage;
 
 // ============================================================================
 // Message Handler Types
@@ -517,6 +529,7 @@ export interface MessageHandlers {
   storage_warning?: MessageHandler<StorageWarningMessage>;
   storage_eviction?: MessageHandler<StorageEvictionMessage>;
   plugin_health?: MessageHandler<PluginHealthMessage>;
+  system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
   _default?: MessageHandler<BaseMessage>;
 }
 
