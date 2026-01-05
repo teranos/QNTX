@@ -112,6 +112,7 @@ export type {
   StageInfo,
   StatsMessage,
   StorageWarningMessage,
+  SystemCapabilitiesMessage,
   TaskInfo,
   TaskLogsResponse,
   UpdateScheduledJobRequest,

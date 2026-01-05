@@ -461,6 +461,19 @@ pub struct StorageWarningMessage {
     pub timestamp: i64,
 }
 
+/// SystemCapabilitiesMessage represents system capability information
+/// Sent once on WebSocket connection to inform client of available optimizations
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#systemcapabilitiesmessage>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SystemCapabilitiesMessage {
+    /// "system_capabilities"
+    pub r#type: String,
+    /// "rust" or "go" - which fuzzy matching implementation is active
+    pub fuzzy_backend: String,
+    /// true if using Rust (optimized), false if Go fallback
+    pub fuzzy_optimized: bool,
+}
+
 /// TaskInfo represents a task within a stage
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#taskinfo>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
