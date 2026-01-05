@@ -23,6 +23,9 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      - name: Validate Nix flake
+        run: nix flake check
+
       - name: Build CI image with Nix
         run: nix build .#ci-image
 
