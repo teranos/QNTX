@@ -49,6 +49,9 @@
           # Hash of vendored Go dependencies (computed from go.sum)
           vendorHash = "sha256-W2SPkC8HMfzgldH+kiEJVzIDdKHMY0gicsDJpoC02kM=";
 
+          # Allow Go to auto-download required toolchain version
+          env.GOTOOLCHAIN = "auto";
+
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
             "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
