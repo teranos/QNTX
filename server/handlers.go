@@ -593,6 +593,7 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 	// Get all plugins and their health status
 	ctx := r.Context()
 	healthResults := s.pluginRegistry.HealthCheckAll(ctx)
+	stateResults := s.pluginRegistry.GetAllStates()
 
 	type PluginInfo struct {
 		Name        string                 `json:"name"`
@@ -604,6 +605,8 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		Healthy     bool                   `json:"healthy"`
 		Message     string                 `json:"message,omitempty"`
 		Details     map[string]interface{} `json:"details,omitempty"`
+		State       string                 `json:"state"`
+		Pausable    bool                   `json:"pausable"`
 	}
 
 	plugins := make([]PluginInfo, 0)
@@ -615,6 +618,7 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 
 		meta := p.Metadata()
 		health := healthResults[name]
+		state := stateResults[name]
 
 		plugins = append(plugins, PluginInfo{
 			Name:        meta.Name,
@@ -626,6 +630,8 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 			Healthy:     health.Healthy,
 			Message:     health.Message,
 			Details:     health.Details,
+			State:       string(state),
+			Pausable:    s.pluginRegistry.IsPausable(name),
 		})
 	}
 
@@ -635,6 +641,74 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Errorw("Failed to encode plugins response", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// HandlePluginAction handles pause/resume actions for plugins
+// POST /api/plugins/{name}/pause - Pause a plugin
+// POST /api/plugins/{name}/resume - Resume a plugin
+func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.pluginRegistry == nil {
+		http.Error(w, "Plugin registry not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Parse path: /api/plugins/{name}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 {
+		http.Error(w, "Invalid path: expected /api/plugins/{name}/{action}", http.StatusBadRequest)
+		return
+	}
+
+	name := parts[0]
+	action := parts[1]
+
+	ctx := r.Context()
+	var err error
+
+	switch action {
+	case "pause":
+		err = s.pluginRegistry.Pause(ctx, name)
+		if err != nil {
+			s.logger.Warnw("Failed to pause plugin", "plugin", name, "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.logger.Infow("Plugin paused", "plugin", name)
+
+	case "resume":
+		err = s.pluginRegistry.Resume(ctx, name)
+		if err != nil {
+			s.logger.Warnw("Failed to resume plugin", "plugin", name, "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.logger.Infow("Plugin resumed", "plugin", name)
+
+	default:
+		http.Error(w, fmt.Sprintf("Unknown action: %s (expected 'pause' or 'resume')", action), http.StatusBadRequest)
+		return
+	}
+
+	// Return updated state
+	state, _ := s.pluginRegistry.GetState(name)
+	response := map[string]interface{}{
+		"name":   name,
+		"state":  string(state),
+		"action": action,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Errorw("Failed to encode plugin action response", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

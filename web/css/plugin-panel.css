@@ -114,6 +114,44 @@
     color: var(--panel-text-secondary);
 }
 
+/* Plugin badges container */
+.plugin-badges {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Plugin state indicator */
+.plugin-state {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 12px;
+    text-transform: capitalize;
+}
+
+.plugin-state-running {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.plugin-state-paused {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.plugin-state-stopped {
+    background: #fafafa;
+    color: #757575;
+}
+
+.plugin-state-icon {
+    font-size: 10px;
+}
+
 /* Plugin status indicator */
 .plugin-status {
     display: flex;
@@ -137,6 +175,41 @@
 
 .plugin-status-icon {
     font-size: 10px;
+}
+
+/* Plugin controls */
+.plugin-controls {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 8px;
+}
+
+.plugin-pause-btn,
+.plugin-resume-btn {
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.plugin-pause-btn {
+    background: #fff3e0;
+    border-color: #ef6c00;
+    color: #ef6c00;
+}
+
+.plugin-pause-btn:hover {
+    background: #ffe0b2;
+}
+
+.plugin-resume-btn {
+    background: #e8f5e9;
+    border-color: #2e7d32;
+    color: #2e7d32;
+}
+
+.plugin-resume-btn:hover {
+    background: #c8e6c9;
 }
 
 /* Plugin description */
