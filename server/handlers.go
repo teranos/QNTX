@@ -686,7 +686,8 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		}
 		s.logger.Infow("Plugin paused", "plugin", name)
 		// Broadcast plugin health update to all clients
-		s.BroadcastPluginHealth(name, false, string(plugin.StatePaused), "Plugin paused")
+		// healthy=true because paused is intentional, not a failure
+		s.BroadcastPluginHealth(name, true, string(plugin.StatePaused), "Plugin paused")
 
 	case "resume":
 		err = s.pluginRegistry.Resume(ctx, name)
