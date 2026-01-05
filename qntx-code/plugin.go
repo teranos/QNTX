@@ -130,7 +130,8 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	}
 
 	return plugin.HealthStatus{
-		Healthy: !p.paused,
+		Healthy: true,       // Paused is intentional, not a failure
+		Paused:  p.paused,   // Separate field for pause state
 		Message: message,
 		Details: details,
 	}
