@@ -1,6 +1,9 @@
+//go:build grpcfuzzy
+
 // Package client provides a Go client for the qntx-fuzzy Rust service.
 //
 // RustFuzzyMatcher provides a drop-in replacement for the built-in FuzzyMatcher.
+// This package requires the grpcfuzzy build tag and generated proto code.
 package client
 
 import (

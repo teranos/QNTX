@@ -1,7 +1,12 @@
+//go:build grpcfuzzy
+
 // Package client provides a Go client for the qntx-fuzzy Rust service.
 //
 // This client implements the same interface as the built-in FuzzyMatcher,
 // allowing it to be used as a drop-in replacement in AxExecutor.
+//
+// This package requires the grpcfuzzy build tag and generated proto code.
+// To use: go build -tags grpcfuzzy
 package client
 
 import (

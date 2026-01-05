@@ -36,7 +36,7 @@ jobs:
         run: git config --global --add safe.directory /__w/QNTX/QNTX
 
       - name: Install protoc
-        run: apt-get update && apt-get install -y protobuf-compiler
+        run: apt update && apt install -y protobuf-compiler
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
