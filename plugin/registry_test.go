@@ -646,6 +646,7 @@ func (m *mockConfig) GetBool(key string) bool            { return false }
 func (m *mockConfig) GetStringSlice(key string) []string { return nil }
 func (m *mockConfig) Get(key string) interface{}         { return nil }
 func (m *mockConfig) Set(key string, value interface{})  {}
+func (m *mockConfig) GetKeys() []string                   { return []string{} }
 
 // Verify mockConfig implements Config
 var _ Config = (*mockConfig)(nil)
