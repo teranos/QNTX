@@ -19,7 +19,7 @@
  * - insertAfter: '' (default) appends panel to document.body
  */
 
-import { CSS } from './css-classes.ts';
+import { CSS, DATA, setDataState } from './css-classes.ts';
 
 export interface PanelConfig {
     id: string;
@@ -86,8 +86,9 @@ export abstract class BasePanel {
     protected createPanel(): HTMLElement {
         const panel = document.createElement('div');
         panel.id = this.config.id;
-        // Start panels hidden by default
-        panel.className = `${this.config.classes.join(' ')} ${CSS.STATE.HIDDEN}`;
+        panel.className = this.config.classes.join(' ');
+        // Start panels hidden by default using data attribute (issue #114)
+        setDataState(panel, 'visibility', DATA.VISIBILITY.HIDDEN);
         return panel;
     }
 
@@ -158,13 +159,12 @@ export abstract class BasePanel {
 
     /**
      * Set visibility state for panel and overlay
-     * Handles both CSS class toggling and internal state
+     * Uses data-visibility attribute for cleaner state management (issue #114)
      */
     protected setVisibility(visible: boolean): void {
-        this.panel?.classList.toggle(CSS.STATE.VISIBLE, visible);
-        this.panel?.classList.toggle(CSS.STATE.HIDDEN, !visible);
-        this.overlay?.classList.toggle(CSS.STATE.VISIBLE, visible);
-        this.overlay?.classList.toggle(CSS.STATE.HIDDEN, !visible);
+        const state = visible ? DATA.VISIBILITY.VISIBLE : DATA.VISIBILITY.HIDDEN;
+        setDataState(this.panel, 'visibility', state);
+        setDataState(this.overlay, 'visibility', state);
         this.isVisible = visible;
     }
 
