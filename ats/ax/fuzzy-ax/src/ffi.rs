@@ -27,6 +27,10 @@ use std::slice;
 
 use crate::engine::{FuzzyEngine, VocabularyType};
 
+// Safety limits to prevent DoS attacks
+const MAX_QUERY_LENGTH: usize = 1000;
+const MAX_VOCABULARY_SIZE: usize = 100_000;
+
 /// C-compatible match result
 #[repr(C)]
 pub struct RustMatchC {
@@ -74,9 +78,9 @@ impl RustMatchResultC {
     fn error(msg: &str) -> Self {
         Self {
             success: false,
-            // Properly handle CString creation failure (e.g., null bytes in msg)
+            // Safe fallback: single space cannot contain null bytes
             error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("invalid error message").unwrap())
+                .unwrap_or_else(|_| CString::new(" ").expect("space is valid CString"))
                 .into_raw(),
             matches: ptr::null_mut(),
             matches_len: 0,
@@ -89,9 +93,9 @@ impl RustRebuildResultC {
     fn error(msg: &str) -> Self {
         Self {
             success: false,
-            // Properly handle CString creation failure (e.g., null bytes in msg)
+            // Safe fallback: single space cannot contain null bytes
             error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("invalid error message").unwrap())
+                .unwrap_or_else(|_| CString::new(" ").expect("space is valid CString"))
                 .into_raw(),
             predicate_count: 0,
             context_count: 0,
@@ -169,6 +173,14 @@ pub extern "C" fn fuzzy_engine_rebuild_index(
     }
 
     let engine = unsafe { &*engine };
+
+    // Validate vocabulary sizes to prevent DoS
+    if predicates_len > MAX_VOCABULARY_SIZE {
+        return RustRebuildResultC::error("predicate vocabulary exceeds maximum size");
+    }
+    if contexts_len > MAX_VOCABULARY_SIZE {
+        return RustRebuildResultC::error("context vocabulary exceeds maximum size");
+    }
 
     // Convert C string arrays to Vec<String>
     let predicates_vec = if predicates.is_null() || predicates_len == 0 {
@@ -262,6 +274,11 @@ pub extern "C" fn fuzzy_engine_find_matches(
         Err(_) => return RustMatchResultC::error("invalid UTF-8 in query"),
     };
 
+    // Validate query length to prevent DoS
+    if query_str.len() > MAX_QUERY_LENGTH {
+        return RustMatchResultC::error("query exceeds maximum length");
+    }
+
     // Convert vocabulary type
     let vocab_type = if vocabulary_type == 1 {
         VocabularyType::Contexts
@@ -294,9 +311,15 @@ pub extern "C" fn fuzzy_engine_find_matches(
     let mut c_matches: Vec<RustMatchC> = Vec::with_capacity(matches.len());
     for m in matches {
         c_matches.push(RustMatchC {
-            value: CString::new(m.value).unwrap_or_default().into_raw(),
+            // Safe: value and strategy come from Rust engine (not user input)
+            // Panic here indicates a bug in the engine
+            value: CString::new(m.value)
+                .expect("match value should not contain null bytes")
+                .into_raw(),
             score: m.score,
-            strategy: CString::new(m.strategy).unwrap_or_default().into_raw(),
+            strategy: CString::new(m.strategy)
+                .expect("strategy name should not contain null bytes")
+                .into_raw(),
         });
     }
 
