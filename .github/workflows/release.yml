@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: QNTX ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          body: |
+            ## QNTX ${{ steps.version.outputs.version }}
+
+            ### Installation
+
+            **Nix (Recommended):**
+            ```bash
+            nix profile install github:teranos/QNTX/${{ github.ref_name }}
+            ```
+
+            **Docker:**
+            ```bash
+            docker pull ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
+            ```
+
+            **Manual Download:**
+            Download the appropriate binary for your platform below, extract it, and add to your PATH.
+
+            ### Binaries
+
+            - **Linux amd64**: `qntx-${{ steps.version.outputs.version }}-linux-amd64.tar.gz`
+            - **Linux arm64**: `qntx-${{ steps.version.outputs.version }}-linux-arm64.tar.gz`
+
+            ### Changes
+
+            See [full changelog](https://github.com/teranos/QNTX/compare/v${{ steps.version.outputs.previous }}...${{ github.ref_name }})
+
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build QNTX binary
+        run: |
+          echo "Building QNTX for Linux ${{ matrix.arch }}..."
+          nix build .#qntx --print-build-logs
+
+      - name: Package binary
+        run: |
+          mkdir -p release
+          cp result/bin/qntx release/
+          cd release
+          tar -czf qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz qntx
+          sha256sum qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz > qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+            release/qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz.sha256
