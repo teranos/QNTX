@@ -7,7 +7,8 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
-      url = "github:cachix/pre-commit-hooks.nix";
+      # Pin to version compatible with nixpkgs 24.05 (June 2024)
+      url = "github:cachix/pre-commit-hooks.nix/4e743a6920eab45e8ba0fbe49dc459f1423a4b74";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
