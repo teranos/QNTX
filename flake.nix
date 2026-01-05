@@ -2,9 +2,9 @@
   description = "QNTX container image";
 
   inputs = {
-    # Pin to stable release channel for reproducibility
-    # Update to newer releases (24.11, 25.05, etc.) as needed
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    # Use unstable for latest Go version (1.24+)
+    # Stable channels (24.11) only have Go 1.23
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       # Use latest pre-commit-hooks compatible with nixpkgs 24.11
@@ -48,11 +48,6 @@
 
           # Hash of vendored Go dependencies (computed from go.sum)
           vendorHash = "sha256-W2SPkC8HMfzgldH+kiEJVzIDdKHMY0gicsDJpoC02kM=";
-
-          # Allow Go to auto-download required toolchain version
-          preBuild = ''
-            export GOTOOLCHAIN=auto
-          '';
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
