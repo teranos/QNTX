@@ -165,6 +165,23 @@ func (s *QNTXServer) Stop() error {
 		s.logger.Infow("Daemon stopped")
 	}
 
+	// Shutdown plugins before closing clients
+	if s.pluginRegistry != nil {
+		s.logger.Infow("Shutting down domain plugins")
+		if err := s.pluginRegistry.ShutdownAll(s.ctx); err != nil {
+			s.logger.Warnw("Plugin shutdown errors", "error", err)
+		} else {
+			s.logger.Infow("Domain plugins shut down")
+		}
+	}
+
+	// Shutdown gRPC services for plugins (Issue #138)
+	if s.servicesManager != nil {
+		s.logger.Infow("Shutting down plugin services")
+		s.servicesManager.Shutdown()
+		s.logger.Infow("Plugin services shut down")
+	}
+
 	// Close all client connections BEFORE cancelling context
 	// This ensures readPump/writePump exit cleanly before context cancellation
 	s.mu.Lock()

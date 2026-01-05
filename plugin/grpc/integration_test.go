@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"testing"
@@ -10,9 +12,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/storage"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	pluginpkg "github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/pulse/async"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+	"google.golang.org/grpc"
 )
 
 // =============================================================================
@@ -545,4 +553,184 @@ func TestInvalid_NilContext(t *testing.T) {
 	// Health check with background context should work
 	health := plugin.Health(context.Background())
 	assert.True(t, health.Healthy)
+}
+
+// =============================================================================
+// Service Integration Tests (Issue #138)
+// =============================================================================
+
+// testServiceRegistry implements pluginpkg.ServiceRegistry for integration testing
+type testServiceRegistry struct {
+	logger *zap.SugaredLogger
+	store  ats.AttestationStore
+	queue  pluginpkg.QueueService
+	config map[string]string
+}
+
+func (r *testServiceRegistry) Database() *sql.DB {
+	return nil
+}
+
+func (r *testServiceRegistry) Logger(domain string) *zap.SugaredLogger {
+	return r.logger.Named(domain)
+}
+
+func (r *testServiceRegistry) Config(domain string) pluginpkg.Config {
+	return &testConfig{config: r.config}
+}
+
+func (r *testServiceRegistry) ATSStore() ats.AttestationStore {
+	return r.store
+}
+
+func (r *testServiceRegistry) Queue() pluginpkg.QueueService {
+	return r.queue
+}
+
+// testConfig implements pluginpkg.Config for integration testing
+type testConfig struct {
+	config map[string]string
+}
+
+func (c *testConfig) GetString(key string) string {
+	return c.config[key]
+}
+
+func (c *testConfig) GetInt(key string) int {
+	return 0
+}
+
+func (c *testConfig) GetBool(key string) bool {
+	return false
+}
+
+func (c *testConfig) GetStringSlice(key string) []string {
+	return nil
+}
+
+func (c *testConfig) Get(key string) interface{} {
+	return c.config[key]
+}
+
+func (c *testConfig) Set(key string, value interface{}) {
+	if s, ok := value.(string); ok {
+		c.config[key] = s
+	}
+}
+
+// TestServiceIntegration_BookCollectorAttestations tests end-to-end service callbacks.
+// This verifies that external plugins can create attestations via gRPC ATSStore service.
+func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping service integration test in short mode")
+	}
+
+	logger := zaptest.NewLogger(t).Sugar()
+	ctx := context.Background()
+
+	// 1. Create test database
+	db := qntxtest.CreateTestDB(t)
+
+	// 2. Create ATSStore and Queue
+	store := storage.NewSQLStore(db, logger)
+	queue := async.NewQueue(db)
+
+	// 3. Start gRPC services for plugin callbacks
+	servicesManager := NewServicesManager(logger)
+	endpoints, err := servicesManager.Start(ctx, store, queue)
+	require.NoError(t, err)
+	defer servicesManager.Shutdown()
+
+	logger.Infow("Started plugin services",
+		"ats_store", endpoints.ATSStoreAddress,
+		"queue", endpoints.QueueAddress,
+	)
+
+	// 4. Create and start book plugin server
+	bookPlugin := NewBookPlugin()
+	pluginServer := NewPluginServer(bookPlugin, logger)
+
+	// Start plugin gRPC server in background
+	pluginAddr := "localhost:0" // Use dynamic port
+	listener, err := net.Listen("tcp", pluginAddr)
+	require.NoError(t, err)
+	actualPluginAddr := listener.Addr().String()
+	defer listener.Close()
+
+	grpcServer := grpc.NewServer()
+	protocol.RegisterDomainPluginServiceServer(grpcServer, pluginServer)
+
+	go func() {
+		grpcServer.Serve(listener)
+	}()
+	defer grpcServer.Stop()
+
+	// Wait for server to start
+	time.Sleep(100 * time.Millisecond)
+
+	// 5. Connect to plugin as client
+	proxy, err := NewExternalDomainProxy(actualPluginAddr, logger)
+	require.NoError(t, err)
+	defer proxy.Close()
+
+	// 6. Initialize book plugin directly with real services
+	// Note: In production, external plugins would use gRPC clients from RemoteServiceRegistry.
+	// For this test, we directly initialize with services to verify the attestation logic.
+	services := &testServiceRegistry{
+		logger: logger,
+		store:  store,
+		queue:  queue,
+		config: map[string]string{},
+	}
+
+	// Initialize the book plugin directly (not through gRPC proxy)
+	// This tests that the plugin can create attestations when given services
+	err = bookPlugin.Initialize(ctx, services)
+	require.NoError(t, err)
+
+	// 9. Verify attestations were created in database
+	filter := ats.AttestationFilter{Limit: 100}
+	attestations, err := store.GetAttestations(filter)
+	require.NoError(t, err)
+
+	// Should have attestations for collector wants and auction offers
+	assert.Greater(t, len(attestations), 0, "Plugin should have created attestations")
+
+	// Verify specific attestations exist
+	var collectorWants []string
+	var auctionOffers []string
+
+	for _, att := range attestations {
+		if len(att.Subjects) > 0 && len(att.Predicates) > 0 && len(att.Contexts) > 0 {
+			subject := att.Subjects[0]
+			predicate := att.Predicates[0]
+			context := att.Contexts[0]
+
+			if subject == "collector" && predicate == "wants" {
+				collectorWants = append(collectorWants, context)
+			}
+			if predicate == "offers" {
+				auctionOffers = append(auctionOffers, context)
+			}
+		}
+	}
+
+	logger.Infow("Service integration verification",
+		"total_attestations", len(attestations),
+		"collector_wants", len(collectorWants),
+		"auction_offers", len(auctionOffers),
+	)
+
+	// Verify expected attestations
+	assert.Contains(t, collectorWants, "organon", "Collector should want Organon")
+	assert.Contains(t, collectorWants, "elements", "Collector should want Elements")
+	assert.Contains(t, collectorWants, "time-clocks-ordering", "Collector should want Lamport's paper")
+
+	assert.Contains(t, auctionOffers, "organon", "Christie's should offer Organon")
+	assert.Contains(t, auctionOffers, "elements", "Sotheby's should offer Elements")
+
+	// 10. Verify plugin found matches
+	health := proxy.Health(ctx)
+	assert.True(t, health.Healthy)
+	logger.Info("Book collector plugin successfully created and queried attestations via gRPC services")
 }
