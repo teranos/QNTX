@@ -86,5 +86,5 @@ No special configuration required. The pattern is implemented through job handle
 ## Related Documentation
 
 - [Pulse Async Architecture](pulse-async-ix.md)
-- [GRACE Shutdown](../development/grace.md) - Handles job recovery
+- [Opening (✿) and Closing (❀)](../development/grace.md) - Handles job recovery
 - [Job Type Definitions](../types/async.md)
