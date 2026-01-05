@@ -84,3 +84,164 @@ export type LogClass = typeof CSS.LOG[keyof typeof CSS.LOG];
 export type ToastClass = typeof CSS.TOAST[keyof typeof CSS.TOAST];
 export type PanelClass = typeof CSS.PANEL[keyof typeof CSS.PANEL];
 export type StreamClass = typeof CSS.STREAM[keyof typeof CSS.STREAM];
+
+// ============================================================================
+// Data Attribute State Management
+// ============================================================================
+
+/**
+ * Data attribute values for component state
+ * Use data-state attribute instead of multiple classes for clearer state management
+ *
+ * Benefits (per issue #114):
+ * - Single attribute vs many classes
+ * - Easier debugging (inspect shows data-state="hidden")
+ * - Prevents conflicting states
+ * - Better DevTools filtering
+ *
+ * IMPORTANT: Each data attribute requires corresponding CSS selectors!
+ *
+ * @example
+ * // TypeScript
+ * import { DATA, setVisibility } from './css-classes.ts';
+ * setVisibility(element, DATA.VISIBILITY.HIDDEN);
+ * // Results in: <div data-visibility="hidden">
+ *
+ * // Required CSS (add to component's stylesheet)
+ * .my-component[data-visibility="hidden"] { display: none; }
+ * .my-component[data-visibility="visible"] { display: block; }
+ */
+export const DATA = {
+    /** Visibility states */
+    VISIBILITY: {
+        HIDDEN: 'hidden',
+        VISIBLE: 'visible',
+        FADING: 'fading',
+    },
+
+    /** Expansion states */
+    EXPANSION: {
+        COLLAPSED: 'collapsed',
+        EXPANDED: 'expanded',
+    },
+
+    /** Active/selection states */
+    ACTIVE: {
+        INACTIVE: 'inactive',
+        ACTIVE: 'active',
+        SELECTED: 'selected',
+    },
+
+    /** Loading states */
+    LOADING: {
+        IDLE: 'idle',
+        LOADING: 'loading',
+        ERROR: 'error',
+        SUCCESS: 'success',
+    },
+} as const;
+
+export type VisibilityState = typeof DATA.VISIBILITY[keyof typeof DATA.VISIBILITY];
+export type ExpansionState = typeof DATA.EXPANSION[keyof typeof DATA.EXPANSION];
+export type ActiveState = typeof DATA.ACTIVE[keyof typeof DATA.ACTIVE];
+export type LoadingState = typeof DATA.LOADING[keyof typeof DATA.LOADING];
+
+/**
+ * Set a data-* attribute state on an element
+ */
+export function setDataState(
+    element: HTMLElement | null | undefined,
+    attribute: string,
+    value: string
+): void {
+    if (element) {
+        element.dataset[attribute] = value;
+    }
+}
+
+/**
+ * Get a data-* attribute state from an element
+ */
+export function getDataState(
+    element: HTMLElement | null | undefined,
+    attribute: string
+): string | undefined {
+    return element?.dataset[attribute];
+}
+
+/**
+ * Clear a data-* attribute from an element
+ */
+export function clearDataState(
+    element: HTMLElement | null | undefined,
+    attribute: string
+): void {
+    if (element) {
+        delete element.dataset[attribute];
+    }
+}
+
+// ============================================================================
+// Type-Safe Convenience Functions
+// ============================================================================
+
+/**
+ * Set data-visibility attribute with type safety
+ * @requires CSS: [data-visibility="hidden"], [data-visibility="visible"], [data-visibility="fading"]
+ */
+export function setVisibility(
+    element: HTMLElement | null | undefined,
+    value: VisibilityState
+): void {
+    if (element) {
+        element.dataset.visibility = value;
+    }
+}
+
+/**
+ * Get data-visibility attribute value
+ */
+export function getVisibility(
+    element: HTMLElement | null | undefined
+): VisibilityState | undefined {
+    return element?.dataset.visibility as VisibilityState | undefined;
+}
+
+/**
+ * Set data-expansion attribute with type safety
+ * @requires CSS: [data-expansion="collapsed"], [data-expansion="expanded"]
+ */
+export function setExpansion(
+    element: HTMLElement | null | undefined,
+    value: ExpansionState
+): void {
+    if (element) {
+        element.dataset.expansion = value;
+    }
+}
+
+/**
+ * Set data-active attribute with type safety
+ * @requires CSS: [data-active="inactive"], [data-active="active"], [data-active="selected"]
+ */
+export function setActive(
+    element: HTMLElement | null | undefined,
+    value: ActiveState
+): void {
+    if (element) {
+        element.dataset.active = value;
+    }
+}
+
+/**
+ * Set data-loading attribute with type safety
+ * @requires CSS: [data-loading="idle"], [data-loading="loading"], [data-loading="error"], [data-loading="success"]
+ */
+export function setLoading(
+    element: HTMLElement | null | undefined,
+    value: LoadingState
+): void {
+    if (element) {
+        element.dataset.loading = value;
+    }
+}

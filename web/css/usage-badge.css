@@ -44,17 +44,22 @@
     pointer-events: none; /* Allow mouse to pass through when fading */
 }
 
-.usage-detail-box.visible {
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.usage-detail-box.visible,
+.usage-detail-box[data-visibility="visible"] {
     display: block;
     opacity: 1;
     pointer-events: auto;
 }
 
-.usage-detail-box.fading {
+.usage-detail-box.fading,
+.usage-detail-box[data-visibility="fading"] {
     opacity: 0;
 }
 
-.usage-detail-box.expanded {
+/* Expansion state - supports both class (legacy) and data-attribute (issue #114) */
+.usage-detail-box.expanded,
+.usage-detail-box[data-expansion="expanded"] {
     /* Full width expansion for month view */
     top: 12px;
     left: 12px;
@@ -68,6 +73,36 @@
     width: 100%;
     height: 100%;
     position: relative;
+}
+
+/* Loading state - shows spinner while fetching data (issue #114) */
+.usage-chart-container[data-loading="loading"]::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(100, 200, 255, 0.8);
+    border-radius: 50%;
+    animation: usage-spinner 0.8s linear infinite;
+}
+
+@keyframes usage-spinner {
+    to { transform: rotate(360deg); }
+}
+
+/* Error state - subtle error indicator */
+.usage-chart-container[data-loading="error"]::after {
+    content: '⚠ Failed to load';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 10px;
+    color: rgba(255, 100, 100, 0.8);
 }
 
 .usage-chart-svg {
@@ -125,7 +160,8 @@
         font-size: 10px;
     }
 
-    .usage-detail-box.expanded {
+    .usage-detail-box.expanded,
+    .usage-detail-box[data-expansion="expanded"] {
         /* Full width on mobile when expanded */
         top: 36px;
         left: 12px;

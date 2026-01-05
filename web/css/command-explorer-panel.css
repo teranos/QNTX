@@ -17,11 +17,14 @@
     overflow: hidden;
 }
 
-.command-explorer-panel.hidden {
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.command-explorer-panel.hidden,
+.command-explorer-panel[data-visibility="hidden"] {
     display: none;
 }
 
-.command-explorer-panel.visible {
+.command-explorer-panel.visible,
+.command-explorer-panel[data-visibility="visible"] {
     display: flex;
     animation: slideDown 0.2s ease;
 }
@@ -123,28 +126,36 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.filter-item.selected {
+/* Selected state - supports both class (legacy) and data-attribute (issue #114) */
+.filter-item.selected,
+.filter-item[data-active="selected"] {
     background: #000;
     color: #fff;
     border-color: #000;
 }
 
-.filter-item.selected .filter-item-type {
+.filter-item.selected .filter-item-type,
+.filter-item[data-active="selected"] .filter-item-type {
     color: #fff;
 }
 
 .filter-item.selected .filter-item-label,
 .filter-item.selected .filter-item-meta,
-.filter-item.selected .filter-item-description {
+.filter-item.selected .filter-item-description,
+.filter-item[data-active="selected"] .filter-item-label,
+.filter-item[data-active="selected"] .filter-item-meta,
+.filter-item[data-active="selected"] .filter-item-description {
     color: #fff;
 }
 
-.filter-item.selected .filter-item-count {
+.filter-item.selected .filter-item-count,
+.filter-item[data-active="selected"] .filter-item-count {
     background: var(--panel-bg);
     color: #000;
 }
 
-.filter-item.selected code {
+.filter-item.selected code,
+.filter-item[data-active="selected"] code {
     background: rgba(255, 255, 255, 0.15);
     color: #fff;
     border-color: rgba(255, 255, 255, 0.3);
