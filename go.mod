@@ -130,8 +130,8 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/tliron/commonlog v0.2.8 // indirect
-	github.com/tliron/kutil v0.3.11 // indirect
+	github.com/tliron/commonlog v0.2.15 // indirect
+	github.com/tliron/kutil v0.3.22 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
