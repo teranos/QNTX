@@ -32,7 +32,7 @@ import { uiState } from './ui-state.ts';
 import { debugLog } from './debug.ts';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'plugins';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'plugins' | 'scraper';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -42,6 +42,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'prose') return Prose;
     if (cmd === 'go') return 'Go';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
+    if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -66,9 +67,44 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeSymbolPalette(): void {
     const cmdCells = document.querySelectorAll('.palette-cell');
 
-    cmdCells.forEach(cell => {
+    cmdCells.forEach((cell, index) => {
         cell.addEventListener('click', handleSymbolClick);
         // Tooltips now handled purely via CSS ::after pseudo-element
+
+        // Add keyboard navigation with arrow keys
+        cell.addEventListener('keydown', (e: Event) => {
+            const keyEvent = e as KeyboardEvent;
+            let nextElement: Element | null = null;
+
+            switch(keyEvent.key) {
+                case 'ArrowRight':
+                case 'ArrowDown':
+                    nextElement = cmdCells[index + 1] || cmdCells[0]; // Wrap to first
+                    break;
+                case 'ArrowLeft':
+                case 'ArrowUp':
+                    nextElement = cmdCells[index - 1] || cmdCells[cmdCells.length - 1]; // Wrap to last
+                    break;
+                case 'Home':
+                    nextElement = cmdCells[0];
+                    break;
+                case 'End':
+                    nextElement = cmdCells[cmdCells.length - 1];
+                    break;
+            }
+
+            if (nextElement && nextElement instanceof HTMLElement) {
+                e.preventDefault();
+                nextElement.focus();
+            }
+        });
+
+        // Set tabindex for first element to enable keyboard entry
+        if (index === 0) {
+            cell.setAttribute('tabindex', '0');
+        } else {
+            cell.setAttribute('tabindex', '-1');
+        }
     });
 }
 
@@ -177,6 +213,10 @@ function handleSymbolClick(e: Event): void {
             // Plugins - show installed domain plugins
             showPluginPanel();
             break;
+        case 'scraper':
+            // Web Scraper - show scraping panel
+            showWebscraperPanel();
+            break;
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -240,6 +280,14 @@ async function showGoEditor(): Promise<void> {
 async function showPluginPanel(): Promise<void> {
     const { togglePluginPanel } = await import('./plugin-panel.js');
     togglePluginPanel();
+}
+
+/**
+ * Show webscraper panel - UI for web scraping operations
+ */
+async function showWebscraperPanel(): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.toggle();
 }
 
 /**
