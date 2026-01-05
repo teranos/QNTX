@@ -29,6 +29,7 @@ var VersionCmd = &cobra.Command{
 			fmt.Println(info.String())
 			fmt.Printf("Platform: %s\n", info.Platform)
 			fmt.Printf("Go: %s\n", info.GoVersion)
+			fmt.Printf("Fuzzy: %s\n", info.FuzzyBackend)
 		}
 	},
 }
