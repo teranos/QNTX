@@ -22,6 +22,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/wslogs"
 )
@@ -571,4 +572,149 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 // Helper for calling queue.ListJobs which requires *JobStatus
 func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 	return &status
+}
+
+// HandlePlugins serves plugin information endpoint
+// Returns list of installed plugins with their metadata and health status
+func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.pluginRegistry == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"plugins": []interface{}{},
+		})
+		return
+	}
+
+	// Get all plugins and their health status
+	ctx := r.Context()
+	healthResults := s.pluginRegistry.HealthCheckAll(ctx)
+	stateResults := s.pluginRegistry.GetAllStates()
+
+	type PluginInfo struct {
+		Name        string                 `json:"name"`
+		Version     string                 `json:"version"`
+		QNTXVersion string                 `json:"qntx_version,omitempty"`
+		Description string                 `json:"description"`
+		Author      string                 `json:"author,omitempty"`
+		License     string                 `json:"license,omitempty"`
+		Healthy     bool                   `json:"healthy"`
+		Message     string                 `json:"message,omitempty"`
+		Details     map[string]interface{} `json:"details,omitempty"`
+		State       string                 `json:"state"`
+		Pausable    bool                   `json:"pausable"`
+	}
+
+	plugins := make([]PluginInfo, 0)
+	for _, name := range s.pluginRegistry.List() {
+		p, ok := s.pluginRegistry.Get(name)
+		if !ok {
+			continue
+		}
+
+		meta := p.Metadata()
+		health := healthResults[name]
+		state := stateResults[name]
+
+		plugins = append(plugins, PluginInfo{
+			Name:        meta.Name,
+			Version:     meta.Version,
+			QNTXVersion: meta.QNTXVersion,
+			Description: meta.Description,
+			Author:      meta.Author,
+			License:     meta.License,
+			Healthy:     health.Healthy,
+			Message:     health.Message,
+			Details:     health.Details,
+			State:       string(state),
+			Pausable:    s.pluginRegistry.IsPausable(name),
+		})
+	}
+
+	response := map[string]interface{}{
+		"plugins": plugins,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Errorw("Failed to encode plugins response", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// HandlePluginAction handles pause/resume actions for plugins
+// POST /api/plugins/{name}/pause - Pause a plugin
+// POST /api/plugins/{name}/resume - Resume a plugin
+func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.pluginRegistry == nil {
+		http.Error(w, "Plugin registry not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Parse path: /api/plugins/{name}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 {
+		http.Error(w, "Invalid path: expected /api/plugins/{name}/{action}", http.StatusBadRequest)
+		return
+	}
+
+	name := parts[0]
+	action := parts[1]
+
+	ctx := r.Context()
+	var err error
+
+	switch action {
+	case "pause":
+		err = s.pluginRegistry.Pause(ctx, name)
+		if err != nil {
+			s.logger.Warnw("Failed to pause plugin", "plugin", name, "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.logger.Infow("Plugin paused", "plugin", name)
+		// Broadcast plugin health update to all clients
+		// healthy=true because paused is intentional, not a failure
+		s.BroadcastPluginHealth(name, true, string(plugin.StatePaused), "Plugin paused")
+
+	case "resume":
+		err = s.pluginRegistry.Resume(ctx, name)
+		if err != nil {
+			s.logger.Warnw("Failed to resume plugin", "plugin", name, "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.logger.Infow("Plugin resumed", "plugin", name)
+		// Broadcast plugin health update to all clients
+		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin resumed")
+
+	default:
+		http.Error(w, fmt.Sprintf("Unknown action: %s (expected 'pause' or 'resume')", action), http.StatusBadRequest)
+		return
+	}
+
+	// Return updated state
+	state, _ := s.pluginRegistry.GetState(name)
+	response := map[string]interface{}{
+		"name":   name,
+		"state":  string(state),
+		"action": action,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Errorw("Failed to encode plugin action response", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
