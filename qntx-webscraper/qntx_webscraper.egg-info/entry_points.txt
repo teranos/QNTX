@@ -1,2 +1,0 @@
-[console_scripts]
-qntx-webscraper = qntx_webscraper.main:main
