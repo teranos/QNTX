@@ -106,6 +106,8 @@
             pkgs.diffutils
             pkgs.findutils
             pkgs.bash
+            pkgs.curl
+            pkgs.unzip
 
             # CA certificates for HTTPS
             pkgs.cacert
@@ -134,9 +136,10 @@
         };
 
         # Architecture detection for Docker images
-        dockerArch = if system == "x86_64-linux" then "amd64"
-                     else if system == "aarch64-linux" then "arm64"
-                     else "amd64";
+        dockerArch =
+          if system == "x86_64-linux" then "amd64"
+          else if system == "aarch64-linux" then "arm64"
+          else "amd64";
 
         # CI image with detected architecture
         ciImage = mkCiImage dockerArch;
@@ -166,8 +169,8 @@
         # Expose pre-commit checks
         checks = {
           pre-commit = pre-commit-check;
-          qntx-build = qntx;  # Ensure QNTX builds
-          ci-image = ciImage;  # Ensure image builds
+          qntx-build = qntx; # Ensure QNTX builds
+          ci-image = ciImage; # Ensure image builds
         };
       }
     );
