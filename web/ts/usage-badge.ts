@@ -25,6 +25,7 @@
 
 import * as d3 from 'd3';
 import { uiState } from './ui-state.ts';
+import { DATA, setVisibility, setExpansion } from './css-classes.ts';
 
 // Type definitions for usage data
 interface UsageStats {
@@ -121,11 +122,10 @@ async function showDetailBox(): Promise<void> {
 
     // Reset to week view (persisted in UIState)
     uiState.setUsageView('week');
-    detailBox.classList.remove('expanded');
+    setExpansion(detailBox, DATA.EXPANSION.COLLAPSED);
 
     // Show immediately (before data fetch)
-    detailBox.classList.remove('fading');
-    detailBox.classList.add('visible');
+    setVisibility(detailBox, DATA.VISIBILITY.VISIBLE);
     detailBoxVisible = true;
 
     // Cancel any pending fade
@@ -142,11 +142,11 @@ function hideDetailBox(): void {
     const detailBox = document.getElementById('usage-detail-box');
     if (!detailBox) return;
 
-    detailBox.classList.add('fading');
+    setVisibility(detailBox, DATA.VISIBILITY.FADING);
 
     // Wait for fade animation to complete before hiding
     setTimeout(() => {
-        detailBox.classList.remove('visible');
+        setVisibility(detailBox, DATA.VISIBILITY.HIDDEN);
         detailBoxVisible = false;
 
         // Restore badge to 24h cost
@@ -221,7 +221,7 @@ async function expandToMonthView(): Promise<void> {
     if (!detailBox) return;
 
     uiState.setUsageView('month');
-    detailBox.classList.add('expanded');
+    setExpansion(detailBox, DATA.EXPANSION.EXPANDED);
 
     // Fetch month data and re-render (async, doesn't block expansion)
     fetchTimeSeriesData().then(() => {
