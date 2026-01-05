@@ -19,7 +19,7 @@
  * - insertAfter: '' (default) appends panel to document.body
  */
 
-import { CSS } from './css-classes.ts';
+import { CSS, DATA, setVisibility } from './css-classes.ts';
 
 export interface PanelConfig {
     id: string;
@@ -74,6 +74,8 @@ export abstract class BasePanel {
     protected createOverlay(): HTMLElement {
         const overlay = document.createElement('div');
         overlay.className = `${CSS.PANEL.OVERLAY} ${this.config.id}-overlay`;
+        // Start overlays hidden by default using data attribute (issue #114)
+        setVisibility(overlay, DATA.VISIBILITY.HIDDEN);
 
         if (this.config.closeOnOverlayClick) {
             overlay.addEventListener('click', () => this.hide());
@@ -86,8 +88,9 @@ export abstract class BasePanel {
     protected createPanel(): HTMLElement {
         const panel = document.createElement('div');
         panel.id = this.config.id;
-        // Start panels hidden by default
-        panel.className = `${this.config.classes.join(' ')} ${CSS.STATE.HIDDEN}`;
+        panel.className = this.config.classes.join(' ');
+        // Start panels hidden by default using data attribute (issue #114)
+        setVisibility(panel, DATA.VISIBILITY.HIDDEN);
         return panel;
     }
 
@@ -142,7 +145,7 @@ export abstract class BasePanel {
         // Allow subclass to prevent show (e.g., unsaved changes check)
         if (!await this.beforeShow()) return;
 
-        this.setVisibility(true);
+        this.updateVisibility(true);
         await this.onShow();
     }
 
@@ -152,19 +155,18 @@ export abstract class BasePanel {
         // Allow subclass to prevent hide (e.g., unsaved changes prompt)
         if (!this.beforeHide()) return;
 
-        this.setVisibility(false);
+        this.updateVisibility(false);
         this.onHide();
     }
 
     /**
      * Set visibility state for panel and overlay
-     * Handles both CSS class toggling and internal state
+     * Uses data-visibility attribute for cleaner state management (issue #114)
      */
-    protected setVisibility(visible: boolean): void {
-        this.panel?.classList.toggle(CSS.STATE.VISIBLE, visible);
-        this.panel?.classList.toggle(CSS.STATE.HIDDEN, !visible);
-        this.overlay?.classList.toggle(CSS.STATE.VISIBLE, visible);
-        this.overlay?.classList.toggle(CSS.STATE.HIDDEN, !visible);
+    protected updateVisibility(visible: boolean): void {
+        const state = visible ? DATA.VISIBILITY.VISIBLE : DATA.VISIBILITY.HIDDEN;
+        setVisibility(this.panel, state);
+        setVisibility(this.overlay, state);
         this.isVisible = visible;
     }
 

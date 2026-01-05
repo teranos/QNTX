@@ -153,22 +153,11 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 // executeAdvancedClassification performs smart conflict classification
 func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim) ([]types.Conflict, []types.As) {
 	// Group claims by key for classification
-	claimGroups := make(map[string][]classification.IndividualClaim)
+	claimGroups := make(map[string][]ats.IndividualClaim)
 
 	for _, claim := range claims {
 		key := claim.Subject + "|" + claim.Predicate + "|" + claim.Context + "|" + claim.Actor
-
-		// Convert to classification.IndividualClaim
-		classificationClaim := classification.IndividualClaim{
-			Subject:   claim.Subject,
-			Predicate: claim.Predicate,
-			Context:   claim.Context,
-			Actor:     claim.Actor,
-			Timestamp: claim.Timestamp,
-			SourceAs:  claim.SourceAs,
-		}
-
-		claimGroups[key] = append(claimGroups[key], classificationClaim)
+		claimGroups[key] = append(claimGroups[key], claim)
 	}
 
 	// Perform smart classification
@@ -190,7 +179,7 @@ func (ae *AxExecutor) executeAdvancedClassification(claims []ats.IndividualClaim
 }
 
 // applyResolutionStrategies applies resolution strategies to filter claims based on classification results
-func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]classification.IndividualClaim, conflicts []classification.AdvancedConflict) []ats.IndividualClaim {
+func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]ats.IndividualClaim, conflicts []classification.AdvancedConflict) []ats.IndividualClaim {
 	// Create a map of conflict resolutions by matching conflicts to claim groups
 	resolutionMap := make(map[string]classification.AdvancedConflict)
 	for _, conflict := range conflicts {
@@ -214,9 +203,7 @@ func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]classif
 	for groupKey, groupClaims := range claimGroups {
 		if len(groupClaims) <= 1 {
 			// Single claim - always include
-			for _, claim := range groupClaims {
-				filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(claim))
-			}
+			filteredClaims = append(filteredClaims, groupClaims...)
 			continue
 		}
 
@@ -227,54 +214,34 @@ func (ae *AxExecutor) applyResolutionStrategies(claimGroups map[string][]classif
 			case "show_latest":
 				// Evolution - show only the most recent claim
 				latest := ae.getMostRecentClaim(groupClaims)
-				filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(latest))
+				filteredClaims = append(filteredClaims, latest)
 			case "show_all_sources":
 				// Verification - show all sources (no filtering)
-				for _, claim := range groupClaims {
-					filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(claim))
-				}
+				filteredClaims = append(filteredClaims, groupClaims...)
 			case "show_highest_authority":
 				// Supersession - show only the highest authority claim
 				highest := ae.getHighestAuthorityClaim(groupClaims)
-				filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(highest))
+				filteredClaims = append(filteredClaims, highest)
 			case "show_all_contexts":
 				// Coexistence - show all (different contexts should coexist)
-				for _, claim := range groupClaims {
-					filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(claim))
-				}
+				filteredClaims = append(filteredClaims, groupClaims...)
 			default:
 				// Unknown strategy or requires review - show all for human decision
-				for _, claim := range groupClaims {
-					filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(claim))
-				}
+				filteredClaims = append(filteredClaims, groupClaims...)
 			}
 		} else {
 			// No conflict detected - show all claims
-			for _, claim := range groupClaims {
-				filteredClaims = append(filteredClaims, ae.convertToIndividualClaim(claim))
-			}
+			filteredClaims = append(filteredClaims, groupClaims...)
 		}
 	}
 
 	return filteredClaims
 }
 
-// convertToIndividualClaim converts classification.IndividualClaim to IndividualClaim
-func (ae *AxExecutor) convertToIndividualClaim(claim classification.IndividualClaim) ats.IndividualClaim {
-	return ats.IndividualClaim{
-		Subject:   claim.Subject,
-		Predicate: claim.Predicate,
-		Context:   claim.Context,
-		Actor:     claim.Actor,
-		Timestamp: claim.Timestamp,
-		SourceAs:  claim.SourceAs,
-	}
-}
-
 // getMostRecentClaim returns the claim with the most recent timestamp
-func (ae *AxExecutor) getMostRecentClaim(claims []classification.IndividualClaim) classification.IndividualClaim {
+func (ae *AxExecutor) getMostRecentClaim(claims []ats.IndividualClaim) ats.IndividualClaim {
 	if len(claims) == 0 {
-		return classification.IndividualClaim{}
+		return ats.IndividualClaim{}
 	}
 
 	mostRecent := claims[0]
@@ -287,9 +254,9 @@ func (ae *AxExecutor) getMostRecentClaim(claims []classification.IndividualClaim
 }
 
 // getHighestAuthorityClaim returns the claim from the highest authority actor
-func (ae *AxExecutor) getHighestAuthorityClaim(claims []classification.IndividualClaim) classification.IndividualClaim {
+func (ae *AxExecutor) getHighestAuthorityClaim(claims []ats.IndividualClaim) ats.IndividualClaim {
 	if len(claims) == 0 {
-		return classification.IndividualClaim{}
+		return ats.IndividualClaim{}
 	}
 
 	var actors []string
