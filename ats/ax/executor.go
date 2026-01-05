@@ -69,6 +69,11 @@ func (ae *AxExecutor) SetClassificationConfig(config classification.TemporalConf
 	ae.classifier = classification.NewSmartClassifier(config)
 }
 
+// FuzzyBackend returns which fuzzy matching implementation is currently in use
+func (ae *AxExecutor) FuzzyBackend() MatcherBackend {
+	return ae.fuzzy.Backend()
+}
+
 // ExecuteAsk executes an ask query and returns results
 func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*types.AxResult, error) {
 	startTime := time.Now()

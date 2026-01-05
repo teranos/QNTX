@@ -46,6 +46,11 @@ func (m *CGOMatcher) Close() error {
 	return nil
 }
 
+// Backend returns the matcher backend type (Rust implementation via CGO)
+func (m *CGOMatcher) Backend() MatcherBackend {
+	return MatcherBackendRust
+}
+
 // FindMatches finds predicates that match the query using the Rust fuzzy engine.
 // The vocabulary is synced to the Rust engine if it has changed.
 func (m *CGOMatcher) FindMatches(queryPredicate string, allPredicates []string) []string {

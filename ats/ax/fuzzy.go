@@ -31,6 +31,11 @@ func NewPredicateMatcher() *FuzzyMatcher {
 	return NewFuzzyMatcher()
 }
 
+// Backend returns the matcher backend type (Go implementation)
+func (fm *FuzzyMatcher) Backend() MatcherBackend {
+	return MatcherBackendGo
+}
+
 // FindMatches finds predicates that match the query using fuzzy logic
 func (fm *FuzzyMatcher) FindMatches(queryPredicate string, allPredicates []string) []string {
 	if strings.TrimSpace(queryPredicate) == "" {
