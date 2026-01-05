@@ -47,7 +47,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
 
 	// Core QNTX handlers
-	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))       // Custom WebSocket protocol (graph updates, logs, etc.)
+	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
 	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))

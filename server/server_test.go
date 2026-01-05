@@ -12,9 +12,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/teranos/QNTX/server/wslogs"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/graph"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/server/wslogs"
 )
 
 // createTestDB is a local alias for qntxtest.CreateTestDB

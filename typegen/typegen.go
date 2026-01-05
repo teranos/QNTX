@@ -39,10 +39,10 @@ var ExcludedTypes = map[string]bool{
 	"RegistryExecutor":   true,
 	"JobProgressEmitter": true,
 	// pulse/schedule internal types
-	"ExecutionStore": true,       // Database store
-	"Ticker":         true,       // Internal scheduler
-	"TickerConfig":   true,       // Internal config
-	"schedule.Job":   true,       // No json tags, PascalCase fields - use async.Job instead
+	"ExecutionStore": true, // Database store
+	"Ticker":         true, // Internal scheduler
+	"TickerConfig":   true, // Internal config
+	"schedule.Job":   true, // No json tags, PascalCase fields - use async.Job instead
 	// server internal types
 	"Client":              true, // WebSocket client
 	"ConsoleBuffer":       true, // Internal buffer

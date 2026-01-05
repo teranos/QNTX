@@ -352,7 +352,7 @@ func stripTimestampFooter(content string) string {
 		fourthLastLine := strings.TrimSpace(lines[len(lines)-4])
 
 		if lastLine == "" && strings.HasPrefix(secondLastLine, "*Generated at:") &&
-		   thirdLastLine == "" && fourthLastLine == "---" {
+			thirdLastLine == "" && fourthLastLine == "---" {
 			// Remove the last 4 lines
 			return strings.Join(lines[:len(lines)-4], "\n")
 		}

@@ -20,8 +20,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/teranos/QNTX/qntx-code"
 	plugingrpc "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/qntx-code"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

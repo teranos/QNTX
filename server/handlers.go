@@ -52,7 +52,7 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		id:      fmt.Sprintf("%s_%d", r.RemoteAddr, time.Now().UnixNano()),
 		graphView: &GraphViewState{ // Phase 2: Initialize graph visibility state
 			hiddenNodeTypes:   make(map[string]bool), // Empty = show all types initially
-			hideIsolatedNodes: false,                  // Show isolated nodes by default
+			hideIsolatedNodes: false,                 // Show isolated nodes by default
 		},
 	}
 

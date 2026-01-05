@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/teranos/QNTX/db"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/teranos/QNTX/db"
 )
 
 // CreateTestDB creates an in-memory SQLite test database with migrations.

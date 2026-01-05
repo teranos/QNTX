@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // axTestFixtures provides realistic query scenarios for testing

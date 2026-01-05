@@ -215,9 +215,9 @@ func TestUnifiedEntityResolution_Matrix(t *testing.T) {
 		assert.Equal(t, "ix-crime-database", crimeAltID.Attestor)
 
 		// Attestations should include data from both sources
-		assert.Len(t, allAttestations, 6)                                                      // 3 from public + 3 from crime
-		assert.Contains(t, allAttestations, "BRUC1 resides_in Wayne-Manor")                    // From public records
-		assert.Contains(t, allAttestations, "BATM2 operates_in Gotham-City")                   // From crime database
+		assert.Len(t, allAttestations, 6)                                                            // 3 from public + 3 from crime
+		assert.Contains(t, allAttestations, "BRUC1 resides_in Wayne-Manor")                          // From public records
+		assert.Contains(t, allAttestations, "BATM2 operates_in Gotham-City")                         // From crime database
 		assert.Contains(t, allAttestations, "BATM2 affiliated_with Justice-League since 2015-03-20") // Crime database relationship
 
 		t.Logf("✓ Unified Bruce Wayne/Batman Entity:")

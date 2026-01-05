@@ -26,18 +26,18 @@ func TestRemoteConfigWithViper(t *testing.T) {
 
 	t.Run("GetInt", func(t *testing.T) {
 		config := map[string]string{
-			"port":        "8080",
-			"timeout":     "30",
-			"float_val":   "42.5",
-			"invalid":     "not-a-number",
-			"negative":    "-100",
+			"port":      "8080",
+			"timeout":   "30",
+			"float_val": "42.5",
+			"invalid":   "not-a-number",
+			"negative":  "-100",
 		}
 
 		rc := newRemoteConfig("test", config)
 
 		assert.Equal(t, 8080, rc.GetInt("port"))
 		assert.Equal(t, 30, rc.GetInt("timeout"))
-		assert.Equal(t, 42, rc.GetInt("float_val"))  // Truncates float
+		assert.Equal(t, 42, rc.GetInt("float_val")) // Truncates float
 		assert.Equal(t, 0, rc.GetInt("invalid"))
 		assert.Equal(t, -100, rc.GetInt("negative"))
 		assert.Equal(t, 0, rc.GetInt("nonexistent"))
@@ -98,11 +98,11 @@ func TestRemoteConfigWithViper(t *testing.T) {
 
 	t.Run("GetStringSlice", func(t *testing.T) {
 		config := map[string]string{
-			"csv":           "one,two,three",
-			"csv_spaces":    "one, two, three",
-			"json_array":    `["alpha", "beta", "gamma"]`,
-			"single":        "single-value",
-			"empty":         "",
+			"csv":        "one,two,three",
+			"csv_spaces": "one, two, three",
+			"json_array": `["alpha", "beta", "gamma"]`,
+			"single":     "single-value",
+			"empty":      "",
 		}
 
 		rc := newRemoteConfig("test", config)
@@ -156,10 +156,10 @@ func TestRemoteConfigWithViper(t *testing.T) {
 
 	t.Run("GetKeys", func(t *testing.T) {
 		config := map[string]string{
-			"zebra":   "last",
-			"alpha":   "first",
-			"middle":  "center",
-			"beta":    "second",
+			"zebra":  "last",
+			"alpha":  "first",
+			"middle": "center",
+			"beta":   "second",
 		}
 
 		rc := newRemoteConfig("test", config)
@@ -200,11 +200,11 @@ func TestRemoteConfigWithViper(t *testing.T) {
 
 	t.Run("complex viper features", func(t *testing.T) {
 		config := map[string]string{
-			"database.host":     "localhost",
-			"database.port":     "5432",
-			"database.name":     "testdb",
-			"features.enabled":  "true",
-			"features.list":     "auth,api,web",
+			"database.host":    "localhost",
+			"database.port":    "5432",
+			"database.name":    "testdb",
+			"features.enabled": "true",
+			"features.list":    "auth,api,web",
 		}
 
 		rc := newRemoteConfig("test", config)

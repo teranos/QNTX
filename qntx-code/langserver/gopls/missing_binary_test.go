@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/qntx-code/langserver/gopls"
 )
 
 // TestGoplsMissingBinary verifies graceful handling when gopls binary is not installed
