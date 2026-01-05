@@ -318,5 +318,5 @@ var _DomainPluginService_serviceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "domain.proto",
+	Metadata: "plugin/grpc/protocol/domain.proto",
 }
