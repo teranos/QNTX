@@ -215,3 +215,25 @@ func sanitizeRepoName(name string) string {
 
 	return name
 }
+
+// IsRepoURL checks if the input looks like a remote git repository URL.
+// Uses go-getter's detection to identify remote sources.
+func IsRepoURL(input string) bool {
+	pwd, err := os.Getwd()
+	if err != nil {
+		pwd = "."
+	}
+
+	detected, err := getter.Detect(input, pwd, getter.Detectors)
+	if err != nil {
+		return false
+	}
+
+	parsedURL, err := url.Parse(detected)
+	if err != nil {
+		return false
+	}
+
+	// Remote if scheme is not file:// or empty (local path)
+	return parsedURL.Scheme != "" && parsedURL.Scheme != "file"
+}
