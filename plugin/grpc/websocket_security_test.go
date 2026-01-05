@@ -204,7 +204,7 @@ func TestOriginChecker_EdgeCases(t *testing.T) {
 		{"case sensitive", "HTTP://LOCALHOST:3000", false},
 		{"trailing slash", "http://localhost:3000/", false},
 		{"with path", "http://localhost:3000/app", false},
-		{"empty string", "", true}, // No origin header
+		{"empty string", "", false}, // Empty origin from default remote address rejected
 	}
 
 	for _, tt := range tests {
