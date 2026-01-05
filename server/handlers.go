@@ -19,11 +19,12 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
-	"github.com/teranos/QNTX/server/wslogs"
-	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
+	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/wslogs"
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -684,6 +685,8 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		s.logger.Infow("Plugin paused", "plugin", name)
+		// Broadcast plugin health update to all clients
+		s.BroadcastPluginHealth(name, false, string(plugin.StatePaused), "Plugin paused")
 
 	case "resume":
 		err = s.pluginRegistry.Resume(ctx, name)
@@ -693,6 +696,8 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		s.logger.Infow("Plugin resumed", "plugin", name)
+		// Broadcast plugin health update to all clients
+		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin resumed")
 
 	default:
 		http.Error(w, fmt.Sprintf("Unknown action: %s (expected 'pause' or 'resume')", action), http.StatusBadRequest)

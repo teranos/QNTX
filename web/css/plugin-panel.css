@@ -325,3 +325,27 @@
         gap: 8px;
     }
 }
+
+/* Plugin health indicator (red dot on plugins button) */
+.plugin-health-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background: #d32f2f;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(211, 47, 47, 0.5);
+    animation: plugin-indicator-pulse 2s ease-in-out infinite;
+}
+
+@keyframes plugin-indicator-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
