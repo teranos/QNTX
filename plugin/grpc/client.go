@@ -264,10 +264,12 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	keepaliveHandler := NewKeepaliveHandler(DefaultKeepaliveConfig(), c.logger)
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
+	// TODO: Load WebSocket config from plugin manifest
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
+		wsConfig:  DefaultWebSocketConfig(),
 	}
 
 	return handlers, nil
@@ -279,10 +281,12 @@ func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig
 
 	keepaliveHandler := NewKeepaliveHandler(config, c.logger)
 
+	// TODO: Load WebSocket config from plugin manifest
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
+		wsConfig:  DefaultWebSocketConfig(),
 	}
 
 	return handlers, nil
@@ -293,18 +297,22 @@ type wsProxyHandler struct {
 	client    *ExternalDomainProxy
 	logger    *zap.SugaredLogger
 	keepalive *KeepaliveHandler
-}
-
-var wsUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // TODO: Implement proper origin validation
-	},
+	wsConfig  WebSocketConfig
 }
 
 // ServeWS handles WebSocket upgrade and proxies to remote plugin.
 func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
+	// Add security headers before upgrade
+	AddSecurityHeaders(w)
+
+	// Create upgrader with origin validation
+	upgrader := websocket.Upgrader{
+		CheckOrigin:  CreateOriginChecker(h.wsConfig, h.logger),
+		Subprotocols: []string{"qntx-plugin-v1"},
+	}
+
 	// Upgrade HTTP connection to WebSocket
-	wsConn, err := wsUpgrader.Upgrade(w, r, nil)
+	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.logger.Errorw("WebSocket upgrade failed", "error", err)
 		return
