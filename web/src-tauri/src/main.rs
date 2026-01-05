@@ -268,6 +268,8 @@ fn main() {
             // Desktop only: Create application menu bar
             #[cfg(not(target_os = "ios"))]
             {
+                // macOS: Full app menu with Hide/Hide Others/Show All
+                #[cfg(target_os = "macos")]
                 let app_menu = Submenu::with_items(
                     app,
                     "QNTX",
@@ -286,6 +288,27 @@ fn main() {
                         &PredefinedMenuItem::hide(app, None)?,
                         &PredefinedMenuItem::hide_others(app, None)?,
                         &PredefinedMenuItem::show_all(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::quit(app, None)?,
+                    ],
+                )?;
+
+                // Windows/Linux: Simplified app menu (no Hide/Hide Others/Show All)
+                #[cfg(not(target_os = "macos"))]
+                let app_menu = Submenu::with_items(
+                    app,
+                    "QNTX",
+                    true,
+                    &[
+                        &MenuItem::with_id(app, "about", "About QNTX", false, None::<&str>)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &MenuItem::with_id(
+                            app,
+                            "preferences",
+                            "Preferences...",
+                            true,
+                            Some("CmdOrCtrl+,"),
+                        )?,
                         &PredefinedMenuItem::separator(app)?,
                         &PredefinedMenuItem::quit(app, None)?,
                     ],
