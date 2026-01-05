@@ -26,5 +26,17 @@ type Matcher interface {
 	Backend() MatcherBackend
 }
 
+// NewDefaultMatcher creates the best available matcher implementation.
+// Prefers Rust CGO matcher if available (built with -tags rustfuzzy),
+// otherwise falls back to Go implementation.
+func NewDefaultMatcher() Matcher {
+	// Try CGO matcher first (only available with -tags rustfuzzy)
+	if matcher, err := NewCGOMatcher(); err == nil {
+		return matcher
+	}
+	// Fall back to Go implementation
+	return NewFuzzyMatcher()
+}
+
 // Ensure FuzzyMatcher implements Matcher
 var _ Matcher = (*FuzzyMatcher)(nil)
