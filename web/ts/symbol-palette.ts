@@ -28,6 +28,7 @@ import {
     Pulse, Prose,
     CommandToSymbol,
 } from '@generated/sym.js';
+import { uiState } from './ui-state.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go';
@@ -41,9 +42,6 @@ function getSymbol(cmd: string): string {
     if (cmd === 'go') return 'Go';
     return CommandToSymbol[cmd] || cmd;
 }
-
-// Track current modality
-let currentModality: string = 'ax'; // Default to 'ax' modality
 
 // Extend window interface for global functions
 interface CommandExplorerPanel {
@@ -59,7 +57,8 @@ declare global {
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeSymbolPalette();
-    setActiveModality(currentModality);
+    // Restore modality from persisted UI state
+    setActiveModality(uiState.getActiveModality());
 });
 
 function initializeSymbolPalette(): void {
@@ -72,10 +71,11 @@ function initializeSymbolPalette(): void {
 }
 
 /**
- * Set active modality - highlights the current symbol
+ * Set active modality - highlights the current symbol and persists to UIState
  */
 function setActiveModality(cmd: string): void {
-    currentModality = cmd;
+    // Persist to centralized UI state
+    uiState.setActiveModality(cmd);
 
     // Remove active class from all cells
     document.querySelectorAll('.palette-cell').forEach(cell => {

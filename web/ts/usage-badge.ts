@@ -24,6 +24,7 @@
 // - Consider: Week-over-week, month-over-month, year-over-year
 
 import * as d3 from 'd3';
+import { uiState } from './ui-state.js';
 
 // Type definitions for usage data
 interface UsageStats {
@@ -38,14 +39,14 @@ interface TimeSeriesDataPoint {
     requests: number;
 }
 
-// State
+// State (component-local state that doesn't need centralized management)
 let currentStats: UsageStats | null = null;
 let detailBoxVisible: boolean = false;
 let fadeTimeout: ReturnType<typeof setTimeout> | null = null;
 let isMouseOverBadge: boolean = false;
 let isMouseOverDetailBox: boolean = false;
-let currentView: 'week' | 'month' = 'week';
 let timeSeriesData: TimeSeriesDataPoint[] | null = null;
+// Note: currentView moved to uiState.usageView for persistence
 
 // Create badge element
 export function createUsageBadge(): HTMLDivElement {
@@ -98,7 +99,7 @@ export function updateUsageBadge(stats: UsageStats): void {
 // Fetch time-series data for charting
 async function fetchTimeSeriesData(): Promise<void> {
     try {
-        const days = currentView === 'week' ? 7 : 30;
+        const days = uiState.getUsageView() === 'week' ? 7 : 30;
         const { apiFetch } = await import('./api.ts');
         const response = await apiFetch(`/api/timeseries/usage?days=${days}`);
         if (response.ok) {
@@ -118,8 +119,8 @@ async function showDetailBox(): Promise<void> {
         detailBox = createDetailBox();
     }
 
-    // Reset to week view
-    currentView = 'week';
+    // Reset to week view (persisted in UIState)
+    uiState.setUsageView('week');
     detailBox.classList.remove('expanded');
 
     // Show immediately (before data fetch)
@@ -193,7 +194,7 @@ function createDetailBox(): HTMLDivElement {
 
     // Click to expand to month view
     detailBox.addEventListener('click', () => {
-        if (currentView === 'week') {
+        if (uiState.getUsageView() === 'week') {
             expandToMonthView();
         }
     });
@@ -219,7 +220,7 @@ async function expandToMonthView(): Promise<void> {
     const detailBox = document.getElementById('usage-detail-box');
     if (!detailBox) return;
 
-    currentView = 'month';
+    uiState.setUsageView('month');
     detailBox.classList.add('expanded');
 
     // Fetch month data and re-render (async, doesn't block expansion)
@@ -320,7 +321,7 @@ function renderChart(): void {
     g.append('g')
         .attr('class', 'usage-chart-axis')
         .attr('transform', `translate(0,${chartHeight})`)
-        .call(d3.axisBottom(x).ticks(currentView === 'week' ? 7 : 10).tickFormat(d3.timeFormat('%m/%d') as any));
+        .call(d3.axisBottom(x).ticks(uiState.getUsageView() === 'week' ? 7 : 10).tickFormat(d3.timeFormat('%m/%d') as any));
 
     // Y axis (cost)
     g.append('g')
