@@ -87,10 +87,15 @@ message WebSocketMessage {
     CONNECT = 0;
     DATA = 1;
     CLOSE = 2;
+    PING = 3;   // Client/Server can send for keepalive
+    PONG = 4;   // Response to PING
+    ERROR = 5;  // Error notification
   }
 
   Type type = 1;
   bytes data = 2;
+  map<string, string> headers = 3;  // Optional headers/metadata
+  int64 timestamp = 4;              // For latency measurement (Unix timestamp in nanoseconds)
 }
 
 message HealthResponse {
