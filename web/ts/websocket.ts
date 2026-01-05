@@ -250,13 +250,15 @@ function updateConnectionStatus(connected: boolean): void {
     if (connected) {
         // Remove desaturation/dimming from entire UI
         document.body.classList.remove('disconnected');
-        // Collapse log panel when connected
-        logPanel?.classList.add('collapsed');
+        // Collapse system drawer when connected
+        const systemDrawer = document.getElementById('system-drawer');
+        systemDrawer?.classList.add('collapsed');
     } else {
         // Apply desaturation/dimming to entire UI
         document.body.classList.add('disconnected');
-        // Expand log panel when disconnected (useful for debugging)
-        logPanel?.classList.remove('collapsed');
+        // Expand system drawer when disconnected (useful for debugging)
+        const systemDrawer = document.getElementById('system-drawer');
+        systemDrawer?.classList.remove('collapsed');
     }
 }
 

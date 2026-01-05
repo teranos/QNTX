@@ -62,7 +62,10 @@ export type MessageType =
   | 'storage_warning'
   | 'storage_eviction'
   | 'plugin_health'
-  | 'system_capabilities';
+  | 'system_capabilities'
+  | 'webscraper_request'
+  | 'webscraper_response'
+  | 'webscraper_progress';
 
 // ============================================================================
 // Base Message Interface
@@ -401,6 +404,44 @@ export interface SystemCapabilitiesMessage extends BaseMessage {
   fuzzy_optimized: boolean;
 }
 
+/**
+ * Webscraper request (sent from frontend)
+ */
+export interface WebscraperRequestMessage extends BaseMessage {
+  type: 'webscraper_request';
+  data: {
+    url: string;
+    javascript: boolean;
+    wait_ms: number;
+    extract_links: boolean;
+    extract_images: boolean;
+  };
+}
+
+/**
+ * Webscraper response (received from backend)
+ */
+export interface WebscraperResponseMessage extends BaseMessage {
+  type: 'webscraper_response';
+  url: string;
+  title?: string;
+  description?: string;
+  meta_description?: string;
+  content?: string;
+  links?: string[];
+  images?: string[];
+  error?: string;
+}
+
+/**
+ * Webscraper progress update
+ */
+export interface WebscraperProgressMessage extends BaseMessage {
+  type: 'webscraper_progress';
+  message?: string;
+  progress?: number;
+}
+
 // ============================================================================
 // Type Definitions for Parse Components
 // ============================================================================
@@ -488,7 +529,10 @@ export type WebSocketMessage =
   | StorageWarningMessage
   | StorageEvictionMessage
   | PluginHealthMessage
-  | SystemCapabilitiesMessage;
+  | SystemCapabilitiesMessage
+  | WebscraperRequestMessage
+  | WebscraperResponseMessage
+  | WebscraperProgressMessage;
 
 // ============================================================================
 // Message Handler Types
@@ -530,6 +574,9 @@ export interface MessageHandlers {
   storage_eviction?: MessageHandler<StorageEvictionMessage>;
   plugin_health?: MessageHandler<PluginHealthMessage>;
   system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
+  webscraper_request?: MessageHandler<WebscraperRequestMessage>;
+  webscraper_response?: MessageHandler<WebscraperResponseMessage>;
+  webscraper_progress?: MessageHandler<WebscraperProgressMessage>;
   _default?: MessageHandler<BaseMessage>;
 }
 
