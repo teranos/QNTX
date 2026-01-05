@@ -207,3 +207,11 @@ type PluginHealthMessage struct {
 	Message   string `json:"message"`    // Status message
 	Timestamp int64  `json:"timestamp"`  // Unix timestamp
 }
+
+// SystemCapabilitiesMessage represents system capability information
+// Sent once on WebSocket connection to inform client of available optimizations
+type SystemCapabilitiesMessage struct {
+	Type          string `json:"type"`           // "system_capabilities"
+	FuzzyBackend  string `json:"fuzzy_backend"`  // "rust" or "go" - which fuzzy matching implementation is active
+	FuzzyOptimized bool  `json:"fuzzy_optimized"` // true if using Rust (optimized), false if Go fallback
+}

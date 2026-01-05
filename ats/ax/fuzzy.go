@@ -2,8 +2,10 @@ package ax
 
 import (
 	"strings"
+	"time"
 
 	id "github.com/teranos/vanity-id"
+	"go.uber.org/zap"
 )
 
 // NOTE: This fuzzy matching system is an incremental improvement over the previous
@@ -18,7 +20,7 @@ import (
 // FuzzyMatcher provides fuzzy matching for predicates and contexts
 // This is an incremental improvement - see package note about future plans
 type FuzzyMatcher struct {
-	// Simplified version without caching initially
+	logger *zap.SugaredLogger
 }
 
 // NewFuzzyMatcher creates a new fuzzy matcher
@@ -31,12 +33,25 @@ func NewPredicateMatcher() *FuzzyMatcher {
 	return NewFuzzyMatcher()
 }
 
+// Backend returns the matcher backend type (Go implementation)
+func (fm *FuzzyMatcher) Backend() MatcherBackend {
+	return MatcherBackendGo
+}
+
+// SetLogger sets the logger for debug output
+func (fm *FuzzyMatcher) SetLogger(logger interface{}) {
+	if l, ok := logger.(*zap.SugaredLogger); ok {
+		fm.logger = l
+	}
+}
+
 // FindMatches finds predicates that match the query using fuzzy logic
 func (fm *FuzzyMatcher) FindMatches(queryPredicate string, allPredicates []string) []string {
 	if strings.TrimSpace(queryPredicate) == "" {
 		return []string{}
 	}
 
+	start := time.Now()
 	matches := []string{}
 	queryLower := strings.ToLower(strings.TrimSpace(queryPredicate))
 
@@ -44,6 +59,16 @@ func (fm *FuzzyMatcher) FindMatches(queryPredicate string, allPredicates []strin
 		if fm.isMatch(queryLower, predicate) {
 			matches = append(matches, predicate)
 		}
+	}
+
+	if fm.logger != nil && len(matches) > 0 {
+		fm.logger.Debugw("go fuzzy match",
+			"query", queryPredicate,
+			"matches", len(matches),
+			"time_us", time.Since(start).Microseconds(),
+			"top_match", matches[0],
+			"strategy", "substring",
+		)
 	}
 
 	return matches
@@ -55,6 +80,7 @@ func (fm *FuzzyMatcher) FindContextMatches(queryContext string, allContexts []st
 		return []string{}
 	}
 
+	start := time.Now()
 	matches := []string{}
 	queryLower := strings.ToLower(strings.TrimSpace(queryContext))
 
@@ -62,6 +88,16 @@ func (fm *FuzzyMatcher) FindContextMatches(queryContext string, allContexts []st
 		if fm.isContextMatch(queryLower, context) {
 			matches = append(matches, context)
 		}
+	}
+
+	if fm.logger != nil && len(matches) > 0 {
+		fm.logger.Debugw("go fuzzy context match",
+			"query", queryContext,
+			"matches", len(matches),
+			"time_us", time.Since(start).Microseconds(),
+			"top_match", matches[0],
+			"strategy", "substring",
+		)
 	}
 
 	return matches
