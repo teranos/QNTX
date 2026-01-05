@@ -13,8 +13,8 @@ import (
 
 // FieldTagInfo extends util.FieldTagInfo with TypeScript-specific fields
 type FieldTagInfo struct {
-	util.FieldTagInfo        // Embed shared tag info
-	Readonly          bool   // Mark field as readonly (TypeScript-specific)
+	util.FieldTagInfo      // Embed shared tag info
+	Readonly          bool // Mark field as readonly (TypeScript-specific)
 }
 
 // ParseFieldTags extracts json and tstype tags from a struct field tag.

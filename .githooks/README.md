@@ -12,31 +12,27 @@ Automatically pulls the latest changes when checking out to the `main` branch.
 - When you run `git checkout main`, it automatically runs `git pull` afterward
 - Ensures your local main branch stays in sync with remote
 
-### pre-commit
+### update-nix-hash.sh (utility script)
 
-Automatically updates Nix vendorHash when Go dependencies change.
+Updates Nix vendorHash when Go dependencies change.
 
-**What it does:**
-- Detects when `go.mod` or `go.sum` are being committed
-- Runs `update-nix-hash.sh` to calculate correct vendorHash
-- Updates `flake.nix` and stages it automatically
-- Prevents CI failures from outdated vendorHash
+**Usage:**
+- Called automatically by Nix pre-commit hooks (via `nix develop`)
+- Can also be run manually: `./.githooks/update-nix-hash.sh`
+- Detects correct vendorHash by building with empty hash
+- Updates `flake.nix` automatically
 
 ## Installation
 
-To install the hooks, run from the repository root:
-
+**Nix-based pre-commit hooks** (recommended):
 ```bash
-# Install post-checkout hook
-cp .githooks/post-checkout .git/hooks/post-checkout
-chmod +x .git/hooks/post-checkout
+nix develop  # Automatically installs all pre-commit hooks
 ```
 
-Or install all hooks at once:
+Includes: nixpkgs-fmt, gofmt, govet, and vendorHash auto-update.
 
+**Manual installation** (for non-Nix hooks like post-checkout):
 ```bash
 # Set git hooks directory (Git 2.9+)
 git config core.hooksPath .githooks
 ```
-
-The second method is recommended as it automatically uses all hooks in `.githooks/` without manual copying.

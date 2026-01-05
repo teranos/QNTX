@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/vanity-id"
 )
 

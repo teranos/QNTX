@@ -13,13 +13,15 @@ import (
 type Registry struct {
 	mu      sync.RWMutex
 	plugins map[string]DomainPlugin
-	version string // QNTX version
+	states  map[string]PluginState // Track state of each plugin
+	version string                 // QNTX version
 }
 
 // NewRegistry creates a new plugin registry
 func NewRegistry(qntxVersion string) *Registry {
 	return &Registry{
 		plugins: make(map[string]DomainPlugin),
+		states:  make(map[string]PluginState),
 		version: qntxVersion,
 	}
 }
@@ -43,6 +45,7 @@ func (r *Registry) Register(plugin DomainPlugin) error {
 	}
 
 	r.plugins[metadata.Name] = plugin
+	r.states[metadata.Name] = StateStopped // Initially stopped until Initialize is called
 	return nil
 }
 
@@ -107,6 +110,10 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 		if err := plugins[name].Initialize(ctx, services); err != nil {
 			return fmt.Errorf("failed to initialize domain plugin %s: %w", name, err)
 		}
+		// Set state to running after successful initialization
+		r.mu.Lock()
+		r.states[name] = StateRunning
+		r.mu.Unlock()
 	}
 
 	return nil
@@ -147,6 +154,109 @@ func (r *Registry) HealthCheckAll(ctx context.Context) map[string]HealthStatus {
 		results[name] = plugin.Health(ctx)
 	}
 	return results
+}
+
+// GetState returns the current state of a plugin
+func (r *Registry) GetState(name string) (PluginState, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	state, ok := r.states[name]
+	return state, ok
+}
+
+// GetAllStates returns the states of all plugins
+func (r *Registry) GetAllStates() map[string]PluginState {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make(map[string]PluginState, len(r.states))
+	for name, state := range r.states {
+		result[name] = state
+	}
+	return result
+}
+
+// IsPausable checks if a plugin implements the PausablePlugin interface
+func (r *Registry) IsPausable(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	plugin, ok := r.plugins[name]
+	if !ok {
+		return false
+	}
+	_, isPausable := plugin.(PausablePlugin)
+	return isPausable
+}
+
+// Pause pauses a plugin if it implements PausablePlugin
+func (r *Registry) Pause(ctx context.Context, name string) error {
+	r.mu.Lock()
+	plugin, ok := r.plugins[name]
+	if !ok {
+		r.mu.Unlock()
+		return fmt.Errorf("plugin not found: %s", name)
+	}
+
+	state := r.states[name]
+	if state != StateRunning {
+		r.mu.Unlock()
+		return fmt.Errorf("plugin %s is not running (current state: %s)", name, state)
+	}
+
+	pausable, ok := plugin.(PausablePlugin)
+	if !ok {
+		r.mu.Unlock()
+		return fmt.Errorf("plugin %s does not support pause/resume", name)
+	}
+	r.mu.Unlock()
+
+	// Call pause without holding lock
+	if err := pausable.Pause(ctx); err != nil {
+		return fmt.Errorf("failed to pause plugin %s: %w", name, err)
+	}
+
+	// Update state
+	r.mu.Lock()
+	r.states[name] = StatePaused
+	r.mu.Unlock()
+
+	return nil
+}
+
+// Resume resumes a paused plugin
+func (r *Registry) Resume(ctx context.Context, name string) error {
+	r.mu.Lock()
+	plugin, ok := r.plugins[name]
+	if !ok {
+		r.mu.Unlock()
+		return fmt.Errorf("plugin not found: %s", name)
+	}
+
+	state := r.states[name]
+	if state != StatePaused {
+		r.mu.Unlock()
+		return fmt.Errorf("plugin %s is not paused (current state: %s)", name, state)
+	}
+
+	pausable, ok := plugin.(PausablePlugin)
+	if !ok {
+		r.mu.Unlock()
+		return fmt.Errorf("plugin %s does not support pause/resume", name)
+	}
+	r.mu.Unlock()
+
+	// Call resume without holding lock
+	if err := pausable.Resume(ctx); err != nil {
+		return fmt.Errorf("failed to resume plugin %s: %w", name, err)
+	}
+
+	// Update state
+	r.mu.Lock()
+	r.states[name] = StateRunning
+	r.mu.Unlock()
+
+	return nil
 }
 
 // validateVersion checks if plugin version is compatible with QNTX version
