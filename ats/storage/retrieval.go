@@ -30,13 +30,7 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	// Build WHERE clause based on filters
 	whereClauses := []string{}
 
-	// Actor filter (deprecated single actor - backwards compatible)
-	if filters.Actor != "" {
-		whereClauses = append(whereClauses, "json_extract(actors, '$') LIKE ?")
-		args = append(args, "%\""+escapeLikePattern(filters.Actor)+"\"%")
-	}
-
-	// Actors filter (multiple actors with OR logic)
+	// Actors filter (OR logic)
 	if len(filters.Actors) > 0 {
 		var actorClauses []string
 		for _, actor := range filters.Actors {
