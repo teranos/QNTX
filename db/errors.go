@@ -1,8 +1,9 @@
 package db
 
 import (
-	"errors"
 	"strings"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // ErrDatabaseClosed is returned when operations are attempted on a closed database.

@@ -76,7 +76,11 @@ var (
 	WithContextTags    = crdb.WithContextTags
 	EncodeError        = crdb.EncodeError
 	DecodeError        = crdb.DecodeError
+	GetReportableStackTrace = crdb.GetReportableStackTrace
 )
+
+// GetStack is an alias for GetReportableStackTrace for convenience.
+var GetStack = crdb.GetReportableStackTrace
 
 // Assertions and panics
 var (
