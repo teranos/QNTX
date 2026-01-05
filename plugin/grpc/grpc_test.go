@@ -107,6 +107,7 @@ func (c *mockConfig) GetBool(key string) bool            { return false }
 func (c *mockConfig) GetStringSlice(key string) []string { return nil }
 func (c *mockConfig) Get(key string) interface{}         { return nil }
 func (c *mockConfig) Set(key string, value interface{})  {}
+func (c *mockConfig) GetKeys() []string                   { return []string{} }
 
 // startTestServer starts a gRPC server for testing and returns its address
 func startTestServer(t *testing.T, plugin pluginpkg.DomainPlugin) (string, func()) {
@@ -248,9 +249,11 @@ func TestPluginServer_HandleHTTP(t *testing.T) {
 
 	// Test HTTP request
 	req := &protocol.HTTPRequest{
-		Method:  "GET",
-		Path:    "/api/mock/test",
-		Headers: map[string]string{"Content-Type": "application/json"},
+		Method: "GET",
+		Path:   "/api/mock/test",
+		Headers: []*protocol.HTTPHeader{
+			{Name: "Content-Type", Values: []string{"application/json"}},
+		},
 	}
 
 	resp, err := server.HandleHTTP(context.Background(), req)
@@ -274,10 +277,12 @@ func TestPluginServer_HandleHTTP_POST(t *testing.T) {
 	server.Initialize(context.Background(), &protocol.InitializeRequest{})
 
 	req := &protocol.HTTPRequest{
-		Method:  "POST",
-		Path:    "/api/mock/echo",
-		Headers: map[string]string{"Content-Type": "application/json"},
-		Body:    []byte(`{"message":"hello"}`),
+		Method: "POST",
+		Path:   "/api/mock/echo",
+		Headers: []*protocol.HTTPHeader{
+			{Name: "Content-Type", Values: []string{"application/json"}},
+		},
+		Body: []byte(`{"message":"hello"}`),
 	}
 
 	resp, err := server.HandleHTTP(context.Background(), req)
@@ -515,22 +520,22 @@ func TestRemoteConfig_GetBool(t *testing.T) {
 	}{
 		{"true", true},
 		{"1", true},
+		{"yes", true}, // Now permissive - accepts yes as true
 		{"false", false},
 		{"0", false},
 		{"", false},
-		{"yes", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.value, func(t *testing.T) {
-			cfg := &remoteConfig{config: map[string]string{"key": tt.value}}
+			cfg := newRemoteConfig("test", map[string]string{"key": tt.value})
 			assert.Equal(t, tt.expected, cfg.GetBool("key"))
 		})
 	}
 }
 
 func TestRemoteConfig_Set(t *testing.T) {
-	cfg := &remoteConfig{config: make(map[string]string)}
+	cfg := newRemoteConfig("test", make(map[string]string))
 	cfg.Set("key", "value")
 	assert.Equal(t, "value", cfg.GetString("key"))
 }
