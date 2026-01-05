@@ -271,10 +271,29 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	// Return a proxy WebSocket handler
 	handlers := make(map[string]plugin.WebSocketHandler)
 
+	// Create keepalive handler with default config
+	keepaliveHandler := NewKeepaliveHandler(DefaultKeepaliveConfig(), c.logger)
+
 	// Create a proxy handler for the plugin's WebSocket endpoints
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
-		client: c,
-		logger: c.logger,
+		client:    c,
+		logger:    c.logger,
+		keepalive: keepaliveHandler,
+	}
+
+	return handlers, nil
+}
+
+// RegisterWebSocketWithConfig returns WebSocket handlers with custom keepalive config.
+func (c *ExternalDomainProxy) RegisterWebSocketWithConfig(config KeepaliveConfig) (map[string]plugin.WebSocketHandler, error) {
+	handlers := make(map[string]plugin.WebSocketHandler)
+
+	keepaliveHandler := NewKeepaliveHandler(config, c.logger)
+
+	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
+		client:    c,
+		logger:    c.logger,
+		keepalive: keepaliveHandler,
 	}
 
 	return handlers, nil
@@ -282,8 +301,9 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 
 // wsProxyHandler proxies WebSocket connections to the remote plugin.
 type wsProxyHandler struct {
-	client *ExternalDomainProxy
-	logger *zap.SugaredLogger
+	client    *ExternalDomainProxy
+	logger    *zap.SugaredLogger
+	keepalive *KeepaliveHandler
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -316,12 +336,22 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	// Send CONNECT message to plugin
 	if err := stream.Send(&protocol.WebSocketMessage{
-		Type: protocol.WebSocketMessage_CONNECT,
-		Data: []byte{},
+		Type:      protocol.WebSocketMessage_CONNECT,
+		Timestamp: time.Now().UnixNano(),
 	}); err != nil {
 		h.logger.Errorw("Failed to send CONNECT message", "error", err)
 		return
 	}
+
+	// Start keepalive handler
+	sendPing := func(timestamp int64) error {
+		return stream.Send(&protocol.WebSocketMessage{
+			Type:      protocol.WebSocketMessage_PING,
+			Timestamp: timestamp,
+		})
+	}
+	h.keepalive.Start(ctx, sendPing)
+	defer h.keepalive.Stop()
 
 	// Bridge WebSocket and gRPC stream bidirectionally
 	errChan := make(chan error, 2)
@@ -330,8 +360,8 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer func() {
 			stream.Send(&protocol.WebSocketMessage{
-				Type: protocol.WebSocketMessage_CLOSE,
-				Data: []byte{},
+				Type:      protocol.WebSocketMessage_CLOSE,
+				Timestamp: time.Now().UnixNano(),
 			})
 		}()
 
@@ -349,8 +379,9 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 			// Convert WebSocket message to protocol message
 			protoMsg := &protocol.WebSocketMessage{
-				Type: protocol.WebSocketMessage_DATA,
-				Data: data,
+				Type:      protocol.WebSocketMessage_DATA,
+				Data:      data,
+				Timestamp: time.Now().UnixNano(),
 			}
 
 			// Send to gRPC stream
@@ -375,6 +406,25 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 			}
 
 			h.logger.Debugw("gRPC -> WebSocket", "type", msg.Type, "size", len(msg.Data))
+
+			// Handle keepalive messages
+			if msg.Type == protocol.WebSocketMessage_PING ||
+				msg.Type == protocol.WebSocketMessage_PONG ||
+				msg.Type == protocol.WebSocketMessage_ERROR {
+				response, err := h.keepalive.HandleMessage(msg)
+				if err != nil {
+					h.logger.Errorw("Keepalive error", "error", err)
+					errChan <- err
+					return
+				}
+				// Send PONG response if needed
+				if response != nil {
+					if err := stream.Send(response); err != nil {
+						h.logger.Errorw("Failed to send PONG", "error", err)
+					}
+				}
+				continue
+			}
 
 			// Handle CLOSE message from plugin
 			if msg.Type == protocol.WebSocketMessage_CLOSE {
@@ -401,7 +451,14 @@ func (h *wsProxyHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		h.logger.Errorw("WebSocket proxy error", "error", err)
 	}
 
-	h.logger.Info("WebSocket connection closed")
+	// Log connection metrics
+	metrics := h.keepalive.Metrics()
+	h.logger.Infow("WebSocket connection closed",
+		"uptime", metrics.GetConnectionUptime(),
+		"pings_sent", metrics.GetTotalPings(),
+		"pongs_received", metrics.GetTotalPongs(),
+		"avg_latency", metrics.GetAverageLatency(),
+	)
 }
 
 // Health returns the remote plugin's health status.
