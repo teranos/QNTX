@@ -97,6 +97,10 @@ test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
 	@echo "Running TypeScript tests..."
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
 	@cd web && bun test
 	@echo "✓ All tests complete"
 
@@ -108,6 +112,10 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
 	@echo "Running TypeScript tests..."
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
 	@cd web && bun test
 	@echo "✓ All tests complete"
 
