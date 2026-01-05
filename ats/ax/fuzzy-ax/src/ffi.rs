@@ -471,7 +471,7 @@ mod tests {
         let engine = fuzzy_engine_new();
 
         // Build index
-        let predicates = vec![
+        let predicates = [
             CString::new("is_author_of").unwrap(),
             CString::new("works_at").unwrap(),
         ];
