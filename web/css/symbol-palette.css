@@ -194,8 +194,42 @@
     }
 }
 
-/* Tablets and small laptops (768px - 1024px) */
-@media (min-width: 768px) {
+/* Tablets in portrait mode (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .symbol-palette {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: auto;
+        grid-template-columns: 1fr; /* Single column */
+        grid-template-rows: repeat(10, 1fr); /* 10 rows */
+        padding: 8px 4px;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+        margin-bottom: 0;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .palette-cell {
+        padding: 12px 8px;
+        font-size: 16px;
+        min-width: 50px;
+    }
+
+    .palette-cell::after {
+        /* Position tooltip to the right for vertical layout */
+        bottom: auto;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        margin-left: 8px;
+    }
+}
+
+/* Tablets in landscape and small laptops (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
     .palette-cell {
         padding: 9px 5px;
         font-size: 15px;
