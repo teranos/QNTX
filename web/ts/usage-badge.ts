@@ -25,6 +25,7 @@
 
 import * as d3 from 'd3';
 import { uiState } from './ui-state.ts';
+import { DATA, setVisibility, setExpansion, setLoading } from './css-classes.ts';
 
 // Type definitions for usage data
 interface UsageStats {
@@ -97,17 +98,26 @@ export function updateUsageBadge(stats: UsageStats): void {
 }
 
 // Fetch time-series data for charting
-async function fetchTimeSeriesData(): Promise<void> {
+async function fetchTimeSeriesData(): Promise<boolean> {
+    const container = document.getElementById('usage-chart-container');
+    setLoading(container, DATA.LOADING.LOADING);
+
     try {
         const days = uiState.getUsageView() === 'week' ? 7 : 30;
         const { apiFetch } = await import('./api.ts');
         const response = await apiFetch(`/api/timeseries/usage?days=${days}`);
         if (response.ok) {
             timeSeriesData = await response.json() as TimeSeriesDataPoint[];
+            setLoading(container, DATA.LOADING.SUCCESS);
+            return true;
         }
+        setLoading(container, DATA.LOADING.ERROR);
+        return false;
     } catch (err) {
         console.warn('Failed to fetch time-series data:', err);
         timeSeriesData = [];
+        setLoading(container, DATA.LOADING.ERROR);
+        return false;
     }
 }
 
@@ -121,11 +131,10 @@ async function showDetailBox(): Promise<void> {
 
     // Reset to week view (persisted in UIState)
     uiState.setUsageView('week');
-    detailBox.classList.remove('expanded');
+    setExpansion(detailBox, DATA.EXPANSION.COLLAPSED);
 
     // Show immediately (before data fetch)
-    detailBox.classList.remove('fading');
-    detailBox.classList.add('visible');
+    setVisibility(detailBox, DATA.VISIBILITY.VISIBLE);
     detailBoxVisible = true;
 
     // Cancel any pending fade
@@ -142,11 +151,11 @@ function hideDetailBox(): void {
     const detailBox = document.getElementById('usage-detail-box');
     if (!detailBox) return;
 
-    detailBox.classList.add('fading');
+    setVisibility(detailBox, DATA.VISIBILITY.FADING);
 
     // Wait for fade animation to complete before hiding
     setTimeout(() => {
-        detailBox.classList.remove('visible');
+        setVisibility(detailBox, DATA.VISIBILITY.HIDDEN);
         detailBoxVisible = false;
 
         // Restore badge to 24h cost
@@ -221,7 +230,7 @@ async function expandToMonthView(): Promise<void> {
     if (!detailBox) return;
 
     uiState.setUsageView('month');
-    detailBox.classList.add('expanded');
+    setExpansion(detailBox, DATA.EXPANSION.EXPANDED);
 
     // Fetch month data and re-render (async, doesn't block expansion)
     fetchTimeSeriesData().then(() => {

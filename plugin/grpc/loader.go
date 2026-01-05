@@ -52,6 +52,23 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
 			return nil, fmt.Errorf("failed to load plugins: %w", err)
 		}
+
+		// Configure WebSocket settings from am.Config
+		keepaliveCfg := NewKeepaliveConfigFromSettings(
+			cfg.Plugin.WebSocket.Keepalive.Enabled,
+			cfg.Plugin.WebSocket.Keepalive.PingIntervalSecs,
+			cfg.Plugin.WebSocket.Keepalive.PongTimeoutSecs,
+			cfg.Plugin.WebSocket.Keepalive.ReconnectAttempts,
+		)
+
+		// Build WebSocket origin config from server allowed origins
+		wsConfig := WebSocketConfig{
+			AllowedOrigins:   cfg.GetServerAllowedOrigins(),
+			AllowAllOrigins:  false,
+			AllowCredentials: false,
+		}
+
+		manager.ConfigureWebSocket(keepaliveCfg, wsConfig)
 	}
 
 	// Log summary of discovery results

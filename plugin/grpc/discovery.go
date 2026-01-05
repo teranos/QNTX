@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 )
@@ -267,6 +268,22 @@ func (m *PluginManager) GetAllPlugins() []plugin.DomainPlugin {
 	return plugins
 }
 
+// ConfigureWebSocket sets WebSocket configuration on all loaded plugins.
+// This should be called after LoadPlugins to configure keepalive and origin validation.
+func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig WebSocketConfig) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, p := range m.plugins {
+		p.client.SetWebSocketConfig(keepalive, wsConfig)
+	}
+	m.logger.Infow("WebSocket configuration applied to plugins",
+		"keepalive_enabled", keepalive.Enabled,
+		"ping_interval", keepalive.PingInterval,
+		"allowed_origins_count", len(wsConfig.AllowedOrigins),
+	)
+}
+
 // Shutdown stops all managed plugins.
 func (m *PluginManager) Shutdown(ctx context.Context) error {
 	m.mu.Lock()
@@ -336,8 +353,26 @@ func DiscoverPlugins(configDir string) ([]PluginConfig, error) {
 	pluginsFile := filepath.Join(configDir, "am.plugins.toml")
 	if _, err := os.Stat(pluginsFile); err == nil {
 		// Parse plugins configuration file
-		// TODO: Implement TOML parsing for plugin configs
-		// For now, return empty list
+		data, err := os.ReadFile(pluginsFile)
+		if err == nil {
+			// The file should contain a map of plugin configs
+			var pluginsConfig struct {
+				Plugins map[string]PluginConfig `toml:"plugins"`
+			}
+			if err := toml.Unmarshal(data, &pluginsConfig); err == nil {
+				for name, config := range pluginsConfig.Plugins {
+					// Ensure the name is set
+					if config.Name == "" {
+						config.Name = name
+					}
+					// Resolve relative binary paths
+					if config.Binary != "" && !filepath.IsAbs(config.Binary) {
+						config.Binary = filepath.Join(configDir, "plugins", config.Binary)
+					}
+					configs = append(configs, config)
+				}
+			}
+		}
 	}
 
 	// Scan plugins directory for binaries
@@ -356,22 +391,35 @@ func DiscoverPlugins(configDir string) ([]PluginConfig, error) {
 			// Check if there's a corresponding config file
 			configFile := filepath.Join(pluginsDir, name+".toml")
 			if _, err := os.Stat(configFile); err == nil {
-				// TODO: Parse plugin-specific config
-				configs = append(configs, PluginConfig{
-					Name:      name,
-					Enabled:   true,
-					Binary:    filepath.Join(pluginsDir, name),
-					AutoStart: true,
-				})
-			} else {
-				// Binary without config - add with defaults
-				configs = append(configs, PluginConfig{
-					Name:      name,
-					Enabled:   true,
-					Binary:    filepath.Join(pluginsDir, name),
-					AutoStart: true,
-				})
+				// Parse plugin-specific config
+				data, err := os.ReadFile(configFile)
+				if err == nil {
+					var config PluginConfig
+					if err := toml.Unmarshal(data, &config); err == nil {
+						// Ensure name is set
+						if config.Name == "" {
+							config.Name = name
+						}
+						// Ensure binary is set
+						if config.Binary == "" {
+							config.Binary = filepath.Join(pluginsDir, name)
+						} else if !filepath.IsAbs(config.Binary) {
+							config.Binary = filepath.Join(pluginsDir, config.Binary)
+						}
+						configs = append(configs, config)
+						continue
+					}
+				}
+				// Fall through to defaults if parsing failed
 			}
+
+			// Binary without config or failed to parse - add with defaults
+			configs = append(configs, PluginConfig{
+				Name:      name,
+				Enabled:   true,
+				Binary:    filepath.Join(pluginsDir, name),
+				AutoStart: true,
+			})
 		}
 	}
 

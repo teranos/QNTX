@@ -66,10 +66,13 @@ type AliasResolver interface {
 
 // AttestationFilter represents filters for querying attestations
 type AttestationFilter struct {
-	Actor     string     // Filter by specific actor
-	TimeStart *time.Time // Temporal range start
-	TimeEnd   *time.Time // Temporal range end
-	Limit     int        // Maximum results
+	Actors     []string   // Filter by actors (OR logic)
+	Subjects   []string   // Filter by subjects (OR logic)
+	Predicates []string   // Filter by predicates (OR logic)
+	Contexts   []string   // Filter by contexts (OR logic)
+	TimeStart  *time.Time // Temporal range start
+	TimeEnd    *time.Time // Temporal range end
+	Limit      int        // Maximum results
 }
 
 // StorageStats represents current storage statistics

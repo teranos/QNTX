@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -616,6 +617,15 @@ func (c *testConfig) Set(key string, value interface{}) {
 	if s, ok := value.(string); ok {
 		c.config[key] = s
 	}
+}
+
+func (c *testConfig) GetKeys() []string {
+	keys := make([]string, 0, len(c.config))
+	for k := range c.config {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // TestServiceIntegration_BookCollectorAttestations tests end-to-end service callbacks.

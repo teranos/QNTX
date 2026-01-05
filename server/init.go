@@ -386,6 +386,11 @@ func (c *simpleConfig) Set(key string, value interface{}) {
 	appcfg.Set(c.domain+"."+key, value)
 }
 
+func (c *simpleConfig) GetKeys() []string {
+	// Return empty list for now - could be enhanced to return actual keys from viper
+	return []string{}
+}
+
 // pluginConfigProvider wraps a base config provider to inject service endpoints
 type pluginConfigProvider struct {
 	base      plugin.ConfigProvider
@@ -450,4 +455,8 @@ func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
 
 func (c *pluginConfigWithEndpoints) Set(key string, value interface{}) {
 	c.base.Set(key, value)
+}
+
+func (c *pluginConfigWithEndpoints) GetKeys() []string {
+	return c.base.GetKeys()
 }
