@@ -87,8 +87,21 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	return nil
 }
 
+// checkPaused returns true and writes 503 response if plugin is paused
+func (p *Plugin) checkPaused(w http.ResponseWriter) bool {
+	if p.paused {
+		http.Error(w, "Code plugin is paused", http.StatusServiceUnavailable)
+		return true
+	}
+	return false
+}
+
 // handleCodeTree returns the code file tree
 func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
+	if p.checkPaused(w) {
+		return
+	}
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -106,6 +119,10 @@ func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
 
 // handleCodeContent serves or updates code file content
 func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
+	if p.checkPaused(w) {
+		return
+	}
+
 	logger := p.services.Logger("code")
 
 	codePath := strings.TrimPrefix(r.URL.Path, "/api/code/")
@@ -153,6 +170,10 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 
 // handlePRSuggestions returns PR fix suggestions
 func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
+	if p.checkPaused(w) {
+		return
+	}
+
 	logger := p.services.Logger("code")
 
 	if r.Method != http.MethodGet {
@@ -187,6 +208,10 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 
 // handlePRList returns list of open PRs
 func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
+	if p.checkPaused(w) {
+		return
+	}
+
 	logger := p.services.Logger("code")
 
 	if r.Method != http.MethodGet {
