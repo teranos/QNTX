@@ -4,14 +4,21 @@
 //! Strategies are applied in order of specificity:
 //! 1. Exact match (score: 1.0)
 //! 2. Prefix match (score: 0.9)
-//! 3. Substring match (score: 0.7)
-//! 4. Jaro-Winkler similarity (score: 0.6-0.85)
-//! 5. Levenshtein edit distance (score: 0.6-0.8)
+//! 3. Word boundary match (score: 0.85)
+//! 4. Substring match (score: 0.65-0.75) - SIMD accelerated via memchr
+//! 5. Phonetic match (score: 0.70-0.75) - Double Metaphone algorithm
+//! 6. Jaro-Winkler similarity (score: 0.6-0.825)
+//! 7. Levenshtein edit distance (score: 0.6-0.8)
+//!
+//! For vocabularies > 1000 items, matching is parallelized via rayon.
 
 use std::time::Instant;
 
 use ahash::AHasher;
+use memchr::memmem;
 use parking_lot::RwLock;
+use rayon::prelude::*;
+use rphonetic::DoubleMetaphone;
 use std::hash::{Hash, Hasher};
 use strsim::{jaro_winkler, levenshtein};
 
@@ -44,6 +51,10 @@ pub struct EngineConfig {
     pub max_edit_distance: usize,
     /// Minimum query length for fuzzy matching (shorter queries use exact/prefix only)
     pub min_fuzzy_length: usize,
+    /// Vocabulary size threshold for enabling parallel matching
+    pub parallel_threshold: usize,
+    /// Enable phonetic matching (Double Metaphone)
+    pub enable_phonetic: bool,
 }
 
 impl Default for EngineConfig {
@@ -53,6 +64,8 @@ impl Default for EngineConfig {
             max_results: 20,
             max_edit_distance: 2,
             min_fuzzy_length: 3,
+            parallel_threshold: 1000,
+            enable_phonetic: true,
         }
     }
 }
@@ -137,6 +150,7 @@ impl FuzzyEngine {
     }
 
     /// Find matches for a query in the specified vocabulary
+    /// Uses parallel iteration via rayon for vocabularies larger than parallel_threshold
     pub fn find_matches(
         &self,
         query: &str,
@@ -160,15 +174,29 @@ impl FuzzyEngine {
             VocabularyType::Contexts => (self.contexts.read(), self.contexts_lower.read()),
         };
 
-        let mut matches = Vec::new();
-
-        for (idx, item_lower) in vocabulary_lower.iter().enumerate() {
-            if let Some(m) = self.score_match(&query_lower, item_lower, &vocabulary[idx]) {
-                if m.score >= min_score {
-                    matches.push(m);
-                }
-            }
-        }
+        // Use parallel iteration for large vocabularies
+        let mut matches: Vec<RankedMatch> =
+            if vocabulary_lower.len() >= self.config.parallel_threshold {
+                // Parallel matching with rayon
+                vocabulary_lower
+                    .par_iter()
+                    .enumerate()
+                    .filter_map(|(idx, item_lower)| {
+                        self.score_match(&query_lower, item_lower, &vocabulary[idx])
+                    })
+                    .filter(|m| m.score >= min_score)
+                    .collect()
+            } else {
+                // Sequential matching for small vocabularies (avoid thread overhead)
+                vocabulary_lower
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, item_lower)| {
+                        self.score_match(&query_lower, item_lower, &vocabulary[idx])
+                    })
+                    .filter(|m| m.score >= min_score)
+                    .collect()
+            };
 
         // Sort by score descending, then by value for stability
         matches.sort_by(|a, b| {
@@ -215,8 +243,9 @@ impl FuzzyEngine {
             }
         }
 
-        // 4. Substring match
-        if let Some(pos) = item_lower.find(query_lower) {
+        // 4. Substring match using SIMD-accelerated memchr
+        let finder = memmem::Finder::new(query_lower.as_bytes());
+        if let Some(pos) = finder.find(item_lower.as_bytes()) {
             // Score based on position (earlier = better)
             let pos_penalty = (pos as f64 / item_lower.len() as f64) * 0.1;
             let score = 0.75 - pos_penalty;
@@ -232,7 +261,19 @@ impl FuzzyEngine {
             return None;
         }
 
-        // 5. Jaro-Winkler similarity
+        // 5. Phonetic match using Double Metaphone
+        // Good for catching misspellings like "Dijkstra" vs "Djikstra"
+        if self.config.enable_phonetic {
+            if let Some(score) = self.phonetic_score(query_lower, item_lower) {
+                return Some(RankedMatch::new(
+                    original_value.to_string(),
+                    score,
+                    "phonetic",
+                ));
+            }
+        }
+
+        // 6. Jaro-Winkler similarity
         let jw_score = jaro_winkler(query_lower, item_lower);
         if jw_score > 0.85 {
             // Scale to our scoring range
@@ -244,7 +285,7 @@ impl FuzzyEngine {
             ));
         }
 
-        // 6. Levenshtein edit distance (for typo tolerance)
+        // 7. Levenshtein edit distance (for typo tolerance)
         let edit_dist = levenshtein(query_lower, item_lower);
         if edit_dist <= self.config.max_edit_distance {
             let max_len = query_lower.len().max(item_lower.len());
@@ -258,6 +299,72 @@ impl FuzzyEngine {
                         "levenshtein",
                     ));
                 }
+            }
+        }
+
+        None
+    }
+
+    /// Compute phonetic similarity using Double Metaphone algorithm
+    /// Returns Some(score) if phonetic codes match, None otherwise
+    fn phonetic_score(&self, query: &str, item: &str) -> Option<f64> {
+        // Double Metaphone only works reliably with ASCII - skip non-ASCII strings
+        // (rphonetic has a bug with multibyte UTF-8 characters)
+        if !query.is_ascii() || !item.is_ascii() {
+            return None;
+        }
+
+        // Double Metaphone works best on single words, so check each word
+        let encoder = DoubleMetaphone::default();
+
+        // For compound terms like "is_author_of", check word-by-word
+        let query_words: Vec<&str> = query
+            .split(|c: char| c.is_whitespace() || c == '_' || c == '-')
+            .filter(|w| !w.is_empty())
+            .collect();
+        let item_words: Vec<&str> = item
+            .split(|c: char| c.is_whitespace() || c == '_' || c == '-')
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        // If query is a single word, check if it phonetically matches any word in item
+        if query_words.len() == 1 {
+            let q_result = encoder.double_metaphone(query_words[0]);
+            let q_primary = q_result.primary();
+            let q_alternate = q_result.alternate();
+
+            for item_word in &item_words {
+                let i_result = encoder.double_metaphone(item_word);
+                let i_primary = i_result.primary();
+                let i_alternate = i_result.alternate();
+
+                // Check primary-to-primary match
+                if !q_primary.is_empty() && q_primary == i_primary {
+                    return Some(0.75);
+                }
+                // Check alternate matches
+                if !q_alternate.is_empty() && q_alternate == i_primary {
+                    return Some(0.70);
+                }
+                if !i_alternate.is_empty() && q_primary == i_alternate {
+                    return Some(0.70);
+                }
+            }
+        }
+
+        // For multi-word queries, check if all words have phonetic matches
+        if query_words.len() > 1 && query_words.len() == item_words.len() {
+            let mut all_match = true;
+            for (qw, iw) in query_words.iter().zip(item_words.iter()) {
+                let q_result = encoder.double_metaphone(qw);
+                let i_result = encoder.double_metaphone(iw);
+                if q_result.primary() != i_result.primary() {
+                    all_match = false;
+                    break;
+                }
+            }
+            if all_match {
+                return Some(0.72);
             }
         }
 
@@ -651,5 +758,183 @@ mod tests {
         );
         // Duplicates should be removed during rebuild
         assert_eq!(pred_count, 2);
+    }
+
+    // ========================================================================
+    // Phonetic matching tests
+    // ========================================================================
+
+    #[test]
+    fn test_phonetic_dijkstra_misspelling() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![],
+            vec![
+                "Dijkstra".to_string(), // Just the name for cleaner test
+                "Knuth".to_string(),
+                "Turing".to_string(),
+            ],
+        );
+
+        // "Djikstra" (common misspelling) should match "Dijkstra" via phonetic or levenshtein
+        let (matches, _) =
+            engine.find_matches("Djikstra", VocabularyType::Contexts, None, Some(0.5));
+        assert!(!matches.is_empty(), "Should find matches for 'Djikstra'");
+        // Should find Dijkstra via phonetic (same sound) or levenshtein (1 transposition)
+        assert!(
+            matches.iter().any(|m| m.value == "Dijkstra"),
+            "Should match 'Dijkstra', got: {:?}",
+            matches
+        );
+    }
+
+    #[test]
+    fn test_phonetic_smith_smyth() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "smith_family".to_string(),
+                "jones_family".to_string(),
+            ],
+            vec![],
+        );
+
+        // "smyth" should phonetically match "smith"
+        let (matches, _) =
+            engine.find_matches("smyth", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        let smith_match = matches.iter().find(|m| m.value == "smith_family");
+        assert!(smith_match.is_some());
+        // Should match via phonetic strategy
+        assert_eq!(smith_match.unwrap().strategy, "phonetic");
+    }
+
+    #[test]
+    fn test_phonetic_disabled() {
+        let config = EngineConfig {
+            enable_phonetic: false,
+            ..Default::default()
+        };
+        let engine = FuzzyEngine::with_config(config);
+        engine.rebuild_index(
+            vec!["smith_family".to_string()],
+            vec![],
+        );
+
+        // With phonetic disabled, "smyth" should NOT match "smith" via phonetic
+        // (might still match via levenshtein if within edit distance)
+        let (matches, _) =
+            engine.find_matches("smyth", VocabularyType::Predicates, None, Some(0.5));
+        // Should not use phonetic strategy
+        assert!(matches.iter().all(|m| m.strategy != "phonetic"));
+    }
+
+    // ========================================================================
+    // Parallel processing tests
+    // ========================================================================
+
+    #[test]
+    fn test_parallel_matching_large_vocabulary() {
+        let engine = FuzzyEngine::new();
+
+        // Create a vocabulary larger than parallel_threshold (1000)
+        let mut predicates: Vec<String> = (0..1500)
+            .map(|i| format!("predicate_{:04}", i))
+            .collect();
+        predicates.push("target_item".to_string());
+
+        engine.rebuild_index(predicates, vec![]);
+
+        // Should still find matches correctly with parallel processing
+        let (matches, _) =
+            engine.find_matches("target", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert!(matches.iter().any(|m| m.value == "target_item"));
+    }
+
+    #[test]
+    fn test_parallel_vs_sequential_consistency() {
+        // Create engine with low parallel threshold
+        let parallel_config = EngineConfig {
+            parallel_threshold: 5, // Force parallel for small vocab
+            ..Default::default()
+        };
+        let parallel_engine = FuzzyEngine::with_config(parallel_config);
+
+        let sequential_config = EngineConfig {
+            parallel_threshold: 1000, // Keep sequential
+            ..Default::default()
+        };
+        let sequential_engine = FuzzyEngine::with_config(sequential_config);
+
+        let predicates = vec![
+            "is_author_of".to_string(),
+            "is_maintainer_of".to_string(),
+            "works_at".to_string(),
+            "employed_by".to_string(),
+            "contributes_to".to_string(),
+            "reviewed_by".to_string(),
+            "edited_by".to_string(),
+            "published_by".to_string(),
+        ];
+
+        parallel_engine.rebuild_index(predicates.clone(), vec![]);
+        sequential_engine.rebuild_index(predicates, vec![]);
+
+        // Both should return same results
+        let (par_matches, _) =
+            parallel_engine.find_matches("author", VocabularyType::Predicates, None, Some(0.5));
+        let (seq_matches, _) =
+            sequential_engine.find_matches("author", VocabularyType::Predicates, None, Some(0.5));
+
+        assert_eq!(par_matches.len(), seq_matches.len());
+        for (p, s) in par_matches.iter().zip(seq_matches.iter()) {
+            assert_eq!(p.value, s.value);
+            assert!((p.score - s.score).abs() < 0.001);
+            assert_eq!(p.strategy, s.strategy);
+        }
+    }
+
+    // ========================================================================
+    // SIMD substring search tests (memchr)
+    // ========================================================================
+
+    #[test]
+    fn test_simd_substring_basic() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "the_quick_brown_fox".to_string(),
+                "lazy_dog_jumped".to_string(),
+            ],
+            vec![],
+        );
+
+        // Substring search should work correctly with SIMD
+        let (matches, _) =
+            engine.find_matches("brown", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "the_quick_brown_fox");
+        // "brown" is a word, so should match word_boundary first
+        assert_eq!(matches[0].strategy, "word_boundary");
+    }
+
+    #[test]
+    fn test_simd_substring_mid_word() {
+        let engine = FuzzyEngine::new();
+        engine.rebuild_index(
+            vec![
+                "configuration".to_string(),
+                "documentation".to_string(),
+            ],
+            vec![],
+        );
+
+        // "figur" appears mid-word in "configuration"
+        let (matches, _) =
+            engine.find_matches("figur", VocabularyType::Predicates, None, Some(0.5));
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].value, "configuration");
+        assert_eq!(matches[0].strategy, "substring");
     }
 }
