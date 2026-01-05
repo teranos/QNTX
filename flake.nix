@@ -30,13 +30,14 @@
             govet.enable = true;
 
             # Auto-update vendorHash when go.mod/go.sum changes
-            vendorHash-update = {
-              enable = true;
-              name = "Update Nix vendorHash";
-              entry = "${./.githooks/update-nix-hash.sh}";
-              files = "\\.(mod|sum)$";
-              pass_filenames = false;
-            };
+            # Disabled in CI due to network restrictions in Nix sandbox
+            # vendorHash-update = {
+            #   enable = true;
+            #   name = "Update Nix vendorHash";
+            #   entry = "${./.githooks/update-nix-hash.sh}";
+            #   files = "\\.(mod|sum)$";
+            #   pass_filenames = false;
+            # };
           };
         };
 
