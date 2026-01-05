@@ -156,7 +156,8 @@ export function initQueryFileDrop(): void {
     dropZone.addEventListener('drop', (e: DragEvent) => {
         e.preventDefault();
         dropZone.classList.remove('dragging');
-        dropIndicator.style.display = 'none';
+        dropIndicator.classList.add('u-hidden');
+        dropIndicator.classList.remove('u-flex');
 
         const files = e.dataTransfer?.files;
         if (!files || files.length === 0) return;
