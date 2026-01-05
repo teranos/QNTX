@@ -21,6 +21,27 @@ run-debug:
 test:
 	uv run pytest
 
+test-unit:
+	uv run pytest tests/unit -v --cov=qntx_webscraper
+
+test-integration:
+	uv run python test_integration.py
+
+test-security:
+	uv run python tests/security/test_ssrf.py
+
+lint:
+	uv run ruff check .
+	uv run mypy qntx_webscraper --ignore-missing-imports
+
+format:
+	uv run black .
+	uv run isort .
+
+security-scan:
+	uv run bandit -r qntx_webscraper
+	uv run safety check
+
 # Clean generated files
 clean:
 	rm -rf qntx_webscraper/grpc/*_pb2*.py
