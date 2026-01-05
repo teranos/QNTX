@@ -30,7 +30,6 @@ import './command-explorer-panel.ts';
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
 import './plugin-panel.ts';
-import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
 import type { MessageHandlers, VersionMessage } from '../types/websocket';
