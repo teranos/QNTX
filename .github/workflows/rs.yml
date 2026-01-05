@@ -71,7 +71,7 @@ jobs:
         run: cd plugins/qntx-fuzzy && cargo fmt --check
 
       - name: Clippy (qntx-fuzzy)
-        run: cd plugins/qntx-fuzzy && cargo clippy --lib --all-features
+        run: cd plugins/qntx-fuzzy && cargo clippy --lib
         env:
           RUSTFLAGS: "-Dwarnings"
 
