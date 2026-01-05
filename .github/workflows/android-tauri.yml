@@ -1,0 +1,70 @@
+name: Android Tauri
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/src-tauri/**'
+      - 'web/src/**'
+      - '.github/workflows/android-tauri.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/src-tauri/**'
+      - 'web/src/**'
+  workflow_dispatch:
+
+jobs:
+  android-check:
+    name: Android Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;26.1.10909125"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      - name: Setup Node/Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build frontend
+        run: make web
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: web/src-tauri
+
+      - name: Check formatting
+        run: cd web/src-tauri && cargo fmt --check
+
+      - name: Check (Android ARM64)
+        run: cd web/src-tauri && cargo check --lib --target aarch64-linux-android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+
+      - name: Check (Android ARMv7)
+        run: cd web/src-tauri && cargo check --lib --target armv7-linux-androideabi
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
+
+      - name: Check (Android x86_64)
+        run: cd web/src-tauri && cargo check --lib --target x86_64-linux-android
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
