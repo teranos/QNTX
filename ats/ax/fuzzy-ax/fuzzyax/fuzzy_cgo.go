@@ -1,24 +1,24 @@
-// Package cgo provides a CGO wrapper for the Rust fuzzy matching engine.
+// Package fuzzyax provides a CGO wrapper for the Rust fuzzy matching engine.
 //
 // This package links directly with the Rust library via CGO, providing
-// lower latency than the gRPC approach at the cost of build complexity.
+// high-performance fuzzy matching for ax (⋈) queries.
 //
 // Build Requirements:
-//   - Rust toolchain (cargo build --release in plugins/qntx-fuzzy)
+//   - Rust toolchain (cargo build --release in ats/ax/fuzzy-ax)
 //   - CGO enabled (CGO_ENABLED=1)
 //   - Library path set correctly for your platform
 //
 // Usage:
 //
-//	engine, err := cgo.NewFuzzyEngine()
+//	engine, err := fuzzyax.NewFuzzyEngine()
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	defer engine.Close()
 //
 //	engine.RebuildIndex(predicates, contexts)
-//	matches := engine.FindMatches("query", cgo.VocabPredicates, 20, 0.6)
-package cgo
+//	matches := engine.FindMatches("query", fuzzyax.VocabPredicates, 20, 0.6)
+package fuzzyax
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
