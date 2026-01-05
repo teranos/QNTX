@@ -305,3 +305,104 @@ export async function handleDaemonStatusNotification(status: {
     // Update tracked state
     notificationState.setLastServerState(currentState);
 }
+
+/**
+ * Taskbar progress state for Windows (works on macOS/Linux too)
+ * - none: Clear progress indicator
+ * - normal: Show progress bar with percentage
+ * - indeterminate: Show spinning/pulsing indicator (jobs queued but no progress info)
+ * - paused: Show yellow/warning progress bar (Pulse daemon paused)
+ * - error: Show red progress bar (job failed)
+ */
+export type TaskbarProgressState = 'none' | 'normal' | 'indeterminate' | 'paused' | 'error';
+
+/**
+ * Set taskbar progress indicator
+ * Primary use: Windows taskbar progress bar, but also works on macOS dock
+ *
+ * @param state - Progress state: 'none' | 'normal' | 'indeterminate' | 'paused' | 'error'
+ * @param progress - Optional percentage (0-100), only used for 'normal' state
+ */
+export async function setTaskbarProgress(
+    state: TaskbarProgressState,
+    progress?: number
+): Promise<void> {
+    await invokeIfTauri('set_taskbar_progress', {
+        state,
+        progress: progress !== undefined ? Math.round(progress) : null
+    });
+}
+
+/**
+ * Clear taskbar progress indicator
+ */
+export async function clearTaskbarProgress(): Promise<void> {
+    await setTaskbarProgress('none');
+}
+
+/**
+ * Show indeterminate progress (spinning indicator)
+ * Use when jobs are queued/running but no specific progress percentage available
+ */
+export async function showTaskbarIndeterminate(): Promise<void> {
+    await setTaskbarProgress('indeterminate');
+}
+
+/**
+ * Show progress percentage
+ * @param percent - Progress percentage (0-100)
+ */
+export async function showTaskbarProgress(percent: number): Promise<void> {
+    await setTaskbarProgress('normal', Math.max(0, Math.min(100, percent)));
+}
+
+/**
+ * Show paused state (yellow/warning indicator)
+ * Use when Pulse daemon is paused
+ */
+export async function showTaskbarPaused(progress?: number): Promise<void> {
+    await setTaskbarProgress('paused', progress);
+}
+
+/**
+ * Show error state (red indicator)
+ * Use when a job has failed
+ */
+export async function showTaskbarError(progress?: number): Promise<void> {
+    await setTaskbarProgress('error', progress);
+}
+
+/**
+ * Update taskbar based on current job queue state
+ * Call this when job counts change to reflect overall progress
+ *
+ * @param activeJobs - Number of currently running jobs
+ * @param queuedJobs - Number of queued jobs
+ * @param isPaused - Whether Pulse daemon is paused
+ * @param hasError - Whether any job recently failed
+ */
+export async function updateTaskbarFromJobState(
+    activeJobs: number,
+    queuedJobs: number,
+    isPaused: boolean = false,
+    hasError: boolean = false
+): Promise<void> {
+    if (!isTauri()) return;
+
+    const totalJobs = activeJobs + queuedJobs;
+
+    if (totalJobs === 0) {
+        // No jobs - clear progress
+        await clearTaskbarProgress();
+    } else if (hasError) {
+        // Show error state
+        await showTaskbarError();
+    } else if (isPaused) {
+        // Show paused state
+        await showTaskbarPaused();
+    } else {
+        // Jobs are processing - show indeterminate progress
+        // (We don't have per-job progress, so use indeterminate)
+        await showTaskbarIndeterminate();
+    }
+}

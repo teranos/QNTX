@@ -3,6 +3,13 @@
   "productName": "QNTX",
   "version": "0.1.0",
   "identifier": "nl.sbvh.qntx",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["qntx"]
+      }
+    }
+  },
   "build": {
     "beforeDevCommand": "test \"$SKIP_DEV_SERVER\" = \"1\" && echo 'Skipping dev server (already running)' || (cd .. && bun run dev)",
     "beforeBuildCommand": "",
