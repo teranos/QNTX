@@ -6,13 +6,15 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
 
-// Desktop-only features (menu bar, tray, autostart)
+// Desktop-only features (menu bar, tray, autostart, deep-link)
 #[cfg(not(target_os = "ios"))]
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 #[cfg(not(target_os = "ios"))]
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 #[cfg(not(target_os = "ios"))]
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+#[cfg(not(target_os = "ios"))]
+use tauri_plugin_deep_link::DeepLinkExt;
 
 // Import generated types from Go source (single source of truth)
 // These types are kept in sync with the backend via `make types`
@@ -48,6 +50,54 @@ fn show_window_and_emit<P: serde::Serialize + Clone>(
         let _ = window.set_focus();
         if let Err(e) = window.emit(event_name, payload) {
             eprintln!("[menu] Failed to emit {} event: {}", event_name, e);
+        }
+    }
+}
+
+/// Handle deep link URLs (qntx://...)
+/// Routes to appropriate panels or resources based on URL path
+#[cfg(not(target_os = "ios"))]
+fn handle_deep_link(app: &tauri::AppHandle, url: &str) {
+    println!("[deep-link] Received: {}", url);
+
+    // Parse the URL to extract the path
+    // Format: qntx://path or qntx://path/id
+    let path = url
+        .strip_prefix("qntx://")
+        .unwrap_or(url)
+        .trim_end_matches('/');
+
+    // Route based on path
+    match path {
+        "pulse" => {
+            show_window_and_emit(app, "show-pulse-panel", ());
+        }
+        "config" | "settings" | "preferences" => {
+            show_window_and_emit(app, "show-config-panel", ());
+        }
+        "docs" | "prose" | "documentation" => {
+            show_window_and_emit(app, "show-prose-panel", ());
+        }
+        "code" | "editor" => {
+            show_window_and_emit(app, "show-code-panel", ());
+        }
+        "hixtory" | "history" => {
+            show_window_and_emit(app, "show-hixtory-panel", ());
+        }
+        _ if path.starts_with("job/") => {
+            // qntx://job/<id> - emit event with job ID
+            let job_id = path.strip_prefix("job/").unwrap_or("");
+            if !job_id.is_empty() {
+                show_window_and_emit(app, "deep-link-job", job_id.to_string());
+            }
+        }
+        _ => {
+            // Unknown path - just show window
+            println!("[deep-link] Unknown path: {}", path);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
         }
     }
 }
@@ -160,25 +210,65 @@ fn notify_server_stopped(app: tauri::AppHandle) {
     );
 }
 
+/// Set taskbar progress indicator (Windows feature, works on other platforms too)
+/// - state: "none" | "normal" | "indeterminate" | "paused" | "error"
+/// - progress: Optional percentage (0-100), only used for "normal" state
+#[tauri::command]
+fn set_taskbar_progress(app: tauri::AppHandle, state: String, progress: Option<u64>) {
+    use tauri::window::ProgressBarState;
+    use tauri::window::ProgressBarStatus;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let status = match state.as_str() {
+            "normal" => ProgressBarStatus::Normal,
+            "indeterminate" => ProgressBarStatus::Indeterminate,
+            "paused" => ProgressBarStatus::Paused,
+            "error" => ProgressBarStatus::Error,
+            _ => ProgressBarStatus::None,
+        };
+
+        let progress_state = ProgressBarState {
+            status: Some(status),
+            progress,
+        };
+
+        if let Err(e) = window.set_progress_bar(progress_state) {
+            eprintln!("[taskbar] Failed to set progress bar: {}", e);
+        }
+    }
+}
+
 fn main() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // When another instance tries to start, just show the existing window
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Show and focus the existing window
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
+            }
+
+            // On Windows/Linux, deep links are passed as CLI arguments
+            // Check if any argument is a qntx:// URL
+            #[cfg(not(target_os = "ios"))]
+            for arg in args.iter() {
+                if arg.starts_with("qntx://") {
+                    handle_deep_link(app, arg);
+                    break;
+                }
             }
         }));
 
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
     {
-        builder = builder.plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--minimized"]),
-        ));
+        builder = builder
+            .plugin(tauri_plugin_autostart::init(
+                MacosLauncher::LaunchAgent,
+                Some(vec!["--minimized"]),
+            ))
+            .plugin(tauri_plugin_deep_link::init());
     }
 
     builder
@@ -254,6 +344,24 @@ fn main() {
                     child: Arc::new(Mutex::new(Some(child))),
                     port: SERVER_PORT.to_string(),
                 });
+
+                // Set up deep link handler for macOS (events) and check startup URL
+                // On Windows/Linux, deep links come through single-instance CLI args
+                let app_handle = app.handle().clone();
+
+                // Check if app was started via deep link
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls {
+                        handle_deep_link(&app_handle, url.as_str());
+                    }
+                }
+
+                // Listen for deep link events (macOS sends these while app is running)
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        handle_deep_link(&app_handle, url.as_str());
+                    }
+                });
             }
 
             // iOS: No sidecar, store empty server state
@@ -268,6 +376,8 @@ fn main() {
             // Desktop only: Create application menu bar
             #[cfg(not(target_os = "ios"))]
             {
+                // macOS: Full app menu with Hide/Hide Others/Show All
+                #[cfg(target_os = "macos")]
                 let app_menu = Submenu::with_items(
                     app,
                     "QNTX",
@@ -286,6 +396,27 @@ fn main() {
                         &PredefinedMenuItem::hide(app, None)?,
                         &PredefinedMenuItem::hide_others(app, None)?,
                         &PredefinedMenuItem::show_all(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::quit(app, None)?,
+                    ],
+                )?;
+
+                // Windows/Linux: Simplified app menu (no Hide/Hide Others/Show All)
+                #[cfg(not(target_os = "macos"))]
+                let app_menu = Submenu::with_items(
+                    app,
+                    "QNTX",
+                    true,
+                    &[
+                        &MenuItem::with_id(app, "about", "About QNTX", false, None::<&str>)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &MenuItem::with_id(
+                            app,
+                            "preferences",
+                            "Preferences...",
+                            true,
+                            Some("CmdOrCtrl+,"),
+                        )?,
                         &PredefinedMenuItem::separator(app)?,
                         &PredefinedMenuItem::quit(app, None)?,
                     ],
@@ -576,7 +707,8 @@ fn main() {
             notify_job_failed,
             notify_storage_warning,
             notify_server_draining,
-            notify_server_stopped
+            notify_server_stopped,
+            set_taskbar_progress
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
