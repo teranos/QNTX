@@ -4,11 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'feat/cross-compilation-releases'  # Testing branch - remove before merge
   workflow_dispatch:
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    # Only create release on tags, not on branch pushes
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     outputs:
@@ -65,6 +69,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     needs: create-release
+    if: always()  # Run even if create-release is skipped
     permissions:
       contents: write
     strategy:
@@ -74,6 +79,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          # For tags, extract version from tag name
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            # For branch testing, use test version
+            VERSION="test-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
       - name: Install Nix
         uses: cachix/install-nix-action@v26
@@ -97,13 +115,21 @@ jobs:
           mkdir -p release
           cp result/bin/qntx release/
           cd release
-          tar -czf qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz qntx
-          sha256sum qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz > qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz.sha256
+          tar -czf qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz qntx
+          sha256sum qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz > qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz.sha256
 
-      - name: Upload Release Asset
+      - name: Upload Release Asset (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            release/qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
-            release/qntx-${{ needs.create-release.outputs.version }}-linux-${{ matrix.arch }}.tar.gz.sha256
+            release/qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+            release/qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz.sha256
+
+      - name: Upload artifacts (testing only)
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: qntx-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}
+          path: release/*
