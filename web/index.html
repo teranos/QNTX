@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -91,7 +91,8 @@
         const MAX_LOG_ENTRIES = 10;
 
         // TIMING: Log when inline script starts
-        console.log('[TIMING] Inline script start:', Date.now() - performance.timing.navigationStart, 'ms');
+        const navStart = performance.timeOrigin || (performance.timing && performance.timing.navigationStart) || Date.now();
+        console.log('[TIMING] Inline script start:', Date.now() - navStart, 'ms');
 
         /**
          * Log a step in the initialization process
@@ -234,7 +235,7 @@
     })();
     </script>
 
-    <div id="container">
+    <main id="container">
         <div id="left-panel">
             <!-- Virtue #4: Semantic HTML - Use <header> for page header -->
             <header id="header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;">
@@ -249,21 +250,21 @@
             <div id="query-container">
                 <!-- Symbol Palette - SEG Symbol Interface -->
                 <!-- Virtue #4: Semantic HTML - Use <nav> for symbol palette navigation -->
-                <nav id="symbolPalette" class="symbol-palette">
-                    <div class="palette-cell" data-cmd="i" data-label="i — self">⍟</div>
-                    <div class="palette-cell" data-cmd="am" data-label="am — structure">≡</div>
-                    <div class="palette-cell" data-cmd="ix" data-label="ix — ingest">⨳</div>
-                    <div class="palette-cell" data-cmd="ax" data-label="ax — expand">⋈</div>
-                    <div class="palette-cell" data-cmd="as" data-label="as — assert">+</div>
-                    <div class="palette-cell" data-cmd="is" data-label="is — identity">==</div>
-                    <div class="palette-cell" data-cmd="of" data-label="of — membership">∈</div>
-                    <div class="palette-cell" data-cmd="by" data-label="by — actor">⌬</div>
-                    <div class="palette-cell" data-cmd="at" data-label="at — event">✦</div>
-                    <div class="palette-cell" data-cmd="so" data-label="so — therefore">⟶</div>
-                    <div class="palette-cell" data-cmd="pulse" data-label="pulse — scheduled jobs">꩜</div>
-                    <div class="palette-cell" data-cmd="prose" data-label="prose — documentation">▣</div>
-                    <div class="palette-cell" data-cmd="go" data-label="go — code editor">go</div>
-                </nav>
+                <div id="symbolPalette" class="symbol-palette" role="toolbar" aria-label="Symbol palette">
+                    <button type="button" class="palette-cell" data-cmd="i" data-label="i — self" aria-label="Self: operator vantage point">⍟</button>
+                    <button type="button" class="palette-cell" data-cmd="am" data-label="am — structure" aria-label="Structure: system configuration">≡</button>
+                    <button type="button" class="palette-cell" data-cmd="ix" data-label="ix — ingest" aria-label="Ingest: import external data">⨳</button>
+                    <button type="button" class="palette-cell" data-cmd="ax" data-label="ax — expand" aria-label="Expand: surface related context">⋈</button>
+                    <button type="button" class="palette-cell" data-cmd="as" data-label="as — assert" aria-label="Assert: emit attestation">+</button>
+                    <button type="button" class="palette-cell" data-cmd="is" data-label="is — identity" aria-label="Identity: equivalence check">==</button>
+                    <button type="button" class="palette-cell" data-cmd="of" data-label="of — membership" aria-label="Membership: element-of relation">∈</button>
+                    <button type="button" class="palette-cell" data-cmd="by" data-label="by — actor" aria-label="Actor: origin of action">⌬</button>
+                    <button type="button" class="palette-cell" data-cmd="at" data-label="at — event" aria-label="Event: temporal marker">✦</button>
+                    <button type="button" class="palette-cell" data-cmd="so" data-label="so — therefore" aria-label="Therefore: consequent action">⟶</button>
+                    <button type="button" class="palette-cell" data-cmd="pulse" data-label="pulse — scheduled jobs" aria-label="Pulse: scheduled jobs dashboard">꩜</button>
+                    <button type="button" class="palette-cell" data-cmd="prose" data-label="prose — documentation" aria-label="Prose: documentation editor">▣</button>
+                    <button type="button" class="palette-cell" data-cmd="go" data-label="go — code editor" aria-label="Go: code editor with LSP">go</button>
+                </div>
 
                 <div id="query-drop-zone">
                     <!-- CodeMirror 6 Editor Container -->
@@ -296,20 +297,19 @@
         </div>
 
         <div id="graph-container">
-            <!-- Virtue #4: Semantic HTML - Use <nav> for graph controls -->
-            <nav id="controls">
+            <aside id="controls" role="toolbar" aria-label="Graph controls">
                 <!-- Legenda and isolated toggle built dynamically by legenda.js -->
                 <div class="legenda"></div>
-            </nav>
+            </aside>
             <!-- Attestation feed overlay (behind graph) -->
             <div id="attestation-feed"></div>
             <svg id="graph"></svg>
-            <div class="tooltip" id="tooltip"></div>
+            <div class="tooltip" id="tooltip" role="tooltip"></div>
         </div>
-    </div>
+    </main>
 
     <!-- Toast Notifications -->
-    <div id="toast-container"></div>
+    <div id="toast-container" role="status" aria-live="polite"></div>
 
     <!-- Pulse Configuration Panel (Daily + Monthly Budget) -->
     <div id="pulse-config-overlay" class="pulse-config-overlay" style="display: none;">
@@ -345,7 +345,8 @@
         <div id="log-header">
             <h3>Logs</h3>
             <span id="log-version" style="font-size: 9px; color: #555; margin-left: 8px;"></span>
-            <div id="connection-status">
+            <div id="connection-status" role="status" aria-live="polite">
+                <span id="status-dot" class="status-dot"></span>
                 <span id="status-text">Connected</span>
             </div>
             <div class="controls">
@@ -374,14 +375,14 @@
     <!-- Load D3.js locally (bundled) - Virtue #2: Minimize external dependencies -->
 
     <!-- async instead of defer: Don't block DOMContentLoaded, load independently -->
-    <script async src="/js/vendor/d3.v7.min.js" onload="console.log('[TIMING] D3.js loaded:', Date.now() - performance.timing.navigationStart, 'ms')"></script>
+    <script async src="/js/vendor/d3.v7.min.js" onload="console.log('[TIMING] D3.js loaded:', Date.now() - (performance.timeOrigin || Date.now()), 'ms')"></script>
 
     <!-- Load app after DOM is ready (type="module" defers automatically) -->
     <script type="module" src="/ts/main.ts"></script>
 
     <!-- TIMING: Track module script execution -->
     <script>
-    console.log('[TIMING] HTML parsing complete:', Date.now() - performance.timing.navigationStart, 'ms');
+    console.log('[TIMING] HTML parsing complete:', Date.now() - (performance.timeOrigin || Date.now()), 'ms');
     </script>
 
     <!-- Graph limit control -->

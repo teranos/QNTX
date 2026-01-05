@@ -4,11 +4,7 @@
  * Lightweight notifications for non-critical errors and status updates
  */
 
-interface BuildInfo {
-    version: string;
-    commit: string;
-    build_time?: string;
-}
+import type { BuildInfo } from '../types/core';
 
 let cachedBuildInfo: BuildInfo | null = null;
 

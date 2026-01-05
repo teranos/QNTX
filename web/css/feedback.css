@@ -6,8 +6,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: #1a1a1a;
-    border-top: 1px solid #333;
+    background: var(--bg-secondary, #1a1a1a);
+    border-top: 1px solid var(--border-color, #333);
     max-height: 300px;
     z-index: 1000;
     display: flex;
@@ -24,8 +24,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: #2a2a2a;
-    border-bottom: 1px solid #333;
+    background: var(--bg-tertiary, #2a2a2a);
+    border-bottom: 1px solid var(--border-color, #333);
     cursor: pointer;
     user-select: none;
 }
@@ -437,4 +437,56 @@
 
 .hixtory-time {
     margin-left: auto;
+}
+
+/* Connection Status */
+#connection-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary, #999);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2ecc71;
+    box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
+    transition: background 0.3s, box-shadow 0.3s;
+}
+
+/* Disconnected state */
+body.disconnected .status-dot {
+    background: #ff6b6b;
+    box-shadow: 0 0 4px rgba(255, 107, 107, 0.5);
+}
+
+/* Connecting state */
+body.connecting .status-dot {
+    background: #ffa502;
+    box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    #log-panel {
+        transition: none;
+    }
+
+    .hixtory-item {
+        transition: none;
+    }
+
+    .status-dot {
+        transition: none;
+        animation: none;
+    }
 }
