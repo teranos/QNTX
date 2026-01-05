@@ -32,6 +32,7 @@ import './command-explorer-panel.ts';
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
 import './plugin-panel.ts';
+import './webscraper-panel.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
 import type { MessageHandlers, VersionMessage } from '../types/websocket';
@@ -52,6 +53,18 @@ console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
+
+// Handle webscraper response from server
+async function handleWebscraperResponse(data: any): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.handleScraperResponse(data);
+}
+
+// Handle webscraper progress updates
+async function handleWebscraperProgress(data: any): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.handleScraperProgress(data);
+}
 
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
@@ -157,6 +170,8 @@ async function init(): Promise<void> {
         'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
         'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
         'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
+        'webscraper_response': handleWebscraperResponse as MessageHandlers['webscraper_response'],
+        'webscraper_progress': handleWebscraperProgress as MessageHandlers['webscraper_progress'],
         '_default': updateGraph as unknown as MessageHandlers['_default']
     };
 

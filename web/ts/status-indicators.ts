@@ -152,7 +152,6 @@ class StatusIndicatorManager {
         const indicator = this.indicators.get(id);
         if (!indicator) return;
 
-        const dot = indicator.querySelector('.status-dot') as HTMLElement;
         const text = indicator.querySelector('.status-text') as HTMLElement;
 
         // Remove all state classes
@@ -245,15 +244,8 @@ class StatusIndicatorManager {
      * Handle Pulse daemon status updates
      */
     handlePulseDaemonStatus(data: DaemonStatusMessage): void {
-        let state: 'active' | 'inactive' = 'inactive';
-
         // Determine state from daemon status
-        if (data.daemon_healthy !== undefined) {
-            state = data.daemon_healthy ? 'active' : 'inactive';
-        } else if (data.budget_daily !== undefined || data.budget_weekly !== undefined) {
-            // If receiving budget data, daemon is likely active
-            state = 'active';
-        }
+        const state: 'active' | 'inactive' = data.running ? 'active' : 'inactive';
 
         this.updateIndicator(
             'pulse',
