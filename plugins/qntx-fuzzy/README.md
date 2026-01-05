@@ -1,183 +1,21 @@
 # qntx-fuzzy
 
-High-performance fuzzy matching plugin for QNTX, written in Rust.
+High-performance fuzzy matching library for QNTX, written in Rust with CGO integration.
 
 ## Overview
 
-This plugin provides advanced fuzzy matching capabilities for QNTX attestation queries, replacing the basic substring matching in the Go implementation with a multi-strategy approach:
+This library provides advanced fuzzy matching capabilities for QNTX attestation queries, replacing the basic substring matching in the Go implementation with a multi-strategy approach:
 
 | Strategy | Score | Description |
 |----------|-------|-------------|
 | Exact | 1.0 | Exact case-insensitive match |
 | Prefix | 0.9 | Query is prefix of value |
-| Word Boundary | 0.85 | Query matches complete word |
+| Word Boundary | 0.85 | Query matches complete word (split on space, _, -) |
 | Substring | 0.65-0.75 | Query appears within value |
 | Jaro-Winkler | 0.6-0.82 | String similarity > 85% |
 | Levenshtein | 0.6-0.8 | Edit distance ≤ 2 |
 
 ## Building
-
-```bash
-cd plugins/qntx-fuzzy
-cargo build --release
-```
-
-The binary will be at `target/release/qntx-fuzzy`.
-
-## Running
-
-```bash
-# Default port 9100
-./target/release/qntx-fuzzy
-
-# Custom port
-QNTX_FUZZY_PORT=9200 ./target/release/qntx-fuzzy
-
-# With custom minimum score
-QNTX_FUZZY_MIN_SCORE=0.7 ./target/release/qntx-fuzzy
-```
-
-## Configuration
-
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `QNTX_FUZZY_PORT` | 9100 | gRPC server port |
-| `QNTX_FUZZY_MIN_SCORE` | 0.6 | Minimum match score (0.0-1.0) |
-| `RUST_LOG` | info | Log level (trace, debug, info, warn, error) |
-
-## gRPC API
-
-The service exposes `FuzzyMatchService` with these methods:
-
-### RebuildIndex
-Rebuilds the fuzzy index with new vocabulary. Called on startup and when vocabulary changes.
-
-```protobuf
-rpc RebuildIndex(RebuildIndexRequest) returns (RebuildIndexResponse);
-```
-
-### FindMatches
-Finds vocabulary items matching a query with ranked scores.
-
-```protobuf
-rpc FindMatches(FindMatchesRequest) returns (FindMatchesResponse);
-```
-
-### BatchMatch
-Processes multiple queries in a single request.
-
-```protobuf
-rpc BatchMatch(BatchMatchRequest) returns (BatchMatchResponse);
-```
-
-### Health
-Health check for service readiness.
-
-```protobuf
-rpc Health(HealthRequest) returns (HealthResponse);
-```
-
-## Go Client
-
-A Go client is provided for integration with QNTX:
-
-```go
-import "github.com/teranos/QNTX/plugins/qntx-fuzzy/client"
-
-// Create client
-cfg := client.DefaultRustFuzzyMatcherConfig()
-cfg.ServiceAddress = "localhost:9100"
-matcher, err := client.NewRustFuzzyMatcher(cfg)
-
-// Update vocabulary (call when attestations change)
-ctx := context.Background()
-matcher.UpdateVocabulary(ctx, predicates, contexts)
-
-// Find matches (same interface as ax.FuzzyMatcher)
-matches := matcher.FindMatches("auth", allPredicates)
-```
-
-The `RustFuzzyMatcher` implements the same interface as the built-in `ax.FuzzyMatcher`, enabling drop-in replacement.
-
-## Integration with AxExecutor
-
-To use the Rust fuzzy matcher in AxExecutor:
-
-```go
-// In AxExecutor initialization
-rustMatcher, err := client.NewRustFuzzyMatcher(client.DefaultRustFuzzyMatcherConfig())
-if err != nil {
-    // Fall back to built-in Go matcher
-    rustMatcher = nil
-}
-
-// The wrapper automatically falls back to Go implementation
-// if the Rust service is unavailable
-```
-
-## Performance
-
-Expected improvements over Go implementation:
-
-| Vocabulary Size | Go (current) | Rust | Improvement |
-|-----------------|--------------|------|-------------|
-| 1K items | ~1ms | ~0.1ms | 10x |
-| 10K items | ~10ms | ~0.3ms | 33x |
-| 100K items | ~100ms | ~3ms | 33x |
-
-Additional capabilities:
-- Typo tolerance via Levenshtein distance
-- Better ranking via Jaro-Winkler similarity
-- Consistent scoring across all match types
-
-## Architecture
-
-Two integration options are available:
-
-### Option 1: gRPC (Separate Process)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    QNTX Core (Go)                       │
-│  ┌────────────────┐    ┌───────────────────────────┐   │
-│  │  AxExecutor    │───►│ RustFuzzyMatcher (wrapper)│   │
-│  └────────────────┘    └───────────┬───────────────┘   │
-└─────────────────────────────────────┼───────────────────┘
-                                      │ gRPC
-                                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              qntx-fuzzy (Rust Plugin)                   │
-│  FuzzyMatchService (tonic) → FuzzyEngine                │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Pros**: Process isolation, easy updates, language agnostic
-**Cons**: ~100μs latency per call
-
-### Option 2: CGO (Linked Library)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    QNTX Core (Go)                       │
-│  ┌────────────────┐    ┌───────────────────────────┐   │
-│  │  AxExecutor    │───►│ cgo.FuzzyEngine (CGO)     │   │
-│  └────────────────┘    └───────────┬───────────────┘   │
-│                                    │ FFI (direct call) │
-│                        ┌───────────▼───────────────┐   │
-│                        │ libqntx_fuzzy.so/.a       │   │
-│                        │ (Rust library)            │   │
-│                        └───────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Pros**: ~1-5μs latency, single binary
-**Cons**: Requires CGO, more complex build
-
-## CGO Integration
-
-For lowest latency, link the Rust library directly via CGO:
-
-### Building the Library
 
 ```bash
 cd plugins/qntx-fuzzy
@@ -189,85 +27,114 @@ cargo build --release --lib
 #   target/release/libqntx_fuzzy.dylib (macOS)
 ```
 
+## CGO Integration
+
+This library uses CGO for direct integration with Go, providing:
+- Direct function calls from Go to Rust (~1-5μs latency)
+- Thread-safe concurrent access via RwLock
+- No network overhead or separate process
+- Memory-safe FFI interface
+
 ### Using from Go
 
 ```go
 import "github.com/teranos/QNTX/plugins/qntx-fuzzy/cgo"
 
 // Create engine (links with Rust library)
-engine, err := cgo.NewFuzzyEngine()
-if err != nil {
-    log.Fatal(err)
-}
-defer engine.Close()
+engine := cgo.NewFuzzyEngine()
+defer engine.Free()
 
 // Build index
-result, err := engine.RebuildIndex(predicates, contexts)
+result := engine.RebuildIndex(predicates, contexts)
 fmt.Printf("Indexed %d predicates in %dms\n",
     result.PredicateCount, result.BuildTimeMs)
 
 // Find matches
-matches, timeUs, err := engine.FindMatches(
+matches := engine.FindMatches(
     "author",
     cgo.VocabPredicates,
     20,   // limit
     0.6,  // min score
 )
 
-for _, m := range matches {
+for _, m := range matches.GetMatches() {
     fmt.Printf("  %s (%.2f, %s)\n", m.Value, m.Score, m.Strategy)
 }
 ```
 
-### CGO Build Requirements
+### Integration with AxExecutor
 
-Ensure the library path is set correctly:
+```go
+// Create CGO matcher
+engine := cgo.NewFuzzyEngine()
+defer engine.Free()
+
+matcher := &ax.CGOMatcher{
+    Engine: engine,
+}
+
+// Use with AxExecutor
+executor := ax.NewAxExecutor(ax.AxExecutorOptions{
+    Matcher: matcher, // Use Rust implementation
+})
+```
+
+### Build Requirements
+
+Set the library path correctly:
 
 ```bash
 # Option 1: Set library path at runtime
-export LD_LIBRARY_PATH=/path/to/QNTX/target/release:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH  # Linux
+export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH  # macOS
 
-# Option 2: Install system-wide
-sudo cp target/release/libqntx_fuzzy.so /usr/local/lib/
-sudo ldconfig
-
-# Option 3: Static linking (larger binary, no runtime dependency)
-# Use the .a file instead of .so
+# Option 2: Build with rustfuzzy tag
+go build -tags rustfuzzy ./...
+go test -tags rustfuzzy ./ats/ax/...
 ```
 
-### Files
+## Performance
+
+Expected improvements over Go implementation:
+
+| Vocabulary Size | Go (substring) | Rust (multi-strategy) | Improvement |
+|-----------------|----------------|----------------------|-------------|
+| 1K items | ~1ms | ~0.05ms | 20x |
+| 10K items | ~10ms | ~0.3ms | 33x |
+| 100K items | ~100ms | ~3ms | 33x |
+
+Additional benefits:
+- Typo tolerance via Levenshtein distance
+- Better ranking via multiple strategies
+- Word boundary detection (important for predicates like `is_author_of`)
+- Consistent scoring across all match types
+
+## Files
 
 | File | Purpose |
 |------|---------|
+| `src/engine.rs` | Core fuzzy matching engine |
+| `src/ffi.rs` | Rust FFI implementation (C ABI) |
+| `src/lib.rs` | Library interface |
 | `include/fuzzy_engine.h` | C header for FFI functions |
-| `src/ffi.rs` | Rust FFI implementation |
 | `cgo/fuzzy_cgo.go` | Go CGO wrapper |
-| `target/release/libqntx_fuzzy.*` | Compiled libraries |
+| `ats/ax/matcher_cgo.go` | Go Matcher interface implementation |
 
-## Development
-
-### Running Tests
+## Testing
 
 ```bash
-cargo test
-```
+# Rust unit tests
+cargo test --lib
 
-### Regenerating Protobuf
+# Integration tests (Go + Rust)
+make rust-fuzzy-integration
 
-The protobuf code is generated at build time via `build.rs`. To regenerate:
-
-```bash
-cargo build
-```
-
-### Benchmarking
-
-```bash
-cargo bench
+# Run with specific test
+go test -tags "integration rustfuzzy" -run TestBooksFuzzyMatching ./plugins/qntx-fuzzy/...
 ```
 
 ## Related
 
 - [GitHub Issue #32](https://github.com/teranos/QNTX/issues/32) - Advanced fuzzy matching system
 - [ats/ax/fuzzy.go](../../ats/ax/fuzzy.go) - Current Go implementation
-- [External Plugin Guide](../../docs/development/external-plugin-guide.md)
+- [ats/ax/matcher.go](../../ats/ax/matcher.go) - Matcher interface

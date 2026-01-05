@@ -35,14 +35,6 @@ jobs:
       - name: Configure git safe directory
         run: git config --global --add safe.directory /__w/QNTX/QNTX
 
-      # Install protoc for gRPC feature testing
-      # The Nix image now includes curl and unzip (as of PR #144)
-      - name: Install protoc
-        run: |
-          curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip
-          unzip protoc-25.1-linux-x86_64.zip -d /usr/local
-          protoc --version
-
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
@@ -79,7 +71,7 @@ jobs:
         run: cd plugins/qntx-fuzzy && cargo fmt --check
 
       - name: Clippy (qntx-fuzzy)
-        run: cd plugins/qntx-fuzzy && cargo clippy --lib --all-features
+        run: cd plugins/qntx-fuzzy && cargo clippy --lib
         env:
           RUSTFLAGS: "-Dwarnings"
 

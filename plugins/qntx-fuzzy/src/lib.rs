@@ -1,39 +1,24 @@
-//! QNTX Fuzzy Matching Library
+//! QNTX Fuzzy Matching Library (CGO)
 //!
 //! High-performance fuzzy matching for QNTX attestation queries.
 //! Provides multi-strategy matching (exact, prefix, substring, edit distance).
 //!
-//! ## Usage
+//! This library is designed to be used from Go via CGO for maximum performance.
 //!
-//! ```rust
-//! use qntx_fuzzy::{FuzzyEngine, VocabularyType};
+//! ## Usage from Go via CGO
 //!
-//! let engine = FuzzyEngine::new();
-//! engine.rebuild_index(
-//!     vec!["is_author_of".to_string(), "works_at".to_string()],
-//!     vec!["GitHub".to_string(), "Microsoft".to_string()],
-//! );
+//! ```go
+//! engine := cgo.NewFuzzyEngine()
+//! defer engine.Free()
 //!
-//! let (matches, time_us) = engine.find_matches(
-//!     "author",
-//!     VocabularyType::Predicates,
-//!     Some(10),
-//!     Some(0.6),
-//! );
+//! engine.RebuildIndex(predicates, contexts)
+//! result := engine.FindMatches("author", 0, 10, 0.6)
 //! ```
 
 pub mod engine;
 
 // FFI module for C/CGO integration
 pub mod ffi;
-
-#[cfg(feature = "grpc")]
-pub mod proto {
-    tonic::include_proto!("qntx.fuzzy");
-}
-
-#[cfg(feature = "grpc")]
-pub mod service;
 
 // Re-export main types
 pub use engine::{EngineConfig, FuzzyEngine, RankedMatch, VocabularyType};
