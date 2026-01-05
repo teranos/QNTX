@@ -30,9 +30,50 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	// Build WHERE clause based on filters
 	whereClauses := []string{}
 
+	// Actor filter (deprecated single actor - backwards compatible)
 	if filters.Actor != "" {
 		whereClauses = append(whereClauses, "json_extract(actors, '$') LIKE ?")
-		args = append(args, "%\""+filters.Actor+"\"%")
+		args = append(args, "%\""+escapeLikePattern(filters.Actor)+"\"%")
+	}
+
+	// Actors filter (multiple actors with OR logic)
+	if len(filters.Actors) > 0 {
+		var actorClauses []string
+		for _, actor := range filters.Actors {
+			actorClauses = append(actorClauses, "actors LIKE ? ESCAPE '\\'")
+			args = append(args, "%\""+escapeLikePattern(actor)+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(actorClauses, " OR ")+")")
+	}
+
+	// Subjects filter (OR logic)
+	if len(filters.Subjects) > 0 {
+		var subjectClauses []string
+		for _, subject := range filters.Subjects {
+			subjectClauses = append(subjectClauses, "subjects LIKE ? ESCAPE '\\'")
+			args = append(args, "%\""+escapeLikePattern(subject)+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(subjectClauses, " OR ")+")")
+	}
+
+	// Predicates filter (OR logic)
+	if len(filters.Predicates) > 0 {
+		var predicateClauses []string
+		for _, predicate := range filters.Predicates {
+			predicateClauses = append(predicateClauses, "predicates LIKE ? ESCAPE '\\'")
+			args = append(args, "%\""+escapeLikePattern(predicate)+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(predicateClauses, " OR ")+")")
+	}
+
+	// Contexts filter (OR logic, case-insensitive)
+	if len(filters.Contexts) > 0 {
+		var contextClauses []string
+		for _, context := range filters.Contexts {
+			contextClauses = append(contextClauses, "contexts LIKE ? COLLATE NOCASE ESCAPE '\\'")
+			args = append(args, "%\""+escapeLikePattern(context)+"\"%")
+		}
+		whereClauses = append(whereClauses, "("+strings.Join(contextClauses, " OR ")+")")
 	}
 
 	if filters.TimeStart != nil {

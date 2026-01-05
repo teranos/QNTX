@@ -26,6 +26,10 @@ type ExternalDomainProxy struct {
 	logger   *zap.SugaredLogger
 	addr     string
 	metadata plugin.Metadata
+
+	// WebSocket configuration (set via SetWebSocketConfig)
+	keepaliveConfig *KeepaliveConfig
+	wsConfig        *WebSocketConfig
 }
 
 // NewExternalDomainProxy creates a new proxy to an external plugin running at the given address.
@@ -81,6 +85,13 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 // Close closes the gRPC connection.
 func (c *ExternalDomainProxy) Close() error {
 	return c.conn.Close()
+}
+
+// SetWebSocketConfig configures WebSocket settings for keepalive and origin validation.
+// If not called, defaults will be used.
+func (c *ExternalDomainProxy) SetWebSocketConfig(keepalive KeepaliveConfig, ws WebSocketConfig) {
+	c.keepaliveConfig = &keepalive
+	c.wsConfig = &ws
 }
 
 // Metadata returns the plugin's metadata (cached from connection).
@@ -260,16 +271,25 @@ func (c *ExternalDomainProxy) RegisterWebSocket() (map[string]plugin.WebSocketHa
 	// Return a proxy WebSocket handler
 	handlers := make(map[string]plugin.WebSocketHandler)
 
-	// Create keepalive handler with default config
-	keepaliveHandler := NewKeepaliveHandler(DefaultKeepaliveConfig(), c.logger)
+	// Use configured keepalive or default
+	keepaliveCfg := DefaultKeepaliveConfig()
+	if c.keepaliveConfig != nil {
+		keepaliveCfg = *c.keepaliveConfig
+	}
+	keepaliveHandler := NewKeepaliveHandler(keepaliveCfg, c.logger)
+
+	// Use configured WebSocket security or default
+	wsCfg := DefaultWebSocketConfig()
+	if c.wsConfig != nil {
+		wsCfg = *c.wsConfig
+	}
 
 	// Create a proxy handler for the plugin's WebSocket endpoints
-	// TODO: Load WebSocket config from plugin manifest
 	handlers[fmt.Sprintf("/%s-ws", c.metadata.Name)] = &wsProxyHandler{
 		client:    c,
 		logger:    c.logger,
 		keepalive: keepaliveHandler,
-		wsConfig:  DefaultWebSocketConfig(),
+		wsConfig:  wsCfg,
 	}
 
 	return handlers, nil
