@@ -15,9 +15,9 @@
 
 /* Symbol Cell - Symbol-first design (now using button elements) */
 .palette-cell {
-    padding: 10px 6px;
+    padding: 8px 4px; /* Default padding for mobile */
     text-align: center;
-    font-size: 16px; /* Increased from 11px for better visibility */
+    font-size: 13px; /* Default size for mobile */
     color: #000;
     background: #f8f8f8;
     border: 1px solid #ddd;
@@ -182,4 +182,64 @@
     );
     color: #fff;
     border-color: #000;
+}
+
+/* Responsive sizing - scale symbols based on screen width */
+
+/* Small tablets and large phones (600px - 768px) */
+@media (min-width: 600px) {
+    .palette-cell {
+        padding: 9px 5px;
+        font-size: 14px;
+    }
+}
+
+/* Tablets and small laptops (768px - 1024px) */
+@media (min-width: 768px) {
+    .palette-cell {
+        padding: 9px 5px;
+        font-size: 15px;
+    }
+}
+
+/* Desktop (1024px - 1440px) */
+@media (min-width: 1024px) {
+    .palette-cell {
+        padding: 10px 6px;
+        font-size: 16px;
+    }
+}
+
+/* Large desktop (1440px+) */
+@media (min-width: 1440px) {
+    .palette-cell {
+        padding: 11px 7px;
+        font-size: 17px;
+    }
+}
+
+/* Ultra-wide displays (1920px+) */
+@media (min-width: 1920px) {
+    .palette-cell {
+        padding: 12px 8px;
+        font-size: 18px;
+    }
+}
+
+/* Very small screens (below 480px) - more compact */
+@media (max-width: 480px) {
+    .symbol-palette {
+        padding: 4px 6px;
+        gap: 1px;
+    }
+
+    .palette-cell {
+        padding: 6px 3px;
+        font-size: 12px;
+    }
+
+    .palette-cell::after {
+        bottom: -28px;
+        font-size: 10px;
+    }
 }
