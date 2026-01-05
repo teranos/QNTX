@@ -62,6 +62,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/pulse/schedules", s.corsMiddleware(s.HandlePulseSchedules))    // List/create schedules (GET/POST)
 	http.HandleFunc("/api/pulse/jobs/", s.corsMiddleware(s.HandlePulseJob))              // Individual async job and sub-resources (GET)
 	http.HandleFunc("/api/pulse/jobs", s.corsMiddleware(s.HandlePulseJobs))              // List async jobs (GET)
+	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))             // Plugin actions: pause/resume (POST)
+	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                   // List installed plugins (GET)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 

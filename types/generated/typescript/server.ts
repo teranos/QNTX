@@ -221,6 +221,47 @@ export interface ParsedATSCode {
   SourceURL: string;
 }
 
+export interface PluginHealthMessage {
+  /**
+   * "plugin_health"
+   */
+  type: string;
+  /**
+   * Plugin name
+   */
+  name: string;
+  /**
+   * Current health status
+   */
+  healthy: boolean;
+  /**
+   * "running", "paused", "stopped"
+   */
+  state: string;
+  /**
+   * Status message
+   */
+  message: string;
+  /**
+   * Unix timestamp
+   */
+  timestamp: number;
+}
+
+export interface PluginInfo {
+  name: string;
+  version: string;
+  qntx_version?: string;
+  description: string;
+  author?: string;
+  license?: string;
+  healthy: boolean;
+  message?: string;
+  details?: Record<string, unknown>;
+  state: string;
+  pausable: boolean;
+}
+
 export interface ProgressMessage {
   /**
    * "import_progress"

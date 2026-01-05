@@ -19,9 +19,11 @@ import (
 )
 
 // Plugin is the code domain plugin implementation
+// Implements plugin.PausablePlugin for runtime pause/resume support
 type Plugin struct {
 	services     plugin.ServiceRegistry
 	goplsService *gopls.Service // Go language server for code intelligence
+	paused       bool           // Whether the plugin is currently paused
 }
 
 // NewPlugin creates a new code domain plugin
@@ -122,11 +124,61 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	// Issue #131: Implement health checks for code domain plugin
 	// Should verify: gopls service, database connectivity, optional GitHub API
 
-	return plugin.HealthStatus{
-		Healthy: true,
-		Message: "Code domain operational",
-		Details: make(map[string]interface{}),
+	message := "Code domain operational"
+	if p.paused {
+		message = "Code domain paused"
 	}
+
+	details := map[string]interface{}{
+		"gopls_available": p.goplsService != nil,
+	}
+
+	return plugin.HealthStatus{
+		Healthy: true,       // Paused is intentional, not a failure
+		Paused:  p.paused,   // Separate field for pause state
+		Message: message,
+		Details: details,
+	}
+}
+
+// Pause temporarily suspends the code domain plugin operations
+// Implements plugin.PausablePlugin
+func (p *Plugin) Pause(ctx context.Context) error {
+	logger := p.services.Logger("code")
+
+	if p.paused {
+		return fmt.Errorf("code plugin is already paused")
+	}
+
+	// Pause gopls service if available
+	if p.goplsService != nil {
+		logger.Info("Pausing gopls service")
+		// gopls doesn't have a pause method, so we just mark as paused
+		// HTTP handlers will check p.paused and return 503
+	}
+
+	p.paused = true
+	logger.Info("Code domain plugin paused")
+	return nil
+}
+
+// Resume restores the code domain plugin to active operation
+// Implements plugin.PausablePlugin
+func (p *Plugin) Resume(ctx context.Context) error {
+	logger := p.services.Logger("code")
+
+	if !p.paused {
+		return fmt.Errorf("code plugin is not paused")
+	}
+
+	p.paused = false
+	logger.Info("Code domain plugin resumed")
+	return nil
+}
+
+// IsPaused returns whether the plugin is currently paused
+func (p *Plugin) IsPaused() bool {
+	return p.paused
 }
 
 // attestGoplsStatus creates an attestation for gopls initialization status
