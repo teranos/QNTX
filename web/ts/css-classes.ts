@@ -99,14 +99,17 @@ export type StreamClass = typeof CSS.STREAM[keyof typeof CSS.STREAM];
  * - Prevents conflicting states
  * - Better DevTools filtering
  *
+ * IMPORTANT: Each data attribute requires corresponding CSS selectors!
+ *
  * @example
- * import { DATA, setDataState } from './css-classes.ts';
- * setDataState(element, 'visibility', DATA.VISIBILITY.HIDDEN);
+ * // TypeScript
+ * import { DATA, setVisibility } from './css-classes.ts';
+ * setVisibility(element, DATA.VISIBILITY.HIDDEN);
  * // Results in: <div data-visibility="hidden">
  *
- * CSS:
- * [data-visibility="hidden"] { display: none; }
- * [data-visibility="visible"] { display: block; }
+ * // Required CSS (add to component's stylesheet)
+ * .my-component[data-visibility="hidden"] { display: none; }
+ * .my-component[data-visibility="visible"] { display: block; }
  */
 export const DATA = {
     /** Visibility states */
@@ -175,5 +178,70 @@ export function clearDataState(
 ): void {
     if (element) {
         delete element.dataset[attribute];
+    }
+}
+
+// ============================================================================
+// Type-Safe Convenience Functions
+// ============================================================================
+
+/**
+ * Set data-visibility attribute with type safety
+ * @requires CSS: [data-visibility="hidden"], [data-visibility="visible"], [data-visibility="fading"]
+ */
+export function setVisibility(
+    element: HTMLElement | null | undefined,
+    value: VisibilityState
+): void {
+    if (element) {
+        element.dataset.visibility = value;
+    }
+}
+
+/**
+ * Get data-visibility attribute value
+ */
+export function getVisibility(
+    element: HTMLElement | null | undefined
+): VisibilityState | undefined {
+    return element?.dataset.visibility as VisibilityState | undefined;
+}
+
+/**
+ * Set data-expansion attribute with type safety
+ * @requires CSS: [data-expansion="collapsed"], [data-expansion="expanded"]
+ */
+export function setExpansion(
+    element: HTMLElement | null | undefined,
+    value: ExpansionState
+): void {
+    if (element) {
+        element.dataset.expansion = value;
+    }
+}
+
+/**
+ * Set data-active attribute with type safety
+ * @requires CSS: [data-active="inactive"], [data-active="active"], [data-active="selected"]
+ */
+export function setActive(
+    element: HTMLElement | null | undefined,
+    value: ActiveState
+): void {
+    if (element) {
+        element.dataset.active = value;
+    }
+}
+
+/**
+ * Set data-loading attribute with type safety
+ * @requires CSS: [data-loading="idle"], [data-loading="loading"], [data-loading="error"], [data-loading="success"]
+ */
+export function setLoading(
+    element: HTMLElement | null | undefined,
+    value: LoadingState
+): void {
+    if (element) {
+        element.dataset.loading = value;
     }
 }

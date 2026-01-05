@@ -19,7 +19,7 @@
  * - insertAfter: '' (default) appends panel to document.body
  */
 
-import { CSS, DATA, setDataState } from './css-classes.ts';
+import { CSS, DATA, setVisibility } from './css-classes.ts';
 
 export interface PanelConfig {
     id: string;
@@ -75,7 +75,7 @@ export abstract class BasePanel {
         const overlay = document.createElement('div');
         overlay.className = `${CSS.PANEL.OVERLAY} ${this.config.id}-overlay`;
         // Start overlays hidden by default using data attribute (issue #114)
-        setDataState(overlay, 'visibility', DATA.VISIBILITY.HIDDEN);
+        setVisibility(overlay, DATA.VISIBILITY.HIDDEN);
 
         if (this.config.closeOnOverlayClick) {
             overlay.addEventListener('click', () => this.hide());
@@ -90,7 +90,7 @@ export abstract class BasePanel {
         panel.id = this.config.id;
         panel.className = this.config.classes.join(' ');
         // Start panels hidden by default using data attribute (issue #114)
-        setDataState(panel, 'visibility', DATA.VISIBILITY.HIDDEN);
+        setVisibility(panel, DATA.VISIBILITY.HIDDEN);
         return panel;
     }
 
@@ -145,7 +145,7 @@ export abstract class BasePanel {
         // Allow subclass to prevent show (e.g., unsaved changes check)
         if (!await this.beforeShow()) return;
 
-        this.setVisibility(true);
+        this.updateVisibility(true);
         await this.onShow();
     }
 
@@ -155,7 +155,7 @@ export abstract class BasePanel {
         // Allow subclass to prevent hide (e.g., unsaved changes prompt)
         if (!this.beforeHide()) return;
 
-        this.setVisibility(false);
+        this.updateVisibility(false);
         this.onHide();
     }
 
@@ -163,10 +163,10 @@ export abstract class BasePanel {
      * Set visibility state for panel and overlay
      * Uses data-visibility attribute for cleaner state management (issue #114)
      */
-    protected setVisibility(visible: boolean): void {
+    protected updateVisibility(visible: boolean): void {
         const state = visible ? DATA.VISIBILITY.VISIBLE : DATA.VISIBILITY.HIDDEN;
-        setDataState(this.panel, 'visibility', state);
-        setDataState(this.overlay, 'visibility', state);
+        setVisibility(this.panel, state);
+        setVisibility(this.overlay, state);
         this.isVisible = visible;
     }
 

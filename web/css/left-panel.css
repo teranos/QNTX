@@ -23,14 +23,8 @@
   pointer-events: none;
 }
 
-/* Class-based visibility (legacy) */
-.panel-slide-left.visible {
-  transform: translateX(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Data-attribute visibility (issue #114) */
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.panel-slide-left.visible,
 .panel-slide-left[data-visibility="visible"] {
   transform: translateX(0);
   opacity: 1;
@@ -51,13 +45,8 @@
   transition: opacity 0.3s ease;
 }
 
-/* Class-based visibility (legacy) */
-.panel-overlay.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Data-attribute visibility (issue #114) */
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.panel-overlay.visible,
 .panel-overlay[data-visibility="visible"] {
   opacity: 1;
   pointer-events: auto;
