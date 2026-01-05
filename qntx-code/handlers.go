@@ -14,6 +14,7 @@ import (
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
 
@@ -84,6 +85,9 @@ func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
 	// GitHub PR integration
 	mux.HandleFunc("/api/code/github/pr/", p.handlePRSuggestions)
 	mux.HandleFunc("/api/code/github/pr", p.handlePRList)
+
+	// Git ingestion (⨳ ix segment)
+	mux.HandleFunc("POST /api/code/ixgest/git", p.handleGitIxgest)
 
 	return nil
 }
@@ -211,6 +215,89 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(prs)
+}
+
+// GitIxgestRequest represents a git ingestion request
+type GitIxgestRequest struct {
+	Path      string `json:"path"`                // Repository path (required)
+	Actor     string `json:"actor,omitempty"`     // Custom actor for attestations
+	Since     string `json:"since,omitempty"`     // Filter: only commits after this timestamp/hash
+	Verbosity int    `json:"verbosity,omitempty"` // Logging verbosity (0-5)
+	DryRun    bool   `json:"dry_run,omitempty"`   // If true, don't persist attestations
+}
+
+// handleGitIxgest handles git repository ingestion requests
+func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
+	logger := p.services.Logger("code")
+
+	// Parse request body
+	var req GitIxgestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path
+	if req.Path == "" {
+		http.Error(w, "path is required", http.StatusBadRequest)
+		return
+	}
+
+	// Resolve repository path
+	repoPath := req.Path
+	if !filepath.IsAbs(repoPath) {
+		workspaceRoot, err := getWorkspaceRoot()
+		if err != nil {
+			logger.Errorw("Failed to get workspace root", "error", err)
+			http.Error(w, "Workspace configuration error", http.StatusInternalServerError)
+			return
+		}
+		repoPath = filepath.Join(workspaceRoot, repoPath)
+	}
+
+	// Verify it's a git repository
+	if !git.IsGitRepository(repoPath) {
+		http.Error(w, "Path is not a git repository", http.StatusBadRequest)
+		return
+	}
+
+	// Get ATSStore from services
+	store := p.services.ATSStore()
+	if store == nil && !req.DryRun {
+		http.Error(w, "ATSStore not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Create processor using plugin's ATSStore
+	processor := git.NewGitIxProcessorWithStore(store, req.DryRun, req.Actor, req.Verbosity, logger)
+
+	// Set incremental filter if --since is provided
+	if req.Since != "" {
+		if err := processor.SetSince(req.Since); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid since value: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Process repository
+	result, err := processor.ProcessGitRepository(repoPath)
+	if err != nil {
+		logger.Errorw("Git ingestion failed", "path", repoPath, "error", err)
+		http.Error(w, fmt.Sprintf("Git ingestion failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Create attestation for ixgest completion
+	p.attestIxgestCompleted(repoPath, result.CommitsProcessed, result.TotalAttestations)
+
+	logger.Infow("Git ingestion completed",
+		"path", repoPath,
+		"commits", result.CommitsProcessed,
+		"branches", result.BranchesProcessed,
+		"attestations", result.TotalAttestations)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 // buildCodeTree builds the code file tree
@@ -396,5 +483,27 @@ func (p *Plugin) attestPRListFetch(count int) {
 	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
 		logger := p.services.Logger("code")
 		logger.Debugw("Failed to create PR list attestation", "error", err)
+	}
+}
+
+// attestIxgestCompleted creates an attestation for git ingestion completion
+func (p *Plugin) attestIxgestCompleted(repoPath string, commits, attestations int) {
+	store := p.services.ATSStore()
+	if store == nil {
+		return
+	}
+
+	cmd := &types.AsCommand{
+		Subjects:   []string{repoPath},
+		Predicates: []string{"ingested"},
+		Contexts:   []string{"ixgest-git"},
+		Attributes: map[string]interface{}{
+			"commits":      commits,
+			"attestations": attestations,
+		},
+	}
+	if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		logger := p.services.Logger("code")
+		logger.Debugw("Failed to create ixgest completion attestation", "error", err)
 	}
 }
