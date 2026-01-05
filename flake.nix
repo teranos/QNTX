@@ -28,17 +28,11 @@
             gofmt.enable = true;
             govet.enable = true;
 
-            # Custom hook for vendorHash validation
-            vendorHash-check = {
+            # Auto-update vendorHash when go.mod/go.sum changes
+            vendorHash-update = {
               enable = true;
-              name = "Nix vendorHash validation";
-              entry = "${pkgs.writeShellScript "vendorHash-check" ''
-                # Check if go.mod or go.sum changed
-                if git diff --cached --name-only | grep -qE '^go\.(mod|sum)$'; then
-                  echo "⚠️  go.mod or go.sum changed - remember to update flake.nix vendorHash!"
-                  echo "Run: .githooks/update-nix-hash.sh"
-                fi
-              ''}";
+              name = "Update Nix vendorHash";
+              entry = "${./.githooks/update-nix-hash.sh}";
               files = "\\.(mod|sum)$";
               pass_filenames = false;
             };
