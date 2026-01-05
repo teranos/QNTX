@@ -24,7 +24,7 @@
 // - Consider: Week-over-week, month-over-month, year-over-year
 
 import * as d3 from 'd3';
-import { uiState } from './ui-state.js';
+import { uiState } from './ui-state.ts';
 
 // Type definitions for usage data
 interface UsageStats {
