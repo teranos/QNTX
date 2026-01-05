@@ -17,7 +17,7 @@ import requests
 from bs4 import BeautifulSoup
 from lxml import etree
 
-from .atsstore import ATSStoreClient, AttestationCommand
+from .atsstore import ATSStoreClient, AttestationCommand, AttestationFilter
 
 
 class SSRFError(ValueError):
@@ -1087,11 +1087,62 @@ class WebScraper:
 
     # ==================== Crawling ====================
 
+    def _was_previously_crawled(self, url: str) -> bool:
+        """Check if a URL was previously crawled by querying ATSStore.
+
+        Args:
+            url: The URL to check
+
+        Returns:
+            True if attestations exist for this URL (indicating it was crawled before)
+        """
+        if not self.ats_client:
+            return False
+
+        try:
+            # Query for any attestation where this URL is the subject
+            # with our webscraper predicates
+            filter = AttestationFilter(
+                subjects=[url],
+                predicates=[self.PREDICATE_HAS_TITLE],  # If we have a title, we crawled it
+                limit=1,  # We only need to know if any exist
+            )
+            results = self.ats_client.get_attestations(filter)
+            return len(results) > 0
+        except Exception as e:
+            logger.warning(f"Failed to check ATSStore for {url}: {e}")
+            return False  # Assume not crawled if check fails
+
+    def _get_previously_crawled_urls(self, urls: list[str]) -> set[str]:
+        """Batch check which URLs were previously crawled.
+
+        Args:
+            urls: List of URLs to check
+
+        Returns:
+            Set of URLs that have been previously crawled
+        """
+        if not self.ats_client or not urls:
+            return set()
+
+        previously_crawled = set()
+        try:
+            # Query for attestations where any of these URLs are subjects
+            # Note: This is a batch query for efficiency
+            for url in urls:
+                if self._was_previously_crawled(url):
+                    previously_crawled.add(url)
+        except Exception as e:
+            logger.warning(f"Failed to batch check ATSStore: {e}")
+
+        return previously_crawled
+
     def crawl(
         self,
         start_url: str,
         max_pages: int = 10,
         same_domain_only: bool = True,
+        skip_previously_crawled: bool = False,
     ) -> Iterator[ScrapeResult]:
         """Crawl starting from a URL, following links.
 
@@ -1099,6 +1150,7 @@ class WebScraper:
             start_url: The starting URL
             max_pages: Maximum number of pages to crawl
             same_domain_only: Only follow links on the same domain
+            skip_previously_crawled: Skip URLs that have attestations in ATSStore
 
         Yields:
             ScrapeResult for each page crawled
@@ -1107,9 +1159,20 @@ class WebScraper:
         to_visit: list[str] = [start_url]
         start_domain = urlparse(start_url).netloc
 
+        # Check if start URL was previously crawled
+        if skip_previously_crawled and self._was_previously_crawled(start_url):
+            logger.info(f"Skipping previously crawled URL: {start_url}")
+            return
+
         while to_visit and len(visited) < max_pages:
             url = to_visit.pop(0)
             if url in visited:
+                continue
+
+            # Check ATSStore for previously crawled URLs
+            if skip_previously_crawled and self._was_previously_crawled(url):
+                logger.info(f"Skipping previously crawled URL: {url}")
+                visited.add(url)  # Mark as visited to avoid re-checking
                 continue
 
             visited.add(url)
@@ -1121,12 +1184,11 @@ class WebScraper:
 
             # Queue new URLs to visit
             for link in result.links:
-                if link.target_url in visited:
+                if link.target_url in visited or link.target_url in to_visit:
                     continue
                 if same_domain_only and link.is_external:
                     continue
-                if link.target_url not in to_visit:
-                    to_visit.append(link.target_url)
+                to_visit.append(link.target_url)
 
     def crawl_and_attest(
         self,
@@ -1134,6 +1196,7 @@ class WebScraper:
         actor: str = "",
         max_pages: int = 10,
         same_domain_only: bool = True,
+        skip_previously_crawled: bool = True,
     ) -> tuple[list[ScrapeResult], list[str]]:
         """Crawl and create attestations for all found links.
 
@@ -1142,6 +1205,7 @@ class WebScraper:
             actor: The actor creating the attestations
             max_pages: Maximum number of pages to crawl
             same_domain_only: Only follow links on the same domain
+            skip_previously_crawled: Skip URLs that have attestations in ATSStore (default True)
 
         Returns:
             Tuple of (list of ScrapeResults, list of all attestation IDs)
@@ -1152,7 +1216,12 @@ class WebScraper:
         all_results = []
         all_attestation_ids = []
 
-        for result in self.crawl(start_url, max_pages, same_domain_only):
+        for result in self.crawl(
+            start_url,
+            max_pages,
+            same_domain_only,
+            skip_previously_crawled=skip_previously_crawled,
+        ):
             all_results.append(result)
 
             if result.error:

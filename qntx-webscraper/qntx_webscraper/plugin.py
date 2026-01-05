@@ -397,12 +397,14 @@ class WebScraperPlugin(domain_pb2_grpc.DomainPluginServiceServicer):
         actor = body.get("actor", "")
         max_pages = body.get("max_pages", 10)
         same_domain_only = body.get("same_domain_only", True)
+        skip_previously_crawled = body.get("skip_previously_crawled", True)
 
         results, attestation_ids = self.scraper.crawl_and_attest(
             url,
             actor=actor,
             max_pages=max_pages,
             same_domain_only=same_domain_only,
+            skip_previously_crawled=skip_previously_crawled,
         )
 
         response_data = {
