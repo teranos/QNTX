@@ -242,12 +242,11 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 
 func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 	filter := ats.AttestationFilter{
-		Limit: int(proto.Limit),
-	}
-
-	// AttestationFilter only supports single Actor, use first if provided
-	if len(proto.Actors) > 0 {
-		filter.Actor = proto.Actors[0]
+		Limit:      int(proto.Limit),
+		Actors:     proto.Actors,
+		Subjects:   proto.Subjects,
+		Predicates: proto.Predicates,
+		Contexts:   proto.Contexts,
 	}
 
 	if proto.TimeStart != 0 {
@@ -259,9 +258,6 @@ func protoToFilter(proto *protocol.AttestationFilter) ats.AttestationFilter {
 		t := time.Unix(proto.TimeEnd, 0)
 		filter.TimeEnd = &t
 	}
-
-	// TODO: ats.AttestationFilter doesn't support Subjects, Predicates, Contexts filtering yet
-	// These fields in the proto are for future expansion
 
 	return filter
 }

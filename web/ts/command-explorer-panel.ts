@@ -9,6 +9,7 @@
  */
 
 import { AX } from '@generated/sym.js';
+import { DATA, setVisibility, setActive } from './css-classes.ts';
 
 interface AxStatement {
     type: string;
@@ -52,7 +53,8 @@ class CommandExplorerPanel {
         // Create panel element
         this.panel = document.createElement('div');
         this.panel.id = 'command-explorer-panel';
-        this.panel.className = 'command-explorer-panel hidden';
+        this.panel.className = 'command-explorer-panel';
+        setVisibility(this.panel, DATA.VISIBILITY.HIDDEN);
         this.panel.innerHTML = this.getEmptyTemplate();
 
         // Insert after symbol palette
@@ -96,8 +98,7 @@ class CommandExplorerPanel {
             this.renderAsHistory();
         }
 
-        this.panel.classList.remove('hidden');
-        this.panel.classList.add('visible');
+        setVisibility(this.panel, DATA.VISIBILITY.VISIBLE);
 
         // Focus search input
         const searchInput = this.panel.querySelector('.command-search-input') as HTMLInputElement | null;
@@ -113,8 +114,7 @@ class CommandExplorerPanel {
         if (!this.panel) return;
 
         this.isVisible = false;
-        this.panel.classList.remove('visible');
-        this.panel.classList.add('hidden');
+        setVisibility(this.panel, DATA.VISIBILITY.HIDDEN);
     }
 
     toggle(mode: string): void {
@@ -301,11 +301,13 @@ class CommandExplorerPanel {
             this.populateQueryFromHistory(item);
         }
 
-        // Highlight the selected item
+        // Highlight the selected item using data-active attribute
         if (this.panel) {
-            this.panel.querySelectorAll('.filter-item').forEach(i => i.classList.remove('selected'));
+            this.panel.querySelectorAll('.filter-item').forEach(i => {
+                setActive(i as HTMLElement, DATA.ACTIVE.INACTIVE);
+            });
         }
-        item.classList.add('selected');
+        setActive(item, DATA.ACTIVE.SELECTED);
     }
 
     populateQueryFromHistory(item: HTMLElement): void {

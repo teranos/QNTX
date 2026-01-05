@@ -228,29 +228,3 @@ func TestGetDatabasePath(t *testing.T) {
 	}
 }
 
-func TestGetREPLConfig_Defaults(t *testing.T) {
-	// Create isolated viper instance without loading user/system config
-	v := viper.New()
-	SetDefaults(v)
-
-	cfg, err := LoadWithViper(v)
-	if err != nil {
-		t.Fatalf("LoadWithViper() failed: %v", err)
-	}
-
-	repl := cfg.GetREPLConfig()
-
-	// Verify all defaults are applied
-	if repl.Search.DebounceMs != 50 {
-		t.Errorf("expected debounce 50, got %d", repl.Search.DebounceMs)
-	}
-	if repl.Search.ResultLimit != 10 {
-		t.Errorf("expected result limit 10, got %d", repl.Search.ResultLimit)
-	}
-	if repl.Display.MaxLines != 10 {
-		t.Errorf("expected max lines 10, got %d", repl.Display.MaxLines)
-	}
-	if repl.Timeouts.CommandSeconds != 30 {
-		t.Errorf("expected command timeout 30, got %d", repl.Timeouts.CommandSeconds)
-	}
-}

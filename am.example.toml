@@ -83,57 +83,6 @@ http_delay_between_requests_ms = 2000
 # delay_between_requests_ms = 5000
 
 # ════════════════════════════════════════════════════════════════
-# REPL Configuration (Interactive Shell)
-# ════════════════════════════════════════════════════════════════
-
-[repl.search]
-# Search debounce delay in milliseconds
-# Default: 50
-debounce_ms = 50
-
-# Maximum search results to show
-# Default: 10
-result_limit = 10
-
-# Search scoring
-exact_match_score = 100   # Score for exact matches
-prefix_match_score = 50   # Score for prefix matches
-contains_score = 25       # Score for substring matches
-base_result_score = 50    # Base score for results
-length_bonus_score = 50   # Maximum length bonus
-
-[repl.display]
-# Maximum lines in preview mode
-# Default: 10
-max_lines = 10
-
-# Maximum characters per result buffer
-# Default: 2000
-buffer_limit = 2000
-
-# Target FPS for rendering
-# Default: 60
-target_fps = 60
-
-[repl.timeouts]
-# Command execution timeout (seconds)
-# Default: 30
-command_seconds = 30
-
-# Database query timeout (seconds)
-# Default: 10
-database_seconds = 10
-
-[repl.history]
-# Maximum results in history
-# Default: 100
-result_limit = 100
-
-# Channel buffer size for history
-# Default: 100
-channel_buffer = 100
-
-# ════════════════════════════════════════════════════════════════
 # Code Configuration (GitHub & LSP Integration)
 # ════════════════════════════════════════════════════════════════
 

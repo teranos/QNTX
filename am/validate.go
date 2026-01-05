@@ -38,14 +38,5 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate REPL timeouts - must be non-negative
-	// (Zero values get defaults applied by GetREPLConfig(), so validate all values)
-	if c.REPL.Timeouts.CommandSeconds < 0 {
-		return fmt.Errorf("repl.timeouts.command_seconds must be >= 0, got %d", c.REPL.Timeouts.CommandSeconds)
-	}
-	if c.REPL.Timeouts.DatabaseSeconds < 0 {
-		return fmt.Errorf("repl.timeouts.database_seconds must be >= 0, got %d", c.REPL.Timeouts.DatabaseSeconds)
-	}
-
 	return nil
 }
