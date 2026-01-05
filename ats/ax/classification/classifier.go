@@ -3,6 +3,7 @@ package classification
 import (
 	"time"
 
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
 )
 
@@ -29,7 +30,7 @@ func NewSmartClassifier(config TemporalConfig) *SmartClassifier {
 }
 
 // ClassifyConflicts performs smart classification on a set of claims
-func (sc *SmartClassifier) ClassifyConflicts(claimGroups map[string][]IndividualClaim) ClassificationResult {
+func (sc *SmartClassifier) ClassifyConflicts(claimGroups map[string][]ats.IndividualClaim) ClassificationResult {
 	var conflicts []AdvancedConflict
 	autoResolved := 0
 	reviewRequired := 0
@@ -60,18 +61,8 @@ func (sc *SmartClassifier) ClassifyConflicts(claimGroups map[string][]Individual
 	}
 }
 
-// IndividualClaim represents a single claim from cartesian expansion
-type IndividualClaim struct {
-	Subject   string
-	Predicate string
-	Context   string
-	Actor     string
-	Timestamp time.Time
-	SourceAs  types.As
-}
-
 // classifySingleConflict classifies a single conflict situation
-func (sc *SmartClassifier) classifySingleConflict(claimKey string, claims []IndividualClaim) AdvancedConflict {
+func (sc *SmartClassifier) classifySingleConflict(claimKey string, claims []ats.IndividualClaim) AdvancedConflict {
 	// Convert to ClaimWithTiming for analysis
 	claimsWithTiming := make([]ClaimWithTiming, len(claims))
 	for i, claim := range claims {
@@ -120,7 +111,7 @@ func (sc *SmartClassifier) classifySingleConflict(claimKey string, claims []Indi
 }
 
 // determineResolutionType determines the type of resolution needed
-func (sc *SmartClassifier) determineResolutionType(claims []IndividualClaim) ResolutionType {
+func (sc *SmartClassifier) determineResolutionType(claims []ats.IndividualClaim) ResolutionType {
 	// Check for same actor evolution
 	if sc.isSameActorEvolution(claims) {
 		return ResolutionEvolution
@@ -146,7 +137,7 @@ func (sc *SmartClassifier) determineResolutionType(claims []IndividualClaim) Res
 }
 
 // isSameActorEvolution checks if claims represent evolution by same actor
-func (sc *SmartClassifier) isSameActorEvolution(claims []IndividualClaim) bool {
+func (sc *SmartClassifier) isSameActorEvolution(claims []ats.IndividualClaim) bool {
 	if len(claims) < 2 {
 		return false
 	}
@@ -186,7 +177,7 @@ func (sc *SmartClassifier) isSameActorEvolution(claims []IndividualClaim) bool {
 }
 
 // isSimultaneousVerification checks if claims are simultaneous verification
-func (sc *SmartClassifier) isSimultaneousVerification(claims []IndividualClaim) bool {
+func (sc *SmartClassifier) isSimultaneousVerification(claims []ats.IndividualClaim) bool {
 	if len(claims) < 2 {
 		return false
 	}
@@ -211,7 +202,7 @@ func (sc *SmartClassifier) isSimultaneousVerification(claims []IndividualClaim) 
 }
 
 // isDifferentContexts checks if claims are about different contexts
-func (sc *SmartClassifier) isDifferentContexts(claims []IndividualClaim) bool {
+func (sc *SmartClassifier) isDifferentContexts(claims []ats.IndividualClaim) bool {
 	contexts := make(map[string]bool)
 	for _, claim := range claims {
 		contexts[claim.Context] = true
@@ -220,7 +211,7 @@ func (sc *SmartClassifier) isDifferentContexts(claims []IndividualClaim) bool {
 }
 
 // hasHumanSupersession checks if human operator overrides other actors
-func (sc *SmartClassifier) hasHumanSupersession(claims []IndividualClaim) bool {
+func (sc *SmartClassifier) hasHumanSupersession(claims []ats.IndividualClaim) bool {
 	hasHuman := false
 	hasNonHuman := false
 
@@ -256,7 +247,7 @@ func (sc *SmartClassifier) determineStrategy(resType ResolutionType, confidence 
 }
 
 // analyzeTemporalPattern analyzes temporal patterns in claims
-func (sc *SmartClassifier) analyzeTemporalPattern(claims []IndividualClaim) string {
+func (sc *SmartClassifier) analyzeTemporalPattern(claims []ats.IndividualClaim) string {
 	var timings []ClaimTiming
 	for _, claim := range claims {
 		timings = append(timings, ClaimTiming{
@@ -271,7 +262,7 @@ func (sc *SmartClassifier) analyzeTemporalPattern(claims []IndividualClaim) stri
 }
 
 // createActorHierarchy creates a hierarchy of actors by credibility
-func (sc *SmartClassifier) createActorHierarchy(claims []IndividualClaim) []ActorRanking {
+func (sc *SmartClassifier) createActorHierarchy(claims []ats.IndividualClaim) []ActorRanking {
 	var actors []string
 	for _, claim := range claims {
 		actors = append(actors, claim.Actor)
@@ -293,7 +284,7 @@ func (sc *SmartClassifier) createActorHierarchy(claims []IndividualClaim) []Acto
 }
 
 // getUniqueSourceAttestations extracts unique source attestations
-func (sc *SmartClassifier) getUniqueSourceAttestations(claims []IndividualClaim) []types.As {
+func (sc *SmartClassifier) getUniqueSourceAttestations(claims []ats.IndividualClaim) []types.As {
 	seen := make(map[string]bool)
 	var attestations []types.As
 
