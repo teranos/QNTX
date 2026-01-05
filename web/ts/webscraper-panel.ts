@@ -47,12 +47,12 @@ class WebscraperPanel extends BasePanel {
 
     protected getTemplate(): string {
         return `
-            <div class="panel-header webscraper-panel-header">
-                <h3 class="panel-title webscraper-panel-title">Web Scraper</h3>
-                <button class="panel-close webscraper-panel-close" aria-label="Close">&#10005;</button>
+            <div class="panel-header">
+                <h3 class="panel-title">Web Scraper</h3>
+                <button class="panel-close" aria-label="Close">&#10005;</button>
             </div>
 
-            <div class="panel-content webscraper-panel-content">
+            <div class="panel-content">
                 <!-- URL Input Section -->
                 <div class="scraper-input-section">
                     <label for="scraper-url" class="scraper-label">URL to Scrape:</label>
@@ -130,7 +130,7 @@ class WebscraperPanel extends BasePanel {
         });
 
         // Close button
-        this.$('.webscraper-panel-close')?.addEventListener('click', () => {
+        this.$('.panel-close')?.addEventListener('click', () => {
             this.hide();
         });
     }
@@ -321,7 +321,7 @@ class WebscraperPanel extends BasePanel {
 
         historyList.innerHTML = this.currentResults.map(result => `
             <div class="scraper-history-item" data-url="${this.escapeHtml(result.url)}">
-                <div class="scraper-history-title">${this.escapeHtml(result.title || result.url)}</div>
+                <div class="scraper-history-url">${this.escapeHtml(result.title || result.url)}</div>
                 <div class="scraper-history-time">${new Date(result.timestamp).toLocaleTimeString()}</div>
             </div>
         `).join('');
