@@ -4,11 +4,11 @@
   inputs = {
     # Pin to stable release channel for reproducibility
     # Update to newer releases (24.11, 25.05, etc.) as needed
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
-      # Pin to version compatible with nixpkgs 24.05 (June 2024)
-      url = "github:cachix/pre-commit-hooks.nix/4e743a6920eab45e8ba0fbe49dc459f1423a4b74";
+      # Use latest pre-commit-hooks compatible with nixpkgs 24.11
+      url = "github:cachix/pre-commit-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
