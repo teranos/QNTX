@@ -5,13 +5,7 @@
 
 import type { DaemonStatusMessage } from '../../types/websocket';
 import { toast } from '../toast';
-
-// Track last warning state to avoid duplicate toasts
-let lastBudgetWarningState = {
-    daily: false,
-    weekly: false,
-    monthly: false,
-};
+import { uiState } from '../ui-state.js';
 
 const BUDGET_WARNING_THRESHOLD = 0.80; // Warn at 80% of budget
 
@@ -30,18 +24,21 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
 
 /**
  * Check if budget limits are approaching and show warning toasts
+ * Uses centralized UIState to track warning state across the session
  */
 function checkBudgetWarnings(data: DaemonStatusMessage): void {
+    const warnings = uiState.getBudgetWarnings();
+
     // Daily budget
     const dailyUsage = data.budget_daily ?? 0;
     const dailyLimit = data.budget_daily_limit ?? 0;
     if (dailyLimit > 0) {
         const dailyPercent = dailyUsage / dailyLimit;
-        if (dailyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.daily) {
+        if (dailyPercent >= BUDGET_WARNING_THRESHOLD && !warnings.daily) {
             toast.warning(`Daily budget ${Math.round(dailyPercent * 100)}% used ($${dailyUsage.toFixed(2)}/$${dailyLimit.toFixed(2)})`);
-            lastBudgetWarningState.daily = true;
+            uiState.setBudgetWarning('daily', true);
         } else if (dailyPercent < BUDGET_WARNING_THRESHOLD) {
-            lastBudgetWarningState.daily = false;
+            uiState.setBudgetWarning('daily', false);
         }
     }
 
@@ -50,11 +47,11 @@ function checkBudgetWarnings(data: DaemonStatusMessage): void {
     const weeklyLimit = data.budget_weekly_limit ?? 0;
     if (weeklyLimit > 0) {
         const weeklyPercent = weeklyUsage / weeklyLimit;
-        if (weeklyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.weekly) {
+        if (weeklyPercent >= BUDGET_WARNING_THRESHOLD && !warnings.weekly) {
             toast.warning(`Weekly budget ${Math.round(weeklyPercent * 100)}% used ($${weeklyUsage.toFixed(2)}/$${weeklyLimit.toFixed(2)})`);
-            lastBudgetWarningState.weekly = true;
+            uiState.setBudgetWarning('weekly', true);
         } else if (weeklyPercent < BUDGET_WARNING_THRESHOLD) {
-            lastBudgetWarningState.weekly = false;
+            uiState.setBudgetWarning('weekly', false);
         }
     }
 
@@ -63,11 +60,11 @@ function checkBudgetWarnings(data: DaemonStatusMessage): void {
     const monthlyLimit = data.budget_monthly_limit ?? 0;
     if (monthlyLimit > 0) {
         const monthlyPercent = monthlyUsage / monthlyLimit;
-        if (monthlyPercent >= BUDGET_WARNING_THRESHOLD && !lastBudgetWarningState.monthly) {
+        if (monthlyPercent >= BUDGET_WARNING_THRESHOLD && !warnings.monthly) {
             toast.warning(`Monthly budget ${Math.round(monthlyPercent * 100)}% used ($${monthlyUsage.toFixed(2)}/$${monthlyLimit.toFixed(2)})`);
-            lastBudgetWarningState.monthly = true;
+            uiState.setBudgetWarning('monthly', true);
         } else if (monthlyPercent < BUDGET_WARNING_THRESHOLD) {
-            lastBudgetWarningState.monthly = false;
+            uiState.setBudgetWarning('monthly', false);
         }
     }
 }
