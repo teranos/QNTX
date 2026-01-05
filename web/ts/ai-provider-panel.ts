@@ -226,13 +226,13 @@ class AIProviderPanel extends BasePanel {
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
             ollamaBtn?.classList.remove('active');
-            modelSelector?.classList.add('hidden');
-            openrouterConfig?.classList.remove('hidden');
+            modelSelector?.classList.add('u-hidden');
+            openrouterConfig?.classList.remove('u-hidden');
         } else {
             openrouterBtn?.classList.remove('active');
             ollamaBtn?.classList.add('active');
-            modelSelector?.classList.remove('hidden');
-            openrouterConfig?.classList.add('hidden');
+            modelSelector?.classList.remove('u-hidden');
+            openrouterConfig?.classList.add('u-hidden');
         }
     }
 
