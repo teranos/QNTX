@@ -25,7 +25,7 @@
 
 import * as d3 from 'd3';
 import { uiState } from './ui-state.ts';
-import { DATA, setVisibility, setExpansion } from './css-classes.ts';
+import { DATA, setVisibility, setExpansion, setLoading } from './css-classes.ts';
 
 // Type definitions for usage data
 interface UsageStats {
@@ -98,17 +98,26 @@ export function updateUsageBadge(stats: UsageStats): void {
 }
 
 // Fetch time-series data for charting
-async function fetchTimeSeriesData(): Promise<void> {
+async function fetchTimeSeriesData(): Promise<boolean> {
+    const container = document.getElementById('usage-chart-container');
+    setLoading(container, DATA.LOADING.LOADING);
+
     try {
         const days = uiState.getUsageView() === 'week' ? 7 : 30;
         const { apiFetch } = await import('./api.ts');
         const response = await apiFetch(`/api/timeseries/usage?days=${days}`);
         if (response.ok) {
             timeSeriesData = await response.json() as TimeSeriesDataPoint[];
+            setLoading(container, DATA.LOADING.SUCCESS);
+            return true;
         }
+        setLoading(container, DATA.LOADING.ERROR);
+        return false;
     } catch (err) {
         console.warn('Failed to fetch time-series data:', err);
         timeSeriesData = [];
+        setLoading(container, DATA.LOADING.ERROR);
+        return false;
     }
 }
 
