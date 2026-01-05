@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/ats/storage/testutil"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 // TestAttestationExists_True tests existence check for existing attestation
@@ -249,4 +249,3 @@ func TestCreateAttestation_Duplicate(t *testing.T) {
 		t.Error("CreateAttestation() with duplicate ID should fail, got nil error")
 	}
 }
-

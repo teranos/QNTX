@@ -66,13 +66,13 @@ type JobExecutor interface {
 // WorkerPool manages a pool of workers that process async IX jobs
 type WorkerPool struct {
 	queue         *Queue
-	budgetTracker BudgetTracker    // Budget tracking (optional - can be nil for tests)
-	rateLimiter   RateLimiter      // Rate limiting (optional - can be nil for tests)
+	budgetTracker BudgetTracker // Budget tracking (optional - can be nil for tests)
+	rateLimiter   RateLimiter   // Rate limiting (optional - can be nil for tests)
 	db            *sql.DB
 	config        *am.Config
 	poolConfig    WorkerPoolConfig // Store pool configuration for graceful start timing
 	workers       int
-	parentCtx     context.Context    // Parent context from which worker context is derived
+	parentCtx     context.Context // Parent context from which worker context is derived
 	ctx           context.Context
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
@@ -86,10 +86,10 @@ type WorkerPool struct {
 
 // WorkerPoolConfig contains configuration for the worker pool
 type WorkerPoolConfig struct {
-	Workers            int           `json:"workers"`               // Number of concurrent workers
-	PollInterval       time.Duration `json:"poll_interval"`         // How often to check for new jobs
-	PauseOnBudget      bool          `json:"pause_on_budget"`       // Pause jobs when budget exceeded
-	GracefulStartPhase time.Duration `json:"graceful_start_phase"`  // Duration of each graceful start phase (default: 5min, test: 10s)
+	Workers            int           `json:"workers"`              // Number of concurrent workers
+	PollInterval       time.Duration `json:"poll_interval"`        // How often to check for new jobs
+	PauseOnBudget      bool          `json:"pause_on_budget"`      // Pause jobs when budget exceeded
+	GracefulStartPhase time.Duration `json:"graceful_start_phase"` // Duration of each graceful start phase (default: 5min, test: 10s)
 }
 
 // DefaultWorkerPoolConfig returns sensible defaults
@@ -148,7 +148,7 @@ func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, 
 		config:        cfg,
 		poolConfig:    poolCfg, // Store for graceful start timing
 		workers:       poolCfg.Workers,
-		parentCtx:     ctx,      // Store parent context for context recreation
+		parentCtx:     ctx, // Store parent context for context recreation
 		ctx:           workerCtx,
 		cancel:        cancel,
 		executor:      executor,

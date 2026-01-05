@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/teranos/QNTX/ats/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/teranos/QNTX/ats/types"
 )
 
 func TestParseTemporalExpression(t *testing.T) {

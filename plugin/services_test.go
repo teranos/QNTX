@@ -190,13 +190,13 @@ type mockConfigWithID struct {
 	id string
 }
 
-func (m *mockConfigWithID) GetString(key string) string         { return "" }
-func (m *mockConfigWithID) GetInt(key string) int                { return 0 }
-func (m *mockConfigWithID) GetBool(key string) bool              { return false }
-func (m *mockConfigWithID) GetStringSlice(key string) []string   { return nil }
-func (m *mockConfigWithID) Get(key string) interface{}           { return nil }
-func (m *mockConfigWithID) Set(key string, value interface{})    {}
-func (m *mockConfigWithID) GetKeys() []string                    { return []string{} }
+func (m *mockConfigWithID) GetString(key string) string        { return "" }
+func (m *mockConfigWithID) GetInt(key string) int              { return 0 }
+func (m *mockConfigWithID) GetBool(key string) bool            { return false }
+func (m *mockConfigWithID) GetStringSlice(key string) []string { return nil }
+func (m *mockConfigWithID) Get(key string) interface{}         { return nil }
+func (m *mockConfigWithID) Set(key string, value interface{})  {}
+func (m *mockConfigWithID) GetKeys() []string                   { return []string{} }
 
 // Verify mockConfigWithID implements Config
 var _ Config = (*mockConfigWithID)(nil)

@@ -537,7 +537,7 @@ func TestInvalid_MalformedHTTPRequest(t *testing.T) {
 
 	// Send request with empty method
 	req := &protocol.HTTPRequest{
-		Method: "",  // Invalid empty method
+		Method: "", // Invalid empty method
 		Path:   "/api/mock/test",
 	}
 

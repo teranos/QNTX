@@ -1,9 +1,9 @@
 package storage
 
 import (
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"context"
 	"database/sql"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 	"time"
 
@@ -378,7 +378,7 @@ func TestAxExecutorEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh database and executor for each subtest
 			db := setupTestDatabaseWithAttestations(t)
-					executor := NewExecutor(db)
+			executor := NewExecutor(db)
 
 			result, err := executor.ExecuteAsk(context.Background(), tt.filter)
 			require.NoError(t, err)

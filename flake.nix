@@ -2,14 +2,35 @@
   description = "QNTX container image";
 
   inputs = {
+    # Use unstable for latest Go version (1.24+)
+    # Stable channels (24.11) only have Go 1.23
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    pre-commit-hooks = {
+      # Use latest pre-commit-hooks compatible with nixpkgs 24.11
+      url = "github:cachix/pre-commit-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # Pre-commit hooks configuration
+        pre-commit-check = pre-commit-hooks.lib.${system}.run {
+          src = ./.;
+          hooks = {
+            # Nix formatting
+            nixpkgs-fmt.enable = true;
+
+            # Go hooks disabled - require network access to download modules
+            # which isn't available in Nix sandbox. Use local git hooks instead.
+            # gofmt.enable = true;
+            # govet.enable = true;
+          };
+        };
 
         # Build QNTX binary with Nix
         qntx = pkgs.buildGoModule {
@@ -28,10 +49,11 @@
           subPackages = [ "cmd/qntx" ];
         };
 
-        # CI image with Go + Rust toolchain + prebuilt QNTX binary
-        ciImage = pkgs.dockerTools.buildLayeredImage {
+        # Helper function to build CI image for specific architecture
+        mkCiImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
+          architecture = arch;
 
           contents = [
             # Prebuilt QNTX binary
@@ -71,6 +93,8 @@
             pkgs.diffutils
             pkgs.findutils
             pkgs.bash
+            pkgs.curl
+            pkgs.unzip
 
             # CA certificates for HTTPS
             pkgs.cacert
@@ -98,22 +122,42 @@
           };
         };
 
+        # Architecture detection for Docker images
+        dockerArch =
+          if system == "x86_64-linux" then "amd64"
+          else if system == "aarch64-linux" then "arm64"
+          else "amd64";
+
+        # CI image with detected architecture
+        ciImage = mkCiImage dockerArch;
+
       in
       {
         packages = {
           ci-image = ciImage;
+          ci-image-amd64 = mkCiImage "amd64";
+          ci-image-arm64 = mkCiImage "arm64";
           default = ciImage;
         };
 
         # Development shell with same tools
         devShells.default = pkgs.mkShell {
+          inherit (pre-commit-check) shellHook;
+
           buildInputs = [
             pkgs.go
             pkgs.rustc
             pkgs.cargo
             pkgs.rustfmt
             pkgs.sqlite
-          ];
+          ] ++ pre-commit-check.enabledPackages;
+        };
+
+        # Expose pre-commit checks
+        checks = {
+          pre-commit = pre-commit-check;
+          qntx-build = qntx; # Ensure QNTX builds
+          ci-image = ciImage; # Ensure image builds
         };
       }
     );
