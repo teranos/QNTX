@@ -3,10 +3,26 @@ package plugin
 import (
 	"database/sql"
 
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 )
+
+// QueueService defines the job queue operations available to plugins.
+// This interface allows both local and remote queue implementations.
+type QueueService interface {
+	// Enqueue adds a new job to the queue
+	Enqueue(job *async.Job) error
+
+	// GetJob retrieves a job by ID
+	GetJob(id string) (*async.Job, error)
+
+	// UpdateJob updates a job's state
+	UpdateJob(job *async.Job) error
+
+	// ListJobs lists jobs with optional status filter
+	ListJobs(status *async.JobStatus, limit int) ([]*async.Job, error)
+}
 
 // ServiceRegistry provides access to QNTX core services for domain plugins.
 // Plugins use this registry to look up services they need.
@@ -21,10 +37,10 @@ type ServiceRegistry interface {
 	Config(domain string) Config
 
 	// ATSStore returns the attestation storage interface
-	ATSStore() *storage.SQLStore
+	ATSStore() ats.AttestationStore
 
 	// Queue returns the Pulse async job queue
-	Queue() *async.Queue
+	Queue() QueueService
 }
 
 // Config provides access to plugin configuration
@@ -52,9 +68,9 @@ type Config interface {
 type DefaultServiceRegistry struct {
 	db     *sql.DB
 	logger *zap.SugaredLogger
-	store  *storage.SQLStore
+	store  ats.AttestationStore
 	config ConfigProvider
-	queue  *async.Queue
+	queue  QueueService
 }
 
 // ConfigProvider provides configuration for plugins
@@ -64,7 +80,7 @@ type ConfigProvider interface {
 }
 
 // NewServiceRegistry creates a new service registry
-func NewServiceRegistry(db *sql.DB, logger *zap.SugaredLogger, store *storage.SQLStore, config ConfigProvider, queue *async.Queue) ServiceRegistry {
+func NewServiceRegistry(db *sql.DB, logger *zap.SugaredLogger, store ats.AttestationStore, config ConfigProvider, queue QueueService) ServiceRegistry {
 	return &DefaultServiceRegistry{
 		db:     db,
 		logger: logger,
@@ -90,11 +106,11 @@ func (r *DefaultServiceRegistry) Config(domain string) Config {
 }
 
 // ATSStore returns the attestation storage interface
-func (r *DefaultServiceRegistry) ATSStore() *storage.SQLStore {
+func (r *DefaultServiceRegistry) ATSStore() ats.AttestationStore {
 	return r.store
 }
 
 // Queue returns the Pulse async job queue
-func (r *DefaultServiceRegistry) Queue() *async.Queue {
+func (r *DefaultServiceRegistry) Queue() QueueService {
 	return r.queue
 }

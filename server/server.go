@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/plugin"
+	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/pulse/async"
@@ -50,6 +51,7 @@ type QNTXServer struct {
 	consoleBuffer *ConsoleBuffer        // Browser console log buffer for debugging (dev mode only)
 	initialQuery  string                // Pre-loaded Ax query to execute on client connection
 	pluginRegistry *plugin.Registry    // Domain plugin registry
+	servicesManager *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
