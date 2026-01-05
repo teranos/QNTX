@@ -71,7 +71,7 @@ jobs:
         run: cd ats/ax/fuzzy-ax && cargo fmt --check
 
       - name: Clippy (fuzzy-ax)
-        run: cd ats/ax/fuzzy-ax && cargo clippy --lib
+        run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
@@ -80,3 +80,10 @@ jobs:
 
       - name: Build release (fuzzy-ax)
         run: cd ats/ax/fuzzy-ax && cargo build --release --lib
+
+      - name: Test CGO integration (fuzzy-ax)
+        run: |
+          cd ats/ax/fuzzy-ax && cargo build --release --lib
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+          cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
