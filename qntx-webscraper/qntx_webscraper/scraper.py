@@ -5,7 +5,6 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
-import re
 import socket
 import time
 from dataclasses import dataclass, field
@@ -1157,7 +1156,6 @@ class WebScraper:
         """
         visited: set[str] = set()
         to_visit: list[str] = [start_url]
-        start_domain = urlparse(start_url).netloc
 
         # Check if start URL was previously crawled
         if skip_previously_crawled and self._was_previously_crawled(start_url):

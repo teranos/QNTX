@@ -103,7 +103,7 @@ def demo_plugin():
 
         headings = data.get('headings', {})
         if headings:
-            print(f"✓ Headings structure:")
+            print("✓ Headings structure:")
             for level, texts in headings.items():
                 print(f"    {level}: {len(texts)} heading(s)")
     else:

@@ -18,7 +18,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import grpc
 
 from qntx_webscraper.grpc import atsstore_pb2, atsstore_pb2_grpc
-from qntx_webscraper.grpc import domain_pb2, domain_pb2_grpc
+from qntx_webscraper.grpc import domain_pb2
 from qntx_webscraper.plugin import WebScraperPlugin
 
 
