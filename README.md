@@ -1,8 +1,8 @@
 # [꩜](pulse/README.md)  ⌬   [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  +  =  ✦  ⟶
 
-![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)
-![TypeGen Check](https://github.com/teranos/QNTX/actions/workflows/typegen.yml/badge.svg)
-![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)
+[![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
+[![TypeGen Check](https://github.com/teranos/QNTX/actions/workflows/typegen.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/typegen.yml)
+[![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
 
 **QNTX** = A modular Continuous Intelligence Platform operated as a graph of attestations. It automates data ingestion, enrichment, and reasoning to create a continuously self-improving knowledge graph.
 
