@@ -2,11 +2,11 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
 
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -26,25 +26,25 @@ func Open(path string, logger *zap.SugaredLogger) (*sql.DB, error) {
 	}
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, errors.Wrap(err, "failed to open database")
 	}
 
 	// Enable WAL mode for concurrent reads during writes
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA journal_mode = %s", SQLiteJournalMode)); err != nil {
+	if _, err := db.Exec("PRAGMA journal_mode = " + SQLiteJournalMode); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+		return nil, errors.Wrap(err, "failed to enable WAL mode")
 	}
 
 	// Enable foreign key constraints
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+		return nil, errors.Wrap(err, "failed to enable foreign keys")
 	}
 
 	// Set busy timeout
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %d", SQLiteBusyTimeoutMS)); err != nil {
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+		return nil, errors.Wrap(err, "failed to set busy timeout")
 	}
 
 	if logger != nil {
@@ -70,7 +70,7 @@ func OpenWithMigrations(path string, logger *zap.SugaredLogger) (*sql.DB, error)
 
 	if err := Migrate(db, logger); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
+		return nil, errors.Wrap(err, "failed to run migrations")
 	}
 
 	return db, nil

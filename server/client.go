@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/logger"
@@ -808,18 +809,18 @@ func base64Decode(data string) (string, error) {
 	// Base64 encoding adds ~33% overhead, so decoded size = len(data) * 3/4
 	estimatedSize := (len(data) * 3) / 4
 	if estimatedSize > maxUploadSize {
-		return "", fmt.Errorf("upload too large: estimated %d bytes exceeds %d byte limit", estimatedSize, maxUploadSize)
+		return "", errors.Newf("upload too large: estimated %d bytes exceeds %d byte limit", estimatedSize, maxUploadSize)
 	}
 
 	// Decode from base64
 	bytes, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		return "", fmt.Errorf("base64 decode failed: %w", err)
+		return "", errors.Wrap(err, "base64 decode failed")
 	}
 
 	// Verify actual decoded size doesn't exceed limit
 	if len(bytes) > maxUploadSize {
-		return "", fmt.Errorf("upload too large: %d bytes exceeds %d byte limit", len(bytes), maxUploadSize)
+		return "", errors.Newf("upload too large: %d bytes exceeds %d byte limit", len(bytes), maxUploadSize)
 	}
 
 	return string(bytes), nil
