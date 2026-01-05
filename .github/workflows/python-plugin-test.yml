@@ -1,0 +1,144 @@
+name: Python Plugin Tests
+
+on:
+  push:
+    paths:
+      - 'qntx-webscraper/**'
+      - '.github/workflows/python-plugin-test.yml'
+  pull_request:
+    paths:
+      - 'qntx-webscraper/**'
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+        go-version: ['1.23', '1.25']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Python dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          qntx-webscraper/.venv
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install Python dependencies
+      run: |
+        cd qntx-webscraper
+        python -m venv .venv
+        source .venv/bin/activate || .venv\Scripts\activate
+        pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Generate gRPC stubs
+      run: |
+        cd qntx-webscraper
+        source .venv/bin/activate || .venv\Scripts\activate
+        ./generate_grpc.sh
+
+    - name: Run unit tests
+      run: |
+        cd qntx-webscraper
+        source .venv/bin/activate || .venv\Scripts\activate
+        pytest tests/unit -v --cov=qntx_webscraper --cov-report=xml
+
+    - name: Run integration tests (mock services)
+      run: |
+        cd qntx-webscraper
+        source .venv/bin/activate || .venv\Scripts\activate
+        python test_integration.py
+
+    - name: Build QNTX binary
+      run: |
+        go build -o qntx ./cmd/qntx
+
+    - name: Test plugin discovery
+      run: |
+        mkdir -p ~/.qntx/plugins
+        cp qntx-webscraper/webscraper ~/.qntx/plugins/
+        ./qntx am set plugin.enabled[+]=webscraper
+        timeout 10 ./qntx server --test-mode --no-browser 2>&1 | grep -q "webscraper"
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./qntx-webscraper/coverage.xml
+        flags: python-plugin
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install linting tools
+      run: |
+        pip install ruff mypy black isort
+
+    - name: Run ruff
+      run: |
+        cd qntx-webscraper
+        ruff check .
+
+    - name: Check formatting with black
+      run: |
+        cd qntx-webscraper
+        black --check .
+
+    - name: Check import sorting
+      run: |
+        cd qntx-webscraper
+        isort --check-only .
+
+    - name: Type checking with mypy
+      run: |
+        cd qntx-webscraper
+        pip install -e .
+        mypy qntx_webscraper --ignore-missing-imports
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Bandit security scan
+      run: |
+        pip install bandit
+        bandit -r qntx-webscraper/qntx_webscraper -f json -o bandit-report.json
+
+    - name: Run safety check
+      run: |
+        pip install safety
+        cd qntx-webscraper
+        safety check --json
+
+    - name: SSRF vulnerability test
+      run: |
+        cd qntx-webscraper
+        python -m venv .venv
+        source .venv/bin/activate
+        pip install -e .
+        python tests/security/test_ssrf.py
