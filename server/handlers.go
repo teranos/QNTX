@@ -572,3 +572,69 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 	return &status
 }
+
+// HandlePlugins serves plugin information endpoint
+// Returns list of installed plugins with their metadata and health status
+func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.pluginRegistry == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"plugins": []interface{}{},
+		})
+		return
+	}
+
+	// Get all plugins and their health status
+	ctx := r.Context()
+	healthResults := s.pluginRegistry.HealthCheckAll(ctx)
+
+	type PluginInfo struct {
+		Name        string                 `json:"name"`
+		Version     string                 `json:"version"`
+		QNTXVersion string                 `json:"qntx_version,omitempty"`
+		Description string                 `json:"description"`
+		Author      string                 `json:"author,omitempty"`
+		License     string                 `json:"license,omitempty"`
+		Healthy     bool                   `json:"healthy"`
+		Message     string                 `json:"message,omitempty"`
+		Details     map[string]interface{} `json:"details,omitempty"`
+	}
+
+	plugins := make([]PluginInfo, 0)
+	for _, name := range s.pluginRegistry.List() {
+		p, ok := s.pluginRegistry.Get(name)
+		if !ok {
+			continue
+		}
+
+		meta := p.Metadata()
+		health := healthResults[name]
+
+		plugins = append(plugins, PluginInfo{
+			Name:        meta.Name,
+			Version:     meta.Version,
+			QNTXVersion: meta.QNTXVersion,
+			Description: meta.Description,
+			Author:      meta.Author,
+			License:     meta.License,
+			Healthy:     health.Healthy,
+			Message:     health.Message,
+			Details:     health.Details,
+		})
+	}
+
+	response := map[string]interface{}{
+		"plugins": plugins,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Errorw("Failed to encode plugins response", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}

@@ -29,6 +29,7 @@ import './command-explorer-panel.ts';
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
+import './plugin-panel.ts';
 import './theme.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
@@ -227,6 +228,12 @@ async function init(): Promise<void> {
         listen('show-hixtory-panel', () => {
             import('./hixtory-panel.ts').then(({ showJobList }) => {
                 showJobList();
+            });
+        });
+
+        listen('show-plugin-panel', () => {
+            import('./plugin-panel.ts').then(({ showPluginPanel }) => {
+                showPluginPanel();
             });
         });
 

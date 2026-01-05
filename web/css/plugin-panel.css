@@ -1,0 +1,254 @@
+/**
+ * Plugin Panel Styling - Domain plugin list and status display
+ * Uses panel-base.css for shared components
+ * Uses left-panel.css for base panel structure
+ */
+
+/* Search */
+.plugin-panel-search {
+    padding: 12px 20px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.plugin-search-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 12px;
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    outline: none;
+    transition: var(--panel-transition-fast);
+    font-family: inherit;
+}
+
+.plugin-search-input:focus {
+    border-color: #000;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+.plugin-search-input::placeholder {
+    color: var(--panel-text-tertiary);
+}
+
+/* Plugin-specific content styling */
+.plugin-loading,
+.plugin-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--panel-text-secondary);
+    font-size: 12px;
+}
+
+/* Summary card */
+.plugin-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    background: #f8f8f8;
+}
+
+.plugin-summary-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.plugin-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: #000;
+}
+
+.plugin-health-summary {
+    font-size: 11px;
+}
+
+.plugin-health-good {
+    color: var(--status-completed-text);
+}
+
+.plugin-health-warning {
+    color: var(--status-failed-text);
+}
+
+.plugin-refresh-btn {
+    font-size: 11px;
+}
+
+/* Plugin list */
+.plugin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Plugin card */
+.plugin-card {
+    padding: 16px;
+}
+
+.plugin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.plugin-name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.plugin-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #000;
+}
+
+.plugin-version {
+    font-size: 11px;
+    color: var(--panel-text-secondary);
+}
+
+/* Plugin status indicator */
+.plugin-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.plugin-status-healthy {
+    background: var(--status-completed-bg);
+    color: var(--status-completed-text);
+}
+
+.plugin-status-unhealthy {
+    background: var(--status-failed-bg);
+    color: var(--status-failed-text);
+}
+
+.plugin-status-icon {
+    font-size: 10px;
+}
+
+/* Plugin description */
+.plugin-description {
+    font-size: 12px;
+    color: var(--panel-text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+/* Plugin metadata */
+.plugin-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--panel-text-tertiary);
+}
+
+.plugin-author,
+.plugin-license,
+.plugin-qntx-version {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Plugin message (health status message) */
+.plugin-message {
+    margin-top: 12px;
+    padding: 8px 12px;
+    font-size: 11px;
+    background: #f8f8f8;
+    border-radius: var(--panel-border-radius);
+    color: var(--panel-text-secondary);
+}
+
+.plugin-message-error {
+    background: var(--status-failed-bg);
+    color: var(--status-failed-text);
+}
+
+/* Plugin details (health details) */
+.plugin-details {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: #fafafa;
+    border-radius: var(--panel-border-radius);
+    font-size: 11px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+.plugin-detail-item {
+    display: flex;
+    gap: 8px;
+    padding: 2px 0;
+}
+
+.plugin-detail-key {
+    color: var(--panel-text-secondary);
+}
+
+.plugin-detail-value {
+    color: var(--panel-text-primary);
+}
+
+/* Scrollbar styling */
+.plugin-panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.plugin-panel-content::-webkit-scrollbar-track {
+    background: #f0f0f0;
+}
+
+.plugin-panel-content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: var(--panel-border-radius);
+}
+
+.plugin-panel-content::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .plugin-panel {
+        width: 60%;
+    }
+
+    .plugin-panel-overlay {
+        left: 60%;
+        width: 40%;
+    }
+}
+
+@media (max-width: 768px) {
+    .plugin-panel {
+        width: 100%;
+    }
+
+    .plugin-panel-overlay {
+        display: none;
+    }
+
+    .plugin-card-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .plugin-meta {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
