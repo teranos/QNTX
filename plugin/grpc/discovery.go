@@ -113,13 +113,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 			return fmt.Errorf("failed to launch plugin %s (binary=%s, port=%d): %w",
 				config.Name, config.Binary, port, err)
 		}
-		m.logger.Infow("Plugin process started",
-			"plugin", config.Name,
-			"binary", config.Binary,
-			"port", port,
-			"pid", process.Pid,
-			"address", addr,
-		)
+		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
+			config.Name, process.Pid, port, addr)
 
 		// Wait for plugin to be ready
 		if err := m.waitForPlugin(ctx, addr, 30*time.Second); err != nil {
@@ -154,12 +149,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		port:    port,
 	}
 
-	m.logger.Infow("Plugin loaded and ready",
-		"plugin", config.Name,
-		"version", client.Metadata().Version,
-		"address", addr,
-		"description", client.Metadata().Description,
-	)
+	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
+		config.Name, client.Metadata().Version, client.Metadata().Description)
 
 	return nil
 }
@@ -344,15 +335,9 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 
 		if line = strings.TrimSpace(line); line != "" {
 			if l.level == "error" {
-				l.logger.Errorw("Plugin stderr",
-					"plugin", l.name,
-					"output", line,
-				)
+				l.logger.Errorf("[%s stderr] %s", l.name, line)
 			} else {
-				l.logger.Infow("Plugin stdout",
-					"plugin", l.name,
-					"output", line,
-				)
+				l.logger.Infof("[%s] %s", l.name, line)
 			}
 		}
 	}
