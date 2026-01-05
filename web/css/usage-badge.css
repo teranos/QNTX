@@ -44,17 +44,22 @@
     pointer-events: none; /* Allow mouse to pass through when fading */
 }
 
-.usage-detail-box.visible {
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.usage-detail-box.visible,
+.usage-detail-box[data-visibility="visible"] {
     display: block;
     opacity: 1;
     pointer-events: auto;
 }
 
-.usage-detail-box.fading {
+.usage-detail-box.fading,
+.usage-detail-box[data-visibility="fading"] {
     opacity: 0;
 }
 
-.usage-detail-box.expanded {
+/* Expansion state - supports both class (legacy) and data-attribute (issue #114) */
+.usage-detail-box.expanded,
+.usage-detail-box[data-expansion="expanded"] {
     /* Full width expansion for month view */
     top: 12px;
     left: 12px;
@@ -125,7 +130,8 @@
         font-size: 10px;
     }
 
-    .usage-detail-box.expanded {
+    .usage-detail-box.expanded,
+    .usage-detail-box[data-expansion="expanded"] {
         /* Full width on mobile when expanded */
         top: 36px;
         left: 12px;
