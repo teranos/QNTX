@@ -55,7 +55,15 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 
 ### Error Handling
 
-- **Context in errors**: Errors should provide sufficient context for debugging
+Use `github.com/teranos/QNTX/errors` (wraps cockroachdb/errors). Always wrap with context:
+
+```go
+if err := doSomething(); err != nil {
+    return errors.Wrap(err, "failed to do something")
+}
+```
+
+See `errors/README.md` for full documentation.
 
 ### Testing
 
