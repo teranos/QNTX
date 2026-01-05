@@ -74,6 +74,8 @@ export abstract class BasePanel {
     protected createOverlay(): HTMLElement {
         const overlay = document.createElement('div');
         overlay.className = `${CSS.PANEL.OVERLAY} ${this.config.id}-overlay`;
+        // Start overlays hidden by default using data attribute (issue #114)
+        setDataState(overlay, 'visibility', DATA.VISIBILITY.HIDDEN);
 
         if (this.config.closeOnOverlayClick) {
             overlay.addEventListener('click', () => this.hide());
