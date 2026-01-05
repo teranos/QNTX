@@ -74,7 +74,10 @@ impl RustMatchResultC {
     fn error(msg: &str) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg).unwrap_or_default().into_raw(),
+            // Properly handle CString creation failure (e.g., null bytes in msg)
+            error_msg: CString::new(msg)
+                .unwrap_or_else(|_| CString::new("invalid error message").unwrap())
+                .into_raw(),
             matches: ptr::null_mut(),
             matches_len: 0,
             search_time_us: 0,
@@ -86,7 +89,10 @@ impl RustRebuildResultC {
     fn error(msg: &str) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg).unwrap_or_default().into_raw(),
+            // Properly handle CString creation failure (e.g., null bytes in msg)
+            error_msg: CString::new(msg)
+                .unwrap_or_else(|_| CString::new("invalid error message").unwrap())
+                .into_raw(),
             predicate_count: 0,
             context_count: 0,
             build_time_ms: 0,
