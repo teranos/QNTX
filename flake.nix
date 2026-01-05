@@ -50,7 +50,9 @@
           vendorHash = "sha256-W2SPkC8HMfzgldH+kiEJVzIDdKHMY0gicsDJpoC02kM=";
 
           # Allow Go to auto-download required toolchain version
-          env.GOTOOLCHAIN = "auto";
+          preBuild = ''
+            export GOTOOLCHAIN=auto
+          '';
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
