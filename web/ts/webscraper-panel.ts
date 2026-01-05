@@ -179,11 +179,37 @@ class WebscraperPanel extends BasePanel {
 
         this.startScraping(url);
 
-        // Send scrape request via WebSocket
-        sendMessage({
-            type: 'webscraper_request',
-            data: request
-        });
+        // Send scrape request via HTTP POST to the plugin endpoint
+        try {
+            const response = await fetch('/api/webscraper/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: url,
+                    // The plugin API doesn't support these options yet, but we could extend it
+                    javascript: jsEnabled,
+                    wait_ms: waitMs,
+                    extract_links: extractLinks,
+                    extract_images: extractImages
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+            }
+
+            const data = await response.json();
+            this.handleScraperResponse(data);
+        } catch (error) {
+            console.error('Scraping failed:', error);
+            this.handleScraperResponse({
+                url: url,
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            });
+        }
 
         debugLog('WebscraperPanel', 'Sent scrape request', request);
     }
