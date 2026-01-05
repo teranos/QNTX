@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -25,29 +24,24 @@ const (
 // GetAttestations retrieves attestations based on optional filters
 func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, error) {
 	query := AttestationSelectQuery
-	var args []interface{}
 
-	// Build WHERE clause based on filters
-	whereClauses := []string{}
-
-	if filters.Actor != "" {
-		whereClauses = append(whereClauses, "json_extract(actors, '$') LIKE ?")
-		args = append(args, "%\""+filters.Actor+"\"%")
-	}
+	// Use queryBuilder for consistent filter construction
+	qb := &queryBuilder{}
+	qb.buildActorFilter(filters.Actors)
+	qb.buildSubjectFilter(filters.Subjects)
+	qb.buildPredicateFilter(filters.Predicates)
+	qb.buildContextFilter(filters.Contexts)
 
 	if filters.TimeStart != nil {
-		whereClauses = append(whereClauses, "timestamp >= ?")
-		args = append(args, *filters.TimeStart)
+		qb.addClause("timestamp >= ?", *filters.TimeStart)
 	}
-
 	if filters.TimeEnd != nil {
-		whereClauses = append(whereClauses, "timestamp <= ?")
-		args = append(args, *filters.TimeEnd)
+		qb.addClause("timestamp <= ?", *filters.TimeEnd)
 	}
 
 	// Add WHERE clause if we have filters
-	if len(whereClauses) > 0 {
-		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	if len(qb.whereClauses) > 0 {
+		query += " WHERE " + qb.build()
 	}
 
 	// Add ORDER BY and LIMIT
@@ -61,7 +55,7 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
 
-	rows, err := db.Query(query, args...)
+	rows, err := db.Query(query, qb.args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query attestations: %w", err)
 	}
