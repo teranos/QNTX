@@ -61,7 +61,7 @@ class JobListPanel extends BasePanel {
         return `
             <div class="job-list-header">
                 <h3 class="job-list-title">${IX} Hixtory <span class="hixtory-count">(<span id="hixtory-count">0</span>)</span></h3>
-                <button class="job-list-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="job-list-content" id="job-list-content">
                 <div class="panel-empty job-list-empty">
@@ -73,10 +73,7 @@ class JobListPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Note: Close button (.job-list-close) needs manual handling since it uses
-        // a custom class. BasePanel only auto-handles .panel-close
-        const closeBtn = this.$('.job-list-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        // Close button is now handled automatically by BasePanel (.panel-close)
 
         // New operation button
         const newBtn = this.$('#new-ix-operation');
