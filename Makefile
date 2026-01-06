@@ -234,22 +234,23 @@ rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rus
 	@echo "✓ Integration tests passed"
 
 # Rust Python plugin (PyO3-based Python execution)
-rust-python: ## Build Rust Python plugin binary
-	@echo "Building Rust Python plugin..."
-	@cd qntx-python && cargo build --release
+# REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
+rust-python: ## Build Rust Python plugin binary (via Nix)
+	@echo "Building qntx-python-plugin via Nix..."
+	@nix build .#qntx-python
 	@mkdir -p bin
-	@cp target/release/qntx-python-plugin bin/
+	@cp -L result/bin/qntx-python-plugin bin/
 	@echo "✓ qntx-python-plugin built in bin/"
 
-rust-python-test: ## Run Rust Python plugin tests
-	@echo "Running Rust Python plugin tests..."
-	@cd qntx-python && cargo test
+rust-python-test: ## Run Rust Python plugin tests (via Nix)
+	@echo "Running Rust Python plugin tests via Nix..."
+	@echo "Note: Use 'nix develop' shell and run 'cd qntx-python && cargo test' for iterative testing"
+	@nix develop --command bash -c "cd qntx-python && cargo test"
 	@echo "✓ All Rust Python tests passed"
 
-rust-python-check: ## Check Rust Python plugin code (fmt + clippy)
+rust-python-check: ## Check Rust Python plugin code (fmt + clippy via Nix)
 	@echo "Checking Rust Python plugin code..."
-	@cd qntx-python && cargo fmt --check
-	@cd qntx-python && cargo clippy -- -D warnings
+	@nix develop --command bash -c "cd qntx-python && cargo fmt --check && cargo clippy -- -D warnings"
 	@echo "✓ Rust Python code checks passed"
 
 rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
