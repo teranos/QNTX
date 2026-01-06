@@ -31,6 +31,11 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("openrouter.temperature", 0.2)            // Deterministic
 	v.SetDefault("openrouter.max_tokens", 1000)            // Token limit
 
+	// Anthropic defaults (direct API access)
+	v.SetDefault("anthropic.model", "claude-sonnet-4-20250514") // Latest Sonnet
+	v.SetDefault("anthropic.temperature", 0.2)                  // Deterministic
+	v.SetDefault("anthropic.max_tokens", 4096)                  // Higher default for Claude
+
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")
 
@@ -79,6 +84,12 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	v.BindEnv("local_inference.enabled", "QNTX_LOCAL_INFERENCE_ENABLED")
 	v.BindEnv("local_inference.base_url", "QNTX_LOCAL_INFERENCE_BASE_URL")
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
+
+	// OpenRouter configuration
+	v.BindEnv("openrouter.api_key", "OPENROUTER_API_KEY")
+
+	// Anthropic configuration (direct API)
+	v.BindEnv("anthropic.api_key", "ANTHROPIC_API_KEY")
 }
 
 // GetGraphPort returns the configured QNTX server port
