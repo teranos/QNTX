@@ -153,9 +153,9 @@
             qntx-code
 
             # Runtime dependencies
-            pkgs.gopls           # Go language server (spawned as subprocess)
-            pkgs.git             # Git operations for ixgest
-            pkgs.gh              # GitHub CLI for PR operations
+            pkgs.gopls # Go language server (spawned as subprocess)
+            pkgs.git # Git operations for ixgest
+            pkgs.gh # GitHub CLI for PR operations
 
             # Base utilities
             pkgs.bash
@@ -182,7 +182,7 @@
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
             ];
             ExposedPorts = {
-              "9000/tcp" = {};
+              "9000/tcp" = { };
             };
             WorkingDir = "/workspace";
           };
