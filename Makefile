@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
+.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -221,3 +221,29 @@ rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rus
 		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
 		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
 	@echo "✓ Integration tests passed"
+
+# Rust Python plugin (PyO3-based Python execution)
+rust-python: ## Build Rust Python plugin binary
+	@echo "Building Rust Python plugin..."
+	@cd qntx-python && cargo build --release
+	@mkdir -p bin
+	@cp target/release/qntx-python-plugin bin/
+	@echo "✓ qntx-python-plugin built in bin/"
+
+rust-python-test: ## Run Rust Python plugin tests
+	@echo "Running Rust Python plugin tests..."
+	@cd qntx-python && cargo test
+	@echo "✓ All Rust Python tests passed"
+
+rust-python-check: ## Check Rust Python plugin code (fmt + clippy)
+	@echo "Checking Rust Python plugin code..."
+	@cd qntx-python && cargo fmt --check
+	@cd qntx-python && cargo clippy -- -D warnings
+	@echo "✓ Rust Python code checks passed"
+
+rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
+	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."
+	@mkdir -p $(PREFIX)/plugins
+	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
+	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
+	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
