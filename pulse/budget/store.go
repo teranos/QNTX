@@ -5,6 +5,8 @@ package budget
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // Store handles budget queries against ai_model_usage table
@@ -31,7 +33,7 @@ func (s *Store) getActualSpend(window string, period string) (totalCost float64,
 
 	err = s.db.QueryRow(query).Scan(&totalCost, &opCount)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to query %s spend: %w", period, err)
+		return 0, 0, errors.Wrapf(err, "failed to query %s spend", period)
 	}
 
 	return totalCost, opCount, nil

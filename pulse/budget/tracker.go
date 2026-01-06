@@ -2,8 +2,9 @@ package budget
 
 import (
 	"database/sql"
-	"fmt"
 	"sync"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // BudgetConfig contains budget limits for daily/weekly/monthly spend tracking.
@@ -50,19 +51,19 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 	// Query actual daily spend from ai_model_usage
 	dailySpend, dailyOps, err := bt.store.GetActualDailySpend()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get daily spend from usage: %w", err)
+		return nil, errors.Wrap(err, "failed to get daily spend from usage")
 	}
 
 	// Query actual weekly spend from ai_model_usage
 	weeklySpend, weeklyOps, err := bt.store.GetActualWeeklySpend()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get weekly spend from usage: %w", err)
+		return nil, errors.Wrap(err, "failed to get weekly spend from usage")
 	}
 
 	// Query actual monthly spend from ai_model_usage
 	monthlySpend, monthlyOps, err := bt.store.GetActualMonthlySpend()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get monthly spend from usage: %w", err)
+		return nil, errors.Wrap(err, "failed to get monthly spend from usage")
 	}
 
 	bt.mu.RLock()
@@ -89,7 +90,7 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 	status, err := bt.GetStatus()
 	if err != nil {
-		return fmt.Errorf("failed to get budget status: %w", err)
+		return errors.Wrap(err, "failed to get budget status")
 	}
 
 	bt.mu.RLock()
@@ -99,17 +100,17 @@ func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 	bt.mu.RUnlock()
 
 	if status.DailySpend+estimatedCostUSD > dailyBudget {
-		return fmt.Errorf("daily budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+		return errors.Newf("daily budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.DailySpend, estimatedCostUSD, dailyBudget)
 	}
 
 	if weeklyBudget > 0 && status.WeeklySpend+estimatedCostUSD > weeklyBudget {
-		return fmt.Errorf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+		return errors.Newf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.WeeklySpend, estimatedCostUSD, weeklyBudget)
 	}
 
 	if status.MonthlySpend+estimatedCostUSD > monthlyBudget {
-		return fmt.Errorf("monthly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+		return errors.Newf("monthly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.MonthlySpend, estimatedCostUSD, monthlyBudget)
 	}
 
@@ -127,7 +128,7 @@ func (bt *Tracker) EstimateOperationCost(numOperations int) float64 {
 // UpdateDailyBudget updates the daily budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
-		return fmt.Errorf("daily budget cannot be negative: %.2f", newBudgetUSD)
+		return errors.Newf("daily budget cannot be negative: %.2f", newBudgetUSD)
 	}
 
 	// Update in-memory config
@@ -148,7 +149,7 @@ func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
 // UpdateWeeklyBudget updates the weekly budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
-		return fmt.Errorf("weekly budget cannot be negative: %.2f", newBudgetUSD)
+		return errors.Newf("weekly budget cannot be negative: %.2f", newBudgetUSD)
 	}
 
 	// Update in-memory config
@@ -169,7 +170,7 @@ func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
 // UpdateMonthlyBudget updates the monthly budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateMonthlyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
-		return fmt.Errorf("monthly budget cannot be negative: %.2f", newBudgetUSD)
+		return errors.Newf("monthly budget cannot be negative: %.2f", newBudgetUSD)
 	}
 
 	// Update in-memory config
