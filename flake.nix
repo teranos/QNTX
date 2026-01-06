@@ -131,6 +131,9 @@
             ];
             WorkingDir = "/workspace";
           };
+
+          # Docker images are Linux-only
+          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
         };
 
         # Architecture detection for Docker images
@@ -186,6 +189,9 @@
             };
             WorkingDir = "/workspace";
           };
+
+          # Docker images are Linux-only
+          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
         };
 
         # qntx-code image with detected architecture
@@ -200,6 +206,10 @@
           # qntx-code plugin binary
           qntx-code = qntx-code;
 
+          # Default: CLI binary for easy installation
+          default = qntx;
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Docker images are Linux-only
           # CI Docker images (full dev environment)
           ci-image = ciImage;
           ci-image-amd64 = mkCiImage "amd64";
@@ -209,9 +219,6 @@
           qntx-code-plugin-image = codeImage;
           qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
           qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
-
-          # Default: CLI binary for easy installation
-          default = qntx;
         };
 
         # Development shell with same tools
@@ -232,6 +239,8 @@
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Docker image checks are Linux-only
           ci-image = ciImage; # Ensure CI image builds
           qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
         };
