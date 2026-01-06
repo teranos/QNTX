@@ -119,8 +119,8 @@ function handleVersion(data: VersionMessage): void {
         }
     }
 
-    // Also add subtle version to log panel
-    const logVersion = document.getElementById('log-version');
+    // Also add subtle version to system drawer
+    const logVersion = document.getElementById('system-version');
     if (logVersion && data.commit) {
         logVersion.textContent = data.commit.substring(0, 7);
     }
