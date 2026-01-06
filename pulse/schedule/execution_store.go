@@ -2,8 +2,9 @@ package schedule
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // ExecutionStore handles persistence of job execution history
@@ -66,7 +67,7 @@ func (s *ExecutionStore) CreateExecution(exec *Execution) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to create execution: %w", err)
+		return errors.Wrap(err, "failed to create execution")
 	}
 
 	return nil
@@ -123,16 +124,16 @@ func (s *ExecutionStore) UpdateExecution(exec *Execution) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to update execution: %w", err)
+		return errors.Wrap(err, "failed to update execution")
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("failed to check rows affected: %w", err)
+		return errors.Wrap(err, "failed to check rows affected")
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("execution not found: %s", exec.ID)
+		return errors.Newf("execution not found: %s", exec.ID)
 	}
 
 	return nil
@@ -170,9 +171,9 @@ func (s *ExecutionStore) GetExecution(id string) (*Execution, error) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("execution not found: %s", id)
+			return nil, errors.Newf("execution not found: %s", id)
 		}
-		return nil, fmt.Errorf("failed to get execution: %w", err)
+		return nil, errors.Wrap(err, "failed to get execution")
 	}
 
 	// Convert sql.Null* types to pointers
@@ -218,7 +219,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 	var total int
 	err := s.db.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to count executions: %w", err)
+		return nil, 0, errors.Wrap(err, "failed to count executions")
 	}
 
 	// Get paginated results
@@ -235,7 +236,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to list executions: %w", err)
+		return nil, 0, errors.Wrap(err, "failed to list executions")
 	}
 	defer rows.Close()
 
@@ -261,7 +262,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 		)
 
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan execution: %w", err)
+			return nil, 0, errors.Wrap(err, "failed to scan execution")
 		}
 
 		// Convert sql.Null* types
@@ -289,7 +290,7 @@ func (s *ExecutionStore) ListExecutions(scheduledJobID string, limit, offset int
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating executions: %w", err)
+		return nil, 0, errors.Wrap(err, "error iterating executions")
 	}
 
 	return executions, total, nil
@@ -311,7 +312,7 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 
 	rows, err := s.db.Query(query, ExecutionStatusCompleted, since.Format(time.RFC3339), limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list recent completions: %w", err)
+		return nil, errors.Wrap(err, "failed to list recent completions")
 	}
 	defer rows.Close()
 
@@ -336,7 +337,7 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 			&exec.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan execution: %w", err)
+			return nil, errors.Wrap(err, "failed to scan execution")
 		}
 
 		if asyncJobID.Valid {
@@ -363,7 +364,7 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating executions: %w", err)
+		return nil, errors.Wrap(err, "error iterating executions")
 	}
 
 	return executions, nil
@@ -386,12 +387,12 @@ func (s *ExecutionStore) CleanupOldExecutions(retentionDays int) (int, error) {
 
 	result, err := s.db.Exec(query, cutoffTime)
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup old executions: %w", err)
+		return 0, errors.Wrap(err, "failed to cleanup old executions")
 	}
 
 	deleted, err := result.RowsAffected()
 	if err != nil {
-		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+		return 0, errors.Wrap(err, "failed to get rows affected")
 	}
 
 	return int(deleted), nil

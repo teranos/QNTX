@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 )
@@ -77,8 +78,8 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		}
 
 		if err := m.loadPlugin(ctx, config); err != nil {
-			return fmt.Errorf("failed to load plugin %s (binary=%s, address=%s): %w",
-				config.Name, config.Binary, config.Address, err)
+			return errors.Wrapf(err, "failed to load plugin %s (binary=%s, address=%s)",
+				config.Name, config.Binary, config.Address)
 		}
 	}
 	return nil
@@ -91,7 +92,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 	// Check if already loaded
 	if _, exists := m.plugins[config.Name]; exists {
-		return fmt.Errorf("plugin already loaded: %s", config.Name)
+		return errors.Newf("plugin already loaded: %s", config.Name)
 	}
 
 	var addr string
@@ -110,16 +111,16 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		var err error
 		process, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
-			return fmt.Errorf("failed to launch plugin %s (binary=%s, port=%d): %w",
-				config.Name, config.Binary, port, err)
+			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
+				config.Name, config.Binary, port)
 		}
 		m.logger.Infow("Launched plugin process", "name", config.Name, "port", port, "pid", process.Pid)
 
 		// Wait for plugin to be ready
 		if err := m.waitForPlugin(ctx, addr, 30*time.Second); err != nil {
 			process.Kill()
-			return fmt.Errorf("plugin %s failed to start (binary=%s, addr=%s, pid=%d): %w",
-				config.Name, config.Binary, addr, process.Pid, err)
+			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
+				config.Name, config.Binary, addr, process.Pid)
 		}
 	} else if config.Binary != "" {
 		// Binary specified but auto_start is false
@@ -129,7 +130,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		)
 		return nil
 	} else {
-		return fmt.Errorf("plugin %s: either address or binary must be specified", config.Name)
+		return errors.Newf("plugin %s: either address or binary must be specified", config.Name)
 	}
 
 	// Connect to the plugin
@@ -138,7 +139,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if process != nil {
 			process.Kill()
 		}
-		return fmt.Errorf("failed to connect to plugin %s at %s: %w", config.Name, addr, err)
+		return errors.Wrapf(err, "failed to connect to plugin %s at %s", config.Name, addr)
 	}
 
 	m.plugins[config.Name] = &managedPlugin{
@@ -186,14 +187,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	if !filepath.IsAbs(binary) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory for plugin %s: %w", config.Name, err)
+			return nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
 		}
 		binary = filepath.Join(home, ".qntx", "plugins", binary)
 	}
 
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
-		return nil, fmt.Errorf("plugin binary not found for %s: %s", config.Name, binary)
+		return nil, errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
 	}
 
 	// Build command arguments
@@ -212,8 +213,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	cmd.Stderr = &pluginLogger{logger: m.logger, name: config.Name, level: "error"}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start plugin %s (binary=%s, args=%v): %w",
-			config.Name, binary, args, err)
+		return nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
+			config.Name, binary, args)
 	}
 
 	return cmd.Process, nil
@@ -240,7 +241,7 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return fmt.Errorf("timeout waiting for plugin at %s", addr)
+	return errors.Newf("timeout waiting for plugin at %s", addr)
 }
 
 // GetPlugin returns a connected plugin as a DomainPlugin.
@@ -311,7 +312,7 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 	m.plugins = make(map[string]*managedPlugin)
 
 	if len(errs) > 0 {
-		return fmt.Errorf("shutdown errors: %v", errs)
+		return errors.Newf("shutdown errors: %v", errs)
 	}
 	return nil
 }

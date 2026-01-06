@@ -8,8 +8,8 @@ import { CSS } from './css-classes.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
-import { restoreSession } from './state-manager.ts';
-import { state } from './config.ts';
+import { uiState } from './ui-state.ts';
+import { appState } from './config.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
@@ -35,7 +35,22 @@ import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
-import type { MessageHandlers, VersionMessage } from '../types/websocket';
+import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
+import type { GraphData } from '../types/core';
+
+// Type guard to check if data is graph data (has nodes and links arrays)
+function isGraphData(data: GraphData | BaseMessage): data is GraphData {
+    return 'nodes' in data && 'links' in data && Array.isArray((data as GraphData).nodes);
+}
+
+// Wrapper for default handler that type-guards graph data
+function handleDefaultMessage(data: GraphData | BaseMessage): void {
+    if (isGraphData(data)) {
+        updateGraph(data);
+    } else {
+        console.warn('Received non-graph message without handler:', data);
+    }
+}
 
 // Extend window interface for global functions
 declare global {
@@ -129,21 +144,21 @@ async function init(): Promise<void> {
     }
 
     // Restore previous session if exists
-    const session = restoreSession();
-    if (session) {
+    const graphSession = uiState.getGraphSession();
+    if (graphSession.query || graphSession.verbosity !== undefined) {
         if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
         // Restore verbosity
-        if (session.verbosity !== undefined) {
-            state.currentVerbosity = session.verbosity;
+        if (graphSession.verbosity !== undefined) {
+            appState.currentVerbosity = graphSession.verbosity;
             const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
             if (verbositySelect) {
-                verbositySelect.value = session.verbosity.toString();
+                verbositySelect.value = graphSession.verbosity.toString();
             }
         }
 
         // Restore query (will be re-run to get fresh graph data)
-        if (session.query) {
-            state.currentQuery = session.query;
+        if (graphSession.query) {
+            appState.currentQuery = graphSession.query;
         }
     }
 
@@ -151,28 +166,26 @@ async function init(): Promise<void> {
     console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
-    // Note: Some handlers use internal types that differ from websocket message types.
-    // Using 'unknown' intermediate cast where types don't overlap sufficiently.
-    // TODO: Align handler signatures with MessageHandlers interface.
+    // Message handlers are now properly typed to match their WebSocket message types
     const handlers: MessageHandlers = {
         'version': handleVersion,
-        'logs': handleLogBatch as unknown as MessageHandlers['logs'],
-        'import_progress': handleImportProgress as MessageHandlers['import_progress'],
-        'import_stats': handleImportStats as MessageHandlers['import_stats'],
-        'import_complete': handleImportComplete as MessageHandlers['import_complete'],
-        'usage_update': handleUsageUpdate as unknown as MessageHandlers['usage_update'],
-        'parse_response': handleParseResponse as MessageHandlers['parse_response'],
-        'daemon_status': handleDaemonStatus as MessageHandlers['daemon_status'],
-        'job_update': handleJobUpdate as MessageHandlers['job_update'],
-        'pulse_execution_started': handlePulseExecutionStarted as MessageHandlers['pulse_execution_started'],
-        'pulse_execution_failed': handlePulseExecutionFailed as MessageHandlers['pulse_execution_failed'],
-        'pulse_execution_completed': handlePulseExecutionCompleted as MessageHandlers['pulse_execution_completed'],
-        'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
-        'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
-        'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
-        'webscraper_response': handleWebscraperResponse as MessageHandlers['webscraper_response'],
-        'webscraper_progress': handleWebscraperProgress as MessageHandlers['webscraper_progress'],
-        '_default': updateGraph as unknown as MessageHandlers['_default']
+        'logs': handleLogBatch,
+        'import_progress': handleImportProgress,
+        'import_stats': handleImportStats,
+        'import_complete': handleImportComplete,
+        'usage_update': handleUsageUpdate,
+        'parse_response': handleParseResponse,
+        'daemon_status': handleDaemonStatus,
+        'job_update': handleJobUpdate,
+        'pulse_execution_started': handlePulseExecutionStarted,
+        'pulse_execution_failed': handlePulseExecutionFailed,
+        'pulse_execution_completed': handlePulseExecutionCompleted,
+        'pulse_execution_log_stream': handlePulseExecutionLogStream,
+        'storage_warning': handleStorageWarning,
+        'storage_eviction': handleStorageEviction,
+        'webscraper_response': handleWebscraperResponse,
+        'webscraper_progress': handleWebscraperProgress,
+        '_default': handleDefaultMessage
     };
 
     connectWebSocket(handlers);
@@ -260,7 +273,7 @@ async function init(): Promise<void> {
             import('./websocket.ts').then(({ sendMessage }) => {
                 sendMessage({
                     type: 'query',
-                    query: state.currentQuery || 'i'
+                    query: appState.currentQuery || 'i'
                 });
             });
         });
