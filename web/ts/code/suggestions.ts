@@ -6,6 +6,7 @@
 
 import { apiFetch } from '../api.ts';
 import type { FixSuggestion, PRInfo } from '../../../types/generated/typescript/github.ts';
+import { escapeHtml } from '../html-utils.ts';
 
 export interface SuggestionsOptions {
     panel: HTMLElement;
@@ -33,11 +34,6 @@ export class CodeSuggestions {
     /**
      * Escape HTML to prevent XSS
      */
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     /**
      * Load open PRs from GitHub and populate dropdown
@@ -57,7 +53,7 @@ export class CodeSuggestions {
 
             // Populate dropdown with PRs
             prSelect.innerHTML = '<option value="">Select a PR...</option>' +
-                prs.map(pr => `<option value="${pr.number}">#${pr.number}: ${this.escapeHtml(pr.title)}</option>`).join('');
+                prs.map(pr => `<option value="${pr.number}">#${pr.number}: ${escapeHtml(pr.title)}</option>`).join('');
 
             // Auto-select current PR if set
             if (this.currentPR) {
@@ -149,18 +145,18 @@ export class CodeSuggestions {
         }
 
         const html = suggestions.map((s) => `
-                <div class="suggestion-item severity-${this.escapeHtml(s.severity)}" data-file="${this.escapeHtml(s.file)}" data-line="${s.start_line}">
+                <div class="suggestion-item severity-${escapeHtml(s.severity)}" data-file="${escapeHtml(s.file)}" data-line="${s.start_line}">
                     <div class="suggestion-header">
-                        <span class="suggestion-id">${this.escapeHtml(s.id)}</span>
-                        ${s.category ? `<span class="suggestion-category">${this.escapeHtml(s.category)}</span>` : ''}
-                        <span class="suggestion-severity severity-badge-${this.escapeHtml(s.severity)}">${this.escapeHtml(s.severity)}</span>
+                        <span class="suggestion-id">${escapeHtml(s.id)}</span>
+                        ${s.category ? `<span class="suggestion-category">${escapeHtml(s.category)}</span>` : ''}
+                        <span class="suggestion-severity severity-badge-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span>
                     </div>
-                    <div class="suggestion-title">${this.escapeHtml(s.title || s.issue)}</div>
+                    <div class="suggestion-title">${escapeHtml(s.title || s.issue)}</div>
                     <div class="suggestion-location">
-                        <span class="suggestion-file">${this.escapeHtml(s.file)}</span>
+                        <span class="suggestion-file">${escapeHtml(s.file)}</span>
                         <span class="suggestion-lines">Lines ${s.start_line}-${s.end_line}</span>
                     </div>
-                    <div class="suggestion-issue">${this.escapeHtml(s.issue)}</div>
+                    <div class="suggestion-issue">${escapeHtml(s.issue)}</div>
                 </div>
             `).join('');
 

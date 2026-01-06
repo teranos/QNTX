@@ -7,6 +7,7 @@
  */
 
 import { Pulse } from '@generated/sym.js';
+import { escapeHtml as escapeHtmlUtil, formatRelativeTime as formatRelativeTimeUtil } from '../html-utils.ts';
 
 /**
  * Render the main panel template (header + content wrapper)
@@ -60,34 +61,9 @@ export function formatDuration(durationMs: number): string {
 /**
  * Format timestamp to relative time string (e.g., "5m ago", "2h from now")
  */
-export function formatRelativeTime(timestamp: string): string {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = date.getTime() - now.getTime();
-    const diffSecs = Math.floor(Math.abs(diffMs) / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    const isPast = diffMs < 0;
-    const suffix = isPast ? 'ago' : 'from now';
-
-    if (diffSecs < 60) {
-        return `${diffSecs}s ${suffix}`;
-    } else if (diffMins < 60) {
-        return `${diffMins}m ${suffix}`;
-    } else if (diffHours < 24) {
-        return `${diffHours}h ${suffix}`;
-    } else {
-        return `${diffDays}d ${suffix}`;
-    }
-}
+export const formatRelativeTime = formatRelativeTimeUtil;
 
 /**
  * Escape HTML special characters
  */
-export function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+export const escapeHtml = escapeHtmlUtil;
