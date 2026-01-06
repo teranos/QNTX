@@ -37,7 +37,7 @@ func init() {
 	ServerCmd.Flags().IntVar(&serverPort, "port", am.DefaultGraphPort, "Port for server")
 	ServerCmd.Flags().BoolVar(&serverTestMode, "test-mode", false, "Run with test database")
 	ServerCmd.Flags().StringVar(&serverAtsQuery, "ats", "", "Pre-load graph with an Ax query (e.g., --ats 'role:developer')")
-	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", false, "Disable automatic browser opening (default: auto-open)")
+	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", true, "Disable automatic browser opening")
 	ServerCmd.Flags().BoolVar(&serverDevMode, "dev", false, "Enable development mode")
 	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
 }
