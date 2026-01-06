@@ -15,6 +15,11 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
+        image:
+          - name: ci-image
+            registry: ghcr.io/teranos/qntx
+          - name: qntx-code-image
+            registry: ghcr.io/teranos/qntx-code
 
     steps:
       - name: Checkout repository
@@ -44,15 +49,22 @@ jobs:
         run: nix flake check
 
       - name: Build and cache QNTX CLI binary
+        if: matrix.image.name == 'ci-image'
         run: |
           nix build .#qntx --print-build-logs
           nix build .#qntx --print-out-paths --no-link | cachix push qntx
 
-      - name: Build CI image with Nix
-        run: nix build .#ci-image-${{ matrix.arch }}
+      - name: Build and cache qntx-code plugin binary
+        if: matrix.image.name == 'qntx-code-image'
+        run: |
+          nix build .#qntx-code --print-build-logs
+          nix build .#qntx-code --print-out-paths --no-link | cachix push qntx
 
-      - name: Cache CI image
-        run: nix build .#ci-image-${{ matrix.arch }} --print-out-paths --no-link | cachix push qntx
+      - name: Build image with Nix
+        run: nix build .#${{ matrix.image.name }}-${{ matrix.arch }}
+
+      - name: Cache image
+        run: nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --print-out-paths --no-link | cachix push qntx
 
       - name: Load image into Docker
         run: docker load < result
@@ -78,11 +90,11 @@ jobs:
       - name: Verify reproducible build
         run: |
           echo "Building twice to verify reproducibility..."
-          nix build .#ci-image-${{ matrix.arch }} --rebuild --out-link result-1
+          nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --rebuild --out-link result-1
           HASH1=$(nix-hash --type sha256 result-1)
           rm result-1
 
-          nix build .#ci-image-${{ matrix.arch }} --rebuild --out-link result-2
+          nix build .#${{ matrix.image.name }}-${{ matrix.arch }} --rebuild --out-link result-2
           HASH2=$(nix-hash --type sha256 result-2)
 
           if [ "$HASH1" = "$HASH2" ]; then
@@ -97,13 +109,13 @@ jobs:
       - name: Tag and push
         run: |
           # Tag with architecture
-          docker tag ghcr.io/teranos/qntx:latest ghcr.io/teranos/qntx:latest-${{ matrix.arch }}
-          docker push ghcr.io/teranos/qntx:latest-${{ matrix.arch }}
+          docker tag ${{ matrix.image.registry }}:latest ${{ matrix.image.registry }}:latest-${{ matrix.arch }}
+          docker push ${{ matrix.image.registry }}:latest-${{ matrix.arch }}
 
           # Push versioned tag if this is a tag push
           if [[ "${{ steps.version.outputs.has_version }}" == "true" ]]; then
-            docker tag ghcr.io/teranos/qntx:latest ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-${{ matrix.arch }}
-            docker push ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-${{ matrix.arch }}
+            docker tag ${{ matrix.image.registry }}:latest ${{ matrix.image.registry }}:${{ steps.version.outputs.version }}-${{ matrix.arch }}
+            docker push ${{ matrix.image.registry }}:${{ steps.version.outputs.version }}-${{ matrix.arch }}
           fi
 
   create-manifest:
@@ -112,6 +124,13 @@ jobs:
     permissions:
       packages: write
       contents: read
+    strategy:
+      matrix:
+        image:
+          - name: ci-image
+            registry: ghcr.io/teranos/qntx
+          - name: qntx-code-image
+            registry: ghcr.io/teranos/qntx-code
 
     steps:
       - name: Log in to GHCR
@@ -134,17 +153,17 @@ jobs:
 
       - name: Create and push multi-arch manifest for latest
         run: |
-          docker manifest create ghcr.io/teranos/qntx:latest \
-            ghcr.io/teranos/qntx:latest-amd64 \
-            ghcr.io/teranos/qntx:latest-arm64
+          docker manifest create ${{ matrix.image.registry }}:latest \
+            ${{ matrix.image.registry }}:latest-amd64 \
+            ${{ matrix.image.registry }}:latest-arm64
 
-          docker manifest push ghcr.io/teranos/qntx:latest
+          docker manifest push ${{ matrix.image.registry }}:latest
 
       - name: Create and push multi-arch manifest for version tag
         if: steps.version.outputs.has_version == 'true'
         run: |
-          docker manifest create ghcr.io/teranos/qntx:${{ steps.version.outputs.version }} \
-            ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-amd64 \
-            ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}-arm64
+          docker manifest create ${{ matrix.image.registry }}:${{ steps.version.outputs.version }} \
+            ${{ matrix.image.registry }}:${{ steps.version.outputs.version }}-amd64 \
+            ${{ matrix.image.registry }}:${{ steps.version.outputs.version }}-arm64
 
-          docker manifest push ghcr.io/teranos/qntx:${{ steps.version.outputs.version }}
+          docker manifest push ${{ matrix.image.registry }}:${{ steps.version.outputs.version }}
