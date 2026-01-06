@@ -63,7 +63,7 @@ let
             a:hover { text-decoration: underline; }
             nav { margin-bottom: 2em; padding: 12px; background: #f9f9f9; border-radius: 4px; }
             nav a { margin-right: 16px; }
-            .site-logo { width: 32px; height: 32px; border-radius: 4px; vertical-align: middle; margin-right: 8px; }
+            .site-logo { width: 32px; height: 32px; vertical-align: middle; margin-right: 8px; }
         </style>
     </head>
     <body>
@@ -74,7 +74,7 @@ let
         <style>
             body { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
             .header { display: flex; align-items: center; margin-bottom: 2em; border-bottom: 2px solid #e0e0e0; padding-bottom: 16px; }
-            .header img { width: 48px; height: 48px; border-radius: 6px; margin-right: 16px; }
+            .header img { width: 48px; height: 48px; margin-right: 16px; }
             h1 { margin: 0; }
             h2 { margin-top: 2em; color: #555; font-size: 1.2em; }
             ul { list-style: none; padding: 0; }
