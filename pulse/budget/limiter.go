@@ -2,9 +2,10 @@ package budget
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // Limiter enforces max calls per time window using sliding window algorithm
@@ -44,7 +45,7 @@ func (r *Limiter) Allow() error {
 
 	// Check if we're at the limit
 	if len(r.callTimes) >= r.maxCallsPerMinute {
-		return fmt.Errorf("rate limit exceeded: %d calls per minute (limit: %d)",
+		return errors.Newf("rate limit exceeded: %d calls per minute (limit: %d)",
 			len(r.callTimes), r.maxCallsPerMinute)
 	}
 
