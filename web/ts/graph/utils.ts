@@ -1,7 +1,7 @@
 // Graph utility functions
 // Helper functions for graph data processing
 
-import type { Node } from '../types/core';
+import type { Node } from '../../types/core';
 
 // Normalize node type for comparison (DRY)
 export function normalizeNodeType(type: string | null | undefined): string {

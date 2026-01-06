@@ -1,8 +1,8 @@
 // Graph interaction handlers
 // Drag behavior and resize handling for D3.js graph
 
-import { getSimulation } from './graph-state.ts';
-import type { D3Node, ForceSimulation, DragEvent } from '../types/d3-graph';
+import { getSimulation } from './state.ts';
+import type { D3Node, ForceSimulation, DragEvent } from '../../types/d3-graph';
 
 // Import D3 from vendor bundle
 declare const d3: any;

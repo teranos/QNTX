@@ -1,9 +1,9 @@
 // Graph transform operations
 // Zoom, pan, and centering for D3.js graph
 
-import { GRAPH_PHYSICS } from './config.ts';
-import { getSvg, getG, getZoom } from './graph-state.ts';
-import type { Transform } from '../types/core';
+import { GRAPH_PHYSICS } from '../config.ts';
+import { getSvg, getG, getZoom } from './state.ts';
+import type { Transform } from '../../types/core';
 
 // Import D3 from vendor bundle
 declare const d3: any;

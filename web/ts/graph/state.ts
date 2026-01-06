@@ -1,13 +1,13 @@
 // Graph module state management
 // Centralized state for D3.js graph visualization
 
-import type { GraphData, Transform } from '../types/core';
+import type { GraphData, Transform } from '../../types/core';
 import type {
     ForceSimulation,
     SVGSelection,
     GroupSelection,
     ZoomBehavior
-} from '../types/d3-graph';
+} from '../../types/d3-graph';
 
 // D3 instance references
 let simulation: ForceSimulation | null = null;
