@@ -39,11 +39,13 @@ import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/webs
 import type { GraphData } from '../types/core';
 
 // Type guard to check if data is graph data (has nodes and links arrays)
+// TODO(#209): Remove this type guard once backend sends explicit 'graph_data' message type
 function isGraphData(data: GraphData | BaseMessage): data is GraphData {
     return 'nodes' in data && 'links' in data && Array.isArray((data as GraphData).nodes);
 }
 
 // Wrapper for default handler that type-guards graph data
+// TODO(#209): Replace _default handler with explicit 'graph_data' handler
 function handleDefaultMessage(data: GraphData | BaseMessage): void {
     if (isGraphData(data)) {
         updateGraph(data);
