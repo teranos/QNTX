@@ -34,6 +34,8 @@
  */
 
 import { CSS, DATA, setVisibility, setLoading } from './css-classes.ts';
+import * as PanelError from './base-panel-error.ts';
+import type { PanelErrorState, ErrorHandlingContext } from './base-panel-error.ts';
 
 export interface PanelConfig {
     id: string;
@@ -50,10 +52,11 @@ export abstract class BasePanel {
     protected isVisible: boolean = false;
     protected config: Required<PanelConfig>;
 
-    /** Whether the panel is currently in an error state */
-    protected hasError: boolean = false;
-    /** The last error that occurred during lifecycle methods */
-    protected lastError: Error | null = null;
+    /** Error state management */
+    protected errorState: PanelErrorState = {
+        hasError: false,
+        lastError: null
+    };
 
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private clickOutsideHandler: ((e: Event) => void) | null = null;
@@ -272,6 +275,18 @@ export abstract class BasePanel {
     protected onHide(): void {}
     protected onDestroy(): void {}
 
+    /**
+     * Get error handling context for delegating to error module
+     */
+    private getErrorContext(): ErrorHandlingContext {
+        return {
+            panelId: this.config.id,
+            errorState: this.errorState,
+            $: this.$.bind(this),
+            onShow: this.onShow.bind(this)
+        };
+    }
+
     // =========================================================================
     // DOM Helper Methods
     // =========================================================================
@@ -328,16 +343,7 @@ export abstract class BasePanel {
      * @param message Optional loading message (defaults to "Loading...")
      */
     protected createLoadingState(message: string = 'Loading...'): HTMLElement {
-        const container = document.createElement('div');
-        container.className = CSS.PANEL.LOADING;
-        container.setAttribute('role', 'status');
-        container.setAttribute('aria-live', 'polite');
-
-        const text = document.createElement('p');
-        text.textContent = message;
-        container.appendChild(text);
-
-        return container;
+        return PanelError.createLoadingState(message);
     }
 
     /**
@@ -374,37 +380,11 @@ export abstract class BasePanel {
         message: string,
         onRetry?: () => void
     ): HTMLElement {
-        const container = document.createElement('div');
-        container.className = CSS.PANEL.ERROR;
-        container.setAttribute('role', 'alert');
-
-        const titleEl = document.createElement('p');
-        titleEl.className = 'panel-error-title';
-        titleEl.textContent = title;
-        container.appendChild(titleEl);
-
-        const messageEl = document.createElement('p');
-        messageEl.className = 'panel-error-message';
-        messageEl.textContent = message;
-        container.appendChild(messageEl);
-
-        if (onRetry) {
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'panel-error-retry';
-            retryBtn.setAttribute('type', 'button');
-            retryBtn.textContent = 'Retry';
-            retryBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                onRetry();
-            });
-            container.appendChild(retryBtn);
-        }
-
-        return container;
+        return PanelError.createErrorState(title, message, onRetry);
     }
 
     // =========================================================================
-    // Error Boundary Methods
+    // Error Boundary Methods (delegated to base-panel-error module)
     // =========================================================================
 
     /**
@@ -413,26 +393,7 @@ export abstract class BasePanel {
      * @param error The error to display
      */
     protected showErrorState(error: Error): void {
-        this.hasError = true;
-        this.lastError = error;
-
-        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
-        if (!content) {
-            console.warn(`[${this.config.id}] No .${CSS.PANEL.CONTENT} element found for error display`);
-            return;
-        }
-
-        // Clear existing content and show error
-        content.innerHTML = '';
-        const errorEl = this.createErrorState(
-            'Something went wrong',
-            error.message,
-            () => this.retryShow()
-        );
-        content.appendChild(errorEl);
-
-        // Set loading state to error for CSS styling
-        setLoading(content, DATA.LOADING.ERROR);
+        PanelError.showErrorState(this.getErrorContext(), error);
     }
 
     /**
@@ -440,13 +401,7 @@ export abstract class BasePanel {
      * Called automatically before onShow(), or can be called manually
      */
     protected clearError(): void {
-        this.hasError = false;
-        this.lastError = null;
-
-        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
-        if (content) {
-            setLoading(content, DATA.LOADING.IDLE);
-        }
+        PanelError.clearError(this.getErrorContext());
     }
 
     /**
@@ -454,21 +409,7 @@ export abstract class BasePanel {
      * Clears error state and calls show() again
      */
     protected async retryShow(): Promise<void> {
-        this.clearError();
-        // Clear content before retry
-        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
-        if (content) {
-            content.innerHTML = '';
-            content.appendChild(this.createLoadingState());
-        }
-        // Re-run onShow with error boundary
-        try {
-            await this.onShow();
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in retryShow():`, err);
-            this.showErrorState(err);
-        }
+        await PanelError.retryShow(this.getErrorContext());
     }
 
     /**
@@ -476,21 +417,23 @@ export abstract class BasePanel {
      * @param message Optional loading message
      */
     protected showLoading(message?: string): void {
-        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
-        if (!content) return;
-
-        content.innerHTML = '';
-        content.appendChild(this.createLoadingState(message));
-        setLoading(content, DATA.LOADING.LOADING);
+        PanelError.showLoading(this.getErrorContext(), message);
     }
 
     /**
      * Hide loading state (resets to idle)
      */
     protected hideLoading(): void {
-        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
-        if (content) {
-            setLoading(content, DATA.LOADING.IDLE);
-        }
+        PanelError.hideLoading(this.getErrorContext());
+    }
+
+    /** Whether the panel is currently in an error state */
+    protected get hasError(): boolean {
+        return this.errorState.hasError;
+    }
+
+    /** The last error that occurred during lifecycle methods */
+    protected get lastError(): Error | null {
+        return this.errorState.lastError;
     }
 }
