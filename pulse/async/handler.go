@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // JobHandler defines the interface for executing a specific job type.
@@ -115,7 +117,7 @@ func NewRegistryExecutor(registry *HandlerRegistry, fallback JobExecutor) *Regis
 // Execute implements JobExecutor by dispatching to registered handlers.
 func (e *RegistryExecutor) Execute(ctx context.Context, job *Job) error {
 	if job.HandlerName == "" {
-		return fmt.Errorf("job missing handler_name")
+		return errors.New("job missing handler_name")
 	}
 
 	handler := e.registry.Get(job.HandlerName)
@@ -128,5 +130,5 @@ func (e *RegistryExecutor) Execute(ctx context.Context, job *Job) error {
 		return e.fallback.Execute(ctx, job)
 	}
 
-	return fmt.Errorf("no handler registered for handler name: %s", job.HandlerName)
+	return errors.Newf("no handler registered for handler name: %s", job.HandlerName)
 }
