@@ -12,6 +12,7 @@
 import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
 import { AM } from '@generated/sym.js';
+import { formatValue } from './html-utils.ts';
 
 interface ConfigSetting {
     key: string;
@@ -244,7 +245,7 @@ class ConfigPanel extends BasePanel {
     }
 
     private renderEffectiveSetting(setting: EnhancedSetting): string {
-        const valueDisplay = this.formatValue(setting.value);
+        const valueDisplay = formatValue(setting.value, true); // Always mask secrets in config panel
         const allPossibleSources = ['environment', 'project', 'user_ui', 'user', 'system', 'default'];
         const definedSources = new Set(setting.allSources.map(s => s.source));
 
@@ -302,43 +303,6 @@ class ConfigPanel extends BasePanel {
             'default': 'Built-in default value'
         };
         return paths[source] || 'Unknown source';
-    }
-
-    private formatValue(value: unknown): string {
-        if (value === null || value === undefined) {
-            return '<span class="config-value-null">null</span>';
-        }
-        if (typeof value === 'boolean') {
-            return `<span class="config-value-bool">${value}</span>`;
-        }
-        if (typeof value === 'number') {
-            return `<span class="config-value-number">${value}</span>`;
-        }
-        if (typeof value === 'object') {
-            return `<span class="config-value-object">${JSON.stringify(value)}</span>`;
-        }
-        const str = String(value);
-        if (this.looksLikeSecret(str)) {
-            return `<span class="config-value-secret">********</span>`;
-        }
-        return `<span class="config-value-string">${this.escapeHtml(str)}</span>`;
-    }
-
-    private looksLikeSecret(value: string): boolean {
-        const str = String(value).toLowerCase();
-        return (
-            str.includes('token') ||
-            str.includes('key') ||
-            str.includes('secret') ||
-            str.includes('password') ||
-            str.includes('bearer')
-        );
-    }
-
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     private filterSettings(searchText: string): void {

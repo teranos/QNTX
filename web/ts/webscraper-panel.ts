@@ -9,6 +9,7 @@
  */
 
 import { BasePanel } from './base-panel.ts';
+import { escapeHtml } from './html-utils.ts';
 import { toast } from './toast.ts';
 import { debugLog } from './debug.ts';
 
@@ -299,24 +300,24 @@ class WebscraperPanel extends BasePanel {
         if (result.error) {
             card.innerHTML = `
                 <div class="scraper-result-error">
-                    <strong>Error:</strong> ${this.escapeHtml(result.error)}
+                    <strong>Error:</strong> ${escapeHtml(result.error)}
                 </div>
             `;
         } else {
             let html = `
                 <div class="scraper-result-header">
-                    <h5 class="scraper-result-title">${this.escapeHtml(result.title || 'Untitled')}</h5>
-                    <a href="${this.escapeHtml(result.url)}" target="_blank" class="scraper-result-link">🔗</a>
+                    <h5 class="scraper-result-title">${escapeHtml(result.title || 'Untitled')}</h5>
+                    <a href="${escapeHtml(result.url)}" target="_blank" class="scraper-result-link">🔗</a>
                 </div>
             `;
 
             if (result.description) {
-                html += `<p class="scraper-result-description">${this.escapeHtml(result.description)}</p>`;
+                html += `<p class="scraper-result-description">${escapeHtml(result.description)}</p>`;
             }
 
             if (result.content) {
                 const preview = result.content.substring(0, 200);
-                html += `<div class="scraper-result-content">${this.escapeHtml(preview)}${result.content.length > 200 ? '...' : ''}</div>`;
+                html += `<div class="scraper-result-content">${escapeHtml(preview)}${result.content.length > 200 ? '...' : ''}</div>`;
             }
 
             if (result.links && result.links.length > 0) {
@@ -361,8 +362,8 @@ class WebscraperPanel extends BasePanel {
         }
 
         historyList.innerHTML = this.currentResults.map(result => `
-            <div class="scraper-history-item" data-url="${this.escapeHtml(result.url)}">
-                <div class="scraper-history-url">${this.escapeHtml(result.title || result.url)}</div>
+            <div class="scraper-history-item" data-url="${escapeHtml(result.url)}">
+                <div class="scraper-history-url">${escapeHtml(result.title || result.url)}</div>
                 <div class="scraper-history-time">${new Date(result.timestamp).toLocaleTimeString()}</div>
             </div>
         `).join('');
@@ -381,11 +382,6 @@ class WebscraperPanel extends BasePanel {
         });
     }
 
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     /**
      * Handle webscraper response from server

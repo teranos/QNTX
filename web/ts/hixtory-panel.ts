@@ -17,6 +17,7 @@ import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
 import { IX } from '@generated/sym.js';
+import { formatRelativeTime } from './html-utils.ts';
 
 // Extended Job type with frontend-specific fields
 interface Job extends BackendJob {
@@ -292,7 +293,7 @@ class JobListPanel extends BasePanel {
      */
     private renderHistoryItem(job: Job): HTMLElement {
         const statusClass = this.getStatusClass(job.status);
-        const timeAgo = this.formatRelativeTime(job.created_at);
+        const timeAgo = formatRelativeTime(job.created_at);
         const command = this.getJobCommand(job);
 
         const item = document.createElement('div');
@@ -345,23 +346,6 @@ class JobListPanel extends BasePanel {
         return '';
     }
 
-    /**
-     * Format ISO 8601 timestamp as relative time (e.g., "5m ago")
-     */
-    private formatRelativeTime(timestamp: string): string {
-        const date = new Date(timestamp);
-        const now = Date.now();
-        const diff = now - date.getTime();
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 0) return `${days}d ago`;
-        if (hours > 0) return `${hours}h ago`;
-        if (minutes > 0) return `${minutes}m ago`;
-        return 'just now';
-    }
 }
 
 // Initialize and export
