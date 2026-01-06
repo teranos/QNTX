@@ -66,11 +66,6 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 		AuthToken:       authToken,
 	}
 
-	m.logger.Infow("Plugin services started",
-		"ats_store", atsStoreAddr,
-		"queue", queueAddr,
-	)
-
 	return &m.endpoints, nil
 }
 

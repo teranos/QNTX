@@ -39,6 +39,13 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Set up panic hook to log panics before they terminate the process
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("PANIC: Plugin panicked during startup or execution");
+        eprintln!("  Location: {}", panic_info.location().map(|l| l.to_string()).unwrap_or_else(|| "unknown".to_string()));
+        eprintln!("  Message: {}", panic_info.payload().downcast_ref::<&str>().unwrap_or(&"<no message>"));
+    }));
+
     let args = Args::parse();
 
     if args.version {
@@ -62,25 +69,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_line_number(false)
         .init();
 
+    info!("Initializing QNTX Python Plugin");
+    info!("  Version: {}", env!("CARGO_PKG_VERSION"));
+
     // Determine server address
     let addr: SocketAddr = if let Some(address) = args.address {
-        address.parse()?
+        info!("Parsing address: {}", address);
+        match address.parse() {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("ERROR: Failed to parse address '{}': {}", address, e);
+                return Err(format!("Invalid address: {}", e).into());
+            }
+        }
     } else {
-        format!("0.0.0.0:{}", args.port).parse()?
+        let addr_str = format!("0.0.0.0:{}", args.port);
+        info!("Using default address: {}", addr_str);
+        match addr_str.parse() {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("ERROR: Failed to parse address '{}': {}", addr_str, e);
+                return Err(format!("Invalid address: {}", e).into());
+            }
+        }
     };
 
+    info!("Address parsed successfully: {}", addr);
+
     // Create the Python plugin service
-    let service = PythonPluginService::new()?;
+    info!("Creating Python plugin service...");
+    let service = match PythonPluginService::new() {
+        Ok(s) => {
+            info!("Python plugin service created successfully");
+            s
+        }
+        Err(e) => {
+            eprintln!("ERROR: Failed to create Python plugin service: {}", e);
+            return Err(format!("Service creation failed: {}", e).into());
+        }
+    };
 
     info!("Starting QNTX Python Plugin");
     info!("  Version: {}", env!("CARGO_PKG_VERSION"));
     info!("  Address: {}", addr);
 
-    // Start the gRPC server
-    Server::builder()
-        .add_service(DomainPluginServiceServer::new(service))
-        .serve_with_shutdown(addr, shutdown_signal())
-        .await?;
+    // Build and start the gRPC server
+    info!("Building gRPC server...");
+    let server = Server::builder()
+        .add_service(DomainPluginServiceServer::new(service));
+
+    info!("Starting gRPC server on {}...", addr);
+    match server.serve_with_shutdown(addr, shutdown_signal()).await {
+        Ok(_) => {
+            info!("gRPC server stopped gracefully");
+        }
+        Err(e) => {
+            eprintln!("ERROR: gRPC server failed: {}", e);
+            return Err(format!("Server failed: {}", e).into());
+        }
+    }
 
     info!("Plugin shutdown complete");
     Ok(())

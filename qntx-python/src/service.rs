@@ -47,7 +47,19 @@ pub struct PythonPluginService {
 impl PythonPluginService {
     /// Create a new Python plugin service
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let engine = PythonEngine::new()?;
+        tracing::info!("Creating Python engine...");
+        let engine = match PythonEngine::new() {
+            Ok(e) => {
+                tracing::info!("Python engine created successfully");
+                e
+            }
+            Err(e) => {
+                tracing::error!("Failed to create Python engine: {}", e);
+                return Err(format!("Python engine creation failed: {}", e).into());
+            }
+        };
+
+        tracing::info!("Initializing plugin state...");
         Ok(Self {
             state: Arc::new(RwLock::new(PluginState {
                 config: None,
