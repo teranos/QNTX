@@ -144,8 +144,8 @@ func buildDependencySummary(result *DepsIngestionResult) map[string]interface{} 
 	for _, fileResult := range result.ProjectFiles {
 		if fileResult.Error != "" {
 			errorCount++
-			// Format: "go.mod: failed to read file"
-			errorSummary := fmt.Sprintf("%s: %s", fileResult.Type, fileResult.Error)
+			// Format: "backend/go.mod: failed to read file"
+			errorSummary := fmt.Sprintf("%s: %s", fileResult.Path, fileResult.Error)
 			errorDetails = append(errorDetails, errorSummary)
 		}
 	}
