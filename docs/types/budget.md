@@ -8,7 +8,7 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## BudgetConfig
 
-**Source**: [`pulse/budget/tracker.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L13)
+**Source**: [`pulse/budget/tracker.go:14`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L14)
 
 
 <table>
@@ -46,7 +46,7 @@ export interface BudgetConfig {
 
 ## Limiter
 
-**Source**: [`pulse/budget/limiter.go:11`](https://github.com/teranos/QNTX/blob/main/pulse/budget/limiter.go#L11)
+**Source**: [`pulse/budget/limiter.go:12`](https://github.com/teranos/QNTX/blob/main/pulse/budget/limiter.go#L12)
 
 
 <table>
@@ -76,7 +76,7 @@ export interface Limiter {
 
 ## Status
 
-**Source**: [`pulse/budget/tracker.go:21`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L21)
+**Source**: [`pulse/budget/tracker.go:22`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L22)
 
 
 <table>
@@ -124,7 +124,7 @@ export interface Status {
 
 ## Tracker
 
-**Source**: [`pulse/budget/tracker.go:34`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L34)
+**Source**: [`pulse/budget/tracker.go:35`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L35)
 
 
 <table>

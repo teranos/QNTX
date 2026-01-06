@@ -3,12 +3,12 @@ package async
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/budget"
 	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
@@ -206,7 +206,7 @@ func (wp *WorkerPool) recoverOrphanedJobs() error {
 	runningStatus := JobStatusRunning
 	orphanedJobs, err := wp.queue.store.ListJobs(&runningStatus, MaxOrphanedJobsToRecover)
 	if err != nil {
-		return fmt.Errorf("failed to list running jobs: %w", err)
+		return errors.Wrap(err, "failed to list running jobs")
 	}
 
 	if len(orphanedJobs) == 0 {
@@ -246,7 +246,7 @@ func (wp *WorkerPool) requeueOrphanedJob(job *Job) error {
 	job.Error = "" // Clear any stale error message
 
 	if err := wp.queue.UpdateJob(job); err != nil {
-		return fmt.Errorf("failed to update recovered job %s: %w", job.ID, err)
+		return errors.Wrapf(err, "failed to update recovered job %s", job.ID)
 	}
 
 	wp.logger.Starting("Recovered orphaned job", "job_id", job.ID, "handler", job.HandlerName)
@@ -427,7 +427,7 @@ func (wp *WorkerPool) processNextJob() error {
 	// Dequeue next job
 	job, err := wp.queue.Dequeue()
 	if err != nil {
-		return fmt.Errorf("failed to dequeue job: %w", err)
+		return errors.Wrap(err, "failed to dequeue job")
 	}
 
 	if job == nil {
@@ -476,7 +476,7 @@ func (wp *WorkerPool) processNextJob() error {
 	// Rate limiting prevents API violations, budget prevents cost overruns
 	if paused, err := wp.checkRateLimit(job); paused || err != nil {
 		if err != nil {
-			return fmt.Errorf("rate limit check failed for job %s: %w", job.ID, err)
+			return errors.Wrapf(err, "rate limit check failed for job %s", job.ID)
 		}
 		return nil // Job paused, no error
 	}
@@ -484,7 +484,7 @@ func (wp *WorkerPool) processNextJob() error {
 	// Check budget before processing
 	if paused, err := wp.checkBudget(job); paused || err != nil {
 		if err != nil {
-			return fmt.Errorf("budget check failed for job %s: %w", job.ID, err)
+			return errors.Wrapf(err, "budget check failed for job %s", job.ID)
 		}
 		return nil // Job paused, no error
 	}
@@ -554,7 +554,7 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 
 	if err := wp.rateLimiter.Allow(); err != nil {
 		if pauseErr := wp.queue.PauseJob(job.ID, "rate_limited"); pauseErr != nil {
-			return false, fmt.Errorf("failed to pause job %s: %w", job.ID, pauseErr)
+			return false, errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
 		}
 		// Log rate limit status for visibility
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
@@ -607,7 +607,7 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 
 		if wp.poolConfig.PauseOnBudget {
 			if pauseErr := wp.queue.PauseJob(job.ID, "budget_exceeded"); pauseErr != nil {
-				return false, fmt.Errorf("failed to pause job %s: %w", job.ID, pauseErr)
+				return false, errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
 			}
 			return true, nil
 		}

@@ -242,23 +242,23 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  * @param connected - Whether the WebSocket is connected
  */
 function updateConnectionStatus(connected: boolean): void {
-    const statusText = document.getElementById('status-text') as HTMLElement | null;
-    const logPanel = document.getElementById('log-panel') as HTMLElement | null;
-
-    if (statusText) {
-        statusText.textContent = connected ? 'Connected' : 'Disconnected - Reconnecting...';
-    }
+    // Update status indicator using the new system
+    import('./status-indicators.ts').then(({ statusIndicators }) => {
+        statusIndicators.handleConnectionStatus(connected);
+    });
 
     if (connected) {
         // Remove desaturation/dimming from entire UI
         document.body.classList.remove('disconnected');
-        // Collapse log panel when connected
-        logPanel?.classList.add('collapsed');
+        // Collapse system drawer when connected
+        const systemDrawer = document.getElementById('system-drawer');
+        systemDrawer?.classList.add('collapsed');
     } else {
         // Apply desaturation/dimming to entire UI
         document.body.classList.add('disconnected');
-        // Expand log panel when disconnected (useful for debugging)
-        logPanel?.classList.remove('collapsed');
+        // Expand system drawer when disconnected (useful for debugging)
+        const systemDrawer = document.getElementById('system-drawer');
+        systemDrawer?.classList.remove('collapsed');
     }
 }
 

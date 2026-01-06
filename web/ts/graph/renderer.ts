@@ -1,74 +1,36 @@
 // D3.js graph visualization
+// Main rendering orchestration - delegates to specialized modules
 
-import { state, GRAPH_PHYSICS, GRAPH_STYLES } from './config.ts';
-import { saveSession } from './state-manager.ts';
-import { hiddenNodeTypes, initLegendaToggles } from './legenda.ts';
-import { getLinkDistance, getLinkStrength } from './graph-physics.ts';
-import type { GraphData, Node, Transform } from '../types/core';
+import { appState, GRAPH_PHYSICS, GRAPH_STYLES } from '../config.ts';
+import { uiState } from '../ui-state.ts';
+import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
+import { getLinkDistance, getLinkStrength } from './physics.ts';
+import {
+    getSimulation, getG, getHiddenNodes, getDomCache,
+    setSimulation, setSvg, setG, setZoom, clearState
+} from './state.ts';
+import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
+import { createDragBehavior } from './interactions.ts';
+import { getTransform, centerGraph } from './transform.ts';
+import type { GraphData, Node } from '../../types/core';
 import type {
     D3Node,
     D3Link,
-    ForceSimulation,
-    SVGSelection,
-    GroupSelection,
-    ZoomBehavior,
-    DragEvent,
     ZoomEvent
-} from '../types/d3-graph';
+} from '../../types/d3-graph';
 
 // Import D3 from vendor bundle
 declare const d3: any;
 
-let simulation: ForceSimulation | null = null;
-let svg: SVGSelection | null = null;
-let g: GroupSelection | null = null;
-let zoom: ZoomBehavior | null = null;
-
-// Individual node visibility state (by node ID)
-const hiddenNodes = new Set<string>();
-
-// Virtue #2: Performance - Cache DOM references to avoid repeated queries
-interface DOMCache {
-    graphContainer: HTMLElement | null;
-    isolatedToggle: HTMLElement | null;
-    legenda: HTMLElement | null;
-    get(key: keyof DOMCache, selector: string): HTMLElement | null;
-    clear(): void;
-}
-
-const domCache: DOMCache = {
-    graphContainer: null,
-    isolatedToggle: null,
-    legenda: null,
-    get: function(key: keyof DOMCache, selector: string): HTMLElement | null {
-        if (!this[key]) {
-            const element = document.getElementById(selector) || document.querySelector(selector) as HTMLElement | null;
-            (this as any)[key] = element;
-        }
-        return this[key] as HTMLElement | null;
-    },
-    clear: function(): void {
-        this.graphContainer = null;
-        this.isolatedToggle = null;
-        this.legenda = null;
-    }
-};
-
-// Helper: Normalize node type for comparison (DRY)
-function normalizeNodeType(type: string | null | undefined): string {
-    return (type || '').trim().toLowerCase();
-}
-
-// Phase 2: Backend controls visibility - frontend just filters based on backend's decision
-// Backend sets node.visible and link.hidden based on client preferences
-export function filterVisibleNodes(nodes: Node[]): Node[] {
-    return nodes.filter(node => node.visible !== false);
-}
+// Re-export for public API
+export { filterVisibleNodes } from './utils.ts';
+export { initGraphResize } from './interactions.ts';
+export { getTransform, setTransform, centerGraph, resetZoom } from './transform.ts';
 
 // Update graph with new data
 export function updateGraph(data: GraphData): void {
     // Save graph data to state
-    state.currentGraphData = data;
+    appState.currentGraphData = data;
 
     // Rebuild legend with node types from backend and re-attach event listeners
     initLegendaToggles(renderGraph, data);
@@ -91,6 +53,7 @@ function renderGraph(data: GraphData): void {
     // Support expandable/collapsible sections with markdown rendering
     // Query documentation attestations when tiles are selected
 
+    const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
         console.error('Graph container not found');
@@ -129,7 +92,13 @@ function renderGraph(data: GraphData): void {
     // Show/hide isolated node toggle based on whether isolated nodes exist
     const isolatedToggle = domCache.get('isolatedToggle', 'isolated-toggle');
     if (isolatedToggle) {
-        isolatedToggle.style.display = isolatedNodeCount > 0 ? 'flex' : 'none';
+        if (isolatedNodeCount > 0) {
+            isolatedToggle.classList.remove('u-hidden');
+            isolatedToggle.classList.add('u-flex');
+        } else {
+            isolatedToggle.classList.remove('u-flex');
+            isolatedToggle.classList.add('u-hidden');
+        }
     }
 
     // Detect which node types are present in the data
@@ -142,14 +111,26 @@ function renderGraph(data: GraphData): void {
         const typeNameSpan = item.querySelector('.legenda-type-name');
         if (typeNameSpan) {
             const nodeType = normalizeNodeType(typeNameSpan.textContent);
-            htmlItem.style.display = presentNodeTypes.has(nodeType) ? 'flex' : 'none';
+            if (presentNodeTypes.has(nodeType)) {
+                htmlItem.classList.remove('u-hidden');
+                htmlItem.classList.add('u-flex');
+            } else {
+                htmlItem.classList.remove('u-flex');
+                htmlItem.classList.add('u-hidden');
+            }
         }
     });
 
     // Show/hide entire legenda container if there are no nodes
     const legenda = domCache.get('legenda', '.legenda');
     if (legenda) {
-        legenda.style.display = data.nodes.length > 0 ? 'block' : 'none';
+        if (data.nodes.length > 0) {
+            legenda.classList.remove('u-hidden');
+            legenda.classList.add('u-block');
+        } else {
+            legenda.classList.remove('u-block');
+            legenda.classList.add('u-hidden');
+        }
     }
 
     // Phase 2: Filter based on backend-controlled visibility
@@ -164,15 +145,16 @@ function renderGraph(data: GraphData): void {
     if (linkCountEl) linkCountEl.textContent = String(visibleLinks.length);
 
     // Virtue #3: Memory Management - Stop old simulation before creating new one
-    if (simulation) {
-        simulation.stop();
+    const oldSimulation = getSimulation();
+    if (oldSimulation) {
+        oldSimulation.stop();
     }
 
     // Clear existing graph
     d3.select("#graph").selectAll("*").remove();
 
     // Create SVG
-    svg = d3.select("#graph")
+    const svg = d3.select("#graph")
         .attr("width", width)
         .attr("height", height)
         // Virtue #4: Accessibility - Add ARIA labels for screen readers
@@ -183,6 +165,7 @@ function renderGraph(data: GraphData): void {
         console.error('[Graph] Failed to create SVG element');
         return;
     }
+    setSvg(svg);
 
     // Add pattern definition for problematic/unknown types
     const defs = svg.append("defs");
@@ -209,10 +192,11 @@ function renderGraph(data: GraphData): void {
         .attr("stroke-width", 3);
 
     // Create zoom behavior
-    zoom = d3.zoom()
+    const zoom = d3.zoom()
         // Virtue #5: Prudence - Use named constants instead of magic numbers
         .scaleExtent([GRAPH_PHYSICS.ZOOM_MIN, GRAPH_PHYSICS.ZOOM_MAX])
         .on("zoom", function(event: ZoomEvent) {
+            const g = getG();
             if (g) {
                 g.attr("transform", event.transform.toString());
             }
@@ -222,12 +206,12 @@ function renderGraph(data: GraphData): void {
             saveCurrentSession();
         });
 
-    if (svg && zoom) {
-        svg.call(zoom);
-    }
+    setZoom(zoom);
+    svg.call(zoom);
 
     // Create container group
-    g = svg!.append("g");
+    const g = svg.append("g");
+    setG(g);
 
     // Convert to D3 nodes and links
     const d3Nodes = visibleNodes as D3Node[];
@@ -236,7 +220,7 @@ function renderGraph(data: GraphData): void {
     // Create force simulation with filtered data
     // Phase 2: Physics metadata from backend type system (issue #7)
     const relationshipMeta = data.meta?.relationship_types;
-    simulation = d3.forceSimulation(d3Nodes)
+    const simulation = d3.forceSimulation(d3Nodes)
         .force("link", d3.forceLink(d3Links)
             .id((d: D3Node) => d.id)
             .distance((link: D3Link) => getLinkDistance(link, relationshipMeta))
@@ -248,6 +232,8 @@ function renderGraph(data: GraphData): void {
         .force("collision", d3.forceCollide()
             .radius(GRAPH_PHYSICS.COLLISION_RADIUS)
             .strength(1));
+
+    setSimulation(simulation);
 
     // Create links
     const link = g.append("g")
@@ -275,7 +261,7 @@ function renderGraph(data: GraphData): void {
         .data(d3Nodes)
         .join("g")
         .attr("class", "node")
-        .call(drag(simulation!));
+        .call(createDragBehavior(simulation));
 
     // Render tiles (rectangles with inline data)
     const tileWidth = 180;
@@ -336,6 +322,7 @@ function renderGraph(data: GraphData): void {
     });
 
     // Tooltip
+    const hiddenNodes = getHiddenNodes();
     const tooltip = d3.select("#tooltip");
     node.on("mouseover", function(event: MouseEvent, d: D3Node) {
         let content = '<strong>' + d.label + '</strong><br/>';
@@ -369,13 +356,13 @@ function renderGraph(data: GraphData): void {
         }
 
         // Re-render graph with updated visibility
-        if (state.currentGraphData) {
-            renderGraph(state.currentGraphData);
+        if (appState.currentGraphData) {
+            renderGraph(appState.currentGraphData);
         }
     });
 
     // Update positions on tick
-    simulation!.on("tick", () => {
+    simulation.on("tick", () => {
         link
             .attr("x1", (d: D3Link) => (d.source as D3Node).x!)
             .attr("y1", (d: D3Link) => (d.source as D3Node).y!)
@@ -396,120 +383,22 @@ function renderGraph(data: GraphData): void {
     }
 }
 
-// Drag behavior
-function drag(simulation: ForceSimulation): any {
-    function dragstarted(event: DragEvent, d: D3Node): void {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-    }
-
-    function dragged(event: DragEvent, d: D3Node): void {
-        d.fx = event.x;
-        d.fy = event.y;
-    }
-
-    function dragended(event: DragEvent, d: D3Node): void {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-    }
-
-    return d3.drag()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended);
-}
-
-export function resetZoom(): void {
-    if (!svg || !zoom) return;
-    svg.transition()
-        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
-        .call(zoom.transform, d3.zoomIdentity);
-}
-
-export function centerGraph(): void {
-    if (!g || !g.node()) return;
-
-    const bounds = (g.node() as any).getBBox();
-    if (bounds.width === 0 || bounds.height === 0) return;
-
-    const container = document.getElementById('graph-container');
-    if (!container) return;
-
-    const fullWidth = container.clientWidth;
-    const fullHeight = container.clientHeight;
-    const width = bounds.width;
-    const height = bounds.height;
-    const midX = bounds.x + width / 2;
-    const midY = bounds.y + height / 2;
-    const scale = GRAPH_PHYSICS.CENTER_SCALE / Math.max(width / fullWidth, height / fullHeight);
-    const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
-
-    if (!svg || !zoom) return;
-    svg.transition()
-        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
-        .call(zoom.transform, d3.zoomIdentity
-            .translate(translate[0], translate[1])
-            .scale(scale));
-}
-
-// Handle window resize
-export function initGraphResize(): void {
-    window.addEventListener('resize', function() {
-        if (simulation) {
-            const container = document.getElementById('graph-container');
-            if (!container) return;
-
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-            simulation.force("center", d3.forceCenter(width / 2, height / 2));
-            simulation.alpha(0.3).restart();
-        }
-    });
-}
-
-// Get current transform state
-export function getTransform(): Transform | null {
-    if (!svg || !svg.node()) return null;
-    const transform = d3.zoomTransform(svg.node());
-    return {
-        x: transform.x,
-        y: transform.y,
-        k: transform.k
-    };
-}
-
-// Set transform state
-export function setTransform(transform: Transform): void {
-    if (!svg || !zoom || !transform) return;
-    svg.transition()
-        .duration(0) // Instant, no animation
-        .call(zoom.transform, d3.zoomIdentity
-            .translate(transform.x, transform.y)
-            .scale(transform.k));
-}
-
 // Virtue #7: Cleanliness - Export cleanup function for when graph is destroyed
 export function cleanupGraph(): void {
-    if (simulation) {
-        simulation.stop();
-        simulation = null;
-    }
-    domCache.clear();
+    clearState();
 }
 
 // Save current session to localStorage
 function saveCurrentSession(): void {
     const transform = getTransform();
     if (transform) {
-        state.currentTransform = transform;
+        appState.currentTransform = transform;
     }
 
-    saveSession({
-        query: state.currentQuery,
-        verbosity: state.currentVerbosity
-        // NOTE: Not saving graphData - D3 object references don't serialize properly
-        // Query will be re-run on page load instead
+    // NOTE: Not saving graphData - D3 object references don't serialize properly
+    // Query will be re-run on page load instead
+    uiState.setGraphSession({
+        query: appState.currentQuery,
+        verbosity: appState.currentVerbosity,
     });
 }
