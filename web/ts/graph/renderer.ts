@@ -6,13 +6,13 @@ import { saveSession } from '../state-manager.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
-    getSimulation, getSvg, getG, getZoom, getHiddenNodes, getDomCache,
+    getSimulation, getG, getHiddenNodes, getDomCache,
     setSimulation, setSvg, setG, setZoom, clearState
 } from './state.ts';
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
-import { createDragBehavior, initGraphResize } from './interactions.ts';
-import { getTransform, setTransform, centerGraph, resetZoom } from './transform.ts';
-import type { GraphData, Node, Transform } from '../../types/core';
+import { createDragBehavior } from './interactions.ts';
+import { getTransform, centerGraph } from './transform.ts';
+import type { GraphData, Node } from '../../types/core';
 import type {
     D3Node,
     D3Link,
