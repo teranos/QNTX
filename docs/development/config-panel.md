@@ -200,53 +200,31 @@ Current backend capabilities:
 - Search improvements
 - Responsive design
 
-## Future Product Vision
+## Future Enhancements
 
-### Multi-Provider Config Sources
+For discussion of potential future enhancements including multi-provider configuration support, see Issue #205.
 
-As QNTX scales, config will come from diverse providers:
-- **HashiCorp Vault** - Secrets management (API keys, tokens)
-- **Consul** - Dynamic service configuration
-- **AWS Secrets Manager** - Cloud-native secrets
-- **etcd** - Distributed configuration
-- **Environment** - Container orchestration (k8s ConfigMaps)
-- **Project files** - Repository-specific overrides
-- **UI toggles** - User preferences
+### Current Design Principles
 
-**Key Challenge**: **Visibility into composition**
-- Which provider supplied each config fragment?
-- What's the effective precedence chain?
-- How do I debug config resolution?
-
-### Design Principle: Computer Does the Merging
-
-The config panel's job is to **visualize the dataflow**:
+The config panel's current job is to **visualize the dataflow** from our 5 configuration sources:
 
 1. **Show final merged state** (what server sees)
 2. **Attribute each value to its provider** (source visibility)
 3. **Indicate override relationships** (precedence chain)
-4. **Support provider-specific metadata** (TTL, refresh, health)
 
-**Example with multiple providers:**
+**Current implementation shows:**
 ```
-openrouter.api_key = sk-***           [VAULT:prod/ai] ✓ (refreshed 2m ago)
-  ⚠ overrides [ENV], [USER]
+openrouter.api_key = sk-***           [ENV] ✓
+  ⚠ overrides [USER]
 
-database.path = /var/lib/qntx/...     [CONSUL:service/qntx] ✓ (synced)
+database.path = /var/lib/qntx/...     [PROJECT] ✓
   ⚠ overrides [SYSTEM]
 
 pulse.daily_budget_usd = 10.0         [USER_UI] ✓
-  ⚠ overridden by [PROJECT]
+  (no overrides)
 ```
 
-### Provider Extensibility (Future)
-
-- **Provider registry** - Pluggable config providers with standardized interface
-- **Provider health indicators** - Show sync status, last refresh, errors
-- **Provider metadata** - TTL, refresh intervals, version info
-- **Provider-specific actions** - "Refresh from Vault", "Force sync from Consul"
-
-### Config Dataflow Visualization (Future)
+### Config Dataflow Visualization (Current)
 
 - **Precedence chain view** - Show all sources for a key, with precedence order
 - **Config diff view** - Compare effective config against specific source
@@ -262,9 +240,9 @@ pulse.daily_budget_usd = 10.0         [USER_UI] ✓
 - **Export config**: Download merged config with or without secrets
 - **Documentation drawer**: Click config key to open documentation panel on right side
 
-### Documentation Drawer Vision (Future)
+### Documentation Integration (See Issue #207)
 
-**Layout**: Config panel (left 50%) + Documentation drawer (right 50%)
+**Concept**: Config panel with integrated documentation viewer
 
 **Interaction Flow**:
 1. User clicks config key (e.g., `openrouter.model`)
@@ -276,7 +254,7 @@ pulse.daily_budget_usd = 10.0         [USER_UI] ✓
    - **Default value**: What happens if unset
    - **Examples**: Common use cases with sample values
    - **Related settings**: Other config that interacts with this one
-   - **Provider context**: If from Vault/Consul, show provider-specific metadata
+   - **Source information**: Which configuration source provided this value
 
 **Example Documentation Entry**:
 ```
@@ -319,7 +297,7 @@ pulse.daily_budget_usd = 10.0         [USER_UI] ✓
 - Frontend caches docs for instant display
 - Fallback to generated docs from schema if manual docs missing
 - Support for markdown rendering in description field
-- Link out to external docs (OpenRouter pricing, Vault setup, etc.)
+- Link out to external docs (OpenRouter pricing, etc.)
 
 **Symbol Integration**:
 - **▣** - Documentation symbol

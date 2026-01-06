@@ -14,7 +14,19 @@ Data → Graph → Knowledge → Intelligence → Action
 
 ## What is QNTX?
 
-QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)**
+QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context.
+
+### Quick Example
+```bash
+# Record an attestation
+qntx as USER-123 is member of TEAM-ENGINEERING
+
+# Query attestations
+qntx ax member of TEAM-ENGINEERING
+
+# Continuous updates via Pulse
+qntx pulse start  # Keeps your data current automatically
+```
 
 ## Installation
 
@@ -22,12 +34,20 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 ## Segments
 
-- **꩜** pulse - continuous compute (heartbeat)
+### Primary SEG Operators
+- **⍟** i - self (your vantage point)
 - **≡** am - system configuration (being/state)
-- **⌬** by - actor/catalyst (origin of action)
 - **⨳** ix - ingest/import
 - **⋈** ax - expand/query (contextual surfacing)
-- **⊔** db - database/storage (material retention substrate)
+- **⌬** by - actor/catalyst (origin of action)
+- **✦** at - temporal marker
+- **⟶** so - therefore/consequence
+
+### System Infrastructure
+- **꩜** pulse - continuous compute (heartbeat)
+- **⊔** db - database/storage
+
+See [GLOSSARY.md](docs/GLOSSARY.md) for complete symbol definitions including attestation building blocks.
 
 ## Configuration
 
