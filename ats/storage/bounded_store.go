@@ -7,12 +7,12 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
 
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 const (
@@ -98,7 +98,7 @@ func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*type
 	// First create the attestation
 	as, err := bs.store.GenerateAndCreateAttestation(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create attestation: %w", err)
+		return nil, errors.Wrap(err, "failed to create attestation")
 	}
 
 	// Then enforce limits synchronously to avoid database connection issues
@@ -119,7 +119,7 @@ func (bs *BoundedStore) GetStorageStats() (*ats.StorageStats, error) {
 		&stats.UniqueContexts,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query storage stats: %w", err)
+		return nil, errors.Wrap(err, "failed to query storage stats")
 	}
 
 	return stats, nil

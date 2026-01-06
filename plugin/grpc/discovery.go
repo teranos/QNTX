@@ -159,7 +159,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if process != nil {
 			process.Kill()
 		}
-		return fmt.Errorf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
+		return errors.Newf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
 			config.Binary, actualName, config.Name)
 	}
 
