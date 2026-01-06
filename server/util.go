@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -93,7 +94,7 @@ func findAvailablePort(requestedPort int) (int, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("no available ports found (tried %d, %d, %d, and range 56787-56796)", requestedPort, appcfg.DefaultGraphPort, appcfg.FallbackGraphPort)
+	return 0, errors.Newf("no available ports found (tried %d, %d, %d, and range 56787-56796)", requestedPort, appcfg.DefaultGraphPort, appcfg.FallbackGraphPort)
 }
 
 // createFileCore creates a zap core for file logging without colors
@@ -101,12 +102,12 @@ func createFileCore(path string, verbosity int) (zapcore.Core, error) {
 	// Ensure directory exists (os.OpenFile doesn't create intermediate directories)
 	dir := "tmp"
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
+		return nil, errors.Wrap(err, "failed to create log directory")
 	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file %s: %w", path, err)
+		return nil, errors.Wrapf(err, "failed to open log file %s", path)
 	}
 
 	// Create encoder config for plain file output (no colors)

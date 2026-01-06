@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/auth"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
@@ -42,40 +43,40 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int) (*QNTXServer, error
 func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, initialQuery string) (*QNTXServer, error) {
 	// Defensive: Validate critical inputs
 	if db == nil {
-		return nil, fmt.Errorf("database connection cannot be nil")
+		return nil, errors.New("database connection cannot be nil")
 	}
 	if verbosity < 0 || verbosity > 4 {
-		return nil, fmt.Errorf("verbosity must be 0-4, got %d", verbosity)
+		return nil, errors.Newf("verbosity must be 0-4, got %d", verbosity)
 	}
 
 	// Create logger with multi-output (console, WebSocket, file)
 	serverLogger, wsCore, wsTransport, err := createGraphLogger(verbosity)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
+		return nil, errors.Wrap(err, "failed to create logger")
 	}
 	// Defensive: Verify logger components
 	if serverLogger == nil || wsCore == nil || wsTransport == nil {
-		return nil, fmt.Errorf("logger creation returned nil components")
+		return nil, errors.New("logger creation returned nil components")
 	}
 
 	// Create all server dependencies (builder, services, trackers, daemon)
 	deps, err := createServerDependencies(db, verbosity, wsCore, wsTransport, serverLogger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create server dependencies: %w", err)
+		return nil, errors.Wrap(err, "failed to create server dependencies")
 	}
 
 	// Defensive: Validate critical dependencies (nil daemon is allowed)
 	if deps.builder == nil {
-		return nil, fmt.Errorf("graph builder creation failed")
+		return nil, errors.New("graph builder creation failed")
 	}
 	if deps.langService == nil {
-		return nil, fmt.Errorf("language service creation failed")
+		return nil, errors.New("language service creation failed")
 	}
 	if deps.usageTracker == nil {
-		return nil, fmt.Errorf("usage tracker creation failed")
+		return nil, errors.New("usage tracker creation failed")
 	}
 	if deps.budgetTracker == nil {
-		return nil, fmt.Errorf("budget tracker creation failed")
+		return nil, errors.New("budget tracker creation failed")
 	}
 
 	// Create cancellation context for lifecycle management
@@ -253,7 +254,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	// Create builder with server logger
 	builder, err := graph.NewAxGraphBuilder(db, verbosity, serverLogger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create graph builder: %w", err)
+		return nil, errors.Wrap(err, "failed to create graph builder")
 	}
 	serverLogger.Debugw("Graph builder created", "duration_ms", time.Since(start).Milliseconds())
 
@@ -261,7 +262,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	langStart := time.Now()
 	symbolIndex, err := storage.NewSymbolIndex(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create symbol index: %w", err)
+		return nil, errors.Wrap(err, "failed to create symbol index")
 	}
 	langService := lsp.NewService(symbolIndex)
 	serverLogger.Debugw("Language service created", "duration_ms", time.Since(langStart).Milliseconds())
