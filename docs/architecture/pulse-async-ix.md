@@ -94,9 +94,9 @@ type JobHandler interface {
 
 **Generic Architecture:**
 - No JobType enum - handlers identified by string name
-- No JobMetadata struct - payloads are handler-specific JSON
+- JobMetadata exists for phase tracking in two-phase jobs (ingest/aggregate patterns)
 - Domain packages define their own payload types
-- Infrastructure (async package) is fully domain-agnostic
+- Infrastructure (async package) is domain-agnostic with minimal job coordination support
 
 ### Configuration
 
@@ -313,7 +313,7 @@ func (wp *WorkerPool) processNextJob() error {
 - ✅ Rate limiting enforcement
 - ✅ Unit tests (41/41 passing)
 - ✅ **Refactored (Dec 2025)**: Generic handler-based architecture
-- ✅ **GRACE shutdown (Dec 2025)**: Graceful startup/shutdown with orphan recovery
+- ✅ **Opening (✿) and Closing (❀) (Dec 2025)**: Graceful startup/shutdown with orphan recovery
 
 **Files:**
 - `pulse/async/job.go` - Generic job model (handler-based)
@@ -321,7 +321,7 @@ func (wp *WorkerPool) processNextJob() error {
 - `pulse/async/store.go` - Job persistence
 - `pulse/async/queue.go` - Queue operations
 - `pulse/async/worker.go` - Worker pool with budget integration
-- `pulse/async/grace_test.go` - GRACE shutdown tests
+- `pulse/async/grace_test.go` - Opening/Closing tests
 
 ## Testing Strategy
 
@@ -344,7 +344,7 @@ Full async workflow end-to-end:
 - Rate limiting enforcement
 - Pause/resume functionality
 - Worker pool lifecycle
-- Graceful shutdown (GRACE)
+- Graceful shutdown (Opening ✿ / Closing ❀)
 
 ## Future Enhancements
 
@@ -515,7 +515,7 @@ Response:
 
 ## Related Documentation
 
-- **GRACE Shutdown**: `docs/development/grace.md` - Graceful startup/shutdown system
+- **Opening (✿) and Closing (❀)**: `docs/development/grace.md` - Graceful startup/shutdown system
 - **Handler Implementation**: Applications define domain-specific handlers implementing the JobHandler interface
 - **Configuration**: `docs/architecture/config-system.md` - Configuration system including Pulse settings
 - **Resource Coordination**: `docs/architecture/pulse-resource-coordination.md` - GPU and system resource management

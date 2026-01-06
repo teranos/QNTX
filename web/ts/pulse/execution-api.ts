@@ -13,6 +13,7 @@ import type {
   TaskLogsResponse,
   JobChildrenResponse,
 } from "./execution-types.ts";
+import { formatRelativeTime as formatRelativeTimeUtil } from "../html-utils.ts";
 
 /**
  * Get base URL for Pulse API endpoints
@@ -168,29 +169,9 @@ export function formatDuration(durationMs: number): string {
 
 /**
  * Format relative time for execution timestamps
- *
- * @param timestamp - RFC3339 timestamp
- * @returns Relative time string (e.g., "5m ago", "2h ago")
+ * Re-exported from html-utils for convenience
  */
-export function formatRelativeTime(timestamp: string): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 60) {
-    return `${diffSecs}s ago`;
-  } else if (diffMins < 60) {
-    return `${diffMins}m ago`;
-  } else if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  } else {
-    return `${diffDays}d ago`;
-  }
-}
+export const formatRelativeTime = formatRelativeTimeUtil;
 
 /**
  * Get status color class for styling
