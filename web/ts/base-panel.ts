@@ -33,7 +33,7 @@
  * - Call clearError() to reset error state before retry
  */
 
-import { CSS, DATA, setVisibility, setLoading } from './css-classes.ts';
+import { CSS, DATA, setVisibility } from './css-classes.ts';
 import * as PanelError from './base-panel-error.ts';
 import type { PanelErrorState, ErrorHandlingContext } from './base-panel-error.ts';
 
