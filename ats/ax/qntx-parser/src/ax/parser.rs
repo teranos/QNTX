@@ -187,7 +187,11 @@ impl<'a> Parser<'a> {
             TokenKind::By | TokenKind::Via => {
                 self.state = ParserState::Actors;
             }
-            TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+            TokenKind::Since
+            | TokenKind::Until
+            | TokenKind::On
+            | TokenKind::Between
+            | TokenKind::Over => {
                 self.state = ParserState::Temporal;
             }
             TokenKind::So | TokenKind::Therefore => {
@@ -249,7 +253,11 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 }
                 // Transition to temporal clause
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -318,7 +326,11 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 }
                 // Transition to temporal clause
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -386,7 +398,11 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 }
                 // Transition to temporal clause
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -453,7 +469,11 @@ impl<'a> Parser<'a> {
                     found_actor = true;
                 }
                 // Transition to temporal clause
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -587,7 +607,11 @@ impl<'a> Parser<'a> {
                 self.state = ParserState::Done;
             }
             // Other temporal keywords - additional constraint
-            TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+            TokenKind::Since
+            | TokenKind::Until
+            | TokenKind::On
+            | TokenKind::Between
+            | TokenKind::Over => {
                 // Allow chained temporal constraints by parsing another
                 // For now, we'll overwrite - could extend to support multiple
                 self.state = ParserState::Temporal;

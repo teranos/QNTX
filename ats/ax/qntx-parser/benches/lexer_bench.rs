@@ -54,5 +54,10 @@ fn bench_quoted_strings(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_simple_query, bench_complex_query, bench_quoted_strings);
+criterion_group!(
+    benches,
+    bench_simple_query,
+    bench_complex_query,
+    bench_quoted_strings
+);
 criterion_main!(benches);
