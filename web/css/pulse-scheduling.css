@@ -168,7 +168,7 @@
   color: var(--color-text-secondary, #757575);
 }
 
-/* Dark mode support - uses app's data-theme attribute */
+/* No dark theme - single consistent light design */
 [data-theme="dark"] .pulse-scheduling-controls {
   background: #1e1e1e;
   border-top-color: #404040;
