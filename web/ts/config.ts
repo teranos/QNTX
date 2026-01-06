@@ -139,5 +139,10 @@ export const appState: AppState = {
     progressBuffer: [],
     currentQuery: '',
     currentGraphData: null,
-    currentTransform: null
+    currentTransform: null,
+    graphVisibility: {
+        hiddenNodeTypes: new Set<string>(),
+        hideIsolated: false,
+        revealRelatedActive: new Set<string>()
+    }
 };

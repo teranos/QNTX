@@ -21,6 +21,34 @@ describe('appState', () => {
         expect(appState.currentVerbosity).toBe(5);
         appState.currentVerbosity = originalVerbosity; // Restore
     });
+
+    test('graphVisibility has correct structure', () => {
+        expect(appState.graphVisibility).toBeDefined();
+        expect(appState.graphVisibility.hiddenNodeTypes).toBeInstanceOf(Set);
+        expect(appState.graphVisibility.revealRelatedActive).toBeInstanceOf(Set);
+        expect(typeof appState.graphVisibility.hideIsolated).toBe('boolean');
+    });
+
+    test('graphVisibility state is mutable', () => {
+        const originalHideIsolated = appState.graphVisibility.hideIsolated;
+
+        // Test hiddenNodeTypes - use unique key to avoid conflicts
+        const testType = 'config-test-type-' + Date.now();
+        appState.graphVisibility.hiddenNodeTypes.add(testType);
+        expect(appState.graphVisibility.hiddenNodeTypes.has(testType)).toBe(true);
+        appState.graphVisibility.hiddenNodeTypes.delete(testType);
+
+        // Test hideIsolated
+        appState.graphVisibility.hideIsolated = !originalHideIsolated;
+        expect(appState.graphVisibility.hideIsolated).toBe(!originalHideIsolated);
+        appState.graphVisibility.hideIsolated = originalHideIsolated; // Restore
+
+        // Test revealRelatedActive - use unique key to avoid conflicts
+        const revealType = 'config-reveal-type-' + Date.now();
+        appState.graphVisibility.revealRelatedActive.add(revealType);
+        expect(appState.graphVisibility.revealRelatedActive.has(revealType)).toBe(true);
+        appState.graphVisibility.revealRelatedActive.delete(revealType);
+    });
 });
 
 describe('Constants', () => {
