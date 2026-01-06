@@ -1,7 +1,10 @@
-//go:build cgo
+//go:build cgo && rustparser
 
 // Package parser provides AX query parsing functionality.
 // This file provides the CGO implementation using the Rust parser.
+//
+// Build with: go build -tags rustparser
+// Requires: cargo build --release in ats/ax/qntx-parser
 
 package parser
 

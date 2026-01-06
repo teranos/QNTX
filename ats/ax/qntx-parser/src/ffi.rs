@@ -415,8 +415,7 @@ mod tests {
         assert_eq!(subject, "ALICE");
 
         // Check predicate value
-        let predicates =
-            unsafe { slice::from_raw_parts(result.predicates, result.predicates_len) };
+        let predicates = unsafe { slice::from_raw_parts(result.predicates, result.predicates_len) };
         let predicate = unsafe { CStr::from_ptr(predicates[0]) }.to_str().unwrap();
         assert_eq!(predicate, "author");
 

@@ -1,7 +1,8 @@
-//go:build !cgo
+//go:build !cgo || !rustparser
 
 // Package parser provides AX query parsing functionality.
-// This file provides the pure Go fallback when CGO is disabled.
+// This file provides the pure Go fallback when CGO is disabled or
+// when the rustparser build tag is not specified.
 
 package parser
 

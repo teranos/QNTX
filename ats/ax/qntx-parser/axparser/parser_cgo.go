@@ -1,3 +1,5 @@
+//go:build cgo && rustparser
+
 // Package axparser provides a CGO wrapper for the Rust AX query parser.
 //
 // This package links directly with the Rust library via CGO, providing
@@ -6,6 +8,7 @@
 // Build Requirements:
 //   - Rust toolchain (cargo build --release in ats/ax/qntx-parser)
 //   - CGO enabled (CGO_ENABLED=1)
+//   - Build tag: -tags rustparser
 //   - Library path set correctly for your platform
 //
 // Usage:

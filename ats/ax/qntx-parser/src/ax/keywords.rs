@@ -186,13 +186,19 @@ mod tests {
         assert_eq!(classify_keyword("is"), Some(KeywordKind::Grammatical));
         assert_eq!(classify_keyword("are"), Some(KeywordKind::Grammatical));
         assert_eq!(classify_keyword("of"), Some(KeywordKind::ContextTransition));
-        assert_eq!(classify_keyword("from"), Some(KeywordKind::ContextTransition));
+        assert_eq!(
+            classify_keyword("from"),
+            Some(KeywordKind::ContextTransition)
+        );
         assert_eq!(classify_keyword("by"), Some(KeywordKind::ActorTransition));
         assert_eq!(classify_keyword("via"), Some(KeywordKind::ActorTransition));
         assert_eq!(classify_keyword("since"), Some(KeywordKind::Temporal));
         assert_eq!(classify_keyword("over"), Some(KeywordKind::Temporal));
         assert_eq!(classify_keyword("so"), Some(KeywordKind::Action));
-        assert_eq!(classify_keyword("speaks"), Some(KeywordKind::NaturalPredicate));
+        assert_eq!(
+            classify_keyword("speaks"),
+            Some(KeywordKind::NaturalPredicate)
+        );
     }
 
     #[test]
