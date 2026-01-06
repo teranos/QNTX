@@ -31,9 +31,16 @@
 //! ```
 
 pub mod ax;
+pub mod ffi;
 
 // Re-export main types
 pub use ax::{
     AxQuery, DurationExpr, DurationUnit, Lexer, ParseError, Parser, TemporalClause, Token,
     TokenKind,
+};
+
+// Re-export FFI types
+pub use ffi::{
+    parser_parse_query, parser_result_free, parser_string_free, AxQueryResultC, DurationUnitC,
+    TemporalClauseC, TemporalTypeC,
 };
