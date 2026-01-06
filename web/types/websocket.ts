@@ -10,8 +10,6 @@ import { GraphData } from './core';
 import type {
   SemanticToken as LSPSemanticToken,
   Diagnostic as LSPDiagnostic,
-  Range as LSPRange,
-  Position as LSPPosition,
 } from './lsp';
 
 // Import generated types from Go source (single source of truth)
