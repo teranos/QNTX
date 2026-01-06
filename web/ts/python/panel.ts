@@ -1,0 +1,592 @@
+/**
+ * Python Editor Panel - Python code execution with PyO3-based plugin
+ *
+ * Provides a code editor for writing and executing Python code via
+ * the qntx-python-plugin gRPC service.
+ */
+
+import { BasePanel } from '../base-panel.ts';
+import { apiFetch } from '../api.ts';
+
+// Status type for plugin connection
+type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
+
+// Status configuration
+const STATUS_CONFIG: Record<PluginStatus, { message: string; className: string }> = {
+    connecting: { message: 'connecting...', className: 'python-status-connecting' },
+    ready: { message: 'ready', className: 'python-status-ready' },
+    error: { message: 'error', className: 'python-status-error' },
+    unavailable: { message: 'unavailable', className: 'python-status-unavailable' }
+};
+
+// Execution result from the plugin
+interface ExecutionResult {
+    success: boolean;
+    stdout: string;
+    stderr: string;
+    result: any;
+    error: string | null;
+    duration_ms: number;
+    variables?: Record<string, string>;
+}
+
+class PythonEditorPanel extends BasePanel {
+    private editor: any | null = null;
+    private currentTab: 'editor' | 'output' = 'editor';
+    private lastOutput: ExecutionResult | null = null;
+    private isExecuting: boolean = false;
+    private pythonVersion: string = '';
+
+    // DOM elements
+    private statusElement: HTMLElement | null = null;
+    private outputElement: HTMLElement | null = null;
+
+    // Keyboard handler
+    private executeHandler: ((e: KeyboardEvent) => void) | null = null;
+
+    constructor() {
+        super({
+            id: 'python-editor-panel',
+            classes: ['prose-panel'],
+            useOverlay: true,
+            closeOnEscape: true
+        });
+
+        if (this.panel) {
+            this.statusElement = this.panel.querySelector('#python-status');
+            this.outputElement = this.panel.querySelector('#python-output');
+        }
+    }
+
+    protected getTemplate(): string {
+        return `
+            <div class="prose-header">
+                <div class="prose-title">
+                    <span class="prose-icon python-editor-icon">py</span>
+                    <span class="prose-name">Python</span>
+                    <span class="python-version"></span>
+                </div>
+                <button class="prose-close python-editor-close" aria-label="Close">✕</button>
+            </div>
+            <div class="python-editor-tabs">
+                <button class="python-editor-tab active" data-tab="editor">Editor</button>
+                <button class="python-editor-tab" data-tab="output">Output</button>
+            </div>
+            <div class="prose-body">
+                <div class="prose-sidebar" id="tab-sidebar">
+                    <!-- Sidebar content dynamically rendered here -->
+                </div>
+                <div class="prose-content" id="tab-content">
+                    <!-- Tab content dynamically rendered here -->
+                </div>
+            </div>
+        `;
+    }
+
+    protected setupEventListeners(): void {
+        // Close button
+        const closeBtn = this.$('.python-editor-close');
+        closeBtn?.addEventListener('click', () => this.hide());
+
+        // Tab switching
+        const tabs = this.panel?.querySelectorAll('.python-editor-tab');
+        tabs?.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const target = e.target as HTMLElement;
+                const tabName = target.dataset.tab as 'editor' | 'output';
+                this.switchTab(tabName);
+            });
+        });
+
+        // Execute on Cmd/Ctrl+Enter
+        this.executeHandler = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && this.isVisible) {
+                e.preventDefault();
+                this.executeCode();
+            }
+        };
+        document.addEventListener('keydown', this.executeHandler);
+    }
+
+    protected async onShow(): Promise<void> {
+        // Check plugin status
+        await this.checkPluginStatus();
+
+        // Initialize editor tab
+        this.switchTab('editor');
+
+        console.log('[Python Editor] Panel shown');
+    }
+
+    protected onHide(): void {
+        this.destroyEditor();
+        console.log('[Python Editor] Panel closed');
+    }
+
+    protected onDestroy(): void {
+        this.destroyEditor();
+        if (this.executeHandler) {
+            document.removeEventListener('keydown', this.executeHandler);
+            this.executeHandler = null;
+        }
+    }
+
+    private async checkPluginStatus(): Promise<void> {
+        this.updateStatus('connecting');
+
+        try {
+            const response = await apiFetch('/api/python/version');
+            if (response.ok) {
+                const data = await response.json();
+                this.pythonVersion = data.python_version || 'unknown';
+                this.updateStatus('ready');
+
+                // Update version display
+                const versionEl = this.$('.python-version');
+                if (versionEl) {
+                    versionEl.textContent = `Python ${this.pythonVersion.split(' ')[0]}`;
+                }
+            } else {
+                this.updateStatus('unavailable');
+            }
+        } catch (error) {
+            console.error('[Python Editor] Failed to check plugin status:', error);
+            this.updateStatus('error');
+        }
+    }
+
+    private async initializeEditor(content: string = ''): Promise<void> {
+        if (this.editor) {
+            this.editor.destroy();
+            this.editor = null;
+        }
+
+        try {
+            const { EditorView, keymap } = await import('@codemirror/view');
+            const { EditorState } = await import('@codemirror/state');
+            const { defaultKeymap } = await import('@codemirror/commands');
+            const { oneDark } = await import('@codemirror/theme-one-dark');
+
+            // Import Python language support
+            let pythonExtension;
+            try {
+                const pythonModule = await import('@codemirror/lang-python');
+                pythonExtension = pythonModule.python();
+            } catch (err) {
+                console.warn('[Python Editor] Failed to load Python language support:', err);
+                pythonExtension = [];
+            }
+
+            const container = this.$('#python-editor-container');
+            if (!container) {
+                throw new Error('Editor container not found');
+            }
+
+            this.editor = new EditorView({
+                state: EditorState.create({
+                    doc: content || this.getDefaultCode(),
+                    extensions: [
+                        keymap.of(defaultKeymap),
+                        pythonExtension,
+                        oneDark,
+                        EditorView.lineWrapping
+                    ]
+                }),
+                parent: container
+            });
+
+            console.log('[Python Editor] Editor initialized');
+        } catch (error) {
+            console.error('[Python Editor] Failed to initialize editor:', error);
+            this.showError(error instanceof Error ? error.message : String(error));
+        }
+    }
+
+    private getDefaultCode(): string {
+        return `# Python code editor
+# Press Cmd/Ctrl+Enter to execute
+
+print("Hello from QNTX Python!")
+
+# Example: Calculate something
+result = sum(range(1, 11))
+print(f"Sum of 1-10: {result}")
+
+# Set _result to return a value
+_result = {"message": "Hello", "numbers": [1, 2, 3]}
+`;
+    }
+
+    async executeCode(): Promise<void> {
+        if (!this.editor || this.isExecuting) return;
+
+        this.isExecuting = true;
+        this.updateExecuteButton(true);
+
+        try {
+            const code = this.editor.state.doc.toString();
+
+            const response = await apiFetch('/api/python/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: code,
+                    capture_variables: true
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Execution failed: ${response.statusText}`);
+            }
+
+            const result: ExecutionResult = await response.json();
+            this.lastOutput = result;
+            this.updateOutput(result);
+
+            // Auto-switch to output tab
+            this.switchTab('output');
+
+            console.log('[Python Editor] Code executed:', result.success ? 'success' : 'error');
+        } catch (error) {
+            console.error('[Python Editor] Execution error:', error);
+            this.lastOutput = {
+                success: false,
+                stdout: '',
+                stderr: '',
+                result: null,
+                error: error instanceof Error ? error.message : String(error),
+                duration_ms: 0
+            };
+            this.updateOutput(this.lastOutput);
+            this.switchTab('output');
+        } finally {
+            this.isExecuting = false;
+            this.updateExecuteButton(false);
+        }
+    }
+
+    private updateOutput(result: ExecutionResult): void {
+        const outputEl = this.$('#python-output-content');
+        if (!outputEl) return;
+
+        const statusClass = result.success ? 'output-success' : 'output-error';
+        const statusText = result.success ? 'Success' : 'Error';
+
+        let html = `
+            <div class="output-header ${statusClass}">
+                <span class="output-status">${statusText}</span>
+                <span class="output-duration">${result.duration_ms}ms</span>
+            </div>
+        `;
+
+        if (result.stdout) {
+            html += `
+                <div class="output-section">
+                    <div class="output-label">stdout:</div>
+                    <pre class="output-content">${this.escapeHtml(result.stdout)}</pre>
+                </div>
+            `;
+        }
+
+        if (result.stderr) {
+            html += `
+                <div class="output-section output-stderr">
+                    <div class="output-label">stderr:</div>
+                    <pre class="output-content">${this.escapeHtml(result.stderr)}</pre>
+                </div>
+            `;
+        }
+
+        if (result.error) {
+            html += `
+                <div class="output-section output-error-section">
+                    <div class="output-label">Error:</div>
+                    <pre class="output-content output-error-text">${this.escapeHtml(result.error)}</pre>
+                </div>
+            `;
+        }
+
+        if (result.result !== null && result.result !== undefined) {
+            html += `
+                <div class="output-section">
+                    <div class="output-label">Result:</div>
+                    <pre class="output-content output-result">${this.escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
+                </div>
+            `;
+        }
+
+        if (result.variables && Object.keys(result.variables).length > 0) {
+            html += `
+                <div class="output-section">
+                    <div class="output-label">Variables:</div>
+                    <div class="output-variables">
+                        ${Object.entries(result.variables).map(([k, v]) =>
+                            `<div class="var-item"><span class="var-name">${this.escapeHtml(k)}</span> = <span class="var-value">${this.escapeHtml(v)}</span></div>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        outputEl.innerHTML = html;
+    }
+
+    private escapeHtml(text: string): string {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    private updateExecuteButton(executing: boolean): void {
+        const btn = this.$('#python-execute-btn') as HTMLButtonElement;
+        if (btn) {
+            btn.disabled = executing;
+            btn.textContent = executing ? 'Running...' : 'Run (⌘↵)';
+        }
+    }
+
+    updateStatus(status: PluginStatus): void {
+        const statusEl = this.$('#python-status');
+        if (!statusEl) return;
+
+        const config = STATUS_CONFIG[status];
+
+        Object.values(STATUS_CONFIG).forEach(cfg => {
+            statusEl.classList.remove(cfg.className);
+        });
+
+        statusEl.classList.add(config.className);
+        statusEl.textContent = config.message;
+    }
+
+    private showError(message: string): void {
+        const container = this.$('#python-editor-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="python-editor-error">
+                    <h3>Error</h3>
+                    <p>${this.escapeHtml(message)}</p>
+                </div>
+            `;
+        }
+    }
+
+    destroyEditor(): void {
+        if (this.editor) {
+            try {
+                this.editor.destroy();
+            } catch (err) {
+                console.warn('[Python Editor] Error destroying editor:', err);
+            }
+            this.editor = null;
+        }
+    }
+
+    private getEditorSidebarTemplate(): string {
+        return `
+            <div class="python-sidebar-content">
+                <div class="python-sidebar-section">
+                    <h4>Quick Actions</h4>
+                    <button id="python-execute-btn" class="python-action-btn">Run (⌘↵)</button>
+                    <button id="python-clear-btn" class="python-action-btn secondary">Clear</button>
+                </div>
+                <div class="python-sidebar-section">
+                    <h4>Status</h4>
+                    <div class="python-status-row">
+                        Plugin: <span id="python-status" class="python-status-connecting">connecting...</span>
+                    </div>
+                </div>
+                <div class="python-sidebar-section">
+                    <h4>Examples</h4>
+                    <button class="python-example-btn" data-example="hello">Hello World</button>
+                    <button class="python-example-btn" data-example="math">Math</button>
+                    <button class="python-example-btn" data-example="json">JSON</button>
+                </div>
+            </div>
+        `;
+    }
+
+    private getEditorContentTemplate(): string {
+        return `
+            <div class="python-editor-info">
+                <span>🐍 Python Editor</span>
+                <span class="python-hint">Press ⌘+Enter to execute</span>
+            </div>
+            <div class="prose-editor-container">
+                <div id="python-editor-container" class="python-editor-container">
+                    <!-- CodeMirror will be initialized here -->
+                </div>
+            </div>
+        `;
+    }
+
+    private getOutputSidebarTemplate(): string {
+        return `
+            <div class="python-sidebar-content">
+                <div class="python-sidebar-section">
+                    <h4>Actions</h4>
+                    <button id="python-back-btn" class="python-action-btn">← Back to Editor</button>
+                    <button id="python-copy-btn" class="python-action-btn secondary">Copy Output</button>
+                </div>
+            </div>
+        `;
+    }
+
+    private getOutputContentTemplate(): string {
+        return `
+            <div id="python-output-content" class="python-output-content">
+                <div class="no-output">No output yet. Run some code!</div>
+            </div>
+        `;
+    }
+
+    private bindSidebarEvents(): void {
+        // Execute button
+        const executeBtn = this.$('#python-execute-btn');
+        executeBtn?.addEventListener('click', () => this.executeCode());
+
+        // Clear button
+        const clearBtn = this.$('#python-clear-btn');
+        clearBtn?.addEventListener('click', () => {
+            if (this.editor) {
+                this.editor.dispatch({
+                    changes: { from: 0, to: this.editor.state.doc.length, insert: '' }
+                });
+            }
+        });
+
+        // Example buttons
+        const exampleBtns = this.panel?.querySelectorAll('.python-example-btn');
+        exampleBtns?.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const example = (e.target as HTMLElement).dataset.example;
+                if (example && this.editor) {
+                    this.editor.dispatch({
+                        changes: { from: 0, to: this.editor.state.doc.length, insert: this.getExampleCode(example) }
+                    });
+                }
+            });
+        });
+
+        // Back button (in output tab)
+        const backBtn = this.$('#python-back-btn');
+        backBtn?.addEventListener('click', () => this.switchTab('editor'));
+
+        // Copy button
+        const copyBtn = this.$('#python-copy-btn');
+        copyBtn?.addEventListener('click', () => {
+            if (this.lastOutput) {
+                const text = this.lastOutput.stdout + (this.lastOutput.stderr ? '\n' + this.lastOutput.stderr : '');
+                navigator.clipboard.writeText(text);
+            }
+        });
+    }
+
+    private getExampleCode(example: string): string {
+        switch (example) {
+            case 'hello':
+                return `# Hello World
+print("Hello from QNTX Python!")
+_result = "Hello, World!"
+`;
+            case 'math':
+                return `# Math example
+import math
+
+# Calculate factorial
+n = 10
+factorial = math.factorial(n)
+print(f"{n}! = {factorial}")
+
+# Calculate pi approximation
+pi_approx = sum(1/k**2 for k in range(1, 10000)) * 6
+print(f"π² ≈ {pi_approx:.6f}")
+print(f"π ≈ {math.sqrt(pi_approx):.6f}")
+
+_result = {"factorial": factorial, "pi": math.pi}
+`;
+            case 'json':
+                return `# JSON processing
+import json
+
+data = {
+    "name": "QNTX",
+    "version": "0.1.0",
+    "features": ["attestations", "pulse", "plugins"],
+    "python": True
+}
+
+print(json.dumps(data, indent=2))
+_result = data
+`;
+            default:
+                return this.getDefaultCode();
+        }
+    }
+
+    async switchTab(tab: 'editor' | 'output'): Promise<void> {
+        if (tab === this.currentTab) return;
+
+        // Store editor content before switching
+        let editorContent = '';
+        if (this.currentTab === 'editor' && this.editor) {
+            editorContent = this.editor.state.doc.toString();
+        }
+
+        this.currentTab = tab;
+
+        // Update tab buttons
+        const tabs = this.panel?.querySelectorAll('.python-editor-tab');
+        tabs?.forEach(t => {
+            const tabElement = t as HTMLElement;
+            if (tabElement.dataset.tab === tab) {
+                tabElement.classList.add('active');
+            } else {
+                tabElement.classList.remove('active');
+            }
+        });
+
+        // Render tab content
+        const sidebar = this.$('#tab-sidebar') as HTMLElement;
+        const content = this.$('#tab-content') as HTMLElement;
+
+        if (!sidebar || !content) return;
+
+        if (tab === 'editor') {
+            sidebar.innerHTML = this.getEditorSidebarTemplate();
+            content.innerHTML = this.getEditorContentTemplate();
+
+            // Re-initialize editor
+            await this.initializeEditor(editorContent);
+
+            // Re-check status
+            await this.checkPluginStatus();
+
+            // Bind sidebar events
+            this.bindSidebarEvents();
+        } else {
+            sidebar.innerHTML = this.getOutputSidebarTemplate();
+            content.innerHTML = this.getOutputContentTemplate();
+
+            // Show last output if available
+            if (this.lastOutput) {
+                this.updateOutput(this.lastOutput);
+            }
+
+            // Bind sidebar events
+            this.bindSidebarEvents();
+        }
+    }
+}
+
+// Create singleton instance
+const pythonEditorPanel = new PythonEditorPanel();
+
+// Export show and toggle functions
+export function showPythonEditor(): void {
+    pythonEditorPanel.show();
+}
+
+export function togglePythonEditor(): void {
+    pythonEditorPanel.toggle();
+}
