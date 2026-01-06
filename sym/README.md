@@ -6,6 +6,8 @@ Canonical symbols for QNTX SEG operations and system markers.
 
 **Visual grep.** Scan code, UI, or logs and instantly know which domain you're in. Symbols are stable across CLI, web UI, and documentation.
 
+**Cognitive compression.** Your brain pattern-matches `꩜` faster than parsing "pulse". One symbol = instant context.
+
 ## SEG Operators
 
 | Symbol | Command | Meaning |

@@ -58,7 +58,7 @@ type QNTXServer struct {
 	cancel         context.CancelFunc // Cancels all goroutines
 	wg             sync.WaitGroup     // Tracks active goroutines for clean shutdown
 	broadcastDrops atomic.Int64       // Tracks dropped broadcasts for monitoring
-	state          atomic.Int32       // GRACE Phase 4: Server state (Running/Draining/Stopped)
+	state          atomic.Int32       // Opening/Closing Phase 4: Server state (Running/Draining/Stopped)
 }
 
 // handleClientRegister handles a new client connection

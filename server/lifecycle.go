@@ -9,7 +9,7 @@ import (
 	"github.com/teranos/QNTX/sym"
 )
 
-// GRACE Phase 4: Server state management
+// Opening/Closing Phase 4: Server state management
 
 // getState returns the current server state
 func (s *QNTXServer) getState() ServerState {
@@ -156,7 +156,7 @@ func (s *QNTXServer) monitorBrowserConnection() {
 func (s *QNTXServer) Stop() error {
 	s.logger.Infow("Initiating server shutdown")
 
-	// GRACE Phase 4: Transition to draining state
+	// Opening/Closing Phase 4: Transition to draining state
 	s.setState(ServerStateDraining)
 
 	// Stop daemon FIRST before stopping server goroutines
@@ -233,7 +233,7 @@ func (s *QNTXServer) Stop() error {
 		}
 	}
 
-	// GRACE Phase 4: Mark shutdown complete
+	// Opening/Closing Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)
 
 	s.logger.Infow("Server shutdown complete",
