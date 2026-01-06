@@ -116,7 +116,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	} else if config.Binary != "" && config.AutoStart {
 		// Launch the plugin binary
 		port = m.allocatePort()
-		addr = fmt.Sprintf("localhost:%d", port)
+		// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
+		addr = fmt.Sprintf("127.0.0.1:%d", port)
 
 		var err error
 		process, err = m.launchPlugin(ctx, config, port)
