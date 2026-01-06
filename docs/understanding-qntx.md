@@ -302,32 +302,15 @@ The config panel shows **all 5 sources** simultaneously:
 
 **Why this matters:** When config doesn't work as expected, users can **debug themselves** instead of filing support tickets.
 
-### Documentation Drawer: Infrastructure Ready
+### Documentation Integration
 
-**Status:** UI feature implemented, comprehensive docs aspirational.
+The config panel design includes space for inline documentation. See Issue #207 for discussion of ProseMirror-based documentation editing and viewing capabilities.
 
-The config panel includes a documentation drawer:
-- Infrastructure works: click any config key → right side slides in
-- Shows description, type, valid values, examples, related settings when available
-- **Aspirational:** Complete documentation for every config option
+The concept is "right-click → Go to Definition" UX for configuration - making help contextual and immediately accessible.
 
-**The UI is there.** The content (docs for each key) is the "nice to have someday" part.
+### Current Design Prepared for Extension
 
-**This is "right-click → Go to Definition" UX for config** - the plumbing works, just needs content population.
-
-### Future Vision: Multi-Provider Config
-
-The docs describe future integration with:
-- HashiCorp Vault (secrets rotation)
-- Consul (dynamic service config)
-- AWS Secrets Manager
-- etcd (distributed config)
-
-**Status:** Aspirational. Nice to have someday, not driving current work.
-
-**But:** The current design (precedence visualization, source tracking) prepares for this. The UI just needs to generalize from 5 fixed sources to N pluggable providers.
-
-**This is strategic architecture:** Build the foundation now, extend later.
+The current configuration system with its precedence visualization and source tracking provides a solid foundation that could support additional configuration sources in the future through plugins. See Issue #205 for discussion of potential multi-provider support.
 
 ---
 
@@ -540,10 +523,9 @@ From task-logging.md:
 ### Vision (From Docs)
 
 **config-panel.md future sections:**
-- Multi-provider config (Vault, Consul, AWS)
-- Documentation drawer (click config → see docs on right)
-- Provider health indicators (refresh timestamps, sync status)
-- Config timeline (when values changed)
+- Documentation drawer infrastructure exists (click config → see docs)
+- Content needs to be populated for each config key
+- See GitHub Issues for future enhancements
 
 **task-logging.md future:**
 - Real-time log streaming
@@ -642,10 +624,10 @@ From task-logging.md:
 - Add budget tracking visualization
 - Stabilize all features working together
 
-**Long-term (aspirational):**
-- Multi-provider config (Vault, Consul)
-- Documentation drawer
-- Real-time log streaming
+**Long-term (tracked in GitHub Issues):**
+- See Issue #205 for multi-provider config discussion
+- Documentation drawer content population
+- Real-time log streaming and advanced filtering
 
 **The key:** Fix integration before adding features. Stable foundation first.
 
