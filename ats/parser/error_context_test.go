@@ -62,10 +62,3 @@ func TestErrorContext_BackwardCompatibility(t *testing.T) {
 		t.Error("ParseAskCommandWithVerbosity should default to Terminal context (with ANSI codes)")
 	}
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
