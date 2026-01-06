@@ -69,12 +69,7 @@
             "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
           ];
 
-          subPackages = [ "cmd/plugins/code" ];
-
-          # Rename binary to qntx-code-plugin
-          postInstall = ''
-            mv $out/bin/code $out/bin/qntx-code-plugin
-          '';
+          subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
         };
 
         # Helper function to build CI image for specific architecture
