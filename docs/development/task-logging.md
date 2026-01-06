@@ -3,8 +3,8 @@
 ## Related Documentation
 
 - **[Pulse Execution History](pulse-execution-history.md)** - Designed the `pulse_executions` table with logs field. This document implements the actual log capture mechanism.
-- **[Pulse Frontend Remaining Work](pulse-frontend-remaining-work.md)** - Tracks frontend implementation status. Log viewer UI is already built (execution card expansion).
-- **[Pulse Async IX Design](../design/pulse-ats-blocks-variations.md)** - Overall Pulse system design and ATS block scheduling.
+- **[Pulse Async Architecture](../architecture/pulse-async-ix.md)** - Overall Pulse system design and async job architecture.
+- **Frontend Status**: See GitHub Issue #30 for current Pulse panel status and remaining work.
 
 ## Overview
 

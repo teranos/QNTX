@@ -116,6 +116,9 @@ jobs:
           echo "Building QNTX for Linux ${{ matrix.arch }}..."
           nix build .#qntx --print-build-logs
 
+      - name: Cache binary to Cachix
+        run: nix build .#qntx --print-out-paths --no-link | cachix push qntx
+
       - name: Package binary
         run: |
           mkdir -p release
