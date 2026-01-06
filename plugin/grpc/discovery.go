@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"go.uber.org/zap"
 )
@@ -69,7 +70,10 @@ func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
+// If a plugin fails to load, it logs the error and continues with remaining plugins.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
+	var failedPlugins []string
+
 	for _, config := range configs {
 		if !config.Enabled {
 			m.logger.Infow("Skipping disabled plugin", "name", config.Name)
@@ -77,10 +81,17 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		}
 
 		if err := m.loadPlugin(ctx, config); err != nil {
-			return fmt.Errorf("failed to load plugin %s (binary=%s, address=%s): %w",
+			m.logger.Errorf("Failed to load plugin '%s' (binary=%s, address=%s): %v",
 				config.Name, config.Binary, config.Address, err)
+			failedPlugins = append(failedPlugins, config.Name)
+			continue
 		}
 	}
+
+	if len(failedPlugins) > 0 {
+		m.logger.Warnf("Some plugins failed to load: %v", failedPlugins)
+	}
+
 	return nil
 }
 
@@ -91,7 +102,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 	// Check if already loaded
 	if _, exists := m.plugins[config.Name]; exists {
-		return fmt.Errorf("plugin already loaded: %s", config.Name)
+		return errors.Newf("plugin already loaded: %s", config.Name)
 	}
 
 	var addr string
@@ -110,16 +121,17 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		var err error
 		process, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
-			return fmt.Errorf("failed to launch plugin %s (binary=%s, port=%d): %w",
-				config.Name, config.Binary, port, err)
+			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
+				config.Name, config.Binary, port)
 		}
-		m.logger.Infow("Launched plugin process", "name", config.Name, "port", port, "pid", process.Pid)
+		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
+			config.Name, process.Pid, port, addr)
 
-		// Wait for plugin to be ready
-		if err := m.waitForPlugin(ctx, addr, 30*time.Second); err != nil {
+		// Wait for plugin to be ready (5 second timeout for faster failure detection)
+		if err := m.waitForPlugin(ctx, addr, 5*time.Second); err != nil {
 			process.Kill()
-			return fmt.Errorf("plugin %s failed to start (binary=%s, addr=%s, pid=%d): %w",
-				config.Name, config.Binary, addr, process.Pid, err)
+			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
+				config.Name, config.Binary, addr, process.Pid)
 		}
 	} else if config.Binary != "" {
 		// Binary specified but auto_start is false
@@ -129,7 +141,7 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		)
 		return nil
 	} else {
-		return fmt.Errorf("plugin %s: either address or binary must be specified", config.Name)
+		return errors.Newf("plugin %s: either address or binary must be specified", config.Name)
 	}
 
 	// Connect to the plugin
@@ -138,7 +150,17 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if process != nil {
 			process.Kill()
 		}
-		return fmt.Errorf("failed to connect to plugin %s at %s: %w", config.Name, addr, err)
+		return errors.Wrapf(err, "failed to connect to plugin %s at %s", config.Name, addr)
+	}
+
+	// Validate plugin metadata matches config
+	actualName := client.Metadata().Name
+	if actualName != config.Name {
+		if process != nil {
+			process.Kill()
+		}
+		return fmt.Errorf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
+			config.Binary, actualName, config.Name)
 	}
 
 	m.plugins[config.Name] = &managedPlugin{
@@ -148,10 +170,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		port:    port,
 	}
 
-	m.logger.Infow("Plugin loaded successfully",
-		"name", config.Name,
-		"version", client.Metadata().Version,
-	)
+	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
+		config.Name, client.Metadata().Version, client.Metadata().Description)
 
 	return nil
 }
@@ -186,14 +206,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	if !filepath.IsAbs(binary) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory for plugin %s: %w", config.Name, err)
+			return nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
 		}
 		binary = filepath.Join(home, ".qntx", "plugins", binary)
 	}
 
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
-		return nil, fmt.Errorf("plugin binary not found for %s: %s", config.Name, binary)
+		return nil, errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
 	}
 
 	// Build command arguments
@@ -212,8 +232,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	cmd.Stderr = &pluginLogger{logger: m.logger, name: config.Name, level: "error"}
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start plugin %s (binary=%s, args=%v): %w",
-			config.Name, binary, args, err)
+		return nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
+			config.Name, binary, args)
 	}
 
 	return cmd.Process, nil
@@ -240,7 +260,7 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return fmt.Errorf("timeout waiting for plugin at %s", addr)
+	return errors.Newf("timeout waiting for plugin at %s", addr)
 }
 
 // GetPlugin returns a connected plugin as a DomainPlugin.
@@ -311,7 +331,7 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 	m.plugins = make(map[string]*managedPlugin)
 
 	if len(errs) > 0 {
-		return fmt.Errorf("shutdown errors: %v", errs)
+		return errors.Newf("shutdown errors: %v", errs)
 	}
 	return nil
 }
@@ -336,9 +356,9 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 
 		if line = strings.TrimSpace(line); line != "" {
 			if l.level == "error" {
-				l.logger.Errorw("Plugin output", "plugin", l.name, "message", line)
+				l.logger.Errorf("[%s stderr] %s", l.name, line)
 			} else {
-				l.logger.Infow("Plugin output", "plugin", l.name, "message", line)
+				l.logger.Infof("[%s] %s", l.name, line)
 			}
 		}
 	}

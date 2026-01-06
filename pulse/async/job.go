@@ -3,9 +3,9 @@ package async
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/vanity-id"
 )
 
@@ -105,7 +105,7 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 	// Format: JB + random(2) + handler(5) + random(2) + process(7) + random(2) + source(5) + random(4) + actor(3)
 	jobID, err := id.GenerateJobASID(handlerName, source, actor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate job ASID: %w", err)
+		return nil, errors.Wrap(err, "failed to generate job ASID")
 	}
 
 	now := time.Now()
@@ -203,7 +203,7 @@ func MarshalPulseState(state *PulseState) (string, error) {
 	}
 	data, err := json.Marshal(state)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal pulse state: %w", err)
+		return "", errors.Wrap(err, "failed to marshal pulse state")
 	}
 	return string(data), nil
 }
@@ -215,7 +215,7 @@ func UnmarshalPulseState(data string) (*PulseState, error) {
 	}
 	var state PulseState
 	if err := json.Unmarshal([]byte(data), &state); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal pulse state: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal pulse state")
 	}
 	return &state, nil
 }

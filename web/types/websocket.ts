@@ -6,6 +6,11 @@
  */
 
 import { GraphData } from './core';
+// Import LSP types for parse-related messages to ensure consistency
+import type {
+  SemanticToken as LSPSemanticToken,
+  Diagnostic as LSPDiagnostic,
+} from './lsp';
 
 // Import generated types from Go source (single source of truth)
 import {
@@ -289,25 +294,16 @@ export interface IXCompleteMessage extends BaseMessage {
 }
 
 /**
- * Usage update
+ * Usage update (matches server format from server/types.go:UsageUpdateMessage)
  */
 export interface UsageUpdateMessage extends BaseMessage {
   type: 'usage_update';
-  daily: {
-    used: number;
-    limit: number;
-    percentage: number;
-  };
-  monthly: {
-    used: number;
-    limit: number;
-    percentage: number;
-  };
-  costs?: {
-    daily: number;
-    monthly: number;
-    currency: string;
-  };
+  total_cost: number;    // Total cost in last 24h
+  requests: number;      // Total requests
+  success: number;       // Successful requests
+  tokens: number;        // Total tokens used
+  models: number;        // Unique models used
+  since: string;         // Time period (e.g., "24h")
 }
 
 /**
@@ -326,8 +322,8 @@ export interface ParseRequestMessage extends BaseMessage {
  */
 export interface ParseResponseMessage extends BaseMessage {
   type: 'parse_response';
-  tokens: SemanticToken[];
-  diagnostics: Diagnostic[];
+  tokens: LSPSemanticToken[];
+  diagnostics: LSPDiagnostic[];
   parse_state?: unknown;
   requestId?: string;
 }
@@ -357,16 +353,24 @@ export interface GraphDataMessage extends BaseMessage {
 }
 
 /**
- * Log messages
+ * Log message entry from the backend
+ */
+export interface LogEntry {
+  level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+  timestamp: string;
+  logger: string;
+  message: string;
+  fields?: Record<string, unknown>;
+}
+
+/**
+ * Log messages batch (matches server format: { type: "logs", data: { messages: [...] } })
  */
 export interface LogsMessage extends BaseMessage {
   type: 'logs';
-  logs: Array<{
-    timestamp: number;
-    level: 'info' | 'warn' | 'error' | 'debug';
-    message: string;
-    source?: string;
-  }>;
+  data: {
+    messages: LogEntry[];
+  };
 }
 
 /**
@@ -577,7 +581,11 @@ export interface MessageHandlers {
   webscraper_request?: MessageHandler<WebscraperRequestMessage>;
   webscraper_response?: MessageHandler<WebscraperResponseMessage>;
   webscraper_progress?: MessageHandler<WebscraperProgressMessage>;
-  _default?: MessageHandler<BaseMessage>;
+  /**
+   * Default handler for messages without explicit handlers.
+   * Currently receives raw GraphData from the server (no type field).
+   */
+  _default?: (data: GraphData | BaseMessage) => void | Promise<void>;
 }
 
 // ============================================================================

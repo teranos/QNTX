@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"go.uber.org/zap"
 )
 
 // Registry manages all domain plugins
@@ -15,14 +16,16 @@ type Registry struct {
 	plugins map[string]DomainPlugin
 	states  map[string]PluginState // Track state of each plugin
 	version string                 // QNTX version
+	logger  *zap.SugaredLogger
 }
 
 // NewRegistry creates a new plugin registry
-func NewRegistry(qntxVersion string) *Registry {
+func NewRegistry(qntxVersion string, logger *zap.SugaredLogger) *Registry {
 	return &Registry{
 		plugins: make(map[string]DomainPlugin),
 		states:  make(map[string]PluginState),
 		version: qntxVersion,
+		logger:  logger,
 	}
 }
 
@@ -106,14 +109,25 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 	}
 	sort.Strings(names)
 
+	var failedPlugins []string
 	for _, name := range names {
 		if err := plugins[name].Initialize(ctx, services); err != nil {
-			return fmt.Errorf("failed to initialize domain plugin %s: %w", name, err)
+			r.logger.Errorf("Failed to initialize plugin '%s': %v", name, err)
+			failedPlugins = append(failedPlugins, name)
+			// Mark as failed but continue with other plugins
+			r.mu.Lock()
+			r.states[name] = StateFailed
+			r.mu.Unlock()
+			continue
 		}
 		// Set state to running after successful initialization
 		r.mu.Lock()
 		r.states[name] = StateRunning
 		r.mu.Unlock()
+	}
+
+	if len(failedPlugins) > 0 {
+		r.logger.Warnf("Some plugins failed to initialize: %v", failedPlugins)
 	}
 
 	return nil
