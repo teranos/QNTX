@@ -1,6 +1,6 @@
 // System drawer for logs, progress, and system output
 
-import { MAX_LOGS, state } from './config.ts';
+import { MAX_LOGS, appState } from './config.ts';
 import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
 import type { LogsMessage, LogEntry } from '../types/websocket';
@@ -23,7 +23,7 @@ export function handleLogBatch(data: LogsMessage): void {
         appendLog(msg);
 
         // Show toast for errors at verbosity 0
-        if (state.currentVerbosity === 0 && (msg.level === 'ERROR' || msg.level === 'WARN')) {
+        if (appState.currentVerbosity === 0 && (msg.level === 'ERROR' || msg.level === 'WARN')) {
             showToast(msg);
         }
     });
@@ -73,11 +73,11 @@ function appendLog(msg: LogEntry): void {
     }
 
     // Add to buffer
-    state.logBuffer.push(logLine);
+    appState.logBuffer.push(logLine);
 
     // Maintain circular buffer
-    if (state.logBuffer.length > MAX_LOGS) {
-        state.logBuffer.shift();
+    if (appState.logBuffer.length > MAX_LOGS) {
+        appState.logBuffer.shift();
     }
 
     // Append to DOM
@@ -101,7 +101,7 @@ function appendLog(msg: LogEntry): void {
 function updateLogCount(): void {
     const count = document.getElementById('log-count') as HTMLElement | null;
     if (count) {
-        count.textContent = '(' + state.logBuffer.length + ')';
+        count.textContent = '(' + appState.logBuffer.length + ')';
     }
 }
 
@@ -110,7 +110,7 @@ export function clearLogs(): void {
     if (logContent) {
         logContent.innerHTML = '';
     }
-    state.logBuffer = [];
+    appState.logBuffer = [];
     updateLogCount();
 }
 
@@ -149,7 +149,7 @@ function updateDownloadButton(): void {
     const downloadBtn = document.getElementById('download-logs') as HTMLButtonElement | null;
     if (!downloadBtn) return;
 
-    if (state.currentVerbosity < 2) {
+    if (appState.currentVerbosity < 2) {
         downloadBtn.disabled = true;
         downloadBtn.title = 'File logging disabled (verbosity < 2)';
     } else {
@@ -166,7 +166,7 @@ export function initSystemDrawer(): void {
         verbositySelect.addEventListener('change', function(e: Event) {
             const target = e.target as HTMLSelectElement;
             const verbosity = parseInt(target.value);
-            state.currentVerbosity = verbosity;
+            appState.currentVerbosity = verbosity;
 
             sendMessage({
                 type: 'set_verbosity',

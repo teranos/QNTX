@@ -131,12 +131,18 @@ export const GRAPH_STYLES: GraphStyles & {
     META_COLOR: '#666'
 };
 
-// Shared state
-export const state: AppState = {
+// Shared runtime state (in-memory, not persisted)
+// For persisted state, see ui-state.ts
+export const appState: AppState = {
     currentVerbosity: 2,  // Default: Debug (-vv)
     logBuffer: [],
     progressBuffer: [],
     currentQuery: '',
     currentGraphData: null,
-    currentTransform: null
+    currentTransform: null,
+    graphVisibility: {
+        hiddenNodeTypes: new Set<string>(),
+        hideIsolated: false,
+        revealRelatedActive: new Set<string>()
+    }
 };
