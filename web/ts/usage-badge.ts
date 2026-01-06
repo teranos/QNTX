@@ -75,7 +75,16 @@ export function createUsageBadge(): HTMLDivElement {
         scheduleFadeOut();
     });
 
-    document.body.appendChild(badge);
+    // Insert at the beginning of system drawer header (leftmost position)
+    const drawerHeader = document.getElementById('system-drawer-header');
+    if (drawerHeader && drawerHeader.firstChild) {
+        drawerHeader.insertBefore(badge, drawerHeader.firstChild);
+    } else if (drawerHeader) {
+        drawerHeader.appendChild(badge);
+    } else {
+        // Fallback: append to body if drawer header not ready yet
+        document.body.appendChild(badge);
+    }
 
     return badge;
 }

@@ -411,4 +411,3 @@ func TestConfidenceCalculator_SetReviewThreshold(t *testing.T) {
 		t.Error("Expected new threshold 0.5 to not require review for 0.51")
 	}
 }
-
