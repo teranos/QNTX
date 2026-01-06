@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"net"
 
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
@@ -41,13 +41,13 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate auth token: %w", err)
+		return nil, errors.Wrap(err, "failed to generate auth token")
 	}
 
 	// Start ATSStore service
 	atsStoreAddr, err := m.startATSStoreService(ctx, store, authToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to start ATS store service: %w", err)
+		return nil, errors.Wrap(err, "failed to start ATS store service")
 	}
 
 	// Start Queue service
@@ -57,7 +57,7 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 		if m.atsStoreServer != nil {
 			m.atsStoreServer.Stop()
 		}
-		return nil, fmt.Errorf("failed to start queue service: %w", err)
+		return nil, errors.Wrap(err, "failed to start queue service")
 	}
 
 	m.endpoints = ServiceEndpoints{
@@ -79,7 +79,7 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store *stora
 	// Listen on dynamic port
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return "", fmt.Errorf("failed to listen: %w", err)
+		return "", errors.Wrap(err, "failed to listen")
 	}
 
 	// Create gRPC server
@@ -112,7 +112,7 @@ func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Qu
 	// Listen on dynamic port
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return "", fmt.Errorf("failed to listen: %w", err)
+		return "", errors.Wrap(err, "failed to listen")
 	}
 
 	// Create gRPC server

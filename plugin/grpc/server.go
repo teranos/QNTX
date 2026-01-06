@@ -17,6 +17,7 @@ import (
 	"net/http/httptest"
 	"sync"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -53,7 +54,7 @@ func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *Plu
 func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+		return errors.Wrapf(err, "failed to listen on %s", addr)
 	}
 
 	grpcServer := grpc.NewServer()
@@ -69,7 +70,7 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	}()
 
 	if err := grpcServer.Serve(listener); err != nil {
-		return fmt.Errorf("gRPC server error: %w", err)
+		return errors.Wrap(err, "gRPC server error")
 	}
 
 	return nil
@@ -105,13 +106,13 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 
 		// Initialize the plugin
 		if err := s.plugin.Initialize(ctx, s.services); err != nil {
-			s.initErr = fmt.Errorf("plugin %s initialization failed: %w", s.plugin.Metadata().Name, err)
+			s.initErr = errors.Wrapf(err, "plugin %s initialization failed", s.plugin.Metadata().Name)
 			return
 		}
 
 		// Register HTTP handlers
 		if err := s.plugin.RegisterHTTP(s.httpMux); err != nil {
-			s.initErr = fmt.Errorf("HTTP registration failed for plugin %s: %w", s.plugin.Metadata().Name, err)
+			s.initErr = errors.Wrapf(err, "HTTP registration failed for plugin %s", s.plugin.Metadata().Name)
 			return
 		}
 	})
@@ -126,7 +127,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 // Shutdown shuts down the plugin.
 func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protocol.Empty, error) {
 	if err := s.plugin.Shutdown(ctx); err != nil {
-		return nil, fmt.Errorf("plugin %s shutdown failed: %w", s.plugin.Metadata().Name, err)
+		return nil, errors.Wrapf(err, "plugin %s shutdown failed", s.plugin.Metadata().Name)
 	}
 	return &protocol.Empty{}, nil
 }
@@ -136,7 +137,7 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 	// Create an HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.Path, bytes.NewReader(req.Body))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+		return nil, errors.Wrap(err, "failed to create HTTP request")
 	}
 
 	// Set headers (support multi-value headers)
@@ -158,7 +159,7 @@ func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest
 
 	body, err := io.ReadAll(result.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return nil, errors.Wrap(err, "failed to read response body")
 	}
 
 	// Build response headers (preserve multi-value headers like Set-Cookie)
