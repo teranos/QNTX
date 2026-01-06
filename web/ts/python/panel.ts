@@ -37,10 +37,6 @@ class PythonEditorPanel extends BasePanel {
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
 
-    // DOM elements
-    private statusElement: HTMLElement | null = null;
-    private outputElement: HTMLElement | null = null;
-
     // Keyboard handler
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
 
