@@ -65,6 +65,13 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("plugin.websocket.keepalive.ping_interval_secs", 30)
 	v.SetDefault("plugin.websocket.keepalive.pong_timeout_secs", 60)
 	v.SetDefault("plugin.websocket.keepalive.reconnect_attempts", 3)
+
+	// Auth configuration defaults (disabled by default for local-only use)
+	v.SetDefault("auth.enabled", false)          // Auth disabled by default (local-first)
+	v.SetDefault("auth.token_expiry", "15m")     // Short-lived JWT tokens
+	v.SetDefault("auth.refresh_expiry", "720h") // 30 days for refresh tokens
+	v.SetDefault("auth.github.enabled", false)   // GitHub OAuth disabled by default
+	v.SetDefault("auth.tls.enabled", false)      // TLS disabled by default
 }
 
 // BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables
@@ -79,6 +86,11 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	v.BindEnv("local_inference.enabled", "QNTX_LOCAL_INFERENCE_ENABLED")
 	v.BindEnv("local_inference.base_url", "QNTX_LOCAL_INFERENCE_BASE_URL")
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
+
+	// Auth configuration (secrets should come from environment)
+	v.BindEnv("auth.jwt_secret", "QNTX_AUTH_JWT_SECRET")
+	v.BindEnv("auth.github.client_id", "QNTX_AUTH_GITHUB_CLIENT_ID")
+	v.BindEnv("auth.github.client_secret", "QNTX_AUTH_GITHUB_CLIENT_SECRET")
 }
 
 // GetGraphPort returns the configured QNTX server port

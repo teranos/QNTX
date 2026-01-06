@@ -10,6 +10,31 @@ type Config struct {
 	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
+	Auth           AuthConfig           `mapstructure:"auth"`
+}
+
+// AuthConfig configures authentication for remote clients
+type AuthConfig struct {
+	Enabled       bool               `mapstructure:"enabled"`        // Enable authentication (default: false for local-only)
+	JWTSecret     string             `mapstructure:"jwt_secret"`     // Secret for signing JWTs (auto-generated if empty)
+	TokenExpiry   string             `mapstructure:"token_expiry"`   // JWT token expiry duration (default: 15m)
+	RefreshExpiry string             `mapstructure:"refresh_expiry"` // Refresh token expiry (default: 30d)
+	GitHub        AuthGitHubConfig   `mapstructure:"github"`         // GitHub OAuth provider
+	TLS           AuthTLSConfig      `mapstructure:"tls"`            // TLS/HTTPS configuration
+}
+
+// AuthGitHubConfig configures GitHub OAuth provider
+type AuthGitHubConfig struct {
+	Enabled      bool   `mapstructure:"enabled"`       // Enable GitHub OAuth
+	ClientID     string `mapstructure:"client_id"`     // GitHub OAuth App Client ID
+	ClientSecret string `mapstructure:"client_secret"` // GitHub OAuth App Client Secret (use env var)
+}
+
+// AuthTLSConfig configures TLS/HTTPS for secure connections
+type AuthTLSConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`   // Enable HTTPS
+	CertFile string `mapstructure:"cert_file"` // Path to TLS certificate file
+	KeyFile  string `mapstructure:"key_file"`  // Path to TLS private key file
 }
 
 // DatabaseConfig configures the SQLite database

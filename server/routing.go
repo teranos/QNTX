@@ -46,9 +46,25 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/code/", corsPluginHandler) // Matches all /api/code/* paths
 	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
 
+	// Auth endpoints (public, no auth required)
+	if s.authHandlers != nil {
+		http.HandleFunc("/auth/providers", s.corsMiddleware(s.authHandlers.HandleProviders))
+		http.HandleFunc("/auth/oauth/", s.corsMiddleware(s.handleAuthOAuth))  // /auth/oauth/{provider}/url
+		http.HandleFunc("/auth/callback", s.corsMiddleware(s.authHandlers.HandleCallback))
+		http.HandleFunc("/auth/refresh", s.corsMiddleware(s.authHandlers.HandleRefresh))
+		// Protected auth endpoints (require authentication)
+		http.HandleFunc("/auth/logout", s.corsMiddleware(s.authMiddleware.RequireAuth(s.authHandlers.HandleLogout)))
+		http.HandleFunc("/auth/sessions", s.corsMiddleware(s.authMiddleware.RequireAuth(s.handleAuthSessions)))
+		http.HandleFunc("/auth/me", s.corsMiddleware(s.authMiddleware.RequireAuth(s.authHandlers.HandleMe)))
+		s.logger.Infow("Auth routes registered")
+	}
+
 	// Core QNTX handlers
+	// WebSocket endpoints - auth optional, validated at upgrade time
 	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
 	http.HandleFunc("/lsp", s.corsMiddleware(s.HandleGLSPWebSocket)) // ATS LSP protocol (completions, hover, semantic tokens)
+
+	// Public endpoints
 	http.HandleFunc("/health", s.corsMiddleware(s.HandleHealth))
 	http.HandleFunc("/logs/download", s.corsMiddleware(s.HandleLogDownload))
 	http.HandleFunc("/api/timeseries/usage", s.corsMiddleware(s.HandleUsageTimeSeries))
@@ -65,6 +81,23 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))             // Plugin actions: pause/resume (POST)
 	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                   // List installed plugins (GET)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
+}
+
+// handleAuthOAuth routes OAuth provider requests
+func (s *QNTXServer) handleAuthOAuth(w http.ResponseWriter, r *http.Request) {
+	// Route to auth URL handler for /auth/oauth/{provider}/url
+	s.authHandlers.HandleAuthURL(w, r)
+}
+
+// handleAuthSessions routes session list and revoke requests
+func (s *QNTXServer) handleAuthSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		s.authHandlers.HandleSessions(w, r)
+	} else if r.Method == http.MethodDelete {
+		s.authHandlers.HandleRevokeSession(w, r)
+	} else {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // corsMiddleware adds CORS headers to HTTP responses using configured allowed origins
