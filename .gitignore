@@ -52,3 +52,6 @@ web/src-tauri/gen/
 types/generated/rust/target/
 types/generated/rust/Cargo.lock
 target/
+
+# Nix
+result
