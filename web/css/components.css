@@ -60,25 +60,31 @@
 
 /* ============================================================================
  * Toast-specific Close Button Variant
- * Dark theme styling for toast notifications
+ * Light theme default with dark theme overrides
  * ============================================================================ */
 
 .toast .toast-close {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid #333;
-    color: #666;
+    color: #6e6e73;
+    opacity: 0.9;
+    background: transparent;
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+    border: none;
 }
 
 .toast .toast-close:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ccc;
-    border-color: #555;
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+    color: #3a3a3c;
 }
 
 .toast .toast-close:active {
-    background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    background: rgba(0, 0, 0, 0.08);
+    color: #1d1d1f;
 }
+
+/* No dark theme - single consistent design */
 
 /* ============================================================================
  * Legacy Close Button Classes (for backward compatibility)
