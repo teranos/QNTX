@@ -68,3 +68,20 @@ pause_on_budget_exceeded = true  # or false to fail jobs
 - **API Clients**: Use ai/tracker for all external API calls
 - **Pulse Ticker**: Resets daily/weekly/monthly counters
 - **Web UI**: Displays budget status and usage history
+
+## Monitoring Budget Status
+
+```bash
+# Check current budget status
+qntx am get pulse.daily_budget_usd    # See limit
+qntx pulse status                      # See current usage
+
+# View in web UI
+# Navigate to Pulse panel → Budget tab
+```
+
+## Common Scenarios
+
+**Budget Exceeded**: Jobs will pause (if `pause_on_budget_exceeded = true`) or fail. Check logs for `꩜ Budget exceeded` messages.
+
+**Reset Timing**: Counters reset at midnight UTC for daily, Sunday midnight for weekly, first of month for monthly.

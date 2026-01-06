@@ -29,3 +29,19 @@
 - Follow [README template](docs/README_TEMPLATE.md) for new packages
 - Add entries to [GLOSSARY.md](docs/GLOSSARY.md) for new concepts
 - Future vision goes in GitHub issues, not documentation
+
+## Common Issues
+
+### Tests Failing?
+- Use `qntxtest.CreateTestDB(t)` for database tests
+- Never create schemas inline
+- Check migrations are up to date: `make migrate`
+
+### Type Generation?
+- Never edit `types/generated/*` directly
+- Fix the generator, then run: `make types`
+
+### Symbol Confusion?
+- See [GLOSSARY.md](docs/GLOSSARY.md) for definitive meanings
+- Primary SEG operators: ⍟ ≡ ⨳ ⋈ ⌬ ✦ ⟶
+- System symbols: ꩜ ✿ ❀ ⊔ ▣
