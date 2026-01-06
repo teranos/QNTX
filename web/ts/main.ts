@@ -5,7 +5,7 @@ import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
-import { updateGraph, initGraphResize } from './graph-renderer.ts';
+import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { restoreSession } from './state-manager.ts';

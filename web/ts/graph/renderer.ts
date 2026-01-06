@@ -1,31 +1,31 @@
 // D3.js graph visualization
 // Main rendering orchestration - delegates to specialized modules
 
-import { state, GRAPH_PHYSICS, GRAPH_STYLES } from './config.ts';
-import { saveSession } from './state-manager.ts';
-import { hiddenNodeTypes, initLegendaToggles } from './legenda.ts';
-import { getLinkDistance, getLinkStrength } from './graph-physics.ts';
+import { state, GRAPH_PHYSICS, GRAPH_STYLES } from '../config.ts';
+import { saveSession } from '../state-manager.ts';
+import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
+import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
     getSimulation, getSvg, getG, getZoom, getHiddenNodes, getDomCache,
     setSimulation, setSvg, setG, setZoom, clearState
-} from './graph-state.ts';
-import { normalizeNodeType, filterVisibleNodes } from './graph-utils.ts';
-import { createDragBehavior, initGraphResize } from './graph-interactions.ts';
-import { getTransform, setTransform, centerGraph, resetZoom } from './graph-transform.ts';
-import type { GraphData, Node, Transform } from '../types/core';
+} from './state.ts';
+import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
+import { createDragBehavior, initGraphResize } from './interactions.ts';
+import { getTransform, setTransform, centerGraph, resetZoom } from './transform.ts';
+import type { GraphData, Node, Transform } from '../../types/core';
 import type {
     D3Node,
     D3Link,
     ZoomEvent
-} from '../types/d3-graph';
+} from '../../types/d3-graph';
 
 // Import D3 from vendor bundle
 declare const d3: any;
 
-// Re-export for backwards compatibility
-export { filterVisibleNodes } from './graph-utils.ts';
-export { initGraphResize } from './graph-interactions.ts';
-export { getTransform, setTransform, centerGraph, resetZoom } from './graph-transform.ts';
+// Re-export for public API
+export { filterVisibleNodes } from './utils.ts';
+export { initGraphResize } from './interactions.ts';
+export { getTransform, setTransform, centerGraph, resetZoom } from './transform.ts';
 
 // Update graph with new data
 export function updateGraph(data: GraphData): void {
