@@ -83,7 +83,7 @@ class GoEditorPanel extends BasePanel {
                     <span class="prose-name">Go Editor</span>
                     <span class="prose-breadcrumb"></span>
                 </div>
-                <button class="prose-close go-editor-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="go-editor-tabs">
                 <button class="go-editor-tab active" data-tab="editor">Editor</button>
