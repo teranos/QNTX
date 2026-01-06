@@ -127,6 +127,10 @@ type Client struct {
 	closeOnce sync.Once       // Defensive: Prevents double-close panics
 	graphView *GraphViewState // Phase 2: Client's graph visibility preferences
 	lastQuery string          // Phase 2: Last executed query for re-rendering with new visibility
+
+	// Auth info (populated if auth is enabled)
+	userID string // Authenticated user ID (empty if auth disabled)
+	email  string // Authenticated user email (empty if auth disabled)
 }
 
 // readPump handles reading messages from the WebSocket connection

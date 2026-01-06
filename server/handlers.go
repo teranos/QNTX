@@ -19,6 +19,7 @@ import (
 	"time"
 
 	appcfg "github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/auth"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/version"
@@ -28,6 +29,56 @@ import (
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// Validate auth if enabled
+	var authClaims *auth.Claims
+	if s.authService != nil && s.authService.Enabled() {
+		// Extract token from query param (WebSocket can't easily use headers)
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			// Also check Authorization header for clients that support it
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				token = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
+		if token == "" {
+			s.logger.Warnw("WebSocket connection rejected: missing auth token",
+				"remote_addr", r.RemoteAddr,
+			)
+			http.Error(w, "unauthorized: missing token", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate token
+		claims, err := s.authService.(*auth.Service).GetJWT().ValidateToken(token)
+		if err != nil {
+			s.logger.Warnw("WebSocket connection rejected: invalid token",
+				"remote_addr", r.RemoteAddr,
+				"error", err,
+			)
+			http.Error(w, "unauthorized: invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		// Verify session is still valid
+		session, err := s.authStore.GetSession(r.Context(), claims.SessionID)
+		if err != nil || session == nil || session.RevokedAt != nil {
+			s.logger.Warnw("WebSocket connection rejected: invalid session",
+				"remote_addr", r.RemoteAddr,
+				"session_id", claims.SessionID,
+			)
+			http.Error(w, "unauthorized: session invalid", http.StatusUnauthorized)
+			return
+		}
+
+		authClaims = claims
+		s.logger.Debugw("WebSocket auth validated",
+			"user_id", claims.UserID,
+			"email", claims.Email,
+		)
+	}
+
 	upgrader := getAxUpgrader()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -54,6 +105,12 @@ func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			hiddenNodeTypes:   make(map[string]bool), // Empty = show all types initially
 			hideIsolatedNodes: false,                 // Show isolated nodes by default
 		},
+	}
+
+	// Store auth info if authenticated
+	if authClaims != nil {
+		client.userID = authClaims.UserID
+		client.email = authClaims.Email
 	}
 
 	// Send version info BEFORE starting writePump (avoid concurrent writes)

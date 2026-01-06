@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/auth"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -52,6 +53,12 @@ type QNTXServer struct {
 	initialQuery        string                      // Pre-loaded Ax query to execute on client connection
 	pluginRegistry      *plugin.Registry            // Domain plugin registry
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+
+	// Auth components (optional, nil if auth disabled)
+	authService    *auth.Service    // OAuth service for authentication
+	authStore      *auth.Store      // User/session persistence
+	authMiddleware *auth.Middleware // HTTP auth middleware
+	authHandlers   *auth.Handlers   // Auth HTTP handlers
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown

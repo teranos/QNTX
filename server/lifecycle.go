@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -104,10 +105,20 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	// Set up HTTP routes
 	s.setupHTTPRoutes()
 
-	url := fmt.Sprintf("http://localhost:%d", actualPort)
+	// Check if TLS is enabled
+	cfg, _ := appcfg.Load()
+	useTLS := cfg != nil && cfg.Auth.TLS.Enabled && cfg.Auth.TLS.CertFile != "" && cfg.Auth.TLS.KeyFile != ""
+
+	protocol := "http"
+	if useTLS {
+		protocol = "https"
+	}
+
+	url := fmt.Sprintf("%s://localhost:%d", protocol, actualPort)
 	s.logger.Infow("Server ready",
 		"url", url,
 		"port", actualPort,
+		"tls", useTLS,
 	)
 
 	// Open browser if callback provided
@@ -125,6 +136,14 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	}
 
 	addr := fmt.Sprintf(":%d", actualPort)
+
+	if useTLS {
+		s.logger.Infow(fmt.Sprintf("HTTPS server listening on port %d (TLS enabled)", actualPort),
+			"cert_file", cfg.Auth.TLS.CertFile,
+		)
+		return http.ListenAndServeTLS(addr, cfg.Auth.TLS.CertFile, cfg.Auth.TLS.KeyFile, nil)
+	}
+
 	s.logger.Infow(fmt.Sprintf("HTTP server listening on port %d", actualPort))
 	return http.ListenAndServe(addr, nil)
 }
