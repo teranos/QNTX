@@ -8,6 +8,7 @@ on:
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - 'qntx-python/Cargo.toml'
   workflow_dispatch:
 
 jobs:
@@ -42,6 +44,7 @@ jobs:
             types/generated/rust
             web/src-tauri
             ats/ax/fuzzy-ax
+            qntx-python
 
       - name: Check formatting (generated types)
         run: cd types/generated/rust && cargo fmt --check
@@ -87,3 +90,18 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
+
+      # qntx-python (Rust Python plugin with PyO3)
+      - name: Check formatting (qntx-python)
+        run: cd qntx-python && cargo fmt --check
+
+      - name: Clippy (qntx-python)
+        run: cd qntx-python && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test (qntx-python)
+        run: cd qntx-python && cargo test
+
+      - name: Build release (qntx-python)
+        run: cd qntx-python && cargo build --release
