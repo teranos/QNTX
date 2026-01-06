@@ -1,6 +1,7 @@
 package git
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,10 +117,19 @@ func TestBuildDependencySummary_ErrorDetailsFormat(t *testing.T) {
 
 	fields := buildDependencySummary(result)
 
+	// Verify both errors are present
+	assert.Equal(t, 2, fields["deps_errors"])
+
 	errorDetails := fields["deps_error_details"].(string)
+	errors := strings.Split(errorDetails, "; ")
+	assert.Len(t, errors, 2)
 
 	// Verify format: "path: error; path: error"
+	// Both specific error messages should be present
 	assert.Contains(t, errorDetails, "/repo/go.mod: syntax error at line 10")
 	assert.Contains(t, errorDetails, "/repo/package.json: missing required field 'name'")
-	assert.Contains(t, errorDetails, ";")
+
+	// Verify actual file paths are included (not just types)
+	assert.Contains(t, errorDetails, "/repo/go.mod")
+	assert.Contains(t, errorDetails, "/repo/package.json")
 }
