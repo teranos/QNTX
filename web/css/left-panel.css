@@ -71,32 +71,7 @@
   letter-spacing: 0.3px;
 }
 
-.panel-close {
-  background: transparent;
-  border: 1px solid transparent;
-  font-size: 18px;
-  color: #666;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.panel-close:hover {
-  background: #f0f0f0;
-  color: #000;
-  transform: none;
-}
-
-.panel-close:active {
-  background: #e0e0e0;
-  color: #000;
-}
+/* Close button styles moved to components.css for unified styling */
 
 /* Panel content */
 .panel-content {
