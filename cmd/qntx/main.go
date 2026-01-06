@@ -81,12 +81,12 @@ func init() {
 
 // initializePluginRegistry sets up the domain plugin registry with plugin discovery
 func initializePluginRegistry() {
-	// Create registry with QNTX version
-	registry := plugin.NewRegistry("0.1.0")
-	plugin.SetDefaultRegistry(registry)
-
 	// Initialize logger for plugin loading
 	pluginLogger := logger.Logger.Named("plugin-loader")
+
+	// Create registry with QNTX version and logger
+	registry := plugin.NewRegistry("0.1.0", pluginLogger)
+	plugin.SetDefaultRegistry(registry)
 
 	// Load configuration to determine which plugins to load
 	cfg, err := am.Load()
@@ -114,18 +114,17 @@ func initializePluginRegistry() {
 
 	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
-	for _, p := range loadedPlugins {
+	pluginLogger.Infof("Registering %d loaded plugins with registry", len(loadedPlugins))
+	for i, p := range loadedPlugins {
+		meta := p.Metadata()
+		pluginLogger.Infof("[%d/%d] Attempting to register '%s' plugin", i+1, len(loadedPlugins), meta.Name)
 		if err := registry.Register(p); err != nil {
-			pluginLogger.Errorw("Failed to register plugin",
-				"plugin", p.Metadata().Name,
-				"error", err,
-			)
+			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (may be duplicate or route conflict)",
+				meta.Name, meta.Version, err.Error())
 			os.Exit(1)
 		}
-		pluginLogger.Infow("Registered plugin with registry",
-			"plugin", p.Metadata().Name,
-			"version", p.Metadata().Version,
-		)
+		pluginLogger.Infof("Registered '%s' plugin v%s - %s",
+			meta.Name, meta.Version, meta.Description)
 	}
 }
 

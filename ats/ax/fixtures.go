@@ -144,4 +144,3 @@ func (tf *TestFixtures) GetCartesianTestCase() []types.As {
 	}
 	return cartesianAttestations
 }
-

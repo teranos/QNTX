@@ -127,11 +127,7 @@ class WebscraperPanel extends BasePanel {
         this.$('#scraper-submit')?.addEventListener('click', () => {
             this.handleScrape();
         });
-
-        // Close button
-        this.$('.panel-close')?.addEventListener('click', () => {
-            this.hide();
-        });
+        // Note: Close button is handled by BasePanel automatically
     }
 
     private async handleScrape(): Promise<void> {

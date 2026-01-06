@@ -54,26 +54,7 @@
     color: #000;
 }
 
-.job-list-close {
-    background: none;
-    border: none;
-    font-size: 18px;
-    color: var(--panel-text-secondary);
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-    transition: var(--panel-transition-fast);
-}
 
-.job-list-close:hover {
-    background: var(--panel-bg-secondary);
-    color: var(--panel-text-primary);
-}
 
 /* Content */
 .job-list-content {

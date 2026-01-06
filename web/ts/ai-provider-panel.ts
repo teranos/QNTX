@@ -36,7 +36,7 @@ class AIProviderPanel extends BasePanel {
         return `
             <div class="ai-provider-header">
                 <h3 class="ai-provider-title">${BY} Actor / AI Provider</h3>
-                <button class="ai-provider-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="ai-provider-content">
                 <div class="config-toggle-header">
@@ -86,9 +86,7 @@ class AIProviderPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Close button
-        const closeBtn = this.$('.ai-provider-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        // Close button is now handled automatically by BasePanel (.panel-close)
 
         // AI Provider toggle buttons
         const openrouterBtn = this.$('#provider-openrouter-btn');
