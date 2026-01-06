@@ -8,6 +8,7 @@ type Config struct {
 	Code           CodeConfig           `mapstructure:"code"`
 	LocalInference LocalInferenceConfig `mapstructure:"local_inference"`
 	OpenRouter     OpenRouterConfig     `mapstructure:"openrouter"`
+	Anthropic      AnthropicConfig      `mapstructure:"anthropic"`
 	Ax             AxConfig             `mapstructure:"ax"`
 	Plugin         PluginConfig         `mapstructure:"plugin"`
 }
@@ -102,6 +103,14 @@ type OpenRouterConfig struct {
 	Model       string  `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
 	Temperature float64 `mapstructure:"temperature"` // Sampling temperature (default: 0.2)
 	MaxTokens   int     `mapstructure:"max_tokens"`  // Maximum tokens per request (default: 1000)
+}
+
+// AnthropicConfig configures direct Anthropic API access
+type AnthropicConfig struct {
+	APIKey      string  `mapstructure:"api_key"`     // Anthropic API key (ANTHROPIC_API_KEY)
+	Model       string  `mapstructure:"model"`       // Default model (e.g., "claude-sonnet-4-20250514")
+	Temperature float64 `mapstructure:"temperature"` // Sampling temperature (default: 0.2)
+	MaxTokens   int     `mapstructure:"max_tokens"`  // Maximum tokens per request (default: 4096)
 }
 
 // AxConfig configures the attestation query system
