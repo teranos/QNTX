@@ -43,6 +43,7 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 			failedPlugins = append(failedPlugins, pluginName)
 			continue
 		}
+		logger.Infof("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
 	}
 
