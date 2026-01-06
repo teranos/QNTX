@@ -15,6 +15,8 @@ A verifiable claim in the form: `[Subject] is [Predicate] of [Context] by [Actor
 - Immutable and append-only
 - Has an ASID (Attestation System ID) for unique identification
 
+**Example**: `USER-123 is member of TEAM-ENGINEERING by hr-system@company at 2025-01-06T09:45:00Z`
+
 ### ASID (Attestation System ID)
 Unique identifier for attestations. Always random for uniqueness, ensuring no collisions.
 
@@ -25,7 +27,7 @@ These symbols have UI components and keyboard shortcuts (user-configurable):
 
 | Symbol | Command | Meaning | Usage |
 |--------|---------|---------|--------|
-| `⍟` | i | Self | Your vantage point into QNTX |
+| `⍟` | i | Self | Your vantage point into QNTX - the current user/session |
 | `≡` | am | Configuration | System settings and state |
 | `⨳` | ix | Ingest | Import external data |
 | `⋈` | ax | Expand | Query and surface related context |
@@ -145,3 +147,30 @@ Versioned with migrations using the migration system in `db/sqlite/migrations/`
 - Mark WIP features as "heavily WIP and currently broken" when true
 - Don't hide complexity - show it and make it comprehensible
 - Document reality, not aspiration
+
+## Common Patterns
+
+### Query Pattern
+```
+ax contact                    # Find all attestations about contacts
+ax is member of TEAM-ENGINEERING  # Find team members
+```
+
+### Ingestion Pattern
+```
+ix https://api.example.com/data   # Ingest from API
+ix file://./data.json             # Ingest from local file
+```
+
+### Configuration Check
+```
+qntx am show                      # Show all configuration with sources
+qntx am get pulse.workers         # Get specific value
+```
+
+## See Also
+
+- [Symbol Package](../sym/README.md) - Complete symbol definitions
+- [Understanding QNTX](understanding-qntx.md) - Architectural overview
+- [Installation Guide](installation.md) - Getting started
+- [Configuration Architecture](architecture/config-system.md) - Config system details

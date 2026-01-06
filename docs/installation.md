@@ -29,11 +29,14 @@ nix shell github:teranos/QNTX
 ### Specific Version
 
 ```bash
-# Install specific version
+# Install specific version (example)
 nix profile install github:teranos/QNTX/v0.16.14
 
 # Run specific version
 nix run github:teranos/QNTX/v0.16.14
+
+# List available versions
+git ls-remote --tags https://github.com/teranos/QNTX.git
 ```
 
 ### Binary Cache

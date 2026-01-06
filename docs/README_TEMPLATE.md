@@ -92,7 +92,20 @@ go test ./[package]/...
 
 # With coverage
 go test -cover ./[package]/...
+
+# Verbose output for debugging
+go test -v ./[package]/...
 ```
+
+## Debugging Tips
+
+[Optional but recommended: Common debugging scenarios]
+
+- **Issue**: [Common problem]
+  **Solution**: [How to fix]
+
+- **Issue**: [Another problem]
+  **Solution**: [How to debug]
 
 ## Implementation Notes
 
