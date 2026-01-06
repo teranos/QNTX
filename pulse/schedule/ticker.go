@@ -10,6 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/teranos/QNTX/internal/util"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/vanity-id"
@@ -267,7 +268,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	// Calculate execution duration
 	completedAt := time.Now()
 	durationMs := int(completedAt.Sub(startTime).Milliseconds())
-	execution.CompletedAt = stringPtr(completedAt.Format(time.RFC3339))
+	execution.CompletedAt = util.Ptr(completedAt.Format(time.RFC3339))
 	execution.DurationMs = &durationMs
 	execution.UpdatedAt = completedAt.Format(time.RFC3339)
 
@@ -322,11 +323,6 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	}
 
 	return nil
-}
-
-// Helper function to create string pointer
-func stringPtr(s string) *string {
-	return &s
 }
 
 // resolvePayloadLastRun checks if the payload contains "since":"last_run" and
