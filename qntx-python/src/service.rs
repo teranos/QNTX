@@ -73,7 +73,10 @@ impl Default for PythonPluginService {
 #[tonic::async_trait]
 impl DomainPluginService for PythonPluginService {
     /// Return plugin metadata
-    async fn metadata(&self, _request: Request<Empty>) -> Result<Response<MetadataResponse>, Status> {
+    async fn metadata(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<MetadataResponse>, Status> {
         debug!("Metadata request received");
         Ok(Response::new(MetadataResponse {
             name: "python".to_string(),
@@ -86,7 +89,10 @@ impl DomainPluginService for PythonPluginService {
     }
 
     /// Initialize the plugin with service endpoints
-    async fn initialize(&self, request: Request<InitializeRequest>) -> Result<Response<Empty>, Status> {
+    async fn initialize(
+        &self,
+        request: Request<InitializeRequest>,
+    ) -> Result<Response<Empty>, Status> {
         let req = request.into_inner();
         info!("Initializing Python plugin");
         info!("ATSStore endpoint: {}", req.ats_store_endpoint);
@@ -137,7 +143,10 @@ impl DomainPluginService for PythonPluginService {
     }
 
     /// Handle HTTP requests
-    async fn handle_http(&self, request: Request<HttpRequest>) -> Result<Response<HttpResponse>, Status> {
+    async fn handle_http(
+        &self,
+        request: Request<HttpRequest>,
+    ) -> Result<Response<HttpResponse>, Status> {
         let req = request.into_inner();
         let path = &req.path;
         let method = &req.method;
@@ -148,9 +157,8 @@ impl DomainPluginService for PythonPluginService {
         let body: serde_json::Value = if req.body.is_empty() {
             serde_json::Value::Null
         } else {
-            serde_json::from_slice(&req.body).map_err(|e| {
-                Status::invalid_argument(format!("Invalid JSON body: {}", e))
-            })?
+            serde_json::from_slice(&req.body)
+                .map_err(|e| Status::invalid_argument(format!("Invalid JSON body: {}", e)))?
         };
 
         // Route to handler
@@ -168,7 +176,10 @@ impl DomainPluginService for PythonPluginService {
             ("GET", "/version") => self.handle_version().await,
             ("GET", "/modules") => self.handle_modules(body).await,
 
-            _ => Err(Status::not_found(format!("Unknown endpoint: {} {}", method, path))),
+            _ => Err(Status::not_found(format!(
+                "Unknown endpoint: {} {}",
+                method, path
+            ))),
         };
 
         match result {
@@ -196,7 +207,8 @@ impl DomainPluginService for PythonPluginService {
     }
 
     /// Handle WebSocket connections (not supported)
-    type HandleWebSocketStream = Pin<Box<dyn Stream<Item = Result<WebSocketMessage, Status>> + Send>>;
+    type HandleWebSocketStream =
+        Pin<Box<dyn Stream<Item = Result<WebSocketMessage, Status>> + Send>>;
 
     async fn handle_web_socket(
         &self,
@@ -215,10 +227,7 @@ impl DomainPluginService for PythonPluginService {
 
         let mut details = HashMap::new();
         details.insert("python_version".to_string(), self.python_version());
-        details.insert(
-            "initialized".to_string(),
-            state.initialized.to_string(),
-        );
+        details.insert("initialized".to_string(), state.initialized.to_string());
 
         if let Some(config) = &state.config {
             if !config.ats_store_endpoint.is_empty() {
@@ -443,7 +452,10 @@ impl PythonPluginService {
     }
 
     /// Convert ExecutionResult to HttpResponse
-    fn execution_result_to_response(&self, result: ExecutionResult) -> Result<HttpResponse, Status> {
+    fn execution_result_to_response(
+        &self,
+        result: ExecutionResult,
+    ) -> Result<HttpResponse, Status> {
         #[derive(Serialize)]
         struct ExecutionResponse {
             success: bool,
@@ -471,7 +483,11 @@ impl PythonPluginService {
     }
 
     /// Create a JSON HTTP response
-    fn json_response<T: Serialize>(&self, status_code: i32, data: &T) -> Result<HttpResponse, Status> {
+    fn json_response<T: Serialize>(
+        &self,
+        status_code: i32,
+        data: &T,
+    ) -> Result<HttpResponse, Status> {
         let body = serde_json::to_vec(data)
             .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;
 
