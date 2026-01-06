@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/internal/util"
 )
 
 func TestNewUsageTracker(t *testing.T) {
@@ -217,7 +218,7 @@ func TestGetUsageStats(t *testing.T) {
 	}
 
 	expectedSuccessRate := float64(2) / float64(3)
-	if abs(stats.SuccessRate-expectedSuccessRate) > 0.001 {
+	if util.AbsFloat64(stats.SuccessRate-expectedSuccessRate) > 0.001 {
 		t.Errorf("Expected success rate %f, got %f", expectedSuccessRate, stats.SuccessRate)
 	}
 
@@ -329,7 +330,7 @@ func TestGetModelBreakdown(t *testing.T) {
 	}
 	if gptBreakdown.AvgResponseTimeMs == nil {
 		t.Error("Expected non-nil avg response time")
-	} else if abs(*gptBreakdown.AvgResponseTimeMs-2000) > 1 {
+	} else if util.AbsFloat64(*gptBreakdown.AvgResponseTimeMs-2000) > 1 {
 		t.Errorf("Expected avg response time ~2000ms, got %f", *gptBreakdown.AvgResponseTimeMs)
 	}
 }
@@ -484,7 +485,7 @@ func TestGetUsageStats_Sqlmock(t *testing.T) {
 	}
 
 	expectedSuccessRate := float64(8) / float64(10)
-	if abs(stats.SuccessRate-expectedSuccessRate) > 0.001 {
+	if util.AbsFloat64(stats.SuccessRate-expectedSuccessRate) > 0.001 {
 		t.Errorf("Expected success rate %f, got %f", expectedSuccessRate, stats.SuccessRate)
 	}
 
@@ -642,11 +643,4 @@ func intPtr(i int) *int {
 
 func float64Ptr(f float64) *float64 {
 	return &f
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
 }

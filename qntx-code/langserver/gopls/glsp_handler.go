@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/teranos/QNTX/internal/util"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	"go.uber.org/zap"
@@ -56,7 +57,7 @@ func (h *GLSPHandler) Initialize(ctx *glsp.Context, params *protocol.InitializeP
 		DocumentFormattingProvider: true,
 		DocumentSymbolProvider:     true,
 		TextDocumentSync: &protocol.TextDocumentSyncOptions{
-			OpenClose: boolPtr(true),
+			OpenClose: util.Ptr(true),
 			Change:    textDocSyncPtr(protocol.TextDocumentSyncKindFull),
 		},
 	}
@@ -65,7 +66,7 @@ func (h *GLSPHandler) Initialize(ctx *glsp.Context, params *protocol.InitializeP
 		Capabilities: capabilities,
 		ServerInfo: &protocol.InitializeResultServerInfo{
 			Name:    "gopls Language Server (qntx)",
-			Version: stringPtr("1.0.0"),
+			Version: util.Ptr("1.0.0"),
 		},
 	}, nil
 }
@@ -361,7 +362,7 @@ func (h *GLSPHandler) TextDocumentDocumentSymbol(ctx *glsp.Context, params *prot
 	for i, sym := range symbols {
 		lspSymbols[i] = protocol.DocumentSymbol{
 			Name:   sym.Name,
-			Detail: stringPtr(sym.Detail),
+			Detail: util.Ptr(sym.Detail),
 			Kind:   protocol.SymbolKind(sym.Kind),
 			Range: protocol.Range{
 				Start: protocol.Position{
@@ -390,14 +391,6 @@ func (h *GLSPHandler) TextDocumentDocumentSymbol(ctx *glsp.Context, params *prot
 }
 
 // Helper functions for LSP type conversions
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func stringPtr(s string) *string {
-	return &s
-}
 
 func textDocSyncPtr(kind protocol.TextDocumentSyncKind) *protocol.TextDocumentSyncKind {
 	return &kind
