@@ -11,17 +11,17 @@
     box-shadow: var(--panel-shadow-lg);
     z-index: 100;
     max-height: 500px;
-    display: flex;
+    display: none; /* Hidden by default */
     flex-direction: column;
     transition: var(--panel-transition-normal);
     overflow: hidden;
 }
 
-.job-list-panel.hidden {
+.job-list-panel[data-visibility="hidden"] {
     display: none;
 }
 
-.job-list-panel.visible {
+.job-list-panel[data-visibility="visible"] {
     display: flex;
     animation: slideDown 0.2s ease;
 }

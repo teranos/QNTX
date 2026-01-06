@@ -281,7 +281,13 @@ class CommandExplorerPanel {
                           label.toLowerCase().includes(search) ||
                           description.toLowerCase().includes(search);
 
-            htmlItem.style.display = matches ? 'block' : 'none';
+            if (matches) {
+                htmlItem.classList.remove('u-hidden');
+                htmlItem.classList.add('u-block');
+            } else {
+                htmlItem.classList.remove('u-block');
+                htmlItem.classList.add('u-hidden');
+            }
         });
     }
 
