@@ -6,6 +6,7 @@
  */
 
 import { describe, test, expect, mock } from 'bun:test';
+import { routeMessage } from './websocket';
 import type { MessageHandlers } from '../types/websocket';
 
 describe('WebSocket Message Routing', () => {
@@ -209,5 +210,104 @@ describe('WebSocket Message Routing', () => {
                 reason: 'Code updated'
             })
         );
+    });
+});
+
+describe('routeMessage() function', () => {
+    test('routes built-in message types (reload, backend_status)', () => {
+        // Built-in handlers are in MESSAGE_HANDLERS, not in registered handlers
+        const result = routeMessage(
+            { type: 'backend_status', status: 'healthy' },
+            {} // No registered handlers
+        );
+
+        expect(result.handled).toBe(true);
+        expect(result.handlerType).toBe('builtin');
+    });
+
+    test('routes registered handler when no built-in exists', () => {
+        const customHandler = mock(() => {});
+        const handlers: MessageHandlers = {
+            custom_type: customHandler
+        };
+
+        const result = routeMessage(
+            { type: 'custom_type', data: 'test' },
+            handlers
+        );
+
+        expect(result.handled).toBe(true);
+        expect(result.handlerType).toBe('registered');
+        expect(customHandler).toHaveBeenCalledTimes(1);
+    });
+
+    test('routes to _default for unknown message types', () => {
+        const defaultHandler = mock(() => {});
+        const handlers: MessageHandlers = {
+            _default: defaultHandler
+        };
+
+        const result = routeMessage(
+            { type: 'unknown_type', data: 'test' },
+            handlers
+        );
+
+        expect(result.handled).toBe(true);
+        expect(result.handlerType).toBe('default');
+        expect(defaultHandler).toHaveBeenCalledTimes(1);
+    });
+
+    test('returns not handled when no handler exists', () => {
+        const result = routeMessage(
+            { type: 'unknown_type', data: 'test' },
+            {} // No handlers at all
+        );
+
+        expect(result.handled).toBe(false);
+        expect(result.handlerType).toBe('none');
+    });
+
+    test('prioritizes built-in over registered handlers', () => {
+        // Even if registered handler exists, built-in should take precedence
+        const registeredReload = mock(() => {});
+        const handlers: MessageHandlers = {
+            reload: registeredReload // Try to override built-in
+        };
+
+        const result = routeMessage(
+            { type: 'reload', reason: 'test' },
+            handlers
+        );
+
+        // Should use built-in, not registered
+        expect(result.handlerType).toBe('builtin');
+        // Built-in reload handler will trigger, but won't call registered one
+        // (Note: Built-in reload calls window.location.reload(), can't easily test in Node)
+    });
+
+    test('handler precedence: builtin > registered > default', () => {
+        const defaultHandler = mock(() => {});
+        const registeredHandler = mock(() => {});
+
+        // Test with only default
+        let result = routeMessage(
+            { type: 'unknown', data: 'test' },
+            { _default: defaultHandler }
+        );
+        expect(result.handlerType).toBe('default');
+
+        // Test with registered handler (overrides default)
+        result = routeMessage(
+            { type: 'custom', data: 'test' },
+            { custom: registeredHandler, _default: defaultHandler }
+        );
+        expect(result.handlerType).toBe('registered');
+
+        // Test with built-in (overrides both)
+        result = routeMessage(
+            { type: 'reload', reason: 'test' },
+            { reload: registeredHandler, _default: defaultHandler }
+        );
+        expect(result.handlerType).toBe('builtin');
     });
 });

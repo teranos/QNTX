@@ -26,8 +26,8 @@ class StatusIndicatorManager {
      * Initialize the status indicator system
      */
     init(): void {
-        // Find or create container in the log header
-        const logHeader = document.getElementById('log-header');
+        // Find or create container in the system drawer header
+        const logHeader = document.getElementById('system-drawer-header');
         if (!logHeader) return;
 
         // Remove old hardcoded status indicators from HTML
@@ -41,18 +41,12 @@ class StatusIndicatorManager {
         this.container.id = 'status-indicators';
         this.container.className = 'status-indicators';
 
-        // Insert after the version span
-        const versionSpan = document.getElementById('log-version');
-        if (versionSpan && versionSpan.nextSibling) {
-            logHeader.insertBefore(this.container, versionSpan.nextSibling);
+        // Insert before controls div (system-version is now inside controls)
+        const controls = logHeader.querySelector('.controls');
+        if (controls) {
+            logHeader.insertBefore(this.container, controls);
         } else {
-            // Insert before controls
-            const controls = logHeader.querySelector('.controls');
-            if (controls) {
-                logHeader.insertBefore(this.container, controls);
-            } else {
-                logHeader.appendChild(this.container);
-            }
+            logHeader.appendChild(this.container);
         }
 
         // Add default indicators

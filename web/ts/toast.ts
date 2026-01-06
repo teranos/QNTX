@@ -139,10 +139,10 @@ export function showToast(message: string, options: ToastOptions = {}): void {
 
     const timeoutId = setTimeout(dismissToast, duration);
 
-    // Manual dismiss on close button
+    // Manual dismiss on close button - instant removal
     closeBtn.addEventListener('click', () => {
         clearTimeout(timeoutId);
-        dismissToast();
+        toast.remove(); // Instant removal when clicking close
     });
 }
 

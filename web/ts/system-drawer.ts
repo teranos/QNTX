@@ -179,7 +179,7 @@ export function initSystemDrawer(): void {
     }
 
     // Log panel toggle
-    const logHeader = document.getElementById('log-header') as HTMLElement | null;
+    const logHeader = document.getElementById('system-drawer-header') as HTMLElement | null;
     if (logHeader) {
         logHeader.addEventListener('click', function(e: Event) {
             const target = e.target as HTMLElement;

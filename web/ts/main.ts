@@ -39,11 +39,13 @@ import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/webs
 import type { GraphData } from '../types/core';
 
 // Type guard to check if data is graph data (has nodes and links arrays)
+// TODO(#209): Remove this type guard once backend sends explicit 'graph_data' message type
 function isGraphData(data: GraphData | BaseMessage): data is GraphData {
     return 'nodes' in data && 'links' in data && Array.isArray((data as GraphData).nodes);
 }
 
 // Wrapper for default handler that type-guards graph data
+// TODO(#209): Replace _default handler with explicit 'graph_data' handler
 function handleDefaultMessage(data: GraphData | BaseMessage): void {
     if (isGraphData(data)) {
         updateGraph(data);
@@ -119,8 +121,8 @@ function handleVersion(data: VersionMessage): void {
         }
     }
 
-    // Also add subtle version to log panel
-    const logVersion = document.getElementById('log-version');
+    // Also add subtle version to system drawer
+    const logVersion = document.getElementById('system-version');
     if (logVersion && data.commit) {
         logVersion.textContent = data.commit.substring(0, 7);
     }

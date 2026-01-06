@@ -18,8 +18,8 @@ describe('Status Indicators DOM Lifecycle', () => {
     test('Status indicators create and manage DOM elements correctly', () => {
         // Setup: Create minimal DOM structure
         document.body.innerHTML = `
-            <div id="log-header">
-                <span id="log-version"></span>
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
                 <div class="controls"></div>
             </div>
         `;
@@ -53,8 +53,8 @@ describe('Status Indicators DOM Lifecycle', () => {
 
     test('Pulse indicator changes state on click', () => {
         document.body.innerHTML = `
-            <div id="log-header">
-                <span id="log-version"></span>
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
                 <div class="controls"></div>
             </div>
         `;
@@ -85,8 +85,8 @@ describe('Status Indicators DOM Lifecycle', () => {
 
     test('Keyboard accessibility works for clickable indicators', () => {
         document.body.innerHTML = `
-            <div id="log-header">
-                <span id="log-version"></span>
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
                 <div class="controls"></div>
             </div>
         `;
@@ -113,8 +113,8 @@ describe('Status Indicators DOM Lifecycle', () => {
 
     test('Connection indicator updates with status changes', () => {
         document.body.innerHTML = `
-            <div id="log-header">
-                <span id="log-version"></span>
+            <div id="system-drawer-header">
+                <span id="system-version"></span>
                 <div class="controls"></div>
             </div>
         `;
