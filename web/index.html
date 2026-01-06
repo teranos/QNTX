@@ -265,6 +265,7 @@
                     <button type="button" class="palette-cell" data-cmd="prose" data-label="prose — documentation" aria-label="Prose: documentation editor">▣</button>
                     <button type="button" class="palette-cell" data-cmd="go" data-label="go — code editor" aria-label="Go: code editor with LSP">go</button>
                     <button type="button" class="palette-cell" data-cmd="plugins" data-label="plugins — domain plugins" aria-label="Plugins: installed domain plugins">&#9881;</button>
+                    <button type="button" class="palette-cell" data-cmd="scraper" data-label="scraper — content extraction" aria-label="Scraper: content extraction">⛶</button>
                 </div>
 
                 <div id="query-drop-zone">
@@ -342,14 +343,11 @@
     </div>
 
     <!-- Combined Log Panel (Server + ix Progress side by side) -->
-    <div id="log-panel">
+    <div id="system-drawer">
         <div id="log-header">
             <h3>Logs</h3>
             <span id="log-version" style="font-size: 9px; color: #555; margin-left: 8px;"></span>
-            <div id="connection-status" role="status" aria-live="polite">
-                <span id="status-dot" class="status-dot"></span>
-                <span id="status-text">Connected</span>
-            </div>
+            <!-- Status indicators will be inserted here dynamically by TypeScript -->
             <div class="controls">
                 <select id="verbosity-select">
                     <option value="0">User</option>

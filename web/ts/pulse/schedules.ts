@@ -6,7 +6,7 @@ import type { ScheduledJobResponse } from './types';
 import type { Execution } from './execution-types';
 import type { PulsePanelState } from './panel-state';
 import { formatInterval } from './types';
-import { formatRelativeTime, escapeHtml } from './panel.ts';
+import { formatRelativeTime, escapeHtml, formatDuration } from './panel.ts';
 import { Pulse } from '@generated/sym.js';
 
 /**
@@ -183,14 +183,3 @@ function renderExecutionCard(exec: Execution): string {
     `;
 }
 
-/**
- * Format duration in milliseconds to human-readable string
- */
-function formatDuration(durationMs: number): string {
-    if (durationMs < 1000) return `${durationMs}ms`;
-    const seconds = Math.floor(durationMs / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-}

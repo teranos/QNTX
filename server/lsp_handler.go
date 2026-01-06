@@ -2,13 +2,14 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/parser"
+	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/internal/util"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	glspserver "github.com/tliron/glsp/server"
@@ -75,7 +76,7 @@ func (h *GLSPHandler) Initialize(ctx *glsp.Context, params *protocol.InitializeP
 		},
 		HoverProvider: &protocol.HoverOptions{},
 		TextDocumentSync: &protocol.TextDocumentSyncOptions{
-			OpenClose: boolPtr(true),
+			OpenClose: util.Ptr(true),
 			Change:    &syncKind,
 		},
 		SemanticTokensProvider: &protocol.SemanticTokensOptions{
@@ -102,7 +103,7 @@ func (h *GLSPHandler) Initialize(ctx *glsp.Context, params *protocol.InitializeP
 		Capabilities: capabilities,
 		ServerInfo: &protocol.InitializeResultServerInfo{
 			Name:    "ATS Language Server",
-			Version: stringPtr("0.1.0"),
+			Version: util.Ptr("0.1.0"),
 		},
 	}, nil
 }
@@ -135,7 +136,7 @@ func (h *GLSPHandler) TextDocumentDidOpen(ctx *glsp.Context, params *protocol.Di
 				"current_count", len(h.documents),
 				"max_allowed", maxDocumentsPerClient,
 			)
-			return fmt.Errorf("document cache limit reached (%d documents open)", maxDocumentsPerClient)
+			return errors.Newf("document cache limit reached (%d documents open)", maxDocumentsPerClient)
 		}
 	}
 
@@ -377,14 +378,6 @@ func (h *GLSPHandler) TextDocumentSemanticTokensFull(ctx *glsp.Context, params *
 }
 
 // Helper functions
-
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func stringPtr(s string) *string {
-	return &s
-}
 
 func stringPtrOrNil(s string) *string {
 	if s == "" {

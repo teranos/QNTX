@@ -2,8 +2,8 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
@@ -48,7 +48,7 @@ func (r *RemoteQueue) Close() error {
 func (r *RemoteQueue) Enqueue(job *async.Job) error {
 	protoJob, err := jobToProto(job)
 	if err != nil {
-		return fmt.Errorf("failed to convert job: %w", err)
+		return errors.Wrap(err, "failed to convert job")
 	}
 
 	req := &protocol.EnqueueRequest{
@@ -58,11 +58,11 @@ func (r *RemoteQueue) Enqueue(job *async.Job) error {
 
 	resp, err := r.client.Enqueue(context.Background(), req)
 	if err != nil {
-		return fmt.Errorf("failed to enqueue job: %w", err)
+		return errors.Wrap(err, "failed to enqueue job")
 	}
 
 	if !resp.Success {
-		return fmt.Errorf("enqueue failed: %s", resp.Error)
+		return errors.Newf("enqueue failed: %s", resp.Error)
 	}
 
 	// Update job with server-assigned ID if provided
@@ -82,20 +82,20 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 
 	resp, err := r.client.GetJob(context.Background(), req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get job: %w", err)
+		return nil, errors.Wrap(err, "failed to get job")
 	}
 
 	if !resp.Success {
-		return nil, fmt.Errorf("get job failed: %s", resp.Error)
+		return nil, errors.Newf("get job failed: %s", resp.Error)
 	}
 
 	if resp.Job == nil {
-		return nil, fmt.Errorf("job not found")
+		return nil, errors.New("job not found")
 	}
 
 	job, err := protoToJob(resp.Job)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert job: %w", err)
+		return nil, errors.Wrap(err, "failed to convert job")
 	}
 	return job, nil
 }
@@ -104,7 +104,7 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 func (r *RemoteQueue) UpdateJob(job *async.Job) error {
 	protoJob, err := jobToProto(job)
 	if err != nil {
-		return fmt.Errorf("failed to convert job: %w", err)
+		return errors.Wrap(err, "failed to convert job")
 	}
 
 	req := &protocol.UpdateJobRequest{
@@ -114,11 +114,11 @@ func (r *RemoteQueue) UpdateJob(job *async.Job) error {
 
 	resp, err := r.client.UpdateJob(context.Background(), req)
 	if err != nil {
-		return fmt.Errorf("failed to update job: %w", err)
+		return errors.Wrap(err, "failed to update job")
 	}
 
 	if !resp.Success {
-		return fmt.Errorf("update job failed: %s", resp.Error)
+		return errors.Newf("update job failed: %s", resp.Error)
 	}
 
 	return nil
@@ -138,11 +138,11 @@ func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job
 
 	resp, err := r.client.ListJobs(context.Background(), req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list jobs: %w", err)
+		return nil, errors.Wrap(err, "failed to list jobs")
 	}
 
 	if !resp.Success {
-		return nil, fmt.Errorf("list jobs failed: %s", resp.Error)
+		return nil, errors.Newf("list jobs failed: %s", resp.Error)
 	}
 
 	// Convert proto jobs to Go types
