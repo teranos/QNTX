@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
@@ -34,7 +35,7 @@ func NewATSStoreServer(store *storage.SQLStore, authToken string, logger *zap.Su
 // validateAuth checks the authentication token
 func (s *ATSStoreServer) validateAuth(token string) error {
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
-		return fmt.Errorf("invalid authentication token")
+		return errors.New("invalid authentication token")
 	}
 	return nil
 }
@@ -177,7 +178,7 @@ func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
 	var attributes map[string]interface{}
 	if proto.AttributesJson != "" {
 		if err := json.Unmarshal([]byte(proto.AttributesJson), &attributes); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal attributes: %w", err)
+			return nil, errors.Wrap(err, "failed to unmarshal attributes")
 		}
 	}
 
@@ -199,7 +200,7 @@ func attestationToProto(as *types.As) (*protocol.Attestation, error) {
 	if len(as.Attributes) > 0 {
 		bytes, err := json.Marshal(as.Attributes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal attributes: %w", err)
+			return nil, errors.Wrap(err, "failed to marshal attributes")
 		}
 		attributesJSON = string(bytes)
 	}
@@ -221,7 +222,7 @@ func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error
 	var attributes map[string]interface{}
 	if proto.AttributesJson != "" {
 		if err := json.Unmarshal([]byte(proto.AttributesJson), &attributes); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal attributes: %w", err)
+			return nil, errors.Wrap(err, "failed to unmarshal attributes")
 		}
 	}
 

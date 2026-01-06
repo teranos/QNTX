@@ -8,7 +8,7 @@ Use this as a reference when working with QNTX types in different contexts.
 
 ## ErrorCode
 
-**Source**: [`pulse/async/error.go:12`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L12)
+**Source**: [`pulse/async/error.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L13)
 
 
 <table>
@@ -47,7 +47,7 @@ export type ErrorCode = 'ai_error' | 'database_error' | 'file_not_found' | 'netw
 
 ## ErrorContext
 
-**Source**: [`pulse/async/error.go:26`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L26)
+**Source**: [`pulse/async/error.go:27`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L27)
 
 
 <table>
@@ -303,7 +303,7 @@ export interface PulseState {
 
 ## QueueStats
 
-**Source**: [`pulse/async/queue.go:329`](https://github.com/teranos/QNTX/blob/main/pulse/async/queue.go#L329)
+**Source**: [`pulse/async/queue.go:330`](https://github.com/teranos/QNTX/blob/main/pulse/async/queue.go#L330)
 
 
 <table>

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
 )
@@ -373,7 +374,7 @@ func (s *QNTXServer) getDaemonState() (enabled bool, err error) {
 	query := "SELECT enabled FROM daemon_config WHERE id = 1"
 	err = s.db.QueryRow(query).Scan(&enabled)
 	if err != nil {
-		return false, fmt.Errorf("failed to get daemon state: %w", err)
+		return false, errors.Wrap(err, "failed to get daemon state")
 	}
 	return enabled, nil
 }
@@ -389,7 +390,7 @@ func (s *QNTXServer) setDaemonState(enabled bool) error {
 	`
 	_, err := s.db.Exec(query, enabled)
 	if err != nil {
-		return fmt.Errorf("failed to set daemon state: %w", err)
+		return errors.Wrap(err, "failed to set daemon state")
 	}
 	return nil
 }
@@ -397,7 +398,7 @@ func (s *QNTXServer) setDaemonState(enabled bool) error {
 // startDaemon starts the daemon and updates state
 func (s *QNTXServer) startDaemon() error {
 	if s.daemon == nil {
-		return fmt.Errorf("daemon not initialized")
+		return errors.New("daemon not initialized")
 	}
 
 	s.daemon.Start()
@@ -416,7 +417,7 @@ func (s *QNTXServer) startDaemon() error {
 // stopDaemon stops the daemon and updates state
 func (s *QNTXServer) stopDaemon() error {
 	if s.daemon == nil {
-		return fmt.Errorf("daemon not initialized")
+		return errors.New("daemon not initialized")
 	}
 
 	if s.ticker != nil {
