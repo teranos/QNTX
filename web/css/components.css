@@ -91,16 +91,7 @@
  * These should be migrated to .panel-close or .toast-close
  * ============================================================================ */
 
-.job-list-close,
-.command-explorer-close,
-.pulse-config-close,
-.prose-close,
-.ai-provider-close {
-    /* Inherit all styles from panel-close */
-    @extend .panel-close;
-}
-
-/* Note: @extend doesn't work in regular CSS, so we duplicate the styles */
+/* Note: These styles duplicate .panel-close for backward compatibility */
 .job-list-close,
 .command-explorer-close,
 .pulse-config-close,
