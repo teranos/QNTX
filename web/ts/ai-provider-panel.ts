@@ -2,7 +2,7 @@
  * AI Provider Panel - Actor/Agent Configuration
  *
  * Shows AI inference provider selection when clicking ⌬ (by/actor) in the symbol palette.
- * Allows switching between OpenRouter (cloud) and Ollama (local) providers.
+ * Allows switching between OpenRouter (cloud), Anthropic (Claude), and Ollama (local) providers.
  */
 
 import { BasePanel } from './base-panel.ts';
@@ -17,6 +17,8 @@ interface ConfigResponse {
         source: string;
     }>;
 }
+
+type ProviderType = 'openrouter' | 'anthropic' | 'ollama';
 
 class AIProviderPanel extends BasePanel {
     private appConfig: ConfigResponse | null = null;
@@ -44,10 +46,15 @@ class AIProviderPanel extends BasePanel {
                     <span id="ai-provider-status" class="config-toggle-status"></span>
                 </div>
                 <div class="config-toggle-control">
-                    <button id="provider-openrouter-btn" class="provider-btn active">
+                    <button id="provider-openrouter-btn" class="provider-btn">
                         <span class="provider-icon">☁️</span>
                         <span class="provider-name">OpenRouter</span>
-                        <span class="provider-detail">Cloud API</span>
+                        <span class="provider-detail">100+ Models</span>
+                    </button>
+                    <button id="provider-anthropic-btn" class="provider-btn">
+                        <span class="provider-icon">🧠</span>
+                        <span class="provider-name">Anthropic</span>
+                        <span class="provider-detail">Claude Direct</span>
                     </button>
                     <button id="provider-ollama-btn" class="provider-btn">
                         <span class="provider-icon">🖥️</span>
@@ -72,14 +79,41 @@ class AIProviderPanel extends BasePanel {
                         <div class="api-key-hint">Get your key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></div>
                     </div>
                 </div>
-                <div id="ollama-model-selector" class="ollama-model-selector provider-config hidden">
-                    <label for="ollama-model-select">Model:</label>
-                    <select id="ollama-model-select">
-                        <option value="llama3.2:3b">llama3.2:3b (3B, very fast)</option>
-                        <option value="mistral">mistral (7B, fast, general)</option>
-                        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (code/technical)</option>
-                        <option value="deepseek-r1:7b">deepseek-r1:7b (reasoning)</option>
-                    </select>
+                <div id="anthropic-config" class="provider-config hidden">
+                    <div class="api-key-section">
+                        <label for="anthropic-api-key">Anthropic API Key:</label>
+                        <div class="api-key-input-group">
+                            <input
+                                type="password"
+                                id="anthropic-api-key"
+                                class="api-key-input"
+                                placeholder="sk-ant-..."
+                                autocomplete="off"
+                            />
+                            <button id="anthropic-key-toggle" class="api-key-toggle" title="Show/Hide">👁</button>
+                            <button id="anthropic-key-save" class="api-key-save" title="Save">💾</button>
+                        </div>
+                        <div class="api-key-hint">Get your key from <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a></div>
+                    </div>
+                    <div class="model-selector">
+                        <label for="anthropic-model-select">Model:</label>
+                        <select id="anthropic-model-select">
+                            <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (balanced)</option>
+                            <option value="claude-opus-4-20250514">Claude Opus 4 (powerful)</option>
+                            <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (fast)</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="ollama-config" class="provider-config hidden">
+                    <div class="model-selector">
+                        <label for="ollama-model-select">Model:</label>
+                        <select id="ollama-model-select">
+                            <option value="llama3.2:3b">llama3.2:3b (3B, very fast)</option>
+                            <option value="mistral">mistral (7B, fast, general)</option>
+                            <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (code/technical)</option>
+                            <option value="deepseek-r1:7b">deepseek-r1:7b (reasoning)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         `;
@@ -92,20 +126,36 @@ class AIProviderPanel extends BasePanel {
 
         // AI Provider toggle buttons
         const openrouterBtn = this.$('#provider-openrouter-btn');
+        const anthropicBtn = this.$('#provider-anthropic-btn');
         const ollamaBtn = this.$('#provider-ollama-btn');
-        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
+        const ollamaModelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
+        const anthropicModelSelect = this.$<HTMLSelectElement>('#anthropic-model-select');
 
         openrouterBtn?.addEventListener('click', () => this.switchToOpenRouter());
+        anthropicBtn?.addEventListener('click', () => this.switchToAnthropic());
         ollamaBtn?.addEventListener('click', () => this.switchToOllama());
-        modelSelect?.addEventListener('change', (e: Event) => {
+
+        ollamaModelSelect?.addEventListener('change', (e: Event) => {
             const target = e.target as HTMLSelectElement;
             this.updateOllamaModel(target.value);
         });
 
+        anthropicModelSelect?.addEventListener('change', (e: Event) => {
+            const target = e.target as HTMLSelectElement;
+            this.updateAnthropicModel(target.value);
+        });
+
         // OpenRouter API key handling
-        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
-        const keyToggle = this.$('#openrouter-key-toggle');
-        const keySave = this.$('#openrouter-key-save');
+        this.setupApiKeyHandlers('openrouter', 'sk-or-');
+
+        // Anthropic API key handling
+        this.setupApiKeyHandlers('anthropic', 'sk-ant-');
+    }
+
+    private setupApiKeyHandlers(provider: 'openrouter' | 'anthropic', prefix: string): void {
+        const keyInput = this.$<HTMLInputElement>(`#${provider}-api-key`);
+        const keyToggle = this.$(`#${provider}-key-toggle`);
+        const keySave = this.$(`#${provider}-key-save`);
 
         keyToggle?.addEventListener('click', () => {
             if (keyInput) {
@@ -116,10 +166,10 @@ class AIProviderPanel extends BasePanel {
             }
         });
 
-        keySave?.addEventListener('click', () => this.saveOpenRouterKey());
+        keySave?.addEventListener('click', () => this.saveApiKey(provider, prefix));
         keyInput?.addEventListener('keypress', (e: KeyboardEvent) => {
             if (e.key === 'Enter') {
-                this.saveOpenRouterKey();
+                this.saveApiKey(provider, prefix);
             }
         });
     }
@@ -127,7 +177,7 @@ class AIProviderPanel extends BasePanel {
     protected async onShow(): Promise<void> {
         await this.fetchConfig();
         this.setupProviderButtons();
-        await this.loadOpenRouterKey();
+        await this.loadApiKeys();
         await this.checkOllamaStatus();
     }
 
@@ -146,21 +196,37 @@ class AIProviderPanel extends BasePanel {
     private setupProviderButtons(): void {
         if (!this.appConfig?.settings) return;
 
-        // Find local_inference.enabled setting
+        // Determine active provider based on config
+        // Priority: local_inference.enabled → anthropic.api_key set → openrouter (default)
         const localInferenceSetting = this.appConfig.settings.find(s => s.key === 'local_inference.enabled');
         const isOllamaEnabled = localInferenceSetting?.value === true;
 
-        // Find local_inference.model setting
-        const modelSetting = this.appConfig.settings.find(s => s.key === 'local_inference.model');
-        const effectiveModel = (modelSetting?.value as string) || 'llama3.2:3b';
+        const anthropicKeySetting = this.appConfig.settings.find(s => s.key === 'anthropic.api_key');
+        const hasAnthropicKey = !!(anthropicKeySetting?.value);
+
+        let activeProvider: ProviderType = 'openrouter';
+        if (isOllamaEnabled) {
+            activeProvider = 'ollama';
+        } else if (hasAnthropicKey) {
+            activeProvider = 'anthropic';
+        }
 
         // Update UI
-        this.updateProviderUI(isOllamaEnabled ? 'ollama' : 'openrouter');
+        this.updateProviderUI(activeProvider);
 
-        // Update model dropdown
-        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
-        if (modelSelect) {
-            modelSelect.value = effectiveModel;
+        // Update model dropdowns
+        const ollamaModelSetting = this.appConfig.settings.find(s => s.key === 'local_inference.model');
+        const ollamaModel = (ollamaModelSetting?.value as string) || 'llama3.2:3b';
+        const ollamaSelect = this.$<HTMLSelectElement>('#ollama-model-select');
+        if (ollamaSelect) {
+            ollamaSelect.value = ollamaModel;
+        }
+
+        const anthropicModelSetting = this.appConfig.settings.find(s => s.key === 'anthropic.model');
+        const anthropicModel = (anthropicModelSetting?.value as string) || 'claude-sonnet-4-20250514';
+        const anthropicSelect = this.$<HTMLSelectElement>('#anthropic-model-select');
+        if (anthropicSelect) {
+            anthropicSelect.value = anthropicModel;
         }
     }
 
@@ -177,6 +243,27 @@ class AIProviderPanel extends BasePanel {
             this.updateStatus('Using OpenRouter (cloud API)', 'success');
         } catch (error) {
             console.error('[AI Provider Panel] Failed to switch to OpenRouter:', error);
+            this.updateStatus('Failed to update config', 'error');
+        }
+    }
+
+    private async switchToAnthropic(): Promise<void> {
+        console.log('[AI Provider Panel] Switching to Anthropic');
+
+        this.updateProviderUI('anthropic');
+
+        const modelSelect = this.$<HTMLSelectElement>('#anthropic-model-select');
+        const model = modelSelect ? modelSelect.value : 'claude-sonnet-4-20250514';
+
+        try {
+            await this.updateConfig({
+                'local_inference.enabled': false,
+                'anthropic.model': model
+            });
+
+            this.updateStatus(`Using Anthropic (${model})`, 'success');
+        } catch (error) {
+            console.error('[AI Provider Panel] Failed to switch to Anthropic:', error);
             this.updateStatus('Failed to update config', 'error');
         }
     }
@@ -217,22 +304,53 @@ class AIProviderPanel extends BasePanel {
         }
     }
 
-    private updateProviderUI(provider: 'openrouter' | 'ollama'): void {
-        const openrouterBtn = this.$('#provider-openrouter-btn');
-        const ollamaBtn = this.$('#provider-ollama-btn');
-        const modelSelector = this.$('#ollama-model-selector');
-        const openrouterConfig = this.$('#openrouter-config');
+    private async updateAnthropicModel(model: string): Promise<void> {
+        console.log('[AI Provider Panel] Updating Anthropic model to:', model);
 
-        if (provider === 'openrouter') {
-            openrouterBtn?.classList.add('active');
-            ollamaBtn?.classList.remove('active');
-            modelSelector?.classList.add('u-hidden');
-            openrouterConfig?.classList.remove('u-hidden');
-        } else {
-            openrouterBtn?.classList.remove('active');
-            ollamaBtn?.classList.add('active');
-            modelSelector?.classList.remove('u-hidden');
-            openrouterConfig?.classList.add('u-hidden');
+        try {
+            await this.updateConfig({
+                'anthropic.model': model
+            });
+
+            this.updateStatus(`Using Anthropic (${model})`, 'success');
+        } catch (error) {
+            console.error('[AI Provider Panel] Failed to update Anthropic model:', error);
+            this.updateStatus('Failed to update model', 'error');
+        }
+    }
+
+    private updateProviderUI(provider: ProviderType): void {
+        const openrouterBtn = this.$('#provider-openrouter-btn');
+        const anthropicBtn = this.$('#provider-anthropic-btn');
+        const ollamaBtn = this.$('#provider-ollama-btn');
+        const openrouterConfig = this.$('#openrouter-config');
+        const anthropicConfig = this.$('#anthropic-config');
+        const ollamaConfig = this.$('#ollama-config');
+
+        // Reset all buttons
+        openrouterBtn?.classList.remove('active');
+        anthropicBtn?.classList.remove('active');
+        ollamaBtn?.classList.remove('active');
+
+        // Hide all configs
+        openrouterConfig?.classList.add('hidden');
+        anthropicConfig?.classList.add('hidden');
+        ollamaConfig?.classList.add('hidden');
+
+        // Activate selected provider
+        switch (provider) {
+            case 'openrouter':
+                openrouterBtn?.classList.add('active');
+                openrouterConfig?.classList.remove('hidden');
+                break;
+            case 'anthropic':
+                anthropicBtn?.classList.add('active');
+                anthropicConfig?.classList.remove('hidden');
+                break;
+            case 'ollama':
+                ollamaBtn?.classList.add('active');
+                ollamaConfig?.classList.remove('hidden');
+                break;
         }
     }
 
@@ -268,24 +386,32 @@ class AIProviderPanel extends BasePanel {
         return response.json();
     }
 
-    private async loadOpenRouterKey(): Promise<void> {
+    private async loadApiKeys(): Promise<void> {
         if (!this.appConfig?.settings) return;
 
-        // Find the OpenRouter API key setting
-        const keySetting = this.appConfig.settings.find(s => s.key === 'openrouter.api_key');
-        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
-
-        if (keyInput && keySetting?.value) {
-            const keyValue = keySetting.value as string;
-            // Show masked version of key (first 10 chars + ...)
+        // Load OpenRouter key
+        const openrouterKeySetting = this.appConfig.settings.find(s => s.key === 'openrouter.api_key');
+        const openrouterInput = this.$<HTMLInputElement>('#openrouter-api-key');
+        if (openrouterInput && openrouterKeySetting?.value) {
+            const keyValue = openrouterKeySetting.value as string;
             if (keyValue.length > 10) {
-                keyInput.placeholder = keyValue.substring(0, 10) + '...(configured)';
+                openrouterInput.placeholder = keyValue.substring(0, 10) + '...(configured)';
+            }
+        }
+
+        // Load Anthropic key
+        const anthropicKeySetting = this.appConfig.settings.find(s => s.key === 'anthropic.api_key');
+        const anthropicInput = this.$<HTMLInputElement>('#anthropic-api-key');
+        if (anthropicInput && anthropicKeySetting?.value) {
+            const keyValue = anthropicKeySetting.value as string;
+            if (keyValue.length > 10) {
+                anthropicInput.placeholder = keyValue.substring(0, 10) + '...(configured)';
             }
         }
     }
 
-    private async saveOpenRouterKey(): Promise<void> {
-        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
+    private async saveApiKey(provider: 'openrouter' | 'anthropic', expectedPrefix: string): Promise<void> {
+        const keyInput = this.$<HTMLInputElement>(`#${provider}-api-key`);
         if (!keyInput) return;
 
         const apiKey = keyInput.value.trim();
@@ -294,22 +420,24 @@ class AIProviderPanel extends BasePanel {
             return;
         }
 
-        // Basic validation for OpenRouter key format
-        if (!apiKey.startsWith('sk-or-')) {
-            this.updateStatus('Invalid key format (should start with sk-or-)', 'error');
+        // Basic validation for key format
+        if (!apiKey.startsWith(expectedPrefix)) {
+            this.updateStatus(`Invalid key format (should start with ${expectedPrefix})`, 'error');
             return;
         }
 
+        const configKey = provider === 'openrouter' ? 'openrouter.api_key' : 'anthropic.api_key';
+
         try {
             await this.updateConfig({
-                'openrouter.api_key': apiKey
+                [configKey]: apiKey
             });
 
             this.updateStatus('API key saved successfully', 'success');
             keyInput.value = ''; // Clear the input
             keyInput.placeholder = apiKey.substring(0, 10) + '...(configured)';
         } catch (error) {
-            console.error('[AI Provider Panel] Failed to save API key:', error);
+            console.error(`[AI Provider Panel] Failed to save ${provider} API key:`, error);
             this.updateStatus('Failed to save API key', 'error');
         }
     }
