@@ -117,8 +117,13 @@ export class FileTreeNavigator {
                     const childList = li.querySelector('.prose-tree-list');
                     if (childList) {
                         const isExpanded = childList.classList.contains('expanded');
-                        childList.classList.toggle('expanded', !isExpanded);
-                        toggle.textContent = isExpanded ? '▶' : '▼';
+                        if (isExpanded) {
+                            childList.classList.remove('expanded');
+                            toggle.textContent = '▶';
+                        } else {
+                            childList.classList.add('expanded');
+                            toggle.textContent = '▼';
+                        }
                     }
                 };
 
@@ -220,7 +225,12 @@ export class FileTreeNavigator {
             if (label) {
                 const text = label.textContent?.toLowerCase() || '';
                 const matches = text.includes(lowerQuery);
-                (item as HTMLElement).style.display = matches || !query ? '' : 'none';
+                const element = item as HTMLElement;
+                if (matches || !query) {
+                    element.classList.remove('u-hidden');
+                } else {
+                    element.classList.add('u-hidden');
+                }
             }
         });
     }

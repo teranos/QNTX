@@ -18,6 +18,10 @@ export async function handleDaemonStatus(data: DaemonStatusMessage): Promise<voi
     const { updatePulsePanelDaemonStatus } = await import('../pulse-panel.ts');
     updatePulsePanelDaemonStatus(data);
 
+    // Update Pulse daemon status indicator
+    const { statusIndicators } = await import('../status-indicators.ts');
+    statusIndicators.handlePulseDaemonStatus(data);
+
     // Check for budget warnings (only warn once per threshold crossing)
     checkBudgetWarnings(data);
 }
