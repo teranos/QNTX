@@ -19,23 +19,23 @@
  */
 
 import { BasePanel } from './base-panel.ts';
-import { debugLog } from './debug';
 import type { ScheduledJobResponse } from './pulse/types';
-import { listScheduledJobs, pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './pulse/api';
-import { formatInterval } from './pulse/types';
-import { toast } from './toast';
-import { showErrorDialog } from './error-dialog';
-import { listExecutions } from './pulse/execution-api';
+import { listScheduledJobs } from './pulse/api';
 import { PulsePanelState } from './pulse/panel-state';
 import * as PanelRenderer from './pulse/panel';
 import { attachPanelEventListeners } from './pulse/panel-events';
-import type { DaemonStatusMessage } from '../types/websocket';
+import { subscribeToExecutionEvents } from './pulse/panel-subscriptions';
 import {
-    onExecutionStarted,
-    onExecutionCompleted,
-    onExecutionFailed,
-    unixToISO,
-} from './pulse/events';
+    handleForceTrigger,
+    handleJobAction,
+    handleLoadMore,
+    handleRetryExecutions,
+    handleViewDetailed,
+    handleProseLocationClick,
+    toggleJobExpansion,
+    type JobActionContext,
+} from './pulse/job-actions';
+import type { DaemonStatusMessage } from '../types/websocket';
 
 // Global daemon status (updated via WebSocket)
 let currentDaemonStatus: DaemonStatusMessage | null = null;
@@ -62,96 +62,27 @@ class PulsePanel extends BasePanel {
     }
 
     /**
+     * Get job action context for handlers
+     */
+    private getActionContext(): JobActionContext {
+        return {
+            jobs: this.jobs,
+            state: this.state,
+            render: () => this.render(),
+            loadJobs: () => this.loadJobs(),
+        };
+    }
+
+    /**
      * Subscribe to Pulse execution events for real-time updates
      */
     private subscribeToEvents(): void {
-        // Execution started - update last run time and add to inline list
-        this.unsubscribers.push(
-            onExecutionStarted((detail) => {
-                if (!this.isVisible) return;
-
-                const job = this.jobs.get(detail.scheduledJobId);
-                const timestamp = unixToISO(detail.timestamp);
-                if (job) {
-                    job.last_run_at = timestamp;
-                }
-
-                // Add to inline execution list if job is expanded
-                if (this.state.isExpanded(detail.scheduledJobId)) {
-                    const executions = this.state.getExecutions(detail.scheduledJobId) || [];
-                    executions.unshift({
-                        id: detail.executionId,
-                        scheduled_job_id: detail.scheduledJobId,
-                        status: 'running',
-                        started_at: timestamp,
-                        created_at: timestamp,
-                        updated_at: timestamp,
-                    } as any);
-                    this.state.setExecutions(detail.scheduledJobId, executions);
-                }
-
-                this.render();
-            })
-        );
-
-        // Execution completed - update execution status
-        this.unsubscribers.push(
-            onExecutionCompleted((detail) => {
-                if (!this.isVisible) return;
-
-                const job = this.jobs.get(detail.scheduledJobId);
-                const timestamp = unixToISO(detail.timestamp);
-                if (job) {
-                    job.last_run_at = timestamp;
-                }
-
-                // Update inline execution if expanded
-                for (const [_jobId, executions] of this.state.jobExecutions.entries()) {
-                    const execution = executions.find(e => e.id === detail.executionId);
-                    if (execution) {
-                        Object.assign(execution, {
-                            status: 'completed',
-                            async_job_id: detail.asyncJobId,
-                            result_summary: detail.resultSummary,
-                            duration_ms: detail.durationMs,
-                            completed_at: timestamp,
-                        });
-                        break;
-                    }
-                }
-
-                this.render();
-            })
-        );
-
-        // Execution failed - update execution status
-        this.unsubscribers.push(
-            onExecutionFailed((detail) => {
-                if (!this.isVisible) return;
-
-                const job = this.jobs.get(detail.scheduledJobId);
-                const timestamp = unixToISO(detail.timestamp);
-                if (job) {
-                    job.last_run_at = timestamp;
-                }
-
-                // Update inline execution if expanded
-                for (const [_jobId, executions] of this.state.jobExecutions.entries()) {
-                    const execution = executions.find(e => e.id === detail.executionId);
-                    if (execution) {
-                        Object.assign(execution, {
-                            status: 'failed',
-                            error_message: detail.errorMessage,
-                            duration_ms: detail.durationMs,
-                            completed_at: timestamp,
-                        });
-                        break;
-                    }
-                }
-
-                this.render();
-            })
-        );
+        this.unsubscribers = subscribeToExecutionEvents({
+            jobs: this.jobs,
+            state: this.state,
+            isVisible: () => this.isVisible,
+            render: () => this.render(),
+        });
     }
 
     protected getTemplate(): string {
@@ -179,7 +110,7 @@ class PulsePanel extends BasePanel {
             // Clean up orphaned job IDs from expandedJobs
             this.state.cleanupOrphanedJobs(new Set(this.jobs.keys()));
 
-            this.render();
+            await this.render();
         } catch (error) {
             console.error('[Pulse Panel] Failed to load jobs:', error);
 
@@ -245,14 +176,15 @@ class PulsePanel extends BasePanel {
 
             container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
 
+            const ctx = this.getActionContext();
             attachPanelEventListeners(this.panel!, {
-                onToggleExpansion: (jobId) => this.toggleJobExpansion(jobId),
-                onForceTrigger: (jobId) => this.handleForceTrigger(jobId),
-                onJobAction: (jobId, action) => this.handleJobAction(jobId, action),
-                onLoadMore: (jobId) => this.handleLoadMore(jobId),
-                onRetryExecutions: (jobId) => this.handleRetryExecutions(jobId),
-                onViewDetailed: (jobId) => this.handleViewDetailed(jobId),
-                onProseLocation: (docId) => this.handleProseLocationClick(docId)
+                onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
+                onForceTrigger: (jobId) => handleForceTrigger(jobId, ctx),
+                onJobAction: (jobId, action) => handleJobAction(jobId, action, ctx),
+                onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
+                onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
+                onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
+                onProseLocation: (docId) => handleProseLocationClick(docId)
             });
         });
     }
@@ -284,129 +216,6 @@ class PulsePanel extends BasePanel {
     private async handleSystemStatusAction(action: string): Promise<void> {
         const { handleSystemStatusAction } = await import('./pulse/system-status.ts');
         await handleSystemStatusAction(action);
-    }
-
-    private async handleLoadMore(jobId: string): Promise<void> {
-        const currentLimit = this.state.executionLimits.get(jobId) || 5;
-        this.state.executionLimits.set(jobId, currentLimit + 10);
-        this.render();
-    }
-
-    private async handleRetryExecutions(jobId: string): Promise<void> {
-        this.state.executionErrors.delete(jobId);
-        await this.loadExecutionsForJob(jobId);
-    }
-
-    private async handleViewDetailed(jobId: string): Promise<void> {
-        const job = this.jobs.get(jobId);
-        if (!job) return;
-
-        const { showJobDetail } = await import('./pulse/job-detail-panel.js');
-        showJobDetail(job);
-    }
-
-    private async toggleJobExpansion(jobId: string): Promise<void> {
-        if (this.state.expandedJobs.has(jobId)) {
-            this.state.expandedJobs.delete(jobId);
-            this.state.saveToLocalStorage();
-            this.render();
-        } else {
-            this.state.expandedJobs.add(jobId);
-            this.state.saveToLocalStorage();
-            this.render();
-
-            if (!this.state.jobExecutions.has(jobId) && !this.state.loadingExecutions.has(jobId)) {
-                await this.loadExecutionsForJob(jobId);
-            }
-        }
-    }
-
-    private async loadExecutionsForJob(jobId: string): Promise<void> {
-        this.state.loadingExecutions.add(jobId);
-        this.state.executionErrors.delete(jobId);
-        this.render();
-
-        try {
-            const response = await listExecutions(jobId, { limit: 20, offset: 0 });
-            this.state.jobExecutions.set(jobId, response.executions);
-            this.state.executionErrors.delete(jobId);
-        } catch (error) {
-            console.error('[Pulse Panel] Failed to load executions:', error);
-            const errorMessage = (error as Error).message || 'Unknown error';
-            this.state.executionErrors.set(jobId, errorMessage);
-            toast.error(`Failed to load execution history: ${errorMessage}`);
-        } finally {
-            this.state.loadingExecutions.delete(jobId);
-            this.render();
-        }
-    }
-
-    private async handleForceTrigger(jobId: string): Promise<void> {
-        const job = this.jobs.get(jobId);
-        if (!job) return;
-
-        try {
-            debugLog('[Pulse Panel] Force triggering job:', job.ats_code);
-
-            await forceTriggerJob(job.ats_code);
-
-            if (!this.state.expandedJobs.has(jobId)) {
-                this.state.expandedJobs.add(jobId);
-                this.state.saveToLocalStorage();
-            }
-
-            await this.loadExecutionsForJob(jobId);
-
-            toast.success('Force trigger started - check execution history below');
-        } catch (error) {
-            console.error('[Pulse Panel] Force trigger failed:', error);
-            showErrorDialog(
-                'Force trigger failed',
-                (error as Error).message
-            );
-        }
-    }
-
-    private async handleJobAction(jobId: string, action: string): Promise<void> {
-        const job = this.jobs.get(jobId);
-
-        try {
-            switch (action) {
-                case 'pause':
-                    await pauseScheduledJob(jobId);
-                    break;
-                case 'resume':
-                    await resumeScheduledJob(jobId);
-                    break;
-                case 'delete':
-                    if (!confirm('Delete this scheduled job?')) return;
-                    await deleteScheduledJob(jobId);
-                    break;
-            }
-
-            await this.loadJobs();
-        } catch (error) {
-            console.error(`[Pulse Panel] Failed to ${action} job:`, error);
-
-            let errorMsg = `Failed to ${action} job: ${(error as Error).message}`;
-
-            if (job) {
-                errorMsg += `\n\nATS Code:\n${job.ats_code}`;
-                errorMsg += `\nInterval: ${formatInterval(job.interval_seconds)}`;
-                if (job.created_from_doc) {
-                    errorMsg += `\nDocument: ${job.created_from_doc}`;
-                }
-            }
-
-            toast.error(errorMsg);
-        }
-    }
-
-    private async handleProseLocationClick(docId: string): Promise<void> {
-        debugLog('[Pulse Panel] Opening prose document:', docId);
-
-        const { showProseDocument } = await import('./prose/panel.js');
-        await showProseDocument(docId);
     }
 
     /**
