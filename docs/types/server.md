@@ -621,7 +621,7 @@ export interface LogEntry {
 
 ## ParsedATSCode
 
-**Source**: [`server/ats_parser.go:21`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L21)
+**Source**: [`server/ats_parser.go:22`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L22)
 
 
 <table>
@@ -828,7 +828,7 @@ export interface ProgressMessage {
 
 ## ProseEntry
 
-**Source**: [`server/prose_handler.go:15`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L15)
+**Source**: [`server/prose_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L16)
 
 
 <table>

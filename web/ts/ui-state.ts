@@ -1,22 +1,24 @@
 /**
  * UIState - Centralized UI State Management
  *
- * Consolidates scattered panel visibility and UI state into a single source of truth.
- * Designed to be extensible for future full StateManager implementation.
+ * THE state manager for QNTX web UI. Consolidates all persistent UI state
+ * into a single source of truth with pub/sub reactivity.
  *
  * Architecture:
  * - Singleton instance for global access
  * - Simple pub/sub for reactive updates
- * - localStorage persistence for user preferences
+ * - localStorage persistence via storage.ts utility
  * - Type-safe state access
  *
- * Future: This can be extended to a full StateManager by:
- * - Adding middleware support
- * - Implementing state slices
- * - Adding devtools integration
+ * State domains:
+ * - Panel visibility (transient, not persisted)
+ * - User preferences (persisted)
+ * - Graph session (persisted with expiry)
+ * - Budget warnings (transient)
  */
 
-import type { PanelState } from '../types/core';
+import type { PanelState, Transform } from '../types/core';
+import { getItem, setItem, removeItem } from './storage';
 
 // ============================================================================
 // State Types
@@ -45,6 +47,15 @@ export interface BudgetWarningState {
 }
 
 /**
+ * Graph session state (persisted with 7-day expiry)
+ */
+export interface GraphSessionState {
+    query?: string;
+    verbosity?: number;
+    transform?: Transform | null;
+}
+
+/**
  * Consolidated UI state
  */
 export interface UIStateData {
@@ -59,6 +70,9 @@ export interface UIStateData {
 
     // Usage badge view mode
     usageView: 'week' | 'month';
+
+    // Graph session (query, verbosity, transform)
+    graphSession: GraphSessionState;
 
     // Timestamp for state versioning
     lastUpdated: number;
@@ -76,6 +90,15 @@ export type StateSubscriber<K extends keyof UIStateData> = (
  * Generic subscriber for any state change
  */
 export type GlobalSubscriber = (state: UIStateData, changedKey: keyof UIStateData) => void;
+
+/**
+ * Subset of UIStateData that gets persisted to localStorage
+ */
+interface PersistedUIState {
+    activeModality: string;
+    usageView: 'week' | 'month';
+    graphSession: GraphSessionState;
+}
 
 // ============================================================================
 // Default State
@@ -105,6 +128,7 @@ function createDefaultState(): UIStateData {
             monthly: false,
         },
         usageView: 'week',
+        graphSession: {},
         lastUpdated: Date.now(),
     };
 }
@@ -114,8 +138,9 @@ function createDefaultState(): UIStateData {
 // ============================================================================
 
 const STORAGE_KEY = 'qntx-ui-state';
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2; // Bumped for graph session addition
 const MAX_SUBSCRIBER_FAILURES = 3;
+const GRAPH_SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
  * Centralized UI state manager
@@ -252,6 +277,53 @@ class UIState {
     }
 
     // ========================================================================
+    // Graph Session Management
+    // ========================================================================
+
+    /**
+     * Get current graph session
+     */
+    getGraphSession(): GraphSessionState {
+        return this.state.graphSession;
+    }
+
+    /**
+     * Update graph session (partial update)
+     */
+    setGraphSession(session: Partial<GraphSessionState>): void {
+        const updated = { ...this.state.graphSession, ...session };
+        this.update('graphSession', updated);
+    }
+
+    /**
+     * Set graph query
+     */
+    setGraphQuery(query: string): void {
+        this.setGraphSession({ query });
+    }
+
+    /**
+     * Set graph verbosity level
+     */
+    setGraphVerbosity(verbosity: number): void {
+        this.setGraphSession({ verbosity });
+    }
+
+    /**
+     * Set graph transform (zoom/pan state)
+     */
+    setGraphTransform(transform: Transform | null): void {
+        this.setGraphSession({ transform });
+    }
+
+    /**
+     * Clear graph session
+     */
+    clearGraphSession(): void {
+        this.update('graphSession', {});
+    }
+
+    // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
 
@@ -354,61 +426,50 @@ class UIState {
     // ========================================================================
 
     /**
-     * Save state to localStorage
+     * Persisted state shape (subset of UIStateData)
      */
-    private saveToStorage(): void {
-        try {
-            const data = {
-                version: STORAGE_VERSION,
-                state: {
-                    // Only persist user preferences, not transient state
-                    activeModality: this.state.activeModality,
-                    usageView: this.state.usageView,
-                    // Don't persist: panels (should start closed), budgetWarnings (session-only)
-                },
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } catch (e) {
-            console.error('[UIState] Failed to save state:', e);
-        }
+    private getPersistedState(): PersistedUIState {
+        return {
+            activeModality: this.state.activeModality,
+            usageView: this.state.usageView,
+            graphSession: this.state.graphSession,
+            // Don't persist: panels (should start closed), budgetWarnings (session-only)
+        };
     }
 
     /**
-     * Load state from localStorage
+     * Save state to localStorage using storage.ts
+     */
+    private saveToStorage(): void {
+        setItem(STORAGE_KEY, this.getPersistedState(), { version: STORAGE_VERSION });
+    }
+
+    /**
+     * Load state from localStorage using storage.ts
      */
     private loadFromStorage(): UIStateData | null {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return null;
+        const persisted = getItem<PersistedUIState>(STORAGE_KEY, {
+            version: STORAGE_VERSION,
+            maxAge: GRAPH_SESSION_MAX_AGE,
+        });
 
-            const data = JSON.parse(raw);
-            if (data.version !== STORAGE_VERSION) {
-                console.warn('[UIState] State version mismatch, using defaults');
-                return null;
-            }
+        if (!persisted) return null;
 
-            // Merge persisted preferences with default state
-            const defaultState = createDefaultState();
-            return {
-                ...defaultState,
-                activeModality: data.state.activeModality ?? defaultState.activeModality,
-                usageView: data.state.usageView ?? defaultState.usageView,
-            };
-        } catch (e) {
-            console.error('[UIState] Failed to load state:', e);
-            return null;
-        }
+        // Merge persisted preferences with default state
+        const defaultState = createDefaultState();
+        return {
+            ...defaultState,
+            activeModality: persisted.activeModality ?? defaultState.activeModality,
+            usageView: persisted.usageView ?? defaultState.usageView,
+            graphSession: persisted.graphSession ?? defaultState.graphSession,
+        };
     }
 
     /**
      * Clear all persisted state
      */
     clearStorage(): void {
-        try {
-            localStorage.removeItem(STORAGE_KEY);
-        } catch (e) {
-            console.error('[UIState] Failed to clear storage:', e);
-        }
+        removeItem(STORAGE_KEY);
     }
 
     /**

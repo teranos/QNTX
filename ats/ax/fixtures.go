@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/internal/util"
 )
 
 // TestFixtures provides predictable test data for Ask System testing
@@ -123,7 +124,7 @@ func (tf *TestFixtures) GetFuzzyMatchingTestCase() []types.As {
 	var roleAttestations []types.As
 	for _, as := range tf.Attestations {
 		for _, pred := range as.Predicates {
-			if contains(pred, []string{"participant", "active participant", "contributor"}) {
+			if util.ContainsString([]string{"participant", "active participant", "contributor"}, pred) {
 				roleAttestations = append(roleAttestations, as)
 				break
 			}
@@ -144,11 +145,3 @@ func (tf *TestFixtures) GetCartesianTestCase() []types.As {
 	return cartesianAttestations
 }
 
-func contains(item string, slice []string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}

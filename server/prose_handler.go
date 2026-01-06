@@ -2,13 +2,14 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // ProseEntry represents a prose content file or directory
@@ -80,7 +81,7 @@ func (s *QNTXServer) validateProsePath(urlPath, remoteAddr string) (string, erro
 			"original_path", prosePath,
 			"clean_path", cleanPath,
 			"remote_addr", remoteAddr)
-		return "", fmt.Errorf("path traversal attempt: %s", cleanPath)
+		return "", errors.Newf("path traversal attempt: %s", cleanPath)
 	}
 
 	// Require .md extension
@@ -88,7 +89,7 @@ func (s *QNTXServer) validateProsePath(urlPath, remoteAddr string) (string, erro
 		s.logger.Warnw("Rejected non-markdown file",
 			"path", cleanPath,
 			"remote_addr", remoteAddr)
-		return "", fmt.Errorf("only markdown files allowed: %s", cleanPath)
+		return "", errors.Newf("only markdown files allowed: %s", cleanPath)
 	}
 
 	return cleanPath, nil
@@ -135,7 +136,7 @@ func (s *QNTXServer) readRequestBody(body io.ReadCloser) ([]byte, error) {
 	const maxBodySize = 10 * 1024 * 1024 // 10MB
 	content, err := io.ReadAll(io.LimitReader(body, maxBodySize))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read request body: %w", err)
+		return nil, errors.Wrap(err, "failed to read request body")
 	}
 
 	return content, nil
@@ -147,12 +148,12 @@ func (s *QNTXServer) writeProseFile(prosePath string, content []byte) error {
 
 	// Create parent directories if needed
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return errors.Wrap(err, "failed to create directory")
 	}
 
 	// Write file
 	if err := os.WriteFile(fullPath, content, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+		return errors.Wrap(err, "failed to write file")
 	}
 
 	return nil

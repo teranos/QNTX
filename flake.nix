@@ -15,8 +15,8 @@
 
   # Binary cache configuration
   nixConfig = {
-    extra-substituters = ["https://qntx.cachix.org"];
-    extra-trusted-public-keys = ["qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg="];
+    extra-substituters = [ "https://qntx.cachix.org" ];
+    extra-trusted-public-keys = [ "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg=" ];
   };
 
   outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
@@ -45,7 +45,7 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          vendorHash = "sha256-W2SPkC8HMfzgldH+kiEJVzIDdKHMY0gicsDJpoC02kM=";
+          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
