@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-getter"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
 
@@ -24,33 +26,40 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 		return manager, nil
 	}
 
-	// Build map of enabled plugins for quick lookup
+	// Build map of enabled plugins for deduplication
 	enabledPlugins := make(map[string]bool)
 	for _, name := range cfg.Plugin.Enabled {
 		enabledPlugins[name] = true
 	}
 
-	// Discover plugins from configured paths
+	// Sort plugin names for deterministic iteration
+	pluginNames := make([]string, 0, len(enabledPlugins))
+	for name := range enabledPlugins {
+		pluginNames = append(pluginNames, name)
+	}
+	sort.Strings(pluginNames)
+
+	// Discover plugins from configured paths (deduplicated)
 	var pluginConfigs []PluginConfig
 	var failedPlugins []string
-	for _, pluginName := range cfg.Plugin.Enabled {
+	for _, pluginName := range pluginNames {
+		logger.Infof("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
+
 		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
-			logger.Warnw("Failed to discover plugin",
-				"plugin", pluginName,
-				"error", err,
-				"paths", cfg.Plugin.Paths,
-			)
+			logger.Warnf("Plugin '%s' not found - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]",
+				pluginName, cfg.Plugin.Paths, pluginName, pluginName, pluginName)
 			failedPlugins = append(failedPlugins, pluginName)
 			continue
 		}
+		logger.Infof("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
 	}
 
 	// Load discovered plugins
 	if len(pluginConfigs) > 0 {
 		if err := manager.LoadPlugins(ctx, pluginConfigs); err != nil {
-			return nil, fmt.Errorf("failed to load plugins: %w", err)
+			return nil, errors.Wrap(err, "failed to load plugins")
 		}
 
 		// Configure WebSocket settings from am.Config
@@ -125,10 +134,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 					continue
 				}
 
-				logger.Infow("Discovered plugin binary",
-					"plugin", name,
-					"path", candidate,
-				)
+				logger.Infof("Found '%s' plugin binary: %s", name, candidate)
 
 				return PluginConfig{
 					Name:      name,
@@ -140,7 +146,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 		}
 	}
 
-	return PluginConfig{}, fmt.Errorf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
+	return PluginConfig{}, errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
 }
 
 // expandAndValidatePath safely expands and validates a path using go-getter.
@@ -150,13 +156,13 @@ func expandAndValidatePath(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
+			return "", errors.Wrap(err, "failed to get home directory")
 		}
 		path = filepath.Join(home, path[2:])
 	} else if path == "~" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("failed to get home directory: %w", err)
+			return "", errors.Wrap(err, "failed to get home directory")
 		}
 		return home, nil
 	}
@@ -170,13 +176,13 @@ func expandAndValidatePath(path string) (string, error) {
 	// Use go-getter's detection to safely handle paths
 	detected, err := getter.Detect(path, pwd, getter.Detectors)
 	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
+		return "", errors.Wrap(err, "invalid path")
 	}
 
 	// Parse the detected URL/path
 	u, err := url.Parse(detected)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse path: %w", err)
+		return "", errors.Wrap(err, "failed to parse path")
 	}
 
 	// For file:// URLs, extract the path
@@ -188,10 +194,10 @@ func expandAndValidatePath(path string) (string, error) {
 	if u.Scheme == "" {
 		abs, err := filepath.Abs(path)
 		if err != nil {
-			return "", fmt.Errorf("failed to make absolute path: %w", err)
+			return "", errors.Wrap(err, "failed to make absolute path")
 		}
 		return abs, nil
 	}
 
-	return "", fmt.Errorf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
+	return "", errors.Newf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
 }

@@ -13,7 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
+
+// testLogger creates a test logger for use in registry tests
+func testLogger(t *testing.T) *zap.SugaredLogger {
+	return zaptest.NewLogger(t).Sugar()
+}
 
 // =============================================================================
 // Mock Plugin Implementation
@@ -86,7 +92,7 @@ var _ DomainPlugin = (*mockPlugin)(nil)
 // =============================================================================
 
 func TestNewRegistry(t *testing.T) {
-	registry := NewRegistry("1.0.0")
+	registry := NewRegistry("1.0.0", testLogger(t))
 	assert.NotNil(t, registry)
 	assert.Equal(t, "1.0.0", registry.version)
 	assert.NotNil(t, registry.plugins)
@@ -95,7 +101,7 @@ func TestNewRegistry(t *testing.T) {
 
 func TestRegistry_Register(t *testing.T) {
 	t.Run("successful registration", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newMockPlugin("test")
 
 		err := registry.Register(plugin)
@@ -107,7 +113,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("name conflict", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test")
 		plugin2 := newMockPlugin("test")
 
@@ -120,7 +126,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("version compatibility - no constraint", func(t *testing.T) {
-		registry := NewRegistry("2.5.3")
+		registry := NewRegistry("2.5.3", testLogger(t))
 		plugin := newMockPlugin("test")
 		plugin.metadata.QNTXVersion = "" // No constraint
 
@@ -129,7 +135,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("version compatibility - valid constraint", func(t *testing.T) {
-		registry := NewRegistry("1.5.0")
+		registry := NewRegistry("1.5.0", testLogger(t))
 		plugin := newMockPlugin("test")
 		plugin.metadata.QNTXVersion = "^1.0.0" // 1.x.x compatible
 
@@ -138,7 +144,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("version compatibility - invalid constraint", func(t *testing.T) {
-		registry := NewRegistry("2.0.0")
+		registry := NewRegistry("2.0.0", testLogger(t))
 		plugin := newMockPlugin("test")
 		plugin.metadata.QNTXVersion = "^1.0.0" // Requires 1.x.x
 
@@ -148,7 +154,7 @@ func TestRegistry_Register(t *testing.T) {
 	})
 
 	t.Run("invalid version constraint syntax", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newMockPlugin("test")
 		plugin.metadata.QNTXVersion = "invalid-constraint"
 
@@ -160,7 +166,7 @@ func TestRegistry_Register(t *testing.T) {
 
 func TestRegistry_Get(t *testing.T) {
 	t.Run("existing plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newMockPlugin("test")
 		registry.Register(plugin)
 
@@ -170,7 +176,7 @@ func TestRegistry_Get(t *testing.T) {
 	})
 
 	t.Run("non-existent plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 
 		retrieved, ok := registry.Get("nonexistent")
 		assert.False(t, ok)
@@ -180,13 +186,13 @@ func TestRegistry_Get(t *testing.T) {
 
 func TestRegistry_List(t *testing.T) {
 	t.Run("empty registry", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		list := registry.List()
 		assert.Empty(t, list)
 	})
 
 	t.Run("single plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		registry.Register(newMockPlugin("test"))
 
 		list := registry.List()
@@ -194,7 +200,7 @@ func TestRegistry_List(t *testing.T) {
 	})
 
 	t.Run("multiple plugins - sorted order", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		registry.Register(newMockPlugin("zebra"))
 		registry.Register(newMockPlugin("alpha"))
 		registry.Register(newMockPlugin("beta"))
@@ -207,13 +213,13 @@ func TestRegistry_List(t *testing.T) {
 
 func TestRegistry_GetAll(t *testing.T) {
 	t.Run("empty registry", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		all := registry.GetAll()
 		assert.Empty(t, all)
 	})
 
 	t.Run("multiple plugins", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		registry.Register(plugin1)
@@ -228,7 +234,7 @@ func TestRegistry_GetAll(t *testing.T) {
 
 func TestRegistry_InitializeAll(t *testing.T) {
 	t.Run("successful initialization", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		registry.Register(plugin1)
@@ -242,8 +248,8 @@ func TestRegistry_InitializeAll(t *testing.T) {
 		assert.True(t, plugin2.initCalled)
 	})
 
-	t.Run("initialization error", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+	t.Run("initialization error - resilient behavior", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		plugin1.initError = fmt.Errorf("init failed")
@@ -252,14 +258,24 @@ func TestRegistry_InitializeAll(t *testing.T) {
 
 		mockServices := newMockServiceRegistry()
 		err := registry.InitializeAll(context.Background(), mockServices)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to initialize")
-		assert.Contains(t, err.Error(), "test1")
+		// Should not return error - continues with other plugins
+		assert.NoError(t, err)
+
+		// test1 should be marked as failed
+		state1, ok := registry.GetState("test1")
+		assert.True(t, ok)
+		assert.Equal(t, StateFailed, state1)
+
+		// test2 should be running
+		state2, ok := registry.GetState("test2")
+		assert.True(t, ok)
+		assert.Equal(t, StateRunning, state2)
+		assert.True(t, plugin2.initCalled)
 	})
 
 	t.Run("deterministic order", func(t *testing.T) {
 		// Verify plugins are initialized in sorted order
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		var initOrder []string
 		var mu sync.Mutex
 
@@ -286,7 +302,7 @@ func TestRegistry_InitializeAll(t *testing.T) {
 
 func TestRegistry_ShutdownAll(t *testing.T) {
 	t.Run("successful shutdown", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		registry.Register(plugin1)
@@ -300,7 +316,7 @@ func TestRegistry_ShutdownAll(t *testing.T) {
 	})
 
 	t.Run("shutdown errors collected", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		plugin1.shutdownError = fmt.Errorf("shutdown failed 1")
@@ -315,7 +331,7 @@ func TestRegistry_ShutdownAll(t *testing.T) {
 
 	t.Run("reverse order shutdown", func(t *testing.T) {
 		// Verify plugins are shut down in reverse order
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		var shutdownOrder []string
 		var mu sync.Mutex
 
@@ -341,7 +357,7 @@ func TestRegistry_ShutdownAll(t *testing.T) {
 
 func TestRegistry_HealthCheckAll(t *testing.T) {
 	t.Run("all healthy", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		registry.Register(plugin1)
@@ -354,7 +370,7 @@ func TestRegistry_HealthCheckAll(t *testing.T) {
 	})
 
 	t.Run("partial health issues", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin1 := newMockPlugin("test1")
 		plugin2 := newMockPlugin("test2")
 		plugin2.healthStatus = HealthStatus{
@@ -442,7 +458,7 @@ func TestRegistry_validateVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			registry := NewRegistry(tt.qntxVersion)
+			registry := NewRegistry(tt.qntxVersion, testLogger(t))
 			metadata := Metadata{
 				Name:        "test",
 				QNTXVersion: tt.constraint,
@@ -472,7 +488,7 @@ func TestGlobalRegistry(t *testing.T) {
 		defaultRegistry = nil
 		registryMu.Unlock()
 
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		SetDefaultRegistry(registry)
 
 		retrieved := GetDefaultRegistry()
@@ -485,8 +501,8 @@ func TestGlobalRegistry(t *testing.T) {
 		defaultRegistry = nil
 		registryMu.Unlock()
 
-		registry1 := NewRegistry("1.0.0")
-		registry2 := NewRegistry("2.0.0")
+		registry1 := NewRegistry("1.0.0", testLogger(t))
+		registry2 := NewRegistry("2.0.0", testLogger(t))
 
 		SetDefaultRegistry(registry1)
 		assert.Panics(t, func() {
@@ -500,7 +516,7 @@ func TestGlobalRegistry(t *testing.T) {
 		defaultRegistry = nil
 		registryMu.Unlock()
 
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		SetDefaultRegistry(registry)
 
 		plugin := newMockPlugin("test")
@@ -537,7 +553,7 @@ func TestGlobalRegistry(t *testing.T) {
 		defaultRegistry = nil
 		registryMu.Unlock()
 
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		SetDefaultRegistry(registry)
 
 		Register(newMockPlugin("alpha"))
@@ -554,7 +570,7 @@ func TestGlobalRegistry(t *testing.T) {
 
 func TestRegistry_Concurrency(t *testing.T) {
 	t.Run("concurrent registration", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		var wg sync.WaitGroup
 		const workers = 10
 
@@ -572,7 +588,7 @@ func TestRegistry_Concurrency(t *testing.T) {
 	})
 
 	t.Run("concurrent read/write", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		registry.Register(newMockPlugin("test"))
 
 		var wg sync.WaitGroup
@@ -646,7 +662,7 @@ func (m *mockConfig) GetBool(key string) bool            { return false }
 func (m *mockConfig) GetStringSlice(key string) []string { return nil }
 func (m *mockConfig) Get(key string) interface{}         { return nil }
 func (m *mockConfig) Set(key string, value interface{})  {}
-func (m *mockConfig) GetKeys() []string                   { return []string{} }
+func (m *mockConfig) GetKeys() []string                  { return []string{} }
 
 // Verify mockConfig implements Config
 var _ Config = (*mockConfig)(nil)
@@ -731,7 +747,7 @@ var _ PausablePlugin = (*pausableMockPlugin)(nil)
 
 func TestRegistry_Pause(t *testing.T) {
 	t.Run("pause pausable plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newPausableMockPlugin("pausable")
 		require.NoError(t, registry.Register(plugin))
 
@@ -754,7 +770,7 @@ func TestRegistry_Pause(t *testing.T) {
 	})
 
 	t.Run("pause non-existent plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		ctx := context.Background()
 
 		err := registry.Pause(ctx, "nonexistent")
@@ -763,7 +779,7 @@ func TestRegistry_Pause(t *testing.T) {
 	})
 
 	t.Run("pause non-pausable plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newMockPlugin("regular")
 		require.NoError(t, registry.Register(plugin))
 
@@ -777,7 +793,7 @@ func TestRegistry_Pause(t *testing.T) {
 	})
 
 	t.Run("pause already paused plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newPausableMockPlugin("pausable")
 		require.NoError(t, registry.Register(plugin))
 
@@ -794,7 +810,7 @@ func TestRegistry_Pause(t *testing.T) {
 
 func TestRegistry_Resume(t *testing.T) {
 	t.Run("resume paused plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newPausableMockPlugin("pausable")
 		require.NoError(t, registry.Register(plugin))
 
@@ -812,7 +828,7 @@ func TestRegistry_Resume(t *testing.T) {
 	})
 
 	t.Run("resume non-paused plugin", func(t *testing.T) {
-		registry := NewRegistry("1.0.0")
+		registry := NewRegistry("1.0.0", testLogger(t))
 		plugin := newPausableMockPlugin("pausable")
 		require.NoError(t, registry.Register(plugin))
 
@@ -827,7 +843,7 @@ func TestRegistry_Resume(t *testing.T) {
 }
 
 func TestRegistry_IsPausable(t *testing.T) {
-	registry := NewRegistry("1.0.0")
+	registry := NewRegistry("1.0.0", testLogger(t))
 
 	pausable := newPausableMockPlugin("pausable")
 	regular := newMockPlugin("regular")
@@ -841,7 +857,7 @@ func TestRegistry_IsPausable(t *testing.T) {
 }
 
 func TestRegistry_GetState(t *testing.T) {
-	registry := NewRegistry("1.0.0")
+	registry := NewRegistry("1.0.0", testLogger(t))
 	plugin := newMockPlugin("test")
 	require.NoError(t, registry.Register(plugin))
 
@@ -865,7 +881,7 @@ func TestRegistry_GetState(t *testing.T) {
 }
 
 func TestRegistry_GetAllStates(t *testing.T) {
-	registry := NewRegistry("1.0.0")
+	registry := NewRegistry("1.0.0", testLogger(t))
 	require.NoError(t, registry.Register(newMockPlugin("plugin1")))
 	require.NoError(t, registry.Register(newMockPlugin("plugin2")))
 

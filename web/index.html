@@ -5,11 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>qntx graph</title>
     <link rel="icon" type="image/jpeg" href="/qntx.jpg">
-    <!-- CSS AUTO-GENERATED - DO NOT EDIT MANUALLY -->
+    <!-- Core styles -->
     <link rel="stylesheet" href="/css/core.css">
-    <!-- END CSS AUTO-GENERATED -->
+
+    <!-- Component styles -->
+    <link rel="stylesheet" href="/css/components.css">
+
+    <!-- Graph and visualization -->
+    <link rel="stylesheet" href="/css/graph.css">
+
+    <!-- Panel base styles -->
+    <link rel="stylesheet" href="/css/panel-base.css">
+
+    <!-- Feature panels -->
+    <link rel="stylesheet" href="/css/ai-provider-panel.css">
+    <link rel="stylesheet" href="/css/command-explorer-panel.css">
+    <link rel="stylesheet" href="/css/go-editor-panel.css">
+    <link rel="stylesheet" href="/css/job-detail-panel.css">
+    <link rel="stylesheet" href="/css/job-list-panel.css">
+    <link rel="stylesheet" href="/css/plugin-panel.css">
+    <link rel="stylesheet" href="/css/prose-panel.css">
+    <link rel="stylesheet" href="/css/pulse-panel.css">
+    <link rel="stylesheet" href="/css/pulse-scheduling.css">
+    <link rel="stylesheet" href="/css/webscraper-panel.css">
+
+    <!-- Code editor components -->
+    <link rel="stylesheet" href="/css/ats-code-block.css">
+    <link rel="stylesheet" href="/css/ats-language-client.css">
+    <link rel="stylesheet" href="/css/code-block-base.css">
+    <link rel="stylesheet" href="/css/code-suggestions.css">
+    <link rel="stylesheet" href="/css/codemirror.css">
+    <link rel="stylesheet" href="/css/go-code-block.css">
+
+    <!-- UI components -->
+    <link rel="stylesheet" href="/css/config-panel.css">
+    <link rel="stylesheet" href="/css/feedback.css">
+    <link rel="stylesheet" href="/css/filetree.css">
+    <link rel="stylesheet" href="/css/left-panel.css">
+    <link rel="stylesheet" href="/css/loading.css">
+    <link rel="stylesheet" href="/css/responsive.css">
+    <link rel="stylesheet" href="/css/symbol-palette.css">
+    <link rel="stylesheet" href="/css/toast.css">
+    <link rel="stylesheet" href="/css/usage-badge.css">
+    <link rel="stylesheet" href="/css/utilities.css">
 </head>
-<body class="disconnected" data-theme="dark">
+<body class="disconnected">
     <!-- Loading screen - shows immediately before any scripts run -->
     <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; color: #888; animation: fadeInLoader 300ms ease-out;">
         <!-- qntx Logo -->
@@ -265,6 +305,7 @@
                     <button type="button" class="palette-cell" data-cmd="prose" data-label="prose — documentation" aria-label="Prose: documentation editor">▣</button>
                     <button type="button" class="palette-cell" data-cmd="go" data-label="go — code editor" aria-label="Go: code editor with LSP">go</button>
                     <button type="button" class="palette-cell" data-cmd="plugins" data-label="plugins — domain plugins" aria-label="Plugins: installed domain plugins">&#9881;</button>
+                    <button type="button" class="palette-cell" data-cmd="scraper" data-label="scraper — content extraction" aria-label="Scraper: content extraction">⛶</button>
                 </div>
 
                 <div id="query-drop-zone">
@@ -317,7 +358,7 @@
         <div id="pulse-config-panel" class="pulse-config-panel">
             <div class="pulse-config-header">
                 <h2>Pulse Budget</h2>
-                <button id="pulse-config-close" class="pulse-config-close">×</button>
+                <button id="pulse-config-close" class="panel-close">×</button>
             </div>
             <div class="pulse-config-body">
                 <form id="pulse-config-form">
@@ -342,15 +383,11 @@
     </div>
 
     <!-- Combined Log Panel (Server + ix Progress side by side) -->
-    <div id="log-panel">
-        <div id="log-header">
-            <h3>Logs</h3>
-            <span id="log-version" style="font-size: 9px; color: #555; margin-left: 8px;"></span>
-            <div id="connection-status" role="status" aria-live="polite">
-                <span id="status-dot" class="status-dot"></span>
-                <span id="status-text">Connected</span>
-            </div>
+    <div id="system-drawer">
+        <div id="system-drawer-header">
+            <!-- Usage badge and status indicators will be inserted here dynamically by TypeScript -->
             <div class="controls">
+                <span id="system-version" style="font-size: 9px; color: #555; margin-right: 8px;"></span>
                 <select id="verbosity-select">
                     <option value="0">User</option>
                     <option value="1">Info (-v)</option>

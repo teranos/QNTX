@@ -1,6 +1,6 @@
 package server
 
-import "errors"
+import "github.com/teranos/QNTX/errors"
 
 // Sentinel errors for common cases
 var (

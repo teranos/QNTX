@@ -2,12 +2,12 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
@@ -381,7 +381,7 @@ func (h *KeepaliveHandler) ConnectWithRetry(ctx context.Context, connect func() 
 		}
 	}
 
-	return fmt.Errorf("failed after %d reconnect attempts: %w", h.config.ReconnectAttempts, lastErr)
+	return errors.Wrapf(lastErr, "failed after %d reconnect attempts", h.config.ReconnectAttempts)
 }
 
 // HandleMessage processes incoming WebSocket messages for keepalive-related types
@@ -399,7 +399,7 @@ func (h *KeepaliveHandler) HandleMessage(msg *protocol.WebSocketMessage) (*proto
 	case protocol.WebSocketMessage_ERROR:
 		errMsg := string(msg.Data)
 		h.logger.Errorw("WebSocket error received", "error", errMsg)
-		return nil, fmt.Errorf("websocket error: %s", errMsg)
+		return nil, errors.Newf("websocket error: %s", errMsg)
 
 	default:
 		// Not a keepalive message, let caller handle it

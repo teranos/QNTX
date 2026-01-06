@@ -1,7 +1,7 @@
 /* Feedback Styles - Logs, Toasts, Progress */
 
-/* Log Panel */
-#log-panel {
+/* System Drawer (formerly Log Panel) */
+#system-drawer {
     position: fixed;
     bottom: 0;
     left: 0;
@@ -15,11 +15,11 @@
     transition: max-height 0.3s ease-in-out;
 }
 
-#log-panel.collapsed {
+#system-drawer.collapsed {
     max-height: 32px;
 }
 
-#log-header {
+#system-drawer-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -28,21 +28,14 @@
     border-bottom: 1px solid var(--border-color, #333);
     cursor: pointer;
     user-select: none;
+    gap: 12px;
 }
 
-#log-header h3 {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: #999;
-    letter-spacing: 0.5px;
-}
-
-#log-header .controls {
+#system-drawer-header .controls {
     display: flex;
     gap: 8px;
     align-items: center;
+    margin-left: auto;
 }
 
 #toggle-logs {
@@ -94,7 +87,7 @@
     overflow: hidden;
 }
 
-#log-panel.collapsed #log-panels-container {
+#system-drawer.collapsed #log-panels-container {
     display: none;
 }
 
@@ -439,13 +432,70 @@
     margin-left: auto;
 }
 
-/* Connection Status */
-#connection-status {
+/* Status Indicators Container */
+.status-indicators {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* Individual Status Indicator */
+.status-indicator {
     display: flex;
     align-items: center;
     gap: 6px;
     font-size: 11px;
     color: var(--text-secondary, #999);
+    transition: all 0.2s;
+}
+
+.status-indicator.clickable {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.status-indicator.clickable:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.status-indicator.clickable:active {
+    transform: scale(0.95);
+}
+
+/* Connection Indicator States */
+.status-indicator.connection-connected .status-dot {
+    background: #2ecc71;
+    box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
+}
+
+.status-indicator.connection-disconnected .status-dot {
+    background: #ff6b6b;
+    box-shadow: 0 0 4px rgba(255, 107, 107, 0.5);
+}
+
+.status-indicator.connection-connecting .status-dot {
+    background: #ffa502;
+    box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Pulse Indicator States */
+.status-indicator.pulse-active .status-dot {
+    background: #2ecc71;
+    box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
+}
+
+.status-indicator.pulse-inactive .status-dot {
+    background: #888;
+    box-shadow: none;
+}
+
+.status-indicator.pulse-starting .status-dot,
+.status-indicator.pulse-stopping .status-dot {
+    background: #ffa502;
+    box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
+    animation: pulse 1s ease-in-out infinite;
 }
 
 .status-dot {
@@ -477,7 +527,7 @@ body.connecting .status-dot {
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-    #log-panel {
+    #system-drawer {
         transition: none;
     }
 

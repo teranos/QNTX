@@ -23,6 +23,95 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let messageHandlers: MessageHandlers = {};
 
 /**
+ * Built-in message handlers for WebSocket messages
+ * Maps message type to handler function with logging and side effects
+ */
+const MESSAGE_HANDLERS = {
+    reload: (data: ReloadMessage) => {
+        console.log('🔄 Dev server triggered reload', data.reason);
+        window.location.reload();
+    },
+
+    backend_status: (data: BackendStatusMessage) => {
+        console.log(`📡 Backend status: ${data.status}`, data);
+        // Could update UI to show backend health status
+    },
+
+    job_update: (data: JobUpdateMessage) => {
+        console.log('📦 Job update:', data.job.id, data.job.status);
+
+        // Send native desktop notification if in Tauri
+        handleJobNotification({
+            id: data.job.id,
+            handler_name: data.job.handler_name,
+            status: data.job.status,
+            error: data.job.error
+        });
+
+        // Invoke registered handler
+        messageHandlers['job_update']?.(data);
+    },
+
+    daemon_status: (data: DaemonStatusMessage) => {
+        console.log(
+            '⚙️  Daemon status:',
+            data.server_state || 'running',
+            `${data.active_jobs} active`,
+            `${data.queued_jobs} queued`,
+            `${data.load_percent}% load`
+        );
+
+        // Send native desktop notification for server state changes
+        handleDaemonStatusNotification({
+            server_state: data.server_state,
+            active_jobs: data.active_jobs,
+            queued_jobs: data.queued_jobs,
+        });
+
+        // Invoke registered handler
+        messageHandlers['daemon_status']?.(data);
+    },
+
+    llm_stream: (data: LLMStreamMessage) => {
+        console.log('🤖 LLM stream:', data.job_id, data.content.length, 'chars', data.done ? '(done)' : '');
+        messageHandlers['llm_stream']?.(data);
+    },
+
+    storage_warning: (data: StorageWarningMessage) => {
+        console.log('⚠️ Storage warning:', data.actor, `${(data.fill_percent * 100).toFixed(0)}%`);
+
+        // Send native desktop notification if in Tauri
+        notifyStorageWarning(data.actor, data.fill_percent);
+
+        // Invoke registered handler
+        messageHandlers['storage_warning']?.(data);
+    },
+
+    plugin_health: (data: PluginHealthMessage) => {
+        console.log('🔌 Plugin health:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
+
+        // Handle toast notification and indicator update
+        handlePluginHealth(data);
+
+        // Invoke registered handler
+        messageHandlers['plugin_health']?.(data);
+    },
+
+    system_capabilities: (data: SystemCapabilitiesMessage) => {
+        console.log('⚙️  System capabilities:', {
+            fuzzy_backend: data.fuzzy_backend,
+            fuzzy_optimized: data.fuzzy_optimized ? 'optimized' : 'fallback'
+        });
+
+        // Handle capability-based UI updates
+        handleSystemCapabilities(data);
+
+        // Invoke registered handler
+        messageHandlers['system_capabilities']?.(data);
+    }
+} as const;
+
+/**
  * Validate and sanitize backend URL
  * @param url - URL to validate
  * @returns Validated URL origin or null if invalid
@@ -40,6 +129,41 @@ export function validateBackendURL(url: string): string | null {
     } catch (e) {
         return null;
     }
+}
+
+/**
+ * Route WebSocket message to appropriate handler
+ * Checks built-in handlers first, then registered handlers, then default handler
+ * @param data - The WebSocket message to route
+ * @param registeredHandlers - Map of custom message handlers
+ * @returns Whether the message was handled and by which handler type
+ */
+export function routeMessage(
+    data: WebSocketMessage,
+    registeredHandlers: MessageHandlers
+): { handled: boolean; handlerType: 'builtin' | 'registered' | 'default' | 'none' } {
+    // Look up built-in handler first
+    const builtInHandler = MESSAGE_HANDLERS[data.type as keyof typeof MESSAGE_HANDLERS];
+    if (builtInHandler) {
+        builtInHandler(data as any);
+        return { handled: true, handlerType: 'builtin' };
+    }
+
+    // Fall back to registered handlers for custom message types
+    const registeredHandler = registeredHandlers[data.type as keyof MessageHandlers];
+    if (registeredHandler) {
+        (registeredHandler as MessageHandler)(data);
+        return { handled: true, handlerType: 'registered' };
+    }
+
+    // Fall back to default handler for unknown types (e.g., graph data)
+    // TODO(#209): Graph data should have explicit 'graph_data' type instead of using _default
+    if (registeredHandlers['_default']) {
+        registeredHandlers['_default'](data);
+        return { handled: true, handlerType: 'default' };
+    }
+
+    return { handled: false, handlerType: 'none' };
 }
 
 /**
@@ -76,146 +200,11 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         // Debug: Log all WebSocket messages
         console.log('📨 WS message:', data.type, data);
 
-        // Handle reload message from dev server
-        if (data.type === 'reload') {
-            const reloadData = data as ReloadMessage;
-            console.log('🔄 Dev server triggered reload', reloadData.reason);
-            window.location.reload();  // Force hard reload
-            return;
-        }
-
-        // Handle backend status updates from dev server
-        if (data.type === 'backend_status') {
-            const statusData = data as BackendStatusMessage;
-            console.log(`📡 Backend status: ${statusData.status}`, statusData);
-            // Could update UI to show backend health status
-            return;
-        }
-
-
-        // Handle async job updates
-        // Backend broadcasts job updates for running IX operations
-        // Handler registered in main.js -> job-list-panel.js displays job hierarchy
-        if (data.type === 'job_update') {
-            const jobData = data as JobUpdateMessage;
-            console.log('📦 Job update:', jobData.job.id, jobData.job.status);
-
-            // Send native desktop notification if in Tauri
-            if (jobData.job) {
-                handleJobNotification({
-                    id: jobData.job.id,
-                    handler_name: jobData.job.handler_name,
-                    status: jobData.job.status,
-                    error: jobData.job.error
-                });
-            }
-
-            const handler = messageHandlers['job_update'];
-            if (handler) {
-                handler(jobData);
-            }
-            return;
-        }
-
-        // Handle daemon status updates (IMPLEMENTED)
-        // Backend broadcasts daemon status every 5 seconds
-        // Handler registered in main.js -> daemon-indicator.js displays animated status
-        if (data.type === 'daemon_status') {
-            const daemonData = data as DaemonStatusMessage;
-            console.log(
-                '⚙️  Daemon status:',
-                daemonData.server_state || 'running',
-                `${daemonData.active_jobs} active`,
-                `${daemonData.queued_jobs} queued`,
-                `${daemonData.load_percent}% load`
-            );
-
-            // Send native desktop notification for server state changes (e.g., draining)
-            handleDaemonStatusNotification({
-                server_state: daemonData.server_state,
-                active_jobs: daemonData.active_jobs,
-                queued_jobs: daemonData.queued_jobs,
-            });
-
-            const handler = messageHandlers['daemon_status'];
-            if (handler) {
-                handler(daemonData);
-            }
-            return;
-        }
-
-        // Handle LLM streaming output (IMPLEMENTED)
-        // Backend broadcasts token-by-token LLM output
-        // Handler registered in main.js -> job-list-panel.js displays live stream
-        if (data.type === 'llm_stream') {
-            const llmData = data as LLMStreamMessage;
-            console.log('🤖 LLM stream:', llmData.job_id, llmData.content.length, 'chars', llmData.done ? '(done)' : '');
-            const handler = messageHandlers['llm_stream'];
-            if (handler) {
-                handler(llmData);
-            }
-            return;
-        }
-
-        // Handle storage warning messages
-        // Backend broadcasts when storage limits are approaching
-        if (data.type === 'storage_warning') {
-            const warningData = data as StorageWarningMessage;
-            console.log('⚠️ Storage warning:', warningData.actor, `${(warningData.fill_percent * 100).toFixed(0)}%`);
-
-            // Send native desktop notification if in Tauri
-            notifyStorageWarning(warningData.actor, warningData.fill_percent);
-
-            const handler = messageHandlers['storage_warning'];
-            if (handler) {
-                handler(warningData);
-            }
-            return;
-        }
-
-        // Handle plugin health updates
-        // Backend broadcasts when plugin state changes (pause/resume) or health check fails
-        if (data.type === 'plugin_health') {
-            const healthData = data as PluginHealthMessage;
-            console.log('🔌 Plugin health:', healthData.name, healthData.state, healthData.healthy ? 'healthy' : 'unhealthy');
-
-            // Handle toast notification and indicator update
-            handlePluginHealth(healthData);
-
-            const handler = messageHandlers['plugin_health'];
-            if (handler) {
-                handler(healthData);
-            }
-            return;
-        }
-
-        // Handle system capabilities (sent once on connect)
-        // Informs client about available optimizations (e.g., Rust fuzzy matching)
-        if (data.type === 'system_capabilities') {
-            const capData = data as SystemCapabilitiesMessage;
-            console.log('⚙️  System capabilities:', {
-                fuzzy_backend: capData.fuzzy_backend,
-                fuzzy_optimized: capData.fuzzy_optimized ? 'optimized' : 'fallback'
-            });
-
-            // Handle capability-based UI updates
-            handleSystemCapabilities(capData);
-
-            const handler = messageHandlers['system_capabilities'];
-            if (handler) {
-                handler(capData);
-            }
-            return;
-        }
-
         // Route message to appropriate handler
-        const handler = messageHandlers[data.type as keyof MessageHandlers];
-        if (handler) {
-            (handler as MessageHandler)(data);
-        } else if (messageHandlers['_default']) {
-            // Fall back to default handler for unknown types (e.g., graph data)
-            messageHandlers['_default'](data);
-        } else {
+        const result = routeMessage(data, messageHandlers);
+
+        // Warn if no handler was found
+        if (!result.handled) {
             console.warn('⚠️  No handler for message type:', data.type);
         }
     };
@@ -242,23 +231,23 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  * @param connected - Whether the WebSocket is connected
  */
 function updateConnectionStatus(connected: boolean): void {
-    const statusText = document.getElementById('status-text') as HTMLElement | null;
-    const logPanel = document.getElementById('log-panel') as HTMLElement | null;
-
-    if (statusText) {
-        statusText.textContent = connected ? 'Connected' : 'Disconnected - Reconnecting...';
-    }
+    // Update status indicator using the new system
+    import('./status-indicators.ts').then(({ statusIndicators }) => {
+        statusIndicators.handleConnectionStatus(connected);
+    });
 
     if (connected) {
         // Remove desaturation/dimming from entire UI
         document.body.classList.remove('disconnected');
-        // Collapse log panel when connected
-        logPanel?.classList.add('collapsed');
+        // Collapse system drawer when connected
+        const systemDrawer = document.getElementById('system-drawer');
+        systemDrawer?.classList.add('collapsed');
     } else {
         // Apply desaturation/dimming to entire UI
         document.body.classList.add('disconnected');
-        // Expand log panel when disconnected (useful for debugging)
-        logPanel?.classList.remove('collapsed');
+        // Expand system drawer when disconnected (useful for debugging)
+        const systemDrawer = document.getElementById('system-drawer');
+        systemDrawer?.classList.remove('collapsed');
     }
 }
 

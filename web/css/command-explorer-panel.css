@@ -57,26 +57,7 @@
     color: #000;
 }
 
-.command-explorer-close {
-    background: none;
-    border: none;
-    font-size: 18px;
-    color: var(--panel-text-secondary);
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-    transition: var(--panel-transition-fast);
-}
 
-.command-explorer-close:hover {
-    background: #e0e0e0;
-    color: #000;
-}
 
 /* Search */
 .command-explorer-search {

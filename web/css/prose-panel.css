@@ -5,18 +5,18 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 50%;
+    width: 100%; /* Full width to catch all clicks */
     height: 100%;
     background: rgba(0, 0, 0, 0.3);
     z-index: 999;
     transition: opacity 0.3s ease;
 }
 
-.prose-overlay.hidden {
+.prose-overlay[data-visibility="hidden"] {
     display: none;
 }
 
-.prose-overlay.visible {
+.prose-overlay[data-visibility="visible"] {
     display: block;
 }
 
@@ -37,12 +37,12 @@
     transition: transform 0.3s ease;
 }
 
-.prose-panel.hidden {
+.prose-panel[data-visibility="hidden"] {
     pointer-events: none;
     transform: translateX(100%);
 }
 
-.prose-panel.visible {
+.prose-panel[data-visibility="visible"] {
     pointer-events: auto;
     transform: translateX(0);
 }
@@ -78,19 +78,7 @@
     font-size: 14px;
 }
 
-.prose-close {
-    background: none;
-    border: none;
-    color: #888;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 4px 8px;
-    transition: color 0.2s;
-}
-
-.prose-close:hover {
-    color: #e0e0e0;
-}
+/* Close button styles moved to components.css */
 
 /* Body layout */
 .prose-body {

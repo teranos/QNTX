@@ -104,7 +104,9 @@ class PluginPanel extends BasePanel {
     }
 
     protected async onShow(): Promise<void> {
+        this.showLoading('Loading plugins...');
         await this.fetchPlugins();
+        this.hideLoading();
         this.render();
 
         // Focus search input
@@ -143,13 +145,13 @@ class PluginPanel extends BasePanel {
         if (!content) return;
 
         if (this.plugins.length === 0) {
-            content.innerHTML = `
-                <div class="panel-empty plugin-empty">
-                    <div class="panel-empty-icon">&#128268;</div>
-                    <p>No plugins installed</p>
-                    <p class="panel-text-muted">Domain plugins extend QNTX with specialized functionality</p>
-                </div>
-            `;
+            content.innerHTML = '';
+            const emptyState = this.createEmptyState(
+                'No plugins installed',
+                'Domain plugins extend QNTX with specialized functionality'
+            );
+            emptyState.classList.add('plugin-empty');
+            content.appendChild(emptyState);
             return;
         }
 
@@ -221,6 +223,9 @@ class PluginPanel extends BasePanel {
                     ${plugin.author ? `<span class="plugin-author" title="Author">&#128100; ${this.escapeHtml(plugin.author)}</span>` : ''}
                     ${plugin.license ? `<span class="plugin-license" title="License">&#128196; ${this.escapeHtml(plugin.license)}</span>` : ''}
                     ${plugin.qntx_version ? `<span class="plugin-qntx-version" title="QNTX Version Requirement">&#8805; ${this.escapeHtml(plugin.qntx_version)}</span>` : ''}
+                </div>
+                <div class="plugin-path panel-code" title="Plugin configuration path">
+                    <span class="plugin-path-label">Path:</span> ~/.qntx/plugins/${this.escapeHtml(plugin.name)}.toml
                 </div>
                 ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
                 ${plugin.message ? `<div class="plugin-message ${plugin.healthy ? '' : 'plugin-message-error'}">${this.escapeHtml(plugin.message)}</div>` : ''}
@@ -322,7 +327,13 @@ class PluginPanel extends BasePanel {
             const name = card.querySelector('.plugin-name')?.textContent || '';
             const desc = card.querySelector('.plugin-description')?.textContent || '';
             const matches = name.toLowerCase().includes(search) || desc.toLowerCase().includes(search);
-            htmlCard.style.display = matches ? 'block' : 'none';
+            if (matches) {
+                htmlCard.classList.remove('u-hidden');
+                htmlCard.classList.add('u-block');
+            } else {
+                htmlCard.classList.remove('u-block');
+                htmlCard.classList.add('u-hidden');
+            }
         });
     }
 }
