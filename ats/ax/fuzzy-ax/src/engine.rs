@@ -624,10 +624,7 @@ mod tests {
     fn test_unicode_emoji() {
         let engine = FuzzyEngine::new();
         engine.rebuild_index(
-            vec![
-                "rocket_🚀_launch".to_string(),
-                "heart_❤️_react".to_string(),
-            ],
+            vec!["rocket_🚀_launch".to_string(), "heart_❤️_react".to_string()],
             vec![],
         );
 
@@ -660,8 +657,7 @@ mod tests {
         assert_eq!(matches[0].value, "Tokyo 東京");
 
         // Search Cyrillic
-        let (matches, _) =
-            engine.find_matches("Москва", VocabularyType::Contexts, None, Some(0.5));
+        let (matches, _) = engine.find_matches("Москва", VocabularyType::Contexts, None, Some(0.5));
         assert!(!matches.is_empty());
         assert_eq!(matches[0].value, "Москва Moscow");
     }
@@ -691,7 +687,8 @@ mod tests {
     fn test_single_char_query() {
         let engine = test_engine();
         // Single char should match via substring but skip fuzzy (min_fuzzy_length=3)
-        let (matches, _) = engine.find_matches("a", VocabularyType::Predicates, Some(10), Some(0.5));
+        let (matches, _) =
+            engine.find_matches("a", VocabularyType::Predicates, Some(10), Some(0.5));
         // Should find items containing 'a'
         assert!(matches.iter().any(|m| m.value.contains('a')));
     }
@@ -700,8 +697,7 @@ mod tests {
     fn test_very_long_query() {
         let engine = test_engine();
         let long_query = "a".repeat(500);
-        let (matches, _) =
-            engine.find_matches(&long_query, VocabularyType::Predicates, None, None);
+        let (matches, _) = engine.find_matches(&long_query, VocabularyType::Predicates, None, None);
         // Should return empty, not panic
         assert!(matches.is_empty());
     }
@@ -719,8 +715,7 @@ mod tests {
         );
 
         // These should be treated as literal strings, not regex
-        let (matches, _) =
-            engine.find_matches(".*", VocabularyType::Predicates, None, Some(0.5));
+        let (matches, _) = engine.find_matches(".*", VocabularyType::Predicates, None, Some(0.5));
         assert!(!matches.is_empty());
         assert!(matches.iter().any(|m| m.value == "match.*pattern"));
     }
@@ -792,10 +787,7 @@ mod tests {
     fn test_phonetic_smith_smyth() {
         let engine = FuzzyEngine::new();
         engine.rebuild_index(
-            vec![
-                "smith_family".to_string(),
-                "jones_family".to_string(),
-            ],
+            vec!["smith_family".to_string(), "jones_family".to_string()],
             vec![],
         );
 
@@ -816,10 +808,7 @@ mod tests {
             ..Default::default()
         };
         let engine = FuzzyEngine::with_config(config);
-        engine.rebuild_index(
-            vec!["smith_family".to_string()],
-            vec![],
-        );
+        engine.rebuild_index(vec!["smith_family".to_string()], vec![]);
 
         // With phonetic disabled, "smyth" should NOT match "smith" via phonetic
         // (might still match via levenshtein if within edit distance)
@@ -838,9 +827,8 @@ mod tests {
         let engine = FuzzyEngine::new();
 
         // Create a vocabulary larger than parallel_threshold (1000)
-        let mut predicates: Vec<String> = (0..1500)
-            .map(|i| format!("predicate_{:04}", i))
-            .collect();
+        let mut predicates: Vec<String> =
+            (0..1500).map(|i| format!("predicate_{:04}", i)).collect();
         predicates.push("target_item".to_string());
 
         engine.rebuild_index(predicates, vec![]);
@@ -923,10 +911,7 @@ mod tests {
     fn test_simd_substring_mid_word() {
         let engine = FuzzyEngine::new();
         engine.rebuild_index(
-            vec![
-                "configuration".to_string(),
-                "documentation".to_string(),
-            ],
+            vec!["configuration".to_string(), "documentation".to_string()],
             vec![],
         );
 
