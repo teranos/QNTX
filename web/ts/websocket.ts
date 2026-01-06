@@ -132,6 +132,40 @@ export function validateBackendURL(url: string): string | null {
 }
 
 /**
+ * Route WebSocket message to appropriate handler
+ * Checks built-in handlers first, then registered handlers, then default handler
+ * @param data - The WebSocket message to route
+ * @param registeredHandlers - Map of custom message handlers
+ * @returns Whether the message was handled and by which handler type
+ */
+export function routeMessage(
+    data: WebSocketMessage,
+    registeredHandlers: MessageHandlers
+): { handled: boolean; handlerType: 'builtin' | 'registered' | 'default' | 'none' } {
+    // Look up built-in handler first
+    const builtInHandler = MESSAGE_HANDLERS[data.type as keyof typeof MESSAGE_HANDLERS];
+    if (builtInHandler) {
+        builtInHandler(data as any);
+        return { handled: true, handlerType: 'builtin' };
+    }
+
+    // Fall back to registered handlers for custom message types
+    const registeredHandler = registeredHandlers[data.type as keyof MessageHandlers];
+    if (registeredHandler) {
+        (registeredHandler as MessageHandler)(data);
+        return { handled: true, handlerType: 'registered' };
+    }
+
+    // Fall back to default handler for unknown types (e.g., graph data)
+    if (registeredHandlers['_default']) {
+        registeredHandlers['_default'](data);
+        return { handled: true, handlerType: 'default' };
+    }
+
+    return { handled: false, handlerType: 'none' };
+}
+
+/**
  * Initialize WebSocket connection
  * @param handlers - Map of message type to handler functions
  */
@@ -165,27 +199,13 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         // Debug: Log all WebSocket messages
         console.log('📨 WS message:', data.type, data);
 
-        // Look up built-in handler first
-        const builtInHandler = MESSAGE_HANDLERS[data.type as keyof typeof MESSAGE_HANDLERS];
-        if (builtInHandler) {
-            builtInHandler(data as any);
-            return;
-        }
+        // Route message to appropriate handler
+        const result = routeMessage(data, messageHandlers);
 
-        // Fall back to registered handlers for custom message types
-        const registeredHandler = messageHandlers[data.type as keyof MessageHandlers];
-        if (registeredHandler) {
-            (registeredHandler as MessageHandler)(data);
-            return;
+        // Warn if no handler was found
+        if (!result.handled) {
+            console.warn('⚠️  No handler for message type:', data.type);
         }
-
-        // Fall back to default handler for unknown types (e.g., graph data)
-        if (messageHandlers['_default']) {
-            messageHandlers['_default'](data);
-            return;
-        }
-
-        console.warn('⚠️  No handler for message type:', data.type);
     };
 
     ws.onerror = function(error: Event): void {
