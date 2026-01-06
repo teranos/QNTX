@@ -2,13 +2,13 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/parser"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/util"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -136,7 +136,7 @@ func (h *GLSPHandler) TextDocumentDidOpen(ctx *glsp.Context, params *protocol.Di
 				"current_count", len(h.documents),
 				"max_allowed", maxDocumentsPerClient,
 			)
-			return fmt.Errorf("document cache limit reached (%d documents open)", maxDocumentsPerClient)
+			return errors.Newf("document cache limit reached (%d documents open)", maxDocumentsPerClient)
 		}
 	}
 
