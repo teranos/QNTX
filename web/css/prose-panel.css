@@ -78,19 +78,7 @@
     font-size: 14px;
 }
 
-.prose-close {
-    background: none;
-    border: none;
-    color: #888;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 4px 8px;
-    transition: color 0.2s;
-}
-
-.prose-close:hover {
-    color: #e0e0e0;
-}
+/* Close button styles moved to components.css */
 
 /* Body layout */
 .prose-body {

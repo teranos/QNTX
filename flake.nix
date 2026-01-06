@@ -55,6 +55,23 @@
           subPackages = [ "cmd/qntx" ];
         };
 
+        # Build qntx-code plugin binary
+        qntx-code = pkgs.buildGoModule {
+          pname = "qntx-code-plugin";
+          version = self.rev or "dev";
+          src = ./.;
+
+          # Same vendorHash as qntx (shared go.mod)
+          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+
+          ldflags = [
+            "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
+            "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
+          ];
+
+          subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
+        };
+
         # Helper function to build CI image for specific architecture
         mkCiImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
@@ -74,20 +91,8 @@
             pkgs.rustfmt
             pkgs.clippy
 
-            # Tauri system dependencies (from NixOS Wiki)
-            pkgs.webkitgtk_4_1
-            pkgs.gtk3
-            pkgs.at-spi2-atk
-            pkgs.cairo
-            pkgs.gdk-pixbuf
-            pkgs.glib
-            pkgs.harfbuzz
-            pkgs.librsvg
-            pkgs.libsoup_3
-            pkgs.pango
-            pkgs.gobject-introspection
+            # System dependencies
             pkgs.openssl
-            pkgs.libayatana-appindicator
             pkgs.patchelf
 
             # Build tools and utilities
@@ -120,7 +125,7 @@
           config = {
             Env = [
               "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
-              "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.glib pkgs.gtk3 pkgs.at-spi2-atk pkgs.cairo pkgs.gdk-pixbuf pkgs.harfbuzz pkgs.librsvg pkgs.libsoup_3 pkgs.pango pkgs.gobject-introspection pkgs.webkitgtk_4_1 pkgs.openssl ]}:${pkgs.lib.concatMapStringsSep ":" (p: "${p}/lib/pkgconfig") [ pkgs.libayatana-appindicator ]}"
+              "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.openssl ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
             ];
@@ -137,16 +142,73 @@
         # CI image with detected architecture
         ciImage = mkCiImage dockerArch;
 
+        # Helper function to build qntx-code plugin image for specific architecture
+        mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
+          name = "ghcr.io/teranos/qntx-code-plugin";
+          tag = "latest";
+          architecture = arch;
+
+          contents = [
+            # The qntx-code plugin binary
+            qntx-code
+
+            # Runtime dependencies
+            pkgs.gopls           # Go language server (spawned as subprocess)
+            pkgs.git             # Git operations for ixgest
+            pkgs.gh              # GitHub CLI for PR operations
+
+            # Base utilities
+            pkgs.bash
+            pkgs.coreutils
+
+            # CA certificates for HTTPS
+            pkgs.cacert
+
+            # System files for container compatibility
+            pkgs.dockerTools.fakeNss
+          ];
+
+          extraCommands = ''
+            # Create tmp directory for runtime
+            mkdir -p tmp
+            chmod 1777 tmp
+          '';
+
+          config = {
+            Entrypoint = [ "${qntx-code}/bin/qntx-code-plugin" ];
+            Cmd = [ "--port" "9000" ];
+            Env = [
+              "PATH=${pkgs.lib.makeBinPath [ qntx-code pkgs.gopls pkgs.git pkgs.gh pkgs.bash pkgs.coreutils ]}"
+              "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+            ];
+            ExposedPorts = {
+              "9000/tcp" = {};
+            };
+            WorkingDir = "/workspace";
+          };
+        };
+
+        # qntx-code image with detected architecture
+        codeImage = mkCodeImage dockerArch;
+
       in
       {
         packages = {
           # QNTX CLI binary
           qntx = qntx;
 
-          # Docker images
+          # qntx-code plugin binary
+          qntx-code = qntx-code;
+
+          # CI Docker images (full dev environment)
           ci-image = ciImage;
           ci-image-amd64 = mkCiImage "amd64";
           ci-image-arm64 = mkCiImage "arm64";
+
+          # qntx-code plugin Docker images (minimal runtime)
+          qntx-code-plugin-image = codeImage;
+          qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
+          qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
 
           # Default: CLI binary for easy installation
           default = qntx;
@@ -169,7 +231,9 @@
         checks = {
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
-          ci-image = ciImage; # Ensure image builds
+          qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
+          ci-image = ciImage; # Ensure CI image builds
+          qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
         };
       }
     );
