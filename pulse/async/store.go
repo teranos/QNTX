@@ -2,9 +2,9 @@ package async
 
 import (
 	"database/sql"
-	"errors"
-	"fmt"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // Store handles persistence of async IX jobs
@@ -21,7 +21,7 @@ func NewStore(db *sql.DB) *Store {
 func (s *Store) CreateJob(job *Job) error {
 	pulseStateJSON, err := MarshalPulseState(job.PulseState)
 	if err != nil {
-		return fmt.Errorf("failed to marshal pulse state: %w", err)
+		return errors.Wrap(err, "failed to marshal pulse state")
 	}
 
 	query := `
@@ -57,7 +57,7 @@ func (s *Store) CreateJob(job *Job) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to create job: %w", err)
+		return errors.Wrap(err, "failed to create job")
 	}
 
 	return nil
@@ -73,10 +73,10 @@ func (s *Store) GetJob(id string) (*Job, error) {
 
 	err := s.db.QueryRow(query, id).Scan(targets...)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("job not found: %s", id)
+		return nil, errors.Newf("job not found: %s", id)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to get job: %w", err)
+		return nil, errors.Wrap(err, "failed to get job")
 	}
 
 	if err := ProcessJobScanArgs(&job, args); err != nil {
@@ -90,7 +90,7 @@ func (s *Store) GetJob(id string) (*Job, error) {
 func (s *Store) UpdateJob(job *Job) error {
 	pulseStateJSON, err := MarshalPulseState(job.PulseState)
 	if err != nil {
-		return fmt.Errorf("failed to marshal pulse state: %w", err)
+		return errors.Wrap(err, "failed to marshal pulse state")
 	}
 
 	query := `
@@ -130,7 +130,7 @@ func (s *Store) UpdateJob(job *Job) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to update job: %w", err)
+		return errors.Wrap(err, "failed to update job")
 	}
 
 	return nil
@@ -152,7 +152,7 @@ func (s *Store) ListJobs(status *JobStatus, limit int) ([]*Job, error) {
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list jobs: %w", err)
+		return nil, errors.Wrap(err, "failed to list jobs")
 	}
 	defer rows.Close()
 
@@ -169,7 +169,7 @@ func (s *Store) ListActiveJobs(limit int) ([]*Job, error) {
 
 	rows, err := s.db.Query(query, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list active jobs: %w", err)
+		return nil, errors.Wrap(err, "failed to list active jobs")
 	}
 	defer rows.Close()
 
@@ -183,13 +183,13 @@ func scanJobs(rows *sql.Rows, context string) ([]*Job, error) {
 	for rows.Next() {
 		var job Job
 		if err := ScanJobFromRows(rows, &job); err != nil {
-			return nil, fmt.Errorf("failed to scan job: %w", err)
+			return nil, errors.Wrap(err, "failed to scan job")
 		}
 		jobs = append(jobs, &job)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating %s: %w", context, err)
+		return nil, errors.Wrapf(err, "error iterating %s", context)
 	}
 
 	return jobs, nil
@@ -201,16 +201,16 @@ func (s *Store) DeleteJob(id string) error {
 
 	result, err := s.db.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete job: %w", err)
+		return errors.Wrap(err, "failed to delete job")
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
+		return errors.Wrap(err, "failed to get rows affected")
 	}
 
 	if rows == 0 {
-		return fmt.Errorf("job not found: %s", id)
+		return errors.Newf("job not found: %s", id)
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func (s *Store) ListTasksByParent(parentJobID string) ([]*Job, error) {
 
 	rows, err := s.db.Query(query, parentJobID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list tasks by parent: %w", err)
+		return nil, errors.Wrap(err, "failed to list tasks by parent")
 	}
 	defer rows.Close()
 
@@ -244,12 +244,12 @@ func (s *Store) CleanupOldJobs(olderThan time.Duration) (int, error) {
 
 	result, err := s.db.Exec(query, cutoff)
 	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup old jobs: %w", err)
+		return 0, errors.Wrap(err, "failed to cleanup old jobs")
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+		return 0, errors.Wrap(err, "failed to get rows affected")
 	}
 
 	return int(rows), nil
@@ -275,7 +275,7 @@ func (s *Store) FindActiveJobBySourceAndHandler(source string, handlerName strin
 		return nil, nil // No active job found - this is not an error
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to find active job by source and handler: %w", err)
+		return nil, errors.Wrap(err, "failed to find active job by source and handler")
 	}
 
 	if err := ProcessJobScanArgs(&job, args); err != nil {
@@ -310,7 +310,7 @@ func (s *Store) FindRecentJobBySourceAndHandler(source string, handlerName strin
 		return nil, nil // No recent job found - this is not an error
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to find recent job by source and handler: %w", err)
+		return nil, errors.Wrap(err, "failed to find recent job by source and handler")
 	}
 
 	if err := ProcessJobScanArgs(&job, args); err != nil {
