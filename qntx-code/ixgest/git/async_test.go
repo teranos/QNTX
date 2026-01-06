@@ -118,8 +118,8 @@ func TestBuildDependencySummary_ErrorDetailsFormat(t *testing.T) {
 
 	errorDetails := fields["deps_error_details"].(string)
 
-	// Verify format: "type: error; type: error"
-	assert.Contains(t, errorDetails, "go.mod: syntax error at line 10")
-	assert.Contains(t, errorDetails, "package.json: missing required field 'name'")
+	// Verify format: "path: error; path: error"
+	assert.Contains(t, errorDetails, "/repo/go.mod: syntax error at line 10")
+	assert.Contains(t, errorDetails, "/repo/package.json: missing required field 'name'")
 	assert.Contains(t, errorDetails, ";")
 }
