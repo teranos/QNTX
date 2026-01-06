@@ -163,6 +163,7 @@ class PulsePanel extends BasePanel {
     }
 
     protected async onShow(): Promise<void> {
+        this.showLoading('Loading scheduled jobs...');
         await this.loadJobs();
     }
 
@@ -179,16 +180,12 @@ class PulsePanel extends BasePanel {
             // Clean up orphaned job IDs from expandedJobs
             this.state.cleanupOrphanedJobs(new Set(this.jobs.keys()));
 
+            this.hideLoading();
             this.render();
         } catch (error) {
             console.error('[Pulse Panel] Failed to load jobs:', error);
-
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'panel-error pulse-error';
-            errorDiv.textContent = `Failed to load scheduled jobs: ${(error as Error).message}`;
-
-            content.innerHTML = '';
-            content.appendChild(errorDiv);
+            const err = error instanceof Error ? error : new Error(String(error));
+            this.showErrorState(err);
         }
     }
 
