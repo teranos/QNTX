@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
 )
@@ -45,13 +47,13 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	// Decode payload
 	var payload GitIngestionPayload
 	if err := json.Unmarshal(job.Payload, &payload); err != nil {
-		return fmt.Errorf("failed to decode payload: %w", err)
+		return errors.Wrap(err, "failed to decode payload")
 	}
 
 	// Resolve repository (handles URLs with auto-clone)
 	repoSource, err := ResolveRepository(payload.RepositorySource, h.logger)
 	if err != nil {
-		return fmt.Errorf("failed to resolve repository: %w", err)
+		return errors.Wrap(err, "failed to resolve repository")
 	}
 	defer repoSource.Cleanup()
 
@@ -70,14 +72,14 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	// Set incremental filter if --since is provided
 	if payload.Since != "" {
 		if err := processor.SetSince(payload.Since); err != nil {
-			return fmt.Errorf("invalid --since value: %w", err)
+			return errors.Wrap(err, "invalid --since value")
 		}
 	}
 
 	// Process git repository
 	result, err := processor.ProcessGitRepository(repoPath)
 	if err != nil {
-		return fmt.Errorf("git ingestion failed: %w", err)
+		return errors.Wrap(err, "git ingestion failed")
 	}
 
 	// Process dependencies unless disabled
@@ -103,18 +105,57 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	job.Progress.Current = result.CommitsProcessed + result.BranchesProcessed
 	job.Progress.Total = result.CommitsProcessed + result.BranchesProcessed
 
+	// Build dependency summary for logging
+	depsFields := buildDependencySummary(depsResult)
+
 	h.logger.Infow("Git ingestion completed",
 		"job_id", job.ID,
 		"repository", payload.RepositorySource,
 		"commits", result.CommitsProcessed,
 		"branches", result.BranchesProcessed,
 		"attestations", totalAttestations,
-		"deps_files", func() int {
-			if depsResult != nil {
-				return depsResult.FilesProcessed
-			}
-			return 0
-		}())
+		"deps_detected", depsFields["deps_detected"],
+		"deps_processed", depsFields["deps_processed"],
+		"deps_errors", depsFields["deps_errors"],
+		"deps_error_details", depsFields["deps_error_details"])
 
 	return nil
+}
+
+// buildDependencySummary creates structured log fields for dependency ingestion results.
+// Surfaces error details to users while keeping jobs successful (deps are optional).
+func buildDependencySummary(result *DepsIngestionResult) map[string]interface{} {
+	fields := make(map[string]interface{})
+
+	if result == nil {
+		fields["deps_detected"] = 0
+		fields["deps_processed"] = 0
+		fields["deps_errors"] = 0
+		fields["deps_error_details"] = nil
+		return fields
+	}
+
+	fields["deps_detected"] = result.FilesDetected
+	fields["deps_processed"] = result.FilesProcessed
+
+	// Collect error details
+	var errorDetails []string
+	errorCount := 0
+	for _, fileResult := range result.ProjectFiles {
+		if fileResult.Error != "" {
+			errorCount++
+			// Format: "backend/go.mod: failed to read file"
+			errorSummary := fmt.Sprintf("%s: %s", fileResult.Path, fileResult.Error)
+			errorDetails = append(errorDetails, errorSummary)
+		}
+	}
+
+	fields["deps_errors"] = errorCount
+	if errorCount > 0 {
+		fields["deps_error_details"] = strings.Join(errorDetails, "; ")
+	} else {
+		fields["deps_error_details"] = nil
+	}
+
+	return fields
 }

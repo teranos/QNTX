@@ -184,17 +184,28 @@ proto: ## Generate Go code from protobuf definitions
 		plugin/grpc/protocol/domain.proto
 	@echo "✓ Proto files generated in plugin/grpc/protocol/"
 
-plugins: ## Build external plugin binaries
+plugins: ## Build and install all external plugin binaries to ~/.qntx/plugins/
 	@echo "Building external plugins..."
-	@go build -o bin/qntx-code-plugin ./cmd/plugins/code
-	@echo "✓ qntx-code-plugin built in bin/"
-
-plugins-install: plugins ## Install plugins to ~/.qntx/plugins/
-	@echo "Installing plugins to $(PREFIX)/plugins..."
 	@mkdir -p $(PREFIX)/plugins
-	@cp bin/qntx-code-plugin $(PREFIX)/plugins/
-	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
-	@echo "✓ Plugins installed to $(PREFIX)/plugins/"
+	@# Build code plugin from qntx-code/cmd/qntx-code-plugin
+	@if [ -d "qntx-code/cmd/qntx-code-plugin" ]; then \
+		echo "  Building code (Go) plugin..."; \
+		go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin || exit 1; \
+		chmod +x $(PREFIX)/plugins/qntx-code-plugin; \
+		echo "  ✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"; \
+	fi
+	@# Install Python/script-based plugins (e.g., webscraper)
+	@if [ -d "qntx-webscraper" ]; then \
+		echo "  Installing webscraper (Python) plugin..."; \
+		cp qntx-webscraper/webscraper $(PREFIX)/plugins/webscraper; \
+		chmod +x $(PREFIX)/plugins/webscraper; \
+		cp qntx-webscraper/webscraper.toml $(PREFIX)/plugins/webscraper.toml 2>/dev/null || true; \
+		echo "  ✓ webscraper → $(PREFIX)/plugins/webscraper"; \
+	fi
+	@echo "✓ All plugins installed to $(PREFIX)/plugins/"
+	@echo ""
+	@echo "Installed plugins:"
+	@ls -lh $(PREFIX)/plugins/qntx-*-plugin $(PREFIX)/plugins/webscraper 2>/dev/null || echo "  (none)"
 
 # Rust fuzzy matching library (ax segment optimization)
 rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
