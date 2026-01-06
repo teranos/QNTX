@@ -47,11 +47,6 @@ class PythonEditorPanel extends BasePanel {
             useOverlay: true,
             closeOnEscape: true
         });
-
-        if (this.panel) {
-            this.statusElement = this.panel.querySelector('#python-status');
-            this.outputElement = this.panel.querySelector('#python-output');
-        }
     }
 
     protected getTemplate(): string {
