@@ -6,6 +6,8 @@
  * - Show/hide/toggle with CSS class management
  * - Close button, escape key, click-outside handlers
  * - DOM insertion strategies
+ * - Error boundaries with recovery support
+ * - Reusable DOM element builders
  *
  * Subclasses implement:
  * - getTemplate(): HTML content
@@ -17,9 +19,21 @@
  * - useOverlay: false for inline panels that integrate with the page (click-outside closes)
  * - insertAfter: specify a selector to insert panel after a specific element (e.g., '#symbolPalette')
  * - insertAfter: '' (default) appends panel to document.body
+ *
+ * DOM Helpers (use in getTemplate() or dynamically):
+ * - createCloseButton(): Standard accessible close button
+ * - createHeader(title): Header with title and close button
+ * - createLoadingState(message): Loading indicator
+ * - createEmptyState(title, hint): Empty state placeholder
+ * - createErrorState(title, message, onRetry): Error with optional retry
+ *
+ * Error Boundaries:
+ * - Errors in onShow() are caught and displayed via showErrorState()
+ * - Use hasError to check current error status
+ * - Call clearError() to reset error state before retry
  */
 
-import { CSS, DATA, setVisibility } from './css-classes.ts';
+import { CSS, DATA, setVisibility, setLoading } from './css-classes.ts';
 
 export interface PanelConfig {
     id: string;
@@ -35,6 +49,11 @@ export abstract class BasePanel {
     protected overlay: HTMLElement | null = null;
     protected isVisible: boolean = false;
     protected config: Required<PanelConfig>;
+
+    /** Whether the panel is currently in an error state */
+    protected hasError: boolean = false;
+    /** The last error that occurred during lifecycle methods */
+    protected lastError: Error | null = null;
 
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private clickOutsideHandler: ((e: Event) => void) | null = null;
@@ -146,7 +165,16 @@ export abstract class BasePanel {
         if (!await this.beforeShow()) return;
 
         this.updateVisibility(true);
-        await this.onShow();
+
+        // Error boundary: wrap onShow() to catch and display errors
+        try {
+            this.clearError();
+            await this.onShow();
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[${this.config.id}] Error in onShow():`, err);
+            this.showErrorState(err);
+        }
     }
 
     public hide(): void {
@@ -213,4 +241,226 @@ export abstract class BasePanel {
     protected async onShow(): Promise<void> {}
     protected onHide(): void {}
     protected onDestroy(): void {}
+
+    // =========================================================================
+    // DOM Helper Methods
+    // =========================================================================
+
+    /**
+     * Create a standard close button with accessibility attributes
+     * @param onClick Optional click handler (defaults to this.hide())
+     */
+    protected createCloseButton(onClick?: () => void): HTMLButtonElement {
+        const btn = document.createElement('button');
+        btn.className = CSS.PANEL.CLOSE;
+        btn.setAttribute('aria-label', 'Close');
+        btn.setAttribute('type', 'button');
+        btn.textContent = '✕';
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (onClick) {
+                onClick();
+            } else {
+                this.hide();
+            }
+        });
+        return btn;
+    }
+
+    /**
+     * Create a standard panel header with title and close button
+     * @param title The header title text
+     * @param options Optional configuration
+     */
+    protected createHeader(
+        title: string,
+        options: { includeClose?: boolean; className?: string } = {}
+    ): HTMLElement {
+        const { includeClose = true, className = '' } = options;
+
+        const header = document.createElement('div');
+        header.className = `${CSS.PANEL.HEADER}${className ? ` ${className}` : ''}`;
+
+        const titleEl = document.createElement('h3');
+        titleEl.className = CSS.PANEL.TITLE;
+        titleEl.textContent = title;
+        header.appendChild(titleEl);
+
+        if (includeClose) {
+            header.appendChild(this.createCloseButton());
+        }
+
+        return header;
+    }
+
+    /**
+     * Create a loading state element
+     * @param message Optional loading message (defaults to "Loading...")
+     */
+    protected createLoadingState(message: string = 'Loading...'): HTMLElement {
+        const container = document.createElement('div');
+        container.className = CSS.PANEL.LOADING;
+        container.setAttribute('role', 'status');
+        container.setAttribute('aria-live', 'polite');
+
+        const text = document.createElement('p');
+        text.textContent = message;
+        container.appendChild(text);
+
+        return container;
+    }
+
+    /**
+     * Create an empty state element
+     * @param title Primary empty state message
+     * @param hint Optional secondary hint text
+     */
+    protected createEmptyState(title: string, hint?: string): HTMLElement {
+        const container = document.createElement('div');
+        container.className = CSS.PANEL.EMPTY;
+
+        const titleEl = document.createElement('p');
+        titleEl.textContent = title;
+        container.appendChild(titleEl);
+
+        if (hint) {
+            const hintEl = document.createElement('p');
+            hintEl.className = 'panel-empty-hint';
+            hintEl.textContent = hint;
+            container.appendChild(hintEl);
+        }
+
+        return container;
+    }
+
+    /**
+     * Create an error state element with optional retry button
+     * @param title Error title
+     * @param message Error message/details
+     * @param onRetry Optional retry callback - if provided, shows retry button
+     */
+    protected createErrorState(
+        title: string,
+        message: string,
+        onRetry?: () => void
+    ): HTMLElement {
+        const container = document.createElement('div');
+        container.className = CSS.PANEL.ERROR;
+        container.setAttribute('role', 'alert');
+
+        const titleEl = document.createElement('p');
+        titleEl.className = 'panel-error-title';
+        titleEl.textContent = title;
+        container.appendChild(titleEl);
+
+        const messageEl = document.createElement('p');
+        messageEl.className = 'panel-error-message';
+        messageEl.textContent = message;
+        container.appendChild(messageEl);
+
+        if (onRetry) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'panel-error-retry';
+            retryBtn.setAttribute('type', 'button');
+            retryBtn.textContent = 'Retry';
+            retryBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                onRetry();
+            });
+            container.appendChild(retryBtn);
+        }
+
+        return container;
+    }
+
+    // =========================================================================
+    // Error Boundary Methods
+    // =========================================================================
+
+    /**
+     * Display an error state in the panel content area
+     * Called automatically when onShow() throws, or can be called manually
+     * @param error The error to display
+     */
+    protected showErrorState(error: Error): void {
+        this.hasError = true;
+        this.lastError = error;
+
+        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
+        if (!content) {
+            console.warn(`[${this.config.id}] No .${CSS.PANEL.CONTENT} element found for error display`);
+            return;
+        }
+
+        // Clear existing content and show error
+        content.innerHTML = '';
+        const errorEl = this.createErrorState(
+            'Something went wrong',
+            error.message,
+            () => this.retryShow()
+        );
+        content.appendChild(errorEl);
+
+        // Set loading state to error for CSS styling
+        setLoading(content, DATA.LOADING.ERROR);
+    }
+
+    /**
+     * Clear the error state
+     * Called automatically before onShow(), or can be called manually
+     */
+    protected clearError(): void {
+        this.hasError = false;
+        this.lastError = null;
+
+        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
+        if (content) {
+            setLoading(content, DATA.LOADING.IDLE);
+        }
+    }
+
+    /**
+     * Retry showing the panel after an error
+     * Clears error state and calls show() again
+     */
+    protected async retryShow(): Promise<void> {
+        this.clearError();
+        // Clear content before retry
+        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
+        if (content) {
+            content.innerHTML = '';
+            content.appendChild(this.createLoadingState());
+        }
+        // Re-run onShow with error boundary
+        try {
+            await this.onShow();
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[${this.config.id}] Error in retryShow():`, err);
+            this.showErrorState(err);
+        }
+    }
+
+    /**
+     * Show loading state in the panel content area
+     * @param message Optional loading message
+     */
+    protected showLoading(message?: string): void {
+        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
+        if (!content) return;
+
+        content.innerHTML = '';
+        content.appendChild(this.createLoadingState(message));
+        setLoading(content, DATA.LOADING.LOADING);
+    }
+
+    /**
+     * Hide loading state (resets to idle)
+     */
+    protected hideLoading(): void {
+        const content = this.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
+        if (content) {
+            setLoading(content, DATA.LOADING.IDLE);
+        }
+    }
 }
