@@ -73,7 +73,8 @@ class JobListPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Close button
+        // Note: Close button (.job-list-close) needs manual handling since it uses
+        // a custom class. BasePanel only auto-handles .panel-close
         const closeBtn = this.$('.job-list-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
@@ -93,7 +94,9 @@ class JobListPanel extends BasePanel {
     protected async onShow(): Promise<void> {
         // Fetch jobs from API on first show (if jobs map is empty)
         if (this.jobs.size === 0) {
+            this.showLoading('Loading history...');
             await this.fetchJobs();
+            this.hideLoading();
         }
         this.render();
     }
@@ -260,21 +263,12 @@ class JobListPanel extends BasePanel {
         if (!content) return;
 
         if (this.jobs.size === 0) {
-            const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'panel-empty job-list-empty';
-
-            const p1 = document.createElement('p');
-            p1.textContent = 'No IX operations yet';
-
-            const p2 = document.createElement('p');
-            p2.className = 'job-list-hint';
-            p2.textContent = 'Run an IX command to start';
-
-            emptyDiv.appendChild(p1);
-            emptyDiv.appendChild(p2);
-
             content.innerHTML = '';
-            content.appendChild(emptyDiv);
+            content.appendChild(
+                this.createEmptyState('No IX operations yet', 'Run an IX command to start')
+            );
+            // Add panel-specific class for styling
+            content.firstElementChild?.classList.add('job-list-empty');
 
             if (countSpan) countSpan.textContent = '0';
             return;

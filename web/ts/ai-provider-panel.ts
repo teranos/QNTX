@@ -86,7 +86,8 @@ class AIProviderPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Close button
+        // Note: Close button (.ai-provider-close) needs manual handling since it uses
+        // a custom class. BasePanel only auto-handles .panel-close
         const closeBtn = this.$('.ai-provider-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
