@@ -69,7 +69,10 @@ func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
+// If a plugin fails to load, it logs the error and continues with remaining plugins.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
+	var failedPlugins []string
+
 	for _, config := range configs {
 		if !config.Enabled {
 			m.logger.Infow("Skipping disabled plugin", "name", config.Name)
@@ -77,10 +80,17 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		}
 
 		if err := m.loadPlugin(ctx, config); err != nil {
-			return fmt.Errorf("failed to load plugin %s (binary=%s, address=%s): %w",
+			m.logger.Errorf("Failed to load plugin '%s' (binary=%s, address=%s): %v",
 				config.Name, config.Binary, config.Address, err)
+			failedPlugins = append(failedPlugins, config.Name)
+			continue
 		}
 	}
+
+	if len(failedPlugins) > 0 {
+		m.logger.Warnf("Some plugins failed to load: %v", failedPlugins)
+	}
+
 	return nil
 }
 
@@ -116,8 +126,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
 			config.Name, process.Pid, port, addr)
 
-		// Wait for plugin to be ready
-		if err := m.waitForPlugin(ctx, addr, 30*time.Second); err != nil {
+		// Wait for plugin to be ready (5 second timeout for faster failure detection)
+		if err := m.waitForPlugin(ctx, addr, 5*time.Second); err != nil {
 			process.Kill()
 			return fmt.Errorf("plugin %s failed to start (binary=%s, addr=%s, pid=%d): %w",
 				config.Name, config.Binary, addr, process.Pid, err)
@@ -140,6 +150,16 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 			process.Kill()
 		}
 		return fmt.Errorf("failed to connect to plugin %s at %s: %w", config.Name, addr, err)
+	}
+
+	// Validate plugin metadata matches config
+	actualName := client.Metadata().Name
+	if actualName != config.Name {
+		if process != nil {
+			process.Kill()
+		}
+		return fmt.Errorf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
+			config.Binary, actualName, config.Name)
 	}
 
 	m.plugins[config.Name] = &managedPlugin{
