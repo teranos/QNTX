@@ -32,10 +32,6 @@ export class CodeSuggestions {
     }
 
     /**
-     * Escape HTML to prevent XSS
-     */
-
-    /**
      * Load open PRs from GitHub and populate dropdown
      */
     async loadOpenPRs(): Promise<void> {
