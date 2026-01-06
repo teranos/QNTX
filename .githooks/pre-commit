@@ -1,11 +1,72 @@
 #!/usr/bin/env bash
-# QNTX pre-commit hook - Go formatting
+# QNTX pre-commit hook - Go formatting and binary prevention
 #
-# This hook runs gofmt on all staged Go files to ensure consistent formatting.
+# This hook:
+# 1. BLOCKS any binary files from being committed
+# 2. Runs gofmt on all staged Go files to ensure consistent formatting
+#
 # Unlike the Nix-based pre-commit hooks, this runs locally and has network access
 # for downloading Go modules if needed.
 
 set -e
+
+# ============================================================================
+# BINARY DETECTION - BLOCKS COMMITS WITH BINARIES
+# ============================================================================
+
+echo "Checking for binary files..."
+
+# Get all staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -n "$STAGED_FILES" ]; then
+  BINARY_FILES=""
+
+  for FILE in $STAGED_FILES; do
+    # Skip files that don't exist (deletions)
+    if [ ! -f "$FILE" ]; then
+      continue
+    fi
+
+    # Use file command to detect binaries
+    # Binaries will contain "executable" or be identified as data/compiled
+    FILE_TYPE=$(file -b "$FILE")
+
+    # Check for common binary indicators
+    if echo "$FILE_TYPE" | grep -qE "(executable|Mach-O|ELF|compiled|PE32|binary data)"; then
+      # Exclude shell scripts which are also "executable"
+      if ! echo "$FILE_TYPE" | grep -q "script"; then
+        BINARY_FILES="$BINARY_FILES\n  - $FILE ($FILE_TYPE)"
+      fi
+    fi
+
+    # Also check file extension for known binary types
+    if echo "$FILE" | grep -qE '\.(so|dylib|a|o|exe|dll|bin|out)$'; then
+      BINARY_FILES="$BINARY_FILES\n  - $FILE (binary extension)"
+    fi
+  done
+
+  if [ -n "$BINARY_FILES" ]; then
+    echo ""
+    echo "❌ ERROR: Binary files detected in commit!"
+    echo ""
+    echo "The following binary files cannot be committed:$BINARY_FILES"
+    echo ""
+    echo "Binaries bloat the git repository and should NEVER be committed."
+    echo "Add these files to .gitignore instead."
+    echo ""
+    echo "To bypass this check (NOT RECOMMENDED):"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+  fi
+fi
+
+echo "✓ No binary files detected"
+
+# ============================================================================
+# GO FORMATTING
+# ============================================================================
 
 # Get list of staged Go files
 STAGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
