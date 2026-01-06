@@ -15,7 +15,7 @@ export function renderPanelTemplate(): string {
     return `
         <div class="panel-header pulse-panel-header">
             <h2 class="panel-title"><span class="pulse-icon">${Pulse}</span> Pulse</h2>
-            <button class="panel-close pulse-close-btn" onclick="window.pulsePanel.hide()">✕</button>
+            <button class="panel-close" aria-label="Close">✕</button>
         </div>
         <div class="panel-content pulse-panel-content">
             <!-- System Status Section -->

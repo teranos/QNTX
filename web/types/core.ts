@@ -37,6 +37,15 @@ export interface BuildInfo {
 // ============================================================================
 
 /**
+ * Graph visibility state for filtering nodes and links
+ */
+export interface GraphVisibility {
+  hiddenNodeTypes: Set<string>;      // Node types hidden from view
+  hideIsolated: boolean;             // Whether to hide nodes with no connections
+  revealRelatedActive: Set<string>;  // Types with "reveal related" feature active
+}
+
+/**
  * Main application state that persists across sessions
  */
 export interface AppState {
@@ -46,6 +55,7 @@ export interface AppState {
   currentQuery: string;
   currentGraphData: GraphData | null;
   currentTransform: Transform | null;
+  graphVisibility: GraphVisibility;  // Graph node/link visibility state
 }
 
 /**

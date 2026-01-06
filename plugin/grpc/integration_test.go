@@ -36,7 +36,7 @@ func TestCriticalPath_PluginLifecycle(t *testing.T) {
 	}
 
 	logger := zaptest.NewLogger(t).Sugar()
-	plugin := newMockPlugin()
+	plugin := newMockPluginWithName("critical-test")
 
 	// 1. Start plugin server (simulates discovered plugin binary)
 	addr, cleanup := startTestServer(t, plugin)
@@ -86,9 +86,9 @@ func TestCriticalPath_MultiPluginCoordination(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 
 	// Start 3 different plugins
-	plugin1 := newMockPlugin()
-	plugin2 := newMockPlugin()
-	plugin3 := newMockPlugin()
+	plugin1 := newMockPluginWithName("plugin1")
+	plugin2 := newMockPluginWithName("plugin2")
+	plugin3 := newMockPluginWithName("plugin3")
 
 	addr1, cleanup1 := startTestServer(t, plugin1)
 	defer cleanup1()
@@ -408,8 +408,8 @@ func TestCrash_PartialFailure(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 
 	// Start two plugins
-	plugin1 := newMockPlugin()
-	plugin2 := newMockPlugin()
+	plugin1 := newMockPluginWithName("plugin1")
+	plugin2 := newMockPluginWithName("plugin2")
 
 	addr1, cleanup1 := startTestServer(t, plugin1)
 	addr2, cleanup2 := startTestServer(t, plugin2)
@@ -459,13 +459,13 @@ func TestCrash_GracefulDegradation(t *testing.T) {
 		{Name: "nonexistent", Enabled: true, Address: "localhost:59999"},
 	}
 
-	// Should fail to load but not panic
+	// Should not return error (resilient loading) but log and continue
 	err := manager.LoadPlugins(context.Background(), configs)
-	require.Error(t, err)
+	require.NoError(t, err, "LoadPlugins should not return error for failed plugins (resilient loading)")
 
-	// Manager should still be usable
+	// Manager should still be usable with no plugins loaded
 	plugins := manager.GetAllPlugins()
-	assert.Empty(t, plugins)
+	assert.Empty(t, plugins, "No plugins should be loaded when connection fails")
 
 	// Can still shut down cleanly
 	err = manager.Shutdown(context.Background())
