@@ -70,7 +70,10 @@ func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
+// If a plugin fails to load, it logs the error and continues with remaining plugins.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
+	var failedPlugins []string
+
 	for _, config := range configs {
 		if !config.Enabled {
 			m.logger.Infow("Skipping disabled plugin", "name", config.Name)
@@ -78,10 +81,17 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 		}
 
 		if err := m.loadPlugin(ctx, config); err != nil {
-			return errors.Wrapf(err, "failed to load plugin %s (binary=%s, address=%s)",
-				config.Name, config.Binary, config.Address)
+			m.logger.Errorf("Failed to load plugin '%s' (binary=%s, address=%s): %v",
+				config.Name, config.Binary, config.Address, err)
+			failedPlugins = append(failedPlugins, config.Name)
+			continue
 		}
 	}
+
+	if len(failedPlugins) > 0 {
+		m.logger.Warnf("Some plugins failed to load: %v", failedPlugins)
+	}
+
 	return nil
 }
 
@@ -114,10 +124,11 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
 				config.Name, config.Binary, port)
 		}
-		m.logger.Infow("Launched plugin process", "name", config.Name, "port", port, "pid", process.Pid)
+		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
+			config.Name, process.Pid, port, addr)
 
-		// Wait for plugin to be ready
-		if err := m.waitForPlugin(ctx, addr, 30*time.Second); err != nil {
+		// Wait for plugin to be ready (5 second timeout for faster failure detection)
+		if err := m.waitForPlugin(ctx, addr, 5*time.Second); err != nil {
 			process.Kill()
 			return errors.Wrapf(err, "plugin %s failed to start (binary=%s, addr=%s, pid=%d)",
 				config.Name, config.Binary, addr, process.Pid)
@@ -142,6 +153,16 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		return errors.Wrapf(err, "failed to connect to plugin %s at %s", config.Name, addr)
 	}
 
+	// Validate plugin metadata matches config
+	actualName := client.Metadata().Name
+	if actualName != config.Name {
+		if process != nil {
+			process.Kill()
+		}
+		return fmt.Errorf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
+			config.Binary, actualName, config.Name)
+	}
+
 	m.plugins[config.Name] = &managedPlugin{
 		config:  config,
 		client:  client,
@@ -149,10 +170,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		port:    port,
 	}
 
-	m.logger.Infow("Plugin loaded successfully",
-		"name", config.Name,
-		"version", client.Metadata().Version,
-	)
+	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
+		config.Name, client.Metadata().Version, client.Metadata().Description)
 
 	return nil
 }
@@ -337,9 +356,9 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 
 		if line = strings.TrimSpace(line); line != "" {
 			if l.level == "error" {
-				l.logger.Errorw("Plugin output", "plugin", l.name, "message", line)
+				l.logger.Errorf("[%s stderr] %s", l.name, line)
 			} else {
-				l.logger.Infow("Plugin output", "plugin", l.name, "message", line)
+				l.logger.Infof("[%s] %s", l.name, line)
 			}
 		}
 	}

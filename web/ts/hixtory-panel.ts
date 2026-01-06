@@ -61,7 +61,7 @@ class JobListPanel extends BasePanel {
         return `
             <div class="job-list-header">
                 <h3 class="job-list-title">${IX} Hixtory <span class="hixtory-count">(<span id="hixtory-count">0</span>)</span></h3>
-                <button class="job-list-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="job-list-content" id="job-list-content">
                 <div class="panel-empty job-list-empty">
@@ -73,9 +73,7 @@ class JobListPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Close button
-        const closeBtn = this.$('.job-list-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        // Close button is now handled automatically by BasePanel (.panel-close)
 
         // New operation button
         const newBtn = this.$('#new-ix-operation');
@@ -93,7 +91,9 @@ class JobListPanel extends BasePanel {
     protected async onShow(): Promise<void> {
         // Fetch jobs from API on first show (if jobs map is empty)
         if (this.jobs.size === 0) {
+            this.showLoading('Loading history...');
             await this.fetchJobs();
+            this.hideLoading();
         }
         this.render();
     }
@@ -260,21 +260,12 @@ class JobListPanel extends BasePanel {
         if (!content) return;
 
         if (this.jobs.size === 0) {
-            const emptyDiv = document.createElement('div');
-            emptyDiv.className = 'panel-empty job-list-empty';
-
-            const p1 = document.createElement('p');
-            p1.textContent = 'No IX operations yet';
-
-            const p2 = document.createElement('p');
-            p2.className = 'job-list-hint';
-            p2.textContent = 'Run an IX command to start';
-
-            emptyDiv.appendChild(p1);
-            emptyDiv.appendChild(p2);
-
             content.innerHTML = '';
-            content.appendChild(emptyDiv);
+            content.appendChild(
+                this.createEmptyState('No IX operations yet', 'Run an IX command to start')
+            );
+            // Add panel-specific class for styling
+            content.firstElementChild?.classList.add('job-list-empty');
 
             if (countSpan) countSpan.textContent = '0';
             return;

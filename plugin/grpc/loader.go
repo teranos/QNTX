@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-getter"
@@ -25,26 +26,33 @@ func LoadPluginsFromConfig(ctx context.Context, cfg *am.Config, logger *zap.Suga
 		return manager, nil
 	}
 
-	// Build map of enabled plugins for quick lookup
+	// Build map of enabled plugins for deduplication
 	enabledPlugins := make(map[string]bool)
 	for _, name := range cfg.Plugin.Enabled {
 		enabledPlugins[name] = true
 	}
 
-	// Discover plugins from configured paths
+	// Sort plugin names for deterministic iteration
+	pluginNames := make([]string, 0, len(enabledPlugins))
+	for name := range enabledPlugins {
+		pluginNames = append(pluginNames, name)
+	}
+	sort.Strings(pluginNames)
+
+	// Discover plugins from configured paths (deduplicated)
 	var pluginConfigs []PluginConfig
 	var failedPlugins []string
-	for _, pluginName := range cfg.Plugin.Enabled {
+	for _, pluginName := range pluginNames {
+		logger.Infof("Searching for '%s' plugin binary in %d paths", pluginName, len(cfg.Plugin.Paths))
+
 		pluginConfig, err := discoverPlugin(pluginName, cfg.Plugin.Paths, logger)
 		if err != nil {
-			logger.Warnw("Failed to discover plugin",
-				"plugin", pluginName,
-				"error", err,
-				"paths", cfg.Plugin.Paths,
-			)
+			logger.Warnf("Plugin '%s' not found - searched paths: %v, tried names: [qntx-%s-plugin, qntx-%s, %s]",
+				pluginName, cfg.Plugin.Paths, pluginName, pluginName, pluginName)
 			failedPlugins = append(failedPlugins, pluginName)
 			continue
 		}
+		logger.Infof("Will load '%s' plugin from binary: %s", pluginName, pluginConfig.Binary)
 		pluginConfigs = append(pluginConfigs, pluginConfig)
 	}
 
@@ -126,10 +134,7 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 					continue
 				}
 
-				logger.Infow("Discovered plugin binary",
-					"plugin", name,
-					"path", candidate,
-				)
+				logger.Infof("Found '%s' plugin binary: %s", name, candidate)
 
 				return PluginConfig{
 					Name:      name,

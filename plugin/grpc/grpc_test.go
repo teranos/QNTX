@@ -27,6 +27,7 @@ import (
 
 // mockPlugin is a configurable mock for testing
 type mockPlugin struct {
+	name           string
 	initCalled     bool
 	shutdownCalled bool
 	initError      error
@@ -36,7 +37,12 @@ type mockPlugin struct {
 }
 
 func newMockPlugin() *mockPlugin {
+	return newMockPluginWithName("mock")
+}
+
+func newMockPluginWithName(name string) *mockPlugin {
 	return &mockPlugin{
+		name: name,
 		healthStatus: pluginpkg.HealthStatus{
 			Healthy: true,
 			Message: "Mock plugin healthy",
@@ -50,7 +56,7 @@ func newMockPlugin() *mockPlugin {
 
 func (p *mockPlugin) Metadata() pluginpkg.Metadata {
 	return pluginpkg.Metadata{
-		Name:        "mock",
+		Name:        p.name,
 		Version:     "1.0.0",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Mock plugin for testing",
@@ -686,8 +692,13 @@ func TestPluginManager_LoadPlugins_InvalidConfig(t *testing.T) {
 		{Name: "invalid", Enabled: true}, // Neither address nor binary
 	}
 
+	// Should not return error - logs warning and continues
 	err := manager.LoadPlugins(context.Background(), configs)
-	require.Error(t, err)
+	require.NoError(t, err)
+
+	// Plugin should not be loaded
+	plugins := manager.GetAllPlugins()
+	assert.Len(t, plugins, 0)
 }
 
 func TestPluginManager_LoadPlugins_WithAddress(t *testing.T) {
@@ -704,7 +715,7 @@ func TestPluginManager_LoadPlugins_WithAddress(t *testing.T) {
 
 	manager := NewPluginManager(logger)
 	configs := []PluginConfig{
-		{Name: "test", Enabled: true, Address: addr},
+		{Name: "mock", Enabled: true, Address: addr}, // Use "mock" to match the plugin metadata
 	}
 
 	err := manager.LoadPlugins(context.Background(), configs)
@@ -725,7 +736,7 @@ func TestPluginManager_GetPlugin(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 
-	plugin := newMockPlugin()
+	plugin := newMockPluginWithName("test")
 	addr, cleanup := startTestServer(t, plugin)
 	defer cleanup()
 

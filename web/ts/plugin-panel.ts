@@ -104,7 +104,9 @@ class PluginPanel extends BasePanel {
     }
 
     protected async onShow(): Promise<void> {
+        this.showLoading('Loading plugins...');
         await this.fetchPlugins();
+        this.hideLoading();
         this.render();
 
         // Focus search input
@@ -143,13 +145,13 @@ class PluginPanel extends BasePanel {
         if (!content) return;
 
         if (this.plugins.length === 0) {
-            content.innerHTML = `
-                <div class="panel-empty plugin-empty">
-                    <div class="panel-empty-icon">&#128268;</div>
-                    <p>No plugins installed</p>
-                    <p class="panel-text-muted">Domain plugins extend QNTX with specialized functionality</p>
-                </div>
-            `;
+            content.innerHTML = '';
+            const emptyState = this.createEmptyState(
+                'No plugins installed',
+                'Domain plugins extend QNTX with specialized functionality'
+            );
+            emptyState.classList.add('plugin-empty');
+            content.appendChild(emptyState);
             return;
         }
 
