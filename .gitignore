@@ -14,10 +14,9 @@ internal/server/dist/
 tmp/
 *.log
 
-<<<<<<< claude/analyze-frontend-improvements-MmHKD
 # Test coverage
 web/coverage/
-=======
+
 # Binaries (NEVER commit these!)
 *.exe
 *.dll
@@ -29,7 +28,6 @@ web/coverage/
 *.bin
 qntx-code-plugin
 qntx-webscraper-plugin
->>>>>>> main
 
 # IDE
 .vscode/
