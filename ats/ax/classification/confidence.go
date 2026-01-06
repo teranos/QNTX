@@ -3,6 +3,8 @@ package classification
 import (
 	"math"
 	"time"
+
+	"github.com/teranos/QNTX/internal/util"
 )
 
 // ConfidenceCalculator calculates confidence scores for conflict resolution
@@ -164,20 +166,13 @@ func (cc *ConfidenceCalculator) areRelatedPredicates(predicates map[string]bool)
 
 	for i, p1 := range predicateList {
 		for j, p2 := range predicateList {
-			if i != j && (contains(p1, p2) || contains(p2, p1)) {
+			if i != j && (util.HasPrefixOrSuffix(p1, p2) || util.HasPrefixOrSuffix(p2, p1)) {
 				return true
 			}
 		}
 	}
 
 	return false
-}
-
-// contains checks if s1 contains s2 (case-insensitive substring)
-func contains(s1, s2 string) bool {
-	// Simple substring check - could be enhanced with more sophisticated logic
-	return len(s2) > 0 && len(s1) > len(s2) &&
-		(s1[:len(s2)] == s2 || s1[len(s1)-len(s2):] == s2)
 }
 
 // RequiresHumanReview returns true if confidence is below review threshold

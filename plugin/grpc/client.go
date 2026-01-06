@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
@@ -45,7 +46,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		grpc.WithBlock(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to plugin at %s: %w", addr, err)
+		return nil, errors.Wrapf(err, "failed to connect to plugin at %s", addr)
 	}
 
 	client := protocol.NewDomainPluginServiceClient(conn)
@@ -61,7 +62,7 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	metaResp, err := client.Metadata(ctx, &protocol.Empty{})
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("failed to get plugin metadata from %s: %w", addr, err)
+		return nil, errors.Wrapf(err, "failed to get plugin metadata from %s", addr)
 	}
 
 	proxy.metadata = plugin.Metadata{
@@ -171,7 +172,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 
 	_, err := c.client.Initialize(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to initialize remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
+		return errors.Wrapf(err, "failed to initialize remote plugin %s at %s", c.metadata.Name, c.addr)
 	}
 
 	c.logger.Infow("Remote plugin initialized",
@@ -186,7 +187,7 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 	_, err := c.client.Shutdown(ctx, &protocol.Empty{})
 	if err != nil {
-		return fmt.Errorf("failed to shutdown remote plugin %s at %s: %w", c.metadata.Name, c.addr, err)
+		return errors.Wrapf(err, "failed to shutdown remote plugin %s at %s", c.metadata.Name, c.addr)
 	}
 	return c.conn.Close()
 }

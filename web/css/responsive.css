@@ -28,8 +28,8 @@
         display: none;
     }
 
-    /* Log panel - move to top */
-    #log-panel {
+    /* System drawer - move to top */
+    #system-drawer {
         top: 0;
         bottom: auto;
         border-top: none;
@@ -39,5 +39,89 @@
     /* Hide build hash on mobile to save space */
     #build-hash {
         display: none !important;
+    }
+
+    /* Symbol palette - more compact on mobile */
+    .symbol-palette {
+        padding: 4px 6px;
+        gap: 1px;
+    }
+
+    .palette-cell {
+        font-size: 12px;
+    }
+
+    .palette-cell::after {
+        bottom: -28px;
+        font-size: 10px;
+    }
+}
+
+/* Tablet: 768px - 900px */
+@media (min-width: 768px) and (max-width: 900px) {
+    .palette-cell {
+        font-size: 14px;
+    }
+}
+
+/* Tablet Portrait: Vertical symbol column */
+@media (min-width: 768px) and (max-width: 900px) and (orientation: portrait) {
+    .symbol-palette {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: auto;
+        grid-template-columns: 1fr; /* Single column */
+        grid-template-rows: repeat(10, 1fr); /* 10 rows */
+        padding: 8px 4px;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+        margin-bottom: 0;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .palette-cell {
+        font-size: 16px;
+        min-width: 50px;
+        min-height: 50px;
+    }
+
+    .palette-cell::after {
+        /* Position tooltip to the right for vertical layout */
+        bottom: auto;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        margin-left: 8px;
+    }
+}
+
+/* Small Desktop: 900px - 1200px */
+@media (min-width: 900px) and (max-width: 1200px) {
+    .palette-cell {
+        font-size: 15px;
+    }
+}
+
+/* Desktop: 1200px+ */
+@media (min-width: 1200px) {
+    .palette-cell {
+        font-size: 16px;
+    }
+}
+
+/* Large Desktop: 1440px+ */
+@media (min-width: 1440px) {
+    .palette-cell {
+        font-size: 17px;
+    }
+}
+
+/* Ultra-wide: 1920px+ */
+@media (min-width: 1920px) {
+    .palette-cell {
+        font-size: 18px;
     }
 }
