@@ -212,8 +212,8 @@
 
 .config-toggle-control {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
     margin-bottom: 12px;
 }
 
@@ -221,14 +221,15 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 16px 12px;
+    gap: 4px;
+    padding: 12px 8px;
     background: var(--panel-bg);
     border: 2px solid #ddd;
     border-radius: 8px;
     cursor: pointer;
     transition: var(--panel-transition-normal);
     font-family: inherit;
+    min-width: 0; /* Allow shrinking in grid */
 }
 
 .provider-btn:hover {
@@ -243,7 +244,7 @@
 }
 
 .provider-icon {
-    font-size: 28px;
+    font-size: 24px;
     line-height: 1;
 }
 
@@ -261,6 +262,35 @@
     color: #aaa;
 }
 
+/* Model selector - shared between providers */
+.model-selector {
+    padding: 10px 14px;
+    background: #f8f8f8;
+    border: var(--panel-border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.model-selector label {
+    font-weight: 600;
+    color: #333;
+}
+
+.model-selector select {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 11px;
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    background: var(--panel-bg);
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+/* Legacy support for ollama-model-selector */
 .ollama-model-selector {
     padding: 10px 14px;
     background: #f8f8f8;
