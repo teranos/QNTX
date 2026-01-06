@@ -1,8 +1,8 @@
 // D3.js graph visualization
 // Main rendering orchestration - delegates to specialized modules
 
-import { state, GRAPH_PHYSICS, GRAPH_STYLES } from '../config.ts';
-import { saveSession } from '../state-manager.ts';
+import { appState, GRAPH_PHYSICS, GRAPH_STYLES } from '../config.ts';
+import { uiState } from '../ui-state.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
@@ -30,7 +30,7 @@ export { getTransform, setTransform, centerGraph, resetZoom } from './transform.
 // Update graph with new data
 export function updateGraph(data: GraphData): void {
     // Save graph data to state
-    state.currentGraphData = data;
+    appState.currentGraphData = data;
 
     // Rebuild legend with node types from backend and re-attach event listeners
     initLegendaToggles(renderGraph, data);
@@ -356,8 +356,8 @@ function renderGraph(data: GraphData): void {
         }
 
         // Re-render graph with updated visibility
-        if (state.currentGraphData) {
-            renderGraph(state.currentGraphData);
+        if (appState.currentGraphData) {
+            renderGraph(appState.currentGraphData);
         }
     });
 
@@ -392,13 +392,13 @@ export function cleanupGraph(): void {
 function saveCurrentSession(): void {
     const transform = getTransform();
     if (transform) {
-        state.currentTransform = transform;
+        appState.currentTransform = transform;
     }
 
-    saveSession({
-        query: state.currentQuery,
-        verbosity: state.currentVerbosity
-        // NOTE: Not saving graphData - D3 object references don't serialize properly
-        // Query will be re-run on page load instead
+    // NOTE: Not saving graphData - D3 object references don't serialize properly
+    // Query will be re-run on page load instead
+    uiState.setGraphSession({
+        query: appState.currentQuery,
+        verbosity: appState.currentVerbosity,
     });
 }

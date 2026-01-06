@@ -2,7 +2,8 @@ package async
 
 import (
 	"database/sql"
-	"fmt"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // JobScanArgs holds all the variables needed for scanning a job from a database row.
@@ -63,7 +64,7 @@ func ProcessJobScanArgs(job *Job, args *JobScanArgs) error {
 	if args.PulseStateJSON.Valid {
 		pulseState, err := UnmarshalPulseState(args.PulseStateJSON.String)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal pulse state for job %s: %w", job.ID, err)
+			return errors.Wrapf(err, "failed to unmarshal pulse state for job %s", job.ID)
 		}
 		job.PulseState = pulseState
 	}
