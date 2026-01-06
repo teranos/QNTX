@@ -13,7 +13,8 @@
 
 import { sendMessage } from './websocket.ts';
 import { applySyntaxHighlighting, updateDiagnosticsDisplay } from './codemirror-editor.ts';
-import type { ParseResponse, ParseRequest } from '../types/lsp';
+import type { ParseRequest } from '../types/lsp';
+import type { ParseResponseMessage } from '../types/websocket';
 
 // Debounce timings
 // TODO(issue #14): Tune these values based on actual latency metrics
@@ -21,7 +22,7 @@ const PARSE_DEBOUNCE_MS: number = 150;      // Fast feedback for highlighting
 
 // State
 let parseTimeout: ReturnType<typeof setTimeout> | null = null;
-let lastParseResponse: ParseResponse | null = null;
+let lastParseResponse: ParseResponseMessage | null = null;
 
 /**
  * Request parse with semantic tokens (debounced)
@@ -50,7 +51,7 @@ export function requestParse(query: string, line?: number, cursor?: number): voi
  * Handle parse response from server - update syntax highlighting and diagnostics
  * @param response - Parse response containing tokens and diagnostics
  */
-export function handleParseResponse(response: ParseResponse): void {
+export function handleParseResponse(response: ParseResponseMessage): void {
     lastParseResponse = response;
 
     // Update syntax highlighting with semantic tokens (CodeMirror decorations)
@@ -84,7 +85,7 @@ export function updatePlainText(text: string): void {
  * Get last parse response (for debugging)
  * @returns The last parse response received, or null if none
  */
-export function getLastParseResponse(): ParseResponse | null {
+export function getLastParseResponse(): ParseResponseMessage | null {
     return lastParseResponse;
 }
 
