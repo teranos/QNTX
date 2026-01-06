@@ -686,8 +686,13 @@ func TestPluginManager_LoadPlugins_InvalidConfig(t *testing.T) {
 		{Name: "invalid", Enabled: true}, // Neither address nor binary
 	}
 
+	// Should not return error - logs warning and continues
 	err := manager.LoadPlugins(context.Background(), configs)
-	require.Error(t, err)
+	require.NoError(t, err)
+
+	// Plugin should not be loaded
+	plugins := manager.GetAllPlugins()
+	assert.Len(t, plugins, 0)
 }
 
 func TestPluginManager_LoadPlugins_WithAddress(t *testing.T) {
@@ -704,7 +709,7 @@ func TestPluginManager_LoadPlugins_WithAddress(t *testing.T) {
 
 	manager := NewPluginManager(logger)
 	configs := []PluginConfig{
-		{Name: "test", Enabled: true, Address: addr},
+		{Name: "mock", Enabled: true, Address: addr}, // Use "mock" to match the plugin metadata
 	}
 
 	err := manager.LoadPlugins(context.Background(), configs)
