@@ -183,6 +183,9 @@ EOF
             ];
             WorkingDir = "/workspace";
           };
+
+          # Docker images are Linux-only
+          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
         };
 
         # Architecture detection for Docker images
@@ -205,9 +208,9 @@ EOF
             qntx-code
 
             # Runtime dependencies
-            pkgs.gopls           # Go language server (spawned as subprocess)
-            pkgs.git             # Git operations for ixgest
-            pkgs.gh              # GitHub CLI for PR operations
+            pkgs.gopls # Go language server (spawned as subprocess)
+            pkgs.git # Git operations for ixgest
+            pkgs.gh # GitHub CLI for PR operations
 
             # Base utilities
             pkgs.bash
@@ -234,10 +237,13 @@ EOF
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
             ];
             ExposedPorts = {
-              "9000/tcp" = {};
+              "9000/tcp" = { };
             };
             WorkingDir = "/workspace";
           };
+
+          # Docker images are Linux-only
+          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
         };
 
         # qntx-code image with detected architecture
@@ -301,6 +307,10 @@ EOF
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
+          # Default: CLI binary for easy installation
+          default = qntx;
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Docker images are Linux-only
           # CI Docker images (full dev environment)
           ci-image = ciImage;
           ci-image-amd64 = mkCiImage "amd64";
@@ -315,9 +325,6 @@ EOF
           qntx-python-plugin-image = pythonImage;
           qntx-python-plugin-image-amd64 = mkPythonImage "amd64";
           qntx-python-plugin-image-arm64 = mkPythonImage "arm64";
-
-          # Default: CLI binary for easy installation
-          default = qntx;
         };
 
         # Development shell with same tools
@@ -345,6 +352,8 @@ EOF
           qntx-build = qntx; # Ensure QNTX builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
           qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Docker image checks are Linux-only
           ci-image = ciImage; # Ensure CI image builds
           qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
           qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds

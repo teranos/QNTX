@@ -12,6 +12,7 @@
 import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
 import { toast } from './toast';
+import { escapeHtml } from './html-utils.ts';
 
 interface PluginInfo {
     name: string;
@@ -202,8 +203,8 @@ class PluginPanel extends BasePanel {
             <div class="panel-card plugin-card" data-plugin="${plugin.name}">
                 <div class="plugin-card-header">
                     <div class="plugin-name-row">
-                        <span class="plugin-name">${this.escapeHtml(plugin.name)}</span>
-                        <span class="plugin-version panel-code">${this.escapeHtml(plugin.version)}</span>
+                        <span class="plugin-name">${escapeHtml(plugin.name)}</span>
+                        <span class="plugin-version panel-code">${escapeHtml(plugin.version)}</span>
                     </div>
                     <div class="plugin-badges">
                         <div class="plugin-state ${stateClass}">
@@ -217,18 +218,18 @@ class PluginPanel extends BasePanel {
                     </div>
                 </div>
                 <div class="plugin-description">
-                    ${this.escapeHtml(plugin.description || 'No description available')}
+                    ${escapeHtml(plugin.description || 'No description available')}
                 </div>
                 <div class="plugin-meta">
-                    ${plugin.author ? `<span class="plugin-author" title="Author">&#128100; ${this.escapeHtml(plugin.author)}</span>` : ''}
-                    ${plugin.license ? `<span class="plugin-license" title="License">&#128196; ${this.escapeHtml(plugin.license)}</span>` : ''}
-                    ${plugin.qntx_version ? `<span class="plugin-qntx-version" title="QNTX Version Requirement">&#8805; ${this.escapeHtml(plugin.qntx_version)}</span>` : ''}
+                    ${plugin.author ? `<span class="plugin-author" title="Author">&#128100; ${escapeHtml(plugin.author)}</span>` : ''}
+                    ${plugin.license ? `<span class="plugin-license" title="License">&#128196; ${escapeHtml(plugin.license)}</span>` : ''}
+                    ${plugin.qntx_version ? `<span class="plugin-qntx-version" title="QNTX Version Requirement">&#8805; ${escapeHtml(plugin.qntx_version)}</span>` : ''}
                 </div>
                 <div class="plugin-path panel-code" title="Plugin configuration path">
-                    <span class="plugin-path-label">Path:</span> ~/.qntx/plugins/${this.escapeHtml(plugin.name)}.toml
+                    <span class="plugin-path-label">Path:</span> ~/.qntx/plugins/${escapeHtml(plugin.name)}.toml
                 </div>
                 ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
-                ${plugin.message ? `<div class="plugin-message ${plugin.healthy ? '' : 'plugin-message-error'}">${this.escapeHtml(plugin.message)}</div>` : ''}
+                ${plugin.message ? `<div class="plugin-message ${plugin.healthy ? '' : 'plugin-message-error'}">${escapeHtml(plugin.message)}</div>` : ''}
                 ${this.renderDetails(plugin.details)}
             </div>
         `;
@@ -304,18 +305,12 @@ class PluginPanel extends BasePanel {
         const items = Object.entries(details).map(([key, value]) => {
             const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
             return `<div class="plugin-detail-item">
-                <span class="plugin-detail-key">${this.escapeHtml(key)}:</span>
-                <span class="plugin-detail-value">${this.escapeHtml(displayValue)}</span>
+                <span class="plugin-detail-key">${escapeHtml(key)}:</span>
+                <span class="plugin-detail-value">${escapeHtml(displayValue)}</span>
             </div>`;
         }).join('');
 
         return `<div class="plugin-details">${items}</div>`;
-    }
-
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     private filterPlugins(searchText: string): void {
