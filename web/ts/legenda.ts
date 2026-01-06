@@ -1,6 +1,6 @@
 // Legenda (Legend) - Node type visualization and filtering controls
 
-import { state, UI_TEXT } from './config.ts';
+import { appState, UI_TEXT } from './config.ts';
 import type { GraphData, NodeTypeInfo } from '../types/core';
 import { sendMessage } from './websocket.ts'; // Phase 2: Send visibility preferences to backend
 
@@ -107,8 +107,8 @@ function setupRevealButtonHandler(
         }
 
         // Re-render graph
-        if (state.currentGraphData) {
-            renderGraphFn(state.currentGraphData);
+        if (appState.currentGraphData) {
+            renderGraphFn(appState.currentGraphData);
         }
     });
 }
