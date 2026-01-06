@@ -8,6 +8,14 @@ import type { LogsMessage, LogEntry } from '../types/websocket';
 // Make this a module
 export {};
 
+// Type-safe log level to CSS class mapping
+const LOG_LEVEL_MAP: Record<string, string> = {
+    ERROR: CSS.LOG.ERROR,
+    WARN: CSS.LOG.WARN,
+    INFO: CSS.LOG.INFO,
+    DEBUG: CSS.LOG.DEBUG,
+} as const;
+
 // Log handling - accepts the full WebSocket message type
 export function handleLogBatch(data: LogsMessage): void {
     console.log('📋 handleLogBatch called:', data);
@@ -36,7 +44,7 @@ function appendLog(msg: LogEntry): void {
     if (!logContent) return;
 
     const logLine = document.createElement('div');
-    logLine.className = 'log-line log-' + msg.level.toLowerCase();
+    logLine.className = `${CSS.LOG.LINE} ${LOG_LEVEL_MAP[msg.level] || CSS.LOG.INFO}`;
 
     // Format timestamp
     const timestamp = new Date(msg.timestamp).toLocaleTimeString('en-US', {
