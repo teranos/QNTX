@@ -96,20 +96,8 @@
             pkgs.rustfmt
             pkgs.clippy
 
-            # Tauri system dependencies (from NixOS Wiki)
-            pkgs.webkitgtk_4_1
-            pkgs.gtk3
-            pkgs.at-spi2-atk
-            pkgs.cairo
-            pkgs.gdk-pixbuf
-            pkgs.glib
-            pkgs.harfbuzz
-            pkgs.librsvg
-            pkgs.libsoup_3
-            pkgs.pango
-            pkgs.gobject-introspection
+            # System dependencies
             pkgs.openssl
-            pkgs.libayatana-appindicator
             pkgs.patchelf
 
             # Build tools and utilities
@@ -142,7 +130,7 @@
           config = {
             Env = [
               "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
-              "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.glib pkgs.gtk3 pkgs.at-spi2-atk pkgs.cairo pkgs.gdk-pixbuf pkgs.harfbuzz pkgs.librsvg pkgs.libsoup_3 pkgs.pango pkgs.gobject-introspection pkgs.webkitgtk_4_1 pkgs.openssl ]}:${pkgs.lib.concatMapStringsSep ":" (p: "${p}/lib/pkgconfig") [ pkgs.libayatana-appindicator ]}"
+              "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.openssl ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
             ];
@@ -161,7 +149,7 @@
 
         # Helper function to build qntx-code plugin image for specific architecture
         mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-code";
+          name = "ghcr.io/teranos/qntx-code-plugin";
           tag = "latest";
           architecture = arch;
 
@@ -223,9 +211,9 @@
           ci-image-arm64 = mkCiImage "arm64";
 
           # qntx-code plugin Docker images (minimal runtime)
-          qntx-code-image = codeImage;
-          qntx-code-image-amd64 = mkCodeImage "amd64";
-          qntx-code-image-arm64 = mkCodeImage "arm64";
+          qntx-code-plugin-image = codeImage;
+          qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
+          qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
 
           # Default: CLI binary for easy installation
           default = qntx;
@@ -250,7 +238,7 @@
           qntx-build = qntx; # Ensure QNTX builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
           ci-image = ciImage; # Ensure CI image builds
-          qntx-code-image = codeImage; # Ensure qntx-code image builds
+          qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
         };
       }
     );
