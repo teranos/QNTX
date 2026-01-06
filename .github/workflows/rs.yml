@@ -92,13 +92,7 @@ jobs:
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
 
       # qntx-python (Rust Python plugin with PyO3)
-      # Temporary: Install Python until CI image is rebuilt with flake.nix changes
-      # TODO: Remove after next image build (Python 3.13 will be in PATH from flake.nix)
-      - name: Install Python for PyO3 (temporary)
-        run: |
-          nix-env -iA nixpkgs.python313
-          python3 --version
-
+      # Python 3.13 available in CI image (see flake.nix)
       - name: Check formatting (qntx-python)
         run: cd qntx-python && cargo fmt --check
 
