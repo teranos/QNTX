@@ -260,7 +260,7 @@ export interface GitCommitResult {
 
 ## GitIngestionHandler
 
-**Source**: [`qntx-code/ixgest/git/async.go:14`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L14)
+**Source**: [`qntx-code/ixgest/git/async.go:16`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L16)
 
 
 <table>
@@ -290,7 +290,7 @@ export interface GitIngestionHandler {
 
 ## GitIngestionPayload
 
-**Source**: [`qntx-code/ixgest/git/async.go:28`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L28)
+**Source**: [`qntx-code/ixgest/git/async.go:30`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L30)
 
 
 <table>
