@@ -52,6 +52,68 @@ The cache is configured in `flake.nix` and uses:
 
 ---
 
+## GitHub Releases (Pre-built Binaries)
+
+Download pre-built binaries directly from GitHub Releases for all major platforms.
+
+### Download Latest Release
+
+Visit the [releases page](https://github.com/teranos/QNTX/releases/latest) or use the commands below:
+
+**Linux:**
+```bash
+# amd64
+curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-linux-amd64.tar.gz
+tar -xzf qntx-VERSION-linux-amd64.tar.gz
+sudo mv qntx /usr/local/bin/
+
+# arm64
+curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-linux-arm64.tar.gz
+tar -xzf qntx-VERSION-linux-arm64.tar.gz
+sudo mv qntx /usr/local/bin/
+```
+
+**macOS:**
+```bash
+# Intel (x64)
+curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-darwin-amd64.tar.gz
+tar -xzf qntx-VERSION-darwin-amd64.tar.gz
+sudo mv qntx /usr/local/bin/
+
+# Apple Silicon (ARM)
+curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-darwin-arm64.tar.gz
+tar -xzf qntx-VERSION-darwin-arm64.tar.gz
+sudo mv qntx /usr/local/bin/
+```
+
+**Windows:**
+```powershell
+# Download from: https://github.com/teranos/QNTX/releases/latest
+# Extract qntx-VERSION-windows-amd64.zip
+# Add qntx.exe to your PATH
+```
+
+### Verify Download
+
+Each release includes SHA256 checksums:
+
+```bash
+# Download checksum file
+curl -LO https://github.com/teranos/QNTX/releases/latest/download/qntx-VERSION-linux-amd64.tar.gz.sha256
+
+# Verify integrity
+sha256sum -c qntx-VERSION-linux-amd64.tar.gz.sha256
+```
+
+**Available Platforms:**
+- Linux (amd64, arm64)
+- macOS (Intel, Apple Silicon)
+- Windows (x64)
+
+**Note:** Replace `VERSION` with the actual version number (e.g., `0.17.3`). See [releases page](https://github.com/teranos/QNTX/releases) for all versions.
+
+---
+
 ## Docker
 
 Multi-architecture images (amd64, arm64) are available on GitHub Container Registry.
@@ -171,11 +233,11 @@ qntx am show
 
 | Platform | Architecture | Method | Status |
 |----------|-------------|---------|---------|
-| Linux | amd64 | Nix, Docker, Source | ✅ |
-| Linux | arm64 | Nix, Docker, Source | ✅ |
-| macOS | Intel (x64) | Nix, Source | ✅ |
-| macOS | Apple Silicon (ARM) | Nix, Source | ✅ |
-| Windows | x64 | Source | ✅ |
+| Linux | amd64 | GitHub Releases, Nix, Docker, Source | ✅ |
+| Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
+| macOS | Intel (x64) | GitHub Releases, Nix, Source | ✅ |
+| macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Source | ✅ |
+| Windows | x64 | GitHub Releases, Source | ✅ |
 | Android | ARM | Docker | ✅ (via Tauri) |
 | iOS | ARM | Source | ⚠️ (experimental) |
 
