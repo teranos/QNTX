@@ -120,15 +120,17 @@ impl PythonEngine {
         Python::with_gil(|py| {
             // Add custom paths to sys.path
             if !python_paths.is_empty() {
-                let sys = py.import("sys").map_err(|e| {
-                    PythonError::InitError(format!("Failed to import sys: {}", e))
-                })?;
+                let sys = py
+                    .import("sys")
+                    .map_err(|e| PythonError::InitError(format!("Failed to import sys: {}", e)))?;
 
-                let path: Bound<'_, PyList> = sys.getattr("path").map_err(|e| {
-                    PythonError::InitError(format!("Failed to get sys.path: {}", e))
-                })?.extract().map_err(|e| {
-                    PythonError::InitError(format!("Failed to extract sys.path: {}", e))
-                })?;
+                let path: Bound<'_, PyList> = sys
+                    .getattr("path")
+                    .map_err(|e| PythonError::InitError(format!("Failed to get sys.path: {}", e)))?
+                    .extract()
+                    .map_err(|e| {
+                        PythonError::InitError(format!("Failed to extract sys.path: {}", e))
+                    })?;
 
                 for p in &python_paths {
                     path.insert(0, p).map_err(|e| {
@@ -177,18 +179,17 @@ impl PythonEngine {
         config: &ExecutionConfig,
     ) -> Result<ExecutionResult, PythonError> {
         // Create CString for the code
-        let code_cstr = CString::new(code).map_err(|e| {
-            PythonError::InvalidInput(format!("Invalid code string: {}", e))
-        })?;
+        let code_cstr = CString::new(code)
+            .map_err(|e| PythonError::InvalidInput(format!("Invalid code string: {}", e)))?;
 
         Python::with_gil(|py| {
             // Set up output capture
-            let io = py.import("io").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to import io: {}", e))
-            })?;
-            let sys = py.import("sys").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to import sys: {}", e))
-            })?;
+            let io = py
+                .import("io")
+                .map_err(|e| PythonError::ExecutionError(format!("Failed to import io: {}", e)))?;
+            let sys = py
+                .import("sys")
+                .map_err(|e| PythonError::ExecutionError(format!("Failed to import sys: {}", e)))?;
 
             // Create StringIO objects for capturing output
             let stdout_capture = io.call_method0("StringIO").map_err(|e| {
@@ -199,12 +200,12 @@ impl PythonEngine {
             })?;
 
             // Save original stdout/stderr
-            let original_stdout = sys.getattr("stdout").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to get stdout: {}", e))
-            })?;
-            let original_stderr = sys.getattr("stderr").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to get stderr: {}", e))
-            })?;
+            let original_stdout = sys
+                .getattr("stdout")
+                .map_err(|e| PythonError::ExecutionError(format!("Failed to get stdout: {}", e)))?;
+            let original_stderr = sys
+                .getattr("stderr")
+                .map_err(|e| PythonError::ExecutionError(format!("Failed to get stderr: {}", e)))?;
 
             // Redirect stdout/stderr
             sys.setattr("stdout", &stdout_capture).map_err(|e| {
@@ -227,11 +228,15 @@ impl PythonEngine {
 
             // Add custom paths if specified
             for path in &config.python_paths {
-                let path_list: Bound<'_, PyList> = sys.getattr("path").map_err(|e| {
-                    PythonError::ExecutionError(format!("Failed to get sys.path: {}", e))
-                })?.extract().map_err(|e| {
-                    PythonError::ExecutionError(format!("Failed to extract sys.path: {}", e))
-                })?;
+                let path_list: Bound<'_, PyList> = sys
+                    .getattr("path")
+                    .map_err(|e| {
+                        PythonError::ExecutionError(format!("Failed to get sys.path: {}", e))
+                    })?
+                    .extract()
+                    .map_err(|e| {
+                        PythonError::ExecutionError(format!("Failed to extract sys.path: {}", e))
+                    })?;
                 let _ = path_list.insert(0, path);
             }
 
@@ -320,9 +325,7 @@ impl PythonEngine {
 
     /// Check if a Python module is available
     pub fn check_module(&self, module_name: &str) -> bool {
-        Python::with_gil(|py| {
-            py.import(module_name).is_ok()
-        })
+        Python::with_gil(|py| py.import(module_name).is_ok())
     }
 
     /// Get Python version info
@@ -365,20 +368,22 @@ impl Default for PythonEngine {
 }
 
 /// Convert a Python object to JSON
-fn python_to_json(py: Python<'_>, obj: &Bound<'_, PyAny>) -> Result<serde_json::Value, PythonError> {
+fn python_to_json(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+) -> Result<serde_json::Value, PythonError> {
     // Try to use json.dumps for serialization
-    let json_module = py.import("json").map_err(|e| {
-        PythonError::ExecutionError(format!("Failed to import json: {}", e))
-    })?;
+    let json_module = py
+        .import("json")
+        .map_err(|e| PythonError::ExecutionError(format!("Failed to import json: {}", e)))?;
 
     match json_module.call_method1("dumps", (obj,)) {
         Ok(json_str) => {
             let s: String = json_str.extract().map_err(|e| {
                 PythonError::ExecutionError(format!("Failed to extract JSON string: {}", e))
             })?;
-            serde_json::from_str(&s).map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to parse JSON: {}", e))
-            })
+            serde_json::from_str(&s)
+                .map_err(|e| PythonError::ExecutionError(format!("Failed to parse JSON: {}", e)))
         }
         Err(_) => {
             // Fallback to string representation
