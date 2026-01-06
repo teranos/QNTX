@@ -30,7 +30,7 @@ type serverDependencies struct {
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
-	config        *appcfg.Config // GRACE Phase 2 optimization: reuse for daemon recreation
+	config        *appcfg.Config // Opening/Closing Phase 2 optimization: reuse for daemon recreation
 }
 
 // NewQNTXServer creates a new QNTX server
@@ -81,7 +81,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	// Create cancellation context for lifecycle management
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// GRACE Phase 2: Recreate daemon with server's context for proper shutdown coordination
+	// Opening/Closing Phase 2: Recreate daemon with server's context for proper shutdown coordination
 	// Reuse config from deps to avoid double-loading (optimization for WS connection speed)
 	poolConfig := async.DefaultWorkerPoolConfig()
 	if deps.config.Pulse.Workers > 0 {
@@ -150,7 +150,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.graphLimit.Store(1000)                 // Default graph node limit
-	server.state.Store(int32(ServerStateRunning)) // GRACE Phase 4: Initialize to running
+	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
 
 	// Initialize domain plugin registry
 	pluginRegistry := plugin.GetDefaultRegistry()

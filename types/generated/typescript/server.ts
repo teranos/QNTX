@@ -111,7 +111,7 @@ export interface DaemonStatusMessage {
    */
   budget_monthly_limit: number;
   /**
-   * GRACE Phase 4: "running", "draining", "stopped"
+   * Opening/Closing Phase 4: "running", "draining", "stopped"
    */
   server_state: string;
   /**
