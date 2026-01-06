@@ -18,8 +18,8 @@ jobs:
         image:
           - name: ci-image
             registry: ghcr.io/teranos/qntx
-          - name: qntx-code-image
-            registry: ghcr.io/teranos/qntx-code
+          - name: qntx-code-plugin-image
+            registry: ghcr.io/teranos/qntx-code-plugin
 
     steps:
       - name: Checkout repository
@@ -55,7 +55,7 @@ jobs:
           nix build .#qntx --print-out-paths --no-link | cachix push qntx
 
       - name: Build and cache qntx-code plugin binary
-        if: matrix.image.name == 'qntx-code-image'
+        if: matrix.image.name == 'qntx-code-plugin-image'
         run: |
           nix build .#qntx-code --print-build-logs
           nix build .#qntx-code --print-out-paths --no-link | cachix push qntx
@@ -129,8 +129,8 @@ jobs:
         image:
           - name: ci-image
             registry: ghcr.io/teranos/qntx
-          - name: qntx-code-image
-            registry: ghcr.io/teranos/qntx-code
+          - name: qntx-code-plugin-image
+            registry: ghcr.io/teranos/qntx-code-plugin
 
     steps:
       - name: Log in to GHCR

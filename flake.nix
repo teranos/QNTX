@@ -161,7 +161,7 @@
 
         # Helper function to build qntx-code plugin image for specific architecture
         mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-code";
+          name = "ghcr.io/teranos/qntx-code-plugin";
           tag = "latest";
           architecture = arch;
 
@@ -223,9 +223,9 @@
           ci-image-arm64 = mkCiImage "arm64";
 
           # qntx-code plugin Docker images (minimal runtime)
-          qntx-code-image = codeImage;
-          qntx-code-image-amd64 = mkCodeImage "amd64";
-          qntx-code-image-arm64 = mkCodeImage "arm64";
+          qntx-code-plugin-image = codeImage;
+          qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
+          qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
 
           # Default: CLI binary for easy installation
           default = qntx;
@@ -250,7 +250,7 @@
           qntx-build = qntx; # Ensure QNTX builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
           ci-image = ciImage; # Ensure CI image builds
-          qntx-code-image = codeImage; # Ensure qntx-code image builds
+          qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
         };
       }
     );
