@@ -21,7 +21,7 @@ import {
   getStatusColorClass,
 } from './execution-api.ts';
 import { forceTriggerJob } from './api.ts';
-import { showErrorDialog } from '../error-dialog.ts';
+import { toast } from '../toast.ts';
 import {
   onExecutionStarted,
   onExecutionCompleted,
@@ -683,9 +683,9 @@ class JobDetailPanel {
       debugLog('[Job Detail] Force trigger successful');
     } catch (error) {
       console.error('[Job Detail] Force trigger failed:', error);
-      showErrorDialog(
-        'Force trigger failed',
-        error instanceof Error ? error.message : 'Unknown error'
+      toast.error(
+        `Force trigger failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        true
       );
     }
   }
