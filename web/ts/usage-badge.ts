@@ -26,12 +26,16 @@
 import * as d3 from 'd3';
 import { uiState } from './ui-state.ts';
 import { DATA, setVisibility, setExpansion, setLoading } from './css-classes.ts';
+import type { UsageUpdateMessage } from '../types/websocket';
 
-// Type definitions for usage data
+// Internal usage stats derived from WebSocket message
 interface UsageStats {
     total_cost: number;
-    total_requests?: number;
-    models?: Record<string, { cost: number; requests: number }>;
+    requests: number;
+    success: number;
+    tokens: number;
+    models: number;
+    since: string;
 }
 
 interface TimeSeriesDataPoint {
@@ -343,7 +347,16 @@ export function initUsageBadge(): void {
     createUsageBadge();
 }
 
-// Handle usage update from WebSocket
-export function handleUsageUpdate(data: UsageStats): void {
-    updateUsageBadge(data);
+// Handle usage update from WebSocket - accepts full message type
+export function handleUsageUpdate(message: UsageUpdateMessage): void {
+    // Extract usage stats from message
+    const stats: UsageStats = {
+        total_cost: message.total_cost,
+        requests: message.requests,
+        success: message.success,
+        tokens: message.tokens,
+        models: message.models,
+        since: message.since,
+    };
+    updateUsageBadge(stats);
 }
