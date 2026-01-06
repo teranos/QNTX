@@ -3,11 +3,11 @@ package grpc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -60,7 +60,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	if cmd.Attributes != nil {
 		attributesJSON, err := json.Marshal(cmd.Attributes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal attributes: %w", err)
+			return nil, errors.Wrap(err, "failed to marshal attributes")
 		}
 		protoCmd.AttributesJson = string(attributesJSON)
 	}
@@ -80,7 +80,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	}
 
 	if !resp.Success {
-		return nil, fmt.Errorf("failed to generate attestation: %s", resp.Error)
+		return nil, errors.Newf("failed to generate attestation: %s", resp.Error)
 	}
 
 	// Convert response to types.As
@@ -180,17 +180,17 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 // Use GenerateAndCreateAttestation instead.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 	r.logger.Warn("CreateAttestation not supported for remote plugins - use GenerateAndCreateAttestation")
-	return fmt.Errorf("CreateAttestation not supported for remote plugins")
+	return errors.New("CreateAttestation not supported for remote plugins")
 }
 
 // GetAttestation is not implemented for remote plugins.
 func (r *RemoteATSStore) GetAttestation(asid string) (*types.As, error) {
 	r.logger.Warn("GetAttestation not supported for remote plugins yet")
-	return nil, fmt.Errorf("GetAttestation not supported for remote plugins yet")
+	return nil, errors.New("GetAttestation not supported for remote plugins yet")
 }
 
 // DeleteAttestation is not implemented for remote plugins.
 func (r *RemoteATSStore) DeleteAttestation(asid string) error {
 	r.logger.Warn("DeleteAttestation not supported for remote plugins")
-	return fmt.Errorf("DeleteAttestation not supported for remote plugins")
+	return errors.New("DeleteAttestation not supported for remote plugins")
 }
