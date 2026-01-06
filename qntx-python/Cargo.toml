@@ -17,7 +17,9 @@ prost = "0.13"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 
-# Python embedding
+# Python embedding via PyO3
+# REQUIRES Nix build (flake.nix) - provides Python 3.13 deterministically
+# Local cargo builds not supported due to platform-specific Python linking issues
 pyo3 = { version = "0.23", features = ["auto-initialize"] }
 
 # Serialization
