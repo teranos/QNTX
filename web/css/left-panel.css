@@ -72,25 +72,30 @@
 }
 
 .panel-close {
-  background: none;
-  border: none;
-  font-size: 20px;
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 18px;
   color: #666;
   cursor: pointer;
   padding: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.15s ease;
+  border-radius: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .panel-close:hover {
+  background: #f0f0f0;
+  color: #000;
+  transform: none;
+}
+
+.panel-close:active {
   background: #e0e0e0;
   color: #000;
-  transform: scale(1.1);
 }
 
 /* Panel content */
