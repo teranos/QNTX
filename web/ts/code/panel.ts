@@ -101,7 +101,8 @@ class GoEditorPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Close button
+        // Note: Close button (.go-editor-close) needs manual handling since it uses
+        // a custom class. BasePanel only auto-handles .panel-close
         const closeBtn = this.$('.go-editor-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
@@ -404,20 +405,10 @@ class GoEditorPanel extends BasePanel {
     showError(message: string): void {
         const container = this.$('#go-editor-container');
         if (container) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'go-editor-error';
-
-            const heading = document.createElement('h3');
-            heading.textContent = 'Error';
-
-            const para = document.createElement('p');
-            para.textContent = message;
-
-            errorDiv.appendChild(heading);
-            errorDiv.appendChild(para);
-
             container.innerHTML = '';
-            container.appendChild(errorDiv);
+            const errorEl = this.createErrorState('Error', message);
+            errorEl.classList.add('go-editor-error');
+            container.appendChild(errorEl);
         }
     }
 
