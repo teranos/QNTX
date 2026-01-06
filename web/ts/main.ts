@@ -9,7 +9,7 @@ import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './ui-state.ts';
-import { state } from './config.ts';
+import { appState } from './config.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
@@ -149,7 +149,7 @@ async function init(): Promise<void> {
         if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
         // Restore verbosity
         if (graphSession.verbosity !== undefined) {
-            state.currentVerbosity = graphSession.verbosity;
+            appState.currentVerbosity = graphSession.verbosity;
             const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
             if (verbositySelect) {
                 verbositySelect.value = graphSession.verbosity.toString();
@@ -158,7 +158,7 @@ async function init(): Promise<void> {
 
         // Restore query (will be re-run to get fresh graph data)
         if (graphSession.query) {
-            state.currentQuery = graphSession.query;
+            appState.currentQuery = graphSession.query;
         }
     }
 
@@ -273,7 +273,7 @@ async function init(): Promise<void> {
             import('./websocket.ts').then(({ sendMessage }) => {
                 sendMessage({
                     type: 'query',
-                    query: state.currentQuery || 'i'
+                    query: appState.currentQuery || 'i'
                 });
             });
         });
