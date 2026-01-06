@@ -90,7 +90,9 @@ class ConfigPanel extends BasePanel {
     }
 
     protected async onShow(): Promise<void> {
+        this.showLoading('Loading configuration...');
         await this.fetchConfig();
+        this.hideLoading();
         this.render();
 
         // Focus search input
@@ -147,11 +149,8 @@ class ConfigPanel extends BasePanel {
         if (!content) return;
 
         if (!this.appConfig || this.appConfig.settings.length === 0) {
-            content.innerHTML = `
-                <div class="config-empty">
-                    <p>No configuration loaded</p>
-                </div>
-            `;
+            content.innerHTML = '';
+            content.appendChild(this.createEmptyState('No configuration loaded'));
             return;
         }
 
