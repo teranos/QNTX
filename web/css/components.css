@@ -1,0 +1,137 @@
+/**
+ * Components - Reusable UI components used across the application
+ *
+ * This file contains shared component styles that are used in multiple places.
+ * Component classes should be semantic and reusable.
+ */
+
+/* ============================================================================
+ * Close Button Component
+ * Used across all panels, modals, toasts, and dismissible elements
+ * ============================================================================ */
+
+.panel-close,
+.toast-close {
+    /* Base styles */
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 18px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Square appearance - no rounded corners */
+    border-radius: 0;
+
+    /* Smooth color transitions, no size changes */
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    /* Accessibility: Minimum touch target size */
+    min-width: 24px;
+    min-height: 24px;
+}
+
+/* Hover state - subtle background change, no scaling */
+.panel-close:hover,
+.toast-close:hover {
+    background: #f0f0f0;
+    color: #000;
+    transform: none; /* Explicitly prevent any scaling */
+}
+
+/* Active/pressed state */
+.panel-close:active,
+.toast-close:active {
+    background: #e0e0e0;
+    color: #000;
+}
+
+/* Focus state for keyboard navigation */
+.panel-close:focus-visible,
+.toast-close:focus-visible {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+}
+
+/* ============================================================================
+ * Toast-specific Close Button Variant
+ * Dark theme styling for toast notifications
+ * ============================================================================ */
+
+.toast .toast-close {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #333;
+    color: #666;
+}
+
+.toast .toast-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ccc;
+    border-color: #555;
+}
+
+.toast .toast-close:active {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+/* ============================================================================
+ * Legacy Close Button Classes (for backward compatibility)
+ * These should be migrated to .panel-close or .toast-close
+ * ============================================================================ */
+
+.job-list-close,
+.command-explorer-close,
+.pulse-config-close,
+.prose-close,
+.ai-provider-close {
+    /* Inherit all styles from panel-close */
+    @extend .panel-close;
+}
+
+/* Note: @extend doesn't work in regular CSS, so we duplicate the styles */
+.job-list-close,
+.command-explorer-close,
+.pulse-config-close,
+.prose-close,
+.ai-provider-close {
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 18px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.job-list-close:hover,
+.command-explorer-close:hover,
+.pulse-config-close:hover,
+.prose-close:hover,
+.ai-provider-close:hover {
+    background: #f0f0f0;
+    color: #000;
+    transform: none;
+}
+
+.job-list-close:active,
+.command-explorer-close:active,
+.pulse-config-close:active,
+.prose-close:active,
+.ai-provider-close:active {
+    background: #e0e0e0;
+    color: #000;
+}
