@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
 	"go.uber.org/zap"
@@ -31,7 +32,7 @@ func NewQueueServer(queue *async.Queue, authToken string, logger *zap.SugaredLog
 // validateAuth checks the authentication token
 func (s *QueueServer) validateAuth(token string) error {
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
-		return fmt.Errorf("invalid authentication token")
+		return errors.New("invalid authentication token")
 	}
 	return nil
 }

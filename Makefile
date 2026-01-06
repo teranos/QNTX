@@ -14,7 +14,7 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
 	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
-types: $(if $(findstring ./bin/qntx,$(QNTX)),cli,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
+types: $(if $(findstring ./bin/qntx,$(QNTX)),cli-nocgo,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
 	@$(QNTX) typegen --lang typescript --output types/generated/
 	@$(QNTX) typegen --lang python --output types/generated/

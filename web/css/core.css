@@ -1,5 +1,23 @@
 /* Core Styles - Foundation, Layout, Shared Components */
 
+/* CSS Variables - Consolidated for reuse */
+:root {
+    /* Font Stacks */
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
+
+    /* Status Colors */
+    --color-success: #22c55e;
+    --color-error: #ef4444;
+    --color-warning: #ffaa00;
+    --color-info: #3b82f6;
+
+    /* Box Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
 /* Base */
 body {
     /* Virtue #5: System Fonts - "Leverage OS defaults for performance and familiarity" */
@@ -99,9 +117,39 @@ body.disconnected #container {
     color: rgba(136, 201, 153, 0.4);
 }
 
+/* Common Animations - Consolidated for reuse */
 @keyframes fadeIn {
     0% { opacity: 0; }
     100% { opacity: 1; }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 /* Reduced motion preference */

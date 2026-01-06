@@ -3,6 +3,8 @@ package classification
 import (
 	"testing"
 	"time"
+
+	"github.com/teranos/QNTX/internal/util"
 )
 
 func TestConfidenceCalculator_CalculateConfidence(t *testing.T) {
@@ -217,7 +219,7 @@ func TestConfidenceCalculator_CalculateCredibilityBonus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			bonus := cc.calculateCredibilityBonus(test.claims)
-			if abs(bonus-test.expected) > 0.001 { // Allow small floating point differences
+			if util.AbsFloat64(bonus-test.expected) > 0.001 { // Allow small floating point differences
 				t.Errorf("Expected bonus %f, got %f", test.expected, bonus)
 			}
 		})
@@ -381,7 +383,7 @@ func TestConfidenceCalculator_CalculateActorAgreement(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			agreement := cc.CalculateActorAgreement(test.claims)
-			if abs(agreement-test.expected) > 0.001 {
+			if util.AbsFloat64(agreement-test.expected) > 0.001 {
 				t.Errorf("Expected agreement %f, got %f", test.expected, agreement)
 			}
 		})
@@ -410,10 +412,3 @@ func TestConfidenceCalculator_SetReviewThreshold(t *testing.T) {
 	}
 }
 
-// Helper function for floating point comparison
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}

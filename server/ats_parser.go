@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/teranos/QNTX/errors"
 	ixgit "github.com/teranos/QNTX/qntx-code/ixgest/git"
 )
 
@@ -39,13 +40,13 @@ type ParsedATSCode struct {
 func ParseATSCodeWithForce(atsCode string, jobID string, force bool) (*ParsedATSCode, error) {
 	atsCode = strings.TrimSpace(atsCode)
 	if atsCode == "" {
-		return nil, fmt.Errorf("empty ATS code")
+		return nil, errors.New("empty ATS code")
 	}
 
 	// Tokenize the ATS code
 	tokens := tokenizeATSCode(atsCode)
 	if len(tokens) == 0 {
-		return nil, fmt.Errorf("empty ATS code")
+		return nil, errors.New("empty ATS code")
 	}
 
 	// Route based on first token (command)
@@ -53,7 +54,7 @@ func ParseATSCodeWithForce(atsCode string, jobID string, force bool) (*ParsedATS
 	case "ix":
 		return parseIxCommand(tokens[1:], jobID)
 	default:
-		return nil, fmt.Errorf("unknown command: %s (supported: ix)", tokens[0])
+		return nil, errors.Newf("unknown command: %s (supported: ix)", tokens[0])
 	}
 }
 
@@ -61,7 +62,7 @@ func ParseATSCodeWithForce(atsCode string, jobID string, force bool) (*ParsedATS
 // Supports both explicit subcommands (ix git <url>) and auto-detection (ix <url>)
 func parseIxCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 	if len(tokens) == 0 {
-		return nil, fmt.Errorf("ix command requires a target (e.g., ix https://github.com/user/repo)")
+		return nil, errors.New("ix command requires a target (e.g., ix https://github.com/user/repo)")
 	}
 
 	// Check for explicit subcommand
@@ -73,14 +74,14 @@ func parseIxCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 		if ixgit.IsRepoURL(tokens[0]) {
 			return parseIxGitCommand(tokens, jobID)
 		}
-		return nil, fmt.Errorf("unknown ix target: %s (expected a git repository URL)", tokens[0])
+		return nil, errors.Newf("unknown ix target: %s (expected a git repository URL)", tokens[0])
 	}
 }
 
 // parseIxGitCommand handles "ix git <url> [options]" syntax
 func parseIxGitCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 	if len(tokens) == 0 {
-		return nil, fmt.Errorf("ix git requires a repository URL or path")
+		return nil, errors.New("ix git requires a repository URL or path")
 	}
 
 	// First non-flag token is the repository URL/path
@@ -97,26 +98,26 @@ func parseIxGitCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 			switch token {
 			case "--since":
 				if i+1 >= len(tokens) {
-					return nil, fmt.Errorf("--since requires a value")
+					return nil, errors.New("--since requires a value")
 				}
 				i++
 				since = tokens[i]
 			case "--no-deps":
 				noDeps = true
 			default:
-				return nil, fmt.Errorf("unknown flag: %s", token)
+				return nil, errors.Newf("unknown flag: %s", token)
 			}
 		} else if repoURL == "" {
 			// First non-flag is the repo URL
 			repoURL = token
 		} else {
-			return nil, fmt.Errorf("unexpected argument: %s", token)
+			return nil, errors.Newf("unexpected argument: %s", token)
 		}
 		i++
 	}
 
 	if repoURL == "" {
-		return nil, fmt.Errorf("ix git requires a repository URL or path")
+		return nil, errors.New("ix git requires a repository URL or path")
 	}
 
 	// Build payload for ixgest.git handler
@@ -130,7 +131,7 @@ func parseIxGitCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal payload")
 	}
 
 	return &ParsedATSCode{
