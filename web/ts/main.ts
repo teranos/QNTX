@@ -2,8 +2,9 @@
 
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
-import { handleLogBatch, initLogPanel } from './log-panel.ts';
+import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
+import { CSS } from './css-classes.ts';
 import { updateGraph, initGraphResize } from './graph-renderer.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -13,6 +14,7 @@ import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
+import { statusIndicators } from './status-indicators.ts';
 import {
     handlePulseExecutionStarted,
     handlePulseExecutionFailed,
@@ -30,7 +32,7 @@ import './command-explorer-panel.ts';
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
 import './plugin-panel.ts';
-import './theme.ts';
+import './webscraper-panel.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
 import type { MessageHandlers, VersionMessage } from '../types/websocket';
@@ -51,6 +53,18 @@ console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
+
+// Handle webscraper response from server
+async function handleWebscraperResponse(data: any): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.handleScraperResponse(data);
+}
+
+// Handle webscraper progress updates
+async function handleWebscraperProgress(data: any): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.handleScraperProgress(data);
+}
 
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
@@ -80,8 +94,7 @@ function handleVersion(data: VersionMessage): void {
         const commitLink = document.createElement('a');
         commitLink.href = `https://github.com/teranos/QNTX/commit/${data.commit}`;
         commitLink.target = '_blank';
-        commitLink.style.color = 'inherit';
-        commitLink.style.textDecoration = 'none';
+        commitLink.classList.add('u-color-inherit', 'u-no-underline');
         commitLink.textContent = commitShort;
 
         buildHash.appendChild(commitLink);
@@ -157,14 +170,19 @@ async function init(): Promise<void> {
         'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
         'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
         'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
+        'webscraper_response': handleWebscraperResponse as MessageHandlers['webscraper_response'],
+        'webscraper_progress': handleWebscraperProgress as MessageHandlers['webscraper_progress'],
         '_default': updateGraph as unknown as MessageHandlers['_default']
     };
 
     connectWebSocket(handlers);
 
     // Initialize UI components
-    if (window.logLoaderStep) window.logLoaderStep('Initializing log panel...');
-    initLogPanel();
+    if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
+    initSystemDrawer();
+
+    // Initialize status indicators (connection, pulse daemon, etc.)
+    statusIndicators.init();
 
     // Initialize CodeMirror editor (replaces textarea)
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
@@ -248,10 +266,15 @@ async function init(): Promise<void> {
         });
 
         listen('toggle-logs', () => {
-            // Toggle log panel visibility
-            const logPanel = document.getElementById('log-panel');
-            if (logPanel) {
-                logPanel.classList.toggle('collapsed');
+            // Toggle system drawer visibility
+            const systemDrawer = document.getElementById('system-drawer');
+            if (systemDrawer) {
+                const isCollapsed = systemDrawer.classList.contains(CSS.STATE.COLLAPSED);
+                if (isCollapsed) {
+                    systemDrawer.classList.remove(CSS.STATE.COLLAPSED);
+                } else {
+                    systemDrawer.classList.add(CSS.STATE.COLLAPSED);
+                }
             }
         });
 

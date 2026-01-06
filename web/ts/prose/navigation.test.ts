@@ -215,7 +215,7 @@ describe('ProseNavigation', () => {
 
             const items = panel.querySelectorAll('.prose-tree-item');
             const visibleItems = Array.from(items).filter(
-                (item) => (item as HTMLElement).style.display !== 'none'
+                (item) => !(item as HTMLElement).classList.contains('u-hidden')
             );
 
             expect(visibleItems.length).toBe(1);
@@ -238,7 +238,7 @@ describe('ProseNavigation', () => {
 
             const items = panel.querySelectorAll('.prose-tree-item');
             const visibleItems = Array.from(items).filter(
-                (item) => (item as HTMLElement).style.display !== 'none'
+                (item) => !(item as HTMLElement).classList.contains('u-hidden')
             );
 
             expect(visibleItems.length).toBe(2);

@@ -129,7 +129,13 @@ function renderGraph(data: GraphData): void {
     // Show/hide isolated node toggle based on whether isolated nodes exist
     const isolatedToggle = domCache.get('isolatedToggle', 'isolated-toggle');
     if (isolatedToggle) {
-        isolatedToggle.style.display = isolatedNodeCount > 0 ? 'flex' : 'none';
+        if (isolatedNodeCount > 0) {
+            isolatedToggle.classList.remove('u-hidden');
+            isolatedToggle.classList.add('u-flex');
+        } else {
+            isolatedToggle.classList.remove('u-flex');
+            isolatedToggle.classList.add('u-hidden');
+        }
     }
 
     // Detect which node types are present in the data
@@ -142,14 +148,26 @@ function renderGraph(data: GraphData): void {
         const typeNameSpan = item.querySelector('.legenda-type-name');
         if (typeNameSpan) {
             const nodeType = normalizeNodeType(typeNameSpan.textContent);
-            htmlItem.style.display = presentNodeTypes.has(nodeType) ? 'flex' : 'none';
+            if (presentNodeTypes.has(nodeType)) {
+                htmlItem.classList.remove('u-hidden');
+                htmlItem.classList.add('u-flex');
+            } else {
+                htmlItem.classList.remove('u-flex');
+                htmlItem.classList.add('u-hidden');
+            }
         }
     });
 
     // Show/hide entire legenda container if there are no nodes
     const legenda = domCache.get('legenda', '.legenda');
     if (legenda) {
-        legenda.style.display = data.nodes.length > 0 ? 'block' : 'none';
+        if (data.nodes.length > 0) {
+            legenda.classList.remove('u-hidden');
+            legenda.classList.add('u-block');
+        } else {
+            legenda.classList.remove('u-block');
+            legenda.classList.add('u-hidden');
+        }
     }
 
     // Phase 2: Filter based on backend-controlled visibility
