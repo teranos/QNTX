@@ -3,12 +3,15 @@
  */
 
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, DecorationSet } from '@codemirror/view';
-import { EditorState, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state';
+import { EditorState, StateField, StateEffect, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+import { bracketMatching } from '@codemirror/language';
 import { autocompletion, completionKeymap, closeBrackets } from '@codemirror/autocomplete';
 import { lintKeymap } from '@codemirror/lint';
 import { languageServer } from 'codemirror-languageserver';
+
+// Theme support
+import { getCurrentThemeExtension, onThemeChange, type ThemeMode } from './codemirror-themes.ts';
 
 // Linter - TODO: enable once we have a proper way to import this
 // import { linter } from '@codemirror/lint';
@@ -22,6 +25,10 @@ import type { Diagnostic, SemanticToken } from '../types/lsp';
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
 let parseTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Theme compartment for dynamic theme switching
+const themeCompartment = new Compartment();
+let themeUnsubscribe: (() => void) | null = null;
 
 // Syntax highlighting via LSP semantic tokens
 // TODO(issue #13): codemirror-languageserver doesn't support semantic tokens yet (v1.18.1)
@@ -87,7 +94,8 @@ export function initCodeMirrorEditor(): EditorView | null {
             bracketMatching(),
             closeBrackets(),
             autocompletion(),
-            syntaxHighlighting(defaultHighlightStyle),
+            // Theme support via compartment for dynamic switching
+            themeCompartment.of(getCurrentThemeExtension()),
             syntaxDecorationsField, // ATS semantic token highlighting (manual LSP request)
             // linter(createAtsLinter()), // ATS parse error diagnostics - TODO: enable when linter is available
             // LSP features: completions, hover, diagnostics (async connection)
@@ -114,6 +122,15 @@ export function initCodeMirrorEditor(): EditorView | null {
                 }
             })
         ]
+    });
+
+    // Subscribe to theme changes for dynamic switching
+    themeUnsubscribe = onThemeChange((_mode: ThemeMode) => {
+        if (editorView) {
+            editorView.dispatch({
+                effects: themeCompartment.reconfigure(getCurrentThemeExtension())
+            });
+        }
     });
 
     // Create editor view
@@ -243,6 +260,12 @@ export function setEditorContent(content: string): void {
  * Cleanup editor and LSP client
  */
 export function destroyEditor(): void {
+    // Unsubscribe from theme changes
+    if (themeUnsubscribe) {
+        themeUnsubscribe();
+        themeUnsubscribe = null;
+    }
+
     if (editorView) {
         editorView.destroy();
         editorView = null;

@@ -4,12 +4,13 @@
  */
 
 import { EditorView } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView as PMEditorView } from 'prosemirror-view';
 import { createSchedulingControls } from '../../pulse/scheduling-controls';
 import type { ScheduledJobResponse } from '../../pulse/types';
 import { getScheduledJob } from '../../pulse/api';
+import { getAtsBlockTheme, onThemeChange, type ThemeMode } from '../../codemirror-themes';
 
 export class ATSCodeBlockNodeView {
     dom: HTMLElement;
@@ -18,6 +19,8 @@ export class ATSCodeBlockNodeView {
     private updating: boolean = false;
     private schedulingControls: HTMLElement | null = null;
     private documentPath: string;
+    private themeCompartment = new Compartment();
+    private themeUnsubscribe: (() => void) | null = null;
 
     constructor(
         private node: PMNode,
@@ -38,31 +41,12 @@ export class ATSCodeBlockNodeView {
         // Tried: CSS !important, caretColor, borderLeftWidth - none seem to work reliably
         // May need to investigate CodeMirror's cursor rendering more deeply
 
-        // Custom theme using CSS variables for easier theming
-        const atsTheme = EditorView.theme({
-            '&': {
-                fontSize: 'var(--ats-editor-font-size, 14px)',
-                fontFamily: "var(--ats-editor-font-family, 'JetBrains Mono', 'Fira Code', 'Consolas', monospace)"
-            },
-            '.cm-content': {
-                caretColor: 'var(--ats-editor-caret-color, #66b3ff)',
-                color: 'var(--ats-editor-text-color, #d4d4d4)',
-                padding: 'var(--ats-editor-padding, 16px)'
-            },
-            '.cm-cursor, .cm-cursor-primary': {
-                borderLeftColor: 'var(--ats-editor-caret-color, #66b3ff) !important',
-                borderLeftWidth: 'var(--ats-editor-cursor-width, 3px) !important'
-            },
-            '.cm-line': {
-                color: 'var(--ats-editor-text-color, #d4d4d4)'
-            }
-        });
-
         this.cmView = new EditorView({
             state: EditorState.create({
                 doc: initialContent,
                 extensions: [
-                    atsTheme,
+                    // Theme via compartment for dynamic switching
+                    this.themeCompartment.of(getAtsBlockTheme()),
                     EditorView.lineWrapping,
                     EditorView.updateListener.of((update) => {
                         if (this.updating) return;
@@ -75,6 +59,13 @@ export class ATSCodeBlockNodeView {
                 ]
             }),
             parent: this.dom
+        });
+
+        // Subscribe to theme changes
+        this.themeUnsubscribe = onThemeChange((_mode: ThemeMode) => {
+            this.cmView.dispatch({
+                effects: this.themeCompartment.reconfigure(getAtsBlockTheme())
+            });
         });
 
         // Add Pulse scheduling controls below CodeMirror editor
@@ -255,6 +246,11 @@ export class ATSCodeBlockNodeView {
     }
 
     destroy(): void {
+        // Unsubscribe from theme changes
+        if (this.themeUnsubscribe) {
+            this.themeUnsubscribe();
+            this.themeUnsubscribe = null;
+        }
         this.cmView.destroy();
     }
 

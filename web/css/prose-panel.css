@@ -27,14 +27,14 @@
     right: 0;
     width: 50%;
     height: 100%;
-    background: #1e1e1e;
-    border-left: 1px solid #333;
+    background: var(--bg-primary, #1e1e1e);
+    border-left: 1px solid var(--border-color, #333);
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
     z-index: 1000;
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, background-color 0.3s ease;
 }
 
 .prose-panel[data-visibility="hidden"] {
@@ -53,8 +53,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid #333;
-    background: #2a2a2a;
+    border-bottom: 1px solid var(--border-color, #333);
+    background: var(--bg-secondary, #2a2a2a);
 }
 
 .prose-title {
@@ -62,7 +62,7 @@
     align-items: center;
     gap: 12px;
     font-size: 16px;
-    color: #e0e0e0;
+    color: var(--text-primary, #e0e0e0);
 }
 
 .prose-icon {
@@ -74,14 +74,14 @@
 }
 
 .prose-breadcrumb {
-    color: #888;
+    color: var(--text-tertiary, #888);
     font-size: 14px;
 }
 
 .prose-close {
     background: none;
     border: none;
-    color: #888;
+    color: var(--text-tertiary, #888);
     font-size: 20px;
     cursor: pointer;
     padding: 4px 8px;
@@ -89,7 +89,7 @@
 }
 
 .prose-close:hover {
-    color: #e0e0e0;
+    color: var(--text-primary, #e0e0e0);
 }
 
 /* Body layout */
@@ -104,7 +104,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #1e1e1e;
+    background: var(--bg-primary, #1e1e1e);
 }
 
 .prose-editor-container {
@@ -123,7 +123,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     font-size: 15px;
     line-height: 1.6;
-    color: #e0e0e0;
+    color: var(--text-primary, #e0e0e0);
     outline: none;
     /* Ensure text is properly rendered */
     -webkit-font-smoothing: antialiased;
@@ -176,8 +176,8 @@
     font-size: 28px;
     font-weight: 600;
     margin: 24px 0 16px;
-    color: #fff;
-    border-bottom: 1px solid #333;
+    color: var(--text-primary, #fff);
+    border-bottom: 1px solid var(--border-color, #333);
     padding-bottom: 8px;
 }
 
@@ -185,14 +185,14 @@
     font-size: 22px;
     font-weight: 600;
     margin: 20px 0 12px;
-    color: #fff;
+    color: var(--text-primary, #fff);
 }
 
 #prose-editor .ProseMirror h3 {
     font-size: 18px;
     font-weight: 600;
     margin: 16px 0 8px;
-    color: #fff;
+    color: var(--text-primary, #fff);
 }
 
 #prose-editor .ProseMirror p {
@@ -210,7 +210,7 @@
 }
 
 #prose-editor .ProseMirror code {
-    background: #2a2a2a;
+    background: var(--bg-secondary, #2a2a2a);
     padding: 2px 4px;
     border-radius: 3px;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
@@ -218,7 +218,7 @@
 }
 
 #prose-editor .ProseMirror pre {
-    background: #2a2a2a;
+    background: var(--bg-secondary, #2a2a2a);
     padding: 12px 16px;
     border-radius: 4px;
     overflow-x: auto;
@@ -233,12 +233,12 @@
 #prose-editor .ProseMirror blockquote {
     margin: 12px 0;
     padding-left: 16px;
-    border-left: 3px solid #444;
-    color: #aaa;
+    border-left: 3px solid var(--border-color, #444);
+    color: var(--text-secondary, #aaa);
 }
 
 #prose-editor .ProseMirror a {
-    color: #66b3ff;
+    color: var(--ats-editor-border-accent, #66b3ff);
     text-decoration: none;
 }
 
@@ -248,7 +248,7 @@
 
 #prose-editor .ProseMirror strong {
     font-weight: 600;
-    color: #fff;
+    color: var(--text-primary, #fff);
 }
 
 #prose-editor .ProseMirror em {
@@ -257,7 +257,7 @@
 
 #prose-editor .ProseMirror hr {
     border: none;
-    border-top: 1px solid #444;
+    border-top: 1px solid var(--border-color, #444);
     margin: 20px 0;
 }
 
@@ -275,23 +275,23 @@
     vertical-align: top;
     box-sizing: border-box;
     position: relative;
-    border: 1px solid #444;
+    border: 1px solid var(--border-color, #444);
     padding: 8px 12px;
     min-width: 100px;
 }
 
 #prose-editor .ProseMirror th {
-    background: #2a2a2a;
+    background: var(--bg-secondary, #2a2a2a);
     font-weight: 600;
     text-align: left;
 }
 
 #prose-editor .ProseMirror td {
-    background: #1e1e1e;
+    background: var(--bg-primary, #1e1e1e);
 }
 
 #prose-editor .ProseMirror .selectedCell {
-    background: rgba(102, 179, 255, 0.2);
+    background: var(--ats-editor-selection, rgba(102, 179, 255, 0.2));
 }
 
 /* Column resize handle */
@@ -301,7 +301,7 @@
     top: 0;
     bottom: 0;
     width: 4px;
-    background: #66b3ff;
+    background: var(--ats-editor-border-accent, #66b3ff);
     pointer-events: none;
     cursor: col-resize;
 }
@@ -316,10 +316,10 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 20px;
-    border-top: 1px solid #333;
-    background: #252525;
+    border-top: 1px solid var(--border-color, #333);
+    background: var(--bg-secondary, #252525);
     font-size: 12px;
-    color: #888;
+    color: var(--text-tertiary, #888);
 }
 
 .prose-status-text {
@@ -327,7 +327,7 @@
 }
 
 .prose-status-text.error {
-    color: #ff6666;
+    color: var(--color-error, #ff6666);
 }
 
 .prose-save-indicator {
@@ -344,22 +344,46 @@
     display: none;
 }
 
+/* Theme toggle button */
+#theme-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+#theme-toggle:hover {
+    background: var(--bg-tertiary, #333);
+}
+
+.theme-icon {
+    font-size: 16px;
+    color: var(--text-secondary, #aaa);
+    transition: color 0.2s;
+}
+
+#theme-toggle:hover .theme-icon {
+    color: var(--text-primary, #e0e0e0);
+}
+
 /* Scrollbar styling */
 .prose-editor-container::-webkit-scrollbar {
     width: 8px;
 }
 
 .prose-editor-container::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-primary, #1e1e1e);
 }
 
 .prose-editor-container::-webkit-scrollbar-thumb {
-    background: #444;
+    background: var(--border-color, #444);
     border-radius: 4px;
 }
 
 .prose-editor-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: var(--text-tertiary, #555);
 }
 
 /* Responsive adjustments */

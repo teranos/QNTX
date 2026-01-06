@@ -4,16 +4,19 @@
  */
 
 import { EditorView } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView as PMEditorView } from 'prosemirror-view';
+import { getGoBlockTheme, onThemeChange, type ThemeMode } from '../../codemirror-themes';
 
 export class GoCodeBlockNodeView {
     dom: HTMLElement;
     contentDOM: HTMLElement | null = null;
     private cmView: EditorView | null = null;
     private updating: boolean = false;
+    private themeCompartment = new Compartment();
+    private themeUnsubscribe: (() => void) | null = null;
 
     constructor(
         private node: PMNode,
@@ -42,38 +45,14 @@ export class GoCodeBlockNodeView {
         // Create CodeMirror instance
         const initialContent = this.node.textContent;
 
-        // Custom theme for Go code
-        const goTheme = EditorView.theme({
-            '&': {
-                fontSize: '14px',
-                fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-                backgroundColor: '#1e1e1e'
-            },
-            '.cm-content': {
-                caretColor: '#66b3ff',
-                padding: '16px'
-            },
-            '.cm-cursor, .cm-cursor-primary': {
-                borderLeftColor: '#66b3ff !important',
-                borderLeftWidth: '2px !important'
-            },
-            '.cm-gutters': {
-                backgroundColor: '#1e1e1e',
-                color: '#858585',
-                border: 'none'
-            },
-            '.cm-activeLineGutter': {
-                backgroundColor: '#2a2d2e'
-            }
-        });
-
         this.cmView = new EditorView({
             state: EditorState.create({
                 doc: initialContent,
                 extensions: [
                     goExtension,  // Go language support (empty if unavailable)
                     syntaxHighlighting(defaultHighlightStyle), // Apply syntax highlighting theme
-                    goTheme,
+                    // Theme via compartment for dynamic switching
+                    this.themeCompartment.of(getGoBlockTheme()),
                     EditorView.lineWrapping,
 
                     EditorView.updateListener.of((update) => {
@@ -87,6 +66,15 @@ export class GoCodeBlockNodeView {
                 ]
             }),
             parent: this.dom
+        });
+
+        // Subscribe to theme changes
+        this.themeUnsubscribe = onThemeChange((_mode: ThemeMode) => {
+            if (this.cmView) {
+                this.cmView.dispatch({
+                    effects: this.themeCompartment.reconfigure(getGoBlockTheme())
+                });
+            }
         });
 
         console.log('[Go Block] CodeMirror initialized with Go syntax highlighting');
@@ -144,6 +132,11 @@ export class GoCodeBlockNodeView {
     }
 
     destroy(): void {
+        // Unsubscribe from theme changes
+        if (this.themeUnsubscribe) {
+            this.themeUnsubscribe();
+            this.themeUnsubscribe = null;
+        }
         if (this.cmView) {
             this.cmView.destroy();
         }

@@ -11,11 +11,103 @@
     --color-warning: #ffaa00;
     --color-info: #3b82f6;
 
+    /* Accent Colors */
+    --accent-blue: #3b82f6;
+    --accent-green: #22c55e;
+    --accent-red: #ef4444;
+
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
     --shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================================
+   Theme Variables - Dark Theme (default)
+   ============================================================================ */
+body[data-theme="dark"],
+body:not([data-theme]) {
+    /* Base colors */
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #252526;
+    --bg-tertiary: #2d2d30;
+    --text-primary: #d4d4d4;
+    --text-secondary: #aaa;
+    --text-tertiary: #666;
+    --border-color: #333;
+    --accent-color: #4ade80;
+
+    /* ATS Editor Variables */
+    --ats-editor-bg: #1a1a2e;
+    --ats-editor-text-color: #d4d4d4;
+    --ats-editor-caret-color: #66b3ff;
+    --ats-editor-selection: rgba(102, 179, 255, 0.2);
+    --ats-editor-border: #2a2a40;
+    --ats-editor-border-accent: #66b3ff;
+    --ats-editor-shadow: rgba(0, 0, 0, 0.3);
+    --ats-editor-badge-bg: rgba(102, 179, 255, 0.15);
+    --ats-editor-badge-color: #66b3ff;
+    --ats-editor-font-size: 14px;
+    --ats-editor-font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    --ats-editor-cursor-width: 3px;
+    --ats-editor-padding: 16px;
+
+    /* CodeMirror Main Editor */
+    --cm-bg: #1e1e1e;
+    --cm-text: #e0e0e0;
+    --cm-caret: #4ade80;
+    --cm-selection: rgba(74, 222, 128, 0.2);
+    --cm-gutter-bg: transparent;
+    --cm-gutter-text: #555;
+    --cm-gutter-border: #333;
+    --cm-active-line: rgba(74, 222, 128, 0.03);
+    --cm-active-line-gutter: rgba(74, 222, 128, 0.05);
+    --cm-tooltip-bg: #2a2a2a;
+    --cm-tooltip-border: #444;
+}
+
+/* ============================================================================
+   Theme Variables - Light Theme
+   ============================================================================ */
+body[data-theme="light"] {
+    /* Base colors */
+    --bg-primary: #ffffff;
+    --bg-secondary: #fafafa;
+    --bg-tertiary: #f0f0f0;
+    --text-primary: #1e1e1e;
+    --text-secondary: #555;
+    --text-tertiary: #999;
+    --border-color: #e0e0e0;
+    --accent-color: #16a34a;
+
+    /* ATS Editor Variables */
+    --ats-editor-bg: #f8f9fa;
+    --ats-editor-text-color: #1e1e1e;
+    --ats-editor-caret-color: #16a34a;
+    --ats-editor-selection: rgba(22, 163, 74, 0.2);
+    --ats-editor-border: #e0e0e0;
+    --ats-editor-border-accent: #16a34a;
+    --ats-editor-shadow: rgba(0, 0, 0, 0.08);
+    --ats-editor-badge-bg: rgba(22, 163, 74, 0.1);
+    --ats-editor-badge-color: #16a34a;
+    --ats-editor-font-size: 14px;
+    --ats-editor-font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    --ats-editor-cursor-width: 3px;
+    --ats-editor-padding: 16px;
+
+    /* CodeMirror Main Editor */
+    --cm-bg: #ffffff;
+    --cm-text: #1e1e1e;
+    --cm-caret: #16a34a;
+    --cm-selection: rgba(22, 163, 74, 0.2);
+    --cm-gutter-bg: #fafafa;
+    --cm-gutter-text: #999;
+    --cm-gutter-border: #e0e0e0;
+    --cm-active-line: rgba(22, 163, 74, 0.05);
+    --cm-active-line-gutter: rgba(22, 163, 74, 0.08);
+    --cm-tooltip-bg: #ffffff;
+    --cm-tooltip-border: #d4d4d4;
 }
 
 /* Base */

@@ -1,17 +1,18 @@
 /* CodeMirror 6 Editor Styling */
+/* Note: These are CSS overrides. Main theming is done via JavaScript themes in codemirror-themes.ts */
 
 #codemirror-container {
     width: 100%;
     height: 100%;
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
 }
 
 /* Match existing ATS editor styling */
 #codemirror-container .cm-editor {
     height: 100%;
-    background: transparent;
-    color: #e0e0e0;
+    background: var(--cm-bg, transparent);
+    color: var(--cm-text, #e0e0e0);
 }
 
 #codemirror-container .cm-scroller {
@@ -21,33 +22,33 @@
 
 #codemirror-container .cm-content {
     padding: 8px 0;
-    caret-color: #4ade80;
+    caret-color: var(--cm-caret, #4ade80);
 }
 
 #codemirror-container .cm-cursor {
-    border-left-color: #4ade80;
+    border-left-color: var(--cm-caret, #4ade80);
 }
 
 /* Line numbers */
 #codemirror-container .cm-gutters {
-    background: transparent;
-    border-right: 1px solid #333;
-    color: #555;
+    background: var(--cm-gutter-bg, transparent);
+    border-right: 1px solid var(--cm-gutter-border, #333);
+    color: var(--cm-gutter-text, #555);
     padding-right: 8px;
 }
 
 #codemirror-container .cm-activeLineGutter {
-    background: rgba(74, 222, 128, 0.05);
+    background: var(--cm-active-line-gutter, rgba(74, 222, 128, 0.05));
 }
 
 /* Active line highlight */
 #codemirror-container .cm-activeLine {
-    background: rgba(74, 222, 128, 0.03);
+    background: var(--cm-active-line, rgba(74, 222, 128, 0.03));
 }
 
 /* Selection */
 #codemirror-container .cm-selectionBackground {
-    background: rgba(74, 222, 128, 0.2) !important;
+    background: var(--cm-selection, rgba(74, 222, 128, 0.2)) !important;
 }
 
 /* Focused state */
@@ -57,8 +58,8 @@
 
 /* Completion popup */
 .cm-tooltip-autocomplete {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--cm-tooltip-bg, #2a2a2a);
+    border: 1px solid var(--cm-tooltip-border, #444);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
@@ -69,18 +70,18 @@
 
 .cm-tooltip-autocomplete li {
     padding: 4px 8px;
-    color: #ccc;
+    color: var(--text-secondary, #ccc);
 }
 
 .cm-tooltip-autocomplete li[aria-selected] {
-    background: rgba(74, 222, 128, 0.2);
-    color: #fff;
+    background: var(--cm-selection, rgba(74, 222, 128, 0.2));
+    color: var(--text-primary, #fff);
 }
 
 /* Match bracket highlighting */
 .cm-matchingBracket {
-    background: rgba(74, 222, 128, 0.2);
-    outline: 1px solid rgba(74, 222, 128, 0.5);
+    background: var(--cm-selection, rgba(74, 222, 128, 0.2));
+    outline: 1px solid var(--accent-color, rgba(74, 222, 128, 0.5));
 }
 
 .cm-nonmatchingBracket {
