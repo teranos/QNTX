@@ -3,13 +3,13 @@
 import { MAX_LOGS, state } from './config.ts';
 import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
-import type { LogMessage, LogBatchData } from '../types/core';
+import type { LogsMessage, LogEntry } from '../types/websocket';
 
 // Make this a module
 export {};
 
-// Log handling
-export function handleLogBatch(data: LogBatchData): void {
+// Log handling - accepts the full WebSocket message type
+export function handleLogBatch(data: LogsMessage): void {
     console.log('📋 handleLogBatch called:', data);
 
     if (!data.data || !data.data.messages) {
@@ -31,7 +31,7 @@ export function handleLogBatch(data: LogBatchData): void {
     updateLogCount();
 }
 
-function appendLog(msg: LogMessage): void {
+function appendLog(msg: LogEntry): void {
     const logContent = document.getElementById('log-content') as HTMLElement | null;
     if (!logContent) return;
 
@@ -115,7 +115,7 @@ export function clearLogs(): void {
 }
 
 // Toast notifications
-function showToast(msg: LogMessage): void {
+function showToast(msg: LogEntry): void {
     const container = document.getElementById('toast-container') as HTMLElement | null;
     if (!container) return;
 
