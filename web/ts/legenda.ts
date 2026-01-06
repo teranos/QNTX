@@ -4,17 +4,20 @@ import { appState, UI_TEXT } from './config.ts';
 import type { GraphData, NodeTypeInfo } from '../types/core';
 import { sendMessage } from './websocket.ts'; // Phase 2: Send visibility preferences to backend
 
-// Node type visibility state
-export const hiddenNodeTypes: Set<string> = new Set();
+// Re-export graph visibility state from appState for backward compatibility
+// All visibility state is now centralized in appState.graphVisibility
+export const hiddenNodeTypes = appState.graphVisibility.hiddenNodeTypes;
+export const revealRelatedActive = appState.graphVisibility.revealRelatedActive;
 
-// Isolated node visibility state
-export let hideIsolated: boolean = false;
+// Getter for hideIsolated (re-exporting a primitive requires a getter)
+export function getHideIsolated(): boolean {
+    return appState.graphVisibility.hideIsolated;
+}
 
-// Reveal related nodes state - tracks which types have "reveal related" active
-// TODO: This feature is experimental. The proper implementation should modify the ATS query
-// in the editor to reflect the current graph state, rather than just filtering the display.
-// Future work: Parse current query, add/remove node type filters, update editor, re-run query.
-export const revealRelatedActive: Set<string> = new Set();
+// Setter for hideIsolated (needed for checkbox handler)
+export function setHideIsolated(value: boolean): void {
+    appState.graphVisibility.hideIsolated = value;
+}
 
 // Event listener tracking interface
 interface EventListenerRecord {
@@ -235,7 +238,7 @@ export function initLegendaToggles(
     const isolatedCheckbox = document.getElementById('hide-isolated') as HTMLInputElement | null;
     if (isolatedCheckbox) {
         const handler = function(this: HTMLInputElement): void {
-            hideIsolated = this.checked;
+            setHideIsolated(this.checked);
 
             // Phase 2: Send visibility preference to backend
             sendMessage({
