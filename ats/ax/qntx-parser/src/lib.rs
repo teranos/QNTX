@@ -20,14 +20,20 @@
 //! # Example
 //!
 //! ```rust
-//! use qntx_parser::ax::Lexer;
+//! use qntx_parser::{Parser, AxQuery};
 //!
 //! let input = "ALICE is author of GitHub";
-//! let lexer = Lexer::new(input);
-//! let tokens: Vec<_> = lexer.collect();
+//! let query = Parser::parse_str(input).unwrap();
+//!
+//! assert_eq!(query.subjects, vec!["ALICE"]);
+//! assert_eq!(query.predicates, vec!["author"]);
+//! assert_eq!(query.contexts, vec!["GitHub"]);
 //! ```
 
 pub mod ax;
 
 // Re-export main types
-pub use ax::{Lexer, Token, TokenKind};
+pub use ax::{
+    AxQuery, DurationExpr, DurationUnit, Lexer, ParseError, Parser, TemporalClause, Token,
+    TokenKind,
+};
