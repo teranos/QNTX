@@ -11,6 +11,7 @@ import { BasePanel } from '../base-panel.ts';
 import { ProseEditor } from './editor.ts';
 import { ProseNavigation } from './navigation.ts';
 import { fetchDevMode } from '../dev-mode.ts';
+import { toggleTheme, getCurrentTheme } from '../codemirror-themes.ts';
 
 class ProsePanel extends BasePanel {
     // Component modules
@@ -99,6 +100,16 @@ class ProsePanel extends BasePanel {
         const closeBtn = this.$('.prose-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
+        // Theme toggle button
+        const themeToggle = this.$('#theme-toggle');
+        themeToggle?.addEventListener('click', () => {
+            const newTheme = toggleTheme();
+            this.updateThemeIcon(newTheme === 'dark');
+        });
+
+        // Initialize theme icon based on current theme
+        this.updateThemeIcon(getCurrentTheme() === 'dark');
+
         // Save on Cmd/Ctrl+S
         this.saveKeyHandler = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 's' && this.isVisible) {
@@ -107,6 +118,13 @@ class ProsePanel extends BasePanel {
             }
         };
         document.addEventListener('keydown', this.saveKeyHandler);
+    }
+
+    private updateThemeIcon(isDark: boolean): void {
+        const themeIcon = this.$('.theme-icon');
+        if (themeIcon) {
+            themeIcon.textContent = isDark ? '☀' : '☾';
+        }
     }
 
     protected beforeHide(): boolean {

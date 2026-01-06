@@ -10,6 +10,7 @@ import { GoEditorNavigation } from './navigation.ts';
 import { CodeSuggestions } from './suggestions.ts';
 import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
+import { getTheme, onThemeChange, type ThemeMode } from '../codemirror-themes.ts';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -30,6 +31,10 @@ class GoEditorPanel extends BasePanel {
     private workspaceRoot: string = '';
     private currentTab: 'editor' | 'suggestions' = 'editor';
     private editorContent: string = '';
+
+    // Theme support
+    private themeCompartment: any | null = null;
+    private themeUnsubscribe: (() => void) | null = null;
 
     // Components
     private navigation: GoEditorNavigation;
@@ -227,9 +232,8 @@ class GoEditorPanel extends BasePanel {
 
     private async loadCodeMirrorModules() {
         const { EditorView, keymap } = await import('@codemirror/view');
-        const { EditorState } = await import('@codemirror/state');
+        const { EditorState, Compartment } = await import('@codemirror/state');
         const { defaultKeymap } = await import('@codemirror/commands');
-        const { oneDark } = await import('@codemirror/theme-one-dark');
         const { autocompletion, completionKeymap } = await import('@codemirror/autocomplete');
         const { languageServer } = await import('codemirror-languageserver');
 
@@ -246,10 +250,10 @@ class GoEditorPanel extends BasePanel {
         return {
             EditorView,
             EditorState,
+            Compartment,
             keymap,
             defaultKeymap,
             completionKeymap,
-            oneDark,
             autocompletion,
             languageServer,
             goExtension
@@ -298,9 +302,12 @@ class GoEditorPanel extends BasePanel {
             throw new Error('Editor container not found');
         }
 
-        const { EditorView, EditorState, keymap, defaultKeymap, completionKeymap,
-                oneDark, autocompletion, languageServer, goExtension } = modules;
+        const { EditorView, EditorState, Compartment, keymap, defaultKeymap, completionKeymap,
+                autocompletion, languageServer, goExtension } = modules;
         const { goplsUri, workspaceRoot, documentUri } = goplsConfig;
+
+        // Create theme compartment for dynamic switching
+        this.themeCompartment = new Compartment();
 
         this.editor = new EditorView({
             state: EditorState.create({
@@ -308,7 +315,8 @@ class GoEditorPanel extends BasePanel {
                 extensions: [
                     keymap.of([...defaultKeymap, ...completionKeymap]),
                     goExtension,
-                    oneDark,
+                    // Theme via compartment for dynamic switching
+                    this.themeCompartment.of(getTheme()),
                     autocompletion(),
                     languageServer({
                         serverUri: goplsUri,
@@ -330,6 +338,15 @@ class GoEditorPanel extends BasePanel {
                 ]
             }),
             parent: container
+        });
+
+        // Subscribe to theme changes
+        this.themeUnsubscribe = onThemeChange((_mode: ThemeMode) => {
+            if (this.editor && this.themeCompartment) {
+                this.editor.dispatch({
+                    effects: this.themeCompartment.reconfigure(getTheme())
+                });
+            }
         });
     }
 
@@ -422,6 +439,12 @@ class GoEditorPanel extends BasePanel {
     }
 
     destroyEditor(): void {
+        // Unsubscribe from theme changes
+        if (this.themeUnsubscribe) {
+            this.themeUnsubscribe();
+            this.themeUnsubscribe = null;
+        }
+
         if (this.editor) {
             try {
                 this.editor.destroy();
@@ -430,6 +453,7 @@ class GoEditorPanel extends BasePanel {
             }
             this.editor = null;
         }
+        this.themeCompartment = null;
     }
 
     private getEditorSidebarTemplate(): string {

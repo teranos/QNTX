@@ -34,6 +34,7 @@ import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initConsoleReporter } from './console-reporter.ts';
+import { initTheme } from './codemirror-themes.ts';
 
 import type { MessageHandlers, VersionMessage } from '../types/websocket';
 
@@ -119,6 +120,9 @@ async function init(): Promise<void> {
     // TIMING: Track when init() is called
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
+
+    // Initialize theme from localStorage or system preference
+    initTheme();
 
     // Initialize console reporter (dev mode only)
     try {
