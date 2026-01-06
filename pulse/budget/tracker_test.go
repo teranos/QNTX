@@ -7,6 +7,7 @@ import (
 	"time"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/internal/util"
 )
 
 // TestTracker_ReadsFromActualUsage verifies that Tracker reads actual spend from ai_model_usage
@@ -39,10 +40,10 @@ func TestTracker_ReadsFromActualUsage(t *testing.T) {
 	expectedRemaining := 1.50
 	tolerance := 0.01
 
-	if abs(status.DailySpend-expectedSpend) > tolerance {
+	if util.AbsFloat64(status.DailySpend-expectedSpend) > tolerance {
 		t.Errorf("DailySpend = $%.2f, want $%.2f", status.DailySpend, expectedSpend)
 	}
-	if abs(status.DailyRemaining-expectedRemaining) > tolerance {
+	if util.AbsFloat64(status.DailyRemaining-expectedRemaining) > tolerance {
 		t.Errorf("DailyRemaining = $%.2f, want $%.2f", status.DailyRemaining, expectedRemaining)
 	}
 }
@@ -71,7 +72,7 @@ func TestTracker_EnforcesDailyLimit(t *testing.T) {
 	if err == nil {
 		t.Fatal("CheckBudget() should return error when daily limit exceeded")
 	}
-	if !contains(err.Error(), "daily budget would be exceeded") {
+	if !strings.Contains(err.Error(), "daily budget would be exceeded") {
 		t.Errorf("Expected 'daily budget would be exceeded' error, got: %v", err)
 	}
 }
@@ -142,7 +143,7 @@ func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
 	if err == nil {
 		t.Fatal("CheckBudget() should return error when monthly limit exceeded")
 	}
-	if !contains(err.Error(), "monthly budget would be exceeded") {
+	if !strings.Contains(err.Error(), "monthly budget would be exceeded") {
 		t.Errorf("Expected 'monthly budget would be exceeded' error, got: %v", err)
 	}
 }
@@ -173,7 +174,7 @@ func TestTracker_MultipleJobsCounted(t *testing.T) {
 	if err == nil {
 		t.Fatal("CheckBudget() should block Job C when combined spend exceeds limit")
 	}
-	if !contains(err.Error(), "daily budget would be exceeded") {
+	if !strings.Contains(err.Error(), "daily budget would be exceeded") {
 		t.Errorf("Expected daily budget error, got: %v", err)
 	}
 }
@@ -210,24 +211,6 @@ func insertUsage(t *testing.T, db *sql.DB, timestamp time.Time, costUSD float64)
 	if err != nil {
 		t.Fatalf("Failed to insert usage record: %v", err)
 	}
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func daysInMonth(t time.Time) int {

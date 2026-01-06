@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -91,7 +92,7 @@ func (s *QNTXServer) Start(port int, openBrowserFunc func(url string)) error {
 	// Find an available port
 	actualPort, err := findAvailablePort(port)
 	if err != nil {
-		return fmt.Errorf("failed to find available port: %w", err)
+		return errors.Wrap(err, "failed to find available port")
 	}
 
 	if actualPort != port {
