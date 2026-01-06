@@ -8,7 +8,7 @@ import { CSS } from './css-classes.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
-import { restoreSession } from './state-manager.ts';
+import { uiState } from './ui-state.ts';
 import { state } from './config.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
@@ -144,21 +144,21 @@ async function init(): Promise<void> {
     }
 
     // Restore previous session if exists
-    const session = restoreSession();
-    if (session) {
+    const graphSession = uiState.getGraphSession();
+    if (graphSession.query || graphSession.verbosity !== undefined) {
         if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
         // Restore verbosity
-        if (session.verbosity !== undefined) {
-            state.currentVerbosity = session.verbosity;
+        if (graphSession.verbosity !== undefined) {
+            state.currentVerbosity = graphSession.verbosity;
             const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
             if (verbositySelect) {
-                verbositySelect.value = session.verbosity.toString();
+                verbositySelect.value = graphSession.verbosity.toString();
             }
         }
 
         // Restore query (will be re-run to get fresh graph data)
-        if (session.query) {
-            state.currentQuery = session.query;
+        if (graphSession.query) {
+            state.currentQuery = graphSession.query;
         }
     }
 

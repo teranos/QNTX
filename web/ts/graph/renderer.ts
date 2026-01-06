@@ -2,7 +2,7 @@
 // Main rendering orchestration - delegates to specialized modules
 
 import { state, GRAPH_PHYSICS, GRAPH_STYLES } from '../config.ts';
-import { saveSession } from '../state-manager.ts';
+import { uiState } from '../ui-state.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
@@ -395,10 +395,10 @@ function saveCurrentSession(): void {
         state.currentTransform = transform;
     }
 
-    saveSession({
+    // NOTE: Not saving graphData - D3 object references don't serialize properly
+    // Query will be re-run on page load instead
+    uiState.setGraphSession({
         query: state.currentQuery,
-        verbosity: state.currentVerbosity
-        // NOTE: Not saving graphData - D3 object references don't serialize properly
-        // Query will be re-run on page load instead
+        verbosity: state.currentVerbosity,
     });
 }
