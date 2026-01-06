@@ -67,16 +67,22 @@ flake.nix
 │   ├── flake-utils (multi-platform support)
 │   └── pre-commit-hooks (Nix-based code formatting)
 ├── packages
-│   ├── qntx (Go binary)
+│   ├── qntx (CLI binary)
+│   ├── qntx-code (plugin binary)
 │   ├── ci-image (auto-detected architecture)
 │   ├── ci-image-amd64
-│   └── ci-image-arm64
+│   ├── ci-image-arm64
+│   ├── qntx-code-plugin-image (auto-detected architecture)
+│   ├── qntx-code-plugin-image-amd64
+│   └── qntx-code-plugin-image-arm64
 ├── devShells
 │   └── default (development environment)
 └── checks
     ├── pre-commit (Nix formatting)
-    ├── qntx-build (verify QNTX compiles)
-    └── ci-image (verify image builds)
+    ├── qntx-build (verify QNTX CLI compiles)
+    ├── qntx-code-build (verify plugin compiles)
+    ├── ci-image (verify CI image builds)
+    └── qntx-code-plugin-image (verify plugin image builds)
 ```
 
 ### Container Image Contents
@@ -91,9 +97,9 @@ The CI image (`ci-image-*`) includes:
 **Rust Toolchain:**
 - rustc, cargo, rustfmt, clippy
 
-**Tauri Dependencies:**
-- WebKitGTK, GTK3, Cairo, Pango, etc.
-- System libraries for Linux desktop app builds
+**System Dependencies:**
+- openssl (for HTTPS)
+- patchelf (for binary patching)
 
 **Build Tools:**
 - pkg-config, gcc, make, sqlite
