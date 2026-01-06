@@ -8,8 +8,9 @@
  * For ix (⨳) operations, see job-list-panel.js
  */
 
+import { BasePanel } from './base-panel.ts';
 import { AX } from '@generated/sym.js';
-import { DATA, setVisibility, setActive } from './css-classes.ts';
+import { setActive, DATA } from './css-classes.ts';
 
 interface AxStatement {
     type: string;
@@ -40,96 +41,89 @@ const mockQueryHistory: QueryHistoryItem[] = [
     { query: 'is manager by linkedin', timestamp: '3 days ago', results: 8 }
 ];
 
-class CommandExplorerPanel {
+class CommandExplorerPanel extends BasePanel {
     private currentMode: 'ax' | 'as' | null = null;
-    private panel: HTMLElement | null = null;
-    private isVisible: boolean = false;
 
     constructor() {
-        this.initialize();
-    }
-
-    initialize(): void {
-        // Create panel element
-        this.panel = document.createElement('div');
-        this.panel.id = 'command-explorer-panel';
-        this.panel.className = 'command-explorer-panel';
-        setVisibility(this.panel, DATA.VISIBILITY.HIDDEN);
-        this.panel.innerHTML = this.getEmptyTemplate();
-
-        // Insert after symbol palette
-        const symbolPalette = document.getElementById('symbolPalette');
-        if (symbolPalette && symbolPalette.parentNode) {
-            symbolPalette.parentNode.insertBefore(this.panel, symbolPalette.nextSibling);
-        }
-
-        // Click outside to close
-        document.addEventListener('click', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (this.panel && this.isVisible && !this.panel.contains(target) && !target.closest('.palette-cell')) {
-                this.hide();
-            }
+        super({
+            id: 'command-explorer-panel',
+            classes: ['command-explorer-panel'],
+            useOverlay: false,  // Uses click-outside instead
+            closeOnEscape: true,
+            insertAfter: '#symbolPalette'
         });
     }
 
-    getEmptyTemplate(): string {
+    protected getTemplate(): string {
         return `
             <div class="command-explorer-header">
                 <h3 class="command-explorer-title"></h3>
-                <button class="command-explorer-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="command-explorer-search">
                 <input type="text" placeholder="Filter..." class="command-search-input">
             </div>
-            <div class="command-explorer-content"></div>
+            <div class="panel-content command-explorer-content"></div>
         `;
     }
 
-    show(mode: string): void {
-        if (!this.panel) return;
+    protected setupEventListeners(): void {
+        // Search input
+        const searchInput = this.$<HTMLInputElement>('.command-search-input');
+        searchInput?.addEventListener('input', (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            this.filterItems(target.value);
+        });
 
+        // Filter items - click to populate editor with command (event delegation)
+        const content = this.$('.command-explorer-content');
+        content?.addEventListener('click', (e: Event) => {
+            const target = e.target as HTMLElement;
+            const item = target.closest('.filter-item') as HTMLElement | null;
+            if (item) {
+                this.handleCommandItemClick(item);
+            }
+        });
+    }
+
+    /**
+     * Show panel with specific mode
+     */
+    public showWithMode(mode: string): void {
         this.currentMode = mode as 'ax' | 'as';
-        this.isVisible = true;
 
-        // Update content based on mode
+        // Update content based on mode before showing
         if (mode === 'ax') {
             this.renderAxFilters();
         } else if (mode === 'as') {
             this.renderAsHistory();
         }
 
-        setVisibility(this.panel, DATA.VISIBILITY.VISIBLE);
+        this.show();
+    }
 
+    protected async onShow(): Promise<void> {
         // Focus search input
-        const searchInput = this.panel.querySelector('.command-search-input') as HTMLInputElement | null;
+        const searchInput = this.$<HTMLInputElement>('.command-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
         }
-
-        // Setup event listeners
-        this.setupEventListeners();
     }
 
-    hide(): void {
-        if (!this.panel) return;
-
-        this.isVisible = false;
-        setVisibility(this.panel, DATA.VISIBILITY.HIDDEN);
-    }
-
-    toggle(mode: string): void {
+    /**
+     * Toggle panel with specific mode
+     */
+    public toggleWithMode(mode: string): void {
         if (this.isVisible && this.currentMode === mode) {
             this.hide();
         } else {
-            this.show(mode);
+            this.showWithMode(mode);
         }
     }
 
-    renderAsHistory(): void {
-        if (!this.panel) return;
-
-        const title = this.panel.querySelector('.command-explorer-title');
-        const content = this.panel.querySelector('.command-explorer-content');
+    private renderAsHistory(): void {
+        const title = this.$('.command-explorer-title');
+        const content = this.$('.command-explorer-content');
 
         if (title) {
             title.textContent = '+ Query History';
@@ -163,11 +157,9 @@ class CommandExplorerPanel {
         content.appendChild(filterItems);
     }
 
-    renderAxFilters(): void {
-        if (!this.panel) return;
-
-        const title = this.panel.querySelector('.command-explorer-title');
-        const content = this.panel.querySelector('.command-explorer-content');
+    private renderAxFilters(): void {
+        const title = this.$('.command-explorer-title');
+        const content = this.$('.command-explorer-content');
 
         if (title) {
             title.textContent = `${AX} ax Statements`;
@@ -234,41 +226,8 @@ class CommandExplorerPanel {
         content.appendChild(filterItems);
     }
 
-    setupEventListeners(): void {
-        if (!this.panel) return;
-
-        // Close button
-        const closeBtn = this.panel.querySelector('.command-explorer-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.hide());
-        }
-
-        // Search input
-        const searchInput = this.panel.querySelector('.command-search-input') as HTMLInputElement | null;
-        if (searchInput) {
-            searchInput.addEventListener('input', (e: Event) => {
-                const target = e.target as HTMLInputElement;
-                this.filterItems(target.value);
-            });
-        }
-
-        // Filter items - click to populate editor with command
-        const items = this.panel.querySelectorAll('.filter-item');
-        items.forEach(item => {
-            item.addEventListener('click', () => this.handleCommandItemClick(item as HTMLElement));
-        });
-
-        // TODO: Add action buttons within each command item for operations like:
-        // - Retry failed ix invocations
-        // - Stop running ix invocations
-        // - View detailed logs/results
-        // These buttons should have tooltips explaining their function
-    }
-
-    filterItems(searchText: string): void {
-        if (!this.panel) return;
-
-        const items = this.panel.querySelectorAll('.filter-item');
+    private filterItems(searchText: string): void {
+        const items = this.$$('.filter-item');
         const search = searchText.toLowerCase();
 
         items.forEach(item => {
@@ -281,11 +240,17 @@ class CommandExplorerPanel {
                           label.toLowerCase().includes(search) ||
                           description.toLowerCase().includes(search);
 
-            htmlItem.style.display = matches ? 'block' : 'none';
+            if (matches) {
+                htmlItem.classList.remove('u-hidden');
+                htmlItem.classList.add('u-block');
+            } else {
+                htmlItem.classList.remove('u-block');
+                htmlItem.classList.add('u-hidden');
+            }
         });
     }
 
-    handleCommandItemClick(item: HTMLElement): void {
+    private handleCommandItemClick(item: HTMLElement): void {
         const mode = item.dataset.mode as 'ax' | 'as' | undefined;
 
         console.log(`[Command Explorer] Clicked ${mode} command`);
@@ -302,15 +267,13 @@ class CommandExplorerPanel {
         }
 
         // Highlight the selected item using data-active attribute
-        if (this.panel) {
-            this.panel.querySelectorAll('.filter-item').forEach(i => {
-                setActive(i as HTMLElement, DATA.ACTIVE.INACTIVE);
-            });
-        }
+        this.$$('.filter-item').forEach(i => {
+            setActive(i as HTMLElement, DATA.ACTIVE.INACTIVE);
+        });
         setActive(item, DATA.ACTIVE.SELECTED);
     }
 
-    populateQueryFromHistory(item: HTMLElement): void {
+    private populateQueryFromHistory(item: HTMLElement): void {
         const editor = document.getElementById('ats-editor') as HTMLTextAreaElement | null;
         if (!editor) return;
 
@@ -327,7 +290,7 @@ class CommandExplorerPanel {
         }
     }
 
-    populateAxStatement(type: string): void {
+    private populateAxStatement(type: string): void {
         const editor = document.getElementById('ats-editor') as HTMLTextAreaElement | null;
         if (!editor) return;
 
@@ -352,7 +315,11 @@ class CommandExplorerPanel {
 // Initialize and export
 const commandExplorerPanel = new CommandExplorerPanel();
 
-// Export for use by symbol palette
-window.commandExplorerPanel = commandExplorerPanel;
+// Export for use by symbol palette - expose showWithMode and toggleWithMode
+(window as any).commandExplorerPanel = {
+    show: (mode: string) => commandExplorerPanel.showWithMode(mode),
+    hide: () => commandExplorerPanel.hide(),
+    toggle: (mode: string) => commandExplorerPanel.toggleWithMode(mode)
+};
 
 export {};

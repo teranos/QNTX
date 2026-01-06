@@ -90,7 +90,9 @@ class ConfigPanel extends BasePanel {
     }
 
     protected async onShow(): Promise<void> {
+        this.showLoading('Loading configuration...');
         await this.fetchConfig();
+        this.hideLoading();
         this.render();
 
         // Focus search input
@@ -107,18 +109,6 @@ class ConfigPanel extends BasePanel {
             const toast = document.createElement('div');
             toast.className = 'config-toast';
             toast.textContent = `Copied to clipboard: ${path}`;
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: #333;
-                color: #fff;
-                padding: 12px 20px;
-                border-radius: 4px;
-                font-size: 12px;
-                z-index: 10000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
         }).catch(err => {
@@ -159,11 +149,8 @@ class ConfigPanel extends BasePanel {
         if (!content) return;
 
         if (!this.appConfig || this.appConfig.settings.length === 0) {
-            content.innerHTML = `
-                <div class="config-empty">
-                    <p>No configuration loaded</p>
-                </div>
-            `;
+            content.innerHTML = '';
+            content.appendChild(this.createEmptyState('No configuration loaded'));
             return;
         }
 
@@ -363,15 +350,27 @@ class ConfigPanel extends BasePanel {
             const key = setting.querySelector('.config-setting-key')?.textContent || '';
             const value = setting.querySelector('.config-setting-value')?.textContent || '';
             const matches = key.toLowerCase().includes(search) || value.toLowerCase().includes(search);
-            htmlSetting.style.display = matches ? 'grid' : 'none';
+            if (matches) {
+                htmlSetting.classList.remove('u-hidden');
+                htmlSetting.classList.add('u-grid');
+            } else {
+                htmlSetting.classList.remove('u-grid');
+                htmlSetting.classList.add('u-hidden');
+            }
         });
 
         const groups = this.$$('.config-group');
         groups.forEach(group => {
             const htmlGroup = group as HTMLElement;
             const visibleSettings = Array.from(group.querySelectorAll('.config-setting'))
-                .filter(s => (s as HTMLElement).style.display !== 'none');
-            htmlGroup.style.display = visibleSettings.length > 0 ? 'block' : 'none';
+                .filter(s => !(s as HTMLElement).classList.contains('u-hidden'));
+            if (visibleSettings.length > 0) {
+                htmlGroup.classList.remove('u-hidden');
+                htmlGroup.classList.add('u-block');
+            } else {
+                htmlGroup.classList.remove('u-block');
+                htmlGroup.classList.add('u-hidden');
+            }
         });
     }
 

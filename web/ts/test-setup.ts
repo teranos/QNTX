@@ -13,3 +13,5 @@ globalThis.window = window;
 globalThis.document = document;
 // @ts-ignore
 globalThis.HTMLElement = window.HTMLElement;
+// @ts-ignore
+globalThis.localStorage = window.localStorage;

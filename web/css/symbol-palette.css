@@ -15,16 +15,22 @@
 
 /* Symbol Cell - Symbol-first design (now using button elements) */
 .palette-cell {
-    padding: 8px 4px;
+    /* Square aspect ratio */
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    font-size: 11px;
+    font-size: 13px; /* Default size for mobile */
     color: #000;
     background: #f8f8f8;
     border: 1px solid #ddd;
     cursor: pointer;
     transition: all 0.15s ease;
     position: relative;
-    font-weight: 400;
+    font-weight: 500; /* Slightly bolder for better visibility */
     /* Reset button defaults */
     font-family: inherit;
     line-height: inherit;
@@ -34,14 +40,14 @@
 .palette-cell::after {
     content: attr(data-label);
     position: absolute;
-    bottom: -28px;
+    bottom: -32px; /* Adjusted for larger symbols */
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.85);
     color: #fff;
     padding: 4px 8px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: 11px; /* Slightly larger tooltip text */
     font-family: 'Courier New', monospace;
     white-space: nowrap;
     opacity: 0;
@@ -58,6 +64,43 @@
 
 .palette-cell:hover::after {
     opacity: 1;
+}
+
+/* Focus State - keyboard navigation */
+.palette-cell:focus {
+    outline: none;
+    background: #e8e8e8;
+    border-color: #999;
+    transform: scale(1.05);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .palette-cell {
+        border: 2px solid #000;
+        font-weight: 600;
+    }
+
+    .palette-cell:focus {
+        outline: 2px solid currentColor;
+        outline-offset: 1px;
+    }
+
+    .palette-cell.active {
+        background: #000;
+        color: #fff;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .palette-cell {
+        transition: none;
+    }
+
+    .palette-cell::after {
+        transition: none;
+    }
 }
 
 /* Active/Selected State - Color Inversion */
@@ -183,3 +226,5 @@
     color: #fff;
     border-color: #000;
 }
+
+/* Note: Responsive breakpoints are handled in responsive.css */

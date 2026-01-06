@@ -2,17 +2,19 @@
 
 import { listen } from '@tauri-apps/api/event';
 import { connectWebSocket } from './websocket.ts';
-import { handleLogBatch, initLogPanel } from './log-panel.ts';
+import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
-import { updateGraph, initGraphResize } from './graph-renderer.ts';
+import { CSS } from './css-classes.ts';
+import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
-import { restoreSession } from './state-manager.ts';
-import { state } from './config.ts';
+import { uiState } from './ui-state.ts';
+import { appState } from './config.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
 import { handleDaemonStatus } from './websocket-handlers/daemon-status.ts';
+import { statusIndicators } from './status-indicators.ts';
 import {
     handlePulseExecutionStarted,
     handlePulseExecutionFailed,
@@ -30,10 +32,27 @@ import './command-explorer-panel.ts';
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
 import './plugin-panel.ts';
-import './theme.ts';
+import './webscraper-panel.ts';
 import { initConsoleReporter } from './console-reporter.ts';
 
-import type { MessageHandlers, VersionMessage } from '../types/websocket';
+import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
+import type { GraphData } from '../types/core';
+
+// Type guard to check if data is graph data (has nodes and links arrays)
+// TODO(#209): Remove this type guard once backend sends explicit 'graph_data' message type
+function isGraphData(data: GraphData | BaseMessage): data is GraphData {
+    return 'nodes' in data && 'links' in data && Array.isArray((data as GraphData).nodes);
+}
+
+// Wrapper for default handler that type-guards graph data
+// TODO(#209): Replace _default handler with explicit 'graph_data' handler
+function handleDefaultMessage(data: GraphData | BaseMessage): void {
+    if (isGraphData(data)) {
+        updateGraph(data);
+    } else {
+        console.warn('Received non-graph message without handler:', data);
+    }
+}
 
 // Extend window interface for global functions
 declare global {
@@ -51,6 +70,18 @@ console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
+
+// Handle webscraper response from server
+async function handleWebscraperResponse(data: any): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.handleScraperResponse(data);
+}
+
+// Handle webscraper progress updates
+async function handleWebscraperProgress(data: any): Promise<void> {
+    const { webscraperPanel } = await import('./webscraper-panel.js');
+    webscraperPanel.handleScraperProgress(data);
+}
 
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
@@ -80,8 +111,7 @@ function handleVersion(data: VersionMessage): void {
         const commitLink = document.createElement('a');
         commitLink.href = `https://github.com/teranos/QNTX/commit/${data.commit}`;
         commitLink.target = '_blank';
-        commitLink.style.color = 'inherit';
-        commitLink.style.textDecoration = 'none';
+        commitLink.classList.add('u-color-inherit', 'u-no-underline');
         commitLink.textContent = commitShort;
 
         buildHash.appendChild(commitLink);
@@ -91,8 +121,8 @@ function handleVersion(data: VersionMessage): void {
         }
     }
 
-    // Also add subtle version to log panel
-    const logVersion = document.getElementById('log-version');
+    // Also add subtle version to system drawer
+    const logVersion = document.getElementById('system-version');
     if (logVersion && data.commit) {
         logVersion.textContent = data.commit.substring(0, 7);
     }
@@ -116,21 +146,21 @@ async function init(): Promise<void> {
     }
 
     // Restore previous session if exists
-    const session = restoreSession();
-    if (session) {
+    const graphSession = uiState.getGraphSession();
+    if (graphSession.query || graphSession.verbosity !== undefined) {
         if (window.logLoaderStep) window.logLoaderStep('Restoring session...', false, true);
         // Restore verbosity
-        if (session.verbosity !== undefined) {
-            state.currentVerbosity = session.verbosity;
+        if (graphSession.verbosity !== undefined) {
+            appState.currentVerbosity = graphSession.verbosity;
             const verbositySelect = document.getElementById('verbosity-select') as HTMLSelectElement | null;
             if (verbositySelect) {
-                verbositySelect.value = session.verbosity.toString();
+                verbositySelect.value = graphSession.verbosity.toString();
             }
         }
 
         // Restore query (will be re-run to get fresh graph data)
-        if (session.query) {
-            state.currentQuery = session.query;
+        if (graphSession.query) {
+            appState.currentQuery = graphSession.query;
         }
     }
 
@@ -138,33 +168,36 @@ async function init(): Promise<void> {
     console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
-    // Note: Some handlers use internal types that differ from websocket message types.
-    // Using 'unknown' intermediate cast where types don't overlap sufficiently.
-    // TODO: Align handler signatures with MessageHandlers interface.
+    // Message handlers are now properly typed to match their WebSocket message types
     const handlers: MessageHandlers = {
         'version': handleVersion,
-        'logs': handleLogBatch as unknown as MessageHandlers['logs'],
-        'import_progress': handleImportProgress as MessageHandlers['import_progress'],
-        'import_stats': handleImportStats as MessageHandlers['import_stats'],
-        'import_complete': handleImportComplete as MessageHandlers['import_complete'],
-        'usage_update': handleUsageUpdate as unknown as MessageHandlers['usage_update'],
-        'parse_response': handleParseResponse as MessageHandlers['parse_response'],
-        'daemon_status': handleDaemonStatus as MessageHandlers['daemon_status'],
-        'job_update': handleJobUpdate as MessageHandlers['job_update'],
-        'pulse_execution_started': handlePulseExecutionStarted as MessageHandlers['pulse_execution_started'],
-        'pulse_execution_failed': handlePulseExecutionFailed as MessageHandlers['pulse_execution_failed'],
-        'pulse_execution_completed': handlePulseExecutionCompleted as MessageHandlers['pulse_execution_completed'],
-        'pulse_execution_log_stream': handlePulseExecutionLogStream as MessageHandlers['pulse_execution_log_stream'],
-        'storage_warning': handleStorageWarning as MessageHandlers['storage_warning'],
-        'storage_eviction': handleStorageEviction as MessageHandlers['storage_eviction'],
-        '_default': updateGraph as unknown as MessageHandlers['_default']
+        'logs': handleLogBatch,
+        'import_progress': handleImportProgress,
+        'import_stats': handleImportStats,
+        'import_complete': handleImportComplete,
+        'usage_update': handleUsageUpdate,
+        'parse_response': handleParseResponse,
+        'daemon_status': handleDaemonStatus,
+        'job_update': handleJobUpdate,
+        'pulse_execution_started': handlePulseExecutionStarted,
+        'pulse_execution_failed': handlePulseExecutionFailed,
+        'pulse_execution_completed': handlePulseExecutionCompleted,
+        'pulse_execution_log_stream': handlePulseExecutionLogStream,
+        'storage_warning': handleStorageWarning,
+        'storage_eviction': handleStorageEviction,
+        'webscraper_response': handleWebscraperResponse,
+        'webscraper_progress': handleWebscraperProgress,
+        '_default': handleDefaultMessage
     };
 
     connectWebSocket(handlers);
 
     // Initialize UI components
-    if (window.logLoaderStep) window.logLoaderStep('Initializing log panel...');
-    initLogPanel();
+    if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');
+    initSystemDrawer();
+
+    // Initialize status indicators (connection, pulse daemon, etc.)
+    statusIndicators.init();
 
     // Initialize CodeMirror editor (replaces textarea)
     if (window.logLoaderStep) window.logLoaderStep('Setting up editor...', false, true);
@@ -242,16 +275,21 @@ async function init(): Promise<void> {
             import('./websocket.ts').then(({ sendMessage }) => {
                 sendMessage({
                     type: 'query',
-                    query: state.currentQuery || 'i'
+                    query: appState.currentQuery || 'i'
                 });
             });
         });
 
         listen('toggle-logs', () => {
-            // Toggle log panel visibility
-            const logPanel = document.getElementById('log-panel');
-            if (logPanel) {
-                logPanel.classList.toggle('collapsed');
+            // Toggle system drawer visibility
+            const systemDrawer = document.getElementById('system-drawer');
+            if (systemDrawer) {
+                const isCollapsed = systemDrawer.classList.contains(CSS.STATE.COLLAPSED);
+                if (isCollapsed) {
+                    systemDrawer.classList.remove(CSS.STATE.COLLAPSED);
+                } else {
+                    systemDrawer.classList.add(CSS.STATE.COLLAPSED);
+                }
             }
         });
 

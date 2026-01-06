@@ -6,9 +6,9 @@
  * Domain types (git, music, etc.) define their own physics via the type system.
  */
 
-import { GRAPH_PHYSICS } from './config.ts';
-import type { D3Link } from '../types/d3-graph';
-import type { RelationshipTypeInfo } from '../types/core';
+import { GRAPH_PHYSICS } from '../config.ts';
+import type { D3Link } from '../../types/d3-graph';
+import type { RelationshipTypeInfo } from '../../types/core';
 
 /**
  * Calculate link distance for D3 force simulation based on link type.
