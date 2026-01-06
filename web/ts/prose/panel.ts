@@ -64,7 +64,7 @@ class ProsePanel extends BasePanel {
                     <span class="prose-name">Prose</span>
                     <span class="prose-breadcrumb"></span>
                 </div>
-                <button class="prose-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="prose-body">
                 <div class="prose-sidebar">
@@ -95,10 +95,7 @@ class ProsePanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Note: Close button (.prose-close) needs manual handling since it uses
-        // a custom class. BasePanel only auto-handles .panel-close
-        const closeBtn = this.$('.prose-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        // Close button is handled automatically by BasePanel
 
         // Save on Cmd/Ctrl+S
         this.saveKeyHandler = (e: KeyboardEvent) => {

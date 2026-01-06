@@ -6,6 +6,8 @@
  */
 
 import { CSS } from './css-classes.ts';
+import { BasePanel } from './base-panel.ts';
+import type { PanelConfig } from './base-panel.ts';
 
 describe('BasePanel Data Attributes', () => {
     beforeEach(() => {
@@ -376,5 +378,154 @@ describe('BasePanel Error Boundary', () => {
         retryBtn?.dispatchEvent(clickEvent);
 
         expect(retryClicked).toBe(true);
+    });
+});
+
+describe('BasePanel Integration - Error Boundaries', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    test('Error in onShow is caught and displayed with retry button', async () => {
+        const config: PanelConfig = {
+            id: 'test-panel',
+            title: 'Test Panel',
+            closeOnOverlayClick: false
+        };
+
+        class TestPanel extends BasePanel {
+            protected getTemplate(): string {
+                return '<div class="panel-content"></div>';
+            }
+            protected setupEventListeners(): void {}
+            protected async onShow(): Promise<void> {
+                throw new Error('Test error in onShow');
+            }
+        }
+
+        const panel = new TestPanel(config);
+        await panel.show();
+
+        const errorEl = document.querySelector('[role="alert"]');
+        expect(errorEl).toBeTruthy();
+        expect(errorEl?.textContent).toContain('Test error in onShow');
+
+        const retryBtn = document.querySelector('button');
+        expect(retryBtn?.textContent).toContain('Retry');
+    });
+
+    test('Error in beforeShow is caught and displayed', async () => {
+        const config: PanelConfig = {
+            id: 'test-panel',
+            title: 'Test Panel',
+            closeOnOverlayClick: false
+        };
+
+        class TestPanel extends BasePanel {
+            protected getTemplate(): string {
+                return '<div class="panel-content"></div>';
+            }
+            protected setupEventListeners(): void {}
+            protected async beforeShow(): Promise<boolean> {
+                throw new Error('Test error in beforeShow');
+            }
+        }
+
+        const panel = new TestPanel(config);
+        await panel.show();
+
+        const errorEl = document.querySelector('[role="alert"]');
+        expect(errorEl).toBeTruthy();
+        expect(errorEl?.textContent).toContain('Test error in beforeShow');
+    });
+
+    test('Error in setupEventListeners is logged but panel is created', () => {
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        const config: PanelConfig = {
+            id: 'test-panel',
+            title: 'Test Panel',
+            closeOnOverlayClick: false
+        };
+
+        class TestPanel extends BasePanel {
+            protected getTemplate(): string {
+                return '<div class="panel-content"></div>';
+            }
+            protected setupEventListeners(): void {
+                throw new Error('Test error in setupEventListeners');
+            }
+        }
+
+        const panel = new TestPanel(config);
+
+        // Panel should still be created despite error
+        expect(document.getElementById('test-panel')).toBeTruthy();
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[test-panel] Error in setupEventListeners()'),
+            expect.any(Error)
+        );
+
+        consoleSpy.mockRestore();
+    });
+
+    test('Error in beforeHide is logged but hide continues', () => {
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        const config: PanelConfig = {
+            id: 'test-panel',
+            title: 'Test Panel',
+            closeOnOverlayClick: false
+        };
+
+        class TestPanel extends BasePanel {
+            protected getTemplate(): string {
+                return '<div class="panel-content"></div>';
+            }
+            protected setupEventListeners(): void {}
+            protected beforeHide(): boolean {
+                throw new Error('Test error in beforeHide');
+            }
+        }
+
+        const panel = new TestPanel(config);
+        panel.hide();
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[test-panel] Error in beforeHide()'),
+            expect.any(Error)
+        );
+
+        consoleSpy.mockRestore();
+    });
+
+    test('Error in onHide is logged but hide continues', () => {
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        const config: PanelConfig = {
+            id: 'test-panel',
+            title: 'Test Panel',
+            closeOnOverlayClick: false
+        };
+
+        class TestPanel extends BasePanel {
+            protected getTemplate(): string {
+                return '<div class="panel-content"></div>';
+            }
+            protected setupEventListeners(): void {}
+            protected onHide(): void {
+                throw new Error('Test error in onHide');
+            }
+        }
+
+        const panel = new TestPanel(config);
+        panel.hide();
+
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[test-panel] Error in onHide()'),
+            expect.any(Error)
+        );
+
+        consoleSpy.mockRestore();
     });
 });

@@ -58,7 +58,7 @@ class CommandExplorerPanel extends BasePanel {
         return `
             <div class="command-explorer-header">
                 <h3 class="command-explorer-title"></h3>
-                <button class="panel-close command-explorer-close" aria-label="Close">✕</button>
+                <button class="panel-close" aria-label="Close">✕</button>
             </div>
             <div class="command-explorer-search">
                 <input type="text" placeholder="Filter..." class="command-search-input">

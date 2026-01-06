@@ -86,8 +86,15 @@ export abstract class BasePanel {
         // Attach common handlers
         this.attachCommonListeners();
 
-        // Subclass custom setup
-        this.setupEventListeners();
+        // Error boundary: wrap setupEventListeners() to catch initialization errors
+        try {
+            // Subclass custom setup
+            this.setupEventListeners();
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[${this.config.id}] Error in setupEventListeners():`, err);
+            // Log error but allow panel to be created - it may still be partially functional
+        }
     }
 
     protected createOverlay(): HTMLElement {
@@ -161,8 +168,16 @@ export abstract class BasePanel {
     public async show(): Promise<void> {
         if (!this.panel) return;
 
-        // Allow subclass to prevent show (e.g., unsaved changes check)
-        if (!await this.beforeShow()) return;
+        // Error boundary: wrap beforeShow() to catch and display errors
+        try {
+            // Allow subclass to prevent show (e.g., unsaved changes check)
+            if (!await this.beforeShow()) return;
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[${this.config.id}] Error in beforeShow():`, err);
+            this.showErrorState(err);
+            return;
+        }
 
         this.updateVisibility(true);
 
@@ -180,11 +195,26 @@ export abstract class BasePanel {
     public hide(): void {
         if (!this.panel) return;
 
-        // Allow subclass to prevent hide (e.g., unsaved changes prompt)
-        if (!this.beforeHide()) return;
+        // Error boundary: wrap beforeHide() to catch errors
+        try {
+            // Allow subclass to prevent hide (e.g., unsaved changes prompt)
+            if (!this.beforeHide()) return;
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[${this.config.id}] Error in beforeHide():`, err);
+            // Don't show error state during hide, just log and continue
+        }
 
         this.updateVisibility(false);
-        this.onHide();
+
+        // Error boundary: wrap onHide() to catch errors
+        try {
+            this.onHide();
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            console.error(`[${this.config.id}] Error in onHide():`, err);
+            // Don't show error state during hide, just log
+        }
     }
 
     /**

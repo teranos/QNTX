@@ -100,12 +100,12 @@ test: ## Run all tests (Go + TypeScript) with coverage
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
-	@echo "Running TypeScript tests..."
+	@echo "Running TypeScript tests with coverage..."
 	@if [ ! -d "web/node_modules" ]; then \
 		echo "Installing web dependencies..."; \
 		cd web && bun install; \
 	fi
-	@cd web && bun test
+	@cd web && bun test --coverage
 	@echo "✓ All tests complete"
 
 test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverage
@@ -115,12 +115,12 @@ test-verbose: ## Run all tests (Go + TypeScript) with verbose output and coverag
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
-	@echo "Running TypeScript tests..."
+	@echo "Running TypeScript tests with coverage..."
 	@if [ ! -d "web/node_modules" ]; then \
 		echo "Installing web dependencies..."; \
 		cd web && bun install; \
 	fi
-	@cd web && bun test
+	@cd web && bun test --coverage
 	@echo "✓ All tests complete"
 
 clean: ## Clean build artifacts
