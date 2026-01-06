@@ -95,7 +95,8 @@ class ProsePanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Close button
+        // Note: Close button (.prose-close) needs manual handling since it uses
+        // a custom class. BasePanel only auto-handles .panel-close
         const closeBtn = this.$('.prose-close');
         closeBtn?.addEventListener('click', () => this.hide());
 
