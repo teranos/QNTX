@@ -10,7 +10,6 @@ import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
 import { formatInterval } from './types';
 import { toast } from '../toast';
-import { showErrorDialog } from '../error-dialog';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 
@@ -49,10 +48,7 @@ export async function handleForceTrigger(
         toast.success('Force trigger started - check execution history below');
     } catch (error) {
         console.error('[Pulse Panel] Force trigger failed:', error);
-        showErrorDialog(
-            'Force trigger failed',
-            (error as Error).message
-        );
+        toast.error(`Force trigger failed: ${(error as Error).message}`, true);
     }
 }
 

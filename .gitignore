@@ -14,6 +14,21 @@ internal/server/dist/
 tmp/
 *.log
 
+# Test coverage
+web/coverage/
+
+# Binaries (NEVER commit these!)
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.out
+*.bin
+qntx-code-plugin
+qntx-webscraper-plugin
+
 # IDE
 .vscode/
 .idea/
