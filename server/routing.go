@@ -41,10 +41,16 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	}
 
 	// Register plugin handlers with CORS middleware
-	// Single handler for all /api/code/* routes - mux handles internal routing
+	// Register handlers for all loaded plugins - mux handles internal routing
 	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
-	http.HandleFunc("/api/code/", corsPluginHandler) // Matches all /api/code/* paths
-	http.HandleFunc("/api/code", corsPluginHandler)  // Exact match for /api/code
+	if s.pluginRegistry != nil {
+		for _, name := range s.pluginRegistry.List() {
+			// Use wildcard pattern for Go 1.22+ ServeMux
+			pattern := "/api/" + name + "/{path...}"
+			http.HandleFunc(pattern, corsPluginHandler)
+			s.logger.Infow("Registered HTTP route", "plugin", name, "pattern", pattern)
+		}
+	}
 
 	// Core QNTX handlers
 	http.HandleFunc("/ws", s.corsMiddleware(s.HandleWebSocket))      // Custom WebSocket protocol (graph updates, logs, etc.)
