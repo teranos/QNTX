@@ -45,7 +45,7 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -62,7 +62,7 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
