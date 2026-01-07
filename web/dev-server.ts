@@ -12,7 +12,8 @@ const execAsync = promisify(exec);
 
 // Configuration
 const BACKEND_URL = "http://localhost:877";  // Go backend
-const DEV_PORT = 8820;  // Development server port
+const DEV_PORT_START = 8820;  // Preferred development server port
+const DEV_PORT_MAX = 8830;     // Maximum port to try
 const BUILD_DEBOUNCE = 300; // ms to wait before rebuilding
 
 let buildTimeout: NodeJS.Timeout | null = null;
@@ -55,6 +56,32 @@ function broadcastReload() {
     });
 }
 
+// Check if port is available
+async function isPortAvailable(port: number): Promise<boolean> {
+    try {
+        const server = Bun.serve({
+            port,
+            fetch() {
+                return new Response("test");
+            }
+        });
+        server.stop();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// Find next available port
+async function findAvailablePort(startPort: number, maxPort: number): Promise<number> {
+    for (let port = startPort; port <= maxPort; port++) {
+        if (await isPortAvailable(port)) {
+            return port;
+        }
+    }
+    throw new Error(`No available ports found between ${startPort} and ${maxPort}`);
+}
+
 // Watch for file changes
 function setupWatcher() {
     const dirs = ["./ts", "./css", "./index.html"];
@@ -74,82 +101,99 @@ function setupWatcher() {
     console.log(`${dim}Watching for changes in: ${dirs.join(", ")}${reset}`);
 }
 
-// Create development server
-const server = Bun.serve({
-    port: DEV_PORT,
+// Find available port and create development server
+async function startServer() {
+    // Find available port
+    const port = await findAvailablePort(DEV_PORT_START, DEV_PORT_MAX);
 
-    async fetch(req) {
-        const url = new URL(req.url);
-
-        // Server-Sent Events endpoint for live reload
-        if (url.pathname === "/__dev_reload__") {
-            return new Response(
-                new ReadableStream({
-                    start(controller) {
-                        const client = {
-                            write: (data: string) => controller.enqueue(data)
-                        };
-                        clients.add(client);
-
-                        // Clean up on disconnect
-                        req.signal.addEventListener("abort", () => {
-                            clients.delete(client);
-                        });
-                    }
-                }),
-                {
-                    headers: {
-                        "Content-Type": "text/event-stream",
-                        "Cache-Control": "no-cache",
-                        "Connection": "keep-alive",
-                    }
-                }
-            );
-        }
-
-        // Frontend connects directly to backend - no proxying needed
-
-        // Serve static files from dist
-        if (url.pathname === "/" || url.pathname === "") {
-            const html = await Bun.file("../internal/server/dist/index.html").text();
-            // Inject backend URL and live reload script
-            const modifiedHtml = html.replace(
-                "</head>",
-                `<script>
-                    // Backend URL for WebSocket connections in dev mode
-                    window.__BACKEND_URL__ = "${BACKEND_URL}";
-                </script>
-                </head>`
-            ).replace(
-                "</body>",
-                `<script>
-                    // Live reload for development
-                    const evtSource = new EventSource("/__dev_reload__");
-                    evtSource.onmessage = (event) => {
-                        if (event.data === "reload") {
-                            console.log("Reloading...");
-                            location.reload();
-                        }
-                    };
-                </script>
-                </body>`
-            );
-            return new Response(modifiedHtml, {
-                headers: { "Content-Type": "text/html" }
-            });
-        }
-
-        // Serve other static files
-        const filePath = "../internal/server/dist" + url.pathname;
-        const file = Bun.file(filePath);
-
-        if (await file.exists()) {
-            return new Response(file);
-        }
-
-        return new Response("Not Found", { status: 404 });
+    if (port !== DEV_PORT_START) {
+        console.log(`${pink}Port ${DEV_PORT_START} in use, using port ${port} instead${reset}`);
     }
-});
+
+    const server = Bun.serve({
+        port,
+
+        async fetch(req) {
+            const url = new URL(req.url);
+
+            // Server-Sent Events endpoint for live reload
+            if (url.pathname === "/__dev_reload__") {
+                return new Response(
+                    new ReadableStream({
+                        start(controller) {
+                            const client = {
+                                write: (data: string) => controller.enqueue(data)
+                            };
+                            clients.add(client);
+
+                            // Clean up on disconnect
+                            req.signal.addEventListener("abort", () => {
+                                clients.delete(client);
+                            });
+                        }
+                    }),
+                    {
+                        headers: {
+                            "Content-Type": "text/event-stream",
+                            "Cache-Control": "no-cache",
+                            "Connection": "keep-alive",
+                        }
+                    }
+                );
+            }
+
+            // Frontend connects directly to backend - no proxying needed
+
+            // Serve static files from dist
+            if (url.pathname === "/" || url.pathname === "") {
+                const html = await Bun.file("../internal/server/dist/index.html").text();
+                // Inject backend URL and live reload script
+                const modifiedHtml = html.replace(
+                    "</head>",
+                    `<script>
+                        // Backend URL for WebSocket connections in dev mode
+                        window.__BACKEND_URL__ = "${BACKEND_URL}";
+                    </script>
+                    </head>`
+                ).replace(
+                    "</body>",
+                    `<script>
+                        // Live reload for development
+                        const evtSource = new EventSource("/__dev_reload__");
+                        evtSource.onmessage = (event) => {
+                            if (event.data === "reload") {
+                                console.log("Reloading...");
+                                location.reload();
+                            }
+                        };
+                    </script>
+                    </body>`
+                );
+                return new Response(modifiedHtml, {
+                    headers: { "Content-Type": "text/html" }
+                });
+            }
+
+            // Serve other static files
+            const filePath = "../internal/server/dist" + url.pathname;
+            const file = Bun.file(filePath);
+
+            if (await file.exists()) {
+                return new Response(file);
+            }
+
+            return new Response("Not Found", { status: 404 });
+        }
+    });
+
+    console.log(`
+${lightPink}Development server running at http://localhost:${port}${reset}
+${dim}Backend URL: ${BACKEND_URL}${reset}
+${dim}Live reload enabled${reset}
+
+${dim}Make sure your Go backend is running on port ${BACKEND_URL.split(":")[2]}${reset}
+`);
+}
 
 // Initial build
 await build();
@@ -157,10 +201,5 @@ await build();
 // Setup file watcher
 setupWatcher();
 
-console.log(`
-${lightPink}Development server running at http://localhost:${DEV_PORT}${reset}
-${dim}Backend URL: ${BACKEND_URL}${reset}
-${dim}Live reload enabled${reset}
-
-${dim}Make sure your Go backend is running on port ${BACKEND_URL.split(":")[2]}${reset}
-`);
+// Start server
+await startServer();

@@ -1,5 +1,6 @@
 // Graph interaction handlers
 // Drag behavior and resize handling for D3.js graph
+// Avoid Sin #1: Premature Abstraction - Simple handlers, no unnecessary wrappers
 
 import { getSimulation } from './state.ts';
 import type { D3Node, ForceSimulation, DragEvent } from '../../types/d3-graph';
