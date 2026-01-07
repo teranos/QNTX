@@ -144,6 +144,7 @@ const GRAPH_SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
  * Centralized UI state manager
+ * Virtue #10: State Locality - Single source of truth, scoped access, predictable mutations
  */
 class UIState {
     private state: UIStateData;

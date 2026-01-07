@@ -23,6 +23,7 @@ let focusedNodeId: string | null = null;
 let preFocusTransform: Transform | null = null;
 
 // DOM cache interface for performance optimization
+// Avoid Sin #2: DOM Thrashing - Cache element references instead of repeated querySelector
 interface DOMCache {
     graphContainer: HTMLElement | null;
     isolatedToggle: HTMLElement | null;

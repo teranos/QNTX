@@ -146,6 +146,7 @@ function renderGraph(data: GraphData): void {
     if (linkCountEl) linkCountEl.textContent = String(visibleLinks.length);
 
     // Virtue #3: Memory Management - Stop old simulation before creating new one
+    // Avoid Sin #3: Memory Leaks - Always cleanup before recreation
     const oldSimulation = getSimulation();
     if (oldSimulation) {
         oldSimulation.stop();

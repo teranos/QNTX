@@ -1,5 +1,6 @@
 // Graph transform operations
 // Zoom, pan, and centering for D3.js graph
+// Virtue #11: Animation Purpose - All transitions communicate navigation state, never decorative
 
 import { GRAPH_PHYSICS } from '../config.ts';
 import { getSvg, getG, getZoom } from './state.ts';
