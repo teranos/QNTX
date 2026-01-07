@@ -76,8 +76,13 @@ Non-technical users (recruiters, analysts) can customize views by editing TOML c
 
 ### Progressive Enhancement Path
 
-1. **Phase 1:** Render entities as rectangles (vs circles)
-2. **Phase 2:** Add multi-line text to tile surface
+1. **Phase 1:** Render entities as rectangles (vs circles) ✅ *Implemented*
+   - Tiles render as rectangles with multi-line text (label, type, metadata)
+   - Focus mode expands tiles to fill viewport
+   - Tile-to-tile focus transitions working
+2. **Phase 2:** Add multi-line text to tile surface ✅ *In Progress*
+   - Basic multi-line text rendering complete
+   - Header/footer controls in focus mode
 3. **Phase 3:** Implement semantic zoom thresholds
 4. **Phase 4:** Add layout modes (grid, hierarchy)
 5. **Phase 5:** Config-driven field selection
