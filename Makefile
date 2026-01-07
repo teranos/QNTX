@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check nix-update-hash
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check nix-update-hash
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -14,19 +14,22 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
 	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
-types: $(if $(findstring ./bin/qntx,$(QNTX)),cli-nocgo,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
+typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
+	@go build -o bin/typegen ./cmd/typegen
+
+types: typegen ## Generate TypeScript, Python, Rust types and markdown docs from Go source
 	@echo "Generating types and documentation..."
-	@$(QNTX) typegen --lang typescript --output types/generated/
-	@$(QNTX) typegen --lang python --output types/generated/
-	@$(QNTX) typegen --lang rust --output types/generated/
-	@$(QNTX) typegen --lang markdown  # Defaults to docs/types/
+	@./bin/typegen --lang typescript --output types/generated/
+	@./bin/typegen --lang python --output types/generated/
+	@./bin/typegen --lang rust --output types/generated/
+	@./bin/typegen --lang markdown  # Defaults to docs/types/
 	@echo "✓ TypeScript types generated in types/generated/typescript/"
 	@echo "✓ Python types generated in types/generated/python/"
 	@echo "✓ Rust types generated in types/generated/rust/"
 	@echo "✓ Markdown docs generated in docs/types/"
 
-types-check: cli ## Check if generated types are up to date (always builds from source)
-	@./bin/qntx typegen check
+types-check: typegen ## Check if generated types are up to date (uses standalone typegen, no plugins)
+	@./bin/typegen check
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."

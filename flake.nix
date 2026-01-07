@@ -55,6 +55,18 @@
           subPackages = [ "cmd/qntx" ];
         };
 
+        # Build typegen binary (standalone, no plugins/CGO)
+        typegen = pkgs.buildGoModule {
+          pname = "typegen";
+          version = self.rev or "dev";
+          src = ./.;
+
+          # Same vendorHash as qntx (shared go.mod)
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+
+          subPackages = [ "cmd/typegen" ];
+        };
+
         # Build qntx-code plugin binary
         qntx-code = pkgs.buildGoModule {
           pname = "qntx-code-plugin";
@@ -303,6 +315,9 @@
           # QNTX CLI binary
           qntx = qntx;
 
+          # Typegen binary (standalone, no plugins/CGO)
+          typegen = typegen;
+
           # Plugin binaries
           qntx-code = qntx-code;
           qntx-python = qntx-python;
@@ -353,6 +368,7 @@
         checks = {
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
+          typegen-build = typegen; # Ensure typegen builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
           qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds

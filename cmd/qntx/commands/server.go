@@ -66,11 +66,20 @@ func runServer(cmd *cobra.Command, args []string) error {
 	defer database.Close()
 
 	// Get actual path for banner (openDatabase resolved it)
-	dbPath, _ = am.GetDatabasePath()
 	if serverDBPath != "" {
 		dbPath = serverDBPath
 	} else if serverTestMode {
 		dbPath = "tmp/test-qntx.db"
+	} else {
+		// Resolve the actual path used by openDatabase
+		resolvedPath, err := am.GetDatabasePath()
+		if err != nil {
+			dbPath = "qntx.db" // Default fallback, same as openDatabase
+		} else if resolvedPath != "" {
+			dbPath = resolvedPath
+		} else {
+			dbPath = "qntx.db"
+		}
 	}
 
 	// Print startup banner
