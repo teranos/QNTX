@@ -92,26 +92,41 @@ function calculateFocusedTileDimensions(): { width: number; height: number; scal
 }
 
 /**
- * Show or hide the legenda based on focus state
- * Slides out of view during focus zoom, slides back on unfocus
+ * Show or hide UI elements based on focus state
+ * Slides elements out of view during focus zoom, slides back on unfocus
  */
-function setLegendaVisibility(visible: boolean): void {
+function setFocusUIVisibility(visible: boolean): void {
+    const duration = GRAPH_PHYSICS.ANIMATION_DURATION;
+    const transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
+
+    // Legenda (slides left)
     const domCache = getDomCache();
     const legenda = domCache.get('legenda', '.legenda');
     if (legenda) {
-        const duration = GRAPH_PHYSICS.ANIMATION_DURATION;
-        legenda.style.transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
-
+        legenda.style.transition = transition;
         if (visible) {
-            // Slide back into view
             legenda.style.transform = 'translateX(0)';
             legenda.style.opacity = '1';
             legenda.style.pointerEvents = 'auto';
         } else {
-            // Slide out to the left (off-screen)
             legenda.style.transform = 'translateX(-120%)';
             legenda.style.opacity = '0.5';
             legenda.style.pointerEvents = 'none';
+        }
+    }
+
+    // Left panel / ATS editor (slides left)
+    const leftPanel = document.getElementById('left-panel');
+    if (leftPanel) {
+        leftPanel.style.transition = transition;
+        if (visible) {
+            leftPanel.style.transform = 'translateX(0)';
+            leftPanel.style.opacity = '1';
+            leftPanel.style.pointerEvents = 'auto';
+        } else {
+            leftPanel.style.transform = 'translateX(-120%)';
+            leftPanel.style.opacity = '0.5';
+            leftPanel.style.pointerEvents = 'none';
         }
     }
 }
@@ -263,8 +278,8 @@ export function focusOnTile(node: D3Node): void {
             .translate(targetX, targetY)
             .scale(zoomScale));
 
-    // Hide legenda when focused
-    setLegendaVisibility(false);
+    // Hide UI elements when focused
+    setFocusUIVisibility(false);
 
     // Animate the focused tile to expand
     const nodeGroup = g.selectAll('.node')
@@ -302,8 +317,8 @@ export function unfocus(): void {
 
     if (!svg || !g || !zoom) return;
 
-    // Show legenda again
-    setLegendaVisibility(true);
+    // Show UI elements again
+    setFocusUIVisibility(true);
 
     // Restore the focused tile to normal size
     const nodeGroup = g.selectAll('.node')
