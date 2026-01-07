@@ -130,6 +130,7 @@ function setFocusUIVisibility(visible: boolean): void {
                     .attr('fill', 'rgba(0, 0, 0, 0.4)')
                     .style('opacity', 0)
                     .style('cursor', 'pointer')
+                    // Virtue #13: Touch Parity - Both click and touch trigger unfocus equally
                     .on('click touchend', function(event: Event) {
                         event.preventDefault();
                         event.stopPropagation();
@@ -163,7 +164,8 @@ function setFocusUIVisibility(visible: boolean): void {
     slideLeft(domCache.get('legenda', '.legenda'));
     slideLeft(document.getElementById('left-panel'));
 
-    // System drawer (slides up on mobile/top, down on desktop/bottom)
+    // Virtue #9: Responsive Intent - Adapt to device context, not just size
+    // System drawer slides based on position (top on mobile, bottom on desktop)
     const systemDrawer = document.getElementById('system-drawer');
     if (systemDrawer) {
         const computedStyle = window.getComputedStyle(systemDrawer);

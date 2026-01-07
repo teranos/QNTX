@@ -113,6 +113,7 @@ const MESSAGE_HANDLERS = {
 
 /**
  * Validate and sanitize backend URL
+ * Virtue #12: Graceful Degradation - Invalid URLs return null instead of throwing
  * @param url - URL to validate
  * @returns Validated URL origin or null if invalid
  */
@@ -214,6 +215,7 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         updateConnectionStatus(false);
     };
 
+    // Virtue #12: Graceful Degradation - Handle disconnection without crashing, auto-reconnect
     ws.onclose = function(): void {
         console.log('WebSocket disconnected');
         updateConnectionStatus(false);
