@@ -307,6 +307,9 @@ EOF
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
+          # Static documentation site
+          docs-site = pkgs.callPackage ./sitegen.nix { };
+
           # Default: CLI binary for easy installation
           default = qntx;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
@@ -357,6 +360,27 @@ EOF
           ci-image = ciImage; # Ensure CI image builds
           qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
           qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds
+        };
+
+        # Apps for common tasks
+        apps.build-docs-site = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "build-docs-site" ''
+            set -e
+            echo "Building documentation site..."
+            ${pkgs.nix}/bin/nix build .#docs-site
+
+            echo "Copying to web/site/..."
+            mkdir -p web/site
+            chmod -R +w web/site 2>/dev/null || true
+            rm -rf web/site/*
+            cp -r result/* web/site/
+            chmod -R +w web/site
+
+            echo "Documentation site built and copied to web/site/"
+            echo "Files:"
+            ls -lh web/site/
+          '');
         };
       }
     );

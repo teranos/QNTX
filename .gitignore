@@ -53,5 +53,6 @@ types/generated/rust/target/
 types/generated/rust/Cargo.lock
 target/
 
-# Nix
+# Nix build outputs
 result
+web/site/
