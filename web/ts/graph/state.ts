@@ -7,6 +7,7 @@ import type {
     GroupSelection,
     ZoomBehavior
 } from '../../types/d3-graph';
+import type { Transform } from '../../types/core';
 
 // D3 instance references
 let simulation: ForceSimulation | null = null;
@@ -17,7 +18,13 @@ let zoom: ZoomBehavior | null = null;
 // Individual node visibility state (by node ID)
 const hiddenNodes = new Set<string>();
 
+// Focus state for tile zoom feature
+let focusedNodeId: string | null = null;
+let preFocusTransform: Transform | null = null;
+let isFocusAnimating: boolean = false; // Flag to ignore zoom events during programmatic focus animation
+
 // DOM cache interface for performance optimization
+// Avoid Sin #2: DOM Thrashing - Cache element references instead of repeated querySelector
 interface DOMCache {
     graphContainer: HTMLElement | null;
     isolatedToggle: HTMLElement | null;
@@ -69,6 +76,19 @@ export function getDomCache(): DOMCache {
     return domCache;
 }
 
+// Focus state getters
+export function getFocusedNodeId(): string | null {
+    return focusedNodeId;
+}
+
+export function getPreFocusTransform(): Transform | null {
+    return preFocusTransform;
+}
+
+export function getIsFocusAnimating(): boolean {
+    return isFocusAnimating;
+}
+
 // Setters for module state
 export function setSimulation(sim: ForceSimulation | null): void {
     simulation = sim;
@@ -86,6 +106,19 @@ export function setZoom(z: ZoomBehavior | null): void {
     zoom = z;
 }
 
+// Focus state setters
+export function setFocusedNodeId(nodeId: string | null): void {
+    focusedNodeId = nodeId;
+}
+
+export function setPreFocusTransform(transform: Transform | null): void {
+    preFocusTransform = transform;
+}
+
+export function setIsFocusAnimating(animating: boolean): void {
+    isFocusAnimating = animating;
+}
+
 // Clear all state
 export function clearState(): void {
     if (simulation) {
@@ -95,5 +128,8 @@ export function clearState(): void {
     svg = null;
     g = null;
     zoom = null;
+    focusedNodeId = null;
+    preFocusTransform = null;
+    isFocusAnimating = false;
     domCache.clear();
 }
