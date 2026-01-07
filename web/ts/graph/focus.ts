@@ -108,7 +108,7 @@ function setFocusUIVisibility(visible: boolean): void {
     // Darken the graph background when focused
     const svg = getSvg();
     if (svg) {
-        let overlay = svg.select('.focus-overlay');
+        let overlay: any = svg.select('.focus-overlay');
         if (visible) {
             // Remove overlay when unfocusing
             overlay.transition()
@@ -131,7 +131,7 @@ function setFocusUIVisibility(visible: boolean): void {
                     .style('opacity', 0)
                     .style('cursor', 'pointer')
                     // Virtue #13: Touch Parity - Both click and touch trigger unfocus equally
-                    .on('click touchend', function(event: Event) {
+                    .on('click touchend', (event: Event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         unfocus();
@@ -269,14 +269,14 @@ function createFocusHeader(nodeGroup: any, node: D3Node, dimensions: { width: nu
             .text(symbolDef.symbol);
 
         // Hover effects
-        button.on('mouseenter', function() {
+        button.on('mouseenter', function(this: SVGGElement) {
             d3.select(this).select('circle')
                 .attr('fill', 'rgba(255, 255, 255, 0.15)');
             d3.select(this).select('text')
                 .attr('fill', '#ffffff');
         });
 
-        button.on('mouseleave', function() {
+        button.on('mouseleave', function(this: SVGGElement) {
             d3.select(this).select('circle')
                 .attr('fill', 'transparent');
             d3.select(this).select('text')
@@ -284,7 +284,7 @@ function createFocusHeader(nodeGroup: any, node: D3Node, dimensions: { width: nu
         });
 
         // Click handler
-        button.on('click', function(event: MouseEvent) {
+        button.on('click', (event: MouseEvent) => {
             event.stopPropagation();
             symbolDef.action(node);
         });
@@ -440,7 +440,7 @@ export function focusOnTile(node: D3Node): void {
     // If transitioning between tiles, restore the previous tile to normal size
     if (isTransition) {
         const prevNodeGroup = g.selectAll('.node')
-            .filter((d: D3Node) => d.id === previouslyFocusedId);
+            .filter((d: any) => d.id === previouslyFocusedId);
 
         // Remove header and footer from previous tile
         removeFocusHeader(prevNodeGroup);
@@ -498,7 +498,7 @@ export function focusOnTile(node: D3Node): void {
 
     // Animate the focused tile to expand
     const nodeGroup = g.selectAll('.node')
-        .filter((d: D3Node) => d.id === node.id);
+        .filter((d: any) => d.id === node.id);
 
     // Expand the rect
     nodeGroup.select('rect')
@@ -540,7 +540,7 @@ export function unfocus(): void {
 
     // Restore the focused tile to normal size
     const nodeGroup = g.selectAll('.node')
-        .filter((d: D3Node) => d.id === focusedId);
+        .filter((d: any) => d.id === focusedId);
 
     // Remove the header and footer
     removeFocusHeader(nodeGroup);
@@ -592,13 +592,12 @@ export function getFocusedId(): string | null {
  * Handle user interaction that should trigger unfocus
  * Called when user zooms out, pans, or clicks empty space
  */
-export function handleUnfocusTrigger(event: any): void {
+export function handleUnfocusTrigger(_event: any): void {
     if (!isFocused()) return;
 
     // Determine if this is an unfocus-worthy interaction
     // Zoom out (scale decreased) or pan (translate changed significantly)
     const currentTransform = getTransform();
-    const preFocus = getPreFocusTransform();
 
     if (!currentTransform) return;
 
