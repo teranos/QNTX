@@ -79,7 +79,7 @@ func (b *AxGraphBuilder) BuildFromQuery(ctx context.Context, query string, limit
 	}
 
 	b.logger.Debugw("Parsed query args", "arg_count", len(allArgs))
-	if logger.ShouldLogAll(b.verbosity) {
+	if logger.ShouldOutput(b.verbosity, logger.OutputDataDump) {
 		b.logger.Debugw("Query arguments", "args", allArgs)
 	}
 
@@ -112,7 +112,7 @@ func (b *AxGraphBuilder) BuildFromQuery(ctx context.Context, query string, limit
 	}
 
 	b.logger.Debugw("Query filter created")
-	if logger.ShouldLogTrace(b.verbosity) {
+	if logger.ShouldOutput(b.verbosity, logger.OutputAxExecution) {
 		b.logger.Debugw("Filter details", "filter", fmt.Sprintf("%+v", filter))
 	}
 
@@ -152,7 +152,7 @@ func (b *AxGraphBuilder) BuildFromQuery(ctx context.Context, query string, limit
 		"attestations", len(result.Attestations),
 	)
 
-	if logger.ShouldLogAll(b.verbosity) {
+	if logger.ShouldOutput(b.verbosity, logger.OutputDataDump) {
 		b.logger.Debugw("Attestation results", "results", fmt.Sprintf("%+v", result))
 	}
 
