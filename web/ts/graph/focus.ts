@@ -498,25 +498,24 @@ export function focusOnTile(node: D3Node): void {
     // Calculate the focused tile dimensions
     const focusedDimensions = calculateFocusedTileDimensions();
 
-    // Calculate zoom level to make the tile the right size
-    // We want the tile to appear as focusedDimensions.width/height on screen
-    const zoomScale = focusedDimensions.scale;
+    // Calculate transform to center the node (WITHOUT zoom scaling)
+    // We only pan to center - the tile rect itself expands
+    const currentTransform = getTransform();
+    const currentScale = currentTransform ? currentTransform.k : 1;
+    const targetX = viewportWidth / 2 - node.x * currentScale;
+    const targetY = viewportHeight / 2 - node.y * currentScale;
 
-    // Calculate transform to center the node
-    const targetX = viewportWidth / 2 - node.x * zoomScale;
-    const targetY = viewportHeight / 2 - node.y * zoomScale;
-
-    // Set flag to prevent unfocus detection during programmatic zoom animation
+    // Set flag to prevent unfocus detection during programmatic pan animation
     setIsFocusAnimating(true);
 
-    // Animate viewport to center on the tile
+    // Animate viewport to center on the tile (pan only, no zoom)
     svg.transition()
         .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
         .call(zoom.transform, d3.zoomIdentity
             .translate(targetX, targetY)
-            .scale(zoomScale))
+            .scale(currentScale))  // Keep current zoom level
         .on("end", () => {
-            // Clear animation flag once zoom transition completes
+            // Clear animation flag once pan transition completes
             setIsFocusAnimating(false);
         });
 
@@ -538,11 +537,12 @@ export function focusOnTile(node: D3Node): void {
         .attr('x', -focusedDimensions.width / 2)
         .attr('y', -focusedDimensions.height / 2);
 
-    // Scale the text appropriately
+    // Don't scale text - tile expansion handles the size increase
+    // Text remains at normal size for readability
     nodeGroup.select('text')
         .transition()
         .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
-        .attr('transform', `scale(${focusedDimensions.scale})`);
+        .attr('transform', 'scale(1)');
 
     // Create the header bar with symbols
     createFocusHeader(nodeGroup, node, focusedDimensions);
@@ -659,16 +659,43 @@ function handleFocusKeydown(event: KeyboardEvent): void {
 }
 
 /**
- * Initialize focus mode keyboard listeners
+ * Handle window resize while in focus mode
+ * Recomputes tile dimensions and re-centers the focused tile
+ */
+function handleFocusResize(): void {
+    const focusedId = getFocusedNodeId();
+    if (!focusedId) return;
+
+    const g = getG();
+    if (!g) return;
+
+    // Find the focused node data
+    const nodeData = g.selectAll<SVGGElement, D3Node>('.node')
+        .data()
+        .find((d) => d.id === focusedId);
+
+    if (!nodeData) return;
+
+    // Recalculate dimensions based on new viewport size
+    const focusedDimensions = calculateFocusedTileDimensions();
+
+    // Re-focus the tile with new dimensions (transition between focus states)
+    focusOnTile(nodeData);
+}
+
+/**
+ * Initialize focus mode keyboard listeners and resize handler
  * Should be called once when the graph is initialized
  */
 export function initFocusKeyboardSupport(): void {
     document.addEventListener('keydown', handleFocusKeydown);
+    window.addEventListener('resize', handleFocusResize);
 }
 
 /**
- * Clean up focus mode keyboard listeners
+ * Clean up focus mode keyboard listeners and resize handler
  */
 export function cleanupFocusKeyboardSupport(): void {
     document.removeEventListener('keydown', handleFocusKeydown);
+    window.removeEventListener('resize', handleFocusResize);
 }
