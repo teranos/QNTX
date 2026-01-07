@@ -4,7 +4,7 @@
 [![TypeGen Check](https://github.com/teranos/QNTX/actions/workflows/typegen.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/typegen.yml)
 [![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
 
-**QNTX** = A modular Continuous Intelligence Platform operated as a graph of attestations. It automates data ingestion, enrichment, and reasoning to create a continuously self-improving knowledge graph.
+**QNTX** = Direct manipulation of symbolic knowledge through computational systems. A modular Continuous Intelligence Platform operated as a graph of attestations. It automates data ingestion, enrichment, and reasoning to create a continuously self-improving knowledge graph.
 
 ```
 Data → Graph → Knowledge → Intelligence → Action
