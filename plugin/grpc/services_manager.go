@@ -41,7 +41,7 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate auth token")
+		return nil, errors.Wrap(err, "failed to generate auth token for plugin services")
 	}
 
 	// Start ATSStore service
