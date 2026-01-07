@@ -25,9 +25,9 @@ type ChildJobInfo struct {
 	HandlerName string `json:"handler_name"`
 	Source string `json:"source"`
 	Status string `json:"status"`
-	ProgressPct float64 `json:"progress_pct"`
-	CostEstimate float64 `json:"cost_estimate"`
-	CostActual float64 `json:"cost_actual"`
+	ProgressPct float64 `json:"progress_pct,omitempty"`
+	CostEstimate float64 `json:"cost_estimate,omitempty"`
+	CostActual float64 `json:"cost_actual,omitempty"`
 	Error string `json:"error,omitempty"`
 	CreatedAt string `json:"created_at"`
 	StartedAt *string `json:"started_at,omitempty"`
@@ -44,9 +44,9 @@ export interface ChildJobInfo {
   handler_name: string;
   source: string;
   status: string;
-  progress_pct: number;
-  cost_estimate: number;
-  cost_actual: number;
+  progress_pct?: number;
+  cost_estimate?: number;
+  cost_actual?: number;
   error?: string;
   created_at: string;
   started_at?: string | null;
@@ -91,6 +91,36 @@ export interface CompleteMessage {
    * Completion message
    */
   message: string;
+}
+```
+
+</td>
+</tr>
+</table>
+
+## ConsoleFormatter
+
+**Source**: [`server/console_formatter.go:10`](https://github.com/teranos/QNTX/blob/main/server/console_formatter.go#L10)
+
+
+<table>
+<tr>
+<th>Go Source</th>
+<th>TypeScript</th>
+</tr>
+<tr>
+<td>
+
+```go
+type ConsoleFormatter struct {
+}
+```
+
+</td>
+<td>
+
+```typescript
+export interface ConsoleFormatter {
 }
 ```
 
@@ -563,7 +593,7 @@ export interface ListExecutionsResponse {
 ```go
 type ListScheduledJobsResponse struct {
 	Jobs []ScheduledJobResponse `json:"jobs"`
-	Count int `json:"count"`
+	Count int `json:"count,omitempty"`
 }
 ```
 
@@ -573,7 +603,7 @@ type ListScheduledJobsResponse struct {
 ```typescript
 export interface ListScheduledJobsResponse {
   jobs: ScheduledJobResponse[];
-  count: number;
+  count?: number;
 }
 ```
 
@@ -1236,13 +1266,13 @@ export interface QueryMessage {
 type ScheduledJobResponse struct {
 	ID string `json:"id"`
 	ATSCode string `json:"ats_code"`
-	IntervalSeconds int `json:"interval_seconds"`
+	IntervalSeconds int `json:"interval_seconds,omitempty"`
 	NextRunAt string `json:"next_run_at"`
-	LastRunAt *string `json:"last_run_at"`
-	LastExecutionID string `json:"last_execution_id"`
+	LastRunAt *string `json:"last_run_at,omitempty"`
+	LastExecutionID string `json:"last_execution_id,omitempty"`
 	State string `json:"state"`
-	CreatedFromDoc string `json:"created_from_doc"`
-	Metadata string `json:"metadata"`
+	CreatedFromDoc string `json:"created_from_doc,omitempty"`
+	Metadata string `json:"metadata,omitempty"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -1255,7 +1285,7 @@ type ScheduledJobResponse struct {
 export interface ScheduledJobResponse {
   id: string;
   ats_code: string;
-  interval_seconds: number;
+  interval_seconds?: number;
   /**
    * RFC3339 timestamp
    */
@@ -1267,10 +1297,10 @@ export interface ScheduledJobResponse {
   /**
    * Last async job ID
    */
-  last_execution_id: string;
+  last_execution_id?: string;
   state: string;
-  created_from_doc: string;
-  metadata: string;
+  created_from_doc?: string;
+  metadata?: string;
   /**
    * RFC3339 timestamp
    */
@@ -1501,7 +1531,7 @@ export interface SystemCapabilitiesMessage {
 ```go
 type TaskInfo struct {
 	TaskID string `json:"task_id"`
-	LogCount int `json:"log_count"`
+	LogCount int `json:"log_count,omitempty"`
 }
 ```
 
@@ -1511,7 +1541,7 @@ type TaskInfo struct {
 ```typescript
 export interface TaskInfo {
   task_id: string;
-  log_count: number;
+  log_count?: number;
 }
 ```
 

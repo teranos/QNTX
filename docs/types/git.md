@@ -420,7 +420,7 @@ export interface GitProcessingResult {
 
 ## GoPackageInfo
 
-**Source**: [`qntx-code/ixgest/git/ingest.go:728`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L728)
+**Source**: [`qntx-code/ixgest/git/ingest.go:732`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L732)
 
 
 <table>
