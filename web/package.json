@@ -36,7 +36,7 @@
     "prosemirror-markdown": "1.13.1",
     "prosemirror-model": "1.24.0",
     "prosemirror-schema-basic": "1.2.3",
-    "prosemirror-schema-list": "1.4.1",
+    "prosemirror-schema-list": "1.5.1",
     "prosemirror-state": "1.4.3",
     "prosemirror-tables": "1.6.1",
     "prosemirror-view": "1.38.1",
