@@ -2,7 +2,6 @@
 
 import { GRAPH_PHYSICS } from '../../config.ts';
 import { getDomCache } from '../state.ts';
-import { getTransform } from '../transform.ts';
 
 // Default tile dimensions (must match renderer.ts)
 export const DEFAULT_TILE_WIDTH = 180;

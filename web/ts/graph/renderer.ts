@@ -6,7 +6,7 @@ import { uiState } from '../ui-state.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
-    getSimulation, getG, getDomCache,
+    getSimulation, getDomCache,
     setSimulation, setSvg, setG, setZoom, clearState
 } from './state.ts';
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
