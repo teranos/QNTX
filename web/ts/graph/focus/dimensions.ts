@@ -18,6 +18,9 @@ export function calculateFocusedTileDimensions(): { width: number; height: numbe
     const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
+        console.warn('[dimensions] container not found, using defaults', {
+            defaults: { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT, scale: 1 }
+        });
         return { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT, scale: 1 };
     }
 
