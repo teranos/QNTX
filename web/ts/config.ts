@@ -47,6 +47,9 @@ export const GRAPH_PHYSICS: GraphPhysics & {
     TILE_CHARGE_STRENGTH: number;
     CENTER_STRENGTH: number;
     COLLISION_RADIUS: number;
+    // Focus mode constants
+    FOCUS_VIEWPORT_RATIO: number;
+    FOCUS_TILE_PADDING: number;
 } = {
     LINK_DISTANCE: 100,
     CHARGE_STRENGTH: -300,
@@ -63,7 +66,11 @@ export const GRAPH_PHYSICS: GraphPhysics & {
     DEFAULT_LINK_STRENGTH: 0.1,       // Default for all link types - metadata from backend overrides
     TILE_CHARGE_STRENGTH: -2000,      // Strong repulsion for tiles to spread them out
     CENTER_STRENGTH: 0.05,             // Weak centering - just prevent drift
-    COLLISION_RADIUS: 120              // Larger buffer around tiles to prevent overlap
+    COLLISION_RADIUS: 120,             // Larger buffer around tiles to prevent overlap
+    // Focus mode: tile takes up this fraction of viewport (leaves edges for context)
+    FOCUS_VIEWPORT_RATIO: 0.7,
+    // Focus mode: minimum padding around focused tile in pixels
+    FOCUS_TILE_PADDING: 40
 };
 
 // Graph visual styling constants

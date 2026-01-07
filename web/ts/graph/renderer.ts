@@ -12,6 +12,7 @@ import {
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
 import { createDragBehavior } from './interactions.ts';
 import { getTransform, centerGraph } from './transform.ts';
+import { focusOnTile, unfocus, isFocused, getFocusedId } from './focus.ts';
 import type { GraphData, Node } from '../../types/core';
 import type {
     D3Node,
@@ -191,23 +192,65 @@ function renderGraph(data: GraphData): void {
         .attr("stroke", "#808080")
         .attr("stroke-width", 3);
 
+    // Track zoom state for unfocus detection
+    let lastZoomScale: number | null = null;
+    let zoomStartTransform: { x: number; y: number; k: number } | null = null;
+
     // Create zoom behavior
     const zoom = d3.zoom()
         // Virtue #5: Prudence - Use named constants instead of magic numbers
         .scaleExtent([GRAPH_PHYSICS.ZOOM_MIN, GRAPH_PHYSICS.ZOOM_MAX])
+        .on("start", function(event: ZoomEvent) {
+            // Capture starting transform for pan detection
+            zoomStartTransform = {
+                x: event.transform.x,
+                y: event.transform.y,
+                k: event.transform.k
+            };
+            lastZoomScale = event.transform.k;
+        })
         .on("zoom", function(event: ZoomEvent) {
             const g = getG();
             if (g) {
                 g.attr("transform", event.transform.toString());
             }
+
+            // Detect unfocus triggers while focused
+            if (isFocused() && zoomStartTransform) {
+                const currentScale = event.transform.k;
+                const startScale = zoomStartTransform.k;
+
+                // Unfocus if user zooms out significantly
+                if (currentScale < startScale * 0.85) {
+                    unfocus();
+                    return;
+                }
+
+                // Unfocus if user pans significantly (more than 50px in either direction)
+                const panDeltaX = Math.abs(event.transform.x - zoomStartTransform.x);
+                const panDeltaY = Math.abs(event.transform.y - zoomStartTransform.y);
+                if (panDeltaX > 50 || panDeltaY > 50) {
+                    unfocus();
+                    return;
+                }
+            }
         })
         .on("end", function() {
             // Save transform state after zoom/pan
             saveCurrentSession();
+            zoomStartTransform = null;
         });
 
     setZoom(zoom);
     svg.call(zoom);
+
+    // Click on empty SVG space unfocuses
+    svg.on("click", function(event: MouseEvent) {
+        // Only unfocus if clicking directly on the SVG (not on a node)
+        if (event.target === svg.node() && isFocused()) {
+            unfocus();
+        }
+    });
 
     // Create container group
     const g = svg.append("g");
@@ -324,6 +367,13 @@ function renderGraph(data: GraphData): void {
     // Tooltip
     const hiddenNodes = getHiddenNodes();
     const tooltip = d3.select("#tooltip");
+
+    // Click handler for tile focus
+    node.on("click", function(event: MouseEvent, d: D3Node) {
+        event.stopPropagation(); // Prevent SVG click handler from firing
+        focusOnTile(d);
+    });
+
     node.on("mouseover", function(event: MouseEvent, d: D3Node) {
         let content = '<strong>' + d.label + '</strong><br/>';
         content += '<div class="meta-item"><span class="meta-label">Type:</span> ' + d.type + '</div>';
