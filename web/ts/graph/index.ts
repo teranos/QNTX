@@ -14,4 +14,4 @@ export {
 
 export { getLinkDistance, getLinkStrength } from './physics.ts';
 export { normalizeNodeType } from './utils.ts';
-export { focusOnTile, unfocus, isFocused, getFocusedId } from './focus.ts';
+export { focusOnTile, unfocus, isFocused, getFocusedId, initFocusKeyboardSupport, cleanupFocusKeyboardSupport } from './focus.ts';

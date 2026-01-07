@@ -12,7 +12,7 @@ import {
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
 import { createDragBehavior } from './interactions.ts';
 import { getTransform, centerGraph } from './transform.ts';
-import { focusOnTile, unfocus, isFocused, getFocusedId } from './focus.ts';
+import { focusOnTile, unfocus, isFocused, getFocusedId, initFocusKeyboardSupport, cleanupFocusKeyboardSupport } from './focus.ts';
 import type { GraphData, Node } from '../../types/core';
 import type {
     D3Node,
@@ -252,6 +252,9 @@ function renderGraph(data: GraphData): void {
         }
     });
 
+    // Initialize keyboard support for focus mode (Escape to unfocus)
+    initFocusKeyboardSupport();
+
     // Create container group
     const g = svg.append("g");
     setG(g);
@@ -435,6 +438,7 @@ function renderGraph(data: GraphData): void {
 
 // Virtue #7: Cleanliness - Export cleanup function for when graph is destroyed
 export function cleanupGraph(): void {
+    cleanupFocusKeyboardSupport();
     clearState();
 }
 
