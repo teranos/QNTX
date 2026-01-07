@@ -235,8 +235,8 @@ type Node struct {
 	TypeSource string `json:"-"`
 	Label string `json:"label"`
 	Visible bool `json:"visible"`
-	Group int `json:"group"`
-	Metadata map[string]interface{} `json:"metadata"`
+	Group int `json:"group,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 ```
 
@@ -261,8 +261,8 @@ export interface Node {
   /**
    * For coloring/clustering (from type definitions)
    */
-  group: number;
-  metadata: Record<string, unknown>;
+  group?: number;
+  metadata?: Record<string, unknown>;
 }
 ```
 
@@ -287,8 +287,8 @@ export interface Node {
 type NodeTypeInfo struct {
 	Type string `json:"type"`
 	Label string `json:"label"`
-	Color string `json:"color"`
-	Count int `json:"count"`
+	Color string `json:"color,omitempty"`
+	Count int `json:"count,omitempty"`
 }
 ```
 
@@ -308,11 +308,11 @@ export interface NodeTypeInfo {
   /**
    * Hex color code
    */
-  color: string;
+  color?: string;
   /**
    * Number of nodes of this type
    */
-  count: number;
+  count?: number;
 }
 ```
 
@@ -400,7 +400,7 @@ type RelationshipTypeInfo struct {
 	Color string `json:"color,omitempty"`
 	LinkDistance *float64 `json:"link_distance,omitempty"`
 	LinkStrength *float64 `json:"link_strength,omitempty"`
-	Count int `json:"count"`
+	Count int `json:"count,omitempty"`
 }
 ```
 
@@ -432,7 +432,7 @@ export interface RelationshipTypeInfo {
   /**
    * Number of links of this type
    */
-  count: number;
+  count?: number;
 }
 ```
 
@@ -455,8 +455,8 @@ export interface RelationshipTypeInfo {
 
 ```go
 type Stats struct {
-	TotalNodes int `json:"total_nodes"`
-	TotalEdges int `json:"total_edges"`
+	TotalNodes int `json:"total_nodes,omitempty"`
+	TotalEdges int `json:"total_edges,omitempty"`
 }
 ```
 
@@ -465,8 +465,8 @@ type Stats struct {
 
 ```typescript
 export interface Stats {
-  total_nodes: number;
-  total_edges: number;
+  total_nodes?: number;
+  total_edges?: number;
 }
 ```
 

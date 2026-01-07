@@ -75,8 +75,8 @@ export interface Node {
   /**
    * For coloring/clustering (from type definitions)
    */
-  group: number;
-  metadata: Record<string, unknown>;
+  group?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface NodeTypeInfo {
@@ -91,11 +91,11 @@ export interface NodeTypeInfo {
   /**
    * Hex color code
    */
-  color: string;
+  color?: string;
   /**
    * Number of nodes of this type
    */
-  count: number;
+  count?: number;
 }
 
 export interface RelationshipDefinition {
@@ -149,12 +149,12 @@ export interface RelationshipTypeInfo {
   /**
    * Number of links of this type
    */
-  count: number;
+  count?: number;
 }
 
 export interface Stats {
-  total_nodes: number;
-  total_edges: number;
+  total_nodes?: number;
+  total_edges?: number;
 }
 
 export interface TypeDefinition {

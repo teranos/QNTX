@@ -120,13 +120,13 @@ type Job struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 	Source string `json:"source"`
 	Status JobStatus `json:"status"`
-	Progress Progress `json:"progress"`
-	CostEstimate float64 `json:"cost_estimate"`
-	CostActual float64 `json:"cost_actual"`
+	Progress Progress `json:"progress,omitempty"`
+	CostEstimate float64 `json:"cost_estimate,omitempty"`
+	CostActual float64 `json:"cost_actual,omitempty"`
 	PulseState *PulseState `json:"pulse_state,omitempty"`
 	Error string `json:"error,omitempty"`
 	ParentJobID string `json:"parent_job_id,omitempty"`
-	RetryCount int `json:"retry_count"`
+	RetryCount int `json:"retry_count,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	StartedAt *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
@@ -153,9 +153,9 @@ export interface Job {
    */
   source: string;
   status: JobStatus;
-  progress: Progress;
-  cost_estimate: number;
-  cost_actual: number;
+  progress?: Progress;
+  cost_estimate?: number;
+  cost_actual?: number;
   pulse_state?: PulseState | null;
   error?: string;
   /**
@@ -165,7 +165,7 @@ export interface Job {
   /**
    * Number of retry attempts (max 2)
    */
-  retry_count: number;
+  retry_count?: number;
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;
@@ -229,8 +229,8 @@ export type JobStatus = 'cancelled' | 'completed' | 'failed' | 'paused' | 'queue
 
 ```go
 type Progress struct {
-	Current int `json:"current"`
-	Total int `json:"total"`
+	Current int `json:"current,omitempty"`
+	Total int `json:"total,omitempty"`
 }
 ```
 
@@ -242,11 +242,11 @@ export interface Progress {
   /**
    * Completed operations
    */
-  current: number;
+  current?: number;
   /**
    * Total operations
    */
-  total: number;
+  total?: number;
 }
 ```
 
@@ -269,12 +269,12 @@ export interface Progress {
 
 ```go
 type PulseState struct {
-	CallsThisMinute int `json:"calls_this_minute"`
-	CallsRemaining int `json:"calls_remaining"`
-	SpendToday float64 `json:"spend_today"`
-	SpendThisMonth float64 `json:"spend_this_month"`
-	BudgetRemaining float64 `json:"budget_remaining"`
-	IsPaused bool `json:"is_paused"`
+	CallsThisMinute int `json:"calls_this_minute,omitempty"`
+	CallsRemaining int `json:"calls_remaining,omitempty"`
+	SpendToday float64 `json:"spend_today,omitempty"`
+	SpendThisMonth float64 `json:"spend_this_month,omitempty"`
+	BudgetRemaining float64 `json:"budget_remaining,omitempty"`
+	IsPaused bool `json:"is_paused,omitempty"`
 	PauseReason string `json:"pause_reason,omitempty"`
 }
 ```
@@ -284,12 +284,12 @@ type PulseState struct {
 
 ```typescript
 export interface PulseState {
-  calls_this_minute: number;
-  calls_remaining: number;
-  spend_today: number;
-  spend_this_month: number;
-  budget_remaining: number;
-  is_paused: boolean;
+  calls_this_minute?: number;
+  calls_remaining?: number;
+  spend_today?: number;
+  spend_this_month?: number;
+  budget_remaining?: number;
+  is_paused?: boolean;
   /**
    * "budget_exceeded", "rate_limit", "user_requested"
    */
