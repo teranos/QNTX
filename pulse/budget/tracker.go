@@ -100,18 +100,21 @@ func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 	bt.mu.RUnlock()
 
 	if status.DailySpend+estimatedCostUSD > dailyBudget {
-		return errors.Newf("daily budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+		err := errors.Newf("daily budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.DailySpend, estimatedCostUSD, dailyBudget)
+		return errors.WithHint(err, "increase daily budget in config or wait for the 24-hour window to reset")
 	}
 
 	if weeklyBudget > 0 && status.WeeklySpend+estimatedCostUSD > weeklyBudget {
-		return errors.Newf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+		err := errors.Newf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.WeeklySpend, estimatedCostUSD, weeklyBudget)
+		return errors.WithHint(err, "increase weekly budget in config or wait for the 7-day rolling window to reset")
 	}
 
 	if status.MonthlySpend+estimatedCostUSD > monthlyBudget {
-		return errors.Newf("monthly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
+		err := errors.Newf("monthly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.MonthlySpend, estimatedCostUSD, monthlyBudget)
+		return errors.WithHint(err, "increase monthly budget in config or wait for the 30-day rolling window to reset")
 	}
 
 	return nil
@@ -128,7 +131,8 @@ func (bt *Tracker) EstimateOperationCost(numOperations int) float64 {
 // UpdateDailyBudget updates the daily budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
-		return errors.Newf("daily budget cannot be negative: %.2f", newBudgetUSD)
+		err := errors.Newf("daily budget cannot be negative: %.2f", newBudgetUSD)
+		return errors.WithHint(err, "specify a non-negative budget value (e.g., 5.00 for $5/day)")
 	}
 
 	// Update in-memory config
@@ -149,7 +153,8 @@ func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
 // UpdateWeeklyBudget updates the weekly budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
-		return errors.Newf("weekly budget cannot be negative: %.2f", newBudgetUSD)
+		err := errors.Newf("weekly budget cannot be negative: %.2f", newBudgetUSD)
+		return errors.WithHint(err, "specify a non-negative budget value (e.g., 35.00 for $35/week)")
 	}
 
 	// Update in-memory config
@@ -170,7 +175,8 @@ func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
 // UpdateMonthlyBudget updates the monthly budget limit at runtime and persists to config.toml
 func (bt *Tracker) UpdateMonthlyBudget(newBudgetUSD float64) error {
 	if newBudgetUSD < 0 {
-		return errors.Newf("monthly budget cannot be negative: %.2f", newBudgetUSD)
+		err := errors.Newf("monthly budget cannot be negative: %.2f", newBudgetUSD)
+		return errors.WithHint(err, "specify a non-negative budget value (e.g., 100.00 for $100/month)")
 	}
 
 	// Update in-memory config
