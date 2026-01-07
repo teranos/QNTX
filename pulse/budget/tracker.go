@@ -20,15 +20,15 @@ type BudgetConfig struct {
 
 // Status represents current budget state
 type Status struct {
-	DailySpend       float64 `json:"daily_spend"`
-	WeeklySpend      float64 `json:"weekly_spend"`
-	MonthlySpend     float64 `json:"monthly_spend"`
-	DailyRemaining   float64 `json:"daily_remaining"`
-	WeeklyRemaining  float64 `json:"weekly_remaining"`
-	MonthlyRemaining float64 `json:"monthly_remaining"`
-	DailyOps         int     `json:"daily_ops"`
-	WeeklyOps        int     `json:"weekly_ops"`
-	MonthlyOps       int     `json:"monthly_ops"`
+	DailySpend       float64 `json:"daily_spend,omitempty"`
+	WeeklySpend      float64 `json:"weekly_spend,omitempty"`
+	MonthlySpend     float64 `json:"monthly_spend,omitempty"`
+	DailyRemaining   float64 `json:"daily_remaining,omitempty"`
+	WeeklyRemaining  float64 `json:"weekly_remaining,omitempty"`
+	MonthlyRemaining float64 `json:"monthly_remaining,omitempty"`
+	DailyOps         int     `json:"daily_ops,omitempty"`
+	WeeklyOps        int     `json:"weekly_ops,omitempty"`
+	MonthlyOps       int     `json:"monthly_ops,omitempty"`
 }
 
 // Tracker tracks and enforces budget limits

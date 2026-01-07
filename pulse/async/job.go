@@ -34,19 +34,19 @@ func IsValidStatus(s string) bool {
 
 // PulseState represents the pulse rate limiting and budget state for a job
 type PulseState struct {
-	CallsThisMinute int     `json:"calls_this_minute"`
-	CallsRemaining  int     `json:"calls_remaining"`
-	SpendToday      float64 `json:"spend_today"`
-	SpendThisMonth  float64 `json:"spend_this_month"`
-	BudgetRemaining float64 `json:"budget_remaining"`
-	IsPaused        bool    `json:"is_paused"`
+	CallsThisMinute int     `json:"calls_this_minute,omitempty"`
+	CallsRemaining  int     `json:"calls_remaining,omitempty"`
+	SpendToday      float64 `json:"spend_today,omitempty"`
+	SpendThisMonth  float64 `json:"spend_this_month,omitempty"`
+	BudgetRemaining float64 `json:"budget_remaining,omitempty"`
+	IsPaused        bool    `json:"is_paused,omitempty"`
 	PauseReason     string  `json:"pause_reason,omitempty"` // "budget_exceeded", "rate_limit", "user_requested"
 }
 
 // Progress represents job progress information
 type Progress struct {
-	Current int `json:"current"` // Completed operations
-	Total   int `json:"total"`   // Total operations
+	Current int `json:"current,omitempty"` // Completed operations
+	Total   int `json:"total,omitempty"`   // Total operations
 }
 
 // Percentage calculates progress as a percentage (0-100)
@@ -70,13 +70,13 @@ type Job struct {
 	Payload      json.RawMessage `json:"payload,omitempty"` // Handler-specific data (domain-owned)
 	Source       string          `json:"source"`            // For deduplication and logging
 	Status       JobStatus       `json:"status"`
-	Progress     Progress        `json:"progress"`
-	CostEstimate float64         `json:"cost_estimate"`
-	CostActual   float64         `json:"cost_actual"`
+	Progress     Progress        `json:"progress,omitempty"`
+	CostEstimate float64         `json:"cost_estimate,omitempty"`
+	CostActual   float64         `json:"cost_actual,omitempty"`
 	PulseState   *PulseState     `json:"pulse_state,omitempty"`
 	Error        string          `json:"error,omitempty"`
 	ParentJobID  string          `json:"parent_job_id,omitempty"` // For tasks grouped under parent job
-	RetryCount   int             `json:"retry_count"`             // Number of retry attempts (max 2)
+	RetryCount   int             `json:"retry_count,omitempty"`   // Number of retry attempts (max 2)
 	CreatedAt    time.Time       `json:"created_at"`
 	StartedAt    *time.Time      `json:"started_at,omitempty"`
 	CompletedAt  *time.Time      `json:"completed_at,omitempty"`
