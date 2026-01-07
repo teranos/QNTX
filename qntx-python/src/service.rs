@@ -539,15 +539,21 @@ mod tests {
     async fn test_execute_endpoint() {
         let service = PythonPluginService::new().unwrap();
 
-        let request = ExecuteRequest {
-            code: "print('Hello from test')".to_string(),
-            timeout_ms: Some(5000),
-        };
+        let body = serde_json::json!({
+            "code": "print('Hello from test')",
+            "timeout_secs": 5
+        });
 
-        let body = serde_json::to_vec(&request).unwrap();
         let result = service.handle_execute(body).await.unwrap();
 
-        let response: ExecuteResponse = serde_json::from_slice(&result.body).unwrap();
+        #[derive(Deserialize)]
+        struct ExecutionResponse {
+            success: bool,
+            stdout: String,
+            stderr: String,
+        }
+
+        let response: ExecutionResponse = serde_json::from_slice(&result.body).unwrap();
         assert!(response.success);
         assert_eq!(response.stdout, "Hello from test\n");
         assert_eq!(response.stderr, "");
