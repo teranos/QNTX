@@ -100,9 +100,14 @@ jobs:
         run: cd qntx-python && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
+          PYO3_PYTHON: "python3"
 
       - name: Test (qntx-python)
         run: cd qntx-python && cargo test
+        env:
+          PYO3_PYTHON: "python3"
 
       - name: Build release (qntx-python)
         run: cd qntx-python && cargo build --release
+        env:
+          PYO3_PYTHON: "python3"
