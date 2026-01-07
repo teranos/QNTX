@@ -117,7 +117,7 @@ jobs:
           skipPush: true
 
       - name: Check formatting
-        run: cd qntx-python && nix develop ..#qntx-python-dev --command cargo fmt --check
+        run: cd qntx-python && nix develop .. --command cargo fmt --check
 
       - name: Build via Nix (required for Python linking)
         run: nix build .#qntx-python --print-build-logs
