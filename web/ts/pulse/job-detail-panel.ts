@@ -529,12 +529,9 @@ class JobDetailPanel {
   private formatLogTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
+    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
 
-    // If today, show just time
+    // If today, show just time for logs (more useful than relative time)
     if (diffHours < 24 && date.getDate() === now.getDate()) {
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -544,21 +541,8 @@ class JobDetailPanel {
       });
     }
 
-    // If recent, show relative time
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    } else {
-      // Otherwise show date + time
-      return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-    }
+    // For non-today timestamps, use relative time from html-utils
+    return formatRelativeTime(timestamp);
   }
 
   private getLevelBadge(level: string): string {

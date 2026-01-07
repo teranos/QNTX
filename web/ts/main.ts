@@ -5,6 +5,7 @@ import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
+import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -99,10 +100,7 @@ function handleVersion(data: VersionMessage): void {
         // Format build time if available
         let buildTimeText = '';
         if (data.build_time) {
-            const buildDate = new Date(data.build_time);
-            const dateStr = buildDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = buildDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-            buildTimeText = ` · ${dateStr} ${timeStr}`;
+            buildTimeText = ` · ${formatDateTime(data.build_time)}`;
         }
 
         // Build version info using DOM API for security
