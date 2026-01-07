@@ -5,6 +5,7 @@ import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
+import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -99,10 +100,7 @@ function handleVersion(data: VersionMessage): void {
         // Format build time if available
         let buildTimeText = '';
         if (data.build_time) {
-            const buildDate = new Date(data.build_time);
-            const dateStr = buildDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = buildDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-            buildTimeText = ` · ${dateStr} ${timeStr}`;
+            buildTimeText = ` · ${formatDateTime(data.build_time)}`;
         }
 
         // Build version info using DOM API for security
@@ -132,12 +130,14 @@ function handleVersion(data: VersionMessage): void {
 
 
 // Initialize the application
+// Avoid Sin #4: Callback Hell - Use async/await for sequential async operations
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Initialize console reporter (dev mode only)
+    // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
     try {
         await initConsoleReporter();
     } catch (err) {
@@ -317,6 +317,7 @@ async function init(): Promise<void> {
 }
 
 // Start application when DOM is ready
+// Virtue #8: Progressive Enhancement - Core init works immediately, enhanced features layer on
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         init();

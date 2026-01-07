@@ -87,6 +87,7 @@ export type {
 export type {
   ChildJobInfo,
   CompleteMessage,
+  ConsoleFormatter,
   ConsoleLog,
   CreateScheduledJobRequest,
   DaemonStatusMessage,

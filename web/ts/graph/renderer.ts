@@ -1,22 +1,26 @@
 // D3.js graph visualization
 // Main rendering orchestration - delegates to specialized modules
 
-import { appState, GRAPH_PHYSICS, GRAPH_STYLES } from '../config.ts';
+import { appState, GRAPH_PHYSICS } from '../config.ts';
 import { uiState } from '../ui-state.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
-    getSimulation, getG, getHiddenNodes, getDomCache,
+    getSimulation, getDomCache,
     setSimulation, setSvg, setG, setZoom, clearState
 } from './state.ts';
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
 import { createDragBehavior } from './interactions.ts';
 import { getTransform, centerGraph } from './transform.ts';
+import { initFocusKeyboardSupport, cleanupFocusKeyboardSupport } from './focus.ts';
+import { createZoomBehavior, setupSVGClickHandler } from './zoom.ts';
+import { createLinks, createLinkLabels, updateLinkPositions, updateLinkLabelPositions } from './links.ts';
+import { createDiagnosticPattern, createTileRect, createTileText, updateTilePositions } from './tile/rendering.ts';
+import { setupTileClickHandler, setupTileHoverHandlers, setupTileContextMenu } from './tile/interactions.ts';
 import type { GraphData, Node } from '../../types/core';
 import type {
     D3Node,
-    D3Link,
-    ZoomEvent
+    D3Link
 } from '../../types/d3-graph';
 
 // Import D3 from vendor bundle
@@ -67,7 +71,7 @@ function renderGraph(data: GraphData): void {
     const nodeColors: Record<string, string> = {};
     if (data.meta?.node_types) {
         data.meta.node_types.forEach(typeInfo => {
-            nodeColors[typeInfo.type] = typeInfo.color;
+            nodeColors[typeInfo.type] = typeInfo.color ?? '#666666';
         });
     }
 
@@ -145,6 +149,7 @@ function renderGraph(data: GraphData): void {
     if (linkCountEl) linkCountEl.textContent = String(visibleLinks.length);
 
     // Virtue #3: Memory Management - Stop old simulation before creating new one
+    // Avoid Sin #3: Memory Leaks - Always cleanup before recreation
     const oldSimulation = getSimulation();
     if (oldSimulation) {
         oldSimulation.stop();
@@ -169,45 +174,18 @@ function renderGraph(data: GraphData): void {
 
     // Add pattern definition for problematic/unknown types
     const defs = svg.append("defs");
-    const pattern = defs.append("pattern")
-        .attr("id", "diagonal-stripe-pattern")
-        .attr("patternUnits", "userSpaceOnUse")
-        .attr("width", 8)
-        .attr("height", 8)
-        .attr("patternTransform", "rotate(45)");
+    createDiagnosticPattern(defs);
 
-    // Light gray background
-    pattern.append("rect")
-        .attr("width", 8)
-        .attr("height", 8)
-        .attr("fill", "#b0b0b0");
-
-    // Dark gray stripes
-    pattern.append("line")
-        .attr("x1", 0)
-        .attr("y1", 0)
-        .attr("x2", 0)
-        .attr("y2", 8)
-        .attr("stroke", "#808080")
-        .attr("stroke-width", 3);
-
-    // Create zoom behavior
-    const zoom = d3.zoom()
-        // Virtue #5: Prudence - Use named constants instead of magic numbers
-        .scaleExtent([GRAPH_PHYSICS.ZOOM_MIN, GRAPH_PHYSICS.ZOOM_MAX])
-        .on("zoom", function(event: ZoomEvent) {
-            const g = getG();
-            if (g) {
-                g.attr("transform", event.transform.toString());
-            }
-        })
-        .on("end", function() {
-            // Save transform state after zoom/pan
-            saveCurrentSession();
-        });
-
+    // Create zoom behavior with unfocus detection
+    const zoom = createZoomBehavior(saveCurrentSession);
     setZoom(zoom);
     svg.call(zoom);
+
+    // Setup click handler on empty SVG space to unfocus
+    setupSVGClickHandler(svg);
+
+    // Initialize keyboard support for focus mode (Escape to unfocus)
+    initFocusKeyboardSupport();
 
     // Create container group
     const g = svg.append("g");
@@ -235,27 +213,11 @@ function renderGraph(data: GraphData): void {
 
     setSimulation(simulation);
 
-    // Create links
-    const link = g.append("g")
-        .selectAll("line")
-        .data(d3Links)
-        .join("line")
-        .attr("class", (d: D3Link) => "link " + d.type)
-        .attr("stroke-width", (d: D3Link) => Math.sqrt((d.weight || 1) * 2));
+    // Create links and link labels
+    const link = createLinks(g, d3Links);
+    const linkLabel = createLinkLabels(g, d3Links);
 
-    // Create link labels
-    const linkLabel = g.append("g")
-        .selectAll("text")
-        .data(d3Links)
-        .join("text")
-        .attr("class", "link-label")
-        .attr("font-size", 9)
-        .attr("fill", "#8892b0")
-        .attr("text-anchor", "middle")
-        .attr("pointer-events", "none")
-        .text((d: D3Link) => d.label || d.type);
-
-    // Create nodes
+    // Create tile nodes
     const node = g.append("g")
         .selectAll("g")
         .data(d3Nodes)
@@ -263,118 +225,20 @@ function renderGraph(data: GraphData): void {
         .attr("class", "node")
         .call(createDragBehavior(simulation));
 
-    // Render tiles (rectangles with inline data)
-    const tileWidth = 180;
-    const tileHeight = 80;
-    node.append("rect")
-        .attr("width", tileWidth)
-        .attr("height", tileHeight)
-        .attr("x", -tileWidth / 2)
-        .attr("y", -tileHeight / 2)
-        .attr("fill", (d: D3Node) => {
-            // If type is in nodeColors (includes backend "untyped"), use that color
-            if (nodeColors[d.type]) {
-                return nodeColors[d.type];
-            }
-            // Problematic type: backend sent a type we don't have color for
-            // This indicates backend/frontend mismatch - use striped pattern for diagnostic visibility
-            return "url(#diagonal-stripe-pattern)";
-        })
-        .attr("stroke", GRAPH_STYLES.NODE_STROKE_COLOR)
-        .attr("stroke-width", 2)
-        .attr("aria-label", (d: D3Node) => `${d.type}: ${d.label}`);
+    // Render tiles (rectangles and text)
+    createTileRect(node, nodeColors);
+    createTileText(node);
 
-    // Multi-line text with metadata
-    node.each(function(this: any, d: D3Node) {
-        const textGroup = d3.select(this).append("text")
-            .attr("text-anchor", "middle")
-            .attr("fill", "#e0e0e0");
-
-        // Line 1: Label (bold)
-        textGroup.append("tspan")
-            .attr("x", 0)
-            .attr("dy", "-1em")
-            .attr("font-size", "13px")
-            .attr("font-weight", "bold")
-            .text(d.label);
-
-        // Line 2: Type (subdued)
-        textGroup.append("tspan")
-            .attr("x", 0)
-            .attr("dy", "1.2em")
-            .attr("font-size", "10px")
-            .attr("fill", "#888")
-            .text(d.type);
-
-        // Line 3: First metadata value if available
-        if (d.metadata && Object.keys(d.metadata).length > 0) {
-            const firstKey = Object.keys(d.metadata)[0];
-            const firstValue = d.metadata[firstKey];
-            if (firstValue && firstKey !== 'original_id') {
-                textGroup.append("tspan")
-                    .attr("x", 0)
-                    .attr("dy", "1.2em")
-                    .attr("font-size", "9px")
-                    .attr("fill", "#666")
-                    .text(`${firstKey}: ${String(firstValue).substring(0, 20)}`);
-            }
-        }
-    });
-
-    // Tooltip
-    const hiddenNodes = getHiddenNodes();
-    const tooltip = d3.select("#tooltip");
-    node.on("mouseover", function(event: MouseEvent, d: D3Node) {
-        let content = '<strong>' + d.label + '</strong><br/>';
-        content += '<div class="meta-item"><span class="meta-label">Type:</span> ' + d.type + '</div>';
-
-        if (d.metadata) {
-            Object.entries(d.metadata).forEach(([key, value]) => {
-                if (key !== 'original_id') {
-                    content += '<div class="meta-item"><span class="meta-label">' + key + ':</span> ' + value + '</div>';
-                }
-            });
-        }
-
-        tooltip.html(content)
-            .style("left", (event.pageX + 15) + "px")
-            .style("top", (event.pageY - 15) + "px")
-            .style("opacity", 1);
-    })
-    .on("mouseout", function() {
-        tooltip.style("opacity", 0);
-    })
-    .on("contextmenu", function(event: MouseEvent, d: D3Node) {
-        // Prevent default context menu
-        event.preventDefault();
-
-        // Toggle node visibility
-        if (hiddenNodes.has(d.id)) {
-            hiddenNodes.delete(d.id);
-        } else {
-            hiddenNodes.add(d.id);
-        }
-
-        // Re-render graph with updated visibility
-        if (appState.currentGraphData) {
-            renderGraph(appState.currentGraphData);
-        }
-    });
+    // Setup tile interaction handlers
+    setupTileClickHandler(node);
+    setupTileHoverHandlers(node);
+    setupTileContextMenu(node, renderGraph);
 
     // Update positions on tick
     simulation.on("tick", () => {
-        link
-            .attr("x1", (d: D3Link) => (d.source as D3Node).x!)
-            .attr("y1", (d: D3Link) => (d.source as D3Node).y!)
-            .attr("x2", (d: D3Link) => (d.target as D3Node).x!)
-            .attr("y2", (d: D3Link) => (d.target as D3Node).y!);
-
-        linkLabel
-            .attr("x", (d: D3Link) => ((d.source as D3Node).x! + (d.target as D3Node).x!) / 2)
-            .attr("y", (d: D3Link) => ((d.source as D3Node).y! + (d.target as D3Node).y!) / 2);
-
-        node
-            .attr("transform", (d: D3Node) => "translate(" + d.x + "," + d.y + ")");
+        updateLinkPositions(link);
+        updateLinkLabelPositions(linkLabel);
+        updateTilePositions(node);
     });
 
     // Auto-center if there are nodes
@@ -385,6 +249,7 @@ function renderGraph(data: GraphData): void {
 
 // Virtue #7: Cleanliness - Export cleanup function for when graph is destroyed
 export function cleanupGraph(): void {
+    cleanupFocusKeyboardSupport();
     clearState();
 }
 

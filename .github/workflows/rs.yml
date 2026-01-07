@@ -8,19 +8,23 @@ on:
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'claude/**'
     paths:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'types/generated/rust/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - 'qntx-python/Cargo.toml'
   workflow_dispatch:
 
 jobs:
-  check:
-    name: Rust Check
+  generated-types:
+    name: Generated Types
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/teranos/qntx:latest
@@ -38,52 +42,143 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: |
-            types/generated/rust
-            web/src-tauri
-            ats/ax/fuzzy-ax
+          workspaces: types/generated/rust
 
-      - name: Check formatting (generated types)
+      - name: Check formatting
         run: cd types/generated/rust && cargo fmt --check
 
-      # Tauri app checks disabled on Linux - see macos-tauri.yml for macOS builds
-      # - name: Check formatting (Tauri app)
-      #   run: cd web/src-tauri && cargo fmt --check
-
-      - name: Clippy (generated types)
+      - name: Clippy
         run: cd types/generated/rust && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      # - name: Clippy (Tauri app)
-      #   run: cd web/src-tauri && cargo clippy --all-targets --all-features
-      #   env:
-      #     RUSTFLAGS: "-Dwarnings"
-
-      - name: Check (generated types)
+      - name: Check
         run: cd types/generated/rust && cargo check
 
-      # - name: Check (Tauri app)
-      #   run: cd web/src-tauri && cargo check
+  fuzzy-ax:
+    name: Fuzzy Ax
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      # fuzzy-ax (Rust fuzzy matching for ax segment)
-      - name: Check formatting (fuzzy-ax)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ats/ax/fuzzy-ax
+
+      - name: Check formatting
         run: cd ats/ax/fuzzy-ax && cargo fmt --check
 
-      - name: Clippy (fuzzy-ax)
+      - name: Clippy
         run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      - name: Test (fuzzy-ax)
+      - name: Test
         run: cd ats/ax/fuzzy-ax && cargo test --lib
 
-      - name: Build release (fuzzy-ax)
+      - name: Build release
         run: cd ats/ax/fuzzy-ax && cargo build --release --lib
 
-      - name: Test CGO integration (fuzzy-ax)
+      - name: Test CGO integration
         run: |
           cd ats/ax/fuzzy-ax && cargo build --release --lib
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
+
+  qntx-python:
+    name: Python Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Check formatting
+        run: cd qntx-python && nix develop .. --command cargo fmt --check
+
+      - name: Build via Nix (required for Python linking)
+        run: nix build .#qntx-python --print-build-logs
+
+      - name: Verify binary works
+        run: ./result/bin/qntx-python-plugin --version
+
+  # Legacy cargo-based checks (disabled - Python linking issues)
+  # Kept for reference until Nix-based checks are stable
+  # qntx-python-cargo:
+  #   name: Python Plugin (Cargo)
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: ghcr.io/teranos/qntx:latest
+  #     credentials:
+  #       username: ${{ github.actor }}
+  #       password: ${{ secrets.GITHUB_TOKEN }}
+  #
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Configure git safe directory
+  #       run: git config --global --add safe.directory /__w/QNTX/QNTX
+  #
+  #     - name: Cache Rust dependencies
+  #       uses: swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: qntx-python
+  #
+  #     - name: Find Python in container
+  #       id: find-python
+  #       run: |
+  #         # Python3.13 is in the container but not in PATH
+  #         # Find it in the Nix store
+  #         PYTHON_PATH=$(find /nix/store -name "python3" -type f -path "*/python3-*/bin/python3" 2>/dev/null | head -1)
+  #         if [ -z "$PYTHON_PATH" ]; then
+  #           echo "ERROR: Could not find python3 in Nix store"
+  #           exit 1
+  #         fi
+  #         echo "Found Python at: $PYTHON_PATH"
+  #         $PYTHON_PATH --version
+  #         echo "python_path=$PYTHON_PATH" >> $GITHUB_OUTPUT
+  #
+  #     - name: Check formatting
+  #       run: cd qntx-python && cargo fmt --check
+  #
+  #     - name: Clippy
+  #       run: cd qntx-python && cargo clippy --all-targets --all-features
+  #       env:
+  #         RUSTFLAGS: "-Dwarnings"
+  #         PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
+  #
+  #     - name: Test
+  #       run: cd qntx-python && cargo test
+  #       env:
+  #         PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
+  #
+  #     - name: Build release
+  #       run: cd qntx-python && cargo build --release
+  #       env:
+  #         PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}

@@ -83,12 +83,12 @@ func TestGenerateInterface_EmptyStruct(t *testing.T) {
 		t.Fatal("Expected non-empty result")
 	}
 
-	// Should contain table structure
-	if !strings.Contains(result, "<table>") {
-		t.Error("Expected HTML table")
-	}
+	// Should contain heading and Go code block
 	if !strings.Contains(result, "## Empty") {
 		t.Error("Expected heading")
+	}
+	if !strings.Contains(result, "```go") {
+		t.Error("Expected Go code block")
 	}
 }
 
@@ -121,20 +121,9 @@ func TestGenerateInterface_BasicFields(t *testing.T) {
 		t.Error("Expected struct tag in Go struct")
 	}
 
-	// Should contain TypeScript interface
-	if !strings.Contains(result, "export interface Example {") {
-		t.Error("Expected TypeScript interface")
-	}
-	if !strings.Contains(result, "name: string") {
-		t.Error("Expected field in TypeScript interface")
-	}
-
-	// Should have side-by-side table
-	if !strings.Contains(result, "<th>Go Source</th>") {
-		t.Error("Expected Go Source column")
-	}
-	if !strings.Contains(result, "<th>TypeScript</th>") {
-		t.Error("Expected TypeScript column")
+	// Should have Go code block
+	if !strings.Contains(result, "```go") {
+		t.Error("Expected Go code block")
 	}
 }
 

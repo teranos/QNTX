@@ -24,9 +24,12 @@ pub struct ChildJobInfo {
     pub handler_name: String,
     pub source: String,
     pub status: String,
-    pub progress_pct: f64,
-    pub cost_estimate: f64,
-    pub cost_actual: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_estimate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_actual: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub created_at: String,
@@ -45,6 +48,11 @@ pub struct CompleteMessage {
     /// Completion message
     pub message: String,
 }
+
+/// ConsoleFormatter formats browser console logs with JSON summarization
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#consoleformatter>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ConsoleFormatter {}
 
 /// ConsoleLog represents a browser console message
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#consolelog>"]
@@ -105,7 +113,7 @@ pub struct DaemonStatusMessage {
     pub budget_weekly_limit: f64,
     /// Monthly budget limit (config)
     pub budget_monthly_limit: f64,
-    /// GRACE Phase 4: "running", "draining", "stopped"
+    /// Opening/Closing Phase 4: "running", "draining", "stopped"
     pub server_state: String,
     /// Unix timestamp
     pub timestamp: i64,
@@ -189,7 +197,8 @@ pub struct ListExecutionsResponse {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ListScheduledJobsResponse {
     pub jobs: Vec<ScheduledJobResponse>,
-    pub count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
 }
 
 /// LogEntry represents a single log entry
@@ -400,17 +409,21 @@ pub struct QueryMessage {
 pub struct ScheduledJobResponse {
     pub id: String,
     pub ats_code: String,
-    pub interval_seconds: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval_seconds: Option<i64>,
     /// RFC3339 timestamp
     pub next_run_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// RFC3339 timestamp
     pub last_run_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Last async job ID
-    pub last_execution_id: String,
+    pub last_execution_id: Option<String>,
     pub state: String,
-    pub created_from_doc: String,
-    pub metadata: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_from_doc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<String>,
     /// RFC3339 timestamp
     pub created_at: String,
     /// RFC3339 timestamp
@@ -479,7 +492,8 @@ pub struct SystemCapabilitiesMessage {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TaskInfo {
     pub task_id: String,
-    pub log_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_count: Option<i64>,
 }
 
 /// TaskLogsResponse represents the response for GET /tasks/:task_id/logs

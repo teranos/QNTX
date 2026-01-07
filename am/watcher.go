@@ -2,12 +2,12 @@ package am
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/teranos/QNTX/logger"
 )
 
 // ConfigWatcher watches config files for changes and triggers reload callbacks
@@ -104,11 +104,14 @@ func (cw *ConfigWatcher) watchLoop() {
 
 				// Check if this is our own write
 				if cw.checkOwnWrite() {
-					log.Printf("Config watcher: Ignoring own write to %s\n", event.Name)
+					logger.Debugw("Config watcher ignoring own write",
+						"file", event.Name)
 					continue
 				}
 
-				log.Printf("Config watcher: Detected change to %s (op: %s)\n", event.Name, event.Op)
+				logger.Infow("Config watcher detected change",
+					"file", event.Name,
+					"op", event.Op.String())
 				cw.scheduleReload()
 			}
 
@@ -116,7 +119,8 @@ func (cw *ConfigWatcher) watchLoop() {
 			if !ok {
 				return
 			}
-			log.Printf("Config watcher error: %v\n", err)
+			logger.Warnw("Config watcher error",
+				"error", err)
 		}
 	}
 }
@@ -134,7 +138,8 @@ func (cw *ConfigWatcher) scheduleReload() {
 	// Schedule reload after debounce period
 	cw.debounceTimer = time.AfterFunc(cw.debouncePeriod, func() {
 		if err := cw.reload(); err != nil {
-			log.Printf("Config reload failed: %v\n", err)
+			logger.Errorw("Config reload failed",
+				"error", err)
 		}
 	})
 }
@@ -150,7 +155,8 @@ func (cw *ConfigWatcher) reload() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	log.Printf("Config watcher: Successfully reloaded config from %s\n", cw.configPath)
+	logger.Infow("Config reloaded successfully",
+		"path", cw.configPath)
 
 	// Call all registered callbacks
 	cw.mu.RLock()
@@ -160,7 +166,8 @@ func (cw *ConfigWatcher) reload() error {
 
 	for _, callback := range callbacks {
 		if err := callback(newConfig); err != nil {
-			log.Printf("Config reload callback error: %v\n", err)
+			logger.Warnw("Config reload callback error",
+				"error", err)
 			// Continue calling other callbacks even if one fails
 		}
 	}

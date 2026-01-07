@@ -304,6 +304,7 @@
                     <button type="button" class="palette-cell" data-cmd="pulse" data-label="pulse — scheduled jobs" aria-label="Pulse: scheduled jobs dashboard">꩜</button>
                     <button type="button" class="palette-cell" data-cmd="prose" data-label="prose — documentation" aria-label="Prose: documentation editor">▣</button>
                     <button type="button" class="palette-cell" data-cmd="go" data-label="go — code editor" aria-label="Go: code editor with LSP">go</button>
+                    <button type="button" class="palette-cell" data-cmd="py" data-label="py — python" aria-label="Python: code execution">py</button>
                     <button type="button" class="palette-cell" data-cmd="plugins" data-label="plugins — domain plugins" aria-label="Plugins: installed domain plugins">&#9881;</button>
                     <button type="button" class="palette-cell" data-cmd="scraper" data-label="scraper — content extraction" aria-label="Scraper: content extraction">⛶</button>
                 </div>
@@ -338,12 +339,18 @@
             </div>
         </div>
 
+        <!-- TODO: Rename #graph-container to #graph-viewer for clarity
+             Current name is ambiguous - "container" doesn't convey it's the graph viewing area.
+             "graph-viewer" better describes its purpose as the interactive graph visualization space. -->
         <div id="graph-container">
+            <!-- TODO: Rename #controls to #legenda-container or #graph-controls
+                 Current name is too generic - doesn't indicate it contains the legenda.
+                 "legenda-container" would be clearer and match its actual content. -->
             <aside id="controls" role="toolbar" aria-label="Graph controls">
                 <!-- Legenda and isolated toggle built dynamically by legenda.js -->
                 <div class="legenda"></div>
             </aside>
-            <!-- Attestation feed overlay (behind graph) -->
+            <!-- TODO: Remove #attestation-feed - deprecated, no longer used -->
             <div id="attestation-feed"></div>
             <svg id="graph"></svg>
             <div class="tooltip" id="tooltip" role="tooltip"></div>

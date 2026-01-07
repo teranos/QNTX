@@ -70,9 +70,12 @@ pub struct Job {
     /// For deduplication and logging
     pub source: String,
     pub status: JobStatus,
-    pub progress: Progress,
-    pub cost_estimate: f64,
-    pub cost_actual: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress: Option<Progress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_estimate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_actual: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pulse_state: Option<PulseState>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -80,8 +83,9 @@ pub struct Job {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// For tasks grouped under parent job
     pub parent_job_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Number of retry attempts (max 2)
-    pub retry_count: i64,
+    pub retry_count: Option<i64>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<String>,
@@ -112,22 +116,30 @@ pub enum JobStatus {
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#progress>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Progress {
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Completed operations
-    pub current: i64,
+    pub current: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Total operations
-    pub total: i64,
+    pub total: Option<i64>,
 }
 
 /// PulseState represents the pulse rate limiting and budget state for a job
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#pulsestate>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PulseState {
-    pub calls_this_minute: i64,
-    pub calls_remaining: i64,
-    pub spend_today: f64,
-    pub spend_this_month: f64,
-    pub budget_remaining: f64,
-    pub is_paused: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub calls_this_minute: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub calls_remaining: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spend_today: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spend_this_month: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_remaining: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_paused: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// "budget_exceeded", "rate_limit", "user_requested"
     pub pause_reason: Option<String>,

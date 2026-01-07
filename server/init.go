@@ -31,7 +31,7 @@ type serverDependencies struct {
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
-	config        *appcfg.Config // GRACE Phase 2 optimization: reuse for daemon recreation
+	config        *appcfg.Config // Opening/Closing Phase 2 optimization: reuse for daemon recreation
 }
 
 // NewQNTXServer creates a new QNTX server
@@ -82,7 +82,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	// Create cancellation context for lifecycle management
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// GRACE Phase 2: Recreate daemon with server's context for proper shutdown coordination
+	// Opening/Closing Phase 2: Recreate daemon with server's context for proper shutdown coordination
 	// Reuse config from deps to avoid double-loading (optimization for WS connection speed)
 	poolConfig := async.DefaultWorkerPoolConfig()
 	if deps.config.Pulse.Workers > 0 {
@@ -100,29 +100,38 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 
 	// Create console buffer with callback to print logs to terminal
 	consoleBuffer := NewConsoleBuffer(100)
+	formatter := NewConsoleFormatter(verbosity) // Verbosity-aware formatting
 	consoleBuffer.onNewLog = func(log ConsoleLog) {
-		// Format log level for display
-		levelIcon := map[string]string{
-			"error": "✗",
-			"warn":  "⚠",
-			"info":  "ℹ",
-			"debug": "→",
-		}
-		icon := levelIcon[log.Level]
-		if icon == "" {
-			icon = "·"
-		}
+		// Format message using custom formatter for JSON summarization and coloring
+		formattedMsg := formatter.FormatMessage(log.Message)
 
-		// Print to server terminal
-		serverLogger.Infow(fmt.Sprintf("[Browser %s] %s", icon, log.Message),
-			"level", log.Level,
-			"url", log.URL,
-		)
+		// Prefix with [Browser] to make it obvious where this log came from
+		browserMsg := fmt.Sprintf("[Browser] %s", formattedMsg)
 
-		// Also print stack trace for errors
-		if log.Level == "error" && log.Stack != "" {
-			serverLogger.Debugw("Browser error stack trace",
-				"stack", log.Stack,
+		// Log through zap to match existing log style
+		// Use Infow for consistency with other logs (zap will add its own coloring)
+		switch log.Level {
+		case "error":
+			serverLogger.Errorw(browserMsg,
+				"url", log.URL,
+			)
+			// Also print stack trace for errors at debug level
+			if log.Stack != "" {
+				serverLogger.Debugw("Browser error stack trace",
+					"stack", log.Stack,
+				)
+			}
+		case "warn":
+			serverLogger.Warnw(browserMsg,
+				"url", log.URL,
+			)
+		case "debug":
+			serverLogger.Debugw(browserMsg,
+				"url", log.URL,
+			)
+		default: // info
+			serverLogger.Infow(browserMsg,
+				"url", log.URL,
 			)
 		}
 	}
@@ -151,7 +160,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.graphLimit.Store(1000)                 // Default graph node limit
-	server.state.Store(int32(ServerStateRunning)) // GRACE Phase 4: Initialize to running
+	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
 
 	// Initialize domain plugin registry
 	pluginRegistry := plugin.GetDefaultRegistry()

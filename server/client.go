@@ -157,7 +157,7 @@ func (c *Client) readPump() {
 			break
 		}
 
-		if logger.ShouldLogAll(int(c.server.verbosity.Load())) {
+		if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputDataDump) {
 			c.server.logger.Debugw("Received WebSocket message",
 				"client_id", c.id,
 				"size_bytes", len(messageBytes),
@@ -271,7 +271,7 @@ func (c *Client) writePump() {
 				return
 			}
 
-			if logger.ShouldLogTrace(int(c.server.verbosity.Load())) {
+			if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputInternalFlow) {
 				c.server.logger.Debugw("Sent graph to client",
 					"client_id", c.id,
 					"nodes", len(g.Nodes),
@@ -350,7 +350,7 @@ func (c *Client) handleQuery(query string) {
 		"query_length", len(query),
 	)
 
-	if logger.ShouldLogTrace(int(c.server.verbosity.Load())) {
+	if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputAxExecution) {
 		c.server.logger.Debugw("Query details",
 			"query_id", queryID,
 			"query", query,

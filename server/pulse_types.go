@@ -29,13 +29,13 @@ type UpdateScheduledJobRequest struct {
 type ScheduledJobResponse struct {
 	ID              string  `json:"id"`
 	ATSCode         string  `json:"ats_code"`
-	IntervalSeconds int     `json:"interval_seconds"`
-	NextRunAt       string  `json:"next_run_at"`       // RFC3339 timestamp
-	LastRunAt       *string `json:"last_run_at"`       // RFC3339 timestamp
-	LastExecutionID string  `json:"last_execution_id"` // Last async job ID
+	IntervalSeconds int     `json:"interval_seconds,omitempty"`
+	NextRunAt       string  `json:"next_run_at"`                 // RFC3339 timestamp
+	LastRunAt       *string `json:"last_run_at,omitempty"`       // RFC3339 timestamp
+	LastExecutionID string  `json:"last_execution_id,omitempty"` // Last async job ID
 	State           string  `json:"state"`
-	CreatedFromDoc  string  `json:"created_from_doc"`
-	Metadata        string  `json:"metadata"`
+	CreatedFromDoc  string  `json:"created_from_doc,omitempty"`
+	Metadata        string  `json:"metadata,omitempty"`
 	CreatedAt       string  `json:"created_at"` // RFC3339 timestamp
 	UpdatedAt       string  `json:"updated_at"` // RFC3339 timestamp
 }
@@ -43,7 +43,7 @@ type ScheduledJobResponse struct {
 // ListScheduledJobsResponse represents the response for listing scheduled jobs
 type ListScheduledJobsResponse struct {
 	Jobs  []ScheduledJobResponse `json:"jobs"`
-	Count int                    `json:"count"`
+	Count int                    `json:"count,omitempty"`
 }
 
 // ErrorResponse represents an API error
@@ -54,7 +54,7 @@ type ErrorResponse struct {
 // TaskInfo represents a task within a stage
 type TaskInfo struct {
 	TaskID   string `json:"task_id"`
-	LogCount int    `json:"log_count"`
+	LogCount int    `json:"log_count,omitempty"`
 }
 
 // StageInfo represents a stage with its tasks
@@ -89,9 +89,9 @@ type ChildJobInfo struct {
 	HandlerName  string  `json:"handler_name"`
 	Source       string  `json:"source"`
 	Status       string  `json:"status"`
-	ProgressPct  float64 `json:"progress_pct"`
-	CostEstimate float64 `json:"cost_estimate"`
-	CostActual   float64 `json:"cost_actual"`
+	ProgressPct  float64 `json:"progress_pct,omitempty"`
+	CostEstimate float64 `json:"cost_estimate,omitempty"`
+	CostActual   float64 `json:"cost_actual,omitempty"`
 	Error        string  `json:"error,omitempty"`
 	CreatedAt    string  `json:"created_at"`
 	StartedAt    *string `json:"started_at,omitempty"`
