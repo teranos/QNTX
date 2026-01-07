@@ -197,7 +197,7 @@ class JobDetailPanel {
           </div>
           <div class="job-info-row">
             <span class="job-info-label">Interval:</span>
-            <span class="job-info-value">${this.formatInterval(this.currentJob.interval_seconds)}</span>
+            <span class="job-info-value">${this.formatInterval(this.currentJob.interval_seconds ?? 0)}</span>
           </div>
           <div class="job-info-row">
             <span class="job-info-label">State:</span>
@@ -411,7 +411,7 @@ class JobDetailPanel {
     `;
   }
 
-  private renderTaskLogsDirectly(task: { task_id: string; log_count: number }, jobId: string): string {
+  private renderTaskLogsDirectly(task: { task_id: string; log_count?: number }, jobId: string): string {
     const taskKey = `${jobId}:${task.task_id}`;
     const logs = this.taskLogs.get(taskKey);
 
@@ -447,7 +447,7 @@ class JobDetailPanel {
                 <span class="child-expand-icon">${isExpanded ? '▼' : '▶'}</span>
                 <span class="child-handler">${this.escapeHtml(child.handler_name)}</span>
                 <span class="child-status child-status-${this.escapeHtml(child.status)}">${this.escapeHtml(child.status)}</span>
-                <span class="child-progress">${Math.round(child.progress_pct)}%</span>
+                <span class="child-progress">${Math.round(child.progress_pct ?? 0)}%</span>
               </div>
               <div class="child-meta">
                 <span class="child-id">${this.escapeHtml(child.id.substring(0, 16))}...</span>
