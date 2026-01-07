@@ -104,12 +104,14 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		// Format message using custom formatter for JSON summarization and coloring
 		formattedMsg := formatter.FormatMessage(log.Message)
 
+		// Prefix with [Browser] to make it obvious where this log came from
+		browserMsg := fmt.Sprintf("[Browser] %s", formattedMsg)
+
 		// Log through zap to match existing log style
 		// Use Infow for consistency with other logs (zap will add its own coloring)
 		switch log.Level {
 		case "error":
-			serverLogger.Errorw(formattedMsg,
-				"source", "browser",
+			serverLogger.Errorw(browserMsg,
 				"url", log.URL,
 			)
 			// Also print stack trace for errors at debug level
@@ -119,18 +121,15 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 				)
 			}
 		case "warn":
-			serverLogger.Warnw(formattedMsg,
-				"source", "browser",
+			serverLogger.Warnw(browserMsg,
 				"url", log.URL,
 			)
 		case "debug":
-			serverLogger.Debugw(formattedMsg,
-				"source", "browser",
+			serverLogger.Debugw(browserMsg,
 				"url", log.URL,
 			)
 		default: // info
-			serverLogger.Infow(formattedMsg,
-				"source", "browser",
+			serverLogger.Infow(browserMsg,
 				"url", log.URL,
 			)
 		}
