@@ -9,8 +9,8 @@ export const DEFAULT_TILE_WIDTH = 180;
 export const DEFAULT_TILE_HEIGHT = 80;
 
 /**
- * Calculate dimensions for a focused tile based on viewport size AND current zoom level
- * Returns SVG dimensions that will appear at the correct screen size regardless of zoom
+ * Calculate dimensions for a focused tile based on viewport size at canonical zoom (1.0)
+ * Focus mode always resets to zoom 1.0 for a consistent viewing experience
  */
 export function calculateFocusedTileDimensions(): { width: number; height: number; scale: number } {
     // TODO: When #graph-container is renamed to #graph-viewer, update this selector
@@ -25,26 +25,24 @@ export function calculateFocusedTileDimensions(): { width: number; height: numbe
     const viewportHeight = container.clientHeight;
     const padding = GRAPH_PHYSICS.FOCUS_TILE_PADDING;
 
-    // Get current zoom level
-    const currentTransform = getTransform();
-    const currentZoom = currentTransform ? currentTransform.k : 1;
+    // Canonical zoom level for focus mode
+    const canonicalZoom = 1.0;
 
     // Target SCREEN size (what we want to see on screen)
     const targetScreenWidth = (viewportWidth * GRAPH_PHYSICS.FOCUS_VIEWPORT_RATIO) - (padding * 2);
     const targetScreenHeight = (viewportHeight * GRAPH_PHYSICS.FOCUS_VIEWPORT_RATIO) - (padding * 2);
 
-    // Convert screen size to SVG size by dividing by current zoom
-    // This ensures the tile appears at the correct size regardless of zoom level
-    const targetWidth = targetScreenWidth / currentZoom;
-    const targetHeight = targetScreenHeight / currentZoom;
+    // At canonical zoom (1.0), screen size = SVG size
+    const targetWidth = targetScreenWidth / canonicalZoom;
+    const targetHeight = targetScreenHeight / canonicalZoom;
 
     // Calculate scale factors for reference
     const scaleX = targetWidth / DEFAULT_TILE_WIDTH;
     const scaleY = targetHeight / DEFAULT_TILE_HEIGHT;
 
     return {
-        width: targetWidth,   // SVG width (compensated for zoom)
-        height: targetHeight, // SVG height (compensated for zoom)
+        width: targetWidth,   // SVG width at canonical zoom
+        height: targetHeight, // SVG height at canonical zoom
         scale: Math.max(scaleX, scaleY)
     };
 }

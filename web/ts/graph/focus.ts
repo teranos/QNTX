@@ -530,27 +530,27 @@ export function focusOnTile(node: D3Node): void {
     const viewportWidth = container.clientWidth;
     const viewportHeight = container.clientHeight;
 
-    // Calculate the focused tile dimensions
+    // Reset to canonical zoom level (1.0) for consistent focus experience
+    const canonicalZoom = 1.0;
+
+    // Calculate the focused tile dimensions (at canonical zoom)
     const focusedDimensions = calculateFocusedTileDimensions();
 
-    // Calculate transform to center the node (WITHOUT zoom scaling)
-    // We only pan to center - the tile rect itself expands
-    const currentTransform = getTransform();
-    const currentScale = currentTransform ? currentTransform.k : 1;
-    const targetX = viewportWidth / 2 - node.x * currentScale;
-    const targetY = viewportHeight / 2 - node.y * currentScale;
+    // Calculate transform to center the node at canonical zoom
+    const targetX = viewportWidth / 2 - node.x * canonicalZoom;
+    const targetY = viewportHeight / 2 - node.y * canonicalZoom;
 
-    // Set flag to prevent unfocus detection during programmatic pan animation
+    // Set flag to prevent unfocus detection during programmatic zoom animation
     setIsFocusAnimating(true);
 
-    // Animate viewport to center on the tile (pan only, no zoom)
+    // Animate to canonical zoom and center on the tile
     svg.transition()
         .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
         .call(zoom.transform, d3.zoomIdentity
             .translate(targetX, targetY)
-            .scale(currentScale))  // Keep current zoom level
+            .scale(canonicalZoom))  // Reset to canonical zoom level
         .on("end", () => {
-            // Clear animation flag once pan transition completes
+            // Clear animation flag once transition completes
             setIsFocusAnimating(false);
         });
 
