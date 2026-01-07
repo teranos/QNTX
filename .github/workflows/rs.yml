@@ -116,11 +116,19 @@ jobs:
         with:
           workspaces: qntx-python
 
-      - name: Verify Python availability
+      - name: Find Python in container
+        id: find-python
         run: |
-          echo "PATH=$PATH"
-          command -v python3 || echo "python3 not found in PATH"
-          python3 --version || echo "python3 command failed"
+          # Python3.13 is in the container but not in PATH
+          # Find it in the Nix store
+          PYTHON_PATH=$(find /nix/store -name "python3" -type f -path "*/python3-*/bin/python3" 2>/dev/null | head -1)
+          if [ -z "$PYTHON_PATH" ]; then
+            echo "ERROR: Could not find python3 in Nix store"
+            exit 1
+          fi
+          echo "Found Python at: $PYTHON_PATH"
+          $PYTHON_PATH --version
+          echo "python_path=$PYTHON_PATH" >> $GITHUB_OUTPUT
 
       - name: Check formatting
         run: cd qntx-python && cargo fmt --check
@@ -129,14 +137,14 @@ jobs:
         run: cd qntx-python && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
-          PYO3_PYTHON: python3
+          PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
 
       - name: Test
         run: cd qntx-python && cargo test
         env:
-          PYO3_PYTHON: python3
+          PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
 
       - name: Build release
         run: cd qntx-python && cargo build --release
         env:
-          PYO3_PYTHON: python3
+          PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
