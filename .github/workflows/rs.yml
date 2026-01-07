@@ -95,56 +95,59 @@ jobs:
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
 
-  qntx-python:
-    name: Python Plugin
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/teranos/qntx:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure git safe directory
-        run: git config --global --add safe.directory /__w/QNTX/QNTX
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: qntx-python
-
-      - name: Find Python in container
-        id: find-python
-        run: |
-          # Python3.13 is in the container but not in PATH
-          # Find it in the Nix store
-          PYTHON_PATH=$(find /nix/store -name "python3" -type f -path "*/python3-*/bin/python3" 2>/dev/null | head -1)
-          if [ -z "$PYTHON_PATH" ]; then
-            echo "ERROR: Could not find python3 in Nix store"
-            exit 1
-          fi
-          echo "Found Python at: $PYTHON_PATH"
-          $PYTHON_PATH --version
-          echo "python_path=$PYTHON_PATH" >> $GITHUB_OUTPUT
-
-      - name: Check formatting
-        run: cd qntx-python && cargo fmt --check
-
-      - name: Clippy
-        run: cd qntx-python && cargo clippy --all-targets --all-features
-        env:
-          RUSTFLAGS: "-Dwarnings"
-          PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
-
-      - name: Test
-        run: cd qntx-python && cargo test
-        env:
-          PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
-
-      - name: Build release
-        run: cd qntx-python && cargo build --release
-        env:
-          PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
+  # qntx-python builds require Nix (Python linking issues prevent cargo-only builds)
+  # Temporarily disabled until CI image includes python313
+  # TODO: Re-enable once ghcr.io/teranos/qntx:latest image is rebuilt with Python
+  # qntx-python:
+  #   name: Python Plugin
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: ghcr.io/teranos/qntx:latest
+  #     credentials:
+  #       username: ${{ github.actor }}
+  #       password: ${{ secrets.GITHUB_TOKEN }}
+  #
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Configure git safe directory
+  #       run: git config --global --add safe.directory /__w/QNTX/QNTX
+  #
+  #     - name: Cache Rust dependencies
+  #       uses: swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: qntx-python
+  #
+  #     - name: Find Python in container
+  #       id: find-python
+  #       run: |
+  #         # Python3.13 is in the container but not in PATH
+  #         # Find it in the Nix store
+  #         PYTHON_PATH=$(find /nix/store -name "python3" -type f -path "*/python3-*/bin/python3" 2>/dev/null | head -1)
+  #         if [ -z "$PYTHON_PATH" ]; then
+  #           echo "ERROR: Could not find python3 in Nix store"
+  #           exit 1
+  #         fi
+  #         echo "Found Python at: $PYTHON_PATH"
+  #         $PYTHON_PATH --version
+  #         echo "python_path=$PYTHON_PATH" >> $GITHUB_OUTPUT
+  #
+  #     - name: Check formatting
+  #       run: cd qntx-python && cargo fmt --check
+  #
+  #     - name: Clippy
+  #       run: cd qntx-python && cargo clippy --all-targets --all-features
+  #       env:
+  #         RUSTFLAGS: "-Dwarnings"
+  #         PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
+  #
+  #     - name: Test
+  #       run: cd qntx-python && cargo test
+  #       env:
+  #         PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
+  #
+  #     - name: Build release
+  #       run: cd qntx-python && cargo build --release
+  #       env:
+  #         PYO3_PYTHON: ${{ steps.find-python.outputs.python_path }}
