@@ -18,13 +18,28 @@ func LoadFixtures(t *testing.T, db *sql.DB, fixtures *ax.TestFixtures) {
 	`
 
 	for _, as := range fixtures.Attestations {
-		subjectsJSON, _ := json.Marshal(as.Subjects)
-		predicatesJSON, _ := json.Marshal(as.Predicates)
-		contextsJSON, _ := json.Marshal(as.Contexts)
-		actorsJSON, _ := json.Marshal(as.Actors)
-		attributesJSON, _ := json.Marshal(as.Attributes)
+		subjectsJSON, err := json.Marshal(as.Subjects)
+		if err != nil {
+			t.Fatalf("Failed to marshal subjects for fixture %s: %v", as.ID, err)
+		}
+		predicatesJSON, err := json.Marshal(as.Predicates)
+		if err != nil {
+			t.Fatalf("Failed to marshal predicates for fixture %s: %v", as.ID, err)
+		}
+		contextsJSON, err := json.Marshal(as.Contexts)
+		if err != nil {
+			t.Fatalf("Failed to marshal contexts for fixture %s: %v", as.ID, err)
+		}
+		actorsJSON, err := json.Marshal(as.Actors)
+		if err != nil {
+			t.Fatalf("Failed to marshal actors for fixture %s: %v", as.ID, err)
+		}
+		attributesJSON, err := json.Marshal(as.Attributes)
+		if err != nil {
+			t.Fatalf("Failed to marshal attributes for fixture %s: %v", as.ID, err)
+		}
 
-		_, err := db.Exec(query,
+		_, err = db.Exec(query,
 			as.ID,
 			string(subjectsJSON),
 			string(predicatesJSON),
