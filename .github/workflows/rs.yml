@@ -21,8 +21,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  check:
-    name: Rust Check
+  generated-types:
+    name: Generated Types
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/teranos/qntx:latest
@@ -40,80 +40,103 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: |
-            types/generated/rust
-            web/src-tauri
-            ats/ax/fuzzy-ax
-            qntx-python
+          workspaces: types/generated/rust
 
-      - name: Check formatting (generated types)
+      - name: Check formatting
         run: cd types/generated/rust && cargo fmt --check
 
-      # Tauri app checks disabled on Linux - see macos-tauri.yml for macOS builds
-      # - name: Check formatting (Tauri app)
-      #   run: cd web/src-tauri && cargo fmt --check
-
-      - name: Clippy (generated types)
+      - name: Clippy
         run: cd types/generated/rust && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      # - name: Clippy (Tauri app)
-      #   run: cd web/src-tauri && cargo clippy --all-targets --all-features
-      #   env:
-      #     RUSTFLAGS: "-Dwarnings"
-
-      - name: Check (generated types)
+      - name: Check
         run: cd types/generated/rust && cargo check
 
-      # - name: Check (Tauri app)
-      #   run: cd web/src-tauri && cargo check
+  fuzzy-ax:
+    name: Fuzzy Ax
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      # fuzzy-ax (Rust fuzzy matching for ax segment)
-      - name: Check formatting (fuzzy-ax)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ats/ax/fuzzy-ax
+
+      - name: Check formatting
         run: cd ats/ax/fuzzy-ax && cargo fmt --check
 
-      - name: Clippy (fuzzy-ax)
+      - name: Clippy
         run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
 
-      - name: Test (fuzzy-ax)
+      - name: Test
         run: cd ats/ax/fuzzy-ax && cargo test --lib
 
-      - name: Build release (fuzzy-ax)
+      - name: Build release
         run: cd ats/ax/fuzzy-ax && cargo build --release --lib
 
-      - name: Test CGO integration (fuzzy-ax)
+      - name: Test CGO integration
         run: |
           cd ats/ax/fuzzy-ax && cargo build --release --lib
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
 
-      # qntx-python (Rust Python plugin with PyO3)
-      # Python 3.13 available in CI image (see flake.nix)
+  qntx-python:
+    name: Python Plugin
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: qntx-python
+
       - name: Verify Python availability
         run: |
           echo "PATH=$PATH"
           command -v python3 || echo "python3 not found in PATH"
           python3 --version || echo "python3 command failed"
 
-      - name: Check formatting (qntx-python)
+      - name: Check formatting
         run: cd qntx-python && cargo fmt --check
 
-      - name: Clippy (qntx-python)
+      - name: Clippy
         run: cd qntx-python && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
           PYO3_PYTHON: python3
 
-      - name: Test (qntx-python)
+      - name: Test
         run: cd qntx-python && cargo test
         env:
           PYO3_PYTHON: python3
 
-      - name: Build release (qntx-python)
+      - name: Build release
         run: cd qntx-python && cargo build --release
         env:
           PYO3_PYTHON: python3
