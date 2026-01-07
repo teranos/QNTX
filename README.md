@@ -79,5 +79,5 @@ See the [am package documentation](am/README.md) for details on configuration st
 Run the full test suite:
 
 ```bash
-go test ./...
+make test
 ```
