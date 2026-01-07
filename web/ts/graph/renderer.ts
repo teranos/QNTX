@@ -6,7 +6,7 @@ import { uiState } from '../ui-state.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
-    getSimulation, getG, getHiddenNodes, getDomCache,
+    getSimulation, getG, getHiddenNodes, getDomCache, getIsFocusAnimating,
     setSimulation, setSvg, setG, setZoom, clearState
 } from './state.ts';
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
@@ -212,6 +212,11 @@ function renderGraph(data: GraphData): void {
             const g = getG();
             if (g) {
                 g.attr("transform", event.transform.toString());
+            }
+
+            // Skip unfocus detection during programmatic focus/unfocus animations
+            if (getIsFocusAnimating()) {
+                return;
             }
 
             // Detect unfocus triggers while focused

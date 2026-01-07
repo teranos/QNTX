@@ -68,9 +68,9 @@ export const GRAPH_PHYSICS: GraphPhysics & {
     CENTER_STRENGTH: 0.05,             // Weak centering - just prevent drift
     COLLISION_RADIUS: 120,             // Larger buffer around tiles to prevent overlap
     // Focus mode: tile takes up this fraction of viewport (leaves edges for context)
-    FOCUS_VIEWPORT_RATIO: 0.7,
+    FOCUS_VIEWPORT_RATIO: 0.6,
     // Focus mode: minimum padding around focused tile in pixels
-    FOCUS_TILE_PADDING: 40
+    FOCUS_TILE_PADDING: 60
 };
 
 // Graph visual styling constants
