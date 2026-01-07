@@ -4,11 +4,11 @@
 // Re-export all tile-related functionality
 export * from './constants.ts';
 export * from './state.ts';
+export * from './controls.ts';
+export * from './rendering.ts';
+export * from './interactions.ts';
 
 // TODO: Complete tile module extraction
-// export * from './rendering.ts';    - Core tile creation and updates
-// export * from './decorations.ts';  - Header/footer bars with commands and stats
-// export * from './interactions.ts'; - Click, hover, drag, context menu
 // export * from './transitions.ts';  - Expand, collapse, fade animations
 
 /**
