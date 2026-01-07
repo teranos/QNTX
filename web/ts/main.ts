@@ -130,12 +130,14 @@ function handleVersion(data: VersionMessage): void {
 
 
 // Initialize the application
+// Avoid Sin #4: Callback Hell - Use async/await for sequential async operations
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Initialize console reporter (dev mode only)
+    // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
     try {
         await initConsoleReporter();
     } catch (err) {
@@ -315,6 +317,7 @@ async function init(): Promise<void> {
 }
 
 // Start application when DOM is ready
+// Virtue #8: Progressive Enhancement - Core init works immediately, enhanced features layer on
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         init();

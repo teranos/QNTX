@@ -15,19 +15,21 @@ Transform entity visualization from **nodes as dots** to **tiles as always-on su
 
 Tiles are **persistent information surfaces** displaying contextual data at all zoom levels. No interaction required to see entity state.
 
-### 2. Semantic Zoom (5 Discrete Levels)
+### 2. Semantic Zoom (Progressive Modes)
 
-Progressive detail disclosure through **meaning density**, not pixel scaling:
+Progressive detail disclosure through **meaning density**, not pixel scaling. The true shape will emerge during development - current thinking:
 
-| Level | Scale | Display | Use Case |
-|-------|-------|---------|----------|
-| **0** | < 50% | Entity type symbol only (⌬ ≡ ꩜) | High-level landscape |
-| **1** | 50-100% | Type + label | Entity identification |
-| **2** | 100-150% | Label + key fields (2-3) | Working context |
-| **3** | 150-200% | Detailed metadata (5-7 fields) | Deep inspection |
-| **4** | > 200% | Graph slice (relationships embedded) | Entity neighborhood |
+| Mode | Gesture (Mobile) | Display | Use Case |
+|------|------------------|---------|----------|
+| **Focus** | Pinch in (max zoom) | Single tile fills screen, full detail | Deep inspection of one entity |
+| **Relational** | Pinch out slightly | Focused tile + half of connected tiles visible | Navigate relationships, jump between entities |
+| **Overview** | Pinch out fully | Full force-directed graph | Landscape view, see all connections |
 
-**Philosophy:** Each zoom level reveals **semantically meaningful** information, not just larger pixels.
+**Mobile-First Insight:** Relational mode is the key innovation - shows relationship context without losing focus. Drag connected tile to center to navigate.
+
+**Desktop:** Same three modes, plus potential intermediate levels for specific workflows (will emerge organically).
+
+**Philosophy:** Each mode serves a distinct cognitive task - focus for depth, relational for exploration, overview for orientation.
 
 ### 3. Pane-Based Computing
 
@@ -76,8 +78,13 @@ Non-technical users (recruiters, analysts) can customize views by editing TOML c
 
 ### Progressive Enhancement Path
 
-1. **Phase 1:** Render entities as rectangles (vs circles)
-2. **Phase 2:** Add multi-line text to tile surface
+1. **Phase 1:** Render entities as rectangles (vs circles) ✅ *Implemented*
+   - Tiles render as rectangles with multi-line text (label, type, metadata)
+   - Focus mode expands tiles to fill viewport
+   - Tile-to-tile focus transitions working
+2. **Phase 2:** Add multi-line text to tile surface ✅ *In Progress*
+   - Basic multi-line text rendering complete
+   - Header/footer controls in focus mode
 3. **Phase 3:** Implement semantic zoom thresholds
 4. **Phase 4:** Add layout modes (grid, hierarchy)
 5. **Phase 5:** Config-driven field selection
@@ -101,17 +108,22 @@ Core QNTX symbols appear progressively:
 
 ## Use Cases
 
-### Landscape Overview (Zoom 0)
-Scan 100+ entities by type symbols only - quick pattern recognition.
+### Mobile Exploratory Session (30 min)
+**Scenario:** Biology researcher on morning commute, analyzing gene clusters from overnight metagenomic pipeline run
 
-### Working Context (Zoom 2)
-See 10-20 entities with key fields visible - make decisions without clicking.
+1. **Overview mode:** Pinch out - see full gene network, identify novel cluster
+2. **Focus mode:** Tap target gene tile - see full sequence annotations, expression data
+3. **Relational mode:** Pinch out slightly - view connected genes (homologs, co-expressed partners)
+4. **Navigate:** Drag candidate protein-coding gene to center - examine function predictions
+5. **Discovery:** Pinch to relational mode - see this gene's regulatory network
+6. **Backtrack:** Swipe back gesture - return to original cluster for comparison
 
-### Deep Inspection (Zoom 3)
-Focus on 2-5 entities with full metadata - detailed comparison.
+**Key insight:** Discovers potential novel protein function before arriving at lab - gestural exploration enables hypothesis formation during commute.
 
-### Neighborhood Exploration (Zoom 4)
-Single entity with embedded relationship graph - understand context.
+### Desktop Deep Dive (Zoom levels emerge organically)
+**Working context:** See key fields without interaction
+**Deep inspection:** Full metadata for detailed comparison
+**Neighborhood exploration:** Embedded relationship graphs
 
 ## Comparison to Current UI
 
@@ -123,13 +135,31 @@ Single entity with embedded relationship graph - understand context.
 | **Customization** | Hardcoded | Config-driven per entity type |
 | **Information density** | Low (interaction required) | High (data always on) |
 
+## Mobile-First Considerations
+
+**Deep Exploratory Analysis** (30+ min sessions on mobile):
+- **Fast navigation** via gesture shortcuts (swipe patterns, drag-to-center)
+- **Threshold-based zoom:** Smooth pinch within modes, discrete snap between modes
+- **Simplified physics:** Less movement at overview level for touch stability
+- **Adaptive detail:** Entity type determines what fields show at each mode
+- **Landscape enhancement:** Show 2-3 tiles side-by-side when horizontal
+
+**Gesture Mapping:**
+- Pinch in → Focus mode (single tile, full detail)
+- Pinch out slightly → Relational mode (show connected tiles)
+- Pinch out fully → Overview mode (full graph)
+- Drag tile to center → Navigate to that tile (in relational mode)
+- Swipe → Gesture shortcuts (back, related entities, etc)
+
+**Key Design Principle:** Mobile is not a compromise - it's the primary exploratory interface. Desktop adds power-user features.
+
 ## Open Questions
 
 1. **Tile sizing:** Fixed dimensions vs dynamic based on content?
-2. **Transition animations:** Smooth zoom interpolation or discrete snapping?
-3. **Mobile experience:** How do semantic zoom levels work on touch devices?
+2. **Transition animations:** Smooth zoom interpolation or discrete snapping? *Answer: Threshold-based - smooth within, snap between*
+3. **Relational mode polish:** Exactly how much of connected tiles? *Answer: Half-tile (symbol, label, 1-2 fields visible)*
 4. **Performance:** Can we render 1000+ tiles without degradation?
-5. **Hybrid mode:** Support both graph and tile views simultaneously?
+5. **Gesture vocabulary:** What swipe patterns for shortcuts? (back, forward, star, hide, etc)
 
 ## Success Criteria
 
