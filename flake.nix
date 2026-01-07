@@ -398,24 +398,48 @@
         };
 
         # Apps for common tasks
-        apps.build-docs-site = {
-          type = "app";
-          program = toString (pkgs.writeShellScript "build-docs-site" ''
-            set -e
-            echo "Building documentation site..."
-            ${pkgs.nix}/bin/nix build .#docs-site
+        apps = {
+          build-docs-site = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "build-docs-site" ''
+              set -e
+              echo "Building documentation site..."
+              ${pkgs.nix}/bin/nix build .#docs-site
 
-            echo "Copying to web/site/..."
-            mkdir -p web/site
-            chmod -R +w web/site 2>/dev/null || true
-            rm -rf web/site/*
-            cp -r result/* web/site/
-            chmod -R +w web/site
+              echo "Copying to web/site/..."
+              mkdir -p web/site
+              chmod -R +w web/site 2>/dev/null || true
+              rm -rf web/site/*
+              cp -r result/* web/site/
+              chmod -R +w web/site
 
-            echo "Documentation site built and copied to web/site/"
-            echo "Files:"
-            ls -lh web/site/
-          '');
+              echo "Documentation site built and copied to web/site/"
+              echo "Files:"
+              ls -lh web/site/
+            '');
+          };
+
+          generate-types = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "generate-types" ''
+              set -e
+              echo "Generating types and documentation..."
+
+              # Ensure typegen is built
+              ${pkgs.nix}/bin/nix build .#typegen
+
+              # Run typegen for each language
+              ./result/bin/typegen --lang typescript --output types/generated/
+              ./result/bin/typegen --lang python --output types/generated/
+              ./result/bin/typegen --lang rust --output types/generated/
+              ./result/bin/typegen --lang markdown
+
+              echo "✓ TypeScript types generated in types/generated/typescript/"
+              echo "✓ Python types generated in types/generated/python/"
+              echo "✓ Rust types generated in types/generated/rust/"
+              echo "✓ Markdown docs generated in docs/types/"
+            '');
+          };
         };
       }
     );
