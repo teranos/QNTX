@@ -93,6 +93,9 @@ jobs:
 
       # qntx-python (Rust Python plugin with PyO3)
       # Python 3.13 available in CI image (see flake.nix)
+      - name: Verify Python availability
+        run: which python3 && python3 --version
+
       - name: Check formatting (qntx-python)
         run: cd qntx-python && cargo fmt --check
 
@@ -100,14 +103,14 @@ jobs:
         run: cd qntx-python && cargo clippy --all-targets --all-features
         env:
           RUSTFLAGS: "-Dwarnings"
-          PYO3_PYTHON: "python3"
+          PYO3_PYTHON: python3
 
       - name: Test (qntx-python)
         run: cd qntx-python && cargo test
         env:
-          PYO3_PYTHON: "python3"
+          PYO3_PYTHON: python3
 
       - name: Build release (qntx-python)
         run: cd qntx-python && cargo build --release
         env:
-          PYO3_PYTHON: "python3"
+          PYO3_PYTHON: python3

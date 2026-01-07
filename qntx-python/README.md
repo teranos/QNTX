@@ -1,6 +1,18 @@
 # QNTX Python Plugin
 
-A Rust-based gRPC plugin that allows running Python code within QNTX. Uses PyO3 to embed a Python interpreter in a fast, reliable Rust binary.
+A Rust-based gRPC plugin for executing Python code within QNTX.
+
+## Why Rust + gRPC
+
+Go-to-Python integration via CGo is fragile and version-dependent. This plugin runs Python in a separate process to avoid:
+
+- Python version coupling with QNTX builds
+- Interpreter crashes affecting the main process
+- FFI incompatibilities across systems
+
+Uses PyO3 for memory-safe Python embedding and Nix for reproducible Python environments.
+
+See [External Plugin Development Guide](../docs/development/external-plugin-guide.md) for plugin architecture details and [domain.proto](../plugin/grpc/protocol/domain.proto) for the gRPC interface specification.
 
 ## Features
 
