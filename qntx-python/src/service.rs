@@ -235,6 +235,17 @@ impl DomainPluginService for PythonPluginService {
         details.insert("python_version".to_string(), self.python_version());
         details.insert("initialized".to_string(), state.initialized.to_string());
 
+        // Add binary build time
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Ok(metadata) = std::fs::metadata(&exe_path) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                        details.insert("binary_built".to_string(), duration.as_secs().to_string());
+                    }
+                }
+            }
+        }
+
         if let Some(config) = &state.config {
             if !config.ats_store_endpoint.is_empty() {
                 details.insert("ats_store".to_string(), "configured".to_string());
