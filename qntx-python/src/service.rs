@@ -2,13 +2,14 @@
 //!
 //! Implements the DomainPluginService interface for QNTX.
 
-use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
+use crate::config::PluginConfig;
+use crate::engine::PythonEngine;
+use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, Empty, HealthResponse, HttpHeader,
     HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -16,32 +17,9 @@ use tokio_stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::{debug, error, info, warn};
 
-/// Plugin configuration received during initialization
-#[derive(Debug, Clone, Default)]
-pub struct PluginConfig {
-    /// ATSStore gRPC endpoint
-    pub ats_store_endpoint: String,
-    /// Queue service gRPC endpoint
-    pub queue_endpoint: String,
-    /// Auth token for service calls
-    pub auth_token: String,
-    /// Custom configuration values
-    pub config: HashMap<String, String>,
-}
-
-/// State of the Python plugin
-struct PluginState {
-    /// Plugin configuration
-    config: Option<PluginConfig>,
-    /// Python engine
-    engine: PythonEngine,
-    /// Whether the plugin is initialized
-    initialized: bool,
-}
-
 /// Python plugin gRPC service
 pub struct PythonPluginService {
-    state: Arc<RwLock<PluginState>>,
+    handlers: HandlerContext,
 }
 
 impl PythonPluginService {
@@ -60,19 +38,20 @@ impl PythonPluginService {
         };
 
         tracing::info!("Initializing plugin state...");
+        let state = Arc::new(RwLock::new(PluginState {
+            config: None,
+            engine,
+            initialized: false,
+        }));
+
         Ok(Self {
-            state: Arc::new(RwLock::new(PluginState {
-                config: None,
-                engine,
-                initialized: false,
-            })),
+            handlers: HandlerContext::new(state),
         })
     }
 
     /// Get Python version for health checks
     fn python_version(&self) -> String {
-        let state = self.state.read();
-        state.engine.python_version()
+        self.handlers.python_version()
     }
 }
 
@@ -110,7 +89,7 @@ impl DomainPluginService for PythonPluginService {
         info!("ATSStore endpoint: {}", req.ats_store_endpoint);
         info!("Queue endpoint: {}", req.queue_endpoint);
 
-        let mut state = self.state.write();
+        let mut state = self.handlers.state.write();
 
         // Store configuration
         state.config = Some(PluginConfig {
@@ -148,13 +127,13 @@ impl DomainPluginService for PythonPluginService {
     /// Shutdown the plugin
     async fn shutdown(&self, _request: Request<Empty>) -> Result<Response<Empty>, Status> {
         info!("Shutting down Python plugin");
-        let mut state = self.state.write();
+        let mut state = self.handlers.state.write();
         state.initialized = false;
         state.config = None;
         Ok(Response::new(Empty {}))
     }
 
-    /// Handle HTTP requests
+    /// Handle HTTP requests - routes to appropriate handler
     async fn handle_http(
         &self,
         request: Request<HttpRequest>,
@@ -176,17 +155,17 @@ impl DomainPluginService for PythonPluginService {
         // Route to handler
         let result = match (method.as_str(), path.as_str()) {
             // Python execution endpoints
-            ("POST", "/execute") => self.handle_execute(body).await,
-            ("POST", "/evaluate") => self.handle_evaluate(body).await,
-            ("POST", "/execute-file") => self.handle_execute_file(body).await,
+            ("POST", "/execute") => self.handlers.handle_execute(body).await,
+            ("POST", "/evaluate") => self.handlers.handle_evaluate(body).await,
+            ("POST", "/execute-file") => self.handlers.handle_execute_file(body).await,
 
             // Package management
-            ("POST", "/pip/install") => self.handle_pip_install(body).await,
-            ("GET", "/pip/check") => self.handle_pip_check(body).await,
+            ("POST", "/pip/install") => self.handlers.handle_pip_install(body).await,
+            ("GET", "/pip/check") => self.handlers.handle_pip_check(body).await,
 
             // Info endpoints
-            ("GET", "/version") => self.handle_version().await,
-            ("GET", "/modules") => self.handle_modules(body).await,
+            ("GET", "/version") => self.handlers.handle_version().await,
+            ("GET", "/modules") => self.handlers.handle_modules(body).await,
 
             _ => Err(Status::not_found(format!(
                 "Unknown endpoint: {} {}",
@@ -234,7 +213,7 @@ impl DomainPluginService for PythonPluginService {
 
     /// Check plugin health
     async fn health(&self, _request: Request<Empty>) -> Result<Response<HealthResponse>, Status> {
-        let state = self.state.read();
+        let state = self.handlers.state.read();
         let healthy = state.initialized;
 
         let mut details = HashMap::new();
@@ -262,261 +241,10 @@ impl DomainPluginService for PythonPluginService {
     }
 }
 
-// HTTP endpoint handlers
-impl PythonPluginService {
-    /// Handle POST /execute - Execute Python code
-    async fn handle_execute(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
-        #[derive(Deserialize)]
-        struct ExecuteRequest {
-            code: String,
-            #[serde(default)]
-            timeout_secs: Option<u64>,
-            #[serde(default)]
-            capture_variables: Option<bool>,
-            #[serde(default)]
-            python_paths: Option<Vec<String>>,
-        }
-
-        let req: ExecuteRequest = serde_json::from_value(body)
-            .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
-
-        if req.code.is_empty() {
-            return Err(Status::invalid_argument("Missing 'code' field"));
-        }
-
-        let config = ExecutionConfig {
-            timeout_secs: req.timeout_secs.unwrap_or(30),
-            capture_variables: req.capture_variables.unwrap_or(false),
-            python_paths: req.python_paths.unwrap_or_default(),
-            ..Default::default()
-        };
-
-        let result = {
-            let state = self.state.read();
-            state.engine.execute(&req.code, &config)
-        };
-
-        self.execution_result_to_response(result)
-    }
-
-    /// Handle POST /evaluate - Evaluate a Python expression
-    async fn handle_evaluate(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
-        #[derive(Deserialize)]
-        struct EvaluateRequest {
-            expr: String,
-        }
-
-        let req: EvaluateRequest = serde_json::from_value(body)
-            .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
-
-        if req.expr.is_empty() {
-            return Err(Status::invalid_argument("Missing 'expr' field"));
-        }
-
-        let result = {
-            let state = self.state.read();
-            state.engine.evaluate(&req.expr)
-        };
-
-        self.execution_result_to_response(result)
-    }
-
-    /// Handle POST /execute-file - Execute a Python file
-    async fn handle_execute_file(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
-        #[derive(Deserialize)]
-        struct ExecuteFileRequest {
-            path: String,
-            #[serde(default)]
-            timeout_secs: Option<u64>,
-            #[serde(default)]
-            capture_variables: Option<bool>,
-        }
-
-        let req: ExecuteFileRequest = serde_json::from_value(body)
-            .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
-
-        if req.path.is_empty() {
-            return Err(Status::invalid_argument("Missing 'path' field"));
-        }
-
-        let config = ExecutionConfig {
-            timeout_secs: req.timeout_secs.unwrap_or(30),
-            capture_variables: req.capture_variables.unwrap_or(false),
-            ..Default::default()
-        };
-
-        let result = {
-            let state = self.state.read();
-            state.engine.execute_file(&req.path, &config)
-        };
-
-        self.execution_result_to_response(result)
-    }
-
-    /// Handle POST /pip/install - Install a Python package
-    async fn handle_pip_install(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
-        #[derive(Deserialize)]
-        struct PipInstallRequest {
-            package: String,
-        }
-
-        let req: PipInstallRequest = serde_json::from_value(body)
-            .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
-
-        if req.package.is_empty() {
-            return Err(Status::invalid_argument("Missing 'package' field"));
-        }
-
-        let result = {
-            let state = self.state.read();
-            state.engine.pip_install(&req.package)
-        };
-
-        self.execution_result_to_response(result)
-    }
-
-    /// Handle GET /pip/check - Check if a module is available
-    async fn handle_pip_check(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
-        #[derive(Deserialize)]
-        struct PipCheckRequest {
-            module: String,
-        }
-
-        let req: PipCheckRequest = serde_json::from_value(body)
-            .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
-
-        if req.module.is_empty() {
-            return Err(Status::invalid_argument("Missing 'module' field"));
-        }
-
-        let available = {
-            let state = self.state.read();
-            state.engine.check_module(&req.module)
-        };
-
-        #[derive(Serialize)]
-        struct PipCheckResponse {
-            module: String,
-            available: bool,
-        }
-
-        let response = PipCheckResponse {
-            module: req.module,
-            available,
-        };
-
-        self.json_response(200, &response)
-    }
-
-    /// Handle GET /version - Get Python version info
-    async fn handle_version(&self) -> Result<HttpResponse, Status> {
-        #[derive(Serialize)]
-        struct VersionResponse {
-            python_version: String,
-            plugin_version: String,
-        }
-
-        let response = VersionResponse {
-            python_version: self.python_version(),
-            plugin_version: env!("CARGO_PKG_VERSION").to_string(),
-        };
-
-        self.json_response(200, &response)
-    }
-
-    /// Handle GET /modules - Check availability of common modules
-    async fn handle_modules(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
-        #[derive(Deserialize, Default)]
-        struct ModulesRequest {
-            #[serde(default)]
-            modules: Option<Vec<String>>,
-        }
-
-        let req: ModulesRequest = serde_json::from_value(body).unwrap_or_default();
-
-        // Default modules to check
-        let modules_to_check: Vec<String> = req.modules.unwrap_or_else(|| {
-            vec![
-                "numpy".to_string(),
-                "pandas".to_string(),
-                "requests".to_string(),
-                "json".to_string(),
-                "os".to_string(),
-                "sys".to_string(),
-            ]
-        });
-
-        let state = self.state.read();
-        let mut available = HashMap::new();
-
-        for module in modules_to_check {
-            available.insert(module.clone(), state.engine.check_module(&module));
-        }
-
-        #[derive(Serialize)]
-        struct ModulesResponse {
-            modules: HashMap<String, bool>,
-        }
-
-        let response = ModulesResponse { modules: available };
-
-        self.json_response(200, &response)
-    }
-
-    /// Convert ExecutionResult to HttpResponse
-    fn execution_result_to_response(
-        &self,
-        result: ExecutionResult,
-    ) -> Result<HttpResponse, Status> {
-        #[derive(Serialize)]
-        struct ExecutionResponse {
-            success: bool,
-            stdout: String,
-            stderr: String,
-            result: Option<serde_json::Value>,
-            error: Option<String>,
-            duration_ms: u64,
-            #[serde(skip_serializing_if = "HashMap::is_empty")]
-            variables: HashMap<String, String>,
-        }
-
-        let response = ExecutionResponse {
-            success: result.success,
-            stdout: result.stdout,
-            stderr: result.stderr,
-            result: result.result,
-            error: result.error,
-            duration_ms: result.duration_ms,
-            variables: result.variables,
-        };
-
-        let status_code = if result.success { 200 } else { 400 };
-        self.json_response(status_code, &response)
-    }
-
-    /// Create a JSON HTTP response
-    fn json_response<T: Serialize>(
-        &self,
-        status_code: i32,
-        data: &T,
-    ) -> Result<HttpResponse, Status> {
-        let body = serde_json::to_vec(data)
-            .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;
-
-        Ok(HttpResponse {
-            status_code,
-            headers: vec![HttpHeader {
-                name: "Content-Type".to_string(),
-                values: vec!["application/json".to_string()],
-            }],
-            body,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
 
     #[tokio::test]
     async fn test_metadata() {
@@ -544,7 +272,7 @@ mod tests {
             "timeout_secs": 5
         });
 
-        let result = service.handle_execute(body).await.unwrap();
+        let result = service.handlers.handle_execute(body).await.unwrap();
 
         #[derive(Deserialize)]
         struct ExecutionResponse {
