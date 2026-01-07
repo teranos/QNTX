@@ -96,6 +96,13 @@ func initializePluginRegistry() {
 		return
 	}
 
+	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
+	// This merges [config] sections into am's viper for plugin initialization
+	if err := am.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
+		// Log detailed error but don't fail - plugins may still work with defaults
+		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
+	}
+
 	// If no plugins enabled, run in minimal mode
 	if len(cfg.Plugin.Enabled) == 0 {
 		pluginLogger.Infow("No plugins enabled - QNTX running in minimal core mode")

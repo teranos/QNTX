@@ -23,6 +23,9 @@ service DomainPluginService {
 
   // Health checks plugin health
   rpc Health(Empty) returns (HealthResponse);
+
+  // ConfigSchema returns the configuration schema for this plugin
+  rpc ConfigSchema(Empty) returns (ConfigSchemaResponse);
 }
 
 message Empty {}
@@ -102,4 +105,35 @@ message HealthResponse {
   bool healthy = 1;
   string message = 2;
   map<string, string> details = 3;
+}
+
+message ConfigSchemaResponse {
+  // Map of config field name to schema definition
+  map<string, ConfigFieldSchema> fields = 1;
+}
+
+message ConfigFieldSchema {
+  // Field type: "string", "number", "boolean", "array"
+  string type = 1;
+
+  // Human-readable description of what this field does
+  string description = 2;
+
+  // Default value (as string representation)
+  string default_value = 3;
+
+  // Whether this field is required
+  bool required = 4;
+
+  // For number types: minimum value (optional)
+  string min_value = 5;
+
+  // For number types: maximum value (optional)
+  string max_value = 6;
+
+  // For string types: validation pattern (regex, optional)
+  string pattern = 7;
+
+  // For array types: element type (optional)
+  string element_type = 8;
 }
