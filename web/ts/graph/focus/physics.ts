@@ -1,7 +1,7 @@
 // Physics adjustments for focus mode
 
 import { GRAPH_PHYSICS } from '../../config.ts';
-import { getSimulation, getDomCache } from '../state.ts';
+import { getSimulation } from '../state.ts';
 import type { D3Node } from '../../../types/d3-graph';
 
 // Import D3 from vendor bundle
@@ -16,12 +16,6 @@ declare const d3: any;
 export function adjustPhysicsForFocus(focusedNode: D3Node): void {
     const simulation = getSimulation();
     if (!simulation) return;
-
-    const container = getDomCache().get('graphContainer', '#graph-container');
-    if (!container) return;
-
-    const viewportWidth = container.clientWidth;
-    const viewportHeight = container.clientHeight;
 
     console.log('[physics] adjusting for focus', {
         focusedNodeId: focusedNode.id,

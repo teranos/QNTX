@@ -323,9 +323,6 @@ function handleFocusResize(): void {
 
     if (!nodeData) return;
 
-    // Recalculate dimensions based on new viewport size
-    const focusedDimensions = calculateFocusedTileDimensions();
-
     // Re-focus the tile with new dimensions (transition between focus states)
     focusOnTile(nodeData);
 }
