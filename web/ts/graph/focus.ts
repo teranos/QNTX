@@ -1,11 +1,12 @@
 // Tile focus functionality
 // Handles focusing viewport on a tile and expanding it to fill most of the view
 
-import { GRAPH_PHYSICS } from '../config.ts';
+import { GRAPH_PHYSICS, appState } from '../config.ts';
 import { getSvg, getG, getZoom, getDomCache, getFocusedNodeId, getPreFocusTransform, setFocusedNodeId, setPreFocusTransform } from './state.ts';
 import { getTransform } from './transform.ts';
 import { AX, BY, AS, CommandDescriptions } from '../../../types/generated/typescript/sym.ts';
 import type { D3Node } from '../../types/d3-graph';
+import type { Node } from '../../types/core';
 
 // Import D3 from vendor bundle
 declare const d3: any;
@@ -19,6 +20,10 @@ const HEADER_HEIGHT = 32;
 const HEADER_PADDING = 8;
 const HEADER_SYMBOL_SIZE = 24;
 const HEADER_SYMBOL_SPACING = 8;
+
+// Footer configuration
+const FOOTER_HEIGHT = 24;
+const FOOTER_PADDING = 8;
 
 // Header symbols with their actions
 interface HeaderSymbol {
@@ -267,6 +272,109 @@ function removeFocusHeader(nodeGroup: any): void {
 }
 
 /**
+ * Count connections for a node from the current graph data
+ */
+function countNodeConnections(nodeId: string): { incoming: number; outgoing: number; total: number } {
+    const graphData = appState.currentGraphData;
+    if (!graphData || !graphData.links) {
+        return { incoming: 0, outgoing: 0, total: 0 };
+    }
+
+    let incoming = 0;
+    let outgoing = 0;
+
+    graphData.links.forEach(link => {
+        const sourceId = (typeof link.source === 'object' && link.source !== null)
+            ? (link.source as Node).id
+            : link.source as string;
+        const targetId = (typeof link.target === 'object' && link.target !== null)
+            ? (link.target as Node).id
+            : link.target as string;
+
+        if (sourceId === nodeId) outgoing++;
+        if (targetId === nodeId) incoming++;
+    });
+
+    return { incoming, outgoing, total: incoming + outgoing };
+}
+
+/**
+ * Create the footer bar with contextual information below the focused tile
+ */
+function createFocusFooter(nodeGroup: any, node: D3Node, dimensions: { width: number; height: number; scale: number }): void {
+    // Remove any existing footer
+    nodeGroup.select('.focus-footer').remove();
+
+    // Calculate footer position (below the tile)
+    const footerY = dimensions.height / 2 + FOOTER_PADDING;
+    const footerWidth = dimensions.width * 0.9;
+
+    // Get connection counts
+    const connections = countNodeConnections(node.id);
+
+    // Build contextual info items
+    const infoItems: string[] = [];
+    infoItems.push(node.type);
+    if (connections.total > 0) {
+        infoItems.push(`${connections.total} connection${connections.total !== 1 ? 's' : ''}`);
+    }
+    // Add first metadata value if available
+    if (node.metadata) {
+        const keys = Object.keys(node.metadata).filter(k => k !== 'original_id');
+        if (keys.length > 0) {
+            const firstKey = keys[0];
+            const value = String(node.metadata[firstKey]).substring(0, 20);
+            infoItems.push(`${firstKey}: ${value}`);
+        }
+    }
+
+    // Create footer group
+    const footer = nodeGroup.append('g')
+        .attr('class', 'focus-footer')
+        .attr('transform', `translate(0, ${footerY})`)
+        .style('opacity', 0);
+
+    // Footer background
+    footer.append('rect')
+        .attr('class', 'focus-footer-bg')
+        .attr('x', -footerWidth / 2)
+        .attr('y', 0)
+        .attr('width', footerWidth)
+        .attr('height', FOOTER_HEIGHT)
+        .attr('rx', 4)
+        .attr('ry', 4)
+        .attr('fill', 'rgba(0, 0, 0, 0.6)')
+        .attr('stroke', 'rgba(255, 255, 255, 0.1)')
+        .attr('stroke-width', 1);
+
+    // Footer text - contextual info
+    footer.append('text')
+        .attr('class', 'focus-footer-text')
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('y', FOOTER_HEIGHT / 2)
+        .attr('font-size', '11px')
+        .attr('fill', '#a0a0a0')
+        .text(infoItems.join(' · '));
+
+    // Animate footer in
+    footer.transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 1);
+}
+
+/**
+ * Remove the focus footer from a node
+ */
+function removeFocusFooter(nodeGroup: any): void {
+    nodeGroup.select('.focus-footer')
+        .transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 0)
+        .remove();
+}
+
+/**
  * Focus on a specific tile
  * - Centers the viewport on the tile
  * - Zooms in
@@ -339,6 +447,9 @@ export function focusOnTile(node: D3Node): void {
 
     // Create the header bar with symbols
     createFocusHeader(nodeGroup, node, focusedDimensions);
+
+    // Create the footer bar with contextual info
+    createFocusFooter(nodeGroup, node, focusedDimensions);
 }
 
 /**
@@ -361,8 +472,9 @@ export function unfocus(): void {
     const nodeGroup = g.selectAll('.node')
         .filter((d: D3Node) => d.id === focusedId);
 
-    // Remove the header
+    // Remove the header and footer
     removeFocusHeader(nodeGroup);
+    removeFocusFooter(nodeGroup);
 
     nodeGroup.select('rect')
         .transition()
