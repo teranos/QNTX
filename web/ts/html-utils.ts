@@ -131,3 +131,53 @@ function looksLikeSecret(value: string): boolean {
         str.includes('bearer')
     );
 }
+
+/**
+ * Format timestamp as locale time string (HH:MM:SS)
+ *
+ * Provides consistent time formatting across the application with
+ * 24-hour format and milliseconds.
+ *
+ * @param timestamp - ISO timestamp string or Date object
+ * @returns Formatted time string (e.g., "14:30:45.123")
+ *
+ * @example
+ * formatTimestamp("2024-01-15T14:30:45.123Z") // "14:30:45.123"
+ */
+export function formatTimestamp(timestamp: string | Date): string {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+    return date.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        fractionalSecondDigits: 3
+    } as Intl.DateTimeFormatOptions);
+}
+
+/**
+ * Format date and time for display (e.g., "Jan 15, 2024 14:30")
+ *
+ * Combines date and time formatting for consistent timestamp display.
+ * Uses short month, numeric day/year, and 24-hour time format.
+ *
+ * @param timestamp - ISO timestamp string or Date object
+ * @returns Formatted datetime string
+ *
+ * @example
+ * formatDateTime("2024-01-15T14:30:00Z") // "Jan 15, 2024 14:30"
+ */
+export function formatDateTime(timestamp: string | Date): string {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+    const dateStr = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+    const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    return `${dateStr} ${timeStr}`;
+}

@@ -3,6 +3,7 @@
 import { MAX_LOGS, appState } from './config.ts';
 import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
+import { formatTimestamp } from './html-utils.ts';
 import type { LogsMessage, LogEntry } from '../types/websocket';
 
 // Make this a module
@@ -47,13 +48,7 @@ function appendLog(msg: LogEntry): void {
     logLine.className = `${CSS.LOG.LINE} ${LOG_LEVEL_MAP[msg.level] || CSS.LOG.INFO}`;
 
     // Format timestamp
-    const timestamp = new Date(msg.timestamp).toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        fractionalSecondDigits: 3
-    } as Intl.DateTimeFormatOptions);
+    const timestamp = formatTimestamp(msg.timestamp);
 
     // Build log line safely using DOM API
     const timestampEl = document.createElement('span');
