@@ -5,15 +5,20 @@
 //!
 //! ## Module Structure
 //!
-//! - `engine` - Core PythonEngine struct and initialization
+//! - `engine` - Core PythonEngine struct, types, and initialization
 //! - `execution` - Code execution, file execution, evaluation
+//! - `config` - Plugin configuration types
+//! - `handlers` - HTTP endpoint handlers
 //! - `service` - gRPC service implementation
 //! - `proto` - Generated protobuf types
 
+pub mod config;
 pub mod engine;
 pub mod execution;
+mod handlers;
 pub mod proto;
 pub mod service;
 
+pub use config::PluginConfig;
 pub use engine::{ExecutionConfig, ExecutionResult, PythonEngine, PythonError};
 pub use service::PythonPluginService;
