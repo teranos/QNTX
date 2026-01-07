@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +14,10 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // PluginConfig represents configuration for an external plugin.
@@ -116,7 +118,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	} else if config.Binary != "" && config.AutoStart {
 		// Launch the plugin binary
 		port = m.allocatePort()
-		addr = fmt.Sprintf("localhost:%d", port)
+		// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
+		addr = fmt.Sprintf("127.0.0.1:%d", port)
 
 		var err error
 		process, err = m.launchPlugin(ctx, config, port)
@@ -219,7 +222,14 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Build command arguments
 	args := append([]string{"--port", strconv.Itoa(port)}, config.Args...)
 
-	cmd := exec.CommandContext(ctx, binary, args...)
+	// NOTE: Using exec.Command instead of exec.CommandContext intentionally.
+	// This prevents plugins from being killed when parent context is cancelled (e.g., during
+	// graceful shutdown), allowing proper plugin shutdown via gRPC Shutdown() call.
+	//
+	// TRADEOFF: If QNTX crashes or is killed (SIGKILL), plugin processes become orphans.
+	// TODO: Consider implementing process group management or pidfile tracking for cleanup
+	// of orphaned plugins on next QNTX startup.
+	cmd := exec.Command(binary, args...)
 
 	// Set environment
 	cmd.Env = os.Environ()
@@ -239,7 +249,9 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	return cmd.Process, nil
 }
 
-// waitForPlugin waits for a plugin to become available.
+// waitForPlugin waits for a plugin's gRPC server to become ready.
+// This polls the gRPC metadata endpoint rather than just checking TCP connectivity
+// to ensure the plugin is actually ready to handle requests.
 func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
@@ -250,17 +262,33 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 		default:
 		}
 
-		// Try to connect
-		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		// Try gRPC connection with short timeout
+		connCtx, cancel := context.WithTimeout(ctx, time.Second)
+		conn, err := grpc.DialContext(connCtx, addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+		)
+		cancel()
+
 		if err == nil {
+			// Connection succeeded, verify gRPC service is ready by calling metadata
+			client := protocol.NewDomainPluginServiceClient(conn)
+			metaCtx, metaCancel := context.WithTimeout(ctx, time.Second)
+			_, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
+			metaCancel()
 			conn.Close()
-			return nil
+
+			if metaErr == nil {
+				// gRPC service is ready
+				return nil
+			}
+			// gRPC service not ready yet, continue waiting
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return errors.Newf("timeout waiting for plugin at %s", addr)
+	return errors.Newf("timeout waiting for plugin gRPC service at %s", addr)
 }
 
 // GetPlugin returns a connected plugin as a DomainPlugin.

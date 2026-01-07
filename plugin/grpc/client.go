@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -194,14 +195,14 @@ func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
 func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
-	// Register a catch-all handler for the plugin's namespace
-	namespace := fmt.Sprintf("/api/%s/", c.metadata.Name)
+	// Register a catch-all handler for the plugin's namespace using Go 1.22+ wildcard pattern
+	pattern := fmt.Sprintf("/api/%s/{path...}", c.metadata.Name)
 
-	mux.HandleFunc(namespace, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		c.proxyHTTPRequest(w, r)
 	})
 
-	c.logger.Infow("Registered HTTP proxy handler", "namespace", namespace)
+	c.logger.Infow("Registered HTTP proxy handler", "pattern", pattern)
 	return nil
 }
 
@@ -228,23 +229,41 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		})
 	}
 
+	// Strip plugin namespace prefix from path
+	// e.g., /api/python/execute -> /execute
+	namespace := "/api/" + c.metadata.Name + "/"
+	path := strings.TrimPrefix(r.URL.Path, namespace)
+	// Ensure path starts with / (TrimPrefix removes it)
+	if path != "" && !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	// Handle exact namespace match (e.g., /api/python -> /)
+	if path == "" || path == r.URL.Path {
+		path = "/"
+	}
+
 	// Create gRPC request
 	req := &protocol.HTTPRequest{
 		Method:  r.Method,
-		Path:    r.URL.Path,
+		Path:    path,
 		Headers: headers,
 		Body:    body,
 	}
 
 	// Add query string to path
 	if r.URL.RawQuery != "" {
-		req.Path = r.URL.Path + "?" + r.URL.RawQuery
+		req.Path = path + "?" + r.URL.RawQuery
 	}
 
 	// Call remote plugin
 	resp, err := c.client.HandleHTTP(r.Context(), req)
 	if err != nil {
-		c.logger.Errorw("Remote HTTP request failed", "error", err, "path", r.URL.Path)
+		c.logger.Errorw("Remote HTTP request failed",
+			"plugin", c.metadata.Name,
+			"method", r.Method,
+			"original_path", r.URL.Path,
+			"stripped_path", path,
+			"error", err)
 		http.Error(w, "Plugin error", http.StatusBadGateway)
 		return
 	}
