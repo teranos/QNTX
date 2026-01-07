@@ -42,6 +42,10 @@ impl PythonPluginService {
             config: None,
             engine,
             initialized: false,
+            default_modules: crate::handlers::DEFAULT_MODULES
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
         }));
 
         Ok(Self {
@@ -106,6 +110,16 @@ impl DomainPluginService for PythonPluginService {
             .and_then(|c| c.config.get("python_paths"))
             .map(|p| p.split(':').map(String::from).collect())
             .unwrap_or_default();
+
+        // Override default modules if provided in config
+        if let Some(modules_str) = state
+            .config
+            .as_ref()
+            .and_then(|c| c.config.get("default_modules"))
+        {
+            state.default_modules = modules_str.split(',').map(|s| s.trim().to_string()).collect();
+            info!("Using configured default modules: {:?}", state.default_modules);
+        }
 
         if let Err(e) = state.engine.initialize(python_paths) {
             error!("Failed to initialize Python engine: {}", e);
