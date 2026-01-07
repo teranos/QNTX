@@ -23,13 +23,14 @@ export function adjustPhysicsForFocus(focusedNode: D3Node): void {
     const viewportWidth = container.clientWidth;
     const viewportHeight = container.clientHeight;
 
-    // Add a position force to pin the focused tile at the center
-    simulation.force('focus-position', d3.forceX(viewportWidth / 2)
-        .x((d: D3Node) => d.id === focusedNode.id ? viewportWidth / 2 : d.x!)
+    // Add a position force to pin the focused tile at its current position
+    // This prevents physics from moving the focused tile while other tiles can still move
+    simulation.force('focus-position', d3.forceX()
+        .x((d: D3Node) => d.x!)  // Pin each node to its current x
         .strength((d: D3Node) => d.id === focusedNode.id ? GRAPH_PHYSICS.FOCUS_POSITION_STRENGTH : 0));
 
-    simulation.force('focus-position-y', d3.forceY(viewportHeight / 2)
-        .y((d: D3Node) => d.id === focusedNode.id ? viewportHeight / 2 : d.y!)
+    simulation.force('focus-position-y', d3.forceY()
+        .y((d: D3Node) => d.y!)  // Pin each node to its current y
         .strength((d: D3Node) => d.id === focusedNode.id ? GRAPH_PHYSICS.FOCUS_POSITION_STRENGTH : 0));
 
     // Reduce charge strength to bring other tiles closer
