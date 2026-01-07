@@ -661,6 +661,8 @@ func TestKeepaliveHandler_Integration_PingPongFlow(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	handler.Stop()
+	// Wait for keepalive loop to exit before closing channel
+	time.Sleep(50 * time.Millisecond)
 	close(pingCh)
 
 	// Verify metrics
