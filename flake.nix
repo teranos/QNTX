@@ -45,6 +45,7 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
           vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
@@ -62,6 +63,7 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
+          # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
           vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           subPackages = [ "cmd/typegen" ];
@@ -74,6 +76,7 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
           vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
@@ -395,64 +398,24 @@
         };
 
         # Apps for common tasks
-        apps = {
-          build-docs-site = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "build-docs-site" ''
-              set -e
-              echo "Building documentation site..."
-              ${pkgs.nix}/bin/nix build .#docs-site
+        apps.build-docs-site = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "build-docs-site" ''
+            set -e
+            echo "Building documentation site..."
+            ${pkgs.nix}/bin/nix build .#docs-site
 
-              echo "Copying to web/site/..."
-              mkdir -p web/site
-              chmod -R +w web/site 2>/dev/null || true
-              rm -rf web/site/*
-              cp -r result/* web/site/
-              chmod -R +w web/site
+            echo "Copying to web/site/..."
+            mkdir -p web/site
+            chmod -R +w web/site 2>/dev/null || true
+            rm -rf web/site/*
+            cp -r result/* web/site/
+            chmod -R +w web/site
 
-              echo "Documentation site built and copied to web/site/"
-              echo "Files:"
-              ls -lh web/site/
-            '');
-          };
-
-          update-vendor-hash = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "update-vendor-hash" ''
-              set -e
-              echo "Computing correct vendorHash for Go modules..."
-
-              # Try to build and capture the hash mismatch
-              if OUTPUT=$(${pkgs.nix}/bin/nix build .#qntx --no-link --rebuild 2>&1); then
-                echo "✓ vendorHash is already correct"
-                exit 0
-              fi
-
-              # Extract the correct hash from error message
-              if echo "$OUTPUT" | ${pkgs.gnugrep}/bin/grep -q "got:.*sha256-"; then
-                HASH=$(echo "$OUTPUT" | ${pkgs.gnugrep}/bin/grep "got:" | ${pkgs.gnused}/bin/sed -n 's/.*got:[[:space:]]*\(sha256-[^[:space:]]*\).*/\1/p')
-
-                if [ -z "$HASH" ]; then
-                  echo "Error: Could not extract hash from build output"
-                  echo "$OUTPUT"
-                  exit 1
-                fi
-
-                echo "Correct hash: $HASH"
-                echo "Updating flake.nix..."
-
-                # Update all vendorHash instances (qntx, qntx-code, typegen share go.mod)
-                ${pkgs.gnused}/bin/sed -i "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$HASH\";|g" flake.nix
-
-                echo "✓ Updated vendorHash in flake.nix"
-                echo "  Run: nix flake check"
-              else
-                echo "Build failed for a different reason:"
-                echo "$OUTPUT"
-                exit 1
-              fi
-            '');
-          };
+            echo "Documentation site built and copied to web/site/"
+            echo "Files:"
+            ls -lh web/site/
+          '');
         };
       }
     );
