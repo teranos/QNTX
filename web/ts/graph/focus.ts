@@ -29,18 +29,43 @@ export function focusOnTile(node: D3Node): void {
     const zoom = getZoom();
 
     if (!svg || !g || !zoom || node.x === undefined || node.y === undefined) {
+        console.warn('[focus] early return - missing requirements', {
+            svg: !!svg,
+            g: !!g,
+            zoom: !!zoom,
+            nodeX: node.x,
+            nodeY: node.y
+        });
         return;
     }
 
     const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
-    if (!container) return;
+    if (!container) {
+        console.warn('[focus] container not found', { selector: '#graph-container' });
+        return;
+    }
 
     const previouslyFocusedId = getFocusedNodeId();
     const isTransition = previouslyFocusedId !== null && previouslyFocusedId !== node.id;
 
+    console.log('[focus] focusOnTile', {
+        nodeId: node.id,
+        nodeLabel: node.label,
+        nodePos: { x: node.x, y: node.y },
+        previouslyFocusedId,
+        isTransition,
+        viewportSize: { width: container.clientWidth, height: container.clientHeight }
+    });
+
     // If transitioning between tiles, restore the previous tile to normal size
     if (isTransition) {
+        console.log('[focus] tile-transition', {
+            from: previouslyFocusedId,
+            to: node.id,
+            toLabel: node.label
+        });
+
         const prevNodeGroup = g.selectAll<SVGGElement, D3Node>('.node')
             .filter((d) => d.id === previouslyFocusedId);
 
@@ -81,6 +106,12 @@ export function focusOnTile(node: D3Node): void {
     // Calculate the focused tile dimensions (at canonical zoom)
     const focusedDimensions = calculateFocusedTileDimensions();
 
+    console.log('[focus] dimensions', {
+        focusedDimensions,
+        canonicalZoom,
+        viewport: { width: viewportWidth, height: viewportHeight }
+    });
+
     // Adjust physics first to pin the tile at its current position
     // This prevents the tile from drifting during focus
     adjustPhysicsForFocus(node);
@@ -97,8 +128,19 @@ export function focusOnTile(node: D3Node): void {
     const targetX = viewportWidth / 2 - node.x * canonicalZoom;
     const targetY = viewportHeight / 2 - node.y * canonicalZoom;
 
+    console.log('[focus] pan-target', {
+        nodePos: { x: node.x, y: node.y },
+        targetTransform: { x: targetX, y: targetY, k: canonicalZoom },
+        calculation: `viewport_center (${viewportWidth/2}, ${viewportHeight/2}) - node_pos * zoom`
+    });
+
     // Set flag to prevent unfocus detection during programmatic zoom animation
     setIsFocusAnimating(true);
+
+    console.log('[focus] animation-start', {
+        focusedNodeId: node.id,
+        duration: GRAPH_PHYSICS.ANIMATION_DURATION
+    });
 
     // Always animate to canonical zoom and center on the tile (even during transitions)
     svg.transition()
@@ -107,6 +149,9 @@ export function focusOnTile(node: D3Node): void {
             .translate(targetX, targetY)
             .scale(canonicalZoom))  // Reset to canonical zoom level
         .on("end", () => {
+            console.log('[focus] animation-end', {
+                focusedNodeId: node.id
+            });
             // Clear animation flag once transition completes
             setIsFocusAnimating(false);
         });
@@ -157,6 +202,12 @@ export function unfocus(): void {
 
     if (!svg || !g || !zoom) return;
 
+    const preFocusTransform = getPreFocusTransform();
+    console.log('[focus] unfocus', {
+        focusedId,
+        hadPreFocusTransform: preFocusTransform !== null
+    });
+
     // Show UI elements again
     setFocusUIVisibility(true);
 
@@ -186,7 +237,6 @@ export function unfocus(): void {
         .attr('transform', 'scale(1)');
 
     // Restore the previous transform if available
-    const preFocusTransform = getPreFocusTransform();
     if (preFocusTransform) {
         // Set flag to prevent unfocus detection during programmatic zoom animation
         setIsFocusAnimating(true);

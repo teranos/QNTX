@@ -23,6 +23,14 @@ export function adjustPhysicsForFocus(focusedNode: D3Node): void {
     const viewportWidth = container.clientWidth;
     const viewportHeight = container.clientHeight;
 
+    console.log('[physics] adjusting for focus', {
+        focusedNodeId: focusedNode.id,
+        positionStrength: GRAPH_PHYSICS.FOCUS_POSITION_STRENGTH,
+        chargeStrength: GRAPH_PHYSICS.FOCUS_CHARGE_STRENGTH,
+        collisionRadius: GRAPH_PHYSICS.FOCUS_COLLISION_RADIUS,
+        simulationAlpha: 0.3
+    });
+
     // Add a position force to pin the focused tile at its current position
     // This prevents physics from moving the focused tile while other tiles can still move
     simulation.force('focus-position', d3.forceX()
@@ -53,6 +61,12 @@ export function adjustPhysicsForFocus(focusedNode: D3Node): void {
 export function restoreNormalPhysics(): void {
     const simulation = getSimulation();
     if (!simulation) return;
+
+    console.log('[physics] restoring normal physics', {
+        chargeStrength: GRAPH_PHYSICS.TILE_CHARGE_STRENGTH,
+        collisionRadius: GRAPH_PHYSICS.COLLISION_RADIUS,
+        simulationAlpha: 0.2
+    });
 
     // Remove focus-specific position forces
     simulation.force('focus-position', null);
