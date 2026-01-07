@@ -55,6 +55,7 @@ pub struct ExecutionResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionConfig {
     /// Timeout in seconds (0 = no timeout)
+    /// NOTE: Not yet implemented - executions run to completion
     pub timeout_secs: u64,
 
     /// Whether to capture variables after execution
@@ -64,12 +65,15 @@ pub struct ExecutionConfig {
     pub python_paths: Vec<String>,
 
     /// Environment variables to set
+    /// NOTE: Not yet implemented
     pub env_vars: HashMap<String, String>,
 
     /// Whether to allow file system access
+    /// NOTE: Not yet implemented - all executions have full fs access
     pub allow_fs: bool,
 
     /// Whether to allow network access
+    /// NOTE: Not yet implemented - all executions have full network access
     pub allow_network: bool,
 }
 
@@ -301,7 +305,12 @@ impl PythonEngine {
     }
 
     /// Execute a Python file
+    ///
+    /// TODO(sec): Consider path validation to restrict execution to allowed directories.
+    /// Currently reads arbitrary filesystem paths which may be a security concern
+    /// depending on deployment context.
     pub fn execute_file(&self, path: &str, config: &ExecutionConfig) -> ExecutionResult {
+        // TODO(sec): Validate path is within allowed directories if config.allow_fs is false
         match std::fs::read_to_string(path) {
             Ok(code) => self.execute(&code, config),
             Err(e) => ExecutionResult {
@@ -339,7 +348,12 @@ impl PythonEngine {
     }
 
     /// Install a package using pip (if allowed)
+    ///
+    /// TODO(sec): Validate package name against PEP 508 pattern before execution.
+    /// Current escaping only handles quotes - malicious package names could potentially
+    /// cause issues. Consider: `^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`
     pub fn pip_install(&self, package: &str) -> ExecutionResult {
+        // TODO(sec): Add package name validation
         let code = format!(
             r#"
 import subprocess
