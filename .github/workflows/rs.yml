@@ -95,11 +95,40 @@ jobs:
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
 
-  # qntx-python builds require Nix (Python linking issues prevent cargo-only builds)
-  # Temporarily disabled until CI image includes python313
-  # TODO: Re-enable once ghcr.io/teranos/qntx:latest image is rebuilt with Python
-  # qntx-python:
-  #   name: Python Plugin
+  qntx-python:
+    name: Python Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: qntx
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Check formatting
+        run: cd qntx-python && nix develop ..#qntx-python-dev --command cargo fmt --check
+
+      - name: Build via Nix (required for Python linking)
+        run: nix build .#qntx-python --print-build-logs
+
+      - name: Verify binary works
+        run: ./result/bin/qntx-python-plugin --version
+
+  # Legacy cargo-based checks (disabled - Python linking issues)
+  # Kept for reference until Nix-based checks are stable
+  # qntx-python-cargo:
+  #   name: Python Plugin (Cargo)
   #   runs-on: ubuntu-latest
   #   container:
   #     image: ghcr.io/teranos/qntx:latest
