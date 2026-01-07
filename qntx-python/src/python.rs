@@ -289,7 +289,8 @@ impl PythonEngine {
                     })
                 }
                 Err(e) => {
-                    let error_msg = format!("{}", e);
+                    // Capture full traceback for better debugging
+                    let error_msg = format_python_error(py, &e);
                     Ok(ExecutionResult {
                         success: false,
                         stdout,
@@ -379,6 +380,30 @@ impl Default for PythonEngine {
     fn default() -> Self {
         Self::new().expect("Failed to create Python engine")
     }
+}
+
+/// Format a Python error with full traceback for better debugging
+fn format_python_error(py: Python<'_>, err: &PyErr) -> String {
+    // Try to get the full traceback using Python's traceback module
+    if let Some(tb) = err.traceback(py) {
+        if let Ok(traceback_mod) = py.import("traceback") {
+            if let Ok(lines) = traceback_mod
+                .call_method1("format_exception", (err.get_type(py), err.value(py), tb))
+            {
+                if let Ok(iter) = lines.try_iter() {
+                    let formatted: Vec<String> = iter
+                        .filter_map(|line| line.ok())
+                        .filter_map(|line| line.extract::<String>().ok())
+                        .collect();
+                    if !formatted.is_empty() {
+                        return formatted.join("");
+                    }
+                }
+            }
+        }
+    }
+    // Fallback to simple error message
+    format!("{}", err)
 }
 
 /// Convert a Python object to JSON
