@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/sym"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 // HandlePulseJobs handles requests to /api/pulse/jobs
 // GET: List all async jobs (active, completed, failed)
 func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
-	s.logger.Infow(fmt.Sprintf("%s Pulse list async jobs", sym.Pulse),
+	logger.AddPulseSymbol(s.logger).Infow("Pulse list async jobs",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"remote", r.RemoteAddr)
@@ -46,7 +46,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 	// Check if this is a request for child jobs
 	if len(pathParts) > 1 && pathParts[1] == "children" {
 		if r.Method == http.MethodGet {
-			s.logger.Infow(fmt.Sprintf("%s Pulse get children | job:%s", sym.Pulse, jobID), "job_id", jobID)
+			logger.AddPulseSymbol(s.logger).Infow("Pulse get children", "job_id", jobID)
 			s.handleGetJobChildren(w, r, jobID)
 		} else {
 			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -57,7 +57,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 	// Check if this is a request for stages
 	if len(pathParts) > 1 && pathParts[1] == "stages" {
 		if r.Method == http.MethodGet {
-			s.logger.Infow(fmt.Sprintf("%s Pulse get stages | job:%s", sym.Pulse, jobID), "job_id", jobID)
+			logger.AddPulseSymbol(s.logger).Infow("Pulse get stages", "job_id", jobID)
 			s.handleGetJobStages(w, r, jobID)
 		} else {
 			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -69,7 +69,7 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 	if len(pathParts) >= 4 && pathParts[1] == "tasks" && pathParts[3] == "logs" {
 		if r.Method == http.MethodGet {
 			taskID := pathParts[2]
-			s.logger.Infow(fmt.Sprintf("%s Pulse get task logs | job:%s task:%s", sym.Pulse, jobID, taskID), "job_id", jobID, "task_id", taskID)
+			logger.AddPulseSymbol(s.logger).Infow("Pulse get task logs", "job_id", jobID, "task_id", taskID)
 			s.handleGetTaskLogsForJob(w, r, jobID, taskID)
 		} else {
 			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
