@@ -536,7 +536,12 @@ export function focusOnTile(node: D3Node): void {
     // Calculate the focused tile dimensions (at canonical zoom)
     const focusedDimensions = calculateFocusedTileDimensions();
 
+    // Adjust physics first to pin the tile at its current position
+    // This prevents the tile from drifting during focus
+    adjustPhysicsForFocus(node);
+
     // Calculate transform to center the node at canonical zoom
+    // Use the node's current position (which is now pinned by physics)
     const targetX = viewportWidth / 2 - node.x * canonicalZoom;
     const targetY = viewportHeight / 2 - node.y * canonicalZoom;
 
@@ -584,9 +589,6 @@ export function focusOnTile(node: D3Node): void {
 
     // Create the footer bar with contextual info
     createFocusFooter(nodeGroup, node, focusedDimensions);
-
-    // Adjust physics to make other tiles move closer
-    adjustPhysicsForFocus(node);
 }
 
 /**
