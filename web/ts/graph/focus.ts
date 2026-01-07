@@ -5,15 +5,12 @@ import { GRAPH_PHYSICS, appState } from '../config.ts';
 import { getSimulation, getSvg, getG, getZoom, getDomCache, getFocusedNodeId, getPreFocusTransform, setFocusedNodeId, setPreFocusTransform, setIsFocusAnimating } from './state.ts';
 import { getTransform } from './transform.ts';
 import { AX, BY, AS, CommandDescriptions } from '../../../types/generated/typescript/sym.ts';
+import { calculateFocusedTileDimensions, DEFAULT_TILE_WIDTH, DEFAULT_TILE_HEIGHT } from './focus/dimensions.ts';
 import type { D3Node } from '../../types/d3-graph';
 import type { Node } from '../../types/core';
 
 // Import D3 from vendor bundle
 declare const d3: any;
-
-// Default tile dimensions (must match renderer.ts)
-const DEFAULT_TILE_WIDTH = 180;
-const DEFAULT_TILE_HEIGHT = 80;
 
 // Header configuration
 const HEADER_HEIGHT = 24;
@@ -62,39 +59,6 @@ const HEADER_SYMBOLS: HeaderSymbol[] = [
         }
     }
 ];
-
-/**
- * Calculate focused tile dimensions based on viewport size
- * The tile should take up FOCUS_VIEWPORT_RATIO of the viewport
- */
-function calculateFocusedTileDimensions(): { width: number; height: number; scale: number } {
-    // TODO: When #graph-container is renamed to #graph-viewer, update this selector
-    // Use graph-container dimensions (the actual graph viewing area)
-    const domCache = getDomCache();
-    const container = domCache.get('graphContainer', '#graph-container');
-    if (!container) {
-        return { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT, scale: 1 };
-    }
-
-    const viewportWidth = container.clientWidth;
-    const viewportHeight = container.clientHeight;
-    const padding = GRAPH_PHYSICS.FOCUS_TILE_PADDING;
-
-    // Target size is viewport * ratio - padding
-    const targetWidth = (viewportWidth * GRAPH_PHYSICS.FOCUS_VIEWPORT_RATIO) - (padding * 2);
-    const targetHeight = (viewportHeight * GRAPH_PHYSICS.FOCUS_VIEWPORT_RATIO) - (padding * 2);
-
-    // Calculate scale factors independently for width and height
-    // This allows the tile to fill the viewport better, rather than maintaining original aspect ratio
-    const scaleX = targetWidth / DEFAULT_TILE_WIDTH;
-    const scaleY = targetHeight / DEFAULT_TILE_HEIGHT;
-
-    return {
-        width: targetWidth,
-        height: targetHeight,
-        scale: Math.max(scaleX, scaleY)  // Use larger scale for zoom calculation
-    };
-}
 
 /**
  * Adjust simulation physics for focus mode
@@ -169,41 +133,48 @@ function setFocusUIVisibility(visible: boolean): void {
     const duration = GRAPH_PHYSICS.ANIMATION_DURATION;
     const transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
 
-    // Darken the graph background when focused
-    const svg = getSvg();
-    if (svg) {
-        let overlay: any = svg.select('.focus-overlay');
+    // Darken the graph background when focused using a CSS overlay
+    // This ensures the overlay is clipped to the graph-container bounds
+    const container = document.getElementById('graph-container');
+    if (container) {
+        let overlay = container.querySelector('.focus-overlay') as HTMLElement;
+
         if (visible) {
             // Remove overlay when unfocusing
-            overlay.transition()
-                .duration(duration)
-                .style('opacity', 0)
-                .remove();
-        } else {
-            // Create or update overlay when focusing
-            if (overlay.empty()) {
-                const container = document.getElementById('graph-container');
-                const width = container?.clientWidth || 2000;
-                const height = container?.clientHeight || 2000;
-                overlay = svg.insert('rect', ':first-child')
-                    .attr('class', 'focus-overlay')
-                    .attr('x', -width * 2)
-                    .attr('y', -height * 2)
-                    .attr('width', width * 5)
-                    .attr('height', height * 5)
-                    .attr('fill', 'rgba(0, 0, 0, 0.4)')
-                    .style('opacity', 0)
-                    .style('cursor', 'pointer')
-                    // Virtue #13: Touch Parity - Both click and touch trigger unfocus equally
-                    .on('click touchend', (event: Event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        unfocus();
-                    });
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay?.remove(), duration);
             }
-            overlay.transition()
-                .duration(duration)
-                .style('opacity', 1);
+        } else {
+            // Create overlay when focusing
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'focus-overlay';
+                overlay.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.4);
+                    pointer-events: auto;
+                    cursor: pointer;
+                    opacity: 0;
+                    transition: opacity ${duration}ms ease;
+                    z-index: 1;
+                `;
+                // Click overlay to unfocus
+                overlay.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    unfocus();
+                });
+                container.appendChild(overlay);
+            }
+            // Trigger opacity transition
+            requestAnimationFrame(() => {
+                if (overlay) overlay.style.opacity = '1';
+            });
         }
     }
 
