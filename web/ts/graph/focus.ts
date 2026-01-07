@@ -439,8 +439,8 @@ export function focusOnTile(node: D3Node): void {
 
     // If transitioning between tiles, restore the previous tile to normal size
     if (isTransition) {
-        const prevNodeGroup = g.selectAll('.node')
-            .filter((d: any) => d.id === previouslyFocusedId);
+        const prevNodeGroup = g.selectAll<SVGGElement, D3Node>('.node')
+            .filter((d) => d.id === previouslyFocusedId);
 
         // Remove header and footer from previous tile
         removeFocusHeader(prevNodeGroup);
@@ -497,8 +497,8 @@ export function focusOnTile(node: D3Node): void {
     }
 
     // Animate the focused tile to expand
-    const nodeGroup = g.selectAll('.node')
-        .filter((d: any) => d.id === node.id);
+    const nodeGroup = g.selectAll<SVGGElement, D3Node>('.node')
+        .filter((d) => d.id === node.id);
 
     // Expand the rect
     nodeGroup.select('rect')
@@ -539,8 +539,8 @@ export function unfocus(): void {
     setFocusUIVisibility(true);
 
     // Restore the focused tile to normal size
-    const nodeGroup = g.selectAll('.node')
-        .filter((d: any) => d.id === focusedId);
+    const nodeGroup = g.selectAll<SVGGElement, D3Node>('.node')
+        .filter((d) => d.id === focusedId);
 
     // Remove the header and footer
     removeFocusHeader(nodeGroup);
