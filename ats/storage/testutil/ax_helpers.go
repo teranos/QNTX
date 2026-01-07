@@ -6,27 +6,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/db"
 )
-
-// SetupInMemoryDB creates a clean in-memory database for testing.
-// Uses real migrations to ensure test schema matches production schema.
-func SetupInMemoryDB(t *testing.T) *sql.DB {
-	testDB, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		t.Fatalf("Failed to create in-memory database: %v", err)
-	}
-
-	// Apply real migrations (ensures test schema = production schema)
-	err = db.Migrate(testDB, nil)
-	if err != nil {
-		t.Fatalf("Failed to run migrations: %v", err)
-	}
-
-	return testDB
-}
 
 // LoadFixtures inserts test fixtures into the database
 func LoadFixtures(t *testing.T, db *sql.DB, fixtures *ax.TestFixtures) {
@@ -37,13 +18,28 @@ func LoadFixtures(t *testing.T, db *sql.DB, fixtures *ax.TestFixtures) {
 	`
 
 	for _, as := range fixtures.Attestations {
-		subjectsJSON, _ := json.Marshal(as.Subjects)
-		predicatesJSON, _ := json.Marshal(as.Predicates)
-		contextsJSON, _ := json.Marshal(as.Contexts)
-		actorsJSON, _ := json.Marshal(as.Actors)
-		attributesJSON, _ := json.Marshal(as.Attributes)
+		subjectsJSON, err := json.Marshal(as.Subjects)
+		if err != nil {
+			t.Fatalf("Failed to marshal subjects for fixture %s: %v", as.ID, err)
+		}
+		predicatesJSON, err := json.Marshal(as.Predicates)
+		if err != nil {
+			t.Fatalf("Failed to marshal predicates for fixture %s: %v", as.ID, err)
+		}
+		contextsJSON, err := json.Marshal(as.Contexts)
+		if err != nil {
+			t.Fatalf("Failed to marshal contexts for fixture %s: %v", as.ID, err)
+		}
+		actorsJSON, err := json.Marshal(as.Actors)
+		if err != nil {
+			t.Fatalf("Failed to marshal actors for fixture %s: %v", as.ID, err)
+		}
+		attributesJSON, err := json.Marshal(as.Attributes)
+		if err != nil {
+			t.Fatalf("Failed to marshal attributes for fixture %s: %v", as.ID, err)
+		}
 
-		_, err := db.Exec(query,
+		_, err = db.Exec(query,
 			as.ID,
 			string(subjectsJSON),
 			string(predicatesJSON),
@@ -99,33 +95,12 @@ const (
 	ComplexQueryTarget = 2 * time.Second
 )
 
-// AssertNoError is a helper that fails the test if err is not nil
-func AssertNoError(t *testing.T, err error, format string, args ...interface{}) {
-	if err != nil {
-		t.Fatalf(format+": %v", append(args, err)...)
-	}
-}
-
-// AssertEqual is a helper for equality assertions
-func AssertEqual(t *testing.T, expected, actual interface{}, format string, args ...interface{}) {
-	if expected != actual {
-		t.Fatalf(format+": expected %v, got %v", append(args, expected, actual)...)
-	}
-}
-
-// AssertContains checks if a slice contains an item
-func AssertContains(t *testing.T, slice []string, item string, format string, args ...interface{}) {
-	for _, s := range slice {
-		if s == item {
-			return
-		}
-	}
-	t.Fatalf(format+": slice %v does not contain %v", append(args, slice, item)...)
-}
-
-// CreateTestDB creates and configures a test database with fixtures
-func CreateTestDB(t *testing.T) *sql.DB {
-	db := SetupInMemoryDB(t)
+// CreateTestDBWithFixtures creates a test database and loads ax fixtures.
+// Use SetupTestDB from helpers.go for a clean database without fixtures.
+// Automatically registers cleanup via t.Cleanup().
+func CreateTestDBWithFixtures(t *testing.T) *sql.DB {
+	t.Helper()
+	db := SetupTestDB(t)
 	fixtures := ax.NewTestFixtures()
 	LoadFixtures(t, db, fixtures)
 	return db

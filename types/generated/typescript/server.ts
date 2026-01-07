@@ -11,9 +11,9 @@ export interface ChildJobInfo {
   handler_name: string;
   source: string;
   status: string;
-  progress_pct: number;
-  cost_estimate: number;
-  cost_actual: number;
+  progress_pct?: number;
+  cost_estimate?: number;
+  cost_actual?: number;
   error?: string;
   created_at: string;
   started_at?: string | null;
@@ -29,6 +29,9 @@ export interface CompleteMessage {
    * Completion message
    */
   message: string;
+}
+
+export interface ConsoleFormatter {
 }
 
 export interface ConsoleLog {
@@ -196,7 +199,7 @@ export interface ListExecutionsResponse {
 
 export interface ListScheduledJobsResponse {
   jobs: ScheduledJobResponse[];
-  count: number;
+  count?: number;
 }
 
 export interface LogEntry {
@@ -470,7 +473,7 @@ export interface QueryMessage {
 export interface ScheduledJobResponse {
   id: string;
   ats_code: string;
-  interval_seconds: number;
+  interval_seconds?: number;
   /**
    * RFC3339 timestamp
    */
@@ -482,10 +485,10 @@ export interface ScheduledJobResponse {
   /**
    * Last async job ID
    */
-  last_execution_id: string;
+  last_execution_id?: string;
   state: string;
-  created_from_doc: string;
-  metadata: string;
+  created_from_doc?: string;
+  metadata?: string;
   /**
    * RFC3339 timestamp
    */
@@ -572,7 +575,7 @@ export interface SystemCapabilitiesMessage {
 
 export interface TaskInfo {
   task_id: string;
-  log_count: number;
+  log_count?: number;
 }
 
 export interface TaskLogsResponse {

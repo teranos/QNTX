@@ -99,7 +99,7 @@ function renderExistingJobControls(
 
   const interval = document.createElement('span');
   interval.className = 'pulse-interval';
-  interval.textContent = formatInterval(job.interval_seconds);
+  interval.textContent = formatInterval(job.interval_seconds ?? 0);
 
   const state = document.createElement('span');
   state.className = 'pulse-state';
@@ -174,7 +174,7 @@ function renderExistingJobControls(
     if (value === "custom") {
       const customValue = prompt("Enter interval (e.g., 30m, 2h, 1d):");
       if (!customValue) {
-        intervalSelect.value = job.interval_seconds.toString();
+        intervalSelect.value = (job.interval_seconds ?? 0).toString();
         return;
       }
       // TODO(#30): Parse custom interval

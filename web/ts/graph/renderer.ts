@@ -71,7 +71,7 @@ function renderGraph(data: GraphData): void {
     const nodeColors: Record<string, string> = {};
     if (data.meta?.node_types) {
         data.meta.node_types.forEach(typeInfo => {
-            nodeColors[typeInfo.type] = typeInfo.color;
+            nodeColors[typeInfo.type] = typeInfo.color ?? '#666666';
         });
     }
 

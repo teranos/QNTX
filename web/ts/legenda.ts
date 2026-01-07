@@ -158,7 +158,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
         // Build item contents using DOM API for security
         const colorDiv = document.createElement('div');
         colorDiv.className = 'legenda-color';
-        colorDiv.style.background = type.color;
+        colorDiv.style.background = type.color ?? '#666666';
 
         const revealSpan = document.createElement('span');
         revealSpan.className = 'reveal-related';
