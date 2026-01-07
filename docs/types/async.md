@@ -6,9 +6,9 @@
 This document shows Go type definitions from the codebase.
 
 **Generated types**:
-- TypeScript: [`types/generated/async.ts`](../async.ts)
-- Rust: [`types/generated/async.rs`](../async.rs)
-- Python: [`types/generated/async.py`](../async.py)
+- TypeScript: [`types/generated/typescript/async.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/async.ts)
+- Rust: [`types/generated/rust/async.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/async.rs)
+- Python: [`types/generated/python/async.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/async.py)
 
 ## ErrorCode
 
