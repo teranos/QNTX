@@ -99,10 +99,48 @@ function calculateFocusedTileDimensions(): { width: number; height: number; scal
 /**
  * Show or hide UI elements based on focus state
  * Slides elements out of view during focus zoom, slides back on unfocus
+ * Also fades in a darker background to indicate focus mode
  */
 function setFocusUIVisibility(visible: boolean): void {
     const duration = GRAPH_PHYSICS.ANIMATION_DURATION;
     const transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
+
+    // Darken the graph background when focused
+    const svg = getSvg();
+    if (svg) {
+        let overlay = svg.select('.focus-overlay');
+        if (visible) {
+            // Remove overlay when unfocusing
+            overlay.transition()
+                .duration(duration)
+                .style('opacity', 0)
+                .remove();
+        } else {
+            // Create or update overlay when focusing
+            if (overlay.empty()) {
+                const container = document.getElementById('graph-container');
+                const width = container?.clientWidth || 2000;
+                const height = container?.clientHeight || 2000;
+                overlay = svg.insert('rect', ':first-child')
+                    .attr('class', 'focus-overlay')
+                    .attr('x', -width * 2)
+                    .attr('y', -height * 2)
+                    .attr('width', width * 5)
+                    .attr('height', height * 5)
+                    .attr('fill', 'rgba(0, 0, 0, 0.4)')
+                    .style('opacity', 0)
+                    .style('cursor', 'pointer')
+                    .on('click touchend', function(event: Event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        unfocus();
+                    });
+            }
+            overlay.transition()
+                .duration(duration)
+                .style('opacity', 1);
+        }
+    }
 
     // Helper to slide element left
     const slideLeft = (el: HTMLElement | null) => {
@@ -379,6 +417,7 @@ function removeFocusFooter(nodeGroup: any): void {
  * - Centers the viewport on the tile
  * - Zooms in
  * - Expands the tile to fill most of the viewport
+ * - Supports smooth tile-to-tile transitions when already focused
  */
 export function focusOnTile(node: D3Node): void {
     const svg = getSvg();
@@ -393,8 +432,35 @@ export function focusOnTile(node: D3Node): void {
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) return;
 
+    const previouslyFocusedId = getFocusedNodeId();
+    const isTransition = previouslyFocusedId !== null && previouslyFocusedId !== node.id;
+
+    // If transitioning between tiles, restore the previous tile to normal size
+    if (isTransition) {
+        const prevNodeGroup = g.selectAll('.node')
+            .filter((d: D3Node) => d.id === previouslyFocusedId);
+
+        // Remove header and footer from previous tile
+        removeFocusHeader(prevNodeGroup);
+        removeFocusFooter(prevNodeGroup);
+
+        // Restore previous tile to normal size
+        prevNodeGroup.select('rect')
+            .transition()
+            .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+            .attr('width', DEFAULT_TILE_WIDTH)
+            .attr('height', DEFAULT_TILE_HEIGHT)
+            .attr('x', -DEFAULT_TILE_WIDTH / 2)
+            .attr('y', -DEFAULT_TILE_HEIGHT / 2);
+
+        prevNodeGroup.select('text')
+            .transition()
+            .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+            .attr('transform', 'scale(1)');
+    }
+
     // Save current transform before focusing (only if not already focused)
-    if (!getFocusedNodeId()) {
+    if (!previouslyFocusedId) {
         const currentTransform = getTransform();
         setPreFocusTransform(currentTransform);
     }
@@ -423,8 +489,10 @@ export function focusOnTile(node: D3Node): void {
             .translate(targetX, targetY)
             .scale(zoomScale));
 
-    // Hide UI elements when focused
-    setFocusUIVisibility(false);
+    // Hide UI elements when focused (only if not already in focus mode)
+    if (!isTransition) {
+        setFocusUIVisibility(false);
+    }
 
     // Animate the focused tile to expand
     const nodeGroup = g.selectAll('.node')
@@ -541,4 +609,29 @@ export function handleUnfocusTrigger(event: any): void {
     if (currentTransform.k < focusScale * 0.9) {
         unfocus();
     }
+}
+
+/**
+ * Handle keyboard events for focus mode
+ */
+function handleFocusKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && isFocused()) {
+        event.preventDefault();
+        unfocus();
+    }
+}
+
+/**
+ * Initialize focus mode keyboard listeners
+ * Should be called once when the graph is initialized
+ */
+export function initFocusKeyboardSupport(): void {
+    document.addEventListener('keydown', handleFocusKeydown);
+}
+
+/**
+ * Clean up focus mode keyboard listeners
+ */
+export function cleanupFocusKeyboardSupport(): void {
+    document.removeEventListener('keydown', handleFocusKeydown);
 }
