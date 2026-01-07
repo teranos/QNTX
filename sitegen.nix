@@ -133,6 +133,11 @@ let
 
   # Create a separate derivation for each markdown file (enables incremental rebuilds)
   mkHtmlDerivation = fileInfo:
+    let
+      # Read markdown content and rewrite .md links to .html (pure Nix)
+      mdContent = builtins.readFile fileInfo.mdPath;
+      rewrittenMd = builtins.replaceStrings [ ".md)" ] [ ".html)" ] mdContent;
+    in
     pkgs.runCommand "qntx-doc-${fileInfo.name}"
       {
         nativeBuildInputs = [ pkgs.pulldown-cmark ];
@@ -144,7 +149,9 @@ let
         ${htmlHead "QNTX - ${fileInfo.name}" fileInfo.prefix}
         ${docStyles fileInfo.prefix}
         EOF
-                  ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F < "${fileInfo.mdPath}"
+                  cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
+        ${rewrittenMd}
+        EOF
                   echo "    </body>"
                   echo "</html>"
                 } > "$out/${fileInfo.htmlPath}"
