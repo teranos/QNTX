@@ -43,9 +43,9 @@ export interface Job {
    */
   source: string;
   status: JobStatus;
-  progress: Progress;
-  cost_estimate: number;
-  cost_actual: number;
+  progress?: Progress;
+  cost_estimate?: number;
+  cost_actual?: number;
   pulse_state?: PulseState | null;
   error?: string;
   /**
@@ -55,7 +55,7 @@ export interface Job {
   /**
    * Number of retry attempts (max 2)
    */
-  retry_count: number;
+  retry_count?: number;
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;
@@ -68,20 +68,20 @@ export interface Progress {
   /**
    * Completed operations
    */
-  current: number;
+  current?: number;
   /**
    * Total operations
    */
-  total: number;
+  total?: number;
 }
 
 export interface PulseState {
-  calls_this_minute: number;
-  calls_remaining: number;
-  spend_today: number;
-  spend_this_month: number;
-  budget_remaining: number;
-  is_paused: boolean;
+  calls_this_minute?: number;
+  calls_remaining?: number;
+  spend_today?: number;
+  spend_this_month?: number;
+  budget_remaining?: number;
+  is_paused?: boolean;
   /**
    * "budget_exceeded", "rate_limit", "user_requested"
    */

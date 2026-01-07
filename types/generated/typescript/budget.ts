@@ -14,15 +14,15 @@ export interface Limiter {
 }
 
 export interface Status {
-  daily_spend: number;
-  weekly_spend: number;
-  monthly_spend: number;
-  daily_remaining: number;
-  weekly_remaining: number;
-  monthly_remaining: number;
-  daily_ops: number;
-  weekly_ops: number;
-  monthly_ops: number;
+  daily_spend?: number;
+  weekly_spend?: number;
+  monthly_spend?: number;
+  daily_remaining?: number;
+  weekly_remaining?: number;
+  monthly_remaining?: number;
+  daily_ops?: number;
+  weekly_ops?: number;
+  monthly_ops?: number;
 }
 
 export interface Tracker {

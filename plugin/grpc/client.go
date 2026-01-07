@@ -47,7 +47,8 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		grpc.WithBlock(),
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to plugin at %s", addr)
+		wrappedErr := errors.Wrapf(err, "failed to connect to plugin at %s", addr)
+		return nil, errors.WithHint(wrappedErr, "verify the plugin is running and the address/port is correct")
 	}
 
 	client := protocol.NewDomainPluginServiceClient(conn)
@@ -63,7 +64,8 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	metaResp, err := client.Metadata(ctx, &protocol.Empty{})
 	if err != nil {
 		conn.Close()
-		return nil, errors.Wrapf(err, "failed to get plugin metadata from %s", addr)
+		wrappedErr := errors.Wrapf(err, "failed to get plugin metadata from %s", addr)
+		return nil, errors.WithHint(wrappedErr, "plugin may not implement the required gRPC interface or is still starting up")
 	}
 
 	proxy.metadata = plugin.Metadata{
@@ -173,7 +175,8 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 
 	_, err := c.client.Initialize(ctx, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to initialize remote plugin %s at %s", c.metadata.Name, c.addr)
+		wrappedErr := errors.Wrapf(err, "failed to initialize remote plugin %s at %s", c.metadata.Name, c.addr)
+		return errors.WithHint(wrappedErr, "check plugin logs for initialization errors or verify required configuration is set")
 	}
 
 	c.logger.Infow("Remote plugin initialized",

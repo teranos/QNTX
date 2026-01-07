@@ -2,11 +2,11 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 )
 
@@ -39,12 +39,13 @@ func (r *Registry) Register(plugin DomainPlugin) error {
 
 	// Check for name conflicts
 	if _, exists := r.plugins[metadata.Name]; exists {
-		return fmt.Errorf("domain plugin already registered: %s", metadata.Name)
+		err := errors.Newf("domain plugin already registered: %s", metadata.Name)
+		return errors.WithHint(err, "each plugin name must be unique - check for duplicate registrations")
 	}
 
 	// Validate version compatibility
 	if err := r.validateVersion(metadata); err != nil {
-		return fmt.Errorf("version incompatible for %s: %w", metadata.Name, err)
+		return errors.Wrapf(err, "version incompatible for %s", metadata.Name)
 	}
 
 	r.plugins[metadata.Name] = plugin
@@ -147,12 +148,12 @@ func (r *Registry) ShutdownAll(ctx context.Context) error {
 	var errs []error
 	for _, name := range names {
 		if err := plugins[name].Shutdown(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to shutdown domain plugin %s: %w", name, err))
+			errs = append(errs, errors.Wrapf(err, "failed to shutdown domain plugin %s", name))
 		}
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("shutdown errors: %v", errs)
+		return errors.Newf("shutdown errors: %v", errs)
 	}
 
 	return nil
@@ -209,25 +210,27 @@ func (r *Registry) Pause(ctx context.Context, name string) error {
 	plugin, ok := r.plugins[name]
 	if !ok {
 		r.mu.Unlock()
-		return fmt.Errorf("plugin not found: %s", name)
+		err := errors.Newf("plugin not found: %s", name)
+		return errors.WithHint(err, "check available plugins with 'qntx plugin list'")
 	}
 
 	state := r.states[name]
 	if state != StateRunning {
 		r.mu.Unlock()
-		return fmt.Errorf("plugin %s is not running (current state: %s)", name, state)
+		err := errors.Newf("plugin %s is not running (current state: %s)", name, state)
+		return errors.WithHint(err, "plugin must be in 'running' state to pause")
 	}
 
 	pausable, ok := plugin.(PausablePlugin)
 	if !ok {
 		r.mu.Unlock()
-		return fmt.Errorf("plugin %s does not support pause/resume", name)
+		return errors.Newf("plugin %s does not support pause/resume", name)
 	}
 	r.mu.Unlock()
 
 	// Call pause without holding lock
 	if err := pausable.Pause(ctx); err != nil {
-		return fmt.Errorf("failed to pause plugin %s: %w", name, err)
+		return errors.Wrapf(err, "failed to pause plugin %s", name)
 	}
 
 	// Update state
@@ -244,25 +247,27 @@ func (r *Registry) Resume(ctx context.Context, name string) error {
 	plugin, ok := r.plugins[name]
 	if !ok {
 		r.mu.Unlock()
-		return fmt.Errorf("plugin not found: %s", name)
+		err := errors.Newf("plugin not found: %s", name)
+		return errors.WithHint(err, "check available plugins with 'qntx plugin list'")
 	}
 
 	state := r.states[name]
 	if state != StatePaused {
 		r.mu.Unlock()
-		return fmt.Errorf("plugin %s is not paused (current state: %s)", name, state)
+		err := errors.Newf("plugin %s is not paused (current state: %s)", name, state)
+		return errors.WithHint(err, "plugin must be in 'paused' state to resume")
 	}
 
 	pausable, ok := plugin.(PausablePlugin)
 	if !ok {
 		r.mu.Unlock()
-		return fmt.Errorf("plugin %s does not support pause/resume", name)
+		return errors.Newf("plugin %s does not support pause/resume", name)
 	}
 	r.mu.Unlock()
 
 	// Call resume without holding lock
 	if err := pausable.Resume(ctx); err != nil {
-		return fmt.Errorf("failed to resume plugin %s: %w", name, err)
+		return errors.Wrapf(err, "failed to resume plugin %s", name)
 	}
 
 	// Update state
@@ -283,18 +288,20 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 	// Parse QNTX version
 	qntxVer, err := semver.NewVersion(r.version)
 	if err != nil {
-		return fmt.Errorf("invalid QNTX version %s: %w", r.version, err)
+		return errors.Wrapf(err, "invalid QNTX version %s", r.version)
 	}
 
 	// Parse version constraint
 	constraint, err := semver.NewConstraint(metadata.QNTXVersion)
 	if err != nil {
-		return fmt.Errorf("invalid version constraint %s: %w", metadata.QNTXVersion, err)
+		wrappedErr := errors.Wrapf(err, "invalid version constraint %s", metadata.QNTXVersion)
+		return errors.WithHint(wrappedErr, "plugin specifies invalid version constraint - contact plugin author")
 	}
 
 	// Check compatibility
 	if !constraint.Check(qntxVer) {
-		return fmt.Errorf("plugin requires QNTX %s, but running %s", metadata.QNTXVersion, r.version)
+		err := errors.Newf("plugin requires QNTX %s, but running %s", metadata.QNTXVersion, r.version)
+		return errors.WithHint(err, "update QNTX or use a compatible plugin version")
 	}
 
 	return nil
@@ -331,7 +338,7 @@ func Register(plugin DomainPlugin) error {
 	defer registryMu.RUnlock()
 
 	if defaultRegistry == nil {
-		return fmt.Errorf("default registry not initialized")
+		return errors.New("default registry not initialized")
 	}
 	return defaultRegistry.Register(plugin)
 }
