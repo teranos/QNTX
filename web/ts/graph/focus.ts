@@ -114,29 +114,30 @@ function setFocusUIVisibility(visible: boolean): void {
         }
     };
 
-    // Helper to slide element right
-    const slideRight = (el: HTMLElement | null) => {
-        if (!el) return;
-        el.style.transition = transition;
-        if (visible) {
-            el.style.transform = 'translateX(0)';
-            el.style.opacity = '1';
-            el.style.pointerEvents = 'auto';
-        } else {
-            el.style.transform = 'translateX(120%)';
-            el.style.opacity = '0.5';
-            el.style.pointerEvents = 'none';
-        }
-    };
-
     const domCache = getDomCache();
 
     // Left side elements (slide left)
     slideLeft(domCache.get('legenda', '.legenda'));
     slideLeft(document.getElementById('left-panel'));
 
-    // Right side elements (slide right)
-    slideRight(document.getElementById('system-drawer'));
+    // System drawer (slides up on mobile/top, down on desktop/bottom)
+    const systemDrawer = document.getElementById('system-drawer');
+    if (systemDrawer) {
+        const computedStyle = window.getComputedStyle(systemDrawer);
+        const isAtTop = computedStyle.top !== 'auto' && computedStyle.bottom === 'auto';
+
+        systemDrawer.style.transition = transition;
+        if (visible) {
+            systemDrawer.style.transform = 'translateY(0)';
+            systemDrawer.style.opacity = '1';
+            systemDrawer.style.pointerEvents = 'auto';
+        } else {
+            // Slide up if at top (mobile), slide down if at bottom (desktop)
+            systemDrawer.style.transform = isAtTop ? 'translateY(-120%)' : 'translateY(120%)';
+            systemDrawer.style.opacity = '0.5';
+            systemDrawer.style.pointerEvents = 'none';
+        }
+    }
 
     // Symbol palette (slides up or left depending on layout)
     const symbolPalette = document.getElementById('symbolPalette');
