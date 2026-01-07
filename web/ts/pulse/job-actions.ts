@@ -84,7 +84,7 @@ export async function handleJobAction(
 
         if (job) {
             errorMsg += `\n\nATS Code:\n${job.ats_code}`;
-            errorMsg += `\nInterval: ${formatInterval(job.interval_seconds)}`;
+            errorMsg += `\nInterval: ${formatInterval(job.interval_seconds ?? 0)}`;
             if (job.created_from_doc) {
                 errorMsg += `\nDocument: ${job.created_from_doc}`;
             }

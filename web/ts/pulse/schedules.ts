@@ -54,7 +54,7 @@ export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState)
                     <span class="pulse-icon">${Pulse}</span>
                     <span class="pulse-state">${job.state}</span>
                 </div>
-                <div class="pulse-job-interval">${formatInterval(job.interval_seconds)}</div>
+                <div class="pulse-job-interval">${formatInterval(job.interval_seconds ?? 0)}</div>
             </div>
 
             <div class="pulse-job-code">
