@@ -6,8 +6,9 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, Empty, HealthResponse, HttpHeader,
-    HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
+    HealthResponse, HttpHeader, HttpRequest, HttpResponse, InitializeRequest, MetadataResponse,
+    WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -251,6 +252,17 @@ impl DomainPluginService for PythonPluginService {
                 "Not initialized".to_string()
             },
             details,
+        }))
+    }
+
+    /// Return configuration schema
+    async fn config_schema(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ConfigSchemaResponse>, Status> {
+        debug!("ConfigSchema request received");
+        Ok(Response::new(ConfigSchemaResponse {
+            fields: crate::config::build_schema(),
         }))
     }
 }
