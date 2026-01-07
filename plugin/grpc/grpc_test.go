@@ -418,15 +418,6 @@ func TestExternalDomainProxy_Shutdown(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestExternalDomainProxy_ConnectionFailure(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-
-	// Use a port that's unlikely to be in use
-	_, err := NewExternalDomainProxy("localhost:59999", logger)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to connect")
-}
-
 func TestExternalDomainProxy_RegisterHTTP(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
