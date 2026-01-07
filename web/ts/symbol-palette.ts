@@ -72,7 +72,7 @@ function initializeSymbolPalette(): void {
         cell.addEventListener('click', handleSymbolClick);
         // Tooltips now handled purely via CSS ::after pseudo-element
 
-        // Add keyboard navigation with arrow keys
+        // Virtue #14: Keyboard Navigation - Full arrow key support for palette traversal
         cell.addEventListener('keydown', (e: Event) => {
             const keyEvent = e as KeyboardEvent;
             let nextElement: Element | null = null;
@@ -131,6 +131,7 @@ function setActiveModality(cmd: string): void {
 }
 
 // Export for use by other modules
+// Avoid Sin #5: Global Pollution - Only export what's truly needed globally
 window.setActiveModality = setActiveModality;
 
 /**
@@ -241,6 +242,7 @@ function activateSearchMode(mode: string): void {
 
 /**
  * Show config panel - displays configuration introspection
+ * Avoid Sin #6: Blocking Main Thread - Dynamic import defers loading until needed
  */
 async function showConfigPanel(): Promise<void> {
     const { toggleConfig } = await import('./config-panel.js');
