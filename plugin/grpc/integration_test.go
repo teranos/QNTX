@@ -1,3 +1,5 @@
+//go:build integration
+
 package grpc
 
 import (
@@ -743,4 +745,13 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 	health := proxy.Health(ctx)
 	assert.True(t, health.Healthy)
 	logger.Info("Book collector plugin successfully created and queried attestations via gRPC services")
+}
+
+func TestExternalDomainProxy_ConnectionFailure(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+
+	// Use a port that's unlikely to be in use
+	_, err := NewExternalDomainProxy("localhost:59999", logger)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to connect")
 }
