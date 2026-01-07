@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
+.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -232,3 +232,30 @@ rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rus
 		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
 		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
 	@echo "✓ Integration tests passed"
+
+# Rust Python plugin (PyO3-based Python execution)
+# REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
+rust-python: ## Build Rust Python plugin binary (via Nix)
+	@echo "Building qntx-python-plugin via Nix..."
+	@nix build .#qntx-python
+	@mkdir -p bin
+	@cp -L result/bin/qntx-python-plugin bin/
+	@echo "✓ qntx-python-plugin built in bin/"
+
+rust-python-test: ## Run Rust Python plugin tests (via Nix)
+	@echo "Running Rust Python plugin tests via Nix..."
+	@echo "Note: Use 'nix develop' shell and run 'cd qntx-python && cargo test' for iterative testing"
+	@nix develop --command bash -c "cd qntx-python && cargo test"
+	@echo "✓ All Rust Python tests passed"
+
+rust-python-check: ## Check Rust Python plugin code (fmt + clippy via Nix)
+	@echo "Checking Rust Python plugin code..."
+	@nix develop --command bash -c "cd qntx-python && cargo fmt --check && cargo clippy -- -D warnings"
+	@echo "✓ Rust Python code checks passed"
+
+rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
+	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."
+	@mkdir -p $(PREFIX)/plugins
+	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
+	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
+	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
