@@ -11,7 +11,9 @@ on:
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'claude/**'
     paths:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
