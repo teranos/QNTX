@@ -12,7 +12,7 @@ import {
 import { normalizeNodeType, filterVisibleNodes } from './utils.ts';
 import { createDragBehavior } from './interactions.ts';
 import { getTransform, centerGraph } from './transform.ts';
-import { focusOnTile, unfocus, isFocused, getFocusedId, initFocusKeyboardSupport, cleanupFocusKeyboardSupport } from './focus.ts';
+import { focusOnTile, unfocus, isFocused, initFocusKeyboardSupport, cleanupFocusKeyboardSupport } from './focus.ts';
 import type { GraphData, Node } from '../../types/core';
 import type {
     D3Node,
@@ -194,7 +194,6 @@ function renderGraph(data: GraphData): void {
         .attr("stroke-width", 3);
 
     // Track zoom state for unfocus detection
-    let lastZoomScale: number | null = null;
     let zoomStartTransform: { x: number; y: number; k: number } | null = null;
 
     // Create zoom behavior
@@ -208,7 +207,6 @@ function renderGraph(data: GraphData): void {
                 y: event.transform.y,
                 k: event.transform.k
             };
-            lastZoomScale = event.transform.k;
         })
         .on("zoom", function(event: ZoomEvent) {
             const g = getG();
