@@ -3,10 +3,19 @@
 import { MAX_LOGS, appState } from './config.ts';
 import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
+import { formatTimestamp } from './html-utils.ts';
 import type { LogsMessage, LogEntry } from '../types/websocket';
 
 // Make this a module
 export {};
+
+// Type-safe log level to CSS class mapping
+const LOG_LEVEL_MAP: Record<string, string> = {
+    ERROR: CSS.LOG.ERROR,
+    WARN: CSS.LOG.WARN,
+    INFO: CSS.LOG.INFO,
+    DEBUG: CSS.LOG.DEBUG,
+} as const;
 
 // Log handling - accepts the full WebSocket message type
 export function handleLogBatch(data: LogsMessage): void {
@@ -36,16 +45,10 @@ function appendLog(msg: LogEntry): void {
     if (!logContent) return;
 
     const logLine = document.createElement('div');
-    logLine.className = 'log-line log-' + msg.level.toLowerCase();
+    logLine.className = `${CSS.LOG.LINE} ${LOG_LEVEL_MAP[msg.level] || CSS.LOG.INFO}`;
 
     // Format timestamp
-    const timestamp = new Date(msg.timestamp).toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        fractionalSecondDigits: 3
-    } as Intl.DateTimeFormatOptions);
+    const timestamp = formatTimestamp(msg.timestamp);
 
     // Build log line safely using DOM API
     const timestampEl = document.createElement('span');
