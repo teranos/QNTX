@@ -136,7 +136,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	// Get queue stats for activity indicator
 	stats, err := t.queue.GetStats()
 	if err != nil {
-		t.logger.Warnw("Failed to get queue stats", "error", err)
+		t.logger.Warnw(sym.Pulse+" Failed to get queue stats", "error", err)
 		// Continue without stats
 		stats = &async.QueueStats{}
 	}

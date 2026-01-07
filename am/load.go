@@ -1,13 +1,14 @@
 package am
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 var globalConfig *Config
@@ -23,7 +24,7 @@ func Load() (*Config, error) {
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 
 	globalConfig = &config
@@ -39,7 +40,7 @@ func GetViper() *viper.Viper {
 func LoadWithViper(v *viper.Viper) (*Config, error) {
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	return &config, nil
 }
@@ -54,12 +55,12 @@ func LoadFromFile(configPath string) (*Config, error) {
 	SetDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %w", configPath, err)
+		return nil, errors.Wrapf(err, "failed to read config file %s", configPath)
 	}
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config from %s: %w", configPath, err)
+		return nil, errors.Wrapf(err, "failed to unmarshal config from %s", configPath)
 	}
 
 	return &config, nil
