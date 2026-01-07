@@ -2,11 +2,11 @@
 //!
 //! Implements the DomainPluginService interface for QNTX.
 
+use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
 use crate::proto::{
     domain_plugin_service_server::DomainPluginService, Empty, HealthResponse, HttpHeader,
     HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
 };
-use crate::python::{ExecutionConfig, ExecutionResult, PythonEngine};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
