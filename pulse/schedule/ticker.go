@@ -12,6 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/util"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
 	"github.com/teranos/vanity-id"
@@ -43,6 +44,7 @@ type Ticker struct {
 	cancel          context.CancelFunc
 	wg              sync.WaitGroup
 	logger          *zap.SugaredLogger
+	pulseLog        *zap.SugaredLogger // Logger with Pulse symbol pre-attached
 	mu              sync.Mutex
 	lastTickAt      time.Time
 	ticksSinceStart int64
@@ -68,7 +70,7 @@ func NewTicker(store *Store, queue *async.Queue, workerPool *async.WorkerPool, b
 }
 
 // NewTickerWithContext creates a ticker with a parent context
-func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue, workerPool *async.WorkerPool, broadcaster ExecutionBroadcaster, cfg TickerConfig, logger *zap.SugaredLogger) *Ticker {
+func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue, workerPool *async.WorkerPool, broadcaster ExecutionBroadcaster, cfg TickerConfig, log *zap.SugaredLogger) *Ticker {
 	tickerCtx, cancel := context.WithCancel(ctx)
 
 	return &Ticker{
@@ -79,7 +81,8 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 		interval:    cfg.Interval,
 		ctx:         tickerCtx,
 		cancel:      cancel,
-		logger:      logger,
+		logger:      log,
+		pulseLog:    logger.AddPulseSymbol(log),
 	}
 }
 
@@ -87,14 +90,14 @@ func NewTickerWithContext(ctx context.Context, store *Store, queue *async.Queue,
 func (t *Ticker) Start() {
 	t.wg.Add(1)
 	go t.run()
-	t.logger.Infow(sym.Pulse+" Pulse ticker started", "interval", t.interval)
+	t.pulseLog.Infow("Pulse ticker started", "interval", t.interval)
 }
 
 // Stop gracefully stops the ticker
 func (t *Ticker) Stop() {
 	t.cancel()
 	t.wg.Wait()
-	t.logger.Infow(sym.Pulse + " Pulse ticker stopped")
+	t.pulseLog.Infow("Pulse ticker stopped")
 }
 
 // run is the main ticker loop
@@ -119,7 +122,7 @@ func (t *Ticker) run() {
 
 			if err := t.checkScheduledJobs(tickTime); err != nil {
 				// Don't spam logs - log errors at warn level
-				t.logger.Warnw(sym.Pulse+" Pulse tick error", "error", err, "tick", t.ticksSinceStart)
+				t.pulseLog.Warnw("Pulse tick error", "error", err, "tick", t.ticksSinceStart)
 			}
 		}
 	}
@@ -129,14 +132,14 @@ func (t *Ticker) run() {
 func (t *Ticker) logNextJobInfo(now time.Time) {
 	nextJob, err := t.store.GetNextScheduledJob()
 	if err != nil {
-		t.logger.Warnw(sym.Pulse+" Failed to get next scheduled job", "error", err)
+		t.pulseLog.Warnw("Failed to get next scheduled job", "error", err)
 		return
 	}
 
 	// Get queue stats for activity indicator
 	stats, err := t.queue.GetStats()
 	if err != nil {
-		t.logger.Warnw(sym.Pulse+" Failed to get queue stats", "error", err)
+		t.pulseLog.Warnw("Failed to get queue stats", "error", err)
 		// Continue without stats
 		stats = &async.QueueStats{}
 	}
@@ -154,22 +157,23 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 		return // Skip logging if no change in queue activity
 	}
 
-	pulseSymbols := sym.Pulse
+	// Build visual indicator based on work load
+	pulseIndicator := ""
 	if activeWork > 0 {
 		// Add more pulse symbols based on work load (1 symbol per 5 jobs, max 60 symbols)
 		numSymbols := (activeWork / 5) + 1 // 1-5 jobs = 1 symbol, 6-10 = 2, etc.
 		if numSymbols > 60 {
 			numSymbols = 60 // Cap at 60 symbols (300 jobs)
 		}
-		pulseSymbols = strings.Repeat(sym.Pulse+" ", numSymbols)
-		pulseSymbols = strings.TrimSpace(pulseSymbols)
+		pulseIndicator = strings.Repeat(sym.Pulse+" ", numSymbols)
+		pulseIndicator = strings.TrimSpace(pulseIndicator) + " "
 	}
 
 	if nextJob == nil {
 		if activeWork > 0 {
-			t.logger.Infow(fmt.Sprintf("%s Pulse - no scheduled executions, %d jobs active", pulseSymbols, activeWork))
+			t.pulseLog.Infow(fmt.Sprintf("%sPulse - no scheduled executions, %d jobs active", pulseIndicator, activeWork))
 		} else {
-			t.logger.Infow(pulseSymbols + " Pulse - no scheduled executions")
+			t.pulseLog.Infow("Pulse - no scheduled executions")
 		}
 		return
 	}
@@ -180,7 +184,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 	}
 
 	// Build enhanced ticker message with system metrics
-	msg := fmt.Sprintf("%s Pulse - next scheduled execution '%s' in %s", pulseSymbols, nextJob.ATSCode, timeUntil.Round(time.Second))
+	msg := fmt.Sprintf("%sPulse - next scheduled execution '%s' in %s", pulseIndicator, nextJob.ATSCode, timeUntil.Round(time.Second))
 	if activeWork > 0 {
 		msg += fmt.Sprintf(", %d jobs active", activeWork)
 	}
@@ -193,7 +197,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 			metrics.MemoryUsedGB, metrics.MemoryTotalGB, metrics.MemoryPercent)
 	}
 
-	t.logger.Infow(msg)
+	t.pulseLog.Infow(msg)
 }
 
 // checkScheduledJobs finds scheduled jobs ready to run and enqueues them
@@ -218,7 +222,7 @@ func (t *Ticker) checkScheduledJobs(now time.Time) error {
 		}
 
 		if err := t.executeScheduledJob(job, now); err != nil {
-			t.logger.Errorw(sym.Pulse+" Failed to execute scheduled job",
+			t.pulseLog.Errorw("Failed to execute scheduled job",
 				"job_id", job.ID,
 				"ats_code", job.ATSCode,
 				"error", err)
@@ -234,8 +238,9 @@ func (t *Ticker) checkScheduledJobs(now time.Time) error {
 func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 	startTime := time.Now()
 
-	t.logger.Infow(fmt.Sprintf("%s Pulse executing scheduled job | job:%s", sym.Pulse, scheduled.ID[:8]),
+	t.pulseLog.Infow("Pulse executing scheduled job",
 		"job_id", scheduled.ID,
+		"job_short", scheduled.ID[:8],
 		"ats_code", scheduled.ATSCode,
 		"handler_name", scheduled.HandlerName,
 		"source_url", scheduled.SourceURL)
@@ -252,7 +257,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	execStore := NewExecutionStore(t.store.db)
 	if err := execStore.CreateExecution(execution); err != nil {
-		t.logger.Errorw(sym.Pulse+" Failed to create execution record",
+		t.pulseLog.Errorw("Failed to create execution record",
 			"job_id", scheduled.ID,
 			"error", err)
 		// Continue anyway - execution tracking is nice-to-have
@@ -279,11 +284,13 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		errorMsg := err.Error()
 		execution.ErrorMessage = &errorMsg
 
-		t.logger.Errorw(fmt.Sprintf(sym.Pulse+" Pulse FAILED: %s | job:%s exec:%s (%dms) | ERROR: %s",
-			scheduled.ATSCode, scheduled.ID[:8], execution.ID[:8], durationMs, err.Error()),
-			"job_id", scheduled.ID,
-			"execution_id", execution.ID,
+		t.pulseLog.Errorw("Pulse FAILED",
 			"ats_code", scheduled.ATSCode,
+			"job_id", scheduled.ID,
+			"job_short", scheduled.ID[:8],
+			"execution_id", execution.ID,
+			"exec_short", execution.ID[:8],
+			"duration_ms", durationMs,
 			"error", err)
 
 		// Broadcast execution failed event
@@ -301,12 +308,16 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 		nextRun := now.Add(time.Duration(scheduled.IntervalSeconds) * time.Second)
 		nextRunRelative := time.Until(nextRun).Round(time.Minute)
 
-		t.logger.Infow(fmt.Sprintf(sym.Pulse+" Pulse OK: %s → async:%s | job:%s exec:%s | next in %v (%dms)",
-			scheduled.ATSCode, asyncJobID[:8], scheduled.ID[:8], execution.ID[:8], nextRunRelative, durationMs),
-			"job_id", scheduled.ID,
-			"execution_id", execution.ID,
-			"async_job_id", asyncJobID,
+		t.pulseLog.Infow("Pulse OK",
 			"ats_code", scheduled.ATSCode,
+			"async_job_id", asyncJobID,
+			"async_short", asyncJobID[:8],
+			"job_id", scheduled.ID,
+			"job_short", scheduled.ID[:8],
+			"execution_id", execution.ID,
+			"exec_short", execution.ID[:8],
+			"next_in", nextRunRelative,
+			"duration_ms", durationMs,
 			"next_run_at", nextRun.Format(time.RFC3339))
 
 		// Update the scheduled job with next run time
@@ -317,7 +328,7 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 
 	// Update execution record with final status
 	if err := execStore.UpdateExecution(execution); err != nil {
-		t.logger.Errorw(sym.Pulse+" Failed to update execution record",
+		t.pulseLog.Errorw("Failed to update execution record",
 			"execution_id", execution.ID,
 			"error", err)
 		// Not critical - continue
@@ -354,13 +365,13 @@ func (t *Ticker) resolvePayloadLastRun(scheduled *Job) []byte {
 	// Resolve last_run to actual timestamp
 	if scheduled.LastRunAt != nil {
 		payloadMap["since"] = *scheduled.LastRunAt
-		t.logger.Debugw(sym.Pulse+" Resolved --since last_run to timestamp",
+		t.pulseLog.Debugw("Resolved --since last_run to timestamp",
 			"job_id", scheduled.ID,
 			"last_run_at", *scheduled.LastRunAt)
 	} else {
 		// No last run - remove since filter (process all)
 		delete(payloadMap, "since")
-		t.logger.Debugw(sym.Pulse+" No last_run_at, removing --since filter (first run)",
+		t.pulseLog.Debugw("No last_run_at, removing --since filter (first run)",
 			"job_id", scheduled.ID)
 	}
 
@@ -398,7 +409,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 
 	if existingJob != nil {
 		// Job already exists and is active - return existing job ID
-		t.logger.Debugw(sym.Pulse+" Skipping duplicate job",
+		t.pulseLog.Debugw("Skipping duplicate job",
 			"source_url", sourceURL,
 			"handler", handlerName,
 			"existing_job_id", existingJob.ID,
@@ -424,7 +435,7 @@ func (t *Ticker) enqueueAsyncJob(scheduled *Job) (string, error) {
 		return "", errors.Wrap(err, "failed to enqueue job")
 	}
 
-	t.logger.Debugw(sym.Pulse+" Enqueued async job",
+	t.pulseLog.Debugw("Enqueued async job",
 		"source_url", sourceURL,
 		"job_id", job.ID,
 		"handler", handlerName,
