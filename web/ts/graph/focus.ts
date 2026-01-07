@@ -99,34 +99,57 @@ function setFocusUIVisibility(visible: boolean): void {
     const duration = GRAPH_PHYSICS.ANIMATION_DURATION;
     const transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
 
-    // Legenda (slides left)
-    const domCache = getDomCache();
-    const legenda = domCache.get('legenda', '.legenda');
-    if (legenda) {
-        legenda.style.transition = transition;
+    // Helper to slide element left
+    const slideLeft = (el: HTMLElement | null) => {
+        if (!el) return;
+        el.style.transition = transition;
         if (visible) {
-            legenda.style.transform = 'translateX(0)';
-            legenda.style.opacity = '1';
-            legenda.style.pointerEvents = 'auto';
+            el.style.transform = 'translateX(0)';
+            el.style.opacity = '1';
+            el.style.pointerEvents = 'auto';
         } else {
-            legenda.style.transform = 'translateX(-120%)';
-            legenda.style.opacity = '0.5';
-            legenda.style.pointerEvents = 'none';
+            el.style.transform = 'translateX(-120%)';
+            el.style.opacity = '0.5';
+            el.style.pointerEvents = 'none';
         }
-    }
+    };
 
-    // Left panel / ATS editor (slides left)
-    const leftPanel = document.getElementById('left-panel');
-    if (leftPanel) {
-        leftPanel.style.transition = transition;
+    // Helper to slide element right
+    const slideRight = (el: HTMLElement | null) => {
+        if (!el) return;
+        el.style.transition = transition;
         if (visible) {
-            leftPanel.style.transform = 'translateX(0)';
-            leftPanel.style.opacity = '1';
-            leftPanel.style.pointerEvents = 'auto';
+            el.style.transform = 'translateX(0)';
+            el.style.opacity = '1';
+            el.style.pointerEvents = 'auto';
         } else {
-            leftPanel.style.transform = 'translateX(-120%)';
-            leftPanel.style.opacity = '0.5';
-            leftPanel.style.pointerEvents = 'none';
+            el.style.transform = 'translateX(120%)';
+            el.style.opacity = '0.5';
+            el.style.pointerEvents = 'none';
+        }
+    };
+
+    const domCache = getDomCache();
+
+    // Left side elements (slide left)
+    slideLeft(domCache.get('legenda', '.legenda'));
+    slideLeft(document.getElementById('left-panel'));
+
+    // Right side elements (slide right)
+    slideRight(document.getElementById('system-drawer'));
+
+    // Symbol palette (slides up or left depending on layout)
+    const symbolPalette = document.getElementById('symbolPalette');
+    if (symbolPalette) {
+        symbolPalette.style.transition = transition;
+        if (visible) {
+            symbolPalette.style.transform = 'translateY(0)';
+            symbolPalette.style.opacity = '1';
+            symbolPalette.style.pointerEvents = 'auto';
+        } else {
+            symbolPalette.style.transform = 'translateY(-120%)';
+            symbolPalette.style.opacity = '0.5';
+            symbolPalette.style.pointerEvents = 'none';
         }
     }
 }
