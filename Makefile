@@ -17,19 +17,11 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
 	@go build -o bin/typegen ./cmd/typegen
 
-types: typegen ## Generate TypeScript, Python, Rust types and markdown docs from Go source
-	@echo "Generating types and documentation..."
-	@./bin/typegen --lang typescript --output types/generated/
-	@./bin/typegen --lang python --output types/generated/
-	@./bin/typegen --lang rust --output types/generated/
-	@./bin/typegen --lang markdown  # Defaults to docs/types/
-	@echo "✓ TypeScript types generated in types/generated/typescript/"
-	@echo "✓ Python types generated in types/generated/python/"
-	@echo "✓ Rust types generated in types/generated/rust/"
-	@echo "✓ Markdown docs generated in docs/types/"
+types: ## Generate TypeScript, Python, Rust types and markdown docs from Go source (via Nix)
+	@nix run .#generate-types
 
-types-check: typegen ## Check if generated types are up to date (uses standalone typegen, no plugins)
-	@./bin/typegen check
+types-check: ## Check if generated types are up to date (via Nix)
+	@nix run .#check-types
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
