@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check nix-update-hash
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -259,3 +259,20 @@ rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugin
 	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
 	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
+
+nix-update-hash: ## Update Go vendorHash in flake.nix (run after go.mod/go.sum changes)
+	@echo "Computing correct vendorHash..."
+	@if nix build .#qntx --no-link --rebuild 2>&1 | grep -q "hash mismatch"; then \
+		HASH=$$(nix build .#qntx --no-link --rebuild 2>&1 | grep "got:" | sed -n 's/.*got:[[:space:]]*\(sha256-[^[:space:]]*\).*/\1/p'); \
+		if [ -n "$$HASH" ]; then \
+			echo "Updating vendorHash to: $$HASH"; \
+			sed -i.bak "s|vendorHash = \"sha256-[^\"]*\";|vendorHash = \"$$HASH\";|g" flake.nix; \
+			rm -f flake.nix.bak; \
+			echo "✓ Updated flake.nix"; \
+		else \
+			echo "Error: Could not extract hash"; \
+			exit 1; \
+		fi \
+	else \
+		echo "✓ vendorHash is already correct"; \
+	fi
