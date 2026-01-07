@@ -45,7 +45,8 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -62,7 +63,8 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           subPackages = [ "cmd/typegen" ];
         };
@@ -74,7 +76,8 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -93,13 +96,13 @@
 
           # Create workspace-style Cargo.toml/lock at root for Nix
           postUnpack = ''
-            # Copy files from qntx-python to root
-            cp $sourceRoot/qntx-python/Cargo.lock $sourceRoot/
-            # Create minimal workspace Cargo.toml
-            cat > $sourceRoot/Cargo.toml <<'EOF'
-[workspace]
-members = ["qntx-python"]
-EOF
+                        # Copy files from qntx-python to root
+                        cp $sourceRoot/qntx-python/Cargo.lock $sourceRoot/
+                        # Create minimal workspace Cargo.toml
+                        cat > $sourceRoot/Cargo.toml <<'EOF'
+            [workspace]
+            members = ["qntx-python"]
+            EOF
           '';
 
           cargoLock = {
@@ -300,7 +303,7 @@ EOF
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}"
             ];
             ExposedPorts = {
-              "9000/tcp" = {};
+              "9000/tcp" = { };
             };
             WorkingDir = "/workspace";
           };
@@ -371,6 +374,22 @@ EOF
           typegen-build = typegen; # Ensure typegen builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
           qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
+          docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
+          docs-site-links = pkgs.runCommand "docs-site-link-check"
+            {
+              nativeBuildInputs = [ pkgs.lychee ];
+              docsSite = self.packages.${system}.docs-site;
+            }
+            ''
+              # Check internal links only (offline mode)
+              ${pkgs.lychee}/bin/lychee --offline --no-progress $docsSite/*.html $docsSite/**/*.html || {
+                echo "Link validation failed. Some internal links are broken."
+                exit 1
+              }
+
+              # Success marker
+              touch $out
+            '';
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           # Docker image checks are Linux-only
           ci-image = ciImage; # Ensure CI image builds
