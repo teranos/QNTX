@@ -21,7 +21,7 @@ func TestMultiValueHeaders_SetCookie(t *testing.T) {
 	plugin := newMockPlugin()
 
 	// Set up plugin to return multiple Set-Cookie headers
-	plugin.httpHandlers["/api/mock/cookies"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/cookies"] = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Set-Cookie", "session=abc123; Path=/; HttpOnly")
 		w.Header().Add("Set-Cookie", "user=john; Path=/; Secure")
 		w.Header().Add("Set-Cookie", "theme=dark; Path=/")
@@ -70,7 +70,7 @@ func TestMultiValueHeaders_Accept(t *testing.T) {
 
 	// Capture request headers
 	var receivedAccept []string
-	plugin.httpHandlers["/api/mock/accept"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/accept"] = func(w http.ResponseWriter, r *http.Request) {
 		receivedAccept = r.Header.Values("Accept")
 		w.WriteHeader(http.StatusOK)
 	}
@@ -116,7 +116,7 @@ func TestSingleValueHeaders_NoRegression(t *testing.T) {
 
 	var receivedContentType string
 	var receivedAuth string
-	plugin.httpHandlers["/api/mock/single"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/single"] = func(w http.ResponseWriter, r *http.Request) {
 		receivedContentType = r.Header.Get("Content-Type")
 		receivedAuth = r.Header.Get("Authorization")
 
@@ -173,7 +173,7 @@ func TestEmptyHeaderValues(t *testing.T) {
 	// Test with empty header values
 	req := &protocol.HTTPRequest{
 		Method: "GET",
-		Path:   "/api/mock/test",
+		Path:   "/test",
 		Headers: []*protocol.HTTPHeader{
 			{Name: "X-Empty", Values: []string{}},
 			{Name: "X-Valid", Values: []string{"value"}},
@@ -194,7 +194,7 @@ func TestHeaderCaseSensitivity(t *testing.T) {
 	plugin := newMockPlugin()
 
 	var receivedHeaders http.Header
-	plugin.httpHandlers["/api/mock/case"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/case"] = func(w http.ResponseWriter, r *http.Request) {
 		receivedHeaders = r.Header.Clone()
 		w.WriteHeader(http.StatusOK)
 	}

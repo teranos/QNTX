@@ -37,7 +37,7 @@ func init() {
 	ServerCmd.Flags().IntVar(&serverPort, "port", am.DefaultGraphPort, "Port for server")
 	ServerCmd.Flags().BoolVar(&serverTestMode, "test-mode", false, "Run with test database")
 	ServerCmd.Flags().StringVar(&serverAtsQuery, "ats", "", "Pre-load graph with an Ax query (e.g., --ats 'role:developer')")
-	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", false, "Disable automatic browser opening (default: auto-open)")
+	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", true, "Disable automatic browser opening")
 	ServerCmd.Flags().BoolVar(&serverDevMode, "dev", false, "Enable development mode")
 	ServerCmd.Flags().StringVar(&serverDBPath, "db-path", "", "Custom database path (overrides config)")
 }
@@ -66,11 +66,20 @@ func runServer(cmd *cobra.Command, args []string) error {
 	defer database.Close()
 
 	// Get actual path for banner (openDatabase resolved it)
-	dbPath, _ = am.GetDatabasePath()
 	if serverDBPath != "" {
 		dbPath = serverDBPath
 	} else if serverTestMode {
 		dbPath = "tmp/test-qntx.db"
+	} else {
+		// Resolve the actual path used by openDatabase
+		resolvedPath, err := am.GetDatabasePath()
+		if err != nil {
+			dbPath = "qntx.db" // Default fallback, same as openDatabase
+		} else if resolvedPath != "" {
+			dbPath = resolvedPath
+		} else {
+			dbPath = "qntx.db"
+		}
 	}
 
 	// Print startup banner

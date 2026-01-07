@@ -27,7 +27,7 @@ const (
 	DaemonBusy                      // High load (>60%)
 )
 
-// ServerState represents the server lifecycle state for GRACE Phase 4
+// ServerState represents the server lifecycle state for Opening/Closing Phase 4
 type ServerState int
 
 const (
@@ -128,7 +128,7 @@ type DaemonStatusMessage struct {
 	BudgetDailyLimit   float64 `json:"budget_daily_limit"`   // Daily budget limit (config)
 	BudgetWeeklyLimit  float64 `json:"budget_weekly_limit"`  // Weekly budget limit (config)
 	BudgetMonthlyLimit float64 `json:"budget_monthly_limit"` // Monthly budget limit (config)
-	ServerState        string  `json:"server_state"`         // GRACE Phase 4: "running", "draining", "stopped"
+	ServerState        string  `json:"server_state"`         // Opening/Closing Phase 4: "running", "draining", "stopped"
 	Timestamp          int64   `json:"timestamp"`            // Unix timestamp
 }
 

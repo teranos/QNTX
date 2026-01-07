@@ -7,10 +7,10 @@ import (
 
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/QNTX/logger"
 )
 
-// GRACE Phase 4: Server state management
+// Opening/Closing Phase 4: Server state management
 
 // getState returns the current server state
 func (s *QNTXServer) getState() ServerState {
@@ -51,7 +51,7 @@ func (s *QNTXServer) startBackgroundServices() {
 			s.daemon.Start()
 			if s.ticker != nil {
 				s.ticker.Start()
-				s.logger.Infow(fmt.Sprintf("%s Pulse ticker started (from saved state)", sym.Pulse))
+				logger.AddPulseSymbol(s.logger).Infow("Pulse ticker started (from saved state)")
 			}
 			s.logger.Infow("Daemon started (from saved state)", "workers", s.daemon.Workers())
 		} else {
@@ -175,7 +175,7 @@ func (s *QNTXServer) monitorBrowserConnection() {
 func (s *QNTXServer) Stop() error {
 	s.logger.Infow("Initiating server shutdown")
 
-	// GRACE Phase 4: Transition to draining state
+	// Opening/Closing Phase 4: Transition to draining state
 	s.setState(ServerStateDraining)
 
 	// Stop daemon FIRST before stopping server goroutines
@@ -252,7 +252,7 @@ func (s *QNTXServer) Stop() error {
 		}
 	}
 
-	// GRACE Phase 4: Mark shutdown complete
+	// Opening/Closing Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)
 
 	s.logger.Infow("Server shutdown complete",

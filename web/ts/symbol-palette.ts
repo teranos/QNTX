@@ -32,7 +32,7 @@ import { uiState } from './ui-state.ts';
 import { debugLog } from './debug.ts';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'plugins' | 'scraper';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -41,6 +41,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'pulse') return Pulse;
     if (cmd === 'prose') return Prose;
     if (cmd === 'go') return 'Go';
+    if (cmd === 'py') return 'py';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
     if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
     return CommandToSymbol[cmd] || cmd;
@@ -71,7 +72,7 @@ function initializeSymbolPalette(): void {
         cell.addEventListener('click', handleSymbolClick);
         // Tooltips now handled purely via CSS ::after pseudo-element
 
-        // Add keyboard navigation with arrow keys
+        // Virtue #14: Keyboard Navigation - Full arrow key support for palette traversal
         cell.addEventListener('keydown', (e: Event) => {
             const keyEvent = e as KeyboardEvent;
             let nextElement: Element | null = null;
@@ -130,6 +131,7 @@ function setActiveModality(cmd: string): void {
 }
 
 // Export for use by other modules
+// Avoid Sin #5: Global Pollution - Only export what's truly needed globally
 window.setActiveModality = setActiveModality;
 
 /**
@@ -209,6 +211,10 @@ function handleSymbolClick(e: Event): void {
             // Go - show Go code editor with gopls integration
             showGoEditor();
             break;
+        case 'py':
+            // Python - show Python code editor/executor
+            showPythonEditor();
+            break;
         case 'plugins':
             // Plugins - show installed domain plugins
             showPluginPanel();
@@ -236,6 +242,7 @@ function activateSearchMode(mode: string): void {
 
 /**
  * Show config panel - displays configuration introspection
+ * Avoid Sin #6: Blocking Main Thread - Dynamic import defers loading until needed
  */
 async function showConfigPanel(): Promise<void> {
     const { toggleConfig } = await import('./config-panel.js');
@@ -272,6 +279,14 @@ async function showProsePanel(): Promise<void> {
 async function showGoEditor(): Promise<void> {
     const { toggleGoEditor } = await import('./code/panel.js');
     toggleGoEditor();
+}
+
+/**
+ * Show Python editor - displays Python code editor with execution support
+ */
+async function showPythonEditor(): Promise<void> {
+    const { togglePythonEditor } = await import('./python/panel.js');
+    togglePythonEditor();
 }
 
 /**

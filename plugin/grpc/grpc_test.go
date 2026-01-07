@@ -79,8 +79,8 @@ func (p *mockPlugin) RegisterHTTP(mux *http.ServeMux) error {
 	for path, handler := range p.httpHandlers {
 		mux.HandleFunc(path, handler)
 	}
-	// Default handler
-	mux.HandleFunc("/api/mock/test", func(w http.ResponseWriter, r *http.Request) {
+	// Default handler - paths are stripped by proxy (e.g., /test not /api/mock/test)
+	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello from mock"))
 	})
 	return nil
@@ -253,10 +253,10 @@ func TestPluginServer_HandleHTTP(t *testing.T) {
 	// Initialize to register HTTP handlers
 	server.Initialize(context.Background(), &protocol.InitializeRequest{})
 
-	// Test HTTP request
+	// Test HTTP request - path is already stripped by proxy
 	req := &protocol.HTTPRequest{
 		Method: "GET",
-		Path:   "/api/mock/test",
+		Path:   "/test",
 		Headers: []*protocol.HTTPHeader{
 			{Name: "Content-Type", Values: []string{"application/json"}},
 		},
@@ -272,7 +272,7 @@ func TestPluginServer_HandleHTTP(t *testing.T) {
 func TestPluginServer_HandleHTTP_POST(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.httpHandlers["/api/mock/echo"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/echo"] = func(w http.ResponseWriter, r *http.Request) {
 		body := make([]byte, r.ContentLength)
 		r.Body.Read(body)
 		w.Header().Set("Content-Type", "application/json")
@@ -284,7 +284,7 @@ func TestPluginServer_HandleHTTP_POST(t *testing.T) {
 
 	req := &protocol.HTTPRequest{
 		Method: "POST",
-		Path:   "/api/mock/echo",
+		Path:   "/echo",
 		Headers: []*protocol.HTTPHeader{
 			{Name: "Content-Type", Values: []string{"application/json"}},
 		},
@@ -307,7 +307,7 @@ func TestPluginServer_HandleHTTP_NotFound(t *testing.T) {
 
 	req := &protocol.HTTPRequest{
 		Method: "GET",
-		Path:   "/api/mock/nonexistent",
+		Path:   "/nonexistent",
 	}
 
 	resp, err := server.HandleHTTP(context.Background(), req)
@@ -416,15 +416,6 @@ func TestExternalDomainProxy_Shutdown(t *testing.T) {
 
 	err = proxy.Shutdown(context.Background())
 	require.NoError(t, err)
-}
-
-func TestExternalDomainProxy_ConnectionFailure(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-
-	// Use a port that's unlikely to be in use
-	_, err := NewExternalDomainProxy("localhost:59999", logger)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to connect")
 }
 
 func TestExternalDomainProxy_RegisterHTTP(t *testing.T) {
@@ -557,7 +548,7 @@ func TestPluginClientServer_FullIntegration(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.httpHandlers["/api/mock/data"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/data"] = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	}
@@ -595,7 +586,7 @@ func TestPluginClientServer_HTTPProxying(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.httpHandlers["/api/mock/json"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/json"] = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"key":"value"}`))

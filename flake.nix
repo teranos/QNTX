@@ -45,7 +45,8 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -55,6 +56,19 @@
           subPackages = [ "cmd/qntx" ];
         };
 
+        # Build typegen binary (standalone, no plugins/CGO)
+        typegen = pkgs.buildGoModule {
+          pname = "typegen";
+          version = self.rev or "dev";
+          src = ./.;
+
+          # Same vendorHash as qntx (shared go.mod)
+          # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+
+          subPackages = [ "cmd/typegen" ];
+        };
+
         # Build qntx-code plugin binary
         qntx-code = pkgs.buildGoModule {
           pname = "qntx-code-plugin";
@@ -62,7 +76,8 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          vendorHash = "sha256-hpiL3bOtYDFhGcPeSaBdXR0nI0cXllpkF4uPVmhBc7Q=";
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -70,6 +85,54 @@
           ];
 
           subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
+        };
+
+        # Build qntx-python plugin binary (Rust + PyO3)
+        qntx-python = pkgs.rustPlatform.buildRustPackage {
+          pname = "qntx-python-plugin";
+          version = self.rev or "dev";
+          # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
+          src = ./.;
+
+          # Create workspace-style Cargo.toml/lock at root for Nix
+          postUnpack = ''
+                        # Copy files from qntx-python to root
+                        cp $sourceRoot/qntx-python/Cargo.lock $sourceRoot/
+                        # Create minimal workspace Cargo.toml
+                        cat > $sourceRoot/Cargo.toml <<'EOF'
+            [workspace]
+            members = ["qntx-python"]
+            EOF
+          '';
+
+          cargoLock = {
+            lockFile = ./qntx-python/Cargo.lock;
+          };
+
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            pkgs.protobuf
+          ];
+
+          buildInputs = [
+            pkgs.python313
+          ];
+
+          # Point PyO3 to Nix Python
+          PYO3_PYTHON = "${pkgs.python313}/bin/python3";
+
+          # Build only the qntx-python-plugin package
+          cargoBuildFlags = [ "-p" "qntx-python-plugin" ];
+          cargoTestFlags = [ "-p" "qntx-python-plugin" ];
+
+          # Set rpath/install_name to find Python at runtime
+          postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}:$(patchelf --print-rpath $out/bin/qntx-python-plugin)" \
+              $out/bin/qntx-python-plugin
+          '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+            install_name_tool -add_rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}" \
+              $out/bin/qntx-python-plugin
+          '';
         };
 
         # Helper function to build CI image for specific architecture
@@ -91,6 +154,9 @@
             pkgs.rustfmt
             pkgs.clippy
 
+            # Python for qntx-python plugin builds
+            pkgs.python313
+
             # System dependencies
             pkgs.openssl
             pkgs.patchelf
@@ -106,6 +172,7 @@
             pkgs.bash
             pkgs.curl
             pkgs.unzip
+            pkgs.protobuf
 
             # CA certificates for HTTPS
             pkgs.cacert
@@ -124,13 +191,16 @@
 
           config = {
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
+              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
               "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.openssl ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
             ];
             WorkingDir = "/workspace";
           };
+
+          # Docker images are Linux-only
+          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
         };
 
         # Architecture detection for Docker images
@@ -186,10 +256,61 @@
             };
             WorkingDir = "/workspace";
           };
+
+          # Docker images are Linux-only
+          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
         };
 
         # qntx-code image with detected architecture
         codeImage = mkCodeImage dockerArch;
+
+        # Helper function to build qntx-python plugin image for specific architecture
+        mkPythonImage = arch: pkgs.dockerTools.buildLayeredImage {
+          name = "ghcr.io/teranos/qntx-python-plugin";
+          tag = "latest";
+          architecture = arch;
+
+          contents = [
+            # The qntx-python plugin binary
+            qntx-python
+
+            # Python runtime (required by PyO3-embedded code)
+            pkgs.python313
+
+            # Base utilities
+            pkgs.bash
+            pkgs.coreutils
+
+            # CA certificates for HTTPS
+            pkgs.cacert
+
+            # System files for container compatibility
+            pkgs.dockerTools.fakeNss
+          ];
+
+          extraCommands = ''
+            # Create tmp directory for runtime
+            mkdir -p tmp
+            chmod 1777 tmp
+          '';
+
+          config = {
+            Entrypoint = [ "${qntx-python}/bin/qntx-python-plugin" ];
+            Cmd = [ "--port" "9000" ];
+            Env = [
+              "PATH=${pkgs.lib.makeBinPath [ qntx-python pkgs.python313 pkgs.bash pkgs.coreutils ]}"
+              "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}"
+            ];
+            ExposedPorts = {
+              "9000/tcp" = { };
+            };
+            WorkingDir = "/workspace";
+          };
+        };
+
+        # qntx-python image with detected architecture
+        pythonImage = mkPythonImage dockerArch;
 
       in
       {
@@ -197,9 +318,20 @@
           # QNTX CLI binary
           qntx = qntx;
 
-          # qntx-code plugin binary
-          qntx-code = qntx-code;
+          # Typegen binary (standalone, no plugins/CGO)
+          typegen = typegen;
 
+          # Plugin binaries
+          qntx-code = qntx-code;
+          qntx-python = qntx-python;
+
+          # Static documentation site
+          docs-site = pkgs.callPackage ./sitegen.nix { };
+
+          # Default: CLI binary for easy installation
+          default = qntx;
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Docker images are Linux-only
           # CI Docker images (full dev environment)
           ci-image = ciImage;
           ci-image-amd64 = mkCiImage "amd64";
@@ -210,8 +342,10 @@
           qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
           qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
 
-          # Default: CLI binary for easy installation
-          default = qntx;
+          # qntx-python plugin Docker images (minimal runtime)
+          qntx-python-plugin-image = pythonImage;
+          qntx-python-plugin-image-amd64 = mkPythonImage "amd64";
+          qntx-python-plugin-image-arm64 = mkPythonImage "arm64";
         };
 
         # Development shell with same tools
@@ -224,16 +358,64 @@
             pkgs.cargo
             pkgs.rustfmt
             pkgs.sqlite
+            pkgs.python313
+            pkgs.pkg-config
+            pkgs.protobuf
           ] ++ pre-commit-check.enabledPackages;
+
+          # Make Python available to PyO3 builds in dev shell
+          PYO3_PYTHON = "${pkgs.python313}/bin/python3";
         };
 
         # Expose pre-commit checks
         checks = {
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
+          typegen-build = typegen; # Ensure typegen builds
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
+          qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
+          docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
+          docs-site-links = pkgs.runCommand "docs-site-link-check"
+            {
+              nativeBuildInputs = [ pkgs.lychee ];
+              docsSite = self.packages.${system}.docs-site;
+            }
+            ''
+              # Check internal links only (offline mode)
+              ${pkgs.lychee}/bin/lychee --offline --no-progress $docsSite/*.html $docsSite/**/*.html || {
+                echo "Link validation failed. Some internal links are broken."
+                exit 1
+              }
+
+              # Success marker
+              touch $out
+            '';
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Docker image checks are Linux-only
           ci-image = ciImage; # Ensure CI image builds
           qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
+          qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds
+        };
+
+        # Apps for common tasks
+        apps.build-docs-site = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "build-docs-site" ''
+            set -e
+            echo "Building documentation site..."
+            ${pkgs.nix}/bin/nix build .#docs-site
+
+            echo "Copying to web/site/..."
+            mkdir -p web/site
+            chmod -R +w web/site 2>/dev/null || true
+            rm -rf web/site/*
+            cp -r result/* web/site/
+            chmod -R +w web/site
+
+            echo "Documentation site built and copied to web/site/"
+            echo "Files:"
+            ls -lh web/site/
+          '');
         };
       }
     );

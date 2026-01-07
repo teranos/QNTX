@@ -2,7 +2,12 @@
 
 # ATS - Attestation Type System
 
-The ATS (Attestation Type System) provides a domain-agnostic framework for attesting, ix-ing, and ax-ing about entities.
+The ATS (Attestation Type System) is both:
+- **A type system**: Defining the data model and structure of attestations
+- **A storage system**: Managing persistence and retrieval of attestations
+- **A query language**: The `ax` subsystem for querying attestations
+
+Together, these components provide a domain-agnostic framework for attesting, ix-ing, and ax-ing about entities.
 
 ## Why ATS?
 
