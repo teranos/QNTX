@@ -2,7 +2,7 @@
 // Handles focusing viewport on a tile and expanding it to fill most of the view
 
 import { GRAPH_PHYSICS, appState } from '../config.ts';
-import { getSvg, getG, getZoom, getDomCache, getFocusedNodeId, getPreFocusTransform, setFocusedNodeId, setPreFocusTransform } from './state.ts';
+import { getSvg, getG, getZoom, getDomCache, getFocusedNodeId, getPreFocusTransform, setFocusedNodeId, setPreFocusTransform, setIsFocusAnimating } from './state.ts';
 import { getTransform } from './transform.ts';
 import { AX, BY, AS, CommandDescriptions } from '../../../types/generated/typescript/sym.ts';
 import type { D3Node } from '../../types/d3-graph';
@@ -16,14 +16,14 @@ const DEFAULT_TILE_WIDTH = 180;
 const DEFAULT_TILE_HEIGHT = 80;
 
 // Header configuration
-const HEADER_HEIGHT = 32;
-const HEADER_PADDING = 8;
-const HEADER_SYMBOL_SIZE = 24;
-const HEADER_SYMBOL_SPACING = 8;
+const HEADER_HEIGHT = 24;
+const HEADER_PADDING = 6;
+const HEADER_SYMBOL_SIZE = 16;
+const HEADER_SYMBOL_SPACING = 6;
 
 // Footer configuration
-const FOOTER_HEIGHT = 24;
-const FOOTER_PADDING = 8;
+const FOOTER_HEIGHT = 20;
+const FOOTER_PADDING = 6;
 
 // Header symbols with their actions
 interface HeaderSymbol {
@@ -68,6 +68,8 @@ const HEADER_SYMBOLS: HeaderSymbol[] = [
  * The tile should take up FOCUS_VIEWPORT_RATIO of the viewport
  */
 function calculateFocusedTileDimensions(): { width: number; height: number; scale: number } {
+    // TODO: When #graph-container is renamed to #graph-viewer, update this selector
+    // Use graph-container dimensions (the actual graph viewing area)
     const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
@@ -82,17 +84,15 @@ function calculateFocusedTileDimensions(): { width: number; height: number; scal
     const targetWidth = (viewportWidth * GRAPH_PHYSICS.FOCUS_VIEWPORT_RATIO) - (padding * 2);
     const targetHeight = (viewportHeight * GRAPH_PHYSICS.FOCUS_VIEWPORT_RATIO) - (padding * 2);
 
-    // Calculate scale factors to fit tile in target area while maintaining aspect ratio
+    // Calculate scale factors independently for width and height
+    // This allows the tile to fill the viewport better, rather than maintaining original aspect ratio
     const scaleX = targetWidth / DEFAULT_TILE_WIDTH;
     const scaleY = targetHeight / DEFAULT_TILE_HEIGHT;
 
-    // Use the smaller scale to fit within bounds
-    const scale = Math.min(scaleX, scaleY);
-
     return {
-        width: DEFAULT_TILE_WIDTH * scale,
-        height: DEFAULT_TILE_HEIGHT * scale,
-        scale
+        width: targetWidth,
+        height: targetHeight,
+        scale: Math.max(scaleX, scaleY)  // Use larger scale for zoom calculation
     };
 }
 
@@ -146,15 +146,15 @@ function setFocusUIVisibility(visible: boolean): void {
     // Helper to slide element left
     const slideLeft = (el: HTMLElement | null) => {
         if (!el) return;
-        el.style.transition = transition;
+        el.style.setProperty('transition', transition, 'important');
         if (visible) {
-            el.style.transform = 'translateX(0)';
-            el.style.opacity = '1';
-            el.style.pointerEvents = 'auto';
+            el.style.setProperty('transform', 'translateX(0)', 'important');
+            el.style.setProperty('opacity', '1', 'important');
+            el.style.setProperty('pointer-events', 'auto', 'important');
         } else {
-            el.style.transform = 'translateX(-120%)';
-            el.style.opacity = '0.5';
-            el.style.pointerEvents = 'none';
+            el.style.setProperty('transform', 'translateX(-100%)', 'important');
+            el.style.setProperty('opacity', '0', 'important');
+            el.style.setProperty('pointer-events', 'none', 'important');
         }
     };
 
@@ -163,6 +163,28 @@ function setFocusUIVisibility(visible: boolean): void {
     // Left side elements (slide left)
     slideLeft(domCache.get('legenda', '.legenda'));
     slideLeft(document.getElementById('left-panel'));
+    // TODO: When #controls is renamed to #legenda-container, update this selector
+    slideLeft(document.getElementById('controls')); // Contains legenda
+
+    // Expand graph-container to full width when focused
+    // TODO: When #graph-container is renamed to #graph-viewer, update this selector
+    const graphContainer = domCache.get('graphContainer', '#graph-container');
+    if (graphContainer) {
+        graphContainer.style.setProperty('transition', transition, 'important');
+        if (visible) {
+            // Restore normal flex layout
+            graphContainer.style.removeProperty('position');
+            graphContainer.style.removeProperty('left');
+            graphContainer.style.removeProperty('right');
+            graphContainer.style.removeProperty('width');
+        } else {
+            // Expand to fill entire viewport
+            graphContainer.style.setProperty('position', 'fixed', 'important');
+            graphContainer.style.setProperty('left', '0', 'important');
+            graphContainer.style.setProperty('right', '0', 'important');
+            graphContainer.style.setProperty('width', '100%', 'important');
+        }
+    }
 
     // Virtue #9: Responsive Intent - Adapt to device context, not just size
     // System drawer slides based on position (top on mobile, bottom on desktop)
@@ -230,17 +252,17 @@ function createFocusHeader(nodeGroup: any, node: D3Node, dimensions: { width: nu
         .attr('transform', `translate(0, ${headerY})`)
         .style('opacity', 0);
 
-    // Header background
+    // Header background - match symbol palette styling
     header.append('rect')
         .attr('class', 'focus-header-bg')
         .attr('x', -headerWidth / 2)
         .attr('y', 0)
         .attr('width', headerWidth)
         .attr('height', HEADER_HEIGHT)
-        .attr('rx', 6)
-        .attr('ry', 6)
-        .attr('fill', 'rgba(0, 0, 0, 0.8)')
-        .attr('stroke', 'rgba(255, 255, 255, 0.2)')
+        .attr('rx', 3)
+        .attr('ry', 3)
+        .attr('fill', '#f8f8f8')
+        .attr('stroke', '#ddd')
         .attr('stroke-width', 1);
 
     // Add symbol buttons
@@ -260,27 +282,27 @@ function createFocusHeader(nodeGroup: any, node: D3Node, dimensions: { width: nu
             .attr('fill', 'transparent')
             .attr('stroke', 'transparent');
 
-        // Symbol text
+        // Symbol text - match symbol palette color
         button.append('text')
             .attr('text-anchor', 'middle')
             .attr('dominant-baseline', 'central')
-            .attr('font-size', '16px')
-            .attr('fill', '#e0e0e0')
+            .attr('font-size', '14px')
+            .attr('fill', '#000')
             .text(symbolDef.symbol);
 
-        // Hover effects
+        // Hover effects - match symbol palette
         button.on('mouseenter', function(this: SVGGElement) {
             d3.select(this).select('circle')
-                .attr('fill', 'rgba(255, 255, 255, 0.15)');
+                .attr('fill', '#e8e8e8');
             d3.select(this).select('text')
-                .attr('fill', '#ffffff');
+                .attr('fill', '#000');
         });
 
         button.on('mouseleave', function(this: SVGGElement) {
             d3.select(this).select('circle')
                 .attr('fill', 'transparent');
             d3.select(this).select('text')
-                .attr('fill', '#e0e0e0');
+                .attr('fill', '#000');
         });
 
         // Click handler
@@ -374,17 +396,17 @@ function createFocusFooter(nodeGroup: any, node: D3Node, dimensions: { width: nu
         .attr('transform', `translate(0, ${footerY})`)
         .style('opacity', 0);
 
-    // Footer background
+    // Footer background - subtle light style
     footer.append('rect')
         .attr('class', 'focus-footer-bg')
         .attr('x', -footerWidth / 2)
         .attr('y', 0)
         .attr('width', footerWidth)
         .attr('height', FOOTER_HEIGHT)
-        .attr('rx', 4)
-        .attr('ry', 4)
-        .attr('fill', 'rgba(0, 0, 0, 0.6)')
-        .attr('stroke', 'rgba(255, 255, 255, 0.1)')
+        .attr('rx', 3)
+        .attr('ry', 3)
+        .attr('fill', '#f8f8f8')
+        .attr('stroke', '#ddd')
         .attr('stroke-width', 1);
 
     // Footer text - contextual info
@@ -393,8 +415,8 @@ function createFocusFooter(nodeGroup: any, node: D3Node, dimensions: { width: nu
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'central')
         .attr('y', FOOTER_HEIGHT / 2)
-        .attr('font-size', '11px')
-        .attr('fill', '#a0a0a0')
+        .attr('font-size', '10px')
+        .attr('fill', '#666')
         .text(infoItems.join(' · '));
 
     // Animate footer in
@@ -484,12 +506,19 @@ export function focusOnTile(node: D3Node): void {
     const targetX = viewportWidth / 2 - node.x * zoomScale;
     const targetY = viewportHeight / 2 - node.y * zoomScale;
 
+    // Set flag to prevent unfocus detection during programmatic zoom animation
+    setIsFocusAnimating(true);
+
     // Animate viewport to center on the tile
     svg.transition()
         .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
         .call(zoom.transform, d3.zoomIdentity
             .translate(targetX, targetY)
-            .scale(zoomScale));
+            .scale(zoomScale))
+        .on("end", () => {
+            // Clear animation flag once zoom transition completes
+            setIsFocusAnimating(false);
+        });
 
     // Hide UI elements when focused (only if not already in focus mode)
     if (!isTransition) {
@@ -562,11 +591,18 @@ export function unfocus(): void {
     // Restore the previous transform if available
     const preFocusTransform = getPreFocusTransform();
     if (preFocusTransform) {
+        // Set flag to prevent unfocus detection during programmatic zoom animation
+        setIsFocusAnimating(true);
+
         svg.transition()
             .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
             .call(zoom.transform, d3.zoomIdentity
                 .translate(preFocusTransform.x, preFocusTransform.y)
-                .scale(preFocusTransform.k));
+                .scale(preFocusTransform.k))
+            .on("end", () => {
+                // Clear animation flag once zoom transition completes
+                setIsFocusAnimating(false);
+            });
     }
 
     // Clear focus state
