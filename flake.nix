@@ -440,6 +440,18 @@
               echo "✓ Markdown docs generated in docs/types/"
             '');
           };
+
+          check-types = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "check-types" ''
+              set -e
+              # Ensure typegen is built
+              ${pkgs.nix}/bin/nix build .#typegen
+
+              # Run typegen check
+              ./result/bin/typegen check
+            '');
+          };
         };
       }
     );
