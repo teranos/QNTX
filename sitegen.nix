@@ -13,7 +13,11 @@ let
   # Use Nix's filesystem library to discover markdown files
   docsDir = ./docs;
   allFiles = lib.filesystem.listFilesRecursive docsDir;
-  markdownFiles = lib.filter (path: lib.hasSuffix ".md" (toString path)) allFiles;
+  markdownFiles =
+    let filtered = lib.filter (path: lib.hasSuffix ".md" (toString path)) allFiles;
+    in if filtered == []
+       then throw "No markdown files found in docs/ directory"
+       else filtered;
 
   # Calculate relative path from docs/ directory
   getRelativePath = path:
@@ -38,6 +42,12 @@ let
   # Group files by directory for index generation
   groupedFiles = lib.groupBy (f: if f.dir == "." then "_root" else (lib.head (lib.splitString "/" f.dir))) fileInfos;
 
+  # HTML escaping function to prevent XSS from malicious filenames
+  escapeHtml = s: builtins.replaceStrings
+    ["<" ">" "&" "\"" "'"]
+    ["&lt;" "&gt;" "&amp;" "&quot;" "&#39;"]
+    s;
+
   # HTML template functions (pure Nix)
   htmlHead = title: prefix: ''
     <!DOCTYPE html>
@@ -45,7 +55,7 @@ let
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title}</title>
+        <title>${escapeHtml title}</title>
         <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
         <link rel="stylesheet" href="${prefix}/css/core.css">
         <link rel="stylesheet" href="${prefix}/css/utilities.css">
@@ -59,7 +69,7 @@ let
             pre code { background: none; padding: 0; border: none; }
             h1 { border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
             h2 { margin-top: 2em; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; }
-            a { color: #0066cc; text-decoration: none; }
+            a { color: var(--accent-color, #0066cc); text-decoration: none; }
             a:hover { text-decoration: underline; }
             nav { margin-bottom: 2em; padding: 12px; background: #f9f9f9; border-radius: 4px; }
             nav a { margin-right: 16px; }
@@ -81,7 +91,7 @@ let
             li { margin: 12px 0; }
             li a { display: block; padding: 12px 16px; background: #f9f9f9; border-radius: 4px; transition: background 0.2s; }
             li a:hover { background: #f0f0f0; }
-            a { color: #0066cc; text-decoration: none; }
+            a { color: var(--accent-color, #0066cc); text-decoration: none; }
         </style>
     </head>
     <body>
@@ -96,9 +106,9 @@ let
     let
       sortedFiles = lib.sort (a: b: a.name < b.name) files;
       categoryTitle = lib.toUpper (lib.substring 0 1 category) + lib.substring 1 (lib.stringLength category) category;
-      fileLinks = map (f: ''          <li><a href="${f.htmlPath}">${f.name}</a></li>'') sortedFiles;
+      fileLinks = map (f: ''          <li><a href="${f.htmlPath}">${escapeHtml f.name}</a></li>'') sortedFiles;
     in ''
-        <h2>${categoryTitle}</h2>
+        <h2>${escapeHtml categoryTitle}</h2>
         <ul>
 ${lib.concatStringsSep "\n" fileLinks}
         </ul>'';
