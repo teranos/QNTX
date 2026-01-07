@@ -120,3 +120,50 @@ func SymbolInfow(symbol, msg string, keysAndValues ...interface{}) {
 		Logger.Infow(msg, fields...)
 	}
 }
+
+// ============================================================================
+// Instance logger wrappers
+// ============================================================================
+// These functions wrap any logger with a symbol field, useful when you have
+// an instance logger (e.g., s.logger, t.logger) rather than using the global Logger.
+//
+// Usage:
+//
+//	// At initialization:
+//	type Ticker struct {
+//	    pulseLog *zap.SugaredLogger
+//	}
+//	t.pulseLog = logger.AddPulseSymbol(baseLogger)
+//
+//	// Or inline:
+//	logger.AddPulseSymbol(s.logger).Infow("Ticker started", "interval", interval)
+
+// AddPulseSymbol wraps a logger with the Pulse symbol (꩜)
+func AddPulseSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
+	return l.With(FieldSymbol, sym.Pulse)
+}
+
+// AddPulseOpenSymbol wraps a logger with the PulseOpen symbol (✿)
+func AddPulseOpenSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
+	return l.With(FieldSymbol, sym.PulseOpen)
+}
+
+// AddPulseCloseSymbol wraps a logger with the PulseClose symbol (❀)
+func AddPulseCloseSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
+	return l.With(FieldSymbol, sym.PulseClose)
+}
+
+// AddDBSymbol wraps a logger with the DB symbol (⊔)
+func AddDBSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
+	return l.With(FieldSymbol, sym.DB)
+}
+
+// AddAxSymbol wraps a logger with the Ax symbol (⋈)
+func AddAxSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
+	return l.With(FieldSymbol, sym.AX)
+}
+
+// AddIXSymbol wraps a logger with the IX symbol (⨳)
+func AddIXSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
+	return l.With(FieldSymbol, sym.IX)
+}

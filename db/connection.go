@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/errors"
-	"github.com/teranos/QNTX/sym"
+	"github.com/teranos/QNTX/logger"
 )
 
 const (
@@ -19,10 +19,10 @@ const (
 )
 
 // Open opens a SQLite database at the specified path with optimized settings.
-// If logger is provided, logs database operations; otherwise operates silently.
-func Open(path string, logger *zap.SugaredLogger) (*sql.DB, error) {
-	if logger != nil {
-		logger.Debugw("Opening database", "path", path, "symbol", sym.DB)
+// If log is provided, logs database operations; otherwise operates silently.
+func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
+	if log != nil {
+		logger.AddDBSymbol(log).Debugw("Opening database", "path", path)
 	}
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -47,10 +47,9 @@ func Open(path string, logger *zap.SugaredLogger) (*sql.DB, error) {
 		return nil, errors.Wrap(err, "failed to set busy timeout")
 	}
 
-	if logger != nil {
-		logger.Infow("Database opened successfully",
+	if log != nil {
+		logger.AddDBSymbol(log).Infow("Database opened successfully",
 			"path", path,
-			"symbol", sym.DB,
 			"wal_mode", true,
 			"foreign_keys", true,
 		)

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/sym"
 )
 
 // broadcastMessage sends a message to all connected clients.
@@ -404,7 +404,7 @@ func (s *QNTXServer) startDaemon() error {
 	s.daemon.Start()
 	if s.ticker != nil {
 		s.ticker.Start()
-		s.logger.Infow(fmt.Sprintf("%s Pulse ticker started", sym.Pulse))
+		logger.AddPulseSymbol(s.logger).Infow("Pulse ticker started")
 	}
 	if err := s.setDaemonState(true); err != nil {
 		s.logger.Warnw("Failed to persist daemon state", "error", err)
@@ -422,7 +422,7 @@ func (s *QNTXServer) stopDaemon() error {
 
 	if s.ticker != nil {
 		s.ticker.Stop()
-		s.logger.Infow(fmt.Sprintf("%s Pulse ticker stopped", sym.Pulse))
+		logger.AddPulseSymbol(s.logger).Infow("Pulse ticker stopped")
 	}
 	s.daemon.Stop()
 	if err := s.setDaemonState(false); err != nil {
@@ -457,7 +457,7 @@ func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID,
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution started", sym.Pulse),
+	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution started",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"clients", sent,
@@ -477,7 +477,7 @@ func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, 
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution failed", sym.Pulse),
+	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution failed",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"error", errorMsg,
@@ -499,7 +499,7 @@ func (s *QNTXServer) BroadcastPulseExecutionCompleted(scheduledJobID, executionI
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution completed", sym.Pulse),
+	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution completed",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"async_job_id", asyncJobID,
@@ -518,7 +518,7 @@ func (s *QNTXServer) BroadcastPulseExecutionLogStream(scheduledJobID, executionI
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Debugw(fmt.Sprintf("%s Broadcasted execution log chunk", sym.Pulse),
+	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution log chunk",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"chunk_length", len(logChunk),
@@ -541,7 +541,7 @@ func (s *QNTXServer) BroadcastStorageWarning(actor, context string, current, lim
 	}
 
 	sent := s.broadcastMessage(msg)
-	s.logger.Warnw(fmt.Sprintf("%s Storage limit approaching", sym.DB),
+	logger.AddDBSymbol(s.logger).Warnw("Storage limit approaching",
 		"actor", actor,
 		"context", context,
 		"fill_percent", fmt.Sprintf("%.0f%%", fillPercent*100),
