@@ -200,6 +200,6 @@ func expandAndValidatePath(path string) (string, error) {
 		return abs, nil
 	}
 
-	err := errors.Newf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
+	err = errors.Newf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
 	return "", errors.WithHint(err, "use a local filesystem path like ~/.qntx/plugins/ instead of remote URLs")
 }

@@ -23,11 +23,11 @@ const (
 	OutputUserStatus                       // Final success/failure status
 
 	// Level 1 (-v) - Informational
-	OutputProgress       // Progress indicators (e.g., "Processing 50/100 commits")
-	OutputStartup        // Startup banners, config summary
-	OutputPluginStatus   // Plugin loaded/unloaded/health status
-	OutputOperationInfo  // High-level operation summaries
-	OutputAxAST          // Ax query parsed AST
+	OutputProgress      // Progress indicators (e.g., "Processing 50/100 commits")
+	OutputStartup       // Startup banners, config summary
+	OutputPluginStatus  // Plugin loaded/unloaded/health status
+	OutputOperationInfo // High-level operation summaries
+	OutputAxAST         // Ax query parsed AST
 
 	// Level 2 (-vv) - Detailed
 	OutputAxMatches    // What matched in Ax query (predicates, subjects)
@@ -47,12 +47,12 @@ const (
 	OutputAxExecution  // Ax query execution steps
 
 	// Level 4 (-vvvv) - Full dump
-	OutputSQLQueries   // Full SQL queries executed
-	OutputSQLResults   // SQL query result summaries
-	OutputHTTPBody     // Full HTTP request/response bodies
-	OutputGRPCBody     // Full gRPC request/response bodies
-	OutputDataDump     // Full data structure contents
-	OutputAxPlan       // Full Ax query execution plan
+	OutputSQLQueries // Full SQL queries executed
+	OutputSQLResults // SQL query result summaries
+	OutputHTTPBody   // Full HTTP request/response bodies
+	OutputGRPCBody   // Full gRPC request/response bodies
+	OutputDataDump   // Full data structure contents
+	OutputAxPlan     // Full Ax query execution plan
 )
 
 // categoryLevels maps each output category to its minimum verbosity level
@@ -107,33 +107,33 @@ func ShouldOutput(verbosity int, category OutputCategory) bool {
 
 // categoryNames provides human-readable names for output categories
 var categoryNames = map[OutputCategory]string{
-	OutputResults:      "results",
-	OutputErrors:       "errors",
-	OutputUserStatus:   "status",
-	OutputProgress:     "progress",
-	OutputStartup:      "startup",
-	OutputPluginStatus: "plugin-status",
+	OutputResults:       "results",
+	OutputErrors:        "errors",
+	OutputUserStatus:    "status",
+	OutputProgress:      "progress",
+	OutputStartup:       "startup",
+	OutputPluginStatus:  "plugin-status",
 	OutputOperationInfo: "operation-info",
-	OutputAxAST:        "ax-ast",
-	OutputAxMatches:    "ax-matches",
-	OutputTiming:       "timing",
-	OutputConfig:       "config",
-	OutputHTTPRequests: "http-requests",
-	OutputHTTPStatus:   "http-status",
-	OutputDBStats:      "db-stats",
-	OutputPluginConfig: "plugin-config",
-	OutputPluginStdout: "plugin-stdout",
-	OutputPluginStderr: "plugin-stderr",
-	OutputGRPCMethod:   "grpc-method",
-	OutputGRPCStatus:   "grpc-status",
-	OutputInternalFlow: "internal-flow",
-	OutputAxExecution:  "ax-execution",
-	OutputSQLQueries:   "sql-queries",
-	OutputSQLResults:   "sql-results",
-	OutputHTTPBody:     "http-body",
-	OutputGRPCBody:     "grpc-body",
-	OutputDataDump:     "data-dump",
-	OutputAxPlan:       "ax-plan",
+	OutputAxAST:         "ax-ast",
+	OutputAxMatches:     "ax-matches",
+	OutputTiming:        "timing",
+	OutputConfig:        "config",
+	OutputHTTPRequests:  "http-requests",
+	OutputHTTPStatus:    "http-status",
+	OutputDBStats:       "db-stats",
+	OutputPluginConfig:  "plugin-config",
+	OutputPluginStdout:  "plugin-stdout",
+	OutputPluginStderr:  "plugin-stderr",
+	OutputGRPCMethod:    "grpc-method",
+	OutputGRPCStatus:    "grpc-status",
+	OutputInternalFlow:  "internal-flow",
+	OutputAxExecution:   "ax-execution",
+	OutputSQLQueries:    "sql-queries",
+	OutputSQLResults:    "sql-results",
+	OutputHTTPBody:      "http-body",
+	OutputGRPCBody:      "grpc-body",
+	OutputDataDump:      "data-dump",
+	OutputAxPlan:        "ax-plan",
 }
 
 // CategoryName returns the human-readable name for an output category
@@ -222,4 +222,30 @@ func ShouldShowTiming(verbosity int, durationMS int64) bool {
 // ShouldShowTimingAlways returns true if timing should always be shown (slow operation)
 func ShouldShowTimingAlways(durationMS int64) bool {
 	return durationMS >= SlowThresholdMS
+}
+
+// Zero value filtering
+//
+// At lower verbosity levels, zero values add noise without information.
+// Only show them at maximum verbosity where confirming "this is actually zero" matters.
+
+// ShouldShowZeroInt returns true if integer zero values should be included in logs
+func ShouldShowZeroInt(verbosity int) bool {
+	return verbosity >= VerbosityAll // Level 4 only
+}
+
+// ShouldShowZeroFloat returns true if float zero values should be included in logs
+func ShouldShowZeroFloat(verbosity int) bool {
+	return verbosity >= VerbosityAll // Level 4 only
+}
+
+// ShouldShowEmptyString returns true if empty strings should be included in logs
+func ShouldShowEmptyString(verbosity int) bool {
+	return verbosity >= VerbosityAll // Level 4 only
+}
+
+// ShouldShowDefaultValue returns true if default/zero values should be shown.
+// Examples: group=0, type="untyped", count=0, total=0
+func ShouldShowDefaultValue(verbosity int) bool {
+	return verbosity >= VerbosityAll // Level 4 only
 }

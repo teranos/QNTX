@@ -49,6 +49,31 @@ if logger.ShouldShowTiming(verbosity, durationMS) {
 }
 ```
 
+#### Zero Value Filtering
+
+Zero and default values add noise at lower verbosity levels. They're only shown at level 4 (`-vvvv`) where confirming "this is actually zero" matters for full data dumps.
+
+**Filtered at levels 0-3:**
+- Integer zeros: `count=0`, `total=0`, `group=0`
+- Float zeros: `cost_estimate=0.0`, `cost_actual=0.0`
+- Empty strings: `type=""`, `name=""`
+- Default values: `type="untyped"`, `status="unknown"`
+
+**Only shown at level 4:**
+All values including zeros for complete data dumps.
+
+```go
+// Only log non-zero counts at lower verbosity
+if count > 0 || logger.ShouldShowZeroInt(verbosity) {
+    log.Infow("Processed items", "count", count)
+}
+
+// Only log if value differs from default
+if status != "unknown" || logger.ShouldShowDefaultValue(verbosity) {
+    log.Infow("Status check", "status", status)
+}
+```
+
 #### Ax Query Output
 
 Ax queries have granular output control:
