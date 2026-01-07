@@ -4,6 +4,7 @@
 import { GRAPH_PHYSICS } from '../config.ts';
 import { getSvg, getG, getZoom, getDomCache, getFocusedNodeId, getPreFocusTransform, setFocusedNodeId, setPreFocusTransform } from './state.ts';
 import { getTransform } from './transform.ts';
+import { AX, BY, AS, CommandDescriptions } from '../../../types/generated/typescript/sym.ts';
 import type { D3Node } from '../../types/d3-graph';
 
 // Import D3 from vendor bundle
@@ -12,6 +13,50 @@ declare const d3: any;
 // Default tile dimensions (must match renderer.ts)
 const DEFAULT_TILE_WIDTH = 180;
 const DEFAULT_TILE_HEIGHT = 80;
+
+// Header configuration
+const HEADER_HEIGHT = 32;
+const HEADER_PADDING = 8;
+const HEADER_SYMBOL_SIZE = 24;
+const HEADER_SYMBOL_SPACING = 8;
+
+// Header symbols with their actions
+interface HeaderSymbol {
+    symbol: string;
+    command: string;
+    description: string;
+    action: (node: D3Node) => void;
+}
+
+const HEADER_SYMBOLS: HeaderSymbol[] = [
+    {
+        symbol: AX,
+        command: 'ax',
+        description: CommandDescriptions['ax'],
+        action: (node: D3Node) => {
+            console.log(`[⋈ ax] Expand context for: ${node.label}`);
+            // TODO: Implement expand related nodes
+        }
+    },
+    {
+        symbol: BY,
+        command: 'by',
+        description: CommandDescriptions['by'],
+        action: (node: D3Node) => {
+            console.log(`[⌬ by] Show provenance for: ${node.label}`);
+            // TODO: Implement show provenance
+        }
+    },
+    {
+        symbol: AS,
+        command: 'as',
+        description: CommandDescriptions['as'],
+        action: (node: D3Node) => {
+            console.log(`[+ as] Add attestation to: ${node.label}`);
+            // TODO: Implement add attestation
+        }
+    }
+];
 
 /**
  * Calculate focused tile dimensions based on viewport size
@@ -44,6 +89,117 @@ function calculateFocusedTileDimensions(): { width: number; height: number; scal
         height: DEFAULT_TILE_HEIGHT * scale,
         scale
     };
+}
+
+/**
+ * Show or hide the legenda based on focus state
+ */
+function setLegendaVisibility(visible: boolean): void {
+    const domCache = getDomCache();
+    const legenda = domCache.get('legenda', '.legenda');
+    if (legenda) {
+        legenda.style.transition = `opacity ${GRAPH_PHYSICS.ANIMATION_DURATION}ms ease`;
+        legenda.style.opacity = visible ? '1' : '0';
+        legenda.style.pointerEvents = visible ? 'auto' : 'none';
+    }
+}
+
+/**
+ * Create the header bar with symbols above the focused tile
+ */
+function createFocusHeader(nodeGroup: any, node: D3Node, dimensions: { width: number; height: number; scale: number }): void {
+    // Remove any existing header
+    nodeGroup.select('.focus-header').remove();
+
+    // Calculate header position (above the tile)
+    const headerY = -dimensions.height / 2 - HEADER_HEIGHT - HEADER_PADDING;
+    const headerWidth = HEADER_SYMBOLS.length * (HEADER_SYMBOL_SIZE + HEADER_SYMBOL_SPACING) + HEADER_PADDING;
+
+    // Create header group
+    const header = nodeGroup.append('g')
+        .attr('class', 'focus-header')
+        .attr('transform', `translate(0, ${headerY})`)
+        .style('opacity', 0);
+
+    // Header background
+    header.append('rect')
+        .attr('class', 'focus-header-bg')
+        .attr('x', -headerWidth / 2)
+        .attr('y', 0)
+        .attr('width', headerWidth)
+        .attr('height', HEADER_HEIGHT)
+        .attr('rx', 6)
+        .attr('ry', 6)
+        .attr('fill', 'rgba(0, 0, 0, 0.8)')
+        .attr('stroke', 'rgba(255, 255, 255, 0.2)')
+        .attr('stroke-width', 1);
+
+    // Add symbol buttons
+    const startX = -headerWidth / 2 + HEADER_PADDING + HEADER_SYMBOL_SIZE / 2;
+
+    HEADER_SYMBOLS.forEach((symbolDef, index) => {
+        const buttonX = startX + index * (HEADER_SYMBOL_SIZE + HEADER_SYMBOL_SPACING);
+
+        const button = header.append('g')
+            .attr('class', 'focus-header-button')
+            .attr('transform', `translate(${buttonX}, ${HEADER_HEIGHT / 2})`)
+            .style('cursor', 'pointer');
+
+        // Button background (hover target)
+        button.append('circle')
+            .attr('r', HEADER_SYMBOL_SIZE / 2)
+            .attr('fill', 'transparent')
+            .attr('stroke', 'transparent');
+
+        // Symbol text
+        button.append('text')
+            .attr('text-anchor', 'middle')
+            .attr('dominant-baseline', 'central')
+            .attr('font-size', '16px')
+            .attr('fill', '#e0e0e0')
+            .text(symbolDef.symbol);
+
+        // Hover effects
+        button.on('mouseenter', function() {
+            d3.select(this).select('circle')
+                .attr('fill', 'rgba(255, 255, 255, 0.15)');
+            d3.select(this).select('text')
+                .attr('fill', '#ffffff');
+        });
+
+        button.on('mouseleave', function() {
+            d3.select(this).select('circle')
+                .attr('fill', 'transparent');
+            d3.select(this).select('text')
+                .attr('fill', '#e0e0e0');
+        });
+
+        // Click handler
+        button.on('click', function(event: MouseEvent) {
+            event.stopPropagation();
+            symbolDef.action(node);
+        });
+
+        // Tooltip on hover
+        button.append('title')
+            .text(`${symbolDef.symbol} ${symbolDef.command}: ${symbolDef.description}`);
+    });
+
+    // Animate header in
+    header.transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 1);
+}
+
+/**
+ * Remove the focus header from a node
+ */
+function removeFocusHeader(nodeGroup: any): void {
+    nodeGroup.select('.focus-header')
+        .transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 0)
+        .remove();
 }
 
 /**
@@ -95,6 +251,9 @@ export function focusOnTile(node: D3Node): void {
             .translate(targetX, targetY)
             .scale(zoomScale));
 
+    // Hide legenda when focused
+    setLegendaVisibility(false);
+
     // Animate the focused tile to expand
     const nodeGroup = g.selectAll('.node')
         .filter((d: D3Node) => d.id === node.id);
@@ -113,6 +272,9 @@ export function focusOnTile(node: D3Node): void {
         .transition()
         .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
         .attr('transform', `scale(${focusedDimensions.scale})`);
+
+    // Create the header bar with symbols
+    createFocusHeader(nodeGroup, node, focusedDimensions);
 }
 
 /**
@@ -128,9 +290,15 @@ export function unfocus(): void {
 
     if (!svg || !g || !zoom) return;
 
+    // Show legenda again
+    setLegendaVisibility(true);
+
     // Restore the focused tile to normal size
     const nodeGroup = g.selectAll('.node')
         .filter((d: D3Node) => d.id === focusedId);
+
+    // Remove the header
+    removeFocusHeader(nodeGroup);
 
     nodeGroup.select('rect')
         .transition()
