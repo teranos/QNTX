@@ -109,11 +109,11 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	sb.WriteString("This document shows Go type definitions from the codebase.\n\n")
 
-	// Add links to generated type files
+	// Add links to generated type files (using GitHub URLs for consistency with source links)
 	sb.WriteString("**Generated types**:\n")
-	sb.WriteString(fmt.Sprintf("- TypeScript: [`%s/%s.ts`](../%s.ts)\n", g.generatedTypesDir, result.PackageName, result.PackageName))
-	sb.WriteString(fmt.Sprintf("- Rust: [`%s/%s.rs`](../%s.rs)\n", g.generatedTypesDir, result.PackageName, result.PackageName))
-	sb.WriteString(fmt.Sprintf("- Python: [`%s/%s.py`](../%s.py)\n", g.generatedTypesDir, result.PackageName, result.PackageName))
+	sb.WriteString(fmt.Sprintf("- TypeScript: [`%s/typescript/%s.ts`](https://github.com/teranos/QNTX/blob/main/%s/typescript/%s.ts)\n", g.generatedTypesDir, result.PackageName, g.generatedTypesDir, result.PackageName))
+	sb.WriteString(fmt.Sprintf("- Rust: [`%s/rust/%s.rs`](https://github.com/teranos/QNTX/blob/main/%s/rust/%s.rs)\n", g.generatedTypesDir, result.PackageName, g.generatedTypesDir, result.PackageName))
+	sb.WriteString(fmt.Sprintf("- Python: [`%s/python/%s.py`](https://github.com/teranos/QNTX/blob/main/%s/python/%s.py)\n", g.generatedTypesDir, result.PackageName, g.generatedTypesDir, result.PackageName))
 	sb.WriteString("\n")
 
 	// Generate const documentation (untyped consts)
