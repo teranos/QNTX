@@ -8,6 +8,12 @@ use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
 use std::ffi::CString;
 
+/// Maximum length for captured variable values before truncation
+const MAX_VARIABLE_LENGTH: usize = 1000;
+
+/// Suffix appended to truncated variable values
+const TRUNCATION_SUFFIX: &str = "...";
+
 impl PythonEngine {
     /// Execute Python code and return the result
     pub fn execute(&self, code: &str, config: &ExecutionConfig) -> ExecutionResult {
@@ -293,8 +299,8 @@ fn capture_variables(globals: &Bound<'_, PyDict>) -> HashMap<String, String> {
             .unwrap_or_else(|_| "<unknown>".to_string());
 
         // Limit size
-        let value_str = if value_str.len() > 1000 {
-            format!("{}...", &value_str[..1000])
+        let value_str = if value_str.len() > MAX_VARIABLE_LENGTH {
+            format!("{}{}", &value_str[..MAX_VARIABLE_LENGTH], TRUNCATION_SUFFIX)
         } else {
             value_str
         };

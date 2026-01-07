@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
+/// Default execution timeout in seconds
+pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
+
 #[derive(Error, Debug)]
 pub enum PythonError {
     #[error("Python initialization failed: {0}")]
@@ -79,7 +82,7 @@ pub struct ExecutionConfig {
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
-            timeout_secs: 30,
+            timeout_secs: DEFAULT_TIMEOUT_SECS,
             capture_variables: false,
             python_paths: Vec::new(),
             env_vars: HashMap::new(),

@@ -12,11 +12,16 @@ use tonic::Status;
 
 use crate::config::PluginConfig;
 
+/// Default Python modules to check for availability
+pub(crate) const DEFAULT_MODULES: &[&str] = &["numpy", "pandas", "requests", "json", "os", "sys"];
+
 /// Internal plugin state - shared with service module
 pub(crate) struct PluginState {
     pub config: Option<PluginConfig>,
     pub engine: PythonEngine,
     pub initialized: bool,
+    /// Default modules to check (can be overridden via plugin config)
+    pub default_modules: Vec<String>,
 }
 
 /// Handler context providing access to plugin state
@@ -211,19 +216,13 @@ impl HandlerContext {
 
         let req: ModulesRequest = serde_json::from_value(body).unwrap_or_default();
 
-        // Default modules to check
-        let modules_to_check: Vec<String> = req.modules.unwrap_or_else(|| {
-            vec![
-                "numpy".to_string(),
-                "pandas".to_string(),
-                "requests".to_string(),
-                "json".to_string(),
-                "os".to_string(),
-                "sys".to_string(),
-            ]
-        });
-
         let state = self.state.read();
+
+        // Use modules from request, fall back to configured default modules
+        let modules_to_check: Vec<String> = req
+            .modules
+            .unwrap_or_else(|| state.default_modules.clone());
+
         let mut available = HashMap::new();
 
         for module in modules_to_check {
