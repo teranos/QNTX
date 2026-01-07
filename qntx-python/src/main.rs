@@ -42,8 +42,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Set up panic hook to log panics before they terminate the process
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("PANIC: Plugin panicked during startup or execution");
-        eprintln!("  Location: {}", panic_info.location().map(|l| l.to_string()).unwrap_or_else(|| "unknown".to_string()));
-        eprintln!("  Message: {}", panic_info.payload().downcast_ref::<&str>().unwrap_or(&"<no message>"));
+        eprintln!(
+            "  Location: {}",
+            panic_info
+                .location()
+                .map(|l| l.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        );
+        eprintln!(
+            "  Message: {}",
+            panic_info
+                .payload()
+                .downcast_ref::<&str>()
+                .unwrap_or(&"<no message>")
+        );
     }));
 
     let args = Args::parse();
@@ -115,8 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build and start the gRPC server
     info!("Building gRPC server...");
-    let server = Server::builder()
-        .add_service(DomainPluginServiceServer::new(service));
+    let server = Server::builder().add_service(DomainPluginServiceServer::new(service));
 
     info!("Starting gRPC server on {}...", addr);
     match server.serve_with_shutdown(addr, shutdown_signal()).await {

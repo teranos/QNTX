@@ -195,14 +195,14 @@ func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
 func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
-	// Register a catch-all handler for the plugin's namespace
-	namespace := fmt.Sprintf("/api/%s/", c.metadata.Name)
+	// Register a catch-all handler for the plugin's namespace using Go 1.22+ wildcard pattern
+	pattern := fmt.Sprintf("/api/%s/{path...}", c.metadata.Name)
 
-	mux.HandleFunc(namespace, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		c.proxyHTTPRequest(w, r)
 	})
 
-	c.logger.Infow("Registered HTTP proxy handler", "namespace", namespace)
+	c.logger.Infow("Registered HTTP proxy handler", "pattern", pattern)
 	return nil
 }
 

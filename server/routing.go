@@ -45,9 +45,10 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
 	if s.pluginRegistry != nil {
 		for _, name := range s.pluginRegistry.List() {
-			namespace := "/api/" + name + "/"
-			http.HandleFunc(namespace, corsPluginHandler)
-			s.logger.Infow("Registered HTTP route", "plugin", name, "namespace", namespace)
+			// Use wildcard pattern for Go 1.22+ ServeMux
+			pattern := "/api/" + name + "/{path...}"
+			http.HandleFunc(pattern, corsPluginHandler)
+			s.logger.Infow("Registered HTTP route", "plugin", name, "pattern", pattern)
 		}
 	}
 
