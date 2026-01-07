@@ -139,16 +139,29 @@ function setFocusUIVisibility(visible: boolean): void {
         }
     }
 
-    // Symbol palette (slides up or left depending on layout)
+    // Symbol palette (slides based on position)
+    // - Mobile (bottom): slides down
+    // - Tablet portrait (fixed left): slides left
+    // - Desktop (in left panel): slides left with parent
     const symbolPalette = document.getElementById('symbolPalette');
     if (symbolPalette) {
+        const computedStyle = window.getComputedStyle(symbolPalette);
+        const isFixed = computedStyle.position === 'fixed';
+        const isAtLeft = isFixed && computedStyle.left === '0px';
+
         symbolPalette.style.transition = transition;
         if (visible) {
-            symbolPalette.style.transform = 'translateY(0)';
+            symbolPalette.style.transform = isAtLeft ? 'translateX(0) translateY(-50%)' : 'translateY(0)';
             symbolPalette.style.opacity = '1';
             symbolPalette.style.pointerEvents = 'auto';
         } else {
-            symbolPalette.style.transform = 'translateY(-120%)';
+            if (isAtLeft) {
+                // Tablet portrait - fixed left column, slide left
+                symbolPalette.style.transform = 'translateX(-120%) translateY(-50%)';
+            } else {
+                // Mobile/desktop - slide down (mobile at bottom) or handled by parent
+                symbolPalette.style.transform = 'translateY(120%)';
+            }
             symbolPalette.style.opacity = '0.5';
             symbolPalette.style.pointerEvents = 'none';
         }
