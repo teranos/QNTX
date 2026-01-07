@@ -93,14 +93,26 @@ function calculateFocusedTileDimensions(): { width: number; height: number; scal
 
 /**
  * Show or hide the legenda based on focus state
+ * Slides out of view during focus zoom, slides back on unfocus
  */
 function setLegendaVisibility(visible: boolean): void {
     const domCache = getDomCache();
     const legenda = domCache.get('legenda', '.legenda');
     if (legenda) {
-        legenda.style.transition = `opacity ${GRAPH_PHYSICS.ANIMATION_DURATION}ms ease`;
-        legenda.style.opacity = visible ? '1' : '0';
-        legenda.style.pointerEvents = visible ? 'auto' : 'none';
+        const duration = GRAPH_PHYSICS.ANIMATION_DURATION;
+        legenda.style.transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
+
+        if (visible) {
+            // Slide back into view
+            legenda.style.transform = 'translateX(0)';
+            legenda.style.opacity = '1';
+            legenda.style.pointerEvents = 'auto';
+        } else {
+            // Slide out to the left (off-screen)
+            legenda.style.transform = 'translateX(-120%)';
+            legenda.style.opacity = '0.5';
+            legenda.style.pointerEvents = 'none';
+        }
     }
 }
 
