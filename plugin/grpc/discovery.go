@@ -222,8 +222,13 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 	// Build command arguments
 	args := append([]string{"--port", strconv.Itoa(port)}, config.Args...)
 
-	// Use context.Background() instead of parent context to prevent plugin from being killed
-	// when the parent context is cancelled. Plugins should run independently.
+	// NOTE: Using exec.Command instead of exec.CommandContext intentionally.
+	// This prevents plugins from being killed when parent context is cancelled (e.g., during
+	// graceful shutdown), allowing proper plugin shutdown via gRPC Shutdown() call.
+	//
+	// TRADEOFF: If QNTX crashes or is killed (SIGKILL), plugin processes become orphans.
+	// TODO: Consider implementing process group management or pidfile tracking for cleanup
+	// of orphaned plugins on next QNTX startup.
 	cmd := exec.Command(binary, args...)
 
 	// Set environment
