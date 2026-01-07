@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // createBackup creates rotating backups (.back1, .back2, .back3) before modifying config
@@ -29,25 +31,25 @@ func createBackup(configPath string) error {
 	// Rotate .back2 to .back3
 	if _, err := os.Stat(back2); err == nil {
 		if err := os.Rename(back2, back3); err != nil {
-			return fmt.Errorf("failed to rotate .back2 to .back3: %w", err)
+			return errors.Wrap(err, "failed to rotate .back2 to .back3")
 		}
 	}
 
 	// Rotate .back1 to .back2
 	if _, err := os.Stat(back1); err == nil {
 		if err := os.Rename(back1, back2); err != nil {
-			return fmt.Errorf("failed to rotate .back1 to .back2: %w", err)
+			return errors.Wrap(err, "failed to rotate .back1 to .back2")
 		}
 	}
 
 	// Copy current to .back1
 	content, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to read config for backup: %w", err)
+		return errors.Wrap(err, "failed to read config for backup")
 	}
 
 	if err := os.WriteFile(back1, content, 0644); err != nil {
-		return fmt.Errorf("failed to create .back1: %w", err)
+		return errors.Wrap(err, "failed to create .back1")
 	}
 
 	return nil
@@ -66,13 +68,13 @@ func GetUIConfigPath() string {
 func loadOrInitializeUIConfig() (map[string]interface{}, string, error) {
 	configPath := GetUIConfigPath()
 	if configPath == "" {
-		return nil, "", fmt.Errorf("could not determine home directory")
+		return nil, "", errors.New("could not determine home directory")
 	}
 
 	// Ensure ~/.qntx directory exists
 	qntxDir := filepath.Dir(configPath)
 	if err := os.MkdirAll(qntxDir, 0750); err != nil {
-		return nil, "", fmt.Errorf("failed to create .qntx directory: %w", err)
+		return nil, "", errors.Wrap(err, "failed to create .qntx directory")
 	}
 
 	// Try to read existing config
@@ -80,7 +82,7 @@ func loadOrInitializeUIConfig() (map[string]interface{}, string, error) {
 	if data, err := os.ReadFile(configPath); err == nil {
 		// File exists, parse it
 		if err := toml.Unmarshal(data, &config); err != nil {
-			return nil, "", fmt.Errorf("failed to parse UI config: %w", err)
+			return nil, "", errors.Wrap(err, "failed to parse UI config")
 		}
 	} else {
 		// File doesn't exist, create empty config
@@ -94,13 +96,13 @@ func loadOrInitializeUIConfig() (map[string]interface{}, string, error) {
 func saveUIConfig(config map[string]interface{}, configPath string) error {
 	// Create backup
 	if err := createBackup(configPath); err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
+		return errors.Wrap(err, "failed to create backup")
 	}
 
 	// Marshal to TOML
 	data, err := toml.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+		return errors.Wrap(err, "failed to marshal config")
 	}
 
 	// Mark this as our own write to prevent reload loops
@@ -112,7 +114,7 @@ func saveUIConfig(config map[string]interface{}, configPath string) error {
 
 	// Write to file
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write UI config: %w", err)
+		return errors.Wrap(err, "failed to write UI config")
 	}
 
 	return nil

@@ -35,15 +35,24 @@ pub struct Limiter {}
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/budget.md#status>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Status {
-    pub daily_spend: f64,
-    pub weekly_spend: f64,
-    pub monthly_spend: f64,
-    pub daily_remaining: f64,
-    pub weekly_remaining: f64,
-    pub monthly_remaining: f64,
-    pub daily_ops: i64,
-    pub weekly_ops: i64,
-    pub monthly_ops: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub daily_spend: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weekly_spend: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monthly_spend: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub daily_remaining: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weekly_remaining: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monthly_remaining: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub daily_ops: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weekly_ops: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub monthly_ops: Option<i64>,
 }
 
 /// Tracker tracks and enforces budget limits

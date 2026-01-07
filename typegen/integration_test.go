@@ -170,8 +170,8 @@ func TestGenerateJob(t *testing.T) {
 	// TODO: When we add enum support, this should be a union type
 	assertContains(t, jobTS, `status: JobStatus`)
 
-	// Nested struct reference
-	assertContains(t, jobTS, `progress: Progress`)
+	// Nested struct reference (now optional with omitempty)
+	assertContains(t, jobTS, `progress?: Progress`)
 
 	// Pointer to nested struct (optional)
 	assertContains(t, jobTS, `pulse_state?: PulseState | null`)
@@ -197,8 +197,8 @@ func TestGenerateProgress(t *testing.T) {
 		t.Fatalf("Expected 'Progress' type in result, got types: %v", keys(result.Types))
 	}
 
-	assertContains(t, progressTS, `current: number`)
-	assertContains(t, progressTS, `total: number`)
+	assertContains(t, progressTS, `current?: number`)
+	assertContains(t, progressTS, `total?: number`)
 }
 
 func TestGeneratePulseState(t *testing.T) {
@@ -213,10 +213,10 @@ func TestGeneratePulseState(t *testing.T) {
 		t.Fatalf("Expected 'PulseState' type in result, got types: %v", keys(result.Types))
 	}
 
-	assertContains(t, pulseStateTS, `calls_this_minute: number`)
-	assertContains(t, pulseStateTS, `calls_remaining: number`)
-	assertContains(t, pulseStateTS, `spend_today: number`)
-	assertContains(t, pulseStateTS, `is_paused: boolean`)
+	assertContains(t, pulseStateTS, `calls_this_minute?: number`)
+	assertContains(t, pulseStateTS, `calls_remaining?: number`)
+	assertContains(t, pulseStateTS, `spend_today?: number`)
+	assertContains(t, pulseStateTS, `is_paused?: boolean`)
 	assertContains(t, pulseStateTS, `pause_reason?: string`)
 }
 

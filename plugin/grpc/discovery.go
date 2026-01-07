@@ -104,7 +104,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 	// Check if already loaded
 	if _, exists := m.plugins[config.Name]; exists {
-		return errors.Newf("plugin already loaded: %s", config.Name)
+		err := errors.Newf("plugin already loaded: %s", config.Name)
+		return errors.WithHint(err, "check for duplicate plugin entries in am.plugins.toml or ~/.qntx/plugins/")
 	}
 
 	var addr string
@@ -144,7 +145,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		)
 		return nil
 	} else {
-		return errors.Newf("plugin %s: either address or binary must be specified", config.Name)
+		err := errors.Newf("plugin %s: either address or binary must be specified", config.Name)
+		return errors.WithHint(err, "set 'address' for remote plugins or 'binary' with 'auto_start=true' in plugin config")
 	}
 
 	// Connect to the plugin
@@ -162,8 +164,9 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		if process != nil {
 			process.Kill()
 		}
-		return fmt.Errorf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
+		err := errors.Newf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s'",
 			config.Binary, actualName, config.Name)
+		return errors.WithHint(err, "verify the correct plugin binary is installed or update the plugin name in config")
 	}
 
 	m.plugins[config.Name] = &managedPlugin{
@@ -216,7 +219,8 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
-		return nil, errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
+		err := errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
+		return nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
 	}
 
 	// Build command arguments
@@ -288,7 +292,8 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return errors.Newf("timeout waiting for plugin gRPC service at %s", addr)
+	err := errors.Newf("timeout waiting for plugin gRPC service at %s", addr)
+	return errors.WithHint(err, "check plugin logs for startup errors, increase timeout, or verify the plugin binary is compatible")
 }
 
 // GetPlugin returns a connected plugin as a DomainPlugin.

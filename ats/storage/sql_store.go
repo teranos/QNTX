@@ -5,12 +5,12 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 
 	"go.uber.org/zap"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/vanity-id"
 )
 
@@ -29,32 +29,32 @@ type AttestationFields struct {
 // MarshalAttestationFields marshals all attestation array/map fields to JSON
 func MarshalAttestationFields(as *types.As) (*AttestationFields, error) {
 	if as == nil {
-		return nil, fmt.Errorf("attestation is nil")
+		return nil, errors.New("attestation is nil")
 	}
 
 	subjectsJSON, err := json.Marshal(as.Subjects)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal subjects: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal subjects")
 	}
 
 	predicatesJSON, err := json.Marshal(as.Predicates)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal predicates: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal predicates")
 	}
 
 	contextsJSON, err := json.Marshal(as.Contexts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal contexts: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal contexts")
 	}
 
 	actorsJSON, err := json.Marshal(as.Actors)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal actors: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal actors")
 	}
 
 	attributesJSON, err := json.Marshal(as.Attributes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal attributes: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal attributes")
 	}
 
 	return &AttestationFields{
@@ -123,7 +123,7 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 func (s *SQLStore) CreateAttestation(as *types.As) error {
 	fields, err := MarshalAttestationFields(as)
 	if err != nil {
-		return fmt.Errorf("failed to marshal attestation fields: %w", err)
+		return errors.Wrap(err, "failed to marshal attestation fields")
 	}
 
 	_, err = s.db.Exec(
@@ -140,7 +140,7 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("failed to insert attestation: %w", err)
+		return errors.Wrap(err, "failed to insert attestation")
 	}
 
 	// Enforce bounded storage limits after insertion
@@ -182,7 +182,7 @@ func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As
 	// Generate ASID with empty actor seed for self-certification
 	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate vanity ASID: %w", err)
+		return nil, errors.Wrap(err, "failed to generate vanity ASID")
 	}
 
 	// Convert to As struct
@@ -195,7 +195,7 @@ func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As
 	// Create in database
 	err = s.CreateAttestation(as)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create attestation: %w", err)
+		return nil, errors.Wrap(err, "failed to create attestation")
 	}
 
 	return as, nil
