@@ -43,6 +43,9 @@ interface EnhancedSetting extends ConfigSetting {
 class ConfigPanel extends BasePanel {
     private appConfig: ConfigResponse | null = null;
     private configError: RichError | null = null;
+    private editingKey: string | null = null;
+    private saveConfirmPending: boolean = false;
+    private saveConfirmTimeout: number | null = null;
 
     constructor() {
         super({
@@ -79,15 +82,39 @@ class ConfigPanel extends BasePanel {
             this.filterSettings(target.value);
         });
 
-        // Source click handler (event delegation)
+        // Content click handler (event delegation)
         const content = this.$('.config-panel-content');
         content?.addEventListener('click', (e: Event) => {
             const target = e.target as HTMLElement;
+
+            // Source click - copy path
             const sourceSpan = target.closest('.source-clickable') as HTMLElement | null;
             if (sourceSpan?.dataset.source) {
                 const source = sourceSpan.dataset.source;
                 const path = sourceSpan.dataset.path || this.getSourcePath(source);
                 this.handleSourceClick(source, path);
+                return;
+            }
+
+            // Edit button click
+            const editBtn = target.closest('.config-edit-btn') as HTMLElement | null;
+            if (editBtn?.dataset.key) {
+                this.startEditing(editBtn.dataset.key);
+                return;
+            }
+
+            // Save button click (two-click confirmation)
+            const saveBtn = target.closest('.config-save-btn') as HTMLElement | null;
+            if (saveBtn?.dataset.key) {
+                this.handleSaveClick(saveBtn.dataset.key);
+                return;
+            }
+
+            // Cancel button click
+            const cancelBtn = target.closest('.config-cancel-btn') as HTMLElement | null;
+            if (cancelBtn) {
+                this.cancelEditing();
+                return;
             }
         });
     }
@@ -436,6 +463,183 @@ class ConfigPanel extends BasePanel {
             'default': 'Built-in default value'
         };
         return paths[source] || 'Unknown source';
+    }
+
+    /**
+     * Start editing a config setting
+     */
+    private startEditing(key: string): void {
+        // Cancel any existing edit
+        if (this.editingKey) {
+            this.cancelEditing();
+        }
+
+        this.editingKey = key;
+        this.saveConfirmPending = false;
+
+        // Find the setting
+        const setting = this.appConfig?.settingsEnhanced?.find(s => s.key === key && s.isEffective);
+        if (!setting) return;
+
+        // Find the setting row and replace value with input
+        const settingRow = this.$<HTMLElement>(`.config-setting[data-key="${key}"]`);
+        if (!settingRow) return;
+
+        const valueEl = settingRow.querySelector('.config-setting-value');
+        if (!valueEl) return;
+
+        // Create appropriate input based on value type
+        const currentValue = setting.value;
+        let inputHtml: string;
+
+        if (typeof currentValue === 'boolean') {
+            inputHtml = `
+                <select class="config-edit-input" data-type="boolean">
+                    <option value="true" ${currentValue ? 'selected' : ''}>true</option>
+                    <option value="false" ${!currentValue ? 'selected' : ''}>false</option>
+                </select>
+            `;
+        } else if (typeof currentValue === 'number') {
+            inputHtml = `<input type="number" class="config-edit-input" data-type="number" value="${currentValue}" step="any">`;
+        } else {
+            const strValue = typeof currentValue === 'string' ? currentValue : JSON.stringify(currentValue);
+            inputHtml = `<input type="text" class="config-edit-input" data-type="string" value="${this.escapeAttr(strValue)}">`;
+        }
+
+        valueEl.innerHTML = `
+            <div class="config-edit-container">
+                ${inputHtml}
+                <div class="config-edit-actions">
+                    <button class="config-save-btn" data-key="${key}">Save</button>
+                    <button class="config-cancel-btn">Cancel</button>
+                </div>
+            </div>
+        `;
+
+        // Focus the input
+        const input = valueEl.querySelector<HTMLInputElement | HTMLSelectElement>('.config-edit-input');
+        input?.focus();
+
+        // Hide the edit button
+        const editBtn = settingRow.querySelector('.config-edit-btn') as HTMLElement;
+        if (editBtn) editBtn.style.display = 'none';
+    }
+
+    /**
+     * Cancel editing without saving
+     */
+    private cancelEditing(): void {
+        if (!this.editingKey) return;
+
+        // Clear confirmation state
+        if (this.saveConfirmTimeout) {
+            clearTimeout(this.saveConfirmTimeout);
+            this.saveConfirmTimeout = null;
+        }
+        this.saveConfirmPending = false;
+
+        this.editingKey = null;
+        this.render();
+    }
+
+    /**
+     * Handle save button click with two-click confirmation
+     */
+    private handleSaveClick(key: string): void {
+        if (!this.saveConfirmPending) {
+            // First click - enter confirmation state
+            this.saveConfirmPending = true;
+
+            const saveBtn = this.$<HTMLElement>(`.config-save-btn[data-key="${key}"]`);
+            if (saveBtn) {
+                saveBtn.textContent = 'Confirm';
+                saveBtn.classList.add('config-save-confirming');
+            }
+
+            // Auto-reset after 5 seconds
+            this.saveConfirmTimeout = window.setTimeout(() => {
+                this.saveConfirmPending = false;
+                if (saveBtn) {
+                    saveBtn.textContent = 'Save';
+                    saveBtn.classList.remove('config-save-confirming');
+                }
+            }, 5000);
+
+            return;
+        }
+
+        // Second click - actually save
+        if (this.saveConfirmTimeout) {
+            clearTimeout(this.saveConfirmTimeout);
+            this.saveConfirmTimeout = null;
+        }
+        this.saveConfirmPending = false;
+
+        this.saveConfig(key);
+    }
+
+    /**
+     * Save the edited config value
+     */
+    private async saveConfig(key: string): Promise<void> {
+        const settingRow = this.$<HTMLElement>(`.config-setting[data-key="${key}"]`);
+        if (!settingRow) return;
+
+        const input = settingRow.querySelector<HTMLInputElement | HTMLSelectElement>('.config-edit-input');
+        if (!input) return;
+
+        const dataType = input.dataset.type;
+        let newValue: unknown;
+
+        // Parse the value based on type
+        if (dataType === 'boolean') {
+            newValue = input.value === 'true';
+        } else if (dataType === 'number') {
+            newValue = parseFloat(input.value);
+            if (isNaN(newValue as number)) {
+                this.showToast('Invalid number value', 'error');
+                return;
+            }
+        } else {
+            newValue = input.value;
+        }
+
+        // Show saving state
+        const saveBtn = settingRow.querySelector<HTMLElement>('.config-save-btn');
+        if (saveBtn) {
+            saveBtn.textContent = 'Saving...';
+            saveBtn.classList.add('config-save-saving');
+        }
+
+        try {
+            await this.updateConfig({ [key]: newValue });
+            this.showToast(`Updated ${key}`, 'success');
+
+            // Refresh the config
+            this.editingKey = null;
+            await this.fetchConfig();
+            this.render();
+        } catch (error) {
+            console.error('[Config Panel] Failed to save config:', error);
+            this.showToast(`Failed to save: ${(error as Error).message}`, 'error');
+
+            // Reset button state
+            if (saveBtn) {
+                saveBtn.textContent = 'Save';
+                saveBtn.classList.remove('config-save-saving');
+            }
+        }
+    }
+
+    /**
+     * Show a toast notification
+     */
+    private showToast(message: string, type: 'success' | 'error'): void {
+        const toast = document.createElement('div');
+        toast.className = `config-toast config-toast-${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
     }
 
     private filterSettings(searchText: string): void {
