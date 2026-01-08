@@ -51,7 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
-    info!("Starting QNTX Inference Plugin v{}", env!("CARGO_PKG_VERSION"));
+    info!(
+        "Starting QNTX Inference Plugin v{}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // Create the inference engine
     let engine = engine::create_engine();
