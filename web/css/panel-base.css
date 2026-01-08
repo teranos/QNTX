@@ -373,6 +373,7 @@
 
 /* Confirmation hint - shows below button during confirmation state */
 .panel-confirm-hint {
+    display: block;
     font-size: 11px;
     color: #e65100;
     margin-top: 4px;
@@ -471,7 +472,7 @@
     background: #2d2d2d;
     color: #f0f0f0;
     padding: 8px 12px;
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 11px;
     font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
     line-height: 1.6;
@@ -481,27 +482,6 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     max-width: 400px;
     border: 1px solid #444;
-}
-
-/* Arrow pointer (bottom position - default) */
-.panel-tooltip::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    left: 20px;
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 6px solid #2d2d2d;
-}
-
-/* Arrow pointer (top position) */
-.panel-tooltip-top::before {
-    top: auto;
-    bottom: -6px;
-    border-bottom: none;
-    border-top: 6px solid #2d2d2d;
 }
 
 /* Interactive element styling - indicates hoverable for more info */
