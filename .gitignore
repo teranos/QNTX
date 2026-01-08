@@ -55,4 +55,3 @@ target/
 
 # Nix build outputs
 result
-web/site/
