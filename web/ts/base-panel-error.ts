@@ -79,14 +79,15 @@ export function createRichErrorState(
         container.appendChild(suggestionEl);
     }
 
-    // Expandable details if provided
+    // Error details if provided (always visible)
     if (error.details) {
-        const detailsEl = document.createElement('details');
+        const detailsEl = document.createElement('div');
         detailsEl.className = 'panel-error-details';
 
-        const summaryEl = document.createElement('summary');
-        summaryEl.textContent = 'Error Details';
-        detailsEl.appendChild(summaryEl);
+        const headerEl = document.createElement('div');
+        headerEl.className = 'panel-error-details-header';
+        headerEl.textContent = 'Error Details';
+        detailsEl.appendChild(headerEl);
 
         const preEl = document.createElement('pre');
         preEl.className = 'panel-error-details-content';
