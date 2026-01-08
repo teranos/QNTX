@@ -346,7 +346,8 @@ describe('PluginPanel error handling', () => {
             validationErrors: {
                 max_workers: 'Must be a valid integer'
             },
-            needsConfirmation: false
+            needsConfirmation: false,
+            editingFields: new Set()
         };
         (panel as any).expandedPlugin = 'test-plugin';
 
@@ -378,7 +379,8 @@ describe('PluginPanel error handling', () => {
                 }
             },
             validationErrors: {},
-            needsConfirmation: true
+            needsConfirmation: true,
+            editingFields: new Set()
         };
         (panel as any).expandedPlugin = 'test-plugin';
 
