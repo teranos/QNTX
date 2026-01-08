@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -145,12 +144,7 @@ func (s *QNTXServer) handleGetAsyncJob(w http.ResponseWriter, r *http.Request, j
 	queue := s.daemon.GetQueue()
 	job, err := queue.GetJob(jobID)
 	if err != nil {
-		if IsNotFoundError(err) {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
-			return
-		}
-		s.logger.Errorw("Failed to get async job", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		handleError(w, s.logger, err, "failed to get async job")
 		return
 	}
 
