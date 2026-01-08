@@ -8,6 +8,10 @@ on:
       - '**.nix'
       - 'flake.lock'
       - 'docs/**'
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/typegen/**'
       - '.github/workflows/nix.yml'
 
 jobs:
