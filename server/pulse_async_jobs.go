@@ -145,7 +145,7 @@ func (s *QNTXServer) handleGetAsyncJob(w http.ResponseWriter, r *http.Request, j
 	queue := s.daemon.GetQueue()
 	job, err := queue.GetJob(jobID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if IsNotFoundError(err) {
 			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
 			return
 		}
