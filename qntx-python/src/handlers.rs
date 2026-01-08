@@ -219,9 +219,8 @@ impl HandlerContext {
         let state = self.state.read();
 
         // Use modules from request, fall back to configured default modules
-        let modules_to_check: Vec<String> = req
-            .modules
-            .unwrap_or_else(|| state.default_modules.clone());
+        let modules_to_check: Vec<String> =
+            req.modules.unwrap_or_else(|| state.default_modules.clone());
 
         let mut available = HashMap::new();
 

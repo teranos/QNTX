@@ -6,9 +6,8 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
-    HealthResponse, HttpHeader, HttpRequest, HttpResponse, InitializeRequest, MetadataResponse,
-    WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty, HealthResponse,
+    HttpHeader, HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
