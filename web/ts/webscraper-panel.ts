@@ -12,6 +12,7 @@ import { BasePanel } from './base-panel.ts';
 import { escapeHtml } from './html-utils.ts';
 import { toast } from './toast.ts';
 import { debugLog } from './debug.ts';
+import { createRichErrorState, type RichError } from './base-panel-error.ts';
 
 interface ScrapeRequest {
     url: string;
@@ -43,6 +44,88 @@ class WebscraperPanel extends BasePanel {
             useOverlay: true,
             closeOnEscape: true
         });
+    }
+
+    /**
+     * Build a rich error from a scraper error
+     * Provides helpful context and suggestions for common issues
+     */
+    private buildScraperError(error: unknown, url: string): RichError {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        // Check for plugin connection issues (404)
+        if (errorMessage.includes('404')) {
+            return {
+                title: 'Plugin Not Found',
+                message: 'The webscraper plugin endpoint is not available',
+                suggestion: 'Ensure the webscraper plugin is installed and running. Check the Plugin Panel (⚙) for plugin status.',
+                details: `URL: ${url}\n\n${errorStack || errorMessage}`
+            };
+        }
+
+        // Check for plugin unavailable (502/503)
+        if (errorMessage.includes('502') || errorMessage.includes('503')) {
+            return {
+                title: 'Plugin Unavailable',
+                message: 'Cannot connect to the webscraper plugin',
+                suggestion: 'The plugin may be starting up or has crashed. Check the Plugin Panel (⚙) and try restarting the plugin.',
+                details: `URL: ${url}\n\n${errorStack || errorMessage}`
+            };
+        }
+
+        // Check for network errors
+        if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch') || errorMessage.includes('Network')) {
+            return {
+                title: 'Network Error',
+                message: 'Unable to connect to the QNTX server',
+                suggestion: 'Check your network connection and ensure the QNTX server is running.',
+                details: `URL: ${url}\n\n${errorStack || errorMessage}`
+            };
+        }
+
+        // Check for timeout
+        if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+            return {
+                title: 'Request Timeout',
+                message: 'The scraping request took too long to complete',
+                suggestion: 'The target website may be slow or unresponsive. Try again or increase the wait time in options.',
+                details: `URL: ${url}\n\n${errorStack || errorMessage}`
+            };
+        }
+
+        // Check for invalid URL
+        if (errorMessage.includes('Invalid URL') || errorMessage.includes('invalid url')) {
+            return {
+                title: 'Invalid URL',
+                message: 'The provided URL is not valid',
+                suggestion: 'Make sure the URL starts with http:// or https:// and is properly formatted.',
+                details: `URL: ${url}`
+            };
+        }
+
+        // Generic HTTP error
+        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
+        if (httpMatch) {
+            const status = parseInt(httpMatch[1], 10);
+            return {
+                title: `HTTP Error ${status}`,
+                message: errorMessage,
+                status: status,
+                suggestion: status >= 500
+                    ? 'A server error occurred. Try again later.'
+                    : 'Check the URL and try again.',
+                details: `URL: ${url}\n\n${errorStack || errorMessage}`
+            };
+        }
+
+        // Generic error
+        return {
+            title: 'Scraping Failed',
+            message: errorMessage,
+            suggestion: 'An unexpected error occurred. Check the error details for more information.',
+            details: `URL: ${url}\n\n${errorStack || errorMessage}`
+        };
     }
 
     protected getTemplate(): string {
@@ -202,24 +285,14 @@ class WebscraperPanel extends BasePanel {
         } catch (error) {
             console.error('Scraping failed:', error);
 
-            let errorMessage = 'Unknown error occurred';
-            if (error instanceof Error) {
-                // Check for plugin connection issues
-                if (error.message.includes('404')) {
-                    errorMessage = 'Plugin endpoint not found - webscraper plugin may not be running or configured correctly';
-                } else if (error.message.includes('502') || error.message.includes('503')) {
-                    errorMessage = 'Cannot connect to webscraper plugin - check plugin status in Plugin Panel';
-                } else if (error.message.includes('Network')) {
-                    errorMessage = 'Network error - check if QNTX server is running';
-                } else {
-                    errorMessage = error.message;
-                }
-            }
+            // Build rich error with helpful suggestions
+            const richError = this.buildScraperError(error, url);
 
             this.handleScraperResponse({
                 url: url,
-                error: errorMessage
-            });
+                error: richError.message,
+                _richError: richError
+            } as ScrapeResult & { _richError: RichError });
         }
 
         debugLog('WebscraperPanel', 'Sent scrape request', request);
@@ -298,11 +371,25 @@ class WebscraperPanel extends BasePanel {
         card.className = 'scraper-result-card';
 
         if (result.error) {
-            card.innerHTML = `
-                <div class="scraper-result-error">
-                    <strong>Error:</strong> ${escapeHtml(result.error)}
-                </div>
-            `;
+            // Use rich error display if available
+            const richError = (result as ScrapeResult & { _richError?: RichError })._richError;
+            if (richError) {
+                card.appendChild(createRichErrorState(richError, () => {
+                    // Retry scraping the same URL
+                    const urlInput = this.$<HTMLInputElement>('#scraper-url');
+                    if (urlInput && result.url) {
+                        urlInput.value = result.url;
+                        this.handleSubmit();
+                    }
+                }));
+            } else {
+                // Fallback to simple error display
+                card.innerHTML = `
+                    <div class="scraper-result-error">
+                        <strong>Error:</strong> ${escapeHtml(result.error)}
+                    </div>
+                `;
+            }
         } else {
             let html = `
                 <div class="scraper-result-header">
