@@ -533,54 +533,6 @@ class PluginPanel extends BasePanel {
         }
     }
 
-    private renderDetails(details?: Record<string, unknown>): string {
-        if (!details || Object.keys(details).length === 0) {
-            return '';
-        }
-
-        const items = Object.entries(details).map(([key, value]) => {
-            let displayValue: string;
-
-            // Format binary_built timestamps specially
-            if (key === 'binary_built' && typeof value === 'string') {
-                const timestamp = parseInt(value, 10);
-                if (!isNaN(timestamp)) {
-                    const date = new Date(timestamp * 1000);
-                    const now = new Date();
-                    const diffMs = now.getTime() - date.getTime();
-                    const diffMins = Math.floor(diffMs / 60000);
-                    const diffHours = Math.floor(diffMins / 60);
-                    const diffDays = Math.floor(diffHours / 24);
-
-                    let relativeTime: string;
-                    if (diffMins < 1) {
-                        relativeTime = 'just now';
-                    } else if (diffMins < 60) {
-                        relativeTime = `${diffMins}m ago`;
-                    } else if (diffHours < 24) {
-                        relativeTime = `${diffHours}h ago`;
-                    } else {
-                        relativeTime = `${diffDays}d ago`;
-                    }
-
-                    const formattedDate = date.toLocaleString();
-                    displayValue = `${relativeTime} (${formattedDate})`;
-                } else {
-                    displayValue = String(value);
-                }
-            } else {
-                displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-            }
-
-            return `<div class="plugin-detail-item">
-                <span class="plugin-detail-key">${escapeHtml(key)}:</span>
-                <span class="plugin-detail-value">${escapeHtml(displayValue)}</span>
-            </div>`;
-        }).join('');
-
-        return `<div class="plugin-details">${items}</div>`;
-    }
-
     private async togglePluginConfig(pluginName: string): Promise<void> {
         if (this.expandedPlugin === pluginName) {
             // Collapse
@@ -633,7 +585,7 @@ class PluginPanel extends BasePanel {
                 pluginName,
                 currentConfig: { ...data.config },
                 newConfig: { ...data.config },
-                schema: data.schema,
+                schema: data.schema || {},
                 validationErrors: {},
                 needsConfirmation: false
             };

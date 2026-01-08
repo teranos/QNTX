@@ -118,8 +118,14 @@ impl DomainPluginService for PythonPluginService {
             .as_ref()
             .and_then(|c| c.config.get("default_modules"))
         {
-            state.default_modules = modules_str.split(',').map(|s| s.trim().to_string()).collect();
-            info!("Using configured default modules: {:?}", state.default_modules);
+            state.default_modules = modules_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
+            info!(
+                "Using configured default modules: {:?}",
+                state.default_modules
+            );
         }
 
         if let Err(e) = state.engine.initialize(python_paths) {
