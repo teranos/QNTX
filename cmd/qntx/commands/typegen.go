@@ -448,7 +448,14 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 		}
 	} else {
 		// Output specified: use it for all languages
-		outputDir = filepath.Join(typegenOutput, lang)
+		// For Rust and markdown, preserve the actual output structure to ensure correct import generation
+		if lang == "rust" {
+			outputDir = filepath.Join(typegenOutput, "crates/qntx/src/types")
+		} else if lang == "markdown" {
+			outputDir = filepath.Join(typegenOutput, "docs/types")
+		} else {
+			outputDir = filepath.Join(typegenOutput, lang)
+		}
 	}
 
 	switch lang {
