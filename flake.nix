@@ -356,7 +356,7 @@
                 description = "Full development environment for CI/CD pipelines";
                 image = "ghcr.io/teranos/qntx:latest";
                 architectures = [ "amd64" "arm64" ];
-                ports = [];
+                ports = [ ];
               }
               {
                 name = "qntx-code Plugin";
