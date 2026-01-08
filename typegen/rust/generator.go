@@ -17,11 +17,19 @@ func ParseFieldTags(tag *ast.BasicLit) util.FieldTagInfo {
 }
 
 // Generator implements typegen.Generator for Rust
-type Generator struct{}
+type Generator struct {
+	// IsEmbedded indicates if generating for an embedded module (uses super:: instead of crate::)
+	IsEmbedded bool
+}
 
 // NewGenerator creates a new Rust generator
 func NewGenerator() *Generator {
-	return &Generator{}
+	return &Generator{IsEmbedded: false}
+}
+
+// NewEmbeddedGenerator creates a Rust generator for embedded modules
+func NewEmbeddedGenerator() *Generator {
+	return &Generator{IsEmbedded: true}
 }
 
 // Language returns "rust"
@@ -386,7 +394,12 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	// Generate imports for external types
 	externalTypes := collectExternalTypes(result)
 	if len(externalTypes) > 0 {
-		sb.WriteString("use crate::{")
+		// Use super:: for embedded modules, crate:: for standalone
+		importPrefix := "crate"
+		if g.IsEmbedded {
+			importPrefix = "super"
+		}
+		sb.WriteString(fmt.Sprintf("use %s::{", importPrefix))
 		for i, typeName := range externalTypes {
 			if i > 0 {
 				sb.WriteString(", ")

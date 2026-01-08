@@ -10,9 +10,8 @@ mod shutdown;
 
 pub mod proto {
     //! Compiled protobuf definitions.
-    tonic::include_proto!("domain");
-    tonic::include_proto!("atsstore");
-    tonic::include_proto!("queue");
+    //! All proto files use `package protocol`, so they're compiled into a single module.
+    tonic::include_proto!("protocol");
 }
 
 pub use server::PluginServer;
