@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -126,7 +125,6 @@ type Client struct {
 	sendMsg   chan interface{} // Generic message channel for ix progress/errors
 	id        string
 	closeOnce sync.Once       // Defensive: Prevents double-close panics
-	closed    atomic.Bool     // Set to true when channels are closed; prevents send-to-closed-channel panic
 	graphView *GraphViewState // Phase 2: Client's graph visibility preferences
 	lastQuery string          // Phase 2: Last executed query for re-rendering with new visibility
 }
@@ -829,12 +827,9 @@ func base64Decode(data string) (string, error) {
 }
 
 // close safely closes the client's channels using sync.Once to prevent double-close panics.
-// The closed flag is set BEFORE closing channels to prevent send-to-closed-channel panics
-// in broadcastMessage() which may be iterating over clients concurrently.
+// Only called from the broadcast worker goroutine (single-writer model).
 func (c *Client) close() {
 	c.closeOnce.Do(func() {
-		// Set closed flag BEFORE closing channels to signal senders to stop
-		c.closed.Store(true)
 		if c.send != nil {
 			close(c.send)
 		}
@@ -845,10 +840,4 @@ func (c *Client) close() {
 			close(c.sendMsg)
 		}
 	})
-}
-
-// IsClosed returns true if the client's channels have been closed.
-// Use this to check before sending to avoid panic from send-to-closed-channel.
-func (c *Client) IsClosed() bool {
-	return c.closed.Load()
 }

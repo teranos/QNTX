@@ -175,12 +175,8 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) []*async.Job {
 }
 
 // sendJobToClient sends a job update message to a specific client.
+// Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial bool) {
-	// Check if client is closed before sending to prevent panic
-	if client.IsClosed() {
-		return
-	}
-
 	metadata := map[string]interface{}{
 		"timestamp": time.Now().Unix(),
 		"initial":   isInitial,
@@ -192,10 +188,19 @@ func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial b
 		Metadata: metadata,
 	}
 
+	// Send to broadcast worker (thread-safe)
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id, // Send to specific client only
+	}
+
 	select {
-	case client.sendMsg <- msg:
+	case s.broadcastReq <- req:
+	case <-s.ctx.Done():
+		return
 	default:
-		s.logger.Warnw("Client sendMsg channel full, skipping job",
+		s.logger.Warnw("Broadcast request queue full, skipping job",
 			"client_id", client.id,
 			"job_id", job.ID,
 		)

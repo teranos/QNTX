@@ -149,11 +149,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
-		daemon:        daemon,              // Use daemon with server context
-		pluginManager: deps.pluginManager,  // May be nil if no plugins enabled
-		ticker:        nil,                 // Will be set below after passing server as broadcaster
+		daemon:        daemon,             // Use daemon with server context
+		pluginManager: deps.pluginManager, // May be nil if no plugins enabled
+		ticker:        nil,                // Will be set below after passing server as broadcaster
 		clients:       make(map[*Client]bool),
 		broadcast:     make(chan *graph.Graph, MaxClientMessageQueueSize),
+		broadcastReq:  make(chan *broadcastRequest, MaxClientMessageQueueSize*2), // 2x buffer for multiple message types
 		register:      make(chan *Client),
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
@@ -167,6 +168,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	server.verbosity.Store(int32(verbosity))
 	server.graphLimit.Store(1000)                 // Default graph node limit
 	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
+
+	// Configure log transport to route sends through broadcast worker (thread-safe)
+	wsTransport.SetSendFunc(server.sendLogBatch)
 
 	// Initialize domain plugin registry
 	pluginRegistry := plugin.GetDefaultRegistry()
@@ -319,7 +323,7 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore zapcore.Core, ws
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
 		pluginManager: pluginManager, // May be nil if no plugins are enabled
-		config:        cfg,            // GRACE Phase 2 optimization: save for reuse
+		config:        cfg,           // GRACE Phase 2 optimization: save for reuse
 	}, nil
 }
 
