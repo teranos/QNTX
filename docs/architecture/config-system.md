@@ -2,7 +2,7 @@
 
 ## Overview
 
-QNTX uses a layered configuration system with five sources, merged with clear precedence rules. This design allows system-wide defaults, user preferences, team settings, and environment overrides to coexist cleanly. For the UI implementation of this system, see [Config Panel](../development/config-panel.md).
+QNTX uses a layered configuration system with five sources, merged with clear precedence rules. This design allows system-wide defaults, user preferences, team settings, and environment overrides to coexist cleanly. For the UI implementation of this system, see [Config Panel](../development/config-panel.md). For the REST API, see [Configuration API](../api/configuration.md).
 
 ## Configuration Sources
 
