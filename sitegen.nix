@@ -6,7 +6,7 @@
 , ciUser ? null
 , ciPipeline ? null
 , ciRunId ? null
-  # Nix infrastructure metadata (passed from flake)
+# Nix infrastructure metadata (passed from flake)
 , nixPackages ? [ ]
 , nixApps ? [ ]
 , nixContainers ? [ ]
