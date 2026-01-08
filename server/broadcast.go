@@ -17,6 +17,8 @@ import (
 
 // broadcastMessage sends a message to all connected clients.
 // Returns the number of clients that accepted the message (channel not full).
+// This function is safe to call concurrently with client unregistration -
+// the IsClosed() check prevents panic from sending to closed channels.
 func (s *QNTXServer) broadcastMessage(msg interface{}) int {
 	s.mu.RLock()
 	clients := make([]*Client, 0, len(s.clients))
@@ -27,6 +29,12 @@ func (s *QNTXServer) broadcastMessage(msg interface{}) int {
 
 	sent := 0
 	for _, client := range clients {
+		// Check if client is closed before sending to prevent panic.
+		// This race-safe check avoids send-to-closed-channel when a client
+		// is unregistered between copying the client list and iterating.
+		if client.IsClosed() {
+			continue
+		}
 		select {
 		case client.sendMsg <- msg:
 			sent++

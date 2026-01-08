@@ -7,6 +7,15 @@ import (
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
 // This informs the frontend about available optimizations (e.g., Rust fuzzy matching).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
+	// Check if client is closed before sending to prevent panic.
+	// This can happen if client disconnects between registration and this send.
+	if client.IsClosed() {
+		s.logger.Debugw("Client disconnected before system capabilities could be sent",
+			"client_id", client.id,
+		)
+		return
+	}
+
 	// Get fuzzy backend from the AxGraphBuilder
 	fuzzyBackend := s.builder.FuzzyBackend()
 	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust)
@@ -17,16 +26,6 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 		FuzzyBackend:   string(fuzzyBackend),
 		FuzzyOptimized: fuzzyOptimized,
 	}
-
-	// Recover from panic if client channel is closed
-	// This can happen if client disconnects between registration and this send
-	defer func() {
-		if r := recover(); r != nil {
-			s.logger.Debugw("Client disconnected before system capabilities could be sent",
-				"client_id", client.id,
-			)
-		}
-	}()
 
 	// Send to client via generic message channel
 	// Use non-blocking send to handle case where channel is full
