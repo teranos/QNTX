@@ -462,31 +462,19 @@
     font-size: 11px;
     font-family: var(--font-mono, monospace);
     color: #333;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: background 0.15s;
+}
+
+.plugin-config-value-display:hover {
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .plugin-config-value-changed {
     color: #1565c0;
     font-weight: 500;
-}
-
-/* Edit button */
-.plugin-config-edit-btn {
-    background: transparent;
-    border: none;
-    color: var(--panel-text-tertiary);
-    cursor: pointer;
-    padding: 2px 6px;
-    font-size: 12px;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s;
-}
-
-.plugin-config-row:hover .plugin-config-edit-btn {
-    opacity: 1;
-}
-
-.plugin-config-edit-btn:hover {
-    color: #000;
 }
 
 /* Edit container - input + cancel button */
