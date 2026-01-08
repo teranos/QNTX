@@ -36,6 +36,7 @@ import {
     type JobActionContext,
 } from './pulse/job-actions';
 import type { DaemonStatusMessage } from '../types/websocket';
+import { tooltip } from './tooltip.ts';
 
 // Global daemon status (updated via WebSocket)
 let currentDaemonStatus: DaemonStatusMessage | null = null;
@@ -47,6 +48,7 @@ class PulsePanel extends BasePanel {
     private jobs: Map<string, ScheduledJobResponse> = new Map();
     private state: PulsePanelState;
     private unsubscribers: Array<() => void> = [];
+    private tooltipCleanup: (() => void) | null = null;
 
     constructor() {
         super({
@@ -124,6 +126,14 @@ class PulsePanel extends BasePanel {
         await this.renderSystemStatus();
         await this.renderActiveQueue();
         this.renderSchedules();
+
+        // Attach tooltips to the panel content
+        if (this.tooltipCleanup) {
+            this.tooltipCleanup();
+        }
+        if (this.panel) {
+            this.tooltipCleanup = tooltip.attach(this.panel);
+        }
     }
 
     private async renderSystemStatus(): Promise<void> {
@@ -208,11 +218,21 @@ class PulsePanel extends BasePanel {
                 await this.handleSystemStatusAction('edit-budget');
             });
         }
+
+        // Listen for confirmation reset events (triggered when 5s timeout expires)
+        container.addEventListener('daemon-confirm-reset', async () => {
+            await this.renderSystemStatus();
+        });
     }
 
     private async handleSystemStatusAction(action: string): Promise<void> {
         const { handleSystemStatusAction } = await import('./pulse/system-status.ts');
-        await handleSystemStatusAction(action);
+        const executed = await handleSystemStatusAction(action);
+
+        // If action wasn't executed (waiting for confirmation), re-render to show confirm state
+        if (!executed) {
+            await this.renderSystemStatus();
+        }
     }
 
     /**
@@ -233,6 +253,12 @@ class PulsePanel extends BasePanel {
     protected onDestroy(): void {
         this.unsubscribers.forEach(unsub => unsub());
         this.unsubscribers = [];
+
+        // Clean up tooltip listeners
+        if (this.tooltipCleanup) {
+            this.tooltipCleanup();
+            this.tooltipCleanup = null;
+        }
     }
 }
 

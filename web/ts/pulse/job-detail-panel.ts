@@ -29,6 +29,7 @@ import {
   onExecutionLog,
   unixToISO,
 } from './events.ts';
+import type { RichError } from '../base-panel-error.ts';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;
@@ -574,8 +575,69 @@ class JobDetailPanel {
     `;
   }
 
+  /**
+   * Build a rich error from a message, with context about the current job
+   */
+  private buildRichError(message: string): RichError {
+    const lowerMessage = message.toLowerCase();
+    const jobContext = this.currentJob ? `ATS Code: ${this.currentJob.ats_code}` : '';
+
+    // Network errors
+    if (lowerMessage.includes('network') || lowerMessage.includes('failed to fetch') || lowerMessage.includes('connection')) {
+      return {
+        title: 'Network Error',
+        message: 'Unable to connect to the server',
+        suggestion: 'Check your network connection and ensure the QNTX server is running',
+        details: jobContext ? `${jobContext}\nError: ${message}` : message
+      };
+    }
+
+    // Timeout errors
+    if (lowerMessage.includes('timeout')) {
+      return {
+        title: 'Request Timeout',
+        message: 'The server took too long to respond',
+        suggestion: 'Try again or check if the server is under heavy load',
+        details: jobContext ? `${jobContext}\nError: ${message}` : message
+      };
+    }
+
+    // HTTP status code errors
+    const httpMatch = message.match(/(\d{3})/);
+    if (httpMatch) {
+      const status = parseInt(httpMatch[1], 10);
+      if (status >= 400 && status < 600) {
+        const statusInfo: Record<number, { title: string; suggestion: string }> = {
+          401: { title: 'Unauthorized', suggestion: 'Your session may have expired. Try refreshing the page.' },
+          403: { title: 'Forbidden', suggestion: 'You may not have permission to view this job.' },
+          404: { title: 'Not Found', suggestion: 'This job may have been deleted.' },
+          500: { title: 'Server Error', suggestion: 'An internal error occurred. Try again later.' },
+          503: { title: 'Service Unavailable', suggestion: 'The Pulse service may be restarting.' }
+        };
+        const info = statusInfo[status] || { title: `HTTP ${status}`, suggestion: 'An unexpected error occurred.' };
+        return {
+          title: info.title,
+          message: message,
+          status,
+          suggestion: info.suggestion,
+          details: jobContext
+        };
+      }
+    }
+
+    // Generic error
+    return {
+      title: 'Error',
+      message: message,
+      suggestion: 'Try again or check the system status.',
+      details: jobContext
+    };
+  }
+
   private renderError(message: string): void {
     if (!this.panel) return;
+
+    const richError = this.buildRichError(message);
 
     // Build error display using DOM API for security
     this.panel.innerHTML = '';
@@ -603,9 +665,54 @@ class JobDetailPanel {
     const content = document.createElement('div');
     content.className = 'job-detail-content';
 
+    // Rich error container
     const errorDiv = document.createElement('div');
-    errorDiv.className = 'job-detail-error';
-    errorDiv.textContent = message;
+    errorDiv.className = 'job-detail-error job-detail-rich-error';
+    errorDiv.setAttribute('role', 'alert');
+
+    // Error title
+    const errorTitle = document.createElement('div');
+    errorTitle.className = 'job-detail-error-title';
+    errorTitle.textContent = richError.title;
+    errorDiv.appendChild(errorTitle);
+
+    // Error message
+    const errorMessage = document.createElement('div');
+    errorMessage.className = 'job-detail-error-message';
+    errorMessage.textContent = richError.message;
+    errorDiv.appendChild(errorMessage);
+
+    // Suggestion
+    if (richError.suggestion) {
+      const errorSuggestion = document.createElement('div');
+      errorSuggestion.className = 'job-detail-error-suggestion';
+      errorSuggestion.textContent = richError.suggestion;
+      errorDiv.appendChild(errorSuggestion);
+    }
+
+    // Expandable details
+    if (richError.details) {
+      const detailsEl = document.createElement('details');
+      detailsEl.className = 'job-detail-error-details';
+
+      const summaryEl = document.createElement('summary');
+      summaryEl.textContent = 'Error Details';
+      detailsEl.appendChild(summaryEl);
+
+      const preEl = document.createElement('pre');
+      preEl.className = 'job-detail-error-details-content';
+      preEl.textContent = richError.details;
+      detailsEl.appendChild(preEl);
+
+      errorDiv.appendChild(detailsEl);
+    }
+
+    // Retry button
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'job-detail-retry-btn';
+    retryBtn.textContent = 'Retry';
+    retryBtn.onclick = () => this.loadExecutions();
+    errorDiv.appendChild(retryBtn);
 
     content.appendChild(errorDiv);
 
