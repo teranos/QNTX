@@ -8,8 +8,24 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
 )
+
+// writeRichError writes a rich error response with details and stack trace
+func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	errorResponse := map[string]interface{}{
+		"error":   err.Error(),
+		"details": errors.FlattenDetails(err),
+	}
+
+	if encoded := json.NewEncoder(w).Encode(errorResponse); encoded != nil {
+		s.logger.Errorw("Failed to encode error response", "error", encoded)
+	}
+}
 
 // HandlePluginConfig handles plugin configuration operations
 // GET /api/plugins/{name}/config - Get plugin configuration
@@ -23,7 +39,11 @@ func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) 
 	pluginName := path
 
 	if pluginName == "" {
-		http.Error(w, "Plugin name required", http.StatusBadRequest)
+		err := errors.WithDetail(
+			errors.New("plugin name required in URL path"),
+			"The URL path must include the plugin name: /api/plugins/{name}/config",
+		)
+		s.writeRichError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -82,16 +102,38 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 						}
 					}
 				} else if err != nil {
+					wrappedErr := errors.Wrap(err, "ConfigSchema RPC failed")
 					s.logger.Warnw("Failed to get config schema from plugin", "plugin", pluginName, "error", err)
+					s.writeRichError(w, wrappedErr, http.StatusServiceUnavailable)
+					return
 				}
+			} else {
+				// Not an external gRPC plugin
+				err := errors.WithDetail(
+					errors.Newf("plugin %q does not support configuration", pluginName),
+					"This plugin does not implement the ConfigSchema RPC method. Only external gRPC plugins with configuration support can be configured through this API.",
+				)
+				s.writeRichError(w, err, http.StatusNotImplemented)
+				return
 			}
+		} else {
+			err := errors.WithDetail(
+				errors.Newf("plugin %q not found", pluginName),
+				"The requested plugin is not registered with the plugin manager. Check the plugin name and ensure the plugin is properly installed and loaded.",
+			)
+			s.writeRichError(w, err, http.StatusNotFound)
+			return
 		}
+	} else {
+		err := errors.New("plugin manager not initialized")
+		s.writeRichError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	response := map[string]interface{}{
 		"plugin": pluginName,
 		"config": config,
-		"schema": schema, // May be nil if plugin doesn't support schema
+		"schema": schema,
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
