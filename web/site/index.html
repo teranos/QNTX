@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX Documentation</title>
+  <link rel="icon" type="image/jpeg" href="./qntx.jpg">
+  <link rel="stylesheet" href="./css/core.css">
+  <link rel="stylesheet" href="./css/docs.css">
+</head>
+<body>
+
+<div class="doc-header">
+  <img src="./qntx.jpg" alt="QNTX Logo">
+  <h1>QNTX Documentation</h1>
+</div>
+
+<div class="search-container">
+  <input type="search" id="search-input" class="search-input"
+         placeholder="Search documentation..." aria-label="Search documentation">
+  <div id="search-results" class="search-results" hidden></div>
+</div>
+
+<nav class="quick-links">
+  <a href="./downloads.html" class="quick-link">Downloads</a>
+<a href="./infrastructure.html" class="quick-link">Build Infrastructure</a>
+<a href="./sitegen.html" class="quick-link">Sitegen</a>
+</nav>
+
+<section class="download-section quick-download">
+  <h2>Quick Download</h2>
+  <div id="latest-release">
+    <p class="loading">Loading latest release...</p>
+  </div>
+  <p style="margin-top: 12px;">
+    <a href="./downloads.html">View all downloads and installation options</a>
+  </p>
+</section>
+
+<section class="category-section">
+  <div class="category-header">
+    <h2 class="category-title">_root</h2>
+  </div>
+  <ul class="doc-list">
+    <li><a href="GLOSSARY.html"><span class="doc-name">GLOSSARY</span></a></li>
+<li><a href="README_TEMPLATE.html"><span class="doc-name">README_TEMPLATE</span></a></li>
+<li><a href="codemirror-integration.html"><span class="doc-name">Codemirror Integration</span></a></li>
+<li><a href="distribution-strategy.html"><span class="doc-name">Distribution Strategy</span></a></li>
+<li><a href="go-editor.html"><span class="doc-name">Go Editor</span></a></li>
+<li><a href="installation.html"><span class="doc-name">Installation</span></a></li>
+<li><a href="nix-development.html"><span class="doc-name">Nix Development</span></a></li>
+<li><a href="typegen.html"><span class="doc-name">Typegen</span></a></li>
+<li><a href="understanding-qntx.html"><span class="doc-name">Understanding Qntx</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">⍟</span><h2 class="category-title">Getting Started</h2><span class="category-desc">Entry points</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="getting-started/local-inference.html"><span class="doc-name">Local Inference</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">⌬</span><h2 class="category-title">Architecture</h2><span class="category-desc">System design</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="architecture/ADR-001-domain-plugin-architecture.html"><span class="doc-name">ADR 001 Domain Plugin Architecture</span></a></li>
+<li><a href="architecture/ADR-002-plugin-configuration.html"><span class="doc-name">ADR 002 Plugin Configuration</span></a></li>
+<li><a href="architecture/ADR-003-plugin-communication.html"><span class="doc-name">ADR 003 Plugin Communication</span></a></li>
+<li><a href="architecture/bounded-storage.html"><span class="doc-name">Bounded Storage</span></a></li>
+<li><a href="architecture/budget-tracking.html"><span class="doc-name">Budget Tracking</span></a></li>
+<li><a href="architecture/config-system.html"><span class="doc-name">Config System</span></a></li>
+<li><a href="architecture/pulse-async-ix.html"><span class="doc-name">Pulse Async Ix</span></a></li>
+<li><a href="architecture/pulse-resource-coordination.html"><span class="doc-name">Pulse Resource Coordination</span></a></li>
+<li><a href="architecture/two-phase-jobs.html"><span class="doc-name">Two Phase Jobs</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">⨳</span><h2 class="category-title">Development</h2><span class="category-desc">Workflows</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="development/config-panel.html"><span class="doc-name">Config Panel</span></a></li>
+<li><a href="development/design-philosophy.html"><span class="doc-name">Design Philosophy</span></a></li>
+<li><a href="development/domain-plugin-api-reference.html"><span class="doc-name">Domain Plugin Api Reference</span></a></li>
+<li><a href="development/external-plugin-guide.html"><span class="doc-name">External Plugin Guide</span></a></li>
+<li><a href="development/grace.html"><span class="doc-name">Grace</span></a></li>
+<li><a href="development/migrating-to-plugins.html"><span class="doc-name">Migrating To Plugins</span></a></li>
+<li><a href="development/pulse-execution-history.html"><span class="doc-name">Pulse Execution History</span></a></li>
+<li><a href="development/task-logging.html"><span class="doc-name">Task Logging</span></a></li>
+<li><a href="development/verbosity.html"><span class="doc-name">Verbosity</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">≡</span><h2 class="category-title">Types</h2><span class="category-desc">Type reference</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="types/README.html"><span class="doc-name">README</span></a></li>
+<li><a href="types/async.html"><span class="doc-name">Async</span></a></li>
+<li><a href="types/budget.html"><span class="doc-name">Budget</span></a></li>
+<li><a href="types/git.html"><span class="doc-name">Git</span></a></li>
+<li><a href="types/github.html"><span class="doc-name">Github</span></a></li>
+<li><a href="types/graph.html"><span class="doc-name">Graph</span></a></li>
+<li><a href="types/schedule.html"><span class="doc-name">Schedule</span></a></li>
+<li><a href="types/server.html"><span class="doc-name">Server</span></a></li>
+<li><a href="types/sym.html"><span class="doc-name">Sym</span></a></li>
+<li><a href="types/types.html"><span class="doc-name">Types</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">⋈</span><h2 class="category-title">Api</h2><span class="category-desc">API reference</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="api/README.html"><span class="doc-name">README</span></a></li>
+<li><a href="api/configuration.html"><span class="doc-name">Configuration</span></a></li>
+<li><a href="api/grpc-plugin.html"><span class="doc-name">Grpc Plugin</span></a></li>
+<li><a href="api/health-status.html"><span class="doc-name">Health Status</span></a></li>
+<li><a href="api/plugins.html"><span class="doc-name">Plugins</span></a></li>
+<li><a href="api/prose-documents.html"><span class="doc-name">Prose Documents</span></a></li>
+<li><a href="api/pulse-executions.html"><span class="doc-name">Pulse Executions</span></a></li>
+<li><a href="api/pulse-jobs.html"><span class="doc-name">Pulse Jobs</span></a></li>
+<li><a href="api/pulse-schedules.html"><span class="doc-name">Pulse Schedules</span></a></li>
+<li><a href="api/websocket.html"><span class="doc-name">Websocket</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">+</span><h2 class="category-title">Security</h2><span class="category-desc">Security</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="security/ssrf-protection.html"><span class="doc-name">Ssrf Protection</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">✦</span><h2 class="category-title">Testing</h2><span class="category-desc">Test guides</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="testing/pulse-inline-scheduling-tests.html"><span class="doc-name">Pulse Inline Scheduling Tests</span></a></li>
+  </ul>
+</section>
+<section class="category-section">
+  <div class="category-header">
+    <span class="category-symbol">⟶</span><h2 class="category-title">Vision</h2><span class="category-desc">Future direction</span>
+  </div>
+  <ul class="doc-list">
+    <li><a href="vision/tile-based-semantic-ui.html"><span class="doc-name">Tile Based Semantic Ui</span></a></li>
+  </ul>
+</section>
+
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+<script src="./js/search.js"></script>
+<script src="./js/releases.js"></script>
+</body>
+</html>

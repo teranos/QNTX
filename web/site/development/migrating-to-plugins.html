@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - migrating-to-plugins</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>Migrating Existing Features to Domain Plugins</h1>
+<p>Guide for extracting existing QNTX features into domain plugins.</p>
+<h2>Table of Contents</h2>
+<ul>
+<li><a href="#when-to-extract-a-plugin">When to Extract a Plugin</a></li>
+<li><a href="#migration-strategy">Migration Strategy</a></li>
+<li><a href="#code-domain-case-study">Code Domain Case Study</a></li>
+<li><a href="#step-by-step-migration">Step-by-Step Migration</a></li>
+<li><a href="#testing-migrated-plugins">Testing Migrated Plugins</a></li>
+<li><a href="#rollback-strategy">Rollback Strategy</a></li>
+</ul>
+<h2>When to Extract a Plugin</h2>
+<p>Extract a feature into a plugin when:</p>
+<p>✅ <strong>Domain Cohesion</strong>: Feature belongs to a distinct functional domain (code, finance, biotech, legal)
+✅ <strong>Independent Evolution</strong>: Feature needs to evolve separately from core QNTX
+✅ <strong>Third-Party Use Case</strong>: External developers might want to customize/replace this domain
+✅ <strong>Size</strong>: Feature is substantial enough to justify plugin overhead (&gt;500 LOC, multiple files)</p>
+<p>Do <strong>not</strong> extract when:</p>
+<p>❌ <strong>Core Infrastructure</strong>: Feature is fundamental to QNTX (attestation system, database, Ax query)
+❌ <strong>Cross-Cutting</strong>: Feature is used by multiple domains (logger, config)
+❌ <strong>Too Small</strong>: Feature is a single function/utility (creates unnecessary overhead)</p>
+<h2>Migration Strategy</h2>
+<h3>Phase 1: Internal Plugin (No Breaking Changes)</h3>
+<p>Move code to <code>domains/&lt;name&gt;/</code> but keep it built-in:</p>
+<pre><code>Before:                     After:
+code/                       domains/code/
+├── github/           →     ├── vcs/github/
+├── gopls/            →     ├── langserver/gopls/
+└── ast/              →     ├── ast/
+                            └── plugin.go (new)
+</code></pre>
+<p><strong>Benefits</strong>:</p>
+<ul>
+<li>Validates plugin API before external release</li>
+<li>No user-facing changes (still one binary)</li>
+<li>Easier to fix API issues</li>
+</ul>
+<h3>Phase 2: External Plugin (gRPC)</h3>
+<p>Extract to separate repository/binary:</p>
+<pre><code>QNTX Repository:            External Plugin Repository:
+main                        main
+├── domains/                └── qntx-code-plugin/
+│   └── grpc/                   ├── main.go (gRPC server)
+│       └── protocol/           ├── plugin.go (DomainPlugin impl)
+│           └── domain.proto    └── go.mod
+└── cmd/qntx/
+</code></pre>
+<p><strong>Benefits</strong>:</p>
+<ul>
+<li>Process isolation</li>
+<li>Independent versioning</li>
+<li>Private plugin development</li>
+</ul>
+<h2>Code Domain Case Study</h2>
+<p>The code domain migration (PR #130) demonstrates the internal plugin phase:</p>
+<h3>What Was Moved</h3>
+<p><strong>Before</strong> (scattered across codebase):</p>
+<pre><code>code/
+├── github/           # GitHub PR integration
+├── gopls/            # Go language server
+├── ast/              # AST transformations
+└── ixgest/git/       # Git ingestion (was in ixgest/git/)
+cmd/qntx/commands/
+├── code.go           # CLI commands
+└── ixgest_git.go
+server/
+├── code_handler.go   # HTTP handlers
+└── gopls_handler.go
+</code></pre>
+<p><strong>After</strong> (cohesive plugin):</p>
+<pre><code>domains/code/
+├── plugin.go              # DomainPlugin implementation
+├── commands.go            # CLI command builders
+├── handlers.go            # HTTP handlers
+├── vcs/github/            # GitHub integration
+├── langserver/gopls/      # gopls language server
+├── ast/                   # AST utilities
+└── ixgest/git/            # Git repository ingestion
+</code></pre>
+<h3>What Changed</h3>
+<ol>
+<li><strong>Interface Implementation</strong>: Added <code>plugin.go</code> implementing <code>DomainPlugin</code></li>
+<li><strong>CLI Integration</strong>: Commands moved from <code>cmd/</code> to <code>plugin.Commands()</code></li>
+<li><strong>HTTP Integration</strong>: Handlers moved from <code>server/</code> to <code>plugin.RegisterHTTP()</code></li>
+<li><strong>Initialization</strong>: Explicit <code>Initialize()</code> instead of package-level init</li>
+</ol>
+<h3>What Stayed The Same</h3>
+<ul>
+<li>User commands: <code>qntx code ix git &lt;repo&gt;</code> (identical)</li>
+<li>HTTP endpoints: <code>/api/code/github/pr</code> (identical)</li>
+<li>Configuration: <code>am.code.*</code> settings (identical)</li>
+<li>Database schema: No changes</li>
+</ul>
+<h2>Step-by-Step Migration</h2>
+<h3>Step 1: Identify Plugin Boundary</h3>
+<p>Determine what belongs in the plugin:</p>
+<pre><code>Domain: finance
+
+Includes:
+✅ finance/stocks/        # Stock price ingestion
+✅ finance/analysis/      # Financial analysis
+✅ finance/reporting/     # Report generation
+
+Excludes:
+❌ ats/                   # Core attestation system (used by all domains)
+❌ pulse/                 # Job system (infrastructure)
+</code></pre>
+<h3>Step 2: Create Plugin Structure</h3>
+<pre><code class="language-bash">mkdir -p domains/finance
+touch domains/finance/plugin.go
+</code></pre>
+<p><strong><code>domains/finance/plugin.go</code></strong>:</p>
+<pre><code class="language-go">package finance
+
+import (
+    "context"
+    "net/http"
+
+    "github.com/spf13/cobra"
+    "github.com/teranos/QNTX/plugin"
+)
+
+type Plugin struct {
+    services domains.ServiceRegistry
+}
+
+func NewPlugin() *Plugin {
+    return &amp;Plugin{}
+}
+
+func (p *Plugin) Metadata() domains.Metadata {
+    return domains.Metadata{
+        Name:        "finance",
+        Version:     "0.1.0",
+        QNTXVersion: "&gt;= 0.1.0",
+        Description: "Financial analysis and reporting domain",
+        Author:      "Your Organization",
+        License:     "MIT",
+    }
+}
+
+func (p *Plugin) Initialize(ctx context.Context, services domains.ServiceRegistry) error {
+    p.services = services
+    logger := services.Logger("finance")
+    logger.Info("Finance domain plugin initialized")
+    return nil
+}
+
+func (p *Plugin) Shutdown(ctx context.Context) error {
+    if p.services != nil {
+        logger := p.services.Logger("finance")
+        logger.Info("Finance domain plugin shutting down")
+    }
+    return nil
+}
+
+func (p *Plugin) Commands() []*cobra.Command {
+    // TODO: Implement
+    return nil
+}
+
+func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
+    // TODO: Implement
+    return nil
+}
+
+func (p *Plugin) RegisterWebSocket() (map[string]domains.WebSocketHandler, error) {
+    return nil, nil
+}
+
+func (p *Plugin) Health(ctx context.Context) domains.HealthStatus {
+    return domains.HealthStatus{
+        Healthy: true,
+        Message: "Finance domain operational",
+        Details: make(map[string]interface{}),
+    }
+}
+</code></pre>
+<h3>Step 3: Move Source Files</h3>
+<pre><code class="language-bash"># Move existing code
+mv finance/ domains/finance/analysis/
+mv cmd/qntx/commands/finance.go domains/finance/commands.go
+mv server/finance_handler.go domains/finance/handlers.go
+</code></pre>
+<p>Update import paths:</p>
+<pre><code class="language-go">// Before
+import "github.com/teranos/QNTX/finance/analysis"
+
+// After
+import "github.com/teranos/QNTX/plugin/finance/analysis"
+</code></pre>
+<h3>Step 4: Implement CLI Commands</h3>
+<p><strong><code>domains/finance/commands.go</code></strong>:</p>
+<pre><code class="language-go">func (p *Plugin) Commands() []*cobra.Command {
+    financeCmd := &amp;cobra.Command{
+        Use:   "finance",
+        Short: "Financial analysis tools",
+    }
+
+    financeCmd.AddCommand(&amp;cobra.Command{
+        Use:   "analyze &lt;company&gt;",
+        Short: "Analyze company financials",
+        Args:  cobra.ExactArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error {
+            return p.analyzeCompany(args[0])
+        },
+    })
+
+    return []*cobra.Command{financeCmd}
+}
+</code></pre>
+<h3>Step 5: Implement HTTP Handlers</h3>
+<p><strong><code>domains/finance/handlers.go</code></strong>:</p>
+<pre><code class="language-go">func (p *Plugin) RegisterHTTP(mux *http.ServeMux) error {
+    mux.HandleFunc("/api/finance/stocks", p.handleStocks)
+    mux.HandleFunc("/api/finance/reports/", p.handleReports)
+    return nil
+}
+
+func (p *Plugin) handleStocks(w http.ResponseWriter, r *http.Request) {
+    logger := p.services.Logger("finance")
+
+    stocks, err := p.fetchStockData()
+    if err != nil {
+        logger.Errorw("Failed to fetch stocks", "error", err)
+        http.Error(w, "Failed to fetch stocks", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(stocks)
+}
+</code></pre>
+<h3>Step 6: Register Plugin</h3>
+<p><strong><code>cmd/qntx/main.go</code></strong>:</p>
+<pre><code class="language-go">import "github.com/teranos/QNTX/plugin/finance"
+
+func initializePluginRegistry() {
+    registry := domains.NewRegistry("0.1.0")
+    domains.SetDefaultRegistry(registry)
+
+    // Register built-in plugins
+    registry.Register(code.NewPlugin())
+    registry.Register(finance.NewPlugin())  // Add new plugin
+}
+</code></pre>
+<h3>Step 7: Create Configuration File</h3>
+<p><strong><code>~/.qntx/am.finance.toml</code></strong>:</p>
+<pre><code class="language-toml"># Finance domain configuration
+
+# API configuration
+api.key = "${FINANCE_API_KEY}"  # Read from env
+api.endpoint = "https://api.example.com"
+
+# Analysis settings
+analysis.update_interval_minutes = 60
+analysis.cache_results = true
+</code></pre>
+<h3>Step 8: Test Plugin Integration</h3>
+<pre><code class="language-bash"># Build
+make
+
+# Test CLI
+./bin/qntx finance analyze AAPL
+
+# Test HTTP (with server running)
+curl http://localhost:877/api/finance/stocks
+
+# Test initialization
+./bin/qntx server
+# Should see: "Finance domain plugin initialized"
+</code></pre>
+<h2>Testing Migrated Plugins</h2>
+<h3>Unit Tests</h3>
+<p>Test plugin in isolation:</p>
+<pre><code class="language-go">// domains/finance/plugin_test.go
+func TestFinancePlugin_Initialize(t *testing.T) {
+    db := qntxtest.CreateTestDB(t)
+    logger := zaptest.NewLogger(t).Sugar()
+    store := storage.NewSQLStore(db, logger)
+    config := &amp;mockConfig{}
+
+    services := domains.NewServiceRegistry(db, logger, store, config, queue)
+
+    plugin := NewPlugin()
+    err := plugin.Initialize(context.Background(), services)
+
+    assert.NoError(t, err)
+    assert.NotNil(t, plugin.services)
+}
+</code></pre>
+<h3>Integration Tests</h3>
+<p>Test plugin with QNTX server:</p>
+<pre><code class="language-go">// server/server_test.go
+func TestServer_WithFinancePlugin(t *testing.T) {
+    db := qntxtest.CreateTestDB(t)
+    server, err := NewQNTXServer(db, "test.db", 0)
+    require.NoError(t, err)
+
+    // Verify plugin loaded
+    registry := domains.GetDefaultRegistry()
+    plugin, ok := registry.Get("finance")
+    assert.True(t, ok)
+    assert.NotNil(t, plugin)
+}
+</code></pre>
+<h3>HTTP Tests</h3>
+<p>Test HTTP endpoints:</p>
+<pre><code class="language-go">func TestFinancePlugin_StocksEndpoint(t *testing.T) {
+    // Create test server with plugin
+    mux := http.NewServeMux()
+    plugin := NewPlugin()
+    plugin.Initialize(ctx, services)
+    plugin.RegisterHTTP(mux)
+
+    // Test request
+    req := httptest.NewRequest("GET", "/api/finance/stocks", nil)
+    w := httptest.NewRecorder()
+    mux.ServeHTTP(w, req)
+
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+</code></pre>
+<h2>Rollback Strategy</h2>
+<p>If migration causes issues:</p>
+<h3>Quick Rollback (Keep Old Code)</h3>
+<p>During migration, temporarily keep old code:</p>
+<pre><code>domains/finance/         # New plugin code
+legacy/finance/          # Old code (temporary)
+</code></pre>
+<p>Build flags to toggle:</p>
+<pre><code class="language-go">//go:build !use_finance_plugin
+
+// Use legacy finance code
+</code></pre>
+<h3>Git Revert</h3>
+<p>Migration should be in single PR:</p>
+<pre><code class="language-bash">git revert &lt;migration-commit&gt;
+git push
+</code></pre>
+<h3>Feature Flag</h3>
+<p>Make plugin optional:</p>
+<pre><code class="language-toml"># am.toml
+[plugins]
+finance.enabled = false  # Disable plugin, use legacy code
+</code></pre>
+<h2>Best Practices</h2>
+<p>✅ <strong>Atomic Migration</strong>: Migrate entire domain at once (don't split across PRs)
+✅ <strong>Backward Compatibility</strong>: Maintain same CLI/HTTP interfaces
+✅ <strong>Comprehensive Tests</strong>: Test all plugin entry points
+✅ <strong>Configuration Migration</strong>: Document config changes in migration guide
+✅ <strong>Gradual Rollout</strong>: Test internally before external release</p>
+<h2>Next Steps</h2>
+<p>After successful internal plugin migration:</p>
+<ol>
+<li><strong>Validate</strong>: Run in production for 1-2 weeks</li>
+<li><strong>Document</strong>: Create plugin-specific README</li>
+<li><strong>Externalize</strong>: Implement gRPC protocol (see ADR-001)</li>
+<li><strong>Release</strong>: Publish external plugin binary</li>
+</ol>
+<h2>References</h2>
+<ul>
+<li><a href="../architecture/ADR-001-domain-plugin-architecture.html">ADR-001: Domain Plugin Architecture</a></li>
+<li><a href="./domain-plugin-api-reference.html">Domain Plugin API Reference</a></li>
+<li><a href="../../domains/code/plugin.go">Code Domain Plugin</a> (reference implementation)</li>
+</ul>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+</body>
+</html>
