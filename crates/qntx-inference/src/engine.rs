@@ -190,23 +190,25 @@ impl InferenceEngine {
         }
 
         // Create ndarray views
-        let input_ids =
-            Array2::from_shape_vec((batch_size, max_len), input_ids).map_err(|e| {
-                EngineError::Inference(format!("failed to create input_ids tensor: {}", e))
-            })?;
+        let input_ids = Array2::from_shape_vec((batch_size, max_len), input_ids).map_err(|e| {
+            EngineError::Inference(format!("failed to create input_ids tensor: {}", e))
+        })?;
 
-        let attention_mask =
-            Array2::from_shape_vec((batch_size, max_len), attention_mask).map_err(|e| {
+        let attention_mask = Array2::from_shape_vec((batch_size, max_len), attention_mask)
+            .map_err(|e| {
                 EngineError::Inference(format!("failed to create attention_mask tensor: {}", e))
             })?;
 
         // Run inference
         let outputs = model
             .session
-            .run(ort::inputs! {
-                "input_ids" => input_ids,
-                "attention_mask" => attention_mask,
-            }.map_err(|e| EngineError::Inference(e.to_string()))?)
+            .run(
+                ort::inputs! {
+                    "input_ids" => input_ids,
+                    "attention_mask" => attention_mask,
+                }
+                .map_err(|e| EngineError::Inference(e.to_string()))?,
+            )
             .map_err(|e| EngineError::Inference(e.to_string()))?;
 
         // Extract embeddings from output

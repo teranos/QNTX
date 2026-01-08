@@ -6,7 +6,9 @@ members = [
     "qntx-python",
     "web/src-tauri",
 ]
-# fuzzy-ax excluded intentionally - it's a CGO library for Go, not part of Rust ecosystem
+exclude = [
+    "ats/ax/fuzzy-ax",  # CGO library for Go, not part of Rust ecosystem
+]
 
 [workspace.package]
 version = "0.1.0"

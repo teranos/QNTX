@@ -15,7 +15,8 @@ pub fn init() {
 
 /// Initialize tracing with a custom default filter.
 pub fn init_with_filter(default_filter: &str) {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default_filter));
 
     tracing_subscriber::registry()
         .with(filter)

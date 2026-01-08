@@ -121,7 +121,10 @@ impl InferencePluginService {
 
 #[tonic::async_trait]
 impl DomainPluginService for InferencePluginService {
-    async fn metadata(&self, _request: Request<Empty>) -> Result<Response<MetadataResponse>, Status> {
+    async fn metadata(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<MetadataResponse>, Status> {
         Ok(Response::new(MetadataResponse {
             name: "qntx-inference".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -140,11 +143,7 @@ impl DomainPluginService for InferencePluginService {
         info!("Initializing inference plugin");
 
         // Extract configuration
-        let model_path = req
-            .config
-            .get("model_path")
-            .cloned()
-            .unwrap_or_default();
+        let model_path = req.config.get("model_path").cloned().unwrap_or_default();
         let tokenizer_path = req
             .config
             .get("tokenizer_path")
@@ -200,22 +199,20 @@ impl DomainPluginService for InferencePluginService {
         debug!("HTTP {} {}", req.method, req.path);
 
         let (status_code, body) = match (req.method.as_str(), req.path.as_str()) {
-            ("POST", "/embed") | ("POST", "/v1/embeddings") => {
-                match self.handle_embed(&req.body) {
-                    Ok(body) => (200, body),
-                    Err(status) => {
-                        let error = ErrorResponse {
-                            error: status.message().to_string(),
-                        };
-                        let code = match status.code() {
-                            tonic::Code::InvalidArgument => 400,
-                            tonic::Code::NotFound => 404,
-                            _ => 500,
-                        };
-                        (code, serde_json::to_vec(&error).unwrap_or_default())
-                    }
+            ("POST", "/embed") | ("POST", "/v1/embeddings") => match self.handle_embed(&req.body) {
+                Ok(body) => (200, body),
+                Err(status) => {
+                    let error = ErrorResponse {
+                        error: status.message().to_string(),
+                    };
+                    let code = match status.code() {
+                        tonic::Code::InvalidArgument => 400,
+                        tonic::Code::NotFound => 404,
+                        _ => 500,
+                    };
+                    (code, serde_json::to_vec(&error).unwrap_or_default())
                 }
-            }
+            },
             ("GET", "/health") => (200, self.handle_health_http()),
             _ => {
                 let error = ErrorResponse {

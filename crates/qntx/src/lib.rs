@@ -25,6 +25,6 @@ pub mod tracing;
 
 // Re-export commonly used items at crate root
 #[cfg(feature = "types")]
-pub use types::{Job, JobStatus, Progress, sym};
+pub use types::{sym, Job, JobStatus, Progress};
 
 pub use error::{Error, Result};
