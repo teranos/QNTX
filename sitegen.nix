@@ -15,10 +15,12 @@
 let
   inherit (pkgs) lib;
 
-  # GitHub repo for links
+  # ==========================================================================
+  # Configuration
+  # ==========================================================================
+
   githubRepo = "teranos/QNTX";
 
-  # Provenance info
   provenance = {
     commit = gitShortRev;
     fullCommit = gitRevision;
@@ -30,33 +32,21 @@ let
     runId = ciRunId;
   };
 
-  # Static assets
+  # Static assets as attrsets (single source of truth)
   cssFiles = {
     core = ./web/css/core.css;
     utilities = ./web/css/utilities.css;
     docs = ./web/css/docs.css;
   };
+
   jsFiles = {
     search = ./web/js/search.js;
     releases = ./web/js/releases.js;
   };
+
   logo = ./web/qntx.jpg;
 
-  # Use Nix's filesystem library to discover markdown files
-  docsDir = ./docs;
-  allFiles = lib.filesystem.listFilesRecursive docsDir;
-  markdownFiles =
-    let filtered = lib.filter (path: lib.hasSuffix ".md" (toString path)) allFiles;
-    in if filtered == [ ]
-    then throw "No markdown files found in docs/ directory"
-    else filtered;
-
-  # Calculate relative path from docs/ directory
-  getRelativePath = path:
-    lib.removePrefix "${toString docsDir}/" (toString path);
-
   # SEG symbol mappings for semantic navigation
-  # Based on docs/development/design-philosophy.md
   categoryMeta = {
     "getting-started" = { symbol = "⍟"; desc = "Entry points"; };
     "architecture" = { symbol = "⌬"; desc = "System design"; };
@@ -69,35 +59,78 @@ let
     "_root" = { symbol = ""; desc = ""; };
   };
 
-  # Get category metadata with fallback
-  getCategoryMeta = cat:
-    categoryMeta.${cat} or { symbol = ""; desc = ""; };
+  categoryOrder = [ "getting-started" "architecture" "development" "types" "api" "security" "testing" "vision" ];
 
-  # Create structured file info for each markdown file
-  mkFileInfo = mdPath:
-    let
-      relPath = getRelativePath mdPath;
-      dir = dirOf relPath;
-      name = lib.removeSuffix ".md" (baseNameOf relPath);
-      htmlPath = lib.removeSuffix ".md" relPath + ".html";
-      depth = lib.length (lib.filter (x: x != "") (lib.splitString "/" (if dir == "." then "" else dir)));
-      prefix = if depth == 0 then "." else lib.concatStringsSep "/" (lib.genList (_: "..") depth);
-    in
-    {
-      inherit mdPath relPath dir name htmlPath depth prefix;
-    };
+  # ==========================================================================
+  # HTML Mini-DSL
+  # ==========================================================================
 
-  # Process all files to get structured info
-  fileInfos = map mkFileInfo markdownFiles;
+  html = rec {
+    # Escape HTML entities
+    escape = s: builtins.replaceStrings
+      [ "<" ">" "&" "\"" "'" ]
+      [ "&lt;" "&gt;" "&amp;" "&quot;" "&#39;" ]
+      s;
 
-  # Group files by directory for index generation
-  groupedFiles = lib.groupBy (f: if f.dir == "." then "_root" else (lib.head (lib.splitString "/" f.dir))) fileInfos;
+    # Escape JSON string values
+    escapeJson = s: builtins.replaceStrings
+      [ "\\" "\"" "\n" "\r" "\t" ]
+      [ "\\\\" "\\\"" "\\n" "\\r" "\\t" ]
+      s;
 
-  # HTML escaping function to prevent XSS from malicious filenames
-  escapeHtml = s: builtins.replaceStrings
-    [ "<" ">" "&" "\"" "'" ]
-    [ "&lt;" "&gt;" "&amp;" "&quot;" "&#39;" ]
-    s;
+    # Build HTML tag with optional attributes
+    tag = name: attrs: content:
+      let
+        attrStr = lib.concatStringsSep " " (
+          lib.mapAttrsToList (k: v: ''${k}="${v}"'') attrs
+        );
+        attrPart = lib.optionalString (attrs != {}) " ${attrStr}";
+      in
+      "<${name}${attrPart}>${content}</${name}>";
+
+    # Self-closing tag
+    selfClosing = name: attrs:
+      let
+        attrStr = lib.concatStringsSep " " (
+          lib.mapAttrsToList (k: v: ''${k}="${v}"'') attrs
+        );
+        attrPart = lib.optionalString (attrs != {}) " ${attrStr}";
+      in
+      "<${name}${attrPart}>";
+
+    # Table builder
+    table = { class ? "nix-table", headers, rows }: ''
+      <table class="${class}">
+        <thead>
+          <tr>${lib.concatMapStringsSep "" (h: "<th>${h}</th>") headers}</tr>
+        </thead>
+        <tbody>
+          ${lib.concatMapStringsSep "\n          " (row:
+            "<tr>${lib.concatMapStringsSep "" (cell: "<td>${cell}</td>") row}</tr>"
+          ) rows}
+        </tbody>
+      </table>'';
+
+    # Section builder
+    section = { title, content, class ? "download-section" }: ''
+      <section class="${class}">
+        <h2>${title}</h2>
+        ${content}
+      </section>'';
+
+    # Code block
+    codeBlock = content: ''<div class="install-code">${content}</div>'';
+
+    # Link
+    link = { href, text, class ? null }:
+      if class != null
+      then ''<a href="${href}" class="${class}">${text}</a>''
+      else ''<a href="${href}">${text}</a>'';
+  };
+
+  # ==========================================================================
+  # Text Utilities
+  # ==========================================================================
 
   # Convert kebab-case to Title Case
   toTitleCase = s:
@@ -107,260 +140,650 @@ let
     in
     lib.concatStringsSep " " (map capitalize words);
 
-  # HTML template - head section
-  htmlHead = title: prefix: ''
+  # Strip markdown syntax for plain text (using pipe pattern)
+  stripMarkdown = s:
+    lib.pipe s [
+      (builtins.replaceStrings [ "```" ] [ "" ])
+      (builtins.replaceStrings [ "# " "## " "### " "#### " ] [ "" "" "" "" ])
+      (builtins.replaceStrings [ "**" "__" "*" "_" "`" ] [ "" "" "" "" "" ])
+      (builtins.replaceStrings [ "[" "](" ] [ "" " " ])
+    ];
+
+  # ==========================================================================
+  # Markdown Discovery
+  # ==========================================================================
+
+  docsDir = ./docs;
+  allFiles = lib.filesystem.listFilesRecursive docsDir;
+  markdownFiles =
+    let filtered = lib.filter (path: lib.hasSuffix ".md" (toString path)) allFiles;
+    in if filtered == []
+    then throw "No markdown files found in docs/ directory"
+    else filtered;
+
+  getRelativePath = path:
+    lib.removePrefix "${toString docsDir}/" (toString path);
+
+  mkFileInfo = mdPath:
+    let
+      relPath = getRelativePath mdPath;
+      dir = dirOf relPath;
+      name = lib.removeSuffix ".md" (baseNameOf relPath);
+      htmlPath = lib.removeSuffix ".md" relPath + ".html";
+      depth = lib.length (lib.filter (x: x != "") (lib.splitString "/" (if dir == "." then "" else dir)));
+      prefix = if depth == 0 then "." else lib.concatStringsSep "/" (lib.genList (_: "..") depth);
+    in
+    { inherit mdPath relPath dir name htmlPath depth prefix; };
+
+  fileInfos = map mkFileInfo markdownFiles;
+  groupedFiles = lib.groupBy (f: if f.dir == "." then "_root" else (lib.head (lib.splitString "/" f.dir))) fileInfos;
+
+  getCategoryMeta = cat: categoryMeta.${cat} or { symbol = ""; desc = ""; };
+
+  # ==========================================================================
+  # Page Template System
+  # ==========================================================================
+
+  # Common HTML head
+  mkHead = { title, prefix }: ''
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${escapeHtml title}</title>
-        <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
-        <link rel="stylesheet" href="${prefix}/css/core.css">
-        <link rel="stylesheet" href="${prefix}/css/docs.css">
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${html.escape title}</title>
+      <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
+      <link rel="stylesheet" href="${prefix}/css/core.css">
+      <link rel="stylesheet" href="${prefix}/css/docs.css">
     </head>
   '';
 
-  # Provenance footer HTML
-  # Build provenance line with available info
-  commitLink = ''<a href="https://github.com/${githubRepo}/commit/${provenance.fullCommit}">${provenance.commit}</a>'';
-  tagInfo = if provenance.tag != null then " (${provenance.tag})" else "";
-  dateInfo = if provenance.date != null then " on ${provenance.date}" else "";
-  userInfo = if provenance.user != null then " by ${provenance.user}" else "";
-  pipelineInfo =
-    if provenance.pipeline != null && provenance.runId != null
-    then '' via <a href="https://github.com/${githubRepo}/actions/runs/${provenance.runId}">${provenance.pipeline}</a>''
-    else if provenance.pipeline != null
-    then " via ${provenance.pipeline}"
-    else "";
-
-  provenanceFooter = ''
-        <footer class="site-footer">
-            <p class="provenance">Generated by ${provenance.generator} at commit ${commitLink}${tagInfo}${dateInfo}${userInfo}${pipelineInfo}</p>
-        </footer>
+  # Navigation bar
+  mkNav = { prefix }: ''
+    <nav class="doc-nav">
+      <a href="${prefix}/index.html">
+        <img src="${prefix}/qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+      </a>
+    </nav>
   '';
 
-  # Document page structure
-  docBody = prefix: ''
+  # Provenance footer
+  provenanceFooter =
+    let
+      commitLink = ''<a href="https://github.com/${githubRepo}/commit/${provenance.fullCommit}">${provenance.commit}</a>'';
+      tagPart = lib.optionalString (provenance.tag != null) " (${provenance.tag})";
+      datePart = lib.optionalString (provenance.date != null) " on ${provenance.date}";
+      userPart = lib.optionalString (provenance.user != null) " by ${provenance.user}";
+      pipelinePart =
+        if provenance.pipeline != null && provenance.runId != null
+        then '' via <a href="https://github.com/${githubRepo}/actions/runs/${provenance.runId}">${provenance.pipeline}</a>''
+        else lib.optionalString (provenance.pipeline != null) " via ${provenance.pipeline}";
+    in ''
+      <footer class="site-footer">
+        <p class="provenance">Generated by ${provenance.generator} at commit ${commitLink}${tagPart}${datePart}${userPart}${pipelinePart}</p>
+      </footer>
+    '';
+
+  # Build a complete page
+  mkPage = { title, prefix ? ".", nav ? true, content, scripts ? [] }: ''
+    ${mkHead { inherit title prefix; }}
     <body>
-        <nav class="doc-nav"><a href="${prefix}/index.html"><img src="${prefix}/qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
+      ${lib.optionalString nav (mkNav { inherit prefix; })}
+      ${content}
+      ${provenanceFooter}
+      ${lib.concatMapStringsSep "\n  " (s: ''<script src="${prefix}/js/${s}"></script>'') scripts}
+    </body>
+    </html>
   '';
 
-  # Index page structure
-  indexBody = ''
-    <body>
-        <div class="doc-header">
-            <img src="./qntx.jpg" alt="QNTX Logo">
-            <h1>QNTX Documentation</h1>
-        </div>
-        <div class="search-container">
-            <input type="search" id="search-input" class="search-input" placeholder="Search documentation..." aria-label="Search documentation">
-            <div id="search-results" class="search-results" hidden></div>
-        </div>
+  # ==========================================================================
+  # Special Pages Definition (single source of truth for quick links)
+  # ==========================================================================
 
-        <nav class="quick-links">
-            <a href="./downloads.html" class="quick-link">Downloads</a>
-            <a href="./infrastructure.html" class="quick-link">Build Infrastructure</a>
-            <a href="./sitegen.html" class="quick-link">Sitegen</a>
-        </nav>
+  specialPages = {
+    downloads = { title = "Downloads"; order = 1; };
+    infrastructure = { title = "Build Infrastructure"; order = 2; };
+    sitegen = { title = "Sitegen"; order = 3; };
+  };
 
-        <section class="download-section quick-download">
-            <h2>Quick Download</h2>
-            <div id="latest-release">
-                <p class="loading">Loading latest release...</p>
-            </div>
-            <p style="margin-top: 12px;"><a href="./downloads.html">View all downloads and installation options</a></p>
-        </section>
-  '';
+  # Generate quick links from specialPages
+  quickLinksHtml =
+    let
+      sorted = lib.sort (a: b: a.order < b.order) (
+        lib.mapAttrsToList (name: meta: meta // { inherit name; }) specialPages
+      );
+    in
+    lib.concatMapStringsSep "\n      " (p:
+      ''<a href="./${p.name}.html" class="quick-link">${p.title}</a>''
+    ) sorted;
 
-  # Category order for consistent display
-  categoryOrder = [ "getting-started" "architecture" "development" "types" "api" "security" "testing" "vision" ];
+  # ==========================================================================
+  # Component Renderers
+  # ==========================================================================
 
-  # Generate index section with SEG symbol
+  # Render package row
+  renderPackageRow = pkg: [
+    "<code>${html.escape pkg.name}</code>"
+    (html.escape pkg.description)
+    "<code>nix build .#${html.escape pkg.name}</code>"
+  ];
+
+  # Render app row
+  renderAppRow = app: [
+    "<code>${html.escape app.name}</code>"
+    (html.escape app.description)
+    "<code>nix run .#${html.escape app.name}</code>"
+  ];
+
+  # Render container card (detailed, for infrastructure page)
+  renderContainerCard = ctr: ''
+    <div class="download-card">
+      <div class="download-card-header">
+        <span class="download-card-icon">📦</span>
+        <span class="download-card-title">${html.escape ctr.name}</span>
+      </div>
+      <p class="download-card-desc">${html.escape ctr.description}</p>
+      <div class="container-details">
+        <p><strong>Image:</strong> <code>${html.escape ctr.image}</code></p>
+        <p><strong>Architectures:</strong> ${html.escape (lib.concatStringsSep ", " ctr.architectures)}</p>
+        ${lib.optionalString (ctr.ports != []) ''<p><strong>Ports:</strong> ${html.escape (lib.concatStringsSep ", " ctr.ports)}</p>''}
+      </div>
+    </div>'';
+
+  # Render container card (simple, for downloads page)
+  renderDownloadContainerCard = ctr:
+    let
+      cleanName = lib.pipe ctr.image [
+        (lib.splitString "/")
+        lib.last
+        (lib.splitString ":")
+        lib.head
+      ];
+    in ''
+    <div class="download-card">
+      <div class="download-card-header">
+        <span class="download-card-icon">📦</span>
+        <span class="download-card-title">${html.escape ctr.name}</span>
+      </div>
+      <p class="download-card-desc">${html.escape ctr.description}</p>
+      <a href="https://github.com/${githubRepo}/pkgs/container/${html.escape cleanName}" class="download-btn">View Image</a>
+    </div>'';
+
+  # Render SEG category row
+  renderCategoryRow = cat:
+    let meta = categoryMeta.${cat};
+    in [ "<code>${html.escape cat}/</code>" meta.symbol (html.escape meta.desc) ];
+
+  # Get sorted categories (respecting categoryOrder)
+  sortedCategories =
+    let
+      allCats = lib.filter (c: c != "_root") (lib.attrNames categoryMeta);
+      ordered = lib.filter (c: lib.elem c allCats) categoryOrder;
+      extra = lib.filter (c: !(lib.elem c categoryOrder)) allCats;
+    in
+    ordered ++ lib.sort (a: b: a < b) extra;
+
+  # ==========================================================================
+  # Index Page
+  # ==========================================================================
+
   genIndexSection = category: files:
     let
       sortedFiles = lib.sort (a: b: a.name < b.name) files;
       meta = getCategoryMeta category;
       categoryTitle = toTitleCase category;
-      symbolHtml = if meta.symbol != "" then ''<span class="category-symbol">${meta.symbol}</span>'' else "";
-      descHtml = if meta.desc != "" then ''<span class="category-desc">${escapeHtml meta.desc}</span>'' else "";
-      fileLinks = map (f: ''            <li><a href="${f.htmlPath}"><span class="doc-name">${escapeHtml (toTitleCase f.name)}</span></a></li>'') sortedFiles;
-    in
-    ''
-        <section class="category-section">
-            <div class="category-header">
-                ${symbolHtml}<h2 class="category-title">${escapeHtml categoryTitle}</h2>${descHtml}
-            </div>
-            <ul class="doc-list">
-    ${lib.concatStringsSep "\n" fileLinks}
-            </ul>
-        </section>'';
+      symbolHtml = lib.optionalString (meta.symbol != "") ''<span class="category-symbol">${meta.symbol}</span>'';
+      descHtml = lib.optionalString (meta.desc != "") ''<span class="category-desc">${html.escape meta.desc}</span>'';
+      fileLinks = lib.concatMapStringsSep "\n        " (f:
+        ''<li><a href="${f.htmlPath}"><span class="doc-name">${html.escape (toTitleCase f.name)}</span></a></li>''
+      ) sortedFiles;
+    in ''
+    <section class="category-section">
+      <div class="category-header">
+        ${symbolHtml}<h2 class="category-title">${html.escape categoryTitle}</h2>${descHtml}
+      </div>
+      <ul class="doc-list">
+        ${fileLinks}
+      </ul>
+    </section>'';
 
-  # Generate full index content
   indexContent =
     let
-      rootFiles = groupedFiles._root or [ ];
-      # Sort categories by defined order, then alphabetically for any extras
-      sortedCategories =
-        let
-          orderedCats = lib.filter (c: lib.hasAttr c groupedFiles) categoryOrder;
-          extraCats = lib.filter (c: c != "_root" && !(lib.elem c categoryOrder)) (lib.attrNames groupedFiles);
-        in
-        orderedCats ++ (lib.sort (a: b: a < b) extraCats);
-      rootSection = if rootFiles != [ ] then genIndexSection "_root" rootFiles else "";
-      categorySections = map (cat: genIndexSection cat groupedFiles.${cat}) sortedCategories;
+      rootFiles = groupedFiles._root or [];
+      orderedCats = lib.filter (c: lib.hasAttr c groupedFiles) categoryOrder;
+      extraCats = lib.sort (a: b: a < b) (
+        lib.filter (c: c != "_root" && !(lib.elem c categoryOrder)) (lib.attrNames groupedFiles)
+      );
+      allCats = orderedCats ++ extraCats;
+      rootSection = lib.optionalString (rootFiles != []) (genIndexSection "_root" rootFiles);
+      categorySections = lib.concatMapStringsSep "\n" (cat: genIndexSection cat groupedFiles.${cat}) allCats;
     in
-    htmlHead "QNTX Documentation" "." +
-    indexBody +
-    rootSection +
-    lib.concatStringsSep "\n" categorySections +
-    provenanceFooter +
-    ''
-        <script src="./js/search.js"></script>
-        <script src="./js/releases.js"></script>
-    </body>
-    </html>'';
+    mkPage {
+      title = "QNTX Documentation";
+      nav = false;
+      scripts = [ "search.js" "releases.js" ];
+      content = ''
+        <div class="doc-header">
+          <img src="./qntx.jpg" alt="QNTX Logo">
+          <h1>QNTX Documentation</h1>
+        </div>
+        <div class="search-container">
+          <input type="search" id="search-input" class="search-input" placeholder="Search documentation..." aria-label="Search documentation">
+          <div id="search-results" class="search-results" hidden></div>
+        </div>
 
-  # Create a separate derivation for each markdown file (enables incremental rebuilds)
+        <nav class="quick-links">
+          ${quickLinksHtml}
+        </nav>
+
+        <section class="download-section quick-download">
+          <h2>Quick Download</h2>
+          <div id="latest-release">
+            <p class="loading">Loading latest release...</p>
+          </div>
+          <p style="margin-top: 12px;"><a href="./downloads.html">View all downloads and installation options</a></p>
+        </section>
+
+        ${rootSection}
+        ${categorySections}
+      '';
+    };
+
+  # ==========================================================================
+  # Downloads Page
+  # ==========================================================================
+
+  downloadsContent =
+    let
+      nixInstallSection = html.section {
+        title = "Recommended: Install via Nix";
+        content = ''
+          <p>The easiest way to install QNTX is using the Nix package manager:</p>
+          ${html.codeBlock "nix profile install github:${githubRepo}"}
+          <p>This installs the latest version and handles all dependencies automatically.</p>
+        '';
+      };
+
+      releaseSection = html.section {
+        title = "Release Downloads";
+        content = ''
+          <div id="release-downloads">
+            <p class="loading">Loading releases...</p>
+          </div>
+        '';
+      };
+
+      containersSection = lib.optionalString (nixContainers != []) (html.section {
+        title = "Docker Images";
+        content = ''
+          <div class="download-cards">
+            ${lib.concatMapStringsSep "\n        " renderDownloadContainerCard nixContainers}
+          </div>
+        '';
+      });
+
+      sourceSection = html.section {
+        title = "Build from Source";
+        content = ''
+          <p>Clone the repository and build with Go 1.24+:</p>
+          ${html.codeBlock "git clone https://github.com/${githubRepo}.git\ncd QNTX\nmake build"}
+          <p>Or use Nix for reproducible builds:</p>
+          ${html.codeBlock "nix build github:${githubRepo}"}
+        '';
+      };
+    in
+    mkPage {
+      title = "QNTX Downloads";
+      scripts = [ "releases.js" ];
+      content = ''
+        <h1>Download QNTX</h1>
+        ${nixInstallSection}
+        ${releaseSection}
+        ${containersSection}
+        ${sourceSection}
+      '';
+    };
+
+  # ==========================================================================
+  # Infrastructure Page
+  # ==========================================================================
+
+  infrastructureContent =
+    let
+      quickStartSection = html.section {
+        title = "Quick Start";
+        content = html.codeBlock ''
+# Install Nix (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh
+
+# Build QNTX
+nix build github:${githubRepo}
+
+# Enter development shell
+nix develop github:${githubRepo}'';
+      };
+
+      packagesSection = lib.optionalString (nixPackages != []) (html.section {
+        title = "Packages";
+        content = ''
+          <p>Available Nix packages that can be built from this flake:</p>
+          ${html.table {
+            headers = [ "Package" "Description" "Build Command" ];
+            rows = map renderPackageRow nixPackages;
+          }}
+        '';
+      });
+
+      appsSection = lib.optionalString (nixApps != []) (html.section {
+        title = "Apps";
+        content = ''
+          <p>Runnable applications for common tasks:</p>
+          ${html.table {
+            headers = [ "App" "Description" "Run Command" ];
+            rows = map renderAppRow nixApps;
+          }}
+        '';
+      });
+
+      containersSection = lib.optionalString (nixContainers != []) (html.section {
+        title = "Container Images";
+        content = ''
+          <p>Docker/OCI container images built with Nix for reproducible deployments:</p>
+          <div class="download-cards">
+            ${lib.concatMapStringsSep "\n        " renderContainerCard nixContainers}
+          </div>
+        '';
+      });
+
+      devShellSection = html.section {
+        title = "Development Shell";
+        content = ''
+          <p>The development shell includes all tools needed to build and test QNTX:</p>
+          ${html.codeBlock "nix develop"}
+          <p>This provides: Go, Rust, Python, protobuf, SQLite, and pre-commit hooks.</p>
+        '';
+      };
+
+      reproducibilitySection = html.section {
+        title = "Reproducibility";
+        content = ''
+          <p>All builds are fully reproducible. The same inputs always produce identical outputs:</p>
+          <ul>
+            <li><strong>Lockfile:</strong> <code>flake.lock</code> pins all dependencies</li>
+            <li><strong>Vendor hash:</strong> Go modules are content-addressed</li>
+            <li><strong>Binary cache:</strong> <code>qntx.cachix.org</code> for pre-built artifacts</li>
+          </ul>
+        '';
+      };
+    in
+    mkPage {
+      title = "QNTX Infrastructure";
+      content = ''
+        <h1>Build Infrastructure</h1>
+        <p>QNTX uses <a href="https://nixos.org/">Nix</a> for reproducible builds. All packages, container images, and development tools are defined in <code>flake.nix</code>.</p>
+
+        ${quickStartSection}
+        ${packagesSection}
+        ${appsSection}
+        ${containersSection}
+        ${devShellSection}
+        ${reproducibilitySection}
+      '';
+    };
+
+  # ==========================================================================
+  # Sitegen Self-Documentation Page
+  # ==========================================================================
+
+  # Generate file structure dynamically
+  generatedStructure =
+    let
+      # Derive root files from outputs
+      rootFilesList = [
+        { path = "index.html"; desc = "Main documentation index"; }
+        { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
+        { path = "infrastructure.html"; desc = "Nix build documentation"; }
+        { path = "sitegen.html"; desc = "This page"; }
+        { path = "search-index.json"; desc = "Search index for client-side search"; }
+        { path = "build-info.json"; desc = "Provenance metadata"; }
+        { path = "qntx.jpg"; desc = "Logo"; }
+      ];
+
+      cssFileList = lib.mapAttrsToList (name: _: { path = "css/${name}.css"; }) cssFiles;
+      jsFileList = lib.mapAttrsToList (name: _: { path = "js/${name}.js"; }) jsFiles;
+      docHtmlFiles = map (f: { path = f.htmlPath; }) fileInfos;
+      docFilesByDir = lib.groupBy (f: dirOf f.path) docHtmlFiles;
+      docDirs = lib.filter (d: d != ".") (lib.attrNames docFilesByDir);
+
+      renderEntry = prefix: file:
+        let desc = lib.optionalString (file ? desc) "  # ${file.desc}";
+        in "${prefix}${baseNameOf file.path}${desc}";
+
+      sortedRootFiles = lib.sort (a: b: a.path < b.path) rootFilesList;
+      sortedCssFiles = lib.sort (a: b: a.path < b.path) cssFileList;
+      sortedJsFiles = lib.sort (a: b: a.path < b.path) jsFileList;
+      sortedDocDirs = lib.sort (a: b: a < b) docDirs;
+
+      rootEntries = lib.imap0 (i: f:
+        renderEntry (if i == lib.length sortedRootFiles - 1 && sortedDocDirs == [] then "└── " else "├── ") f
+      ) sortedRootFiles;
+
+      cssEntries = ["├── css/"] ++ lib.imap0 (i: f:
+        renderEntry (if i == lib.length sortedCssFiles - 1 then "│   └── " else "│   ├── ") f
+      ) sortedCssFiles;
+
+      jsEntries = ["├── js/"] ++ lib.imap0 (i: f:
+        renderEntry (if i == lib.length sortedJsFiles - 1 then "│   └── " else "│   ├── ") f
+      ) sortedJsFiles;
+
+      docDirEntries = lib.concatLists (lib.imap0 (di: dir:
+        let
+          isLast = di == lib.length sortedDocDirs - 1;
+          dirPrefix = if isLast then "└── " else "├── ";
+          filePrefix = if isLast then "    " else "│   ";
+          dirFiles = lib.sort (a: b: a.path < b.path) docFilesByDir.${dir};
+        in
+        ["${dirPrefix}${dir}/"] ++ lib.imap0 (fi: f:
+          "${if fi == lib.length dirFiles - 1 then "${filePrefix}└── " else "${filePrefix}├── "}${baseNameOf f.path}"
+        ) dirFiles
+      ) sortedDocDirs);
+    in
+    ["qntx-docs-site/"] ++ rootEntries ++ cssEntries ++ jsEntries ++ docDirEntries;
+
+  sitegenContent =
+    let
+      featuresSection = html.section {
+        title = "Features";
+        content = html.table {
+          headers = [ "Feature" "Description" ];
+          rows = [
+            [ "<strong>Pure Nix</strong>" "Entire generator written in Nix - no shell scripts, no external build tools" ]
+            [ "<strong>Markdown to HTML</strong>" ''Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a>'' ]
+            [ "<strong>SEG Symbol Navigation</strong>" "Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API" ]
+            [ "<strong>Client-side Search</strong>" "Build-time JSON index with JavaScript search - no server required" ]
+            [ "<strong>Dark Mode</strong>" "Automatic dark/light theme via <code>prefers-color-scheme</code>" ]
+            [ "<strong>GitHub Releases</strong>" "Dynamic release downloads fetched client-side from GitHub API" ]
+            [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
+            [ "<strong>Self-documenting Infra</strong>" "Nix packages, apps, and containers documented from flake metadata" ]
+            [ "<strong>Incremental Builds</strong>" "Each markdown file is a separate derivation for faster rebuilds" ]
+          ];
+        };
+      };
+
+      structureSection = html.section {
+        title = "Generated Structure";
+        content = ''
+          <p>This structure is generated dynamically from the actual sitegen outputs (${toString (lib.length fileInfos)} documentation files discovered):</p>
+          ${html.codeBlock (lib.concatStringsSep "\n" generatedStructure)}
+        '';
+      };
+
+      howItWorksSection = html.section {
+        title = "How It Works";
+        content = ''
+          <h3>1. Markdown Discovery</h3>
+          <p>Uses <code>lib.filesystem.listFilesRecursive</code> to find all <code>.md</code> files in <code>docs/</code>:</p>
+          ${html.codeBlock ''markdownFiles = lib.filter (path: lib.hasSuffix ".md" (toString path))
+  (lib.filesystem.listFilesRecursive ./docs);''}
+
+          <h3>2. Per-file Derivations</h3>
+          <p>Each markdown file becomes its own Nix derivation, enabling incremental builds:</p>
+          ${html.codeBlock ''mkHtmlDerivation = fileInfo:
+  pkgs.runCommand "qntx-doc-''${fileInfo.name}" {
+    nativeBuildInputs = [ pkgs.pulldown-cmark ];
+  } '''
+    pulldown-cmark input.md > $out/output.html
+  '''
+;''}
+
+          <h3>3. Compositional Assembly</h3>
+          <p>All derivations combined with <code>symlinkJoin</code>:</p>
+          ${html.codeBlock ''pkgs.symlinkJoin {
+  name = "qntx-docs-site";
+  paths = [ staticAssets indexFile downloadsFile ... ] ++ htmlDerivations;
+}''}
+        '';
+      };
+
+      provenanceParamsSection = html.section {
+        title = "Provenance Parameters";
+        content = ''
+          <p>Sitegen accepts these parameters for build provenance:</p>
+          ${html.table {
+            headers = [ "Parameter" "Type" "Description" ];
+            rows = [
+              [ "<code>gitRevision</code>" "string" "Full commit hash" ]
+              [ "<code>gitShortRev</code>" "string" "Short commit hash (displayed)" ]
+              [ "<code>gitTag</code>" "string?" ''Release tag (e.g., "v1.0.0")'' ]
+              [ "<code>buildDate</code>" "string?" ''Build date (e.g., "2025-01-08")'' ]
+              [ "<code>ciUser</code>" "string?" ''CI actor (e.g., "github-actions")'' ]
+              [ "<code>ciPipeline</code>" "string?" "Workflow name" ]
+              [ "<code>ciRunId</code>" "string?" "GitHub Actions run ID (links to run)" ]
+            ];
+          }}
+        '';
+      };
+
+      infraMetadataSection = html.section {
+        title = "Infrastructure Metadata";
+        content = ''
+          <p>Pass Nix infrastructure metadata to generate the infrastructure page:</p>
+          ${html.table {
+            headers = [ "Parameter" "Type" "Description" ];
+            rows = [
+              [ "<code>nixPackages</code>" "[{name, description}]" "List of buildable packages" ]
+              [ "<code>nixApps</code>" "[{name, description}]" "List of runnable apps" ]
+              [ "<code>nixContainers</code>" "[{name, description, image, architectures, ports}]" "List of container images" ]
+            ];
+          }}
+        '';
+      };
+
+      buildingSection = html.section {
+        title = "Building the Site";
+        content = html.codeBlock ''
+# Build docs site
+nix build .#docs-site
+
+# Copy to web/site/ for serving
+nix run .#build-docs-site
+
+# Serve locally (example with Python)
+cd result && python -m http.server 8000'';
+      };
+
+      addingDocsSection = html.section {
+        title = "Adding Documentation";
+        content = ''
+          <p>To add new documentation:</p>
+          <ol>
+            <li>Create a markdown file in <code>docs/</code> (e.g., <code>docs/guides/my-guide.md</code>)</li>
+            <li>The file will be automatically discovered and converted to HTML</li>
+            <li>Category is determined by the first directory (e.g., <code>guides/</code>)</li>
+            <li>Links between docs: use <code>.md</code> extension (auto-rewritten to <code>.html</code>)</li>
+          </ol>
+        '';
+      };
+
+      segMappingSection = html.section {
+        title = "SEG Category Mapping";
+        content = ''
+          <p>Directories are mapped to SEG symbols for semantic navigation (${toString (lib.length sortedCategories)} categories defined):</p>
+          ${html.table {
+            headers = [ "Directory" "Symbol" "Meaning" ];
+            rows = map renderCategoryRow sortedCategories;
+          }}
+        '';
+      };
+    in
+    mkPage {
+      title = "QNTX Sitegen";
+      content = ''
+        <h1>Documentation Generator</h1>
+        <p>This documentation site is generated by <code>sitegen.nix</code>, a pure Nix static site generator. No external tools or build steps required beyond Nix itself.</p>
+
+        ${featuresSection}
+        ${structureSection}
+        ${howItWorksSection}
+        ${provenanceParamsSection}
+        ${infraMetadataSection}
+        ${buildingSection}
+        ${addingDocsSection}
+        ${segMappingSection}
+      '';
+    };
+
+  # ==========================================================================
+  # Markdown to HTML Derivations
+  # ==========================================================================
+
   mkHtmlDerivation = fileInfo:
     let
-      # Read markdown content and rewrite .md links to .html (pure Nix)
       mdContent = builtins.readFile fileInfo.mdPath;
       rewrittenMd = builtins.replaceStrings [ ".md)" ] [ ".html)" ] mdContent;
     in
     pkgs.runCommand "qntx-doc-${fileInfo.name}"
-      {
-        nativeBuildInputs = [ pkgs.pulldown-cmark ];
-      }
+      { nativeBuildInputs = [ pkgs.pulldown-cmark ]; }
       ''
         mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
         {
           cat <<'EOF'
-${htmlHead "QNTX - ${fileInfo.name}" fileInfo.prefix}
-${docBody fileInfo.prefix}
+${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; }}
+<body>
+  ${mkNav { prefix = fileInfo.prefix; }}
 EOF
           cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
 ${rewrittenMd}
 EOF
           cat <<'EOF'
 ${provenanceFooter}
+</body>
+</html>
 EOF
-          echo "    </body>"
-          echo "</html>"
         } > "$out/${fileInfo.htmlPath}"
       '';
 
-  # Generate all HTML file derivations
   htmlDerivations = map mkHtmlDerivation fileInfos;
 
-  # Generate search index JSON
-  # Escape for JSON string values
-  escapeJson = s: builtins.replaceStrings
-    [ "\\" "\"" "\n" "\r" "\t" ]
-    [ "\\\\" "\\\"" "\\n" "\\r" "\\t" ]
-    s;
+  # ==========================================================================
+  # Search Index
+  # ==========================================================================
 
-  # Strip markdown syntax for plain text content
-  stripMarkdown = s:
-    let
-      # Remove code blocks
-      noCodeBlocks = builtins.replaceStrings [ "```" ] [ "" ] s;
-      # Remove headers markers
-      noHeaders = builtins.replaceStrings [ "# " "## " "### " "#### " ] [ "" "" "" "" ] noCodeBlocks;
-      # Remove emphasis markers
-      noEmphasis = builtins.replaceStrings [ "**" "__" "*" "_" "`" ] [ "" "" "" "" "" ] noHeaders;
-      # Remove link syntax [text](url) -> text (simplified)
-      noLinks = builtins.replaceStrings [ "[" "](" ] [ "" " " ] noEmphasis;
-    in
-    noLinks;
-
-  # Generate search index entry for a file
   mkSearchEntry = fileInfo:
     let
       mdContent = builtins.readFile fileInfo.mdPath;
-      # Get first 500 chars of stripped content for search
       strippedContent = stripMarkdown mdContent;
       truncatedContent = lib.substring 0 500 strippedContent;
       category = if fileInfo.dir == "." then "General" else toTitleCase (lib.head (lib.splitString "/" fileInfo.dir));
     in
-    ''{"title":"${escapeJson (toTitleCase fileInfo.name)}","path":"${fileInfo.htmlPath}","category":"${escapeJson category}","content":"${escapeJson truncatedContent}"}'';
+    ''{"title":"${html.escapeJson (toTitleCase fileInfo.name)}","path":"${fileInfo.htmlPath}","category":"${html.escapeJson category}","content":"${html.escapeJson truncatedContent}"}'';
 
-  searchIndexContent = "[" + lib.concatStringsSep "," (map mkSearchEntry fileInfos) + "]";
+  searchIndexContent = "[${lib.concatMapStringsSep "," mkSearchEntry fileInfos}]";
 
-  searchIndexFile = pkgs.writeTextFile {
-    name = "qntx-docs-search-index";
-    text = searchIndexContent;
-    destination = "/search-index.json";
-  };
+  # ==========================================================================
+  # Build Info JSON
+  # ==========================================================================
 
-  # Static assets using linkFarm (pure Nix)
-  staticAssets = pkgs.linkFarm "qntx-docs-static" [
-    { name = "css/core.css"; path = cssFiles.core; }
-    { name = "css/utilities.css"; path = cssFiles.utilities; }
-    { name = "css/docs.css"; path = cssFiles.docs; }
-    { name = "js/search.js"; path = jsFiles.search; }
-    { name = "js/releases.js"; path = jsFiles.releases; }
-    { name = "qntx.jpg"; path = logo; }
-  ];
-
-  # Index file as a derivation
-  indexFile = pkgs.writeTextFile {
-    name = "qntx-docs-index";
-    text = indexContent;
-    destination = "/index.html";
-  };
-
-  # GitHub release base URL
-  githubReleasesUrl = "https://github.com/${githubRepo}/releases";
-
-  # Downloads page content
-  downloadsContent =
-    htmlHead "QNTX Downloads" "." +
-    ''
-    <body>
-        <nav class="doc-nav"><a href="./index.html"><img src="./qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
-
-        <h1>Download QNTX</h1>
-
-        <section class="download-section">
-            <h2>Recommended: Install via Nix</h2>
-            <p>The easiest way to install QNTX is using the Nix package manager:</p>
-            <div class="install-code">nix profile install github:${githubRepo}</div>
-            <p>This installs the latest version and handles all dependencies automatically.</p>
-        </section>
-
-        <section class="download-section">
-            <h2>Release Downloads</h2>
-            <div id="release-downloads">
-                <p class="loading">Loading releases...</p>
-            </div>
-        </section>
-
-${downloadContainersSection}
-
-        <section class="download-section">
-            <h2>Build from Source</h2>
-            <p>Clone the repository and build with Go 1.24+:</p>
-            <div class="install-code">git clone https://github.com/${githubRepo}.git
-cd QNTX
-make build</div>
-            <p>Or use Nix for reproducible builds:</p>
-            <div class="install-code">nix build github:${githubRepo}</div>
-        </section>
-
-${provenanceFooter}
-        <script src="./js/releases.js"></script>
-    </body>
-    </html>'';
-
-  downloadsFile = pkgs.writeTextFile {
-    name = "qntx-docs-downloads";
-    text = downloadsContent;
-    destination = "/downloads.html";
-  };
-
-  # Build info JSON for programmatic access
-  # Filter out null values for cleaner JSON
   buildInfoContent = builtins.toJSON (lib.filterAttrs (_: v: v != null) {
     generator = provenance.generator;
     commit = provenance.fullCommit;
@@ -373,493 +796,56 @@ ${provenanceFooter}
     repository = "https://github.com/${githubRepo}";
   });
 
-  buildInfoFile = pkgs.writeTextFile {
-    name = "qntx-docs-build-info";
-    text = buildInfoContent;
-    destination = "/build-info.json";
-  };
+  # ==========================================================================
+  # Static Assets (generated from attrsets)
+  # ==========================================================================
 
-  # Infrastructure documentation page
-  # Generate package list HTML
-  renderPackage = pkg: ''
-            <tr>
-                <td><code>${escapeHtml pkg.name}</code></td>
-                <td>${escapeHtml pkg.description}</td>
-                <td><code>nix build .#${escapeHtml pkg.name}</code></td>
-            </tr>'';
+  staticAssets = pkgs.linkFarm "qntx-docs-static" (
+    lib.mapAttrsToList (name: path: { name = "css/${name}.css"; inherit path; }) cssFiles
+    ++ lib.mapAttrsToList (name: path: { name = "js/${name}.js"; inherit path; }) jsFiles
+    ++ [{ name = "qntx.jpg"; path = logo; }]
+  );
 
-  renderApp = app: ''
-            <tr>
-                <td><code>${escapeHtml app.name}</code></td>
-                <td>${escapeHtml app.description}</td>
-                <td><code>nix run .#${escapeHtml app.name}</code></td>
-            </tr>'';
+  # ==========================================================================
+  # Output Derivations (single source of truth)
+  # ==========================================================================
 
-  renderContainer = ctr: ''
-            <div class="download-card">
-                <div class="download-card-header">
-                    <span class="download-card-icon">📦</span>
-                    <span class="download-card-title">${escapeHtml ctr.name}</span>
-                </div>
-                <p class="download-card-desc">${escapeHtml ctr.description}</p>
-                <div class="container-details">
-                    <p><strong>Image:</strong> <code>${escapeHtml ctr.image}</code></p>
-                    <p><strong>Architectures:</strong> ${escapeHtml (lib.concatStringsSep ", " ctr.architectures)}</p>
-                    ${if ctr.ports != [] then ''<p><strong>Ports:</strong> ${escapeHtml (lib.concatStringsSep ", " ctr.ports)}</p>'' else ""}
-                </div>
-            </div>'';
-
-  # Simpler container card for downloads page (links to GitHub packages)
-  renderDownloadContainer = ctr:
-    let
-      # Extract package name from image URL for GitHub link
-      imageParts = lib.splitString "/" ctr.image;
-      packageName = lib.last imageParts;
-      # Remove :tag if present
-      cleanName = lib.head (lib.splitString ":" packageName);
-    in ''
-                <div class="download-card">
-                    <div class="download-card-header">
-                        <span class="download-card-icon">📦</span>
-                        <span class="download-card-title">${escapeHtml ctr.name}</span>
-                    </div>
-                    <p class="download-card-desc">${escapeHtml ctr.description}</p>
-                    <a href="https://github.com/${githubRepo}/pkgs/container/${escapeHtml cleanName}" class="download-btn">View Image</a>
-                </div>'';
-
-  # Generate downloads page container section from nixContainers
-  downloadContainersSection = if nixContainers == [] then "" else ''
-        <section class="download-section">
-            <h2>Docker Images</h2>
-            <div class="download-cards">
-${lib.concatStringsSep "\n" (map renderDownloadContainer nixContainers)}
-            </div>
-        </section>
-  '';
-
-  # Generate SEG category mapping table from categoryMeta
-  segCategoryRows =
-    let
-      # Filter out _root and sort by categoryOrder
-      categories = lib.filter (c: c != "_root") (lib.attrNames categoryMeta);
-      sortedCategories = lib.filter (c: lib.elem c categories) categoryOrder
-        ++ lib.filter (c: !(lib.elem c categoryOrder) && c != "_root") categories;
-    in
-    lib.concatStringsSep "\n" (map (cat:
-      let meta = categoryMeta.${cat};
-      in ''                    <tr><td><code>${escapeHtml cat}/</code></td><td>${meta.symbol}</td><td>${escapeHtml meta.desc}</td></tr>''
-    ) sortedCategories);
-
-  packagesSection = if nixPackages == [] then "" else ''
-        <section class="download-section">
-            <h2>Packages</h2>
-            <p>Available Nix packages that can be built from this flake:</p>
-            <table class="nix-table">
-                <thead>
-                    <tr>
-                        <th>Package</th>
-                        <th>Description</th>
-                        <th>Build Command</th>
-                    </tr>
-                </thead>
-                <tbody>
-${lib.concatStringsSep "\n" (map renderPackage nixPackages)}
-                </tbody>
-            </table>
-        </section>
-  '';
-
-  appsSection = if nixApps == [] then "" else ''
-        <section class="download-section">
-            <h2>Apps</h2>
-            <p>Runnable applications for common tasks:</p>
-            <table class="nix-table">
-                <thead>
-                    <tr>
-                        <th>App</th>
-                        <th>Description</th>
-                        <th>Run Command</th>
-                    </tr>
-                </thead>
-                <tbody>
-${lib.concatStringsSep "\n" (map renderApp nixApps)}
-                </tbody>
-            </table>
-        </section>
-  '';
-
-  containersSection = if nixContainers == [] then "" else ''
-        <section class="download-section">
-            <h2>Container Images</h2>
-            <p>Docker/OCI container images built with Nix for reproducible deployments:</p>
-            <div class="download-cards">
-${lib.concatStringsSep "\n" (map renderContainer nixContainers)}
-            </div>
-        </section>
-  '';
-
-  infrastructureContent =
-    htmlHead "QNTX Infrastructure" "." +
-    ''
-    <body>
-        <nav class="doc-nav"><a href="./index.html"><img src="./qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
-
-        <h1>Build Infrastructure</h1>
-        <p>QNTX uses <a href="https://nixos.org/">Nix</a> for reproducible builds. All packages, container images, and development tools are defined in <code>flake.nix</code>.</p>
-
-        <section class="download-section">
-            <h2>Quick Start</h2>
-            <div class="install-code"># Install Nix (if not already installed)
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh
-
-# Build QNTX
-nix build github:${githubRepo}
-
-# Enter development shell
-nix develop github:${githubRepo}</div>
-        </section>
-
-${packagesSection}
-${appsSection}
-${containersSection}
-
-        <section class="download-section">
-            <h2>Development Shell</h2>
-            <p>The development shell includes all tools needed to build and test QNTX:</p>
-            <div class="install-code">nix develop</div>
-            <p>This provides: Go, Rust, Python, protobuf, SQLite, and pre-commit hooks.</p>
-        </section>
-
-        <section class="download-section">
-            <h2>Reproducibility</h2>
-            <p>All builds are fully reproducible. The same inputs always produce identical outputs:</p>
-            <ul>
-                <li><strong>Lockfile:</strong> <code>flake.lock</code> pins all dependencies</li>
-                <li><strong>Vendor hash:</strong> Go modules are content-addressed</li>
-                <li><strong>Binary cache:</strong> <code>qntx.cachix.org</code> for pre-built artifacts</li>
-            </ul>
-        </section>
-
-${provenanceFooter}
-    </body>
-    </html>'';
-
-  infrastructureFile = pkgs.writeTextFile {
-    name = "qntx-docs-infrastructure";
-    text = infrastructureContent;
-    destination = "/infrastructure.html";
-  };
-
-  # Generate file structure dynamically from actual outputs
-  # Root-level files
-  rootFiles = [
-    { path = "index.html"; desc = "Main documentation index"; }
-    { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
-    { path = "infrastructure.html"; desc = "Nix build documentation"; }
-    { path = "sitegen.html"; desc = "This page"; }
-    { path = "search-index.json"; desc = "Search index for client-side search"; }
-    { path = "build-info.json"; desc = "Provenance metadata"; }
-    { path = "qntx.jpg"; desc = "Logo"; }
-  ];
-
-  # CSS files from cssFiles attrset
-  cssFileList = lib.mapAttrsToList (name: _: { path = "css/${name}.css"; }) cssFiles;
-
-  # JS files from jsFiles attrset
-  jsFileList = lib.mapAttrsToList (name: _: { path = "js/${name}.js"; }) jsFiles;
-
-  # Documentation HTML files from fileInfos
-  docHtmlFiles = map (f: { path = f.htmlPath; }) fileInfos;
-
-  # Group doc files by directory for tree display
-  docFilesByDir = lib.groupBy (f: dirOf f.path) docHtmlFiles;
-  docDirs = lib.filter (d: d != ".") (lib.attrNames docFilesByDir);
-
-  # Render a single file entry with tree prefix
-  renderFileEntry = prefix: file:
-    let descPart = if file ? desc then "  # ${file.desc}" else "";
-    in "${prefix}${baseNameOf file.path}${descPart}";
-
-  # Generate the tree structure
-  generatedStructure =
-    let
-      # Root files (sorted)
-      sortedRootFiles = lib.sort (a: b: a.path < b.path) rootFiles;
-      rootCount = lib.length sortedRootFiles;
-
-      # CSS directory entries
-      sortedCssFiles = lib.sort (a: b: a.path < b.path) cssFileList;
-      cssCount = lib.length sortedCssFiles;
-
-      # JS directory entries
-      sortedJsFiles = lib.sort (a: b: a.path < b.path) jsFileList;
-      jsCount = lib.length sortedJsFiles;
-
-      # Doc directories (sorted)
-      sortedDocDirs = lib.sort (a: b: a < b) docDirs;
-
-      # Render root files
-      rootEntries = lib.imap0 (i: f:
-        let prefix = if i == rootCount - 1 && sortedDocDirs == [] then "└── " else "├── ";
-        in renderFileEntry prefix f
-      ) sortedRootFiles;
-
-      # Render CSS directory
-      cssEntries = ["├── css/"] ++ lib.imap0 (i: f:
-        let prefix = if i == cssCount - 1 then "│   └── " else "│   ├── ";
-        in renderFileEntry prefix f
-      ) sortedCssFiles;
-
-      # Render JS directory
-      jsEntries = ["├── js/"] ++ lib.imap0 (i: f:
-        let prefix = if i == jsCount - 1 then "│   └── " else "│   ├── ";
-        in renderFileEntry prefix f
-      ) sortedJsFiles;
-
-      # Render doc directories
-      docDirCount = lib.length sortedDocDirs;
-      docDirEntries = lib.concatLists (lib.imap0 (di: dir:
-        let
-          isLastDir = di == docDirCount - 1;
-          dirPrefix = if isLastDir then "└── " else "├── ";
-          filePrefix = if isLastDir then "    " else "│   ";
-          dirFiles = lib.sort (a: b: a.path < b.path) docFilesByDir.${dir};
-          fileCount = lib.length dirFiles;
-        in
-        ["${dirPrefix}${dir}/"] ++ lib.imap0 (fi: f:
-          let fPrefix = if fi == fileCount - 1 then "${filePrefix}└── " else "${filePrefix}├── ";
-          in "${fPrefix}${baseNameOf f.path}"
-        ) dirFiles
-      ) sortedDocDirs);
-
-    in
-    ["qntx-docs-site/"] ++ rootEntries ++ cssEntries ++ jsEntries ++ docDirEntries;
-
-  # Sitegen self-documentation page
-  sitegenContent =
-    htmlHead "QNTX Sitegen" "." +
-    ''
-    <body>
-        <nav class="doc-nav"><a href="./index.html"><img src="./qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
-
-        <h1>Documentation Generator</h1>
-        <p>This documentation site is generated by <code>sitegen.nix</code>, a pure Nix static site generator. No external tools or build steps required beyond Nix itself.</p>
-
-        <section class="download-section">
-            <h2>Features</h2>
-            <table class="nix-table">
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Pure Nix</strong></td>
-                        <td>Entire generator written in Nix - no shell scripts, no external build tools</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Markdown to HTML</strong></td>
-                        <td>Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>SEG Symbol Navigation</strong></td>
-                        <td>Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Client-side Search</strong></td>
-                        <td>Build-time JSON index with JavaScript search - no server required</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Dark Mode</strong></td>
-                        <td>Automatic dark/light theme via <code>prefers-color-scheme</code></td>
-                    </tr>
-                    <tr>
-                        <td><strong>GitHub Releases</strong></td>
-                        <td>Dynamic release downloads fetched client-side from GitHub API</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Provenance</strong></td>
-                        <td>Every page shows commit, tag, date, CI user, and pipeline info</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Self-documenting Infra</strong></td>
-                        <td>Nix packages, apps, and containers documented from flake metadata</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Incremental Builds</strong></td>
-                        <td>Each markdown file is a separate derivation for faster rebuilds</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="download-section">
-            <h2>Generated Structure</h2>
-            <p>This structure is generated dynamically from the actual sitegen outputs (${toString (lib.length fileInfos)} documentation files discovered):</p>
-            <div class="install-code">${lib.concatStringsSep "\n" generatedStructure}</div>
-        </section>
-
-        <section class="download-section">
-            <h2>How It Works</h2>
-            <h3>1. Markdown Discovery</h3>
-            <p>Uses <code>lib.filesystem.listFilesRecursive</code> to find all <code>.md</code> files in <code>docs/</code>:</p>
-            <div class="install-code">markdownFiles = lib.filter (path: lib.hasSuffix ".md" (toString path))
-  (lib.filesystem.listFilesRecursive ./docs);</div>
-
-            <h3>2. Per-file Derivations</h3>
-            <p>Each markdown file becomes its own Nix derivation, enabling incremental builds:</p>
-            <div class="install-code">mkHtmlDerivation = fileInfo:
-  pkgs.runCommand "qntx-doc-''${fileInfo.name}" {
-    nativeBuildInputs = [ pkgs.pulldown-cmark ];
-  } '''
-    pulldown-cmark input.md > $out/output.html
-  ''';</div>
-
-            <h3>3. Compositional Assembly</h3>
-            <p>All derivations combined with <code>symlinkJoin</code>:</p>
-            <div class="install-code">pkgs.symlinkJoin {
-  name = "qntx-docs-site";
-  paths = [ staticAssets indexFile downloadsFile ... ] ++ htmlDerivations;
-}</div>
-        </section>
-
-        <section class="download-section">
-            <h2>Provenance Parameters</h2>
-            <p>Sitegen accepts these parameters for build provenance:</p>
-            <table class="nix-table">
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Type</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>gitRevision</code></td>
-                        <td>string</td>
-                        <td>Full commit hash</td>
-                    </tr>
-                    <tr>
-                        <td><code>gitShortRev</code></td>
-                        <td>string</td>
-                        <td>Short commit hash (displayed)</td>
-                    </tr>
-                    <tr>
-                        <td><code>gitTag</code></td>
-                        <td>string?</td>
-                        <td>Release tag (e.g., "v1.0.0")</td>
-                    </tr>
-                    <tr>
-                        <td><code>buildDate</code></td>
-                        <td>string?</td>
-                        <td>Build date (e.g., "2025-01-08")</td>
-                    </tr>
-                    <tr>
-                        <td><code>ciUser</code></td>
-                        <td>string?</td>
-                        <td>CI actor (e.g., "github-actions")</td>
-                    </tr>
-                    <tr>
-                        <td><code>ciPipeline</code></td>
-                        <td>string?</td>
-                        <td>Workflow name</td>
-                    </tr>
-                    <tr>
-                        <td><code>ciRunId</code></td>
-                        <td>string?</td>
-                        <td>GitHub Actions run ID (links to run)</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="download-section">
-            <h2>Infrastructure Metadata</h2>
-            <p>Pass Nix infrastructure metadata to generate the infrastructure page:</p>
-            <table class="nix-table">
-                <thead>
-                    <tr>
-                        <th>Parameter</th>
-                        <th>Type</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>nixPackages</code></td>
-                        <td>[{name, description}]</td>
-                        <td>List of buildable packages</td>
-                    </tr>
-                    <tr>
-                        <td><code>nixApps</code></td>
-                        <td>[{name, description}]</td>
-                        <td>List of runnable apps</td>
-                    </tr>
-                    <tr>
-                        <td><code>nixContainers</code></td>
-                        <td>[{name, description, image, architectures, ports}]</td>
-                        <td>List of container images</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="download-section">
-            <h2>Building the Site</h2>
-            <div class="install-code"># Build docs site
-nix build .#docs-site
-
-# Copy to web/site/ for serving
-nix run .#build-docs-site
-
-# Serve locally (example with Python)
-cd result && python -m http.server 8000</div>
-        </section>
-
-        <section class="download-section">
-            <h2>Adding Documentation</h2>
-            <p>To add new documentation:</p>
-            <ol>
-                <li>Create a markdown file in <code>docs/</code> (e.g., <code>docs/guides/my-guide.md</code>)</li>
-                <li>The file will be automatically discovered and converted to HTML</li>
-                <li>Category is determined by the first directory (e.g., <code>guides/</code>)</li>
-                <li>Links between docs: use <code>.md</code> extension (auto-rewritten to <code>.html</code>)</li>
-            </ol>
-        </section>
-
-        <section class="download-section">
-            <h2>SEG Category Mapping</h2>
-            <p>Directories are mapped to SEG symbols for semantic navigation (${toString (lib.length (lib.filter (c: c != "_root") (lib.attrNames categoryMeta)))} categories defined):</p>
-            <table class="nix-table">
-                <thead>
-                    <tr>
-                        <th>Directory</th>
-                        <th>Symbol</th>
-                        <th>Meaning</th>
-                    </tr>
-                </thead>
-                <tbody>
-${segCategoryRows}
-                </tbody>
-            </table>
-        </section>
-
-${provenanceFooter}
-    </body>
-    </html>'';
-
-  sitegenFile = pkgs.writeTextFile {
-    name = "qntx-docs-sitegen";
-    text = sitegenContent;
-    destination = "/sitegen.html";
+  outputs = {
+    "index.html" = pkgs.writeTextFile {
+      name = "qntx-docs-index";
+      text = indexContent;
+      destination = "/index.html";
+    };
+    "downloads.html" = pkgs.writeTextFile {
+      name = "qntx-docs-downloads";
+      text = downloadsContent;
+      destination = "/downloads.html";
+    };
+    "infrastructure.html" = pkgs.writeTextFile {
+      name = "qntx-docs-infrastructure";
+      text = infrastructureContent;
+      destination = "/infrastructure.html";
+    };
+    "sitegen.html" = pkgs.writeTextFile {
+      name = "qntx-docs-sitegen";
+      text = sitegenContent;
+      destination = "/sitegen.html";
+    };
+    "search-index.json" = pkgs.writeTextFile {
+      name = "qntx-docs-search-index";
+      text = searchIndexContent;
+      destination = "/search-index.json";
+    };
+    "build-info.json" = pkgs.writeTextFile {
+      name = "qntx-docs-build-info";
+      text = buildInfoContent;
+      destination = "/build-info.json";
+    };
   };
 
 in
-# Compositional assembly: combine static assets, index, downloads, infrastructure, sitegen, search index, build info, and all HTML files
+# Compositional assembly
 pkgs.symlinkJoin {
   name = "qntx-docs-site";
-  paths = [ staticAssets indexFile downloadsFile infrastructureFile sitegenFile searchIndexFile buildInfoFile ] ++ htmlDerivations;
+  paths = [ staticAssets ] ++ lib.attrValues outputs ++ htmlDerivations;
 }
