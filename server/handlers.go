@@ -484,11 +484,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceEnabled(enabled); err != nil {
-					s.logger.Errorw("Failed to update local_inference.enabled",
-						"enabled", enabled,
-						"error", err,
-					)
-					http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
+					writeWrappedError(w, s.logger, err, "failed to update local_inference.enabled", http.StatusInternalServerError)
 					return
 				}
 				s.logger.Infow("Config updated via REST API",
@@ -504,11 +500,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceModel(model); err != nil {
-					s.logger.Errorw("Failed to update local_inference.model",
-						"model", model,
-						"error", err,
-					)
-					http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
+					writeWrappedError(w, s.logger, err, "failed to update local_inference.model", http.StatusInternalServerError)
 					return
 				}
 				s.logger.Infow("Config updated via REST API",
@@ -532,11 +524,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 	pulseLog := logger.AddPulseSymbol(s.logger)
 	if req.Pulse.DailyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateDailyBudget(*req.Pulse.DailyBudgetUSD); err != nil {
-			pulseLog.Errorw("Failed to update daily budget",
-				"daily_budget", *req.Pulse.DailyBudgetUSD,
-				"error", err,
-			)
-			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			writeWrappedError(w, s.logger, err, "failed to update daily budget", http.StatusBadRequest)
 			return
 		}
 
@@ -548,11 +536,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 	if req.Pulse.WeeklyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateWeeklyBudget(*req.Pulse.WeeklyBudgetUSD); err != nil {
-			pulseLog.Errorw("Failed to update weekly budget",
-				"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
-				"error", err,
-			)
-			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			writeWrappedError(w, s.logger, err, "failed to update weekly budget", http.StatusBadRequest)
 			return
 		}
 
@@ -564,11 +548,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 	if req.Pulse.MonthlyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateMonthlyBudget(*req.Pulse.MonthlyBudgetUSD); err != nil {
-			pulseLog.Errorw("Failed to update monthly budget",
-				"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
-				"error", err,
-			)
-			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			writeWrappedError(w, s.logger, err, "failed to update monthly budget", http.StatusBadRequest)
 			return
 		}
 

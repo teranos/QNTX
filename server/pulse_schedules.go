@@ -90,8 +90,7 @@ func (s *QNTXServer) handleListSchedules(w http.ResponseWriter, r *http.Request)
 	// List all scheduled jobs regardless of state (active, paused, inactive, etc.)
 	jobs, err := s.getScheduleStore().ListAllScheduledJobs()
 	if err != nil {
-		s.logger.Errorw("Failed to list scheduled jobs", "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list jobs: %v", err))
+		writeWrappedError(w, s.logger, err, "failed to list scheduled jobs", http.StatusInternalServerError)
 		return
 	}
 
@@ -113,10 +112,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 	var req CreateScheduledJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		pulseLog.Warnw("Pulse create job - invalid JSON",
-			"error", err,
-			"remote", r.RemoteAddr)
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+		writeWrappedError(w, s.logger, err, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -152,10 +148,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	// Generate job ID using ASID format
 	jobID, err := id.GenerateASID(req.ATSCode, "scheduled", "pulse", "system")
 	if err != nil {
-		pulseLog.Errorw("Pulse create job - ID generation failed",
-			"error", err,
-			"ats_code", req.ATSCode)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to generate job ID: %v", err))
+		writeWrappedError(w, s.logger, err, "failed to generate job ID", http.StatusInternalServerError)
 		return
 	}
 
@@ -163,11 +156,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	// This validates the ATS code format and makes the ticker domain-agnostic
 	parsed, err := ParseATSCodeWithForce(req.ATSCode, jobID, req.Force)
 	if err != nil {
-		pulseLog.Warnw("Pulse create job - invalid ATS code",
-			"error", err,
-			"ats_code", req.ATSCode,
-			"job_id", jobID)
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid ATS code: %v", err))
+		writeWrappedError(w, s.logger, err, "invalid ATS code", http.StatusBadRequest)
 		return
 	}
 
@@ -196,10 +185,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		// Start transaction for atomic job lookup/creation and execution record insert
 		tx, err := s.db.Begin()
 		if err != nil {
-			s.logger.Errorw("Failed to begin transaction for force trigger",
-				"error", err,
-				"ats_code", req.ATSCode)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to begin transaction: %v", err))
+			writeWrappedError(w, s.logger, err, "failed to begin transaction", http.StatusInternalServerError)
 			return
 		}
 		defer tx.Rollback() // Rollback if not committed
@@ -218,10 +204,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 				// No temp job exists - create temporary scheduled job for tracking
 				scheduledJobID, err = id.GenerateASID(req.ATSCode, "force-trigger", "pulse", "system")
 				if err != nil {
-					s.logger.Errorw("Failed to generate temp job ID for force trigger",
-						"error", err,
-						"ats_code", req.ATSCode)
-					writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to generate tracking job ID: %v", err))
+					writeWrappedError(w, s.logger, err, "failed to generate tracking job ID", http.StatusInternalServerError)
 					return
 				}
 
@@ -231,11 +214,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 				`, scheduledJobID, req.ATSCode, parsed.HandlerName, parsed.Payload, parsed.SourceURL, now.Format(time.RFC3339), now.Format(time.RFC3339))
 
 				if err != nil {
-					s.logger.Errorw("Failed to create temp scheduled job for force trigger",
-						"error", err,
-						"scheduled_job_id", scheduledJobID,
-						"ats_code", req.ATSCode)
-					writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create tracking job: %v", err))
+					writeWrappedError(w, s.logger, err, "failed to create tracking job", http.StatusInternalServerError)
 					return
 				}
 
@@ -259,10 +238,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			fmt.Sprintf("user:force-trigger:%s", jobID),
 		)
 		if err != nil {
-			s.logger.Errorw("Failed to create async job for force trigger",
-				"error", err,
-				"handler", parsed.HandlerName)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create async job: %v", err))
+			writeWrappedError(w, s.logger, err, "failed to create async job", http.StatusInternalServerError)
 			return
 		}
 
@@ -274,20 +250,13 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 			VALUES (?, ?, ?, 'running', ?, ?, ?)
 		`, executionID, scheduledJobID, asyncJob.ID, now.Format(time.RFC3339), now.Format(time.RFC3339), now.Format(time.RFC3339))
 		if err != nil {
-			s.logger.Errorw("Failed to create pulse_execution record for force trigger",
-				"error", err,
-				"execution_id", executionID,
-				"async_job_id", asyncJob.ID)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create execution record: %v", err))
+			writeWrappedError(w, s.logger, err, "failed to create execution record", http.StatusInternalServerError)
 			return
 		}
 
 		// Commit transaction - all tracking records now atomically created
 		if err = tx.Commit(); err != nil {
-			s.logger.Errorw("Failed to commit force trigger transaction",
-				"error", err,
-				"execution_id", executionID)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to commit transaction: %v", err))
+			writeWrappedError(w, s.logger, err, "failed to commit force trigger transaction", http.StatusInternalServerError)
 			return
 		}
 
@@ -299,10 +268,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		// Step 4: NOW enqueue async job (all tracking is in place)
 		queue := s.daemon.GetQueue()
 		if err := queue.Enqueue(asyncJob); err != nil {
-			s.logger.Errorw("Failed to enqueue force trigger job",
-				"error", err,
-				"job_id", asyncJob.ID)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to enqueue job: %v", err))
+			writeWrappedError(w, s.logger, err, "failed to enqueue force trigger job", http.StatusInternalServerError)
 			return
 		}
 
@@ -339,8 +305,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := s.getScheduleStore().CreateJob(job); err != nil {
-		s.logger.Errorw("Failed to create scheduled job", "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create job: %v", err))
+		writeWrappedError(w, s.logger, err, "failed to create scheduled job", http.StatusInternalServerError)
 		return
 	}
 
@@ -356,12 +321,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 func (s *QNTXServer) handleGetSchedule(w http.ResponseWriter, r *http.Request, jobID string) {
 	job, err := s.getScheduleStore().GetJob(jobID)
 	if err != nil {
-		if IsNotFoundError(err) {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
-			return
-		}
-		s.logger.Errorw("Failed to get scheduled job", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		handleError(w, s.logger, err, "failed to get scheduled job")
 		return
 	}
 
@@ -372,7 +332,7 @@ func (s *QNTXServer) handleGetSchedule(w http.ResponseWriter, r *http.Request, j
 func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request, jobID string) {
 	var req UpdateScheduledJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+		writeWrappedError(w, s.logger, err, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -390,12 +350,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 		}
 
 		if err := s.getScheduleStore().UpdateJobState(jobID, *req.State); err != nil {
-			if IsNotFoundError(err) {
-				writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
-				return
-			}
-			s.logger.Errorw("Failed to update job state", "job_id", jobID, "error", err)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update job: %v", err))
+			handleError(w, s.logger, err, "failed to update job state")
 			return
 		}
 
@@ -412,8 +367,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 		}
 
 		if err := s.getScheduleStore().UpdateJobInterval(jobID, *req.IntervalSeconds); err != nil {
-			s.logger.Errorw("Failed to update job interval", "job_id", jobID, "error", err)
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update interval: %v", err))
+			writeWrappedError(w, s.logger, err, "failed to update job interval", http.StatusInternalServerError)
 			return
 		}
 
@@ -425,8 +379,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 	// Return updated job
 	job, err := s.getScheduleStore().GetJob(jobID)
 	if err != nil {
-		s.logger.Errorw("Failed to get updated job", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get updated job: %v", err))
+		writeWrappedError(w, s.logger, err, "failed to get updated job", http.StatusInternalServerError)
 		return
 	}
 
@@ -438,12 +391,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 	// Get job details before deletion for logging
 	job, err := s.getScheduleStore().GetJob(jobID)
 	if err != nil {
-		if IsNotFoundError(err) {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
-			return
-		}
-		s.logger.Errorw("Failed to get job for deletion", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		handleError(w, s.logger, err, "failed to get job for deletion")
 		return
 	}
 
@@ -468,8 +416,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 	// Set job to deleted state (soft delete)
 	// We don't hard delete to preserve execution history
 	if err := s.getScheduleStore().UpdateJobState(jobID, schedule.StateDeleted); err != nil {
-		s.logger.Errorw("Failed to delete job", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete job: %v", err))
+		writeWrappedError(w, s.logger, err, "failed to delete job", http.StatusInternalServerError)
 		return
 	}
 
