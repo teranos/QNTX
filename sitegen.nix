@@ -7,6 +7,10 @@ let
   cssFiles = {
     core = ./web/css/core.css;
     utilities = ./web/css/utilities.css;
+    docs = ./web/css/docs.css;
+  };
+  jsFiles = {
+    search = ./web/js/search.js;
   };
   logo = ./web/qntx.jpg;
 
@@ -22,6 +26,24 @@ let
   # Calculate relative path from docs/ directory
   getRelativePath = path:
     lib.removePrefix "${toString docsDir}/" (toString path);
+
+  # SEG symbol mappings for semantic navigation
+  # Based on docs/development/design-philosophy.md
+  categoryMeta = {
+    "getting-started" = { symbol = "⍟"; desc = "Entry points"; };
+    "architecture" = { symbol = "⌬"; desc = "System design"; };
+    "development" = { symbol = "⨳"; desc = "Workflows"; };
+    "types" = { symbol = "≡"; desc = "Type reference"; };
+    "api" = { symbol = "⋈"; desc = "API reference"; };
+    "testing" = { symbol = "✦"; desc = "Test guides"; };
+    "security" = { symbol = "+"; desc = "Security"; };
+    "vision" = { symbol = "⟶"; desc = "Future direction"; };
+    "_root" = { symbol = ""; desc = ""; };
+  };
+
+  # Get category metadata with fallback
+  getCategoryMeta = cat:
+    categoryMeta.${cat} or { symbol = ""; desc = ""; };
 
   # Create structured file info for each markdown file
   mkFileInfo = mdPath:
@@ -49,7 +71,15 @@ let
     [ "&lt;" "&gt;" "&amp;" "&quot;" "&#39;" ]
     s;
 
-  # HTML template functions (pure Nix)
+  # Convert kebab-case to Title Case
+  toTitleCase = s:
+    let
+      words = lib.splitString "-" s;
+      capitalize = w: lib.toUpper (lib.substring 0 1 w) + lib.substring 1 (lib.stringLength w) w;
+    in
+    lib.concatStringsSep " " (map capitalize words);
+
+  # HTML template - head section
   htmlHead = title: prefix: ''
     <!DOCTYPE html>
     <html lang="en">
@@ -59,77 +89,74 @@ let
         <title>${escapeHtml title}</title>
         <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
         <link rel="stylesheet" href="${prefix}/css/core.css">
-        <link rel="stylesheet" href="${prefix}/css/utilities.css">
+        <link rel="stylesheet" href="${prefix}/css/docs.css">
+    </head>
   '';
 
-  docStyles = prefix: ''
-        <style>
-            body { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
-            pre { background: #f4f4f4; padding: 12px 16px; overflow-x: auto; border-radius: 4px; border: 1px solid #e0e0e0; }
-            code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: var(--font-mono, monospace); font-size: 0.9em; }
-            pre code { background: none; padding: 0; border: none; }
-            h1 { border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
-            h2 { margin-top: 2em; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; }
-            a { color: var(--accent-color, #0066cc); text-decoration: none; }
-            a:hover { text-decoration: underline; }
-            nav { margin-bottom: 2em; padding: 12px; background: #f9f9f9; border-radius: 4px; }
-            nav a { margin-right: 16px; }
-            .site-logo { width: 32px; height: 32px; vertical-align: middle; margin-right: 8px; }
-        </style>
-    </head>
+  # Document page structure
+  docBody = prefix: ''
     <body>
-        <nav><a href="${prefix}/index.html"><img src="${prefix}/qntx.jpg" alt="QNTX" class="site-logo">← Documentation Home</a></nav>
+        <nav class="doc-nav"><a href="${prefix}/index.html"><img src="${prefix}/qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
   '';
 
-  indexStyles = ''
-        <style>
-            body { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
-            .header { display: flex; align-items: center; margin-bottom: 2em; border-bottom: 2px solid #e0e0e0; padding-bottom: 16px; }
-            .header img { width: 48px; height: 48px; margin-right: 16px; }
-            h1 { margin: 0; }
-            h2 { margin-top: 2em; color: #555; font-size: 1.2em; }
-            ul { list-style: none; padding: 0; }
-            li { margin: 12px 0; }
-            li a { display: block; padding: 12px 16px; background: #f9f9f9; border-radius: 4px; transition: background 0.2s; }
-            li a:hover { background: #f0f0f0; }
-            a { color: var(--accent-color, #0066cc); text-decoration: none; }
-        </style>
-    </head>
+  # Index page structure
+  indexBody = ''
     <body>
-        <div class="header">
+        <div class="doc-header">
             <img src="./qntx.jpg" alt="QNTX Logo">
             <h1>QNTX Documentation</h1>
         </div>
+        <div class="search-container">
+            <input type="search" id="search-input" class="search-input" placeholder="Search documentation..." aria-label="Search documentation">
+            <div id="search-results" class="search-results" hidden></div>
+        </div>
   '';
 
-  # Generate index HTML structure using pure Nix
+  # Category order for consistent display
+  categoryOrder = [ "getting-started" "architecture" "development" "types" "api" "security" "testing" "vision" ];
+
+  # Generate index section with SEG symbol
   genIndexSection = category: files:
     let
       sortedFiles = lib.sort (a: b: a.name < b.name) files;
-      categoryTitle = lib.toUpper (lib.substring 0 1 category) + lib.substring 1 (lib.stringLength category) category;
-      fileLinks = map (f: ''          <li><a href="${f.htmlPath}">${escapeHtml f.name}</a></li>'') sortedFiles;
+      meta = getCategoryMeta category;
+      categoryTitle = toTitleCase category;
+      symbolHtml = if meta.symbol != "" then ''<span class="category-symbol">${meta.symbol}</span>'' else "";
+      descHtml = if meta.desc != "" then ''<span class="category-desc">${escapeHtml meta.desc}</span>'' else "";
+      fileLinks = map (f: ''            <li><a href="${f.htmlPath}"><span class="doc-name">${escapeHtml (toTitleCase f.name)}</span></a></li>'') sortedFiles;
     in
     ''
-              <h2>${escapeHtml categoryTitle}</h2>
-              <ul>
-      ${lib.concatStringsSep "\n" fileLinks}
-              </ul>'';
+        <section class="category-section">
+            <div class="category-header">
+                ${symbolHtml}<h2 class="category-title">${escapeHtml categoryTitle}</h2>${descHtml}
+            </div>
+            <ul class="doc-list">
+    ${lib.concatStringsSep "\n" fileLinks}
+            </ul>
+        </section>'';
 
   # Generate full index content
   indexContent =
     let
       rootFiles = groupedFiles._root or [ ];
-      categories = lib.filterAttrs (k: v: k != "_root") groupedFiles;
-      rootSection = if rootFiles != [ ] then genIndexSection "Documentation" rootFiles else "";
-      categorySections = lib.mapAttrsToList genIndexSection categories;
+      # Sort categories by defined order, then alphabetically for any extras
+      sortedCategories =
+        let
+          orderedCats = lib.filter (c: lib.hasAttr c groupedFiles) categoryOrder;
+          extraCats = lib.filter (c: c != "_root" && !(lib.elem c categoryOrder)) (lib.attrNames groupedFiles);
+        in
+        orderedCats ++ (lib.sort (a: b: a < b) extraCats);
+      rootSection = if rootFiles != [ ] then genIndexSection "_root" rootFiles else "";
+      categorySections = map (cat: genIndexSection cat groupedFiles.${cat}) sortedCategories;
     in
     htmlHead "QNTX Documentation" "." +
-    indexStyles +
+    indexBody +
     rootSection +
     lib.concatStringsSep "\n" categorySections +
     ''
-          </body>
-      </html>'';
+        <script src="./js/search.js"></script>
+    </body>
+    </html>'';
 
   # Create a separate derivation for each markdown file (enables incremental rebuilds)
   mkHtmlDerivation = fileInfo:
@@ -143,27 +170,69 @@ let
         nativeBuildInputs = [ pkgs.pulldown-cmark ];
       }
       ''
-                mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
-                {
-                  cat <<'EOF'
-        ${htmlHead "QNTX - ${fileInfo.name}" fileInfo.prefix}
-        ${docStyles fileInfo.prefix}
-        EOF
-                  cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
-        ${rewrittenMd}
-        EOF
-                  echo "    </body>"
-                  echo "</html>"
-                } > "$out/${fileInfo.htmlPath}"
+        mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
+        {
+          cat <<'EOF'
+${htmlHead "QNTX - ${fileInfo.name}" fileInfo.prefix}
+${docBody fileInfo.prefix}
+EOF
+          cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
+${rewrittenMd}
+EOF
+          echo "    </body>"
+          echo "</html>"
+        } > "$out/${fileInfo.htmlPath}"
       '';
 
   # Generate all HTML file derivations
   htmlDerivations = map mkHtmlDerivation fileInfos;
 
+  # Generate search index JSON
+  # Escape for JSON string values
+  escapeJson = s: builtins.replaceStrings
+    [ "\\" "\"" "\n" "\r" "\t" ]
+    [ "\\\\" "\\\"" "\\n" "\\r" "\\t" ]
+    s;
+
+  # Strip markdown syntax for plain text content
+  stripMarkdown = s:
+    let
+      # Remove code blocks
+      noCodeBlocks = builtins.replaceStrings [ "```" ] [ "" ] s;
+      # Remove headers markers
+      noHeaders = builtins.replaceStrings [ "# " "## " "### " "#### " ] [ "" "" "" "" ] noCodeBlocks;
+      # Remove emphasis markers
+      noEmphasis = builtins.replaceStrings [ "**" "__" "*" "_" "`" ] [ "" "" "" "" "" ] noHeaders;
+      # Remove link syntax [text](url) -> text (simplified)
+      noLinks = builtins.replaceStrings [ "[" "](" ] [ "" " " ] noEmphasis;
+    in
+    noLinks;
+
+  # Generate search index entry for a file
+  mkSearchEntry = fileInfo:
+    let
+      mdContent = builtins.readFile fileInfo.mdPath;
+      # Get first 500 chars of stripped content for search
+      strippedContent = stripMarkdown mdContent;
+      truncatedContent = lib.substring 0 500 strippedContent;
+      category = if fileInfo.dir == "." then "General" else toTitleCase (lib.head (lib.splitString "/" fileInfo.dir));
+    in
+    ''{"title":"${escapeJson (toTitleCase fileInfo.name)}","path":"${fileInfo.htmlPath}","category":"${escapeJson category}","content":"${escapeJson truncatedContent}"}'';
+
+  searchIndexContent = "[" + lib.concatStringsSep "," (map mkSearchEntry fileInfos) + "]";
+
+  searchIndexFile = pkgs.writeTextFile {
+    name = "qntx-docs-search-index";
+    text = searchIndexContent;
+    destination = "/search-index.json";
+  };
+
   # Static assets using linkFarm (pure Nix)
   staticAssets = pkgs.linkFarm "qntx-docs-static" [
     { name = "css/core.css"; path = cssFiles.core; }
     { name = "css/utilities.css"; path = cssFiles.utilities; }
+    { name = "css/docs.css"; path = cssFiles.docs; }
+    { name = "js/search.js"; path = jsFiles.search; }
     { name = "qntx.jpg"; path = logo; }
   ];
 
@@ -175,8 +244,8 @@ let
   };
 
 in
-# Compositional assembly: combine static assets, index, and all HTML files
+# Compositional assembly: combine static assets, index, search index, and all HTML files
 pkgs.symlinkJoin {
   name = "qntx-docs-site";
-  paths = [ staticAssets indexFile ] ++ htmlDerivations;
+  paths = [ staticAssets indexFile searchIndexFile ] ++ htmlDerivations;
 }
