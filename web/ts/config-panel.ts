@@ -140,8 +140,6 @@ class ConfigPanel extends BasePanel {
             console.log('[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
         } catch (error) {
             console.error('[Config Panel] Failed to fetch config:', error);
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const errorStack = error instanceof Error ? error.stack : undefined;
 
             // Build rich error for display
             this.configError = this.buildConfigError(error);
