@@ -6,6 +6,7 @@ import (
 
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
 // This informs the frontend about available optimizations (e.g., Rust fuzzy matching).
+// Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	// Get fuzzy backend from the AxGraphBuilder
 	fuzzyBackend := s.builder.FuzzyBackend()
@@ -18,21 +19,16 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 		FuzzyOptimized: fuzzyOptimized,
 	}
 
-	// Recover from panic if client channel is closed
-	// This can happen if client disconnects between registration and this send
-	defer func() {
-		if r := recover(); r != nil {
-			s.logger.Debugw("Client disconnected before system capabilities could be sent",
-				"client_id", client.id,
-			)
-		}
-	}()
+	// Send to broadcast worker (thread-safe)
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id, // Send to specific client only
+	}
 
-	// Send to client via generic message channel
-	// Use non-blocking send to handle case where channel is full
 	select {
-	case client.sendMsg <- msg:
-		s.logger.Debugw("Sent system capabilities to client",
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Queued system capabilities to client",
 			"client_id", client.id,
 			"fuzzy_backend", fuzzyBackend,
 			"fuzzy_optimized", fuzzyOptimized,
@@ -40,8 +36,8 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	case <-s.ctx.Done():
 		return
 	default:
-		// Channel full - skip sending
-		s.logger.Debugw("Client channel full, skipping system capabilities",
+		// Broadcast queue full (should never happen with proper sizing)
+		s.logger.Warnw("Broadcast request queue full, skipping system capabilities",
 			"client_id", client.id,
 		)
 	}

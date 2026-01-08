@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 )
 
@@ -21,8 +20,7 @@ func (s *QNTXServer) handleGetJobStages(w http.ResponseWriter, r *http.Request, 
 
 	rows, err := s.db.Query(query, jobID)
 	if err != nil {
-		s.logger.Errorw("Failed to query task logs", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to query logs: %v", err))
+		writeWrappedError(w, s.logger, err, "failed to query task logs", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
