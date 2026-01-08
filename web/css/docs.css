@@ -373,6 +373,28 @@ nav.doc-nav a {
     color: var(--color-error, #ef4444);
 }
 
+/* Provenance Footer */
+.site-footer {
+    margin-top: 4em;
+    padding-top: 1em;
+    border-top: 1px solid #e0e0e0;
+}
+
+.provenance {
+    font-size: 0.8em;
+    color: #888;
+    text-align: center;
+}
+
+.provenance a {
+    color: #888;
+    font-family: var(--font-mono, monospace);
+}
+
+.provenance a:hover {
+    color: var(--accent-color, #0066cc);
+}
+
 /* Category sections with SEG symbols */
 .category-section {
     margin-top: 2em;
@@ -597,6 +619,14 @@ th {
 
     .loading {
         color: #888;
+    }
+
+    .site-footer {
+        border-color: #333;
+    }
+
+    .provenance a:hover {
+        color: #6db3f2;
     }
 }
 

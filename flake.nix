@@ -329,7 +329,10 @@
           qntx-python = qntx-python;
 
           # Static documentation site
-          docs-site = pkgs.callPackage ./sitegen.nix { };
+          docs-site = pkgs.callPackage ./sitegen.nix {
+            gitRevision = self.rev or self.dirtyRev or "unknown";
+            gitShortRev = self.shortRev or self.dirtyShortRev or "unknown";
+          };
 
           # Default: CLI binary for easy installation
           default = qntx;
