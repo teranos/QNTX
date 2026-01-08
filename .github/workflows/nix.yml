@@ -39,18 +39,6 @@ jobs:
       - name: Run flake checks
         run: nix flake check --show-trace
 
-      - name: Build QNTX CLI
-        run: nix build .#qntx --print-build-logs
-
-      - name: Build qntx-code plugin
-        run: nix build .#qntx-code --print-build-logs
-
-      - name: Build qntx-python plugin
-        run: nix build .#qntx-python --print-build-logs
-
-      - name: Build documentation site
-        run: nix build .#docs-site --print-build-logs
-
       - name: Push to Cachix
         if: github.ref == 'refs/heads/main'
         run: |
