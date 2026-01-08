@@ -48,6 +48,10 @@ func (p *Plugin) Initialize(ctx context.Context, services plugin.ServiceRegistry
 	p.services = services
 	logger := services.Logger("code")
 
+	// TODO: Implement ConfigSchema() method to expose gopls.workspace_root and other
+	// configuration fields via the gRPC ConfigSchema RPC. This will enable UI-based
+	// configuration like the Python plugin. See qntx-python/src/config.rs for reference.
+
 	// Initialize gopls service for Go code intelligence
 	config := services.Config("code")
 	workspaceRoot := config.GetString("gopls.workspace_root")

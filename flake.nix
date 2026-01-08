@@ -31,6 +31,9 @@
             # Nix formatting
             nixpkgs-fmt.enable = true;
 
+            # Rust formatting
+            rustfmt.enable = true;
+
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.
             # gofmt.enable = true;

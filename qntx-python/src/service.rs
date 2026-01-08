@@ -6,8 +6,8 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, Empty, HealthResponse, HttpHeader,
-    HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty, HealthResponse,
+    HttpHeader, HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -42,6 +42,10 @@ impl PythonPluginService {
             config: None,
             engine,
             initialized: false,
+            default_modules: crate::handlers::DEFAULT_MODULES
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
         }));
 
         Ok(Self {
@@ -106,6 +110,22 @@ impl DomainPluginService for PythonPluginService {
             .and_then(|c| c.config.get("python_paths"))
             .map(|p| p.split(':').map(String::from).collect())
             .unwrap_or_default();
+
+        // Override default modules if provided in config
+        if let Some(modules_str) = state
+            .config
+            .as_ref()
+            .and_then(|c| c.config.get("default_modules"))
+        {
+            state.default_modules = modules_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
+            info!(
+                "Using configured default modules: {:?}",
+                state.default_modules
+            );
+        }
 
         if let Err(e) = state.engine.initialize(python_paths) {
             error!("Failed to initialize Python engine: {}", e);
@@ -220,6 +240,17 @@ impl DomainPluginService for PythonPluginService {
         details.insert("python_version".to_string(), self.python_version());
         details.insert("initialized".to_string(), state.initialized.to_string());
 
+        // Add binary build time
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Ok(metadata) = std::fs::metadata(&exe_path) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                        details.insert("binary_built".to_string(), duration.as_secs().to_string());
+                    }
+                }
+            }
+        }
+
         if let Some(config) = &state.config {
             if !config.ats_store_endpoint.is_empty() {
                 details.insert("ats_store".to_string(), "configured".to_string());
@@ -237,6 +268,17 @@ impl DomainPluginService for PythonPluginService {
                 "Not initialized".to_string()
             },
             details,
+        }))
+    }
+
+    /// Return configuration schema
+    async fn config_schema(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ConfigSchemaResponse>, Status> {
+        debug!("ConfigSchema request received");
+        Ok(Response::new(ConfigSchemaResponse {
+            fields: crate::config::build_schema(),
         }))
     }
 }
