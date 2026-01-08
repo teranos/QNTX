@@ -95,7 +95,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create server
-	srv, err := server.NewQNTXServerWithInitialQuery(database, dbPath, verbosity, serverAtsQuery)
+	srv, err := server.NewQNTXServer(database, dbPath, verbosity, serverAtsQuery)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}

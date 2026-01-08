@@ -44,6 +44,10 @@ type PluginConfig struct {
 
 	// AutoStart controls whether to automatically start the plugin
 	AutoStart bool `toml:"auto_start"`
+
+	// Config contains plugin-specific runtime configuration
+	// These key-value pairs are passed to the plugin via InitializeRequest
+	Config map[string]string `toml:"config"`
 }
 
 // PluginManager manages external plugin processes and connections.
@@ -69,6 +73,26 @@ func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 		logger:   logger,
 		basePort: 9000, // External plugins start on port 9000+
 	}
+}
+
+// Global plugin manager instance (similar to plugin.Registry pattern)
+var (
+	defaultPluginManager *PluginManager
+	pluginManagerMu      sync.RWMutex
+)
+
+// SetDefaultPluginManager sets the global plugin manager instance
+func SetDefaultPluginManager(manager *PluginManager) {
+	pluginManagerMu.Lock()
+	defer pluginManagerMu.Unlock()
+	defaultPluginManager = manager
+}
+
+// GetDefaultPluginManager returns the global plugin manager instance
+func GetDefaultPluginManager() *PluginManager {
+	pluginManagerMu.RLock()
+	defer pluginManagerMu.RUnlock()
+	return defaultPluginManager
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
@@ -335,6 +359,29 @@ func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig W
 		"ping_interval", keepalive.PingInterval,
 		"allowed_origins_count", len(wsConfig.AllowedOrigins),
 	)
+}
+
+// ReinitializePlugin reinitializes a plugin with updated configuration.
+// This is called after plugin config is updated via the UI.
+// The plugin must already be loaded and running.
+func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName string, services plugin.ServiceRegistry) error {
+	m.mu.RLock()
+	p, exists := m.plugins[pluginName]
+	m.mu.RUnlock()
+
+	if !exists {
+		err := errors.Newf("plugin not loaded: %s", pluginName)
+		return errors.WithHintf(err, "ensure plugin '%s' is enabled and running before reinitializing", pluginName)
+	}
+
+	// Call Initialize again with updated config from ServiceRegistry
+	if err := p.client.Initialize(ctx, services); err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to reinitialize plugin %s", pluginName)
+		return errors.WithHintf(wrappedErr, "check plugin logs and verify configuration is valid")
+	}
+
+	m.logger.Infof("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
+	return nil
 }
 
 // Shutdown stops all managed plugins.
