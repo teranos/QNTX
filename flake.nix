@@ -328,16 +328,51 @@
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
-          # Static documentation site with provenance
-          # For CI builds with full provenance, call sitegen.nix directly:
-          #   nix-build -E 'with import <nixpkgs> {}; callPackage ./sitegen.nix {
-          #     gitRevision = "abc123..."; gitShortRev = "abc123";
-          #     buildDate = "2025-01-08"; ciUser = "github-actions";
-          #     ciPipeline = "docs"; ciRunId = "12345678";
-          #   }'
+          # Static documentation site with provenance and infrastructure docs
+          # For CI builds with full provenance, pass additional args
           docs-site = pkgs.callPackage ./sitegen.nix {
             gitRevision = self.rev or self.dirtyRev or "unknown";
             gitShortRev = self.shortRev or self.dirtyShortRev or "unknown";
+
+            # Nix infrastructure metadata for self-documenting builds
+            nixPackages = [
+              { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
+              { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
+              { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
+              { name = "qntx-python"; description = "Python runtime plugin with PyO3"; }
+              { name = "docs-site"; description = "Static documentation website"; }
+            ];
+
+            nixApps = [
+              { name = "build-docs-site"; description = "Build documentation and copy to web/site/"; }
+              { name = "generate-types"; description = "Generate types for all languages"; }
+              { name = "check-types"; description = "Verify generated types are up-to-date"; }
+              { name = "generate-proto"; description = "Generate gRPC code from proto files"; }
+            ];
+
+            nixContainers = [
+              {
+                name = "CI Image";
+                description = "Full development environment for CI/CD pipelines";
+                image = "ghcr.io/teranos/qntx:latest";
+                architectures = [ "amd64" "arm64" ];
+                ports = [];
+              }
+              {
+                name = "qntx-code Plugin";
+                description = "Code analysis plugin container";
+                image = "ghcr.io/teranos/qntx-code-plugin:latest";
+                architectures = [ "amd64" "arm64" ];
+                ports = [ "9000/tcp" ];
+              }
+              {
+                name = "qntx-python Plugin";
+                description = "Python runtime plugin container";
+                image = "ghcr.io/teranos/qntx-python-plugin:latest";
+                architectures = [ "amd64" "arm64" ];
+                ports = [ "9000/tcp" ];
+              }
+            ];
           };
 
           # Default: CLI binary for easy installation

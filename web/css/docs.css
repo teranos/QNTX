@@ -126,6 +126,31 @@ nav.doc-nav a {
     padding: 0;
 }
 
+/* Quick Links Navigation */
+.quick-links {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 2em;
+    flex-wrap: wrap;
+}
+
+.quick-link {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    color: var(--accent-color, #0066cc);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+
+.quick-link:hover {
+    background: #f0f0f0;
+    text-decoration: none;
+}
+
 /* Search */
 .search-container {
     margin-bottom: 2em;
@@ -395,6 +420,48 @@ nav.doc-nav a {
     color: var(--accent-color, #0066cc);
 }
 
+/* Nix Infrastructure Tables */
+.nix-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+.nix-table th,
+.nix-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.nix-table th {
+    background: #f9f9f9;
+    font-weight: 600;
+}
+
+.nix-table code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+.container-details {
+    margin-top: 12px;
+    font-size: 0.9em;
+}
+
+.container-details p {
+    margin: 4px 0;
+}
+
+.container-details code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
 /* Category sections with SEG symbols */
 .category-section {
     margin-top: 2em;
@@ -524,6 +591,15 @@ th {
         border-color: #333;
     }
 
+    .quick-link {
+        background: #242424;
+        border-color: #333;
+    }
+
+    .quick-link:hover {
+        background: #2a2a2a;
+    }
+
     .category-header {
         border-color: #333;
     }
@@ -627,6 +703,20 @@ th {
 
     .provenance a:hover {
         color: #6db3f2;
+    }
+
+    .nix-table th,
+    .nix-table td {
+        border-color: #333;
+    }
+
+    .nix-table th {
+        background: #242424;
+    }
+
+    .nix-table code,
+    .container-details code {
+        background: #2a2a2a;
     }
 }
 
