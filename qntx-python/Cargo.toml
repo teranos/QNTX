@@ -39,6 +39,3 @@ clap = { version = "4", features = ["derive"] }
 # Utilities
 thiserror.workspace = true
 parking_lot.workspace = true
-
-[build-dependencies]
-tonic-build.workspace = true

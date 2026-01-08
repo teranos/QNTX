@@ -8,7 +8,6 @@ members = [
 ]
 exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
-    "types/generated/rust", # Legacy generated types, superseded by crates/qntx/src/types/
 ]
 
 [workspace.package]
