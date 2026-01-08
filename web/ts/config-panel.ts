@@ -13,6 +13,7 @@ import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
+import { createRichErrorState, type RichError } from './base-panel-error.ts';
 
 interface ConfigSetting {
     key: string;
@@ -41,6 +42,7 @@ interface EnhancedSetting extends ConfigSetting {
 
 class ConfigPanel extends BasePanel {
     private appConfig: ConfigResponse | null = null;
+    private configError: RichError | null = null;
 
     constructor() {
         super({
@@ -120,6 +122,7 @@ class ConfigPanel extends BasePanel {
     private async fetchConfig(): Promise<void> {
         try {
             console.log('[Config Panel] Fetching config from /api/config?introspection=true...');
+            this.configError = null;
             const response = await apiFetch('/api/config?introspection=true');
 
             if (!response.ok) {
@@ -138,16 +141,80 @@ class ConfigPanel extends BasePanel {
         } catch (error) {
             console.error('[Config Panel] Failed to fetch config:', error);
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.appConfig = {
-                config_file: `Error: ${errorMessage}`,
-                settings: []
+            const errorStack = error instanceof Error ? error.stack : undefined;
+
+            // Build rich error for display
+            this.configError = this.buildConfigError(error);
+            this.appConfig = null;
+        }
+    }
+
+    /**
+     * Build rich error from config fetch error
+     */
+    private buildConfigError(error: unknown): RichError {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        // Check for HTTP errors
+        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
+        if (httpMatch) {
+            const status = parseInt(httpMatch[1], 10);
+            if (status === 404) {
+                return {
+                    title: 'Config Endpoint Not Found',
+                    message: 'The configuration API endpoint is not available',
+                    status: 404,
+                    suggestion: 'Ensure the QNTX server is running with the config endpoint enabled.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status >= 500) {
+                return {
+                    title: 'Server Error',
+                    message: 'The server encountered an error loading configuration',
+                    status: status,
+                    suggestion: 'Check the server logs for more details.',
+                    details: errorStack || errorMessage
+                };
+            }
+        }
+
+        // Check for network errors
+        if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
+            return {
+                title: 'Network Error',
+                message: 'Unable to connect to the QNTX server',
+                suggestion: 'Check your network connection and ensure the QNTX server is running.',
+                details: errorStack || errorMessage
             };
         }
+
+        // Generic error
+        return {
+            title: 'Configuration Error',
+            message: errorMessage,
+            suggestion: 'Check the error details for more information.',
+            details: errorStack || errorMessage
+        };
     }
 
     private render(): void {
         const content = this.$('#config-panel-content');
         if (!content) return;
+
+        // Show rich error if there was an error fetching config
+        if (this.configError) {
+            content.innerHTML = '';
+            content.appendChild(createRichErrorState(this.configError, async () => {
+                // Retry fetching config
+                this.showLoading('Retrying...');
+                await this.fetchConfig();
+                this.hideLoading();
+                this.render();
+            }));
+            return;
+        }
 
         if (!this.appConfig || this.appConfig.settings.length === 0) {
             content.innerHTML = '';

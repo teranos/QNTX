@@ -155,8 +155,58 @@
 .panel-error-message {
     font-size: 12px;
     color: var(--panel-text-primary);
-    margin: 0 0 16px 0;
+    margin: 0 0 12px 0;
     word-break: break-word;
+}
+
+/* Suggestion text - helpful hint for resolving the error */
+.panel-error-suggestion {
+    font-size: 11px;
+    color: var(--panel-text-secondary);
+    margin: 0 0 16px 0;
+    font-style: italic;
+}
+
+/* Expandable error details */
+.panel-error-details {
+    text-align: left;
+    margin: 16px 0;
+    border: 1px solid rgba(211, 47, 47, 0.3);
+    border-radius: var(--panel-border-radius);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.panel-error-details summary {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--status-failed-text);
+    cursor: pointer;
+    user-select: none;
+}
+
+.panel-error-details summary:hover {
+    background: rgba(211, 47, 47, 0.1);
+}
+
+.panel-error-details[open] summary {
+    border-bottom: 1px solid rgba(211, 47, 47, 0.2);
+}
+
+.panel-error-details-content {
+    padding: 12px;
+    margin: 0;
+    font-size: 10px;
+    font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #2d2d2d;
+    color: #f0f0f0;
+    border-radius: 0 0 var(--panel-border-radius) var(--panel-border-radius);
 }
 
 .panel-error-retry {
@@ -178,6 +228,39 @@
 .panel-error-retry:focus {
     outline: 2px solid var(--status-failed-text);
     outline-offset: 2px;
+}
+
+/* Inline error messages (e.g., in forms) */
+.panel-error-inline {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--status-failed-bg);
+    border: 1px solid var(--status-failed-text);
+    border-radius: var(--panel-border-radius);
+    font-size: 12px;
+    color: var(--status-failed-text);
+    margin-top: 8px;
+}
+
+.panel-error-inline-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.panel-error-inline-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.panel-error-inline-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.panel-error-inline-message {
+    color: var(--panel-text-primary);
 }
 
 /* Loading state data attribute */
