@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/typegen"
 )
 
@@ -92,7 +93,7 @@ func (g *Generator) parseRouting() error {
 
 	content, err := os.ReadFile(routingPath)
 	if err != nil {
-		return fmt.Errorf("failed to read routing.go: %w", err)
+		return errors.Wrap(err, "failed to read routing.go")
 	}
 
 	// Match http.HandleFunc("/pattern", s.HandlerName)
@@ -783,25 +784,25 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 
 	// Parse HTTP routing and handlers
 	if err := gen.parseRouting(); err != nil {
-		return fmt.Errorf("failed to parse routing: %w", err)
+		return errors.Wrap(err, "failed to parse routing")
 	}
 	if err := gen.parseHandlers(); err != nil {
-		return fmt.Errorf("failed to parse handlers: %w", err)
+		return errors.Wrap(err, "failed to parse handlers")
 	}
 
 	// Parse gRPC proto definitions
 	if err := gen.parseProto(); err != nil {
-		return fmt.Errorf("failed to parse proto: %w", err)
+		return errors.Wrap(err, "failed to parse proto")
 	}
 
 	// Parse WebSocket message types
 	if err := gen.parseWebSocketTypes(); err != nil {
-		return fmt.Errorf("failed to parse WebSocket types: %w", err)
+		return errors.Wrap(err, "failed to parse WebSocket types")
 	}
 
 	// Ensure output directory exists
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+		return errors.Wrap(err, "failed to create output directory")
 	}
 
 	// Group endpoints by category
@@ -811,7 +812,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 	indexContent := gen.generateIndex(categories)
 	indexPath := filepath.Join(outputDir, "README.md")
 	if err := os.WriteFile(indexPath, []byte(indexContent), 0644); err != nil {
-		return fmt.Errorf("failed to write README: %w", err)
+		return errors.Wrap(err, "failed to write README")
 	}
 	fmt.Printf("✓ Generated %s (index)\n", indexPath)
 
@@ -822,7 +823,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		filePath := filepath.Join(outputDir, filename)
 
 		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("failed to write %s: %w", filePath, err)
+			return errors.Wrapf(err, "failed to write %s", filePath)
 		}
 		fmt.Printf("✓ Generated %s (%d endpoints)\n", filePath, len(cat.Endpoints))
 	}
@@ -832,7 +833,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		grpcContent := gen.generateGRPCDoc()
 		grpcPath := filepath.Join(outputDir, "grpc-plugin.md")
 		if err := os.WriteFile(grpcPath, []byte(grpcContent), 0644); err != nil {
-			return fmt.Errorf("failed to write gRPC docs: %w", err)
+			return errors.Wrap(err, "failed to write gRPC docs")
 		}
 		fmt.Printf("✓ Generated %s (%d methods)\n", grpcPath, len(gen.grpcMethods))
 	}
@@ -842,7 +843,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		wsContent := gen.generateWebSocketDoc()
 		wsPath := filepath.Join(outputDir, "websocket.md")
 		if err := os.WriteFile(wsPath, []byte(wsContent), 0644); err != nil {
-			return fmt.Errorf("failed to write WebSocket docs: %w", err)
+			return errors.Wrap(err, "failed to write WebSocket docs")
 		}
 		fmt.Printf("✓ Generated %s (%d message types)\n", wsPath, len(gen.wsMessageTypes))
 	}
