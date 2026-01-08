@@ -6,7 +6,7 @@
 , ciUser ? null
 , ciPipeline ? null
 , ciRunId ? null
-# Nix infrastructure metadata (passed from flake)
+  # Nix infrastructure metadata (passed from flake)
 , nixPackages ? [ ]
 , nixApps ? [ ]
 , nixContainers ? [ ]
@@ -95,9 +95,11 @@ let
     table = { class ? "nix-table", headers, rows }:
       let
         headerRow = "<tr>" + lib.concatMapStringsSep "" (h: "<th>${h}</th>") headers + "</tr>";
-        bodyRows = lib.concatMapStringsSep "\n" (row:
-          "<tr>" + lib.concatMapStringsSep "" (cell: "<td>${cell}</td>") row + "</tr>"
-        ) rows;
+        bodyRows = lib.concatMapStringsSep "\n"
+          (row:
+            "<tr>" + lib.concatMapStringsSep "" (cell: "<td>${cell}</td>") row + "</tr>"
+          )
+          rows;
       in
       ''
         <table class="${class}">
@@ -872,8 +874,8 @@ let
 in
 
 # ============================================================================
-# Final Assembly
-# ============================================================================
+  # Final Assembly
+  # ============================================================================
 
 pkgs.symlinkJoin {
   name = "qntx-docs-site";
