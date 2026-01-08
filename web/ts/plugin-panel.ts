@@ -602,10 +602,10 @@ export class PluginPanel extends BasePanel {
                     <div class="panel-error-title">${errorTitle}</div>
                     <div class="panel-error-message">${escapeHtml(this.configState.error.message)}</div>
                     ${this.configState.error.details ? `
-                        <details class="plugin-config-error-details">
-                            <summary>Error Details</summary>
+                        <div class="plugin-config-error-details">
+                            <div class="panel-error-details-header">Error Details</div>
                             <pre>${escapeHtml(this.configState.error.details)}</pre>
-                        </details>
+                        </div>
                     ` : ''}
                 </div>
             `;
@@ -658,6 +658,7 @@ export class PluginPanel extends BasePanel {
         const hasChanges = Object.entries(this.configState.newConfig).some(([key, value]) =>
             value !== (this.configState!.currentConfig[key] || this.configState!.schema[key].default_value)
         );
+        const isEditing = this.configState.editingFields.size > 0;
 
         return `
             <div class="plugin-config-form">
@@ -668,7 +669,7 @@ export class PluginPanel extends BasePanel {
                     </div>
                     ${fields}
                 </div>
-                ${hasChanges ? `
+                ${(hasChanges || isEditing) ? `
                     <div class="plugin-config-actions">
                         <div class="plugin-config-actions-buttons">
                             <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
