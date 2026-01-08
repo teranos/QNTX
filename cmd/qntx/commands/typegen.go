@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/typegen"
+	"github.com/teranos/QNTX/typegen/api"
 	"github.com/teranos/QNTX/typegen/markdown"
 	"github.com/teranos/QNTX/typegen/python"
 	"github.com/teranos/QNTX/typegen/rust"
@@ -86,10 +87,12 @@ It handles:
   - Pointer types as optional fields
   - time.Time as string
   - map[string]interface{} as Record/dict/HashMap
+  - API endpoint documentation (generated with markdown to docs/api/)
 
 Examples:
   qntx typegen                                    # Generate TypeScript to stdout
   qntx typegen --lang typescript                  # Explicit language
+  qntx typegen --lang markdown                    # Generate docs/types/ and docs/api/
   qntx typegen --lang all                         # All languages
   qntx typegen --output types/generated/          # Write to directory (creates typescript/ subdir)
   qntx typegen --packages pulse/async             # Specific package only`,
@@ -342,6 +345,12 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 			return fmt.Errorf("failed to write README: %w", err)
 		}
 		fmt.Printf("✓ Generated %s (index)\n", readmePath)
+
+		// Also generate API documentation (part of markdown output)
+		apiOutputDir := "docs/api"
+		if err := api.GenerateAPIDoc("server", apiOutputDir); err != nil {
+			return fmt.Errorf("failed to generate API docs: %w", err)
+		}
 	}
 
 	return nil
