@@ -387,7 +387,7 @@ describe('PluginPanel error handling', () => {
         (panel as any).render();
 
         const html = dom.window.document.body.innerHTML;
-        expect(html).toContain('Restart Plugin');
+        expect(html).toContain('Confirm Restart');
         expect(html).toContain('This will apply your changes and reinitialize the plugin');
     });
 });
