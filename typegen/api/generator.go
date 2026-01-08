@@ -213,7 +213,8 @@ func (g *Generator) parseHandlers() error {
 
 		file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 		if err != nil {
-			return nil // Skip files that don't parse
+			fmt.Printf("⚠ Skipping %s: %v\n", path, err)
+			return nil
 		}
 
 		// Find handler functions and their doc comments
