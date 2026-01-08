@@ -177,3 +177,45 @@ func TestInferMethods(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateAPIDoc_Integration(t *testing.T) {
+	// This test runs against the actual server and proto directories
+	// Skip if the directories don't exist (e.g., running in CI without full repo)
+	if _, err := os.Stat("../../server/routing.go"); os.IsNotExist(err) {
+		t.Skip("server/routing.go not found, skipping integration test")
+	}
+
+	tmpDir := t.TempDir()
+
+	err := GenerateAPIDoc("../../server", tmpDir)
+	if err != nil {
+		t.Fatalf("GenerateAPIDoc failed: %v", err)
+	}
+
+	// Check that expected files were created
+	expectedFiles := []string{
+		"README.md",
+		"health-status.md",
+		"websocket.md",
+	}
+
+	for _, file := range expectedFiles {
+		path := filepath.Join(tmpDir, file)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Errorf("expected file %s to be created", file)
+		}
+	}
+
+	// Read and verify README content
+	readme, err := os.ReadFile(filepath.Join(tmpDir, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(readme), "QNTX Server API Reference") {
+		t.Error("README should contain title")
+	}
+	if !strings.Contains(string(readme), "REST API") {
+		t.Error("README should contain REST API section")
+	}
+}

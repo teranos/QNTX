@@ -776,7 +776,9 @@ func (g *Generator) writeEndpoint(sb *strings.Builder, ep Endpoint) {
 // GenerateAPIDoc is the main entry point for generating API documentation
 // Outputs separate files per category to the outputDir
 func GenerateAPIDoc(serverDir, outputDir string) error {
-	protoDir := "plugin/grpc/protocol"
+	// Proto dir is relative to the project root, not serverDir
+	// serverDir is typically "server" so we go up one level
+	protoDir := filepath.Join(filepath.Dir(serverDir), "plugin/grpc/protocol")
 	gen := NewGenerator(serverDir, protoDir)
 
 	// Parse HTTP routing and handlers
