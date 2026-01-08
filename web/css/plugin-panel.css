@@ -4,35 +4,7 @@
  * Uses left-panel.css for base panel structure
  */
 
-/* Custom tooltip styling */
-.plugin-tooltip {
-    position: absolute;
-    background: #2d2d2d;
-    color: #f0f0f0;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    z-index: 10000;
-    pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    max-width: 400px;
-    border: 1px solid #444;
-}
-
-.plugin-tooltip::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    left: 20px;
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 6px solid #2d2d2d;
-}
+/* Note: Tooltip styling is now in panel-base.css (.panel-tooltip) */
 
 /* Search */
 .plugin-panel-search {
@@ -139,25 +111,12 @@
     color: #000;
 }
 
-.plugin-name-interactive {
-    cursor: help;
-}
-
 .plugin-version {
     font-size: 11px;
     color: var(--panel-text-secondary);
 }
 
-.plugin-version-interactive {
-    cursor: help;
-    border-bottom: 1px dotted var(--panel-text-secondary);
-    transition: var(--panel-transition-fast);
-}
-
-.plugin-version-interactive:hover {
-    color: var(--panel-text-primary);
-    border-bottom-color: var(--panel-text-primary);
-}
+/* Note: .has-tooltip styling is now in panel-base.css */
 
 /* Plugin badges container */
 .plugin-badges {
@@ -400,7 +359,7 @@
 
 .plugin-config-header {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 1fr 2fr;
     gap: 1px;
     background: #f5f5f5;
     font-size: 10px;
@@ -417,7 +376,7 @@
 
 .plugin-config-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 1fr 2fr;
     gap: 1px;
     background: #fff;
     align-items: center;
@@ -481,6 +440,92 @@
     transition: var(--panel-transition-fast);
 }
 
+/* Value cell - contains display value or edit input */
+.plugin-config-value-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #fff;
+}
+
+.plugin-config-row-changed .plugin-config-value-cell {
+    background: #e3f2fd;
+}
+
+.plugin-config-row-error .plugin-config-value-cell {
+    background: #ffebee;
+}
+
+.plugin-config-value-display {
+    flex: 1;
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+    color: #333;
+}
+
+.plugin-config-value-changed {
+    color: #1565c0;
+    font-weight: 500;
+}
+
+/* Edit button */
+.plugin-config-edit-btn {
+    background: transparent;
+    border: none;
+    color: var(--panel-text-tertiary);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.plugin-config-row:hover .plugin-config-edit-btn {
+    opacity: 1;
+}
+
+.plugin-config-edit-btn:hover {
+    color: #000;
+}
+
+/* Edit container - input + cancel button */
+.plugin-config-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.plugin-config-edit-container .plugin-config-value-new {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 11px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #fff;
+}
+
+.plugin-config-edit-container .plugin-config-value-new:focus {
+    outline: none;
+    border-color: #000;
+    background: #fffbf0;
+}
+
+.plugin-config-field-cancel {
+    background: transparent;
+    border: none;
+    color: var(--panel-text-tertiary);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+.plugin-config-field-cancel:hover {
+    color: #c62828;
+}
+
+/* Legacy - kept for compatibility */
 .plugin-config-value-new:focus {
     background: #fffbf0;
     box-shadow: inset 0 0 0 2px #1976d2;

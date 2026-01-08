@@ -140,9 +140,11 @@ class CommandExplorerPanel extends BasePanel {
             item.className = 'panel-card filter-item';
             item.dataset.mode = 'as';
 
+            // Query text with tooltip for click instruction
             const queryDiv = document.createElement('div');
-            queryDiv.className = 'filter-item-query';
+            queryDiv.className = 'filter-item-query has-tooltip';
             queryDiv.textContent = query.query;
+            queryDiv.dataset.tooltip = `Click to re-run query\n---\nQuery: ${query.query}\nResults: ${query.results}\nRan: ${query.timestamp}`;
 
             const metaDiv = document.createElement('div');
             metaDiv.className = 'filter-item-meta';
@@ -183,13 +185,17 @@ class CommandExplorerPanel extends BasePanel {
             const header = document.createElement('div');
             header.className = 'filter-item-header';
 
+            // Type badge with tooltip showing full description
             const typeSpan = document.createElement('span');
-            typeSpan.className = 'filter-item-type';
+            typeSpan.className = 'filter-item-type has-tooltip';
             typeSpan.textContent = stmt.type;
+            typeSpan.dataset.tooltip = `${stmt.label}\n---\n${stmt.description}\n\nExamples:\n${stmt.examples.join('\n')}`;
 
+            // Count badge with tooltip showing what it represents
             const countSpan = document.createElement('span');
-            countSpan.className = 'panel-badge filter-item-count';
+            countSpan.className = 'panel-badge filter-item-count has-tooltip';
             countSpan.textContent = String(stmt.count);
+            countSpan.dataset.tooltip = `${stmt.count} attestations with "${stmt.type}" predicate`;
 
             header.appendChild(typeSpan);
             header.appendChild(countSpan);
@@ -204,13 +210,15 @@ class CommandExplorerPanel extends BasePanel {
             descDiv.className = 'filter-item-description';
             descDiv.textContent = stmt.description;
 
-            // Examples
+            // Examples with tooltips
             const examplesDiv = document.createElement('div');
             examplesDiv.className = 'filter-item-examples';
 
             stmt.examples.slice(0, 3).forEach(ex => {
                 const code = document.createElement('code');
+                code.className = 'has-tooltip';
                 code.textContent = ex;
+                code.dataset.tooltip = `Click to insert: ${ex}`;
                 examplesDiv.appendChild(code);
             });
 

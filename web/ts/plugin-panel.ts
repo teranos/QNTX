@@ -61,6 +61,7 @@ interface ConfigFormState {
     schema: Record<string, ConfigFieldSchema>;
     validationErrors: Record<string, string>;
     needsConfirmation: boolean;
+    editingFields: Set<string>;
     error?: { message: string; details: string; status: number };
 }
 
@@ -79,8 +80,6 @@ export class PluginPanel extends BasePanel {
     private expandedPlugin: string | null = null;
     private configState: ConfigFormState | null = null;
     private serverHealth: ServerHealth | null = null;
-    private tooltip: HTMLElement | null = null;
-    private tooltipTimeout: number | null = null;
 
     constructor() {
         super({
@@ -88,6 +87,7 @@ export class PluginPanel extends BasePanel {
             classes: ['panel-slide-left', 'plugin-panel'],
             useOverlay: true,
             closeOnEscape: true
+            // Uses shared tooltip system via 'has-tooltip' class (enabled by default)
         });
     }
 
@@ -158,12 +158,45 @@ export class PluginPanel extends BasePanel {
                 return;
             }
 
-            // Cancel config button
+            // Cancel config button (close entire config form)
             if (target.closest('.plugin-config-cancel-btn')) {
                 e.stopPropagation();
                 this.expandedPlugin = null;
                 this.configState = null;
                 this.render();
+                return;
+            }
+
+            // Edit field button
+            const editFieldBtn = target.closest('.plugin-config-edit-btn') as HTMLElement | null;
+            if (editFieldBtn) {
+                e.stopPropagation();
+                const fieldName = editFieldBtn.dataset.field;
+                if (fieldName && this.configState) {
+                    this.configState.editingFields.add(fieldName);
+                    this.render();
+                    // Focus the input after render
+                    setTimeout(() => {
+                        const input = this.$<HTMLInputElement>(`.plugin-config-value-new[data-field="${fieldName}"]`);
+                        input?.focus();
+                    }, 0);
+                }
+                return;
+            }
+
+            // Cancel field edit button
+            const cancelFieldBtn = target.closest('.plugin-config-field-cancel') as HTMLElement | null;
+            if (cancelFieldBtn) {
+                e.stopPropagation();
+                const fieldName = cancelFieldBtn.dataset.field;
+                if (fieldName && this.configState) {
+                    // Revert to current value
+                    const currentValue = this.configState.currentConfig[fieldName] || this.configState.schema[fieldName]?.default_value || '';
+                    this.configState.newConfig[fieldName] = currentValue;
+                    this.configState.editingFields.delete(fieldName);
+                    delete this.configState.validationErrors[fieldName];
+                    this.render();
+                }
                 return;
             }
 
@@ -193,23 +226,8 @@ export class PluginPanel extends BasePanel {
             }
         });
 
-        // Tooltip handlers (event delegation)
-        content?.addEventListener('mouseenter', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('plugin-name-interactive') || target.classList.contains('plugin-version-interactive')) {
-                const tooltipText = target.dataset.tooltip;
-                if (tooltipText) {
-                    this.showTooltip(target, tooltipText);
-                }
-            }
-        }, true);
-
-        content?.addEventListener('mouseleave', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('plugin-name-interactive') || target.classList.contains('plugin-version-interactive')) {
-                this.hideTooltip();
-            }
-        }, true);
+        // Note: Tooltips are now handled by BasePanel's shared tooltip system
+        // Elements with 'has-tooltip' class and data-tooltip attribute will show tooltips
     }
 
     protected async onShow(): Promise<void> {
@@ -225,42 +243,6 @@ export class PluginPanel extends BasePanel {
         const searchInput = this.$<HTMLInputElement>('.plugin-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
-        }
-    }
-
-    private showTooltip(target: HTMLElement, text: string): void {
-        // Clear any existing timeout
-        if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
-        }
-
-        // Show tooltip quickly (300ms delay)
-        this.tooltipTimeout = window.setTimeout(() => {
-            // Remove old tooltip if exists
-            this.hideTooltip();
-
-            // Create new tooltip
-            this.tooltip = document.createElement('div');
-            this.tooltip.className = 'plugin-tooltip';
-            this.tooltip.textContent = text;
-
-            // Position tooltip
-            const rect = target.getBoundingClientRect();
-            this.tooltip.style.left = `${rect.left}px`;
-            this.tooltip.style.top = `${rect.bottom + 8}px`;
-
-            document.body.appendChild(this.tooltip);
-        }, 300);
-    }
-
-    private hideTooltip(): void {
-        if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
-            this.tooltipTimeout = null;
-        }
-        if (this.tooltip) {
-            this.tooltip.remove();
-            this.tooltip = null;
         }
     }
 
@@ -450,8 +432,8 @@ export class PluginPanel extends BasePanel {
             <div class="panel-card plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${plugin.name}">
                 <div class="plugin-card-header">
                     <div class="plugin-name-row">
-                        <span class="plugin-name plugin-name-interactive" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
-                        <span class="plugin-version plugin-version-interactive panel-code" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
+                        <span class="plugin-name has-tooltip" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
+                        <span class="plugin-version has-tooltip panel-code" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
                     </div>
                     <div class="plugin-badges">
                         <div class="plugin-state ${stateClass}">
@@ -560,6 +542,7 @@ export class PluginPanel extends BasePanel {
                         schema: {},
                         validationErrors: {},
                         needsConfirmation: false,
+                        editingFields: new Set(),
                         error: { message: errorData.error, details: errorData.details, status: response.status }
                     };
                 } catch {
@@ -572,6 +555,7 @@ export class PluginPanel extends BasePanel {
                         schema: {},
                         validationErrors: {},
                         needsConfirmation: false,
+                        editingFields: new Set(),
                         error: { message: errorText || response.statusText, details: '', status: response.status }
                     };
                 }
@@ -587,7 +571,8 @@ export class PluginPanel extends BasePanel {
                 newConfig: { ...data.config },
                 schema: data.schema || {},
                 validationErrors: {},
-                needsConfirmation: false
+                needsConfirmation: false,
+                editingFields: new Set()
             };
         } catch (error) {
             console.error('[Plugin Panel] Failed to fetch config:', pluginName, error);
@@ -598,6 +583,7 @@ export class PluginPanel extends BasePanel {
                 schema: {},
                 validationErrors: {},
                 needsConfirmation: false,
+                editingFields: new Set(),
                 error: { message: `Failed to load configuration: ${error}`, details: '', status: 0 }
             };
             this.render();
@@ -616,10 +602,10 @@ export class PluginPanel extends BasePanel {
                     <div class="panel-error-title">${errorTitle}</div>
                     <div class="panel-error-message">${escapeHtml(this.configState.error.message)}</div>
                     ${this.configState.error.details ? `
-                        <details class="plugin-config-error-details">
-                            <summary>Error Details</summary>
+                        <div class="plugin-config-error-details">
+                            <div class="panel-error-details-header">Error Details</div>
                             <pre>${escapeHtml(this.configState.error.details)}</pre>
-                        </details>
+                        </div>
                     ` : ''}
                 </div>
             `;
@@ -630,21 +616,39 @@ export class PluginPanel extends BasePanel {
             const newValue = this.configState!.newConfig[fieldName] || schema.default_value;
             const error = this.configState!.validationErrors[fieldName];
             const hasChanged = currentValue !== newValue;
+            const isEditing = this.configState!.editingFields.has(fieldName);
+
+            // Value cell content depends on editing state
+            let valueCellContent: string;
+            if (isEditing) {
+                valueCellContent = `
+                    <div class="plugin-config-edit-container">
+                        <input type="${this.getInputType(schema.type)}"
+                               value="${escapeHtml(newValue)}"
+                               data-field="${escapeHtml(fieldName)}"
+                               class="plugin-config-value-new panel-code"
+                               ${schema.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
+                               ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
+                               ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
+                               ${schema.required ? 'required' : ''}>
+                        <button class="plugin-config-field-cancel" data-field="${escapeHtml(fieldName)}" title="Cancel">&#10005;</button>
+                    </div>
+                `;
+            } else {
+                valueCellContent = `
+                    <span class="plugin-config-value-display ${hasChanged ? 'plugin-config-value-changed' : ''}">${escapeHtml(newValue)}</span>
+                    <button class="plugin-config-edit-btn" data-field="${escapeHtml(fieldName)}" title="Edit">&#9998;</button>
+                `;
+            }
 
             return `
                 <div class="plugin-config-row ${error ? 'plugin-config-row-error' : ''} ${hasChanged ? 'plugin-config-row-changed' : ''}" title="${escapeHtml(schema.description)}">
                     <label class="plugin-config-label">
                         ${escapeHtml(fieldName)}${schema.required ? '<span class="plugin-config-required">*</span>' : ''}
                     </label>
-                    <span class="plugin-config-value-old">${escapeHtml(currentValue)}</span>
-                    <input type="${this.getInputType(schema.type)}"
-                           value="${escapeHtml(newValue)}"
-                           data-field="${escapeHtml(fieldName)}"
-                           class="plugin-config-value-new panel-code"
-                           ${schema.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
-                           ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
-                           ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
-                           ${schema.required ? 'required' : ''}>
+                    <div class="plugin-config-value-cell">
+                        ${valueCellContent}
+                    </div>
                     ${error ? `<div class="plugin-config-row-error-msg">${escapeHtml(error)}</div>` : ''}
                 </div>
             `;
@@ -654,31 +658,33 @@ export class PluginPanel extends BasePanel {
         const hasChanges = Object.entries(this.configState.newConfig).some(([key, value]) =>
             value !== (this.configState!.currentConfig[key] || this.configState!.schema[key].default_value)
         );
+        const isEditing = this.configState.editingFields.size > 0;
 
         return `
             <div class="plugin-config-form">
                 <div class="plugin-config-table">
                     <div class="plugin-config-header">
                         <div class="plugin-config-header-label">Setting</div>
-                        <div class="plugin-config-header-old">Current</div>
-                        <div class="plugin-config-header-new">New</div>
+                        <div class="plugin-config-header-value">Value</div>
                     </div>
                     ${fields}
                 </div>
-                <div class="plugin-config-actions">
-                    <div class="plugin-config-actions-buttons">
-                        <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
-                        <button class="panel-btn ${this.configState.needsConfirmation ? 'panel-btn-warning' : 'panel-btn-primary'} plugin-config-save-btn"
-                                ${hasErrors || !hasChanges ? 'disabled' : ''}>
-                            ${this.configState.needsConfirmation ? 'Restart Plugin' : 'Save Changes'}
-                        </button>
-                    </div>
-                    ${this.configState.needsConfirmation ? `
-                        <div class="plugin-config-warning">
-                            This will apply your changes and reinitialize the plugin.
+                ${(hasChanges || isEditing) ? `
+                    <div class="plugin-config-actions">
+                        <div class="plugin-config-actions-buttons">
+                            <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
+                            <button class="panel-btn ${this.configState.needsConfirmation ? 'panel-btn-warning' : 'panel-btn-primary'} plugin-config-save-btn"
+                                    ${hasErrors ? 'disabled' : ''}>
+                                ${this.configState.needsConfirmation ? 'Confirm Restart' : 'Save Changes'}
+                            </button>
                         </div>
-                    ` : ''}
-                </div>
+                        ${this.configState.needsConfirmation ? `
+                            <div class="plugin-config-warning">
+                                This will apply your changes and reinitialize the plugin.
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : ''}
             </div>
         `;
     }

@@ -10,6 +10,7 @@ import { GoEditorNavigation } from './navigation.ts';
 import { CodeSuggestions } from './suggestions.ts';
 import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
+import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -195,7 +196,7 @@ class GoEditorPanel extends BasePanel {
             this.navigation.addToRecentFiles(path);
         } catch (error) {
             console.error('Failed to load file:', error);
-            this.showError(`Failed to load ${path}`);
+            this.showError(`Failed to load ${path}`, path);
         }
     }
 
@@ -402,11 +403,106 @@ class GoEditorPanel extends BasePanel {
         this.log(message);
     }
 
-    showError(message: string): void {
+    /**
+     * Build rich error for Go editor context
+     */
+    private buildEditorError(error: unknown, context?: string): RichError {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        // Check for gopls-specific errors
+        if (errorMessage.includes('gopls') || errorMessage.includes('disabled')) {
+            return {
+                title: 'gopls Unavailable',
+                message: 'The Go language server (gopls) is not available',
+                suggestion: 'Enable gopls in your configuration (code.gopls.enabled = true) or check that gopls is installed.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for WebSocket connection errors
+        if (errorMessage.includes('WebSocket') || errorMessage.includes('ws://') || errorMessage.includes('wss://')) {
+            return {
+                title: 'Connection Error',
+                message: 'Failed to connect to the gopls language server',
+                suggestion: 'Check that the QNTX server is running and the gopls WebSocket endpoint is accessible.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for HTTP errors
+        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
+        if (httpMatch) {
+            const status = parseInt(httpMatch[1], 10);
+            if (status === 404) {
+                return {
+                    title: 'File Not Found',
+                    message: context ? `Could not find file: ${context}` : 'The requested file was not found',
+                    status: 404,
+                    suggestion: 'Check that the file path is correct and the file exists in the workspace.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status === 403) {
+                return {
+                    title: 'Access Denied',
+                    message: 'You do not have permission to access this file',
+                    status: 403,
+                    suggestion: 'Check file permissions or enable dev mode for write access.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status >= 500) {
+                return {
+                    title: 'Server Error',
+                    message: 'The server encountered an error',
+                    status: status,
+                    suggestion: 'Check the server logs for more details.',
+                    details: errorStack || errorMessage
+                };
+            }
+        }
+
+        // Check for file operation errors
+        if (errorMessage.includes('Failed to load') || errorMessage.includes('Failed to save')) {
+            return {
+                title: 'File Operation Failed',
+                message: errorMessage,
+                suggestion: context ? `Check that ${context} exists and is readable.` : 'Check file permissions and try again.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for editor initialization errors
+        if (errorMessage.includes('container not found') || errorMessage.includes('CodeMirror')) {
+            return {
+                title: 'Editor Initialization Failed',
+                message: 'Failed to initialize the code editor',
+                suggestion: 'Try refreshing the page or closing and reopening the editor.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Generic error
+        return {
+            title: 'Error',
+            message: errorMessage,
+            suggestion: 'Check the error details for more information.',
+            details: errorStack || errorMessage
+        };
+    }
+
+    showError(message: string, context?: string): void {
         const container = this.$('#go-editor-container');
         if (container) {
             container.innerHTML = '';
-            const errorEl = this.createErrorState('Error', message);
+            const richError = this.buildEditorError(new Error(message), context);
+            const errorEl = createRichErrorState(richError, async () => {
+                // Retry loading the file if we have a path
+                if (this.currentPath) {
+                    await this.loadFile(this.currentPath);
+                }
+            });
             errorEl.classList.add('go-editor-error');
             container.appendChild(errorEl);
         }
