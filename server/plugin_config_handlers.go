@@ -21,19 +21,10 @@ const (
 	internalKeyPrefix = '_'
 )
 
-// writeRichError writes a rich error response with details and stack trace
+// writeRichErrorMethod is a method wrapper for writeRichError that uses the server's logger.
+// This is kept for backward compatibility - new code should use writeRichError directly.
 func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	errorResponse := map[string]interface{}{
-		"error":   err.Error(),
-		"details": errors.FlattenDetails(err),
-	}
-
-	if encoded := json.NewEncoder(w).Encode(errorResponse); encoded != nil {
-		s.logger.Errorw("Failed to encode error response", "error", encoded)
-	}
+	writeRichError(w, s.logger, err, statusCode)
 }
 
 // HandlePluginConfig handles plugin configuration operations

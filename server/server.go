@@ -37,6 +37,7 @@ type QNTXServer struct {
 	storageEventsPoller *StorageEventsPoller  // Poller for storage events (warnings/evictions)
 	clients             map[*Client]bool
 	broadcast           chan *graph.Graph
+	broadcastReq        chan *broadcastRequest // Requests to broadcast worker (thread-safe sends)
 	register            chan *Client
 	unregister          chan *Client
 	mu                  sync.RWMutex
@@ -121,11 +122,21 @@ func (s *QNTXServer) handleClientRegister(client *Client) {
 			"nodes", len(cachedGraph.Nodes),
 			"links", len(cachedGraph.Links),
 		)
+
+		// Send via broadcast worker (thread-safe)
+		req := &broadcastRequest{
+			reqType:  "graph",
+			graph:    cachedGraph,
+			clientID: client.id, // Send to specific client only
+		}
+
 		select {
-		case client.send <- cachedGraph:
-			s.logger.Debugw("Cached graph sent successfully", "client_id", client.id)
+		case s.broadcastReq <- req:
+			s.logger.Debugw("Queued cached graph for client", "client_id", client.id)
+		case <-s.ctx.Done():
+			return
 		default:
-			s.logger.Warnw("Failed to send cached graph to client", "client_id", client.id)
+			s.logger.Warnw("Broadcast request queue full, skipping cached graph", "client_id", client.id)
 		}
 	}
 }
@@ -138,7 +149,19 @@ func (s *QNTXServer) handleClientUnregister(client *Client) {
 		totalClients := len(s.clients)
 		s.mu.Unlock()
 
-		client.close()
+		// Signal broadcast worker to close channels (thread-safe)
+		req := &broadcastRequest{
+			reqType: "close",
+			client:  client,
+		}
+		select {
+		case s.broadcastReq <- req:
+			// Request queued
+		case <-s.ctx.Done():
+			// Server shutting down, close directly
+			client.close()
+		}
+
 		s.logTransport.UnregisterClient(client.id)
 
 		s.logger.Infow("Client disconnected",
@@ -150,59 +173,60 @@ func (s *QNTXServer) handleClientUnregister(client *Client) {
 	}
 }
 
-// removeSlowClient safely removes a client that can't keep up with broadcasts
+// removeSlowClient safely removes a client that can't keep up with broadcasts.
+// IMPORTANT: Only called from broadcast worker, so safe to close channels directly.
 func (s *QNTXServer) removeSlowClient(client *Client) {
 	s.mu.Lock()
 	if _, ok := s.clients[client]; ok {
 		delete(s.clients, client)
 		s.mu.Unlock()
-		client.close()
-		s.logger.Warnw("Client send channel full, removing client",
-			"client_id", client.id,
-			"total_drops", s.broadcastDrops.Load(),
-		)
 	} else {
 		s.mu.Unlock()
+		return // Already removed
 	}
+
+	// Close channels directly (we're in broadcast worker context, single-writer invariant maintained)
+	client.close()
+
+	// Unregister from log transport
+	s.logTransport.UnregisterClient(client.id)
+
+	s.logger.Warnw("Client send channel full, removing client",
+		"client_id", client.id,
+		"total_drops", s.broadcastDrops.Load(),
+	)
 }
 
-// handleBroadcast sends a graph update to all connected clients
+// handleBroadcast sends a graph update to all connected clients via the broadcast worker
 func (s *QNTXServer) handleBroadcast(g *graph.Graph) {
-	// Cache graph and snapshot clients atomically
+	// Cache graph for reconnecting clients
 	s.mu.Lock()
 	s.lastGraph = g
-	clients := make([]*Client, 0, len(s.clients))
-	for client := range s.clients {
-		clients = append(clients, client)
-	}
-	clientCount := len(clients)
 	s.mu.Unlock()
 
-	// Broadcast to all clients (without holding lock to avoid deadlock)
-	dropped := 0
-	for _, client := range clients {
-		select {
-		case client.send <- g:
-			// Success
-		default:
-			// Track drops and remove slow client
-			dropped++
-			s.broadcastDrops.Add(1)
-			s.removeSlowClient(client)
-		}
+	// Send to broadcast worker (thread-safe)
+	req := &broadcastRequest{
+		reqType: "graph",
+		graph:   g,
 	}
 
-	if dropped > 0 {
-		s.logger.Warnw("Broadcast had drops",
-			"clients", clientCount,
-			"dropped", dropped,
-			"total_drops", s.broadcastDrops.Load(),
-		)
+	select {
+	case s.broadcastReq <- req:
+		// Request queued successfully
+	case <-s.ctx.Done():
+		// Server shutting down
+	default:
+		// Broadcast queue full (should never happen with proper sizing)
+		s.logger.Warnw("Broadcast request queue full, dropping graph update")
 	}
 }
 
 // Run starts the server hub event loop
 func (s *QNTXServer) Run() {
+	// Start dedicated broadcast worker (MUST start before processing any messages)
+	// This worker owns all client channel sends to prevent race conditions
+	go s.runBroadcastWorker()
+
 	for {
 		select {
 		case <-s.ctx.Done():
