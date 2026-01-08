@@ -75,6 +75,26 @@ func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 	}
 }
 
+// Global plugin manager instance (similar to plugin.Registry pattern)
+var (
+	defaultPluginManager *PluginManager
+	pluginManagerMu      sync.RWMutex
+)
+
+// SetDefaultPluginManager sets the global plugin manager instance
+func SetDefaultPluginManager(manager *PluginManager) {
+	pluginManagerMu.Lock()
+	defer pluginManagerMu.Unlock()
+	defaultPluginManager = manager
+}
+
+// GetDefaultPluginManager returns the global plugin manager instance
+func GetDefaultPluginManager() *PluginManager {
+	pluginManagerMu.RLock()
+	defer pluginManagerMu.RUnlock()
+	return defaultPluginManager
+}
+
 // LoadPlugins loads and connects to plugins from configuration.
 // If a plugin fails to load, it logs the error and continues with remaining plugins.
 func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig) error {
