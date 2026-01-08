@@ -74,7 +74,7 @@ interface ServerHealth {
     owner: string;
 }
 
-class PluginPanel extends BasePanel {
+export class PluginPanel extends BasePanel {
     private plugins: PluginInfo[] = [];
     private expandedPlugin: string | null = null;
     private configState: ConfigFormState | null = null;
