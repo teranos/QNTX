@@ -356,7 +356,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 func (s *QNTXServer) handleGetSchedule(w http.ResponseWriter, r *http.Request, jobID string) {
 	job, err := s.getScheduleStore().GetJob(jobID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if IsNotFoundError(err) {
 			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
 			return
 		}
@@ -390,7 +390,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 		}
 
 		if err := s.getScheduleStore().UpdateJobState(jobID, *req.State); err != nil {
-			if strings.Contains(err.Error(), "not found") {
+			if IsNotFoundError(err) {
 				writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
 				return
 			}
@@ -438,7 +438,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 	// Get job details before deletion for logging
 	job, err := s.getScheduleStore().GetJob(jobID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if IsNotFoundError(err) {
 			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
 			return
 		}

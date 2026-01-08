@@ -22,6 +22,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/wslogs"
@@ -528,9 +529,10 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Handle Pulse budget updates
+	pulseLog := logger.AddPulseSymbol(s.logger)
 	if req.Pulse.DailyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateDailyBudget(*req.Pulse.DailyBudgetUSD); err != nil {
-			s.logger.Errorw("Failed to update daily budget",
+			pulseLog.Errorw("Failed to update daily budget",
 				"daily_budget", *req.Pulse.DailyBudgetUSD,
 				"error", err,
 			)
@@ -538,7 +540,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		s.logger.Infow("Config updated via REST API",
+		pulseLog.Infow("Daily budget updated via REST API",
 			"daily_budget", *req.Pulse.DailyBudgetUSD,
 			"client", r.RemoteAddr,
 		)
@@ -546,7 +548,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 	if req.Pulse.WeeklyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateWeeklyBudget(*req.Pulse.WeeklyBudgetUSD); err != nil {
-			s.logger.Errorw("Failed to update weekly budget",
+			pulseLog.Errorw("Failed to update weekly budget",
 				"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
 				"error", err,
 			)
@@ -554,7 +556,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		s.logger.Infow("Config updated via REST API",
+		pulseLog.Infow("Weekly budget updated via REST API",
 			"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
 			"client", r.RemoteAddr,
 		)
@@ -562,7 +564,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 	if req.Pulse.MonthlyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateMonthlyBudget(*req.Pulse.MonthlyBudgetUSD); err != nil {
-			s.logger.Errorw("Failed to update monthly budget",
+			pulseLog.Errorw("Failed to update monthly budget",
 				"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
 				"error", err,
 			)
@@ -570,7 +572,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		s.logger.Infow("Config updated via REST API",
+		pulseLog.Infow("Monthly budget updated via REST API",
 			"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
 			"client", r.RemoteAddr,
 		)

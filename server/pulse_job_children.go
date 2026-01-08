@@ -2,10 +2,11 @@ package server
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 )
 
@@ -31,10 +32,11 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 			})
 			return
 		}
-		s.logger.Errorw("Failed to find async job for scheduled job",
+		wrappedErr := errors.Wrap(err, "failed to find async job for scheduled job")
+		logger.AddPulseSymbol(s.logger).Errorw("Failed to find async job for scheduled job",
 			"scheduled_job_id", scheduledJobID,
-			"error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to find async job: %v", err))
+			"error", wrappedErr)
+		writeError(w, http.StatusInternalServerError, wrappedErr.Error())
 		return
 	}
 
@@ -44,11 +46,12 @@ func (s *QNTXServer) handleGetJobChildren(w http.ResponseWriter, r *http.Request
 	// Fetch child jobs using the async job ID
 	childJobs, err := queue.ListTasksByParent(asyncJobID)
 	if err != nil {
-		s.logger.Errorw("Failed to fetch child jobs",
+		wrappedErr := errors.Wrap(err, "failed to fetch child jobs")
+		logger.AddPulseSymbol(s.logger).Errorw("Failed to fetch child jobs",
 			"scheduled_job_id", scheduledJobID,
 			"async_job_id", asyncJobID,
-			"error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch child jobs: %v", err))
+			"error", wrappedErr)
+		writeError(w, http.StatusInternalServerError, wrappedErr.Error())
 		return
 	}
 

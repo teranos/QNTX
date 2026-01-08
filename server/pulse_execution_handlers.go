@@ -104,7 +104,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	execStore := s.getExecutionStore()
 	execution, err := execStore.GetExecution(executionID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if IsNotFoundError(err) {
 			writeError(w, http.StatusNotFound, "Execution not found")
 			return
 		}
