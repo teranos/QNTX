@@ -95,21 +95,11 @@
           pname = "qntx-python-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
+          # and qntx-python is part of the workspace
           src = ./.;
 
-          # Create workspace-style Cargo.toml/lock at root for Nix
-          postUnpack = ''
-                        # Copy files from qntx-python to root
-                        cp $sourceRoot/qntx-python/Cargo.lock $sourceRoot/
-                        # Create minimal workspace Cargo.toml
-                        cat > $sourceRoot/Cargo.toml <<'EOF'
-            [workspace]
-            members = ["qntx-python"]
-            EOF
-          '';
-
           cargoLock = {
-            lockFile = ./qntx-python/Cargo.lock;
+            lockFile = ./Cargo.lock;
           };
 
           nativeBuildInputs = [
