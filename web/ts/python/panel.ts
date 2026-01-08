@@ -7,6 +7,7 @@
 
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
+import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -36,6 +37,10 @@ class PythonEditorPanel extends BasePanel {
     private lastOutput: ExecutionResult | null = null;
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
+
+    // Two-click confirmation state for execute
+    private needsConfirmation: boolean = false;
+    private confirmationTimeout: number | null = null;
 
     // Keyboard handler
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -180,7 +185,14 @@ class PythonEditorPanel extends BasePanel {
                         keymap.of(defaultKeymap),
                         pythonExtension,
                         oneDark,
-                        EditorView.lineWrapping
+                        EditorView.lineWrapping,
+                        // Reset confirmation when code changes
+                        EditorView.updateListener.of((update) => {
+                            if (update.docChanged && this.needsConfirmation) {
+                                this.needsConfirmation = false;
+                                this.updateExecuteButton(false);
+                            }
+                        })
                     ]
                 }),
                 parent: container
@@ -210,6 +222,30 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     async executeCode(): Promise<void> {
         if (!this.editor || this.isExecuting) return;
+
+        // First click: show confirmation state
+        if (!this.needsConfirmation) {
+            this.needsConfirmation = true;
+            this.updateExecuteButton(false);
+
+            // Auto-reset confirmation after 5 seconds
+            if (this.confirmationTimeout) {
+                clearTimeout(this.confirmationTimeout);
+            }
+            this.confirmationTimeout = window.setTimeout(() => {
+                this.needsConfirmation = false;
+                this.updateExecuteButton(false);
+            }, 5000);
+
+            return;
+        }
+
+        // Second click: actually execute
+        this.needsConfirmation = false;
+        if (this.confirmationTimeout) {
+            clearTimeout(this.confirmationTimeout);
+            this.confirmationTimeout = null;
+        }
 
         this.isExecuting = true;
         this.updateExecuteButton(true);
@@ -330,9 +366,33 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     private updateExecuteButton(executing: boolean): void {
         const btn = this.$('#python-execute-btn') as HTMLButtonElement;
-        if (btn) {
-            btn.disabled = executing;
-            btn.textContent = executing ? 'Running...' : 'Run (⌘↵)';
+        if (!btn) return;
+
+        btn.disabled = executing;
+
+        // Remove existing state classes
+        btn.classList.remove('panel-btn-warning', 'panel-btn-success');
+
+        if (executing) {
+            btn.textContent = 'Running...';
+        } else if (this.needsConfirmation) {
+            btn.textContent = 'Confirm Execute';
+            btn.classList.add('panel-btn-warning');
+        } else {
+            btn.textContent = 'Run (⌘↵)';
+        }
+
+        // Update or remove hint
+        const existingHint = this.$('.python-execute-hint');
+        if (this.needsConfirmation && !executing) {
+            if (!existingHint) {
+                const hint = document.createElement('div');
+                hint.className = 'python-execute-hint panel-confirm-hint';
+                hint.textContent = 'Click again to execute code';
+                btn.parentElement?.insertBefore(hint, btn.nextSibling);
+            }
+        } else {
+            existingHint?.remove();
         }
     }
 
@@ -350,15 +410,106 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         statusEl.textContent = config.message;
     }
 
-    private showError(message: string): void {
+    /**
+     * Build rich error for Python editor context
+     */
+    private buildPythonError(error: unknown, context?: string): RichError {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        // Check for plugin unavailable errors
+        if (errorMessage.includes('unavailable') || errorMessage.includes('plugin')) {
+            return {
+                title: 'Python Plugin Unavailable',
+                message: 'The Python execution plugin is not available',
+                suggestion: 'Check that the qntx-python-plugin is installed and running. You may need to enable it in your configuration.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for execution errors
+        if (errorMessage.includes('Execution failed') || errorMessage.includes('execute')) {
+            return {
+                title: 'Execution Failed',
+                message: context || 'Failed to execute Python code',
+                suggestion: 'Check your code for syntax errors or exceptions. The Python plugin logs may have more details.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for HTTP errors
+        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
+        if (httpMatch) {
+            const status = parseInt(httpMatch[1], 10);
+            if (status === 404) {
+                return {
+                    title: 'Endpoint Not Found',
+                    message: 'The Python API endpoint is not available',
+                    status: 404,
+                    suggestion: 'Ensure the QNTX server is running with Python support enabled.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status === 503) {
+                return {
+                    title: 'Service Unavailable',
+                    message: 'The Python service is temporarily unavailable',
+                    status: 503,
+                    suggestion: 'The Python plugin may be starting up. Try again in a few seconds.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status >= 500) {
+                return {
+                    title: 'Server Error',
+                    message: 'The server encountered an error processing Python code',
+                    status: status,
+                    suggestion: 'Check the server logs for more details.',
+                    details: errorStack || errorMessage
+                };
+            }
+        }
+
+        // Check for network errors
+        if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
+            return {
+                title: 'Network Error',
+                message: 'Unable to connect to the Python service',
+                suggestion: 'Check your network connection and ensure the QNTX server is running.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for editor initialization errors
+        if (errorMessage.includes('container not found') || errorMessage.includes('CodeMirror')) {
+            return {
+                title: 'Editor Initialization Failed',
+                message: 'Failed to initialize the Python code editor',
+                suggestion: 'Try refreshing the page or closing and reopening the editor.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Generic error
+        return {
+            title: 'Error',
+            message: errorMessage,
+            suggestion: 'Check the error details for more information.',
+            details: errorStack || errorMessage
+        };
+    }
+
+    private showError(message: string, context?: string): void {
         const container = this.$('#python-editor-container');
         if (container) {
-            container.innerHTML = `
-                <div class="python-editor-error">
-                    <h3>Error</h3>
-                    <p>${this.escapeHtml(message)}</p>
-                </div>
-            `;
+            container.innerHTML = '';
+            const richError = this.buildPythonError(new Error(message), context);
+            const errorEl = createRichErrorState(richError, async () => {
+                // Retry initializing the editor
+                await this.initializeEditor();
+            });
+            errorEl.classList.add('python-editor-error');
+            container.appendChild(errorEl);
         }
     }
 
