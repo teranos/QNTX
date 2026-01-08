@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - grace</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>Opening (✿) and Closing (❀)</h1>
+<p>Graceful shutdown and startup system for async job processing.</p>
+<p><strong>Symbols:</strong></p>
+<ul>
+<li><strong>✿ Opening</strong> - Graceful startup with orphaned job recovery</li>
+<li><strong>❀ Closing</strong> - Graceful shutdown with checkpoint preservation</li>
+</ul>
+<p><em>(Formerly codename: GRACE - Graceful Async Cancellation Engine)</em></p>
+<h2>Implementation Summary</h2>
+<h3>❀ Closing (Graceful Shutdown)</h3>
+<ul>
+<li><strong>Context propagation</strong>: Application → Worker Pool → Jobs → Handlers</li>
+<li><strong>Task-level atomicity</strong>: Jobs complete current task before checkpointing</li>
+<li><strong>Signal handling</strong>: Application catches signals, triggers shutdown</li>
+<li><strong>Worker timeout</strong>: 30 seconds for clean checkpoint and exit</li>
+<li><strong>Job re-queuing</strong>: Cancelled jobs transition to <code>queued</code> status with checkpoint intact</li>
+</ul>
+<h3>✿ Opening (Graceful Start)</h3>
+<ul>
+<li><strong>Orphan detection</strong>: Finds jobs stuck in <code>running</code> state after crash</li>
+<li><strong>Super gradual warm start</strong>:
+<ul>
+<li>Immediate: First job only</li>
+<li>Warm start (0-10s): Jobs 2-10 at 1 job/second</li>
+<li>Slow start (10s-15min): Remaining jobs spread evenly</li>
+</ul>
+</li>
+<li><strong>Checkpoint priority</strong>: Jobs with checkpoints recovered first</li>
+<li><strong>Configurable timing</strong>: Test mode uses faster intervals (10s phases)</li>
+</ul>
+<h3>Key Files</h3>
+<ul>
+<li><code>pulse/async/worker.go</code> - Graceful start/stop logic</li>
+<li><code>pulse/async/grace_test.go</code> - Test suite</li>
+<li>Handler implementations - Task-level context checks</li>
+</ul>
+<h3>Testing</h3>
+<pre><code class="language-bash"># Fast tests (~10s)
+go test ./pulse/async -run TestGRACE -short
+
+# Full integration tests (~60s)
+go test ./pulse/async -run TestGRACE
+</code></pre>
+<h2>Phase Recovery Architecture</h2>
+<h3>Two-Phase Job Pattern</h3>
+<p>Some jobs use a two-phase execution pattern:</p>
+<ol>
+<li><strong>"ingest" phase</strong>: Process data, create sub-entities, enqueue child tasks</li>
+<li><strong>"aggregate" phase</strong>: Wait for child tasks to complete, aggregate results</li>
+</ol>
+<p>This pattern solves parent-child job coordination without blocking worker threads.</p>
+<h3>Smart Phase Recovery (Implemented)</h3>
+<p><strong>Location</strong>: <code>pulse/async/worker.go:requeueOrphanedJob()</code></p>
+<p>When recovering orphaned jobs, GRACE validates phase consistency:</p>
+<pre><code class="language-go">// Example: Check if child tasks actually exist for aggregate phase
+if job.Metadata != nil &amp;&amp; job.Metadata.Phase == "aggregate" {
+    tasks, err := wp.queue.ListTasksByParent(job.ID)
+    if err != nil || len(tasks) == 0 {
+        // No tasks found - reset to ingest phase
+        job.Metadata.Phase = ""
+        log.Printf("GRACE: Reset job %s to 'ingest' phase (no child tasks found)")
+    } else {
+        // Tasks exist - keep aggregate phase
+        log.Printf("GRACE: Job %s staying in 'aggregate' phase (%d child tasks found)")
+    }
+}
+</code></pre>
+<p><strong>Scenarios handled</strong>:</p>
+<ol>
+<li>
+<p><strong>Crash during phase transition</strong>:</p>
+<ul>
+<li>Job set phase="aggregate" but crash before creating tasks</li>
+<li>Recovery: Reset phase to "" (defaults to "ingest")</li>
+<li>Job re-runs from beginning, creates tasks properly</li>
+</ul>
+</li>
+<li>
+<p><strong>Normal crash after task creation</strong>:</p>
+<ul>
+<li>Job in phase="aggregate" with tasks already created</li>
+<li>Recovery: Keep phase="aggregate"</li>
+<li>Job continues aggregating task results</li>
+</ul>
+</li>
+<li>
+<p><strong>Crash during ingest phase</strong>:</p>
+<ul>
+<li>Job in phase="" or phase="ingest"</li>
+<li>Recovery: No special handling needed</li>
+<li>Job re-runs from beginning</li>
+</ul>
+</li>
+</ol>
+<h3>Testing</h3>
+<p>Phase recovery is tested in <code>pulse/async/grace_test.go</code>:</p>
+<ul>
+<li><code>TestGRACEPhaseRecoveryNoChildTasks</code> - Validates reset when no tasks exist</li>
+<li><code>TestGRACEPhaseRecoveryWithChildTasks</code> - Validates preservation when tasks exist</li>
+</ul>
+<pre><code class="language-bash"># Run phase recovery tests
+go test ./pulse/async -run TestGRACEPhaseRecovery -v
+</code></pre>
+<h3>Implementation Details</h3>
+<p><strong>Error handling</strong>: If checking tasks fails (DB error), defaults to safe behavior (reset phase)</p>
+<p><strong>Logging</strong>: All phase decisions logged for debugging:</p>
+<ul>
+<li>"Reset job X to 'ingest' phase (no child tasks found, likely crashed during phase transition)"</li>
+<li>"Job X staying in 'aggregate' phase (N child tasks found)"</li>
+<li>"Reset job X to 'ingest' phase (couldn't verify child tasks)"</li>
+</ul>
+<p><strong>Backward compatibility</strong>: Only affects jobs with two-phase metadata; other job types unaffected</p>
+<h2>Parent-Child Job Lifecycle</h2>
+<h3>Overview</h3>
+<p>Parent jobs spawn child tasks (subtasks). The system ensures child tasks are properly managed throughout the parent's lifecycle.</p>
+<h3>Cascade Deletion</h3>
+<p><strong>Location</strong>: <code>pulse/async/queue.go:DeleteJobWithChildren()</code></p>
+<p>When a parent job is deleted:</p>
+<ol>
+<li>System finds all child tasks associated with parent</li>
+<li>Marks all active child tasks as <code>cancelled</code> with reason "parent job deleted"</li>
+<li>Deletes the parent job from database</li>
+<li>Preserves completed/failed children for audit trail</li>
+</ol>
+<p><strong>Race condition protection</strong>: Before enqueueing children, parent checks if it still exists in database. This prevents enqueueing tasks after parent deletion during execution.</p>
+<pre><code class="language-go">// Check if parent job still exists before enqueueing children
+if _, err := queue.GetJob(job.ID); err != nil {
+    return fmt.Errorf("parent job deleted during execution: %w", err)
+}
+</code></pre>
+<h3>Orphan Cleanup</h3>
+<p><strong>Location</strong>: <code>pulse/async/queue.go:cancelOrphanedChildren()</code></p>
+<p>When a parent job completes or fails:</p>
+<ol>
+<li>System finds all child tasks still active (queued/running/paused)</li>
+<li>Cancels each child with reason "parent job completed"</li>
+<li>Preserves completed/failed/cancelled children for history</li>
+</ol>
+<p><strong>Behavior</strong>:</p>
+<ul>
+<li><strong>Queued children</strong>: Cancelled immediately, never execute</li>
+<li><strong>Running children</strong>: Marked cancelled in DB, current execution completes but result ignored</li>
+<li><strong>Paused children</strong>: Cancelled</li>
+<li><strong>Completed/failed children</strong>: Preserved unchanged</li>
+</ul>
+<h3>Retry Logic</h3>
+<p><strong>Location</strong>: <code>pulse/async/error.go:RetryableError()</code></p>
+<p>Failed tasks can be retried automatically (max 3 attempts total):</p>
+<ol>
+<li>Task fails with retryable error (AI failure, network error, timeout)</li>
+<li>System increments <code>retry_count</code> and re-queues job</li>
+<li>Logs retry attempt: <code>꩜ Retry 1/2: operation failed | job:JB_abc123</code></li>
+<li>After max retries, logs: <code>꩜ Max retries exceeded (2): operation failed | job:JB_abc123</code></li>
+</ol>
+<p><strong>Database tracking</strong>: Each retry attempt updates the job record with retry count and error details, providing full audit trail.</p>
+<h3>Testing</h3>
+<pre><code class="language-bash"># Test cascade deletion
+go test ./pulse/async -run TestDeleteJobWithChildren -v
+
+# Test parent-child lifecycle
+go test ./pulse/async -run TestParentChild -v
+</code></pre>
+<h2>Integration Guide</h2>
+<h3>Application Shutdown</h3>
+<p>Applications using Pulse should propagate shutdown signals:</p>
+<pre><code class="language-go">// Create worker pool with application context
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+workerPool := async.NewWorkerPool(ctx, db, queue, executor, config)
+workerPool.Start()
+
+// Handle shutdown signals
+sigChan := make(chan os.Signal, 1)
+signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+&lt;-sigChan
+log.Println("Shutdown signal received, stopping workers...")
+cancel() // Triggers graceful shutdown
+
+// Wait for workers to finish (with timeout)
+shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer shutdownCancel()
+workerPool.StopWithContext(shutdownCtx)
+</code></pre>
+<h3>Handler Context Checks</h3>
+<p>Job handlers should check context at task boundaries:</p>
+<pre><code class="language-go">func (h *MyHandler) Execute(ctx context.Context, job *async.Job) error {
+    for _, item := range items {
+        // Check for cancellation before each task
+        select {
+        case &lt;-ctx.Done():
+            return ctx.Err() // Job will be checkpointed
+        default:
+        }
+
+        // Process item
+        if err := processItem(ctx, item); err != nil {
+            return err
+        }
+
+        // Update progress
+        job.Progress.Current++
+    }
+
+    return nil
+}
+</code></pre>
+<h2>Configuration</h2>
+<h3>Worker Pool Config</h3>
+<pre><code class="language-go">type WorkerPoolConfig struct {
+    Workers       int           // Number of concurrent workers
+    PollInterval  time.Duration // How often to check for jobs
+    ShutdownTimeout time.Duration // Max time to wait for graceful shutdown
+}
+</code></pre>
+<h3>Test Mode</h3>
+<p>For faster testing, use shorter intervals:</p>
+<pre><code class="language-go">config := async.WorkerPoolConfig{
+    Workers:         1,
+    PollInterval:    100 * time.Millisecond,
+    ShutdownTimeout: 2 * time.Second,
+}
+</code></pre>
+<hr />
+<p><strong>Last updated</strong>: 2025-12-27
+<strong>Status</strong>: Implemented and tested</p>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+</body>
+</html>
