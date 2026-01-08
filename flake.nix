@@ -427,7 +427,9 @@
               ./result/bin/typegen --lang rust --output types/generated/
               ./result/bin/typegen --lang markdown
 
-              # Sync Rust types to qntx crate (exclude generated package files)
+              # TODO: Remove this sync step after updating typegen to output directly to crates/qntx/src/types/
+              # See docs/plans/phase-2-qntx-crate.md for details
+              # Then delete types/generated/rust/ directory entirely
               echo "Syncing Rust types to crates/qntx/src/types/..."
               for f in types/generated/rust/*.rs; do
                 filename=$(basename "$f")
