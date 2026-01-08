@@ -826,7 +826,8 @@ func base64Decode(data string) (string, error) {
 	return string(bytes), nil
 }
 
-// close safely closes the client's channels using sync.Once to prevent double-close panics
+// close safely closes the client's channels using sync.Once to prevent double-close panics.
+// Only called from the broadcast worker goroutine (single-writer model).
 func (c *Client) close() {
 	c.closeOnce.Do(func() {
 		if c.send != nil {
