@@ -167,11 +167,11 @@ export class PluginPanel extends BasePanel {
                 return;
             }
 
-            // Edit field button
-            const editFieldBtn = target.closest('.plugin-config-edit-btn') as HTMLElement | null;
-            if (editFieldBtn) {
+            // Click on value display to edit (replaces pencil button)
+            const valueDisplay = target.closest('.plugin-config-value-display') as HTMLElement | null;
+            if (valueDisplay) {
                 e.stopPropagation();
-                const fieldName = editFieldBtn.dataset.field;
+                const fieldName = valueDisplay.dataset.field;
                 if (fieldName && this.configState) {
                     this.configState.editingFields.add(fieldName);
                     this.render();
@@ -636,14 +636,13 @@ export class PluginPanel extends BasePanel {
                 `;
             } else {
                 valueCellContent = `
-                    <span class="plugin-config-value-display ${hasChanged ? 'plugin-config-value-changed' : ''}">${escapeHtml(newValue)}</span>
-                    <button class="plugin-config-edit-btn" data-field="${escapeHtml(fieldName)}" title="Edit">&#9998;</button>
+                    <span class="plugin-config-value-display ${hasChanged ? 'plugin-config-value-changed' : ''}" data-field="${escapeHtml(fieldName)}">${escapeHtml(newValue)}</span>
                 `;
             }
 
             return `
-                <div class="plugin-config-row ${error ? 'plugin-config-row-error' : ''} ${hasChanged ? 'plugin-config-row-changed' : ''}" title="${escapeHtml(schema.description)}">
-                    <label class="plugin-config-label">
+                <div class="plugin-config-row ${error ? 'plugin-config-row-error' : ''} ${hasChanged ? 'plugin-config-row-changed' : ''}">
+                    <label class="plugin-config-label has-tooltip" data-tooltip="${escapeHtml(schema.description)}">
                         ${escapeHtml(fieldName)}${schema.required ? '<span class="plugin-config-required">*</span>' : ''}
                     </label>
                     <div class="plugin-config-value-cell">
@@ -763,19 +762,40 @@ export class PluginPanel extends BasePanel {
 
         // Second click: actually save
         try {
+            const requestPayload = { config: this.configState.newConfig };
+            console.log('[Plugin Config] Saving config for', this.configState.pluginName);
+            console.log('[Plugin Config] Request payload:', requestPayload);
+            console.log('[Plugin Config] Payload JSON:', JSON.stringify(requestPayload, null, 2));
+
             const response = await apiFetch(`/api/plugins/${this.configState.pluginName}/config`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ config: this.configState.newConfig })
+                body: JSON.stringify(requestPayload)
             });
+
+            console.log('[Plugin Config] Response status:', response.status);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: response.statusText }));
+                console.log('[Plugin Config] Error response:', errorData);
+
+                // Format error details - handle backend validation errors
+                let errorDetails = errorData.details || '';
+                if (errorData.errors && Object.keys(errorData.errors).length > 0) {
+                    errorDetails = 'Field-specific validation errors:\n\n';
+                    for (const [field, error] of Object.entries(errorData.errors)) {
+                        errorDetails += `• ${field}: ${error}\n`;
+                    }
+                }
+
+                if (!errorDetails) {
+                    errorDetails = JSON.stringify(errorData, null, 2);
+                }
 
                 // Set error in config state and reset confirmation
                 this.configState.error = {
                     message: errorData.message || 'Failed to save configuration',
-                    details: errorData.details || '',
+                    details: errorDetails,
                     status: response.status
                 };
                 this.configState.needsConfirmation = false;

@@ -294,10 +294,14 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 
 		// Validate by type
 		switch fieldSchema.Type {
-		case "integer":
+		case "integer", "number":
 			intVal, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
-				errors[fieldName] = "Must be a valid integer"
+				if fieldSchema.Type == "integer" {
+					errors[fieldName] = "Must be a valid integer"
+				} else {
+					errors[fieldName] = "Must be a valid number"
+				}
 				continue
 			}
 
