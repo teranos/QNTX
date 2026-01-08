@@ -175,6 +175,11 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) []*async.Job {
 
 // sendJobToClient sends a job update message to a specific client.
 func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial bool) {
+	// Check if client is closed before sending to prevent panic
+	if client.IsClosed() {
+		return
+	}
+
 	metadata := map[string]interface{}{
 		"timestamp": time.Now().Unix(),
 		"initial":   isInitial,

@@ -181,6 +181,12 @@ func (s *QNTXServer) handleBroadcast(g *graph.Graph) {
 	// Broadcast to all clients (without holding lock to avoid deadlock)
 	dropped := 0
 	for _, client := range clients {
+		// Check if client is closed before sending to prevent panic.
+		// This race-safe check avoids send-to-closed-channel when a client
+		// is unregistered between copying the client list and iterating.
+		if client.IsClosed() {
+			continue
+		}
 		select {
 		case client.send <- g:
 			// Success
