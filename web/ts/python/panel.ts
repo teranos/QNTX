@@ -38,6 +38,10 @@ class PythonEditorPanel extends BasePanel {
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
 
+    // Two-click confirmation state for execute
+    private needsConfirmation: boolean = false;
+    private confirmationTimeout: number | null = null;
+
     // Keyboard handler
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
 
@@ -181,7 +185,14 @@ class PythonEditorPanel extends BasePanel {
                         keymap.of(defaultKeymap),
                         pythonExtension,
                         oneDark,
-                        EditorView.lineWrapping
+                        EditorView.lineWrapping,
+                        // Reset confirmation when code changes
+                        EditorView.updateListener.of((update) => {
+                            if (update.docChanged && this.needsConfirmation) {
+                                this.needsConfirmation = false;
+                                this.updateExecuteButton(false);
+                            }
+                        })
                     ]
                 }),
                 parent: container
@@ -211,6 +222,30 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     async executeCode(): Promise<void> {
         if (!this.editor || this.isExecuting) return;
+
+        // First click: show confirmation state
+        if (!this.needsConfirmation) {
+            this.needsConfirmation = true;
+            this.updateExecuteButton(false);
+
+            // Auto-reset confirmation after 5 seconds
+            if (this.confirmationTimeout) {
+                clearTimeout(this.confirmationTimeout);
+            }
+            this.confirmationTimeout = window.setTimeout(() => {
+                this.needsConfirmation = false;
+                this.updateExecuteButton(false);
+            }, 5000);
+
+            return;
+        }
+
+        // Second click: actually execute
+        this.needsConfirmation = false;
+        if (this.confirmationTimeout) {
+            clearTimeout(this.confirmationTimeout);
+            this.confirmationTimeout = null;
+        }
 
         this.isExecuting = true;
         this.updateExecuteButton(true);
@@ -331,9 +366,33 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     private updateExecuteButton(executing: boolean): void {
         const btn = this.$('#python-execute-btn') as HTMLButtonElement;
-        if (btn) {
-            btn.disabled = executing;
-            btn.textContent = executing ? 'Running...' : 'Run (⌘↵)';
+        if (!btn) return;
+
+        btn.disabled = executing;
+
+        // Remove existing state classes
+        btn.classList.remove('panel-btn-warning', 'panel-btn-success');
+
+        if (executing) {
+            btn.textContent = 'Running...';
+        } else if (this.needsConfirmation) {
+            btn.textContent = 'Confirm Execute';
+            btn.classList.add('panel-btn-warning');
+        } else {
+            btn.textContent = 'Run (⌘↵)';
+        }
+
+        // Update or remove hint
+        const existingHint = this.$('.python-execute-hint');
+        if (this.needsConfirmation && !executing) {
+            if (!existingHint) {
+                const hint = document.createElement('div');
+                hint.className = 'python-execute-hint panel-confirm-hint';
+                hint.textContent = 'Click again to execute code';
+                btn.parentElement?.insertBefore(hint, btn.nextSibling);
+            }
+        } else {
+            existingHint?.remove();
         }
     }
 
