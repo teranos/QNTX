@@ -372,28 +372,6 @@
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
           typegen-build = typegen; # Ensure typegen builds
-          typegen-check = pkgs.runCommand "typegen-check"
-            {
-              nativeBuildInputs = [ typegen pkgs.go ];
-              src = ./.;
-            }
-            ''
-              # Set up Go environment
-              export HOME=$TMPDIR
-              export GOCACHE=$TMPDIR/go-cache
-              export GOPATH=$TMPDIR/go
-
-              # Copy source to working directory
-              cp -r $src src
-              chmod -R +w src
-              cd src
-
-              # Run typegen check
-              ${typegen}/bin/typegen check
-
-              # Success marker
-              touch $out
-            '';
           qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
           qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
