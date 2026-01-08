@@ -49,18 +49,38 @@ interface PluginConfigResponse {
     schema: Record<string, ConfigFieldSchema> | null;
 }
 
+interface ErrorResponse {
+    error: string;
+    details: string;
+}
+
 interface ConfigFormState {
     pluginName: string;
     currentConfig: Record<string, string>;
     newConfig: Record<string, string>;
     schema: Record<string, ConfigFieldSchema>;
     validationErrors: Record<string, string>;
+    needsConfirmation: boolean;
+    error?: { message: string; details: string; status: number };
+}
+
+interface ServerHealth {
+    status: string;
+    version: string;
+    commit: string;
+    build_time: string;
+    clients: number;
+    verbosity: number;
+    owner: string;
 }
 
 class PluginPanel extends BasePanel {
     private plugins: PluginInfo[] = [];
     private expandedPlugin: string | null = null;
     private configState: ConfigFormState | null = null;
+    private serverHealth: ServerHealth | null = null;
+    private tooltip: HTMLElement | null = null;
+    private tooltipTimeout: number | null = null;
 
     constructor() {
         super({
@@ -161,20 +181,43 @@ class PluginPanel extends BasePanel {
         // Config input change handlers (event delegation)
         content?.addEventListener('input', (e: Event) => {
             const target = e.target as HTMLInputElement;
-            if (target.closest('.plugin-config-input')) {
+            if (target.classList.contains('plugin-config-value-new')) {
                 const fieldName = target.dataset.field;
                 if (fieldName && this.configState) {
                     this.configState.newConfig[fieldName] = target.value;
+                    // Reset confirmation if user changes value after clicking save
+                    this.configState.needsConfirmation = false;
                     this.validateField(fieldName, target.value);
                     this.updateSaveButtonState();
                 }
             }
         });
+
+        // Tooltip handlers (event delegation)
+        content?.addEventListener('mouseenter', (e: Event) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('plugin-name-interactive') || target.classList.contains('plugin-version-interactive')) {
+                const tooltipText = target.dataset.tooltip;
+                if (tooltipText) {
+                    this.showTooltip(target, tooltipText);
+                }
+            }
+        }, true);
+
+        content?.addEventListener('mouseleave', (e: Event) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('plugin-name-interactive') || target.classList.contains('plugin-version-interactive')) {
+                this.hideTooltip();
+            }
+        }, true);
     }
 
     protected async onShow(): Promise<void> {
         this.showLoading('Loading plugins...');
-        await this.fetchPlugins();
+        await Promise.all([
+            this.fetchPlugins(),
+            this.fetchServerHealth()
+        ]);
         this.hideLoading();
         this.render();
 
@@ -182,6 +225,55 @@ class PluginPanel extends BasePanel {
         const searchInput = this.$<HTMLInputElement>('.plugin-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
+        }
+    }
+
+    private showTooltip(target: HTMLElement, text: string): void {
+        // Clear any existing timeout
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+        }
+
+        // Show tooltip quickly (300ms delay)
+        this.tooltipTimeout = window.setTimeout(() => {
+            // Remove old tooltip if exists
+            this.hideTooltip();
+
+            // Create new tooltip
+            this.tooltip = document.createElement('div');
+            this.tooltip.className = 'plugin-tooltip';
+            this.tooltip.textContent = text;
+
+            // Position tooltip
+            const rect = target.getBoundingClientRect();
+            this.tooltip.style.left = `${rect.left}px`;
+            this.tooltip.style.top = `${rect.bottom + 8}px`;
+
+            document.body.appendChild(this.tooltip);
+        }, 300);
+    }
+
+    private hideTooltip(): void {
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+            this.tooltipTimeout = null;
+        }
+        if (this.tooltip) {
+            this.tooltip.remove();
+            this.tooltip = null;
+        }
+    }
+
+    private async fetchServerHealth(): Promise<void> {
+        try {
+            const response = await apiFetch('/health');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            this.serverHealth = await response.json();
+        } catch (error) {
+            console.error('[Plugin Panel] Failed to fetch server health:', error);
+            this.serverHealth = null;
         }
     }
 
@@ -224,12 +316,20 @@ class PluginPanel extends BasePanel {
             return;
         }
 
+        const serverBuildTime = this.formatBuildTime(this.serverHealth?.build_time);
+
         content.innerHTML = `
             <div class="plugin-summary panel-card">
                 <div class="plugin-summary-stats">
                     <span class="plugin-count">${this.plugins.length} plugin${this.plugins.length !== 1 ? 's' : ''} installed</span>
                     <span class="plugin-health-summary">${this.getHealthSummary()}</span>
                 </div>
+                ${serverBuildTime ? `
+                    <div class="plugin-server-info">
+                        <span class="plugin-server-label">QNTX Server Built:</span>
+                        <span class="plugin-server-value panel-code">${serverBuildTime}</span>
+                    </div>
+                ` : ''}
                 <button class="panel-btn panel-btn-sm plugin-refresh-btn" title="Refresh">&#8635; Refresh</button>
             </div>
             <div class="panel-list plugin-list">
@@ -248,11 +348,89 @@ class PluginPanel extends BasePanel {
         return `<span class="plugin-health-warning">${unhealthy} unhealthy</span>`;
     }
 
+    private formatBuildTime(buildTime?: string): string | null {
+        if (!buildTime || buildTime === 'dev' || buildTime === 'unknown') {
+            return null;
+        }
+
+        // Parse RFC3339 timestamp
+        const date = new Date(buildTime);
+        if (isNaN(date.getTime())) {
+            return null;
+        }
+
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        let relativeTime: string;
+        if (diffMins < 1) {
+            relativeTime = 'just now';
+        } else if (diffMins < 60) {
+            relativeTime = `${diffMins}m ago`;
+        } else if (diffHours < 24) {
+            relativeTime = `${diffHours}h ago`;
+        } else {
+            relativeTime = `${diffDays}d ago`;
+        }
+
+        const formattedDate = date.toLocaleString();
+        return `${relativeTime} (${formattedDate})`;
+    }
+
+    private buildVersionTooltip(plugin: PluginInfo): string {
+        const parts: string[] = [];
+
+        // Add metadata
+        if (plugin.author) parts.push(`Author: ${plugin.author}`);
+        if (plugin.license) parts.push(`License: ${plugin.license}`);
+        if (plugin.qntx_version) parts.push(`QNTX Version: ≥${plugin.qntx_version}`);
+
+        // Add separator if we have both metadata and details
+        if (parts.length > 0 && plugin.details && Object.keys(plugin.details).length > 0) {
+            parts.push('---');
+        }
+
+        // Add details
+        if (plugin.details) {
+            Object.entries(plugin.details).forEach(([key, value]) => {
+                let displayValue: string;
+
+                // Format binary_built timestamps specially
+                if (key === 'binary_built' && typeof value === 'string') {
+                    const timestamp = parseInt(value, 10);
+                    if (!isNaN(timestamp)) {
+                        const date = new Date(timestamp * 1000);
+                        displayValue = date.toLocaleString();
+                    } else {
+                        displayValue = String(value);
+                    }
+                } else {
+                    displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+                }
+
+                parts.push(`${key}: ${displayValue}`);
+            });
+        }
+
+        return parts.join('\n');
+    }
+
     private renderPlugin(plugin: PluginInfo): string {
         const statusClass = plugin.healthy ? 'plugin-status-healthy' : 'plugin-status-unhealthy';
         const statusIcon = plugin.healthy ? '&#10003;' : '&#10007;';
         const statusText = plugin.healthy ? 'Healthy' : 'Unhealthy';
         const isExpanded = this.expandedPlugin === plugin.name;
+
+        // Build tooltips
+        const versionTooltip = this.buildVersionTooltip(plugin);
+        const nameTooltip = [
+            plugin.description || 'No description available',
+            '---',
+            `Path: ~/.qntx/plugins/${plugin.name}.toml`
+        ].join('\n');
 
         // State badge
         const stateClass = this.getStateClass(plugin.state);
@@ -272,8 +450,8 @@ class PluginPanel extends BasePanel {
             <div class="panel-card plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${plugin.name}">
                 <div class="plugin-card-header">
                     <div class="plugin-name-row">
-                        <span class="plugin-name">${escapeHtml(plugin.name)}</span>
-                        <span class="plugin-version panel-code">${escapeHtml(plugin.version)}</span>
+                        <span class="plugin-name plugin-name-interactive" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
+                        <span class="plugin-version plugin-version-interactive panel-code" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
                     </div>
                     <div class="plugin-badges">
                         <div class="plugin-state ${stateClass}">
@@ -286,20 +464,8 @@ class PluginPanel extends BasePanel {
                         </div>
                     </div>
                 </div>
-                <div class="plugin-description">
-                    ${escapeHtml(plugin.description || 'No description available')}
-                </div>
-                <div class="plugin-meta">
-                    ${plugin.author ? `<span class="plugin-author" title="Author">&#128100; ${escapeHtml(plugin.author)}</span>` : ''}
-                    ${plugin.license ? `<span class="plugin-license" title="License">&#128196; ${escapeHtml(plugin.license)}</span>` : ''}
-                    ${plugin.qntx_version ? `<span class="plugin-qntx-version" title="QNTX Version Requirement">&#8805; ${escapeHtml(plugin.qntx_version)}</span>` : ''}
-                </div>
-                <div class="plugin-path panel-code" title="Plugin configuration path">
-                    <span class="plugin-path-label">Path:</span> ~/.qntx/plugins/${escapeHtml(plugin.name)}.toml
-                </div>
                 ${controls ? `<div class="plugin-controls">${controls}</div>` : ''}
-                ${plugin.message ? `<div class="plugin-message ${plugin.healthy ? '' : 'plugin-message-error'}">${escapeHtml(plugin.message)}</div>` : ''}
-                ${this.renderDetails(plugin.details)}
+                ${!plugin.healthy && plugin.message ? `<div class="plugin-message plugin-message-error">${escapeHtml(plugin.message)}</div>` : ''}
                 ${isExpanded ? this.renderConfigForm() : ''}
             </div>
         `;
@@ -373,7 +539,39 @@ class PluginPanel extends BasePanel {
         }
 
         const items = Object.entries(details).map(([key, value]) => {
-            const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+            let displayValue: string;
+
+            // Format binary_built timestamps specially
+            if (key === 'binary_built' && typeof value === 'string') {
+                const timestamp = parseInt(value, 10);
+                if (!isNaN(timestamp)) {
+                    const date = new Date(timestamp * 1000);
+                    const now = new Date();
+                    const diffMs = now.getTime() - date.getTime();
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMins / 60);
+                    const diffDays = Math.floor(diffHours / 24);
+
+                    let relativeTime: string;
+                    if (diffMins < 1) {
+                        relativeTime = 'just now';
+                    } else if (diffMins < 60) {
+                        relativeTime = `${diffMins}m ago`;
+                    } else if (diffHours < 24) {
+                        relativeTime = `${diffHours}h ago`;
+                    } else {
+                        relativeTime = `${diffDays}d ago`;
+                    }
+
+                    const formattedDate = date.toLocaleString();
+                    displayValue = `${relativeTime} (${formattedDate})`;
+                } else {
+                    displayValue = String(value);
+                }
+            } else {
+                displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+            }
+
             return `<div class="plugin-detail-item">
                 <span class="plugin-detail-key">${escapeHtml(key)}:</span>
                 <span class="plugin-detail-value">${escapeHtml(displayValue)}</span>
@@ -400,33 +598,80 @@ class PluginPanel extends BasePanel {
         try {
             const response = await apiFetch(`/api/plugins/${pluginName}/config`);
             if (!response.ok) {
-                throw new Error(`Failed to fetch config: ${response.statusText}`);
+                // Try to parse rich error response
+                try {
+                    const errorData: ErrorResponse = await response.json();
+                    this.configState = {
+                        pluginName,
+                        currentConfig: {},
+                        newConfig: {},
+                        schema: {},
+                        validationErrors: {},
+                        needsConfirmation: false,
+                        error: { message: errorData.error, details: errorData.details, status: response.status }
+                    };
+                } catch {
+                    // Fallback to text if JSON parsing fails
+                    const errorText = await response.text();
+                    this.configState = {
+                        pluginName,
+                        currentConfig: {},
+                        newConfig: {},
+                        schema: {},
+                        validationErrors: {},
+                        needsConfirmation: false,
+                        error: { message: errorText || response.statusText, details: '', status: response.status }
+                    };
+                }
+                this.render();
+                return;
             }
 
             const data: PluginConfigResponse = await response.json();
-
-            if (!data.schema) {
-                toast.error('Plugin does not support configuration');
-                this.expandedPlugin = null;
-                return;
-            }
 
             this.configState = {
                 pluginName,
                 currentConfig: { ...data.config },
                 newConfig: { ...data.config },
                 schema: data.schema,
-                validationErrors: {}
+                validationErrors: {},
+                needsConfirmation: false
             };
         } catch (error) {
-            console.error('[Plugin Panel] Failed to fetch config:', error);
-            toast.error(`Failed to load configuration: ${error}`);
-            this.expandedPlugin = null;
+            console.error('[Plugin Panel] Failed to fetch config:', pluginName, error);
+            this.configState = {
+                pluginName,
+                currentConfig: {},
+                newConfig: {},
+                schema: {},
+                validationErrors: {},
+                needsConfirmation: false,
+                error: { message: `Failed to load configuration: ${error}`, details: '', status: 0 }
+            };
+            this.render();
         }
     }
 
     private renderConfigForm(): string {
         if (!this.configState) return '';
+
+        // Show error if configuration fetch failed
+        if (this.configState.error) {
+            const errorTitle = this.configState.error.status >= 500 ? 'Internal Server Error' : 'Error';
+
+            return `
+                <div class="panel-error">
+                    <div class="panel-error-title">${errorTitle}</div>
+                    <div class="panel-error-message">${escapeHtml(this.configState.error.message)}</div>
+                    ${this.configState.error.details ? `
+                        <details class="plugin-config-error-details">
+                            <summary>Error Details</summary>
+                            <pre>${escapeHtml(this.configState.error.details)}</pre>
+                        </details>
+                    ` : ''}
+                </div>
+            `;
+        }
 
         const fields = Object.entries(this.configState.schema).map(([fieldName, schema]) => {
             const currentValue = this.configState!.currentConfig[fieldName] || schema.default_value;
@@ -435,33 +680,20 @@ class PluginPanel extends BasePanel {
             const hasChanged = currentValue !== newValue;
 
             return `
-                <div class="plugin-config-field ${error ? 'plugin-config-field-error' : ''} ${hasChanged ? 'plugin-config-field-changed' : ''}">
-                    <div class="plugin-config-field-header">
-                        <label class="plugin-config-label">${escapeHtml(fieldName)}</label>
-                        ${schema.required ? '<span class="plugin-config-required">*</span>' : ''}
-                    </div>
-                    <div class="plugin-config-description">${escapeHtml(schema.description)}</div>
-                    <div class="plugin-config-values">
-                        <div class="plugin-config-current">
-                            <span class="plugin-config-value-label">Current</span>
-                            <input type="${this.getInputType(schema.type)}"
-                                   value="${escapeHtml(currentValue)}"
-                                   disabled
-                                   class="plugin-config-input-readonly panel-code">
-                        </div>
-                        <div class="plugin-config-new">
-                            <span class="plugin-config-value-label">New</span>
-                            <input type="${this.getInputType(schema.type)}"
-                                   value="${escapeHtml(newValue)}"
-                                   data-field="${escapeHtml(fieldName)}"
-                                   class="plugin-config-input panel-code"
-                                   ${schema.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
-                                   ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
-                                   ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
-                                   ${schema.required ? 'required' : ''}>
-                        </div>
-                    </div>
-                    ${error ? `<div class="plugin-config-error">${escapeHtml(error)}</div>` : ''}
+                <div class="plugin-config-row ${error ? 'plugin-config-row-error' : ''} ${hasChanged ? 'plugin-config-row-changed' : ''}" title="${escapeHtml(schema.description)}">
+                    <label class="plugin-config-label">
+                        ${escapeHtml(fieldName)}${schema.required ? '<span class="plugin-config-required">*</span>' : ''}
+                    </label>
+                    <span class="plugin-config-value-old">${escapeHtml(currentValue)}</span>
+                    <input type="${this.getInputType(schema.type)}"
+                           value="${escapeHtml(newValue)}"
+                           data-field="${escapeHtml(fieldName)}"
+                           class="plugin-config-value-new panel-code"
+                           ${schema.min_value ? `min="${escapeHtml(schema.min_value)}"` : ''}
+                           ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
+                           ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
+                           ${schema.required ? 'required' : ''}>
+                    ${error ? `<div class="plugin-config-row-error-msg">${escapeHtml(error)}</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -473,19 +705,27 @@ class PluginPanel extends BasePanel {
 
         return `
             <div class="plugin-config-form">
-                <div class="plugin-config-form-header">
-                    <h4>Configuration</h4>
-                    <span class="plugin-config-hint">Click to collapse</span>
-                </div>
-                <div class="plugin-config-fields">
+                <div class="plugin-config-table">
+                    <div class="plugin-config-header">
+                        <div class="plugin-config-header-label">Setting</div>
+                        <div class="plugin-config-header-old">Current</div>
+                        <div class="plugin-config-header-new">New</div>
+                    </div>
                     ${fields}
                 </div>
                 <div class="plugin-config-actions">
-                    <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
-                    <button class="panel-btn panel-btn-primary plugin-config-save-btn"
-                            ${hasErrors || !hasChanges ? 'disabled' : ''}>
-                        Save & Restart Plugin
-                    </button>
+                    <div class="plugin-config-actions-buttons">
+                        <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
+                        <button class="panel-btn ${this.configState.needsConfirmation ? 'panel-btn-warning' : 'panel-btn-primary'} plugin-config-save-btn"
+                                ${hasErrors || !hasChanges ? 'disabled' : ''}>
+                            ${this.configState.needsConfirmation ? 'Restart Plugin' : 'Save Changes'}
+                        </button>
+                    </div>
+                    ${this.configState.needsConfirmation ? `
+                        <div class="plugin-config-warning">
+                            This will apply your changes and reinitialize the plugin.
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -556,14 +796,14 @@ class PluginPanel extends BasePanel {
     private async savePluginConfig(): Promise<void> {
         if (!this.configState) return;
 
-        // Show confirmation dialog
-        const confirmed = confirm(
-            `Save configuration changes and restart ${this.configState.pluginName} plugin?\n\n` +
-            `This will apply your changes and reinitialize the plugin.`
-        );
+        // First click: show confirmation state
+        if (!this.configState.needsConfirmation) {
+            this.configState.needsConfirmation = true;
+            this.render();
+            return;
+        }
 
-        if (!confirmed) return;
-
+        // Second click: actually save
         try {
             const response = await apiFetch(`/api/plugins/${this.configState.pluginName}/config`, {
                 method: 'PUT',
@@ -573,7 +813,16 @@ class PluginPanel extends BasePanel {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(errorData.message || 'Failed to save configuration');
+
+                // Set error in config state and reset confirmation
+                this.configState.error = {
+                    message: errorData.message || 'Failed to save configuration',
+                    details: errorData.details || '',
+                    status: response.status
+                };
+                this.configState.needsConfirmation = false;
+                this.render();
+                return;
             }
 
             toast.success('Plugin configuration updated successfully');
@@ -585,7 +834,17 @@ class PluginPanel extends BasePanel {
             this.render();
         } catch (error) {
             console.error('[Plugin Panel] Failed to save config:', error);
-            toast.error(`Failed to save configuration: ${error}`);
+
+            // Set error in config state and reset confirmation
+            if (this.configState) {
+                this.configState.error = {
+                    message: `Failed to save configuration: ${error}`,
+                    details: '',
+                    status: 0
+                };
+                this.configState.needsConfirmation = false;
+                this.render();
+            }
         }
     }
 
