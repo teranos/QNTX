@@ -87,27 +87,55 @@ func NewGenerator(serverDir, protoDir string) *Generator {
 }
 
 
-// parseRouting extracts endpoint patterns from routing.go
+// parseRouting extracts endpoint patterns from routing.go using AST
 func (g *Generator) parseRouting() error {
 	routingPath := filepath.Join(g.serverDir, "routing.go")
 
-	content, err := os.ReadFile(routingPath)
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, routingPath, nil, parser.ParseComments)
 	if err != nil {
-		return errors.Wrap(err, "failed to read routing.go")
+		return errors.Wrap(err, "failed to parse routing.go")
 	}
 
-	// Match http.HandleFunc("/pattern", s.HandlerName)
-	// Also matches http.HandleFunc("/pattern", s.corsMiddleware(s.HandlerName))
-	re := regexp.MustCompile(`http\.HandleFunc\("([^"]+)",\s*s\.(?:corsMiddleware\()?s\.(\w+)`)
-	matches := re.FindAllStringSubmatch(string(content), -1)
+	// Walk the AST looking for http.HandleFunc calls
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
 
-	for _, match := range matches {
-		pattern := match[1]
-		handler := match[2]
+		// Check for http.HandleFunc
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "HandleFunc" {
+			return true
+		}
+		ident, ok := sel.X.(*ast.Ident)
+		if !ok || ident.Name != "http" {
+			return true
+		}
+
+		// Need at least 2 arguments: pattern and handler
+		if len(call.Args) < 2 {
+			return true
+		}
+
+		// Extract pattern (first argument must be a string literal)
+		patternLit, ok := call.Args[0].(*ast.BasicLit)
+		if !ok || patternLit.Kind != token.STRING {
+			return true // Skip dynamic patterns
+		}
+		pattern := strings.Trim(patternLit.Value, `"`)
+
+		// Extract handler name from the second argument
+		// Handles: s.HandleName, s.corsMiddleware(s.HandleName), etc.
+		handler := extractHandlerName(call.Args[1])
+		if handler == "" {
+			return true
+		}
 
 		// Skip static file handler
 		if handler == "HandleStatic" && pattern == "/" {
-			continue
+			return true
 		}
 
 		endpoint := Endpoint{
@@ -116,9 +144,35 @@ func (g *Generator) parseRouting() error {
 			Methods: inferMethods(handler, pattern),
 		}
 		g.endpoints = append(g.endpoints, endpoint)
-	}
+
+		return true
+	})
 
 	return nil
+}
+
+// extractHandlerName extracts the handler function name from various patterns:
+// - s.HandleName
+// - s.corsMiddleware(s.HandleName)
+// - s.middleware1(s.middleware2(s.HandleName))
+func extractHandlerName(expr ast.Expr) string {
+	switch e := expr.(type) {
+	case *ast.SelectorExpr:
+		// Direct method call: s.HandleName
+		if strings.HasPrefix(e.Sel.Name, "Handle") {
+			return e.Sel.Name
+		}
+		return ""
+	case *ast.CallExpr:
+		// Middleware wrapping: s.corsMiddleware(s.HandleName)
+		// Recursively check the innermost argument
+		if len(e.Args) > 0 {
+			return extractHandlerName(e.Args[0])
+		}
+		return ""
+	default:
+		return ""
+	}
 }
 
 // inferMethods guesses HTTP methods from handler name and pattern
@@ -414,108 +468,129 @@ func (g *Generator) parseProto() error {
 	return scanner.Err()
 }
 
-// parseWebSocketTypes extracts WebSocket message type definitions from server/types.go
+// parseWebSocketTypes extracts WebSocket message type definitions from server/types.go using AST
 func (g *Generator) parseWebSocketTypes() error {
 	typesPath := filepath.Join(g.serverDir, "types.go")
 
-	content, err := os.ReadFile(typesPath)
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, typesPath, nil, parser.ParseComments)
 	if err != nil {
-		return nil // types.go is optional
+		return nil // types.go is optional or may not parse
 	}
 
-	// Define known WebSocket message types based on the "type" field values
-	// These are inferred from the code structure
-	messageTypes := []WebSocketMessageType{
-		{
-			Type:        "version",
-			Direction:   "server→client",
-			Description: "Server version information sent on connection",
-			Fields: map[string]string{
-				"version":    "Server version string",
-				"commit":     "Git commit hash",
-				"build_time": "Build timestamp",
-			},
-		},
-		{
-			Type:        "query",
-			Direction:   "client→server",
-			Description: "Execute an ATS query",
-			Fields: map[string]string{
-				"query":    "ATS query string",
-				"line":     "Cursor line position",
-				"cursor":   "Cursor column position",
-				"filename": "Source file name",
-			},
-		},
-		{
-			Type:        "graph",
-			Direction:   "server→client",
-			Description: "Graph data update for visualization",
-			Fields: map[string]string{
-				"nodes": "Array of graph nodes",
-				"edges": "Array of graph edges",
-			},
-		},
-		{
-			Type:        "job_update",
-			Direction:   "server→client",
-			Description: "Async job status update",
-			Fields: map[string]string{
-				"job":      "Job object with status, progress, etc.",
-				"metadata": "Additional metadata about the update",
-			},
-		},
-		{
-			Type:        "daemon_status",
-			Direction:   "server→client",
-			Description: "Pulse daemon status broadcast",
-			Fields: map[string]string{
-				"running":      "Whether daemon is running",
-				"active_jobs":  "Number of active jobs",
-				"load_percent": "Current load percentage",
-			},
-		},
-		{
-			Type:        "usage_update",
-			Direction:   "server→client",
-			Description: "AI usage statistics update",
-			Fields: map[string]string{
-				"total_cost": "Total cost in USD",
-				"requests":   "Number of requests",
-				"tokens":     "Total tokens used",
-			},
-		},
-		{
-			Type:        "llm_stream",
-			Direction:   "server→client",
-			Description: "Streaming LLM response chunks",
-			Fields: map[string]string{
-				"job_id":  "Associated job ID",
-				"content": "Text content chunk",
-				"done":    "Whether streaming is complete",
-			},
-		},
-		{
-			Type:        "plugin_health",
-			Direction:   "server→client",
-			Description: "Plugin health status update",
-			Fields: map[string]string{
-				"name":    "Plugin name",
-				"healthy": "Health status",
-				"state":   "Plugin state (running/paused)",
-			},
-		},
-	}
+	// Find struct types that have a "Type" field with a json tag containing a message type
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
 
-	// Verify these types exist in the content
-	for _, mt := range messageTypes {
-		typePattern := fmt.Sprintf(`Type.*"%s"`, mt.Type)
-		if matched, _ := regexp.Match(typePattern, content); matched {
-			g.wsMessageTypes = append(g.wsMessageTypes, mt)
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok || structType.Fields == nil {
+				continue
+			}
+
+			// Look for a "Type" field to identify WebSocket message structs
+			var messageType string
+			fields := make(map[string]string)
+
+			for _, field := range structType.Fields.List {
+				if len(field.Names) == 0 {
+					continue
+				}
+				fieldName := field.Names[0].Name
+
+				// Extract json tag
+				jsonTag := extractJSONTag(field.Tag)
+				if jsonTag == "" {
+					continue
+				}
+
+				// Extract field comment
+				fieldDesc := ""
+				if field.Comment != nil {
+					fieldDesc = strings.TrimSpace(field.Comment.Text())
+				}
+
+				if fieldName == "Type" {
+					// Extract the message type from the comment (e.g., // "query", "clear", ...)
+					messageType = extractMessageTypeFromComment(fieldDesc)
+				} else {
+					fields[jsonTag] = fieldDesc
+				}
+			}
+
+			// Skip if no message type found
+			if messageType == "" {
+				continue
+			}
+
+			// Get struct doc comment as description
+			description := ""
+			if genDecl.Doc != nil {
+				description = strings.TrimSpace(genDecl.Doc.Text())
+			}
+
+			// Infer direction from struct name
+			direction := inferDirection(typeSpec.Name.Name)
+
+			g.wsMessageTypes = append(g.wsMessageTypes, WebSocketMessageType{
+				Type:        messageType,
+				Direction:   direction,
+				Description: description,
+				Fields:      fields,
+			})
 		}
 	}
 
+	// Sort by type name for deterministic output
+	sort.Slice(g.wsMessageTypes, func(i, j int) bool {
+		return g.wsMessageTypes[i].Type < g.wsMessageTypes[j].Type
+	})
+
 	return nil
+}
+
+// extractJSONTag extracts the json field name from a struct tag
+func extractJSONTag(tag *ast.BasicLit) string {
+	if tag == nil {
+		return ""
+	}
+	tagValue := strings.Trim(tag.Value, "`")
+	jsonMatch := regexp.MustCompile(`json:"([^",]+)`).FindStringSubmatch(tagValue)
+	if len(jsonMatch) > 1 {
+		return jsonMatch[1]
+	}
+	return ""
+}
+
+// extractMessageTypeFromComment extracts the message type value from a Type field comment
+// e.g., // "query", "clear", "ping" -> returns "query"
+func extractMessageTypeFromComment(comment string) string {
+	// Match first quoted string in comment
+	match := regexp.MustCompile(`"([^"]+)"`).FindStringSubmatch(comment)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
+
+// inferDirection infers message direction from struct name
+func inferDirection(structName string) string {
+	nameLower := strings.ToLower(structName)
+	// Messages sent by client typically have "query", "request", or "command" in name
+	if strings.Contains(nameLower, "query") || strings.Contains(nameLower, "request") ||
+		strings.Contains(nameLower, "command") || strings.Contains(nameLower, "control") {
+		return "client→server"
+	}
+	// Most other message types are server→client
+	return "server→client"
 }
 
 // generateGRPCDoc creates the gRPC plugin API documentation
