@@ -437,9 +437,22 @@
               ./result/bin/typegen --lang rust --output types/generated/
               ./result/bin/typegen --lang markdown
 
+              # Sync Rust types to qntx crate (exclude generated package files)
+              echo "Syncing Rust types to crates/qntx/src/types/..."
+              for f in types/generated/rust/*.rs; do
+                filename=$(basename "$f")
+                # Skip lib.rs and mod.rs (we have our own), copy everything else
+                if [ "$filename" != "lib.rs" ] && [ "$filename" != "mod.rs" ]; then
+                  cp "$f" "crates/qntx/src/types/$filename"
+                fi
+              done
+              # Fix server.rs import for new module structure
+              ${pkgs.gnused}/bin/sed -i 's/use crate::{/use super::{/' crates/qntx/src/types/server.rs
+
               echo "✓ TypeScript types generated in types/generated/typescript/"
               echo "✓ Python types generated in types/generated/python/"
               echo "✓ Rust types generated in types/generated/rust/"
+              echo "✓ Rust types synced to crates/qntx/src/types/"
               echo "✓ Markdown docs generated in docs/types/"
             '');
           };
