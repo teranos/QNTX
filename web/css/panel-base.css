@@ -349,3 +349,64 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* === TOOLTIPS === */
+
+/* Terminal-style interactive tooltip */
+.panel-tooltip {
+    position: fixed;
+    background: #2d2d2d;
+    color: #f0f0f0;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    border: 1px solid #444;
+}
+
+/* Arrow pointer (bottom position - default) */
+.panel-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid #2d2d2d;
+}
+
+/* Arrow pointer (top position) */
+.panel-tooltip-top::before {
+    top: auto;
+    bottom: -6px;
+    border-bottom: none;
+    border-top: 6px solid #2d2d2d;
+}
+
+/* Interactive element styling - indicates hoverable for more info */
+.has-tooltip {
+    cursor: help;
+    border-bottom: 1px dotted var(--panel-text-secondary);
+    transition: var(--panel-transition-fast);
+}
+
+.has-tooltip:hover {
+    color: var(--panel-text-primary);
+    border-bottom-color: var(--panel-text-primary);
+}
+
+/* Tooltip content separator */
+.panel-tooltip-separator {
+    display: block;
+    height: 1px;
+    background: #555;
+    margin: 6px 0;
+}

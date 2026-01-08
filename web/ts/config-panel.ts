@@ -257,12 +257,15 @@ class ConfigPanel extends BasePanel {
                 const sourceData = setting.allSources.find(s => s.source === source);
                 const path = sourceData?.source_path || this.getSourcePath(source);
 
+                // Build rich tooltip content
+                const tooltip = this.buildSourceTooltip(source, path, isActive, isDefined, sourceData?.value);
+
                 if (isActive) {
-                    return `<span class="source-active source-clickable" data-source="${source}" data-path="${path}" title="${path} (active)">${label}</span>`;
+                    return `<span class="source-active source-clickable has-tooltip" data-source="${source}" data-path="${path}" data-tooltip="${this.escapeAttr(tooltip)}">${label}</span>`;
                 } else if (isDefined) {
-                    return `<span class="source-inactive source-clickable" data-source="${source}" data-path="${path}" title="${path} (overridden)">${label}</span>`;
+                    return `<span class="source-inactive source-clickable has-tooltip" data-source="${source}" data-path="${path}" data-tooltip="${this.escapeAttr(tooltip)}">${label}</span>`;
                 } else {
-                    return `<span class="source-undefined" title="${this.getSourcePath(source)} (not defined)">${label}</span>`;
+                    return `<span class="source-undefined has-tooltip" data-tooltip="${this.escapeAttr(tooltip)}">${label}</span>`;
                 }
             })
             .join(' ');
@@ -270,14 +273,79 @@ class ConfigPanel extends BasePanel {
         const isEditable = setting.source === 'user_ui';
         const editControl = isEditable ? `<button class="config-edit-btn" data-key="${setting.key}" title="Edit">✎</button>` : '';
 
+        // Build setting key tooltip with all source values
+        const keyTooltip = this.buildSettingTooltip(setting);
+
         return `
             <div class="config-setting" data-key="${setting.key}">
-                <div class="config-setting-key">${setting.key}</div>
+                <div class="config-setting-key has-tooltip" data-tooltip="${this.escapeAttr(keyTooltip)}">${setting.key}</div>
                 <div class="config-setting-value">${valueDisplay}</div>
                 <div class="config-setting-sources">${sourcesDisplay}</div>
                 ${editControl}
             </div>
         `;
+    }
+
+    /**
+     * Build tooltip for a config source badge
+     */
+    private buildSourceTooltip(source: string, path: string, isActive: boolean, isDefined: boolean, value?: unknown): string {
+        const parts: string[] = [];
+
+        parts.push(`Source: ${source.toUpperCase()}`);
+        parts.push(`Path: ${path}`);
+        parts.push(`---`);
+
+        if (isActive) {
+            parts.push(`Status: ACTIVE (this value is used)`);
+        } else if (isDefined) {
+            parts.push(`Status: OVERRIDDEN`);
+            if (value !== undefined) {
+                parts.push(`Value: ${JSON.stringify(value)}`);
+            }
+        } else {
+            parts.push(`Status: Not defined at this level`);
+        }
+
+        if (isDefined) {
+            parts.push(`---`);
+            parts.push(`Click to copy path`);
+        }
+
+        return parts.join('\n');
+    }
+
+    /**
+     * Build tooltip for a setting key showing all source values
+     */
+    private buildSettingTooltip(setting: EnhancedSetting): string {
+        const parts: string[] = [];
+
+        parts.push(`Setting: ${setting.key}`);
+        parts.push(`Effective Value: ${JSON.stringify(setting.value)}`);
+        parts.push(`Source: ${setting.source}`);
+
+        if (setting.allSources.length > 1) {
+            parts.push(`---`);
+            parts.push(`Defined in ${setting.allSources.length} sources:`);
+            setting.allSources.forEach(s => {
+                const marker = s.source === setting.source ? '→' : ' ';
+                parts.push(`${marker} ${s.source}: ${JSON.stringify(s.value)}`);
+            });
+        }
+
+        return parts.join('\n');
+    }
+
+    /**
+     * Escape string for use in HTML attribute
+     */
+    private escapeAttr(str: string): string {
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
     }
 
     private getSourceLabel(source: string): string {
