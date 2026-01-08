@@ -75,13 +75,36 @@ class TooltipManager {
             }
         };
 
+        // Touch support: tap to toggle tooltip
+        const handleTouchStart = (e: TouchEvent) => {
+            const target = e.target as HTMLElement;
+            const trigger = target.closest(selector) as HTMLElement | null;
+            if (trigger) {
+                const tooltipText = trigger.dataset.tooltip;
+                if (tooltipText) {
+                    // If tooltip is already showing for this trigger, hide it
+                    if (this.currentTrigger === trigger && this.tooltip) {
+                        e.preventDefault();
+                        this.hide();
+                    } else {
+                        // Show tooltip immediately on tap (no delay)
+                        e.preventDefault();
+                        this.hideImmediate();
+                        this.showImmediate(trigger, tooltipText);
+                    }
+                }
+            }
+        };
+
         container.addEventListener('mouseenter', handleMouseEnter, true);
         container.addEventListener('mouseleave', handleMouseLeave, true);
+        container.addEventListener('touchstart', handleTouchStart, { capture: true, passive: false });
 
         // Return cleanup function
         return () => {
             container.removeEventListener('mouseenter', handleMouseEnter, true);
             container.removeEventListener('mouseleave', handleMouseLeave, true);
+            container.removeEventListener('touchstart', handleTouchStart, true);
             this.hide();
         };
     }
@@ -116,6 +139,30 @@ class TooltipManager {
 
             document.body.appendChild(this.tooltip);
         }, this.config.delay);
+    }
+
+    /**
+     * Show tooltip immediately without delay (for touch events)
+     */
+    showImmediate(trigger: HTMLElement, text: string): void {
+        this.currentTrigger = trigger;
+
+        // Remove old tooltip if exists
+        this.hideImmediate();
+
+        // Create new tooltip
+        this.tooltip = document.createElement('div');
+        this.tooltip.className = 'panel-tooltip';
+        if (this.config.position === 'top') {
+            this.tooltip.classList.add('panel-tooltip-top');
+        }
+        this.tooltip.textContent = text;
+        this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
+
+        // Position tooltip
+        this.positionTooltip(trigger);
+
+        document.body.appendChild(this.tooltip);
     }
 
     /**

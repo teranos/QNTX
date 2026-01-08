@@ -484,6 +484,13 @@
     border: 1px solid #444;
 }
 
+/* Mobile/tablet: constrain tooltip to viewport */
+@media (max-width: 768px) {
+    .panel-tooltip {
+        max-width: calc(100vw - 32px);
+    }
+}
+
 /* Interactive element styling - indicates hoverable for more info */
 .has-tooltip {
     cursor: help;
