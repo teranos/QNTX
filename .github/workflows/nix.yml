@@ -40,6 +40,9 @@ jobs:
         run: |
           nix run nixpkgs#nixpkgs-fmt -- --check *.nix
 
+      - name: Check generated types are up to date
+        run: nix run .#check-types
+
       - name: Run flake checks
         run: nix flake check --show-trace
 
