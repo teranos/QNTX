@@ -6,6 +6,10 @@
 , ciUser ? null
 , ciPipeline ? null
 , ciRunId ? null
+  # Nix infrastructure metadata (passed from flake)
+, nixPackages ? []
+, nixApps ? []
+, nixContainers ? []
 }:
 
 let
@@ -153,6 +157,11 @@ let
             <input type="search" id="search-input" class="search-input" placeholder="Search documentation..." aria-label="Search documentation">
             <div id="search-results" class="search-results" hidden></div>
         </div>
+
+        <nav class="quick-links">
+            <a href="./downloads.html" class="quick-link">Downloads</a>
+            <a href="./infrastructure.html" class="quick-link">Build Infrastructure</a>
+        </nav>
 
         <section class="download-section quick-download">
             <h2>Quick Download</h2>
@@ -399,9 +408,139 @@ ${provenanceFooter}
     destination = "/build-info.json";
   };
 
+  # Infrastructure documentation page
+  # Generate package list HTML
+  renderPackage = pkg: ''
+            <tr>
+                <td><code>${escapeHtml pkg.name}</code></td>
+                <td>${escapeHtml pkg.description}</td>
+                <td><code>nix build .#${escapeHtml pkg.name}</code></td>
+            </tr>'';
+
+  renderApp = app: ''
+            <tr>
+                <td><code>${escapeHtml app.name}</code></td>
+                <td>${escapeHtml app.description}</td>
+                <td><code>nix run .#${escapeHtml app.name}</code></td>
+            </tr>'';
+
+  renderContainer = ctr: ''
+            <div class="download-card">
+                <div class="download-card-header">
+                    <span class="download-card-icon">📦</span>
+                    <span class="download-card-title">${escapeHtml ctr.name}</span>
+                </div>
+                <p class="download-card-desc">${escapeHtml ctr.description}</p>
+                <div class="container-details">
+                    <p><strong>Image:</strong> <code>${escapeHtml ctr.image}</code></p>
+                    <p><strong>Architectures:</strong> ${escapeHtml (lib.concatStringsSep ", " ctr.architectures)}</p>
+                    ${if ctr.ports != [] then ''<p><strong>Ports:</strong> ${escapeHtml (lib.concatStringsSep ", " ctr.ports)}</p>'' else ""}
+                </div>
+            </div>'';
+
+  packagesSection = if nixPackages == [] then "" else ''
+        <section class="download-section">
+            <h2>Packages</h2>
+            <p>Available Nix packages that can be built from this flake:</p>
+            <table class="nix-table">
+                <thead>
+                    <tr>
+                        <th>Package</th>
+                        <th>Description</th>
+                        <th>Build Command</th>
+                    </tr>
+                </thead>
+                <tbody>
+${lib.concatStringsSep "\n" (map renderPackage nixPackages)}
+                </tbody>
+            </table>
+        </section>
+  '';
+
+  appsSection = if nixApps == [] then "" else ''
+        <section class="download-section">
+            <h2>Apps</h2>
+            <p>Runnable applications for common tasks:</p>
+            <table class="nix-table">
+                <thead>
+                    <tr>
+                        <th>App</th>
+                        <th>Description</th>
+                        <th>Run Command</th>
+                    </tr>
+                </thead>
+                <tbody>
+${lib.concatStringsSep "\n" (map renderApp nixApps)}
+                </tbody>
+            </table>
+        </section>
+  '';
+
+  containersSection = if nixContainers == [] then "" else ''
+        <section class="download-section">
+            <h2>Container Images</h2>
+            <p>Docker/OCI container images built with Nix for reproducible deployments:</p>
+            <div class="download-cards">
+${lib.concatStringsSep "\n" (map renderContainer nixContainers)}
+            </div>
+        </section>
+  '';
+
+  infrastructureContent =
+    htmlHead "QNTX Infrastructure" "." +
+    ''
+    <body>
+        <nav class="doc-nav"><a href="./index.html"><img src="./qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
+
+        <h1>Build Infrastructure</h1>
+        <p>QNTX uses <a href="https://nixos.org/">Nix</a> for reproducible builds. All packages, container images, and development tools are defined in <code>flake.nix</code>.</p>
+
+        <section class="download-section">
+            <h2>Quick Start</h2>
+            <div class="install-code"># Install Nix (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh
+
+# Build QNTX
+nix build github:${githubRepo}
+
+# Enter development shell
+nix develop github:${githubRepo}</div>
+        </section>
+
+${packagesSection}
+${appsSection}
+${containersSection}
+
+        <section class="download-section">
+            <h2>Development Shell</h2>
+            <p>The development shell includes all tools needed to build and test QNTX:</p>
+            <div class="install-code">nix develop</div>
+            <p>This provides: Go, Rust, Python, protobuf, SQLite, and pre-commit hooks.</p>
+        </section>
+
+        <section class="download-section">
+            <h2>Reproducibility</h2>
+            <p>All builds are fully reproducible. The same inputs always produce identical outputs:</p>
+            <ul>
+                <li><strong>Lockfile:</strong> <code>flake.lock</code> pins all dependencies</li>
+                <li><strong>Vendor hash:</strong> Go modules are content-addressed</li>
+                <li><strong>Binary cache:</strong> <code>qntx.cachix.org</code> for pre-built artifacts</li>
+            </ul>
+        </section>
+
+${provenanceFooter}
+    </body>
+    </html>'';
+
+  infrastructureFile = pkgs.writeTextFile {
+    name = "qntx-docs-infrastructure";
+    text = infrastructureContent;
+    destination = "/infrastructure.html";
+  };
+
 in
-# Compositional assembly: combine static assets, index, downloads, search index, build info, and all HTML files
+# Compositional assembly: combine static assets, index, downloads, infrastructure, search index, build info, and all HTML files
 pkgs.symlinkJoin {
   name = "qntx-docs-site";
-  paths = [ staticAssets indexFile downloadsFile searchIndexFile buildInfoFile ] ++ htmlDerivations;
+  paths = [ staticAssets indexFile downloadsFile infrastructureFile searchIndexFile buildInfoFile ] ++ htmlDerivations;
 }
