@@ -265,15 +265,127 @@ describe('Plugin Panel Build Time Display', () => {
     });
 });
 
-describe('PluginPanel class instantiation', () => {
-    test('can be instantiated', () => {
-        const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+describe('PluginPanel error handling', () => {
+    let dom: JSDOM;
+    let panel: PluginPanel;
+
+    beforeEach(() => {
+        dom = new JSDOM('<!DOCTYPE html><html><body><div id="panel-container"></div></body></html>');
         global.document = dom.window.document as unknown as Document;
         global.window = dom.window as unknown as Window & typeof globalThis;
+        global.fetch = () => Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ plugins: [] })
+        } as Response);
 
-        // Just instantiating the class should work and trigger coverage
-        const panel = new PluginPanel();
-        expect(panel).toBeDefined();
-        expect(panel).toBeInstanceOf(PluginPanel);
+        panel = new PluginPanel();
+    });
+
+    test('renders error message when config save fails', () => {
+        // Set up panel with plugins data
+        (panel as any).plugins = [{
+            name: 'test-plugin',
+            version: '1.0.0',
+            state: 'running',
+            healthy: true
+        }];
+
+        // Set up panel with config state containing an error
+        (panel as any).configState = {
+            pluginName: 'test-plugin',
+            currentConfig: { max_workers: '4' },
+            newConfig: { max_workers: '5' },
+            schema: {
+                max_workers: {
+                    type: 'integer',
+                    description: 'Maximum workers',
+                    default_value: '4',
+                    required: true
+                }
+            },
+            validationErrors: {},
+            needsConfirmation: false,
+            error: {
+                message: 'Failed to save configuration',
+                details: 'Connection timeout after 5 seconds',
+                status: 500
+            }
+        };
+        (panel as any).expandedPlugin = 'test-plugin';
+
+        // Render the panel
+        (panel as any).render();
+
+        // Check that error is displayed
+        const html = dom.window.document.body.innerHTML;
+        expect(html).toContain('Failed to save configuration');
+        expect(html).toContain('Error Details');
+        expect(html).toContain('Connection timeout after 5 seconds');
+    });
+
+    test('renders validation errors for config fields', () => {
+        (panel as any).plugins = [{
+            name: 'test-plugin',
+            version: '1.0.0',
+            state: 'running',
+            healthy: true
+        }];
+
+        (panel as any).configState = {
+            pluginName: 'test-plugin',
+            currentConfig: { max_workers: '4' },
+            newConfig: { max_workers: 'invalid' },
+            schema: {
+                max_workers: {
+                    type: 'integer',
+                    description: 'Maximum workers',
+                    default_value: '4',
+                    required: true
+                }
+            },
+            validationErrors: {
+                max_workers: 'Must be a valid integer'
+            },
+            needsConfirmation: false
+        };
+        (panel as any).expandedPlugin = 'test-plugin';
+
+        (panel as any).render();
+
+        const html = dom.window.document.body.innerHTML;
+        expect(html).toContain('Must be a valid integer');
+        expect(html).toContain('plugin-config-row-error');
+    });
+
+    test('shows confirmation warning before restart', () => {
+        (panel as any).plugins = [{
+            name: 'test-plugin',
+            version: '1.0.0',
+            state: 'running',
+            healthy: true
+        }];
+
+        (panel as any).configState = {
+            pluginName: 'test-plugin',
+            currentConfig: { max_workers: '4' },
+            newConfig: { max_workers: '8' },
+            schema: {
+                max_workers: {
+                    type: 'integer',
+                    description: 'Maximum workers',
+                    default_value: '4',
+                    required: false
+                }
+            },
+            validationErrors: {},
+            needsConfirmation: true
+        };
+        (panel as any).expandedPlugin = 'test-plugin';
+
+        (panel as any).render();
+
+        const html = dom.window.document.body.innerHTML;
+        expect(html).toContain('Restart Plugin');
+        expect(html).toContain('This will apply your changes and reinitialize the plugin');
     });
 });

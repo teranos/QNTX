@@ -3,13 +3,22 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
 	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
+)
+
+const (
+	// internalKeyPrefix marks internal config keys that should not be exposed via API
+	internalKeyPrefix = '_'
 )
 
 // writeRichError writes a rich error response with details and stack trace
@@ -53,7 +62,7 @@ func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) 
 	case http.MethodPut:
 		s.handleUpdatePluginConfig(w, r, pluginName)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		s.writeRichError(w, errors.New("method not allowed"), http.StatusMethodNotAllowed)
 	}
 }
 
@@ -70,7 +79,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 			// Strip prefix to get config key
 			configKey := strings.TrimPrefix(key, prefix)
 			// Skip internal keys (prefixed with _)
-			if len(configKey) > 0 && configKey[0] != '_' {
+			if len(configKey) > 0 && configKey[0] != internalKeyPrefix {
 				config[configKey] = am.GetString(key)
 			}
 		}
@@ -138,7 +147,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Errorw("Failed to encode plugin config response", "error", err, "plugin", pluginName)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		s.writeRichError(w, errors.Wrap(err, "failed to encode plugin config response"), http.StatusInternalServerError)
 	}
 }
 
@@ -151,12 +160,12 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		s.writeRichError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
 		return
 	}
 
 	if req.Config == nil {
-		http.Error(w, "Config field required", http.StatusBadRequest)
+		s.writeRichError(w, errors.New("config field required"), http.StatusBadRequest)
 		return
 	}
 
@@ -166,10 +175,44 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Validate config against plugin schema before writing to disk
+	if s.pluginManager != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		proxy, ok := s.pluginManager.GetPlugin(pluginName)
+		if !ok {
+			s.writeRichError(w, errors.Newf("plugin not found: %s", pluginName), http.StatusNotFound)
+			return
+		}
+
+		// Get schema from plugin (only external plugins support ConfigSchema)
+		if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
+			schema, err := extProxy.ConfigSchema(ctx)
+			if err != nil {
+				s.logger.Errorw("Failed to get config schema", "error", err, "plugin", pluginName)
+				s.writeRichError(w, errors.Wrap(err, "failed to validate config"), http.StatusInternalServerError)
+				return
+			}
+
+			// Validate config against schema
+			if validationErrs := validateConfigAgainstSchema(req.Config, schema.Fields); len(validationErrs) > 0 {
+				response := map[string]interface{}{
+					"success": false,
+					"message": "Configuration validation failed",
+					"errors":  validationErrs,
+				}
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+	}
+
 	// Update config in TOML file and viper
 	if err := am.UpdatePluginConfig(pluginName, req.Config); err != nil {
 		s.logger.Errorw("Failed to update plugin config", "error", err, "plugin", pluginName)
-		http.Error(w, "Failed to update config: "+err.Error(), http.StatusInternalServerError)
+		s.writeRichError(w, errors.Wrap(err, "failed to update config"), http.StatusInternalServerError)
 		return
 	}
 
@@ -203,7 +246,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Errorw("Failed to encode response", "error", err, "plugin", pluginName)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		s.writeRichError(w, errors.Wrap(err, "failed to encode response"), http.StatusInternalServerError)
 	}
 }
 
@@ -213,28 +256,93 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 	tempPath, err := am.WritePluginConfigToTemp(pluginName, config)
 	if err != nil {
 		s.logger.Errorw("Failed to write temp config", "error", err, "plugin", pluginName)
-		http.Error(w, "Config validation failed: "+err.Error(), http.StatusBadRequest)
+		s.writeRichError(w, errors.Wrap(err, "config validation failed"), http.StatusBadRequest)
 		return
 	}
+	defer os.Remove(tempPath)
 
 	// TODO: Test-initialize plugin with temp config
 	// This would require launching a test instance of the plugin with the temp config
 	// For now, we just validate that the config can be written as valid TOML
 	// Future: Call plugin.Initialize() with test config in isolated context
 
-	// Clean up temp file
-	// Note: We keep the temp file for now in case manual inspection is needed
-	// In production, this would be cleaned up after test-initialize
-	_ = tempPath
-
 	response := map[string]interface{}{
 		"valid":   true,
-		"message": "Configuration is valid TOML (full validation requires plugin restart)",
+		"message": "TOML syntax valid. Semantic validation pending (will occur on save)",
 		"plugin":  pluginName,
+		"warning": "Some invalid values may not be detected until plugin restart",
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		s.logger.Errorw("Failed to encode validation response", "error", err, "plugin", pluginName)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		s.writeRichError(w, errors.Wrap(err, "failed to encode validation response"), http.StatusInternalServerError)
 	}
+}
+
+// validateConfigAgainstSchema validates config values against plugin schema constraints
+func validateConfigAgainstSchema(config map[string]string, schema map[string]*protocol.ConfigFieldSchema) map[string]string {
+	errors := make(map[string]string)
+
+	// Check all required fields are present
+	for fieldName, fieldSchema := range schema {
+		if fieldSchema.Required {
+			if value, exists := config[fieldName]; !exists || value == "" {
+				errors[fieldName] = "This field is required"
+				continue
+			}
+		}
+	}
+
+	// Validate each provided config value
+	for fieldName, value := range config {
+		fieldSchema, schemaExists := schema[fieldName]
+		if !schemaExists {
+			errors[fieldName] = "Unknown configuration field"
+			continue
+		}
+
+		// Validate by type
+		switch fieldSchema.Type {
+		case "integer":
+			intVal, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				errors[fieldName] = "Must be a valid integer"
+				continue
+			}
+
+			// Check min_value constraint
+			if fieldSchema.MinValue != "" {
+				minVal, err := strconv.ParseInt(fieldSchema.MinValue, 10, 64)
+				if err == nil && intVal < minVal {
+					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
+					continue
+				}
+			}
+
+			// Check max_value constraint
+			if fieldSchema.MaxValue != "" {
+				maxVal, err := strconv.ParseInt(fieldSchema.MaxValue, 10, 64)
+				if err == nil && intVal > maxVal {
+					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
+					continue
+				}
+			}
+
+		case "boolean":
+			if value != "true" && value != "false" {
+				errors[fieldName] = "Must be 'true' or 'false'"
+				continue
+			}
+
+		case "string":
+			// String type - no additional validation needed
+			// Could add min_length/max_length in future if needed
+
+		default:
+			// Unknown type - shouldn't happen if schema is valid
+			errors[fieldName] = fmt.Sprintf("Unknown field type: %s", fieldSchema.Type)
+		}
+	}
+
+	return errors
 }

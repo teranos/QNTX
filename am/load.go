@@ -484,7 +484,7 @@ func writePluginConfigFile(path string, config map[string]interface{}) error {
 	}
 
 	// Write to file with safe permissions
-	if err := os.WriteFile(path, []byte(buf.String()), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(buf.String()), DefaultFilePermissions); err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to write plugin config file")
 		return errors.WithSafeDetails(wrappedErr, "path=%s", path)
 	}
