@@ -37,7 +37,7 @@ jobs:
           nix run nixpkgs#nixpkgs-fmt -- --check *.nix
 
       - name: Run flake checks
-        run: nix flake check --show-trace
+        run: nix flake check --max-jobs auto --show-trace
 
       - name: Push to Cachix
         if: github.ref == 'refs/heads/main'
