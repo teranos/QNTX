@@ -539,6 +539,91 @@ ${provenanceFooter}
     destination = "/infrastructure.html";
   };
 
+  # Generate file structure dynamically from actual outputs
+  # Root-level files
+  rootFiles = [
+    { path = "index.html"; desc = "Main documentation index"; }
+    { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
+    { path = "infrastructure.html"; desc = "Nix build documentation"; }
+    { path = "sitegen.html"; desc = "This page"; }
+    { path = "search-index.json"; desc = "Search index for client-side search"; }
+    { path = "build-info.json"; desc = "Provenance metadata"; }
+    { path = "qntx.jpg"; desc = "Logo"; }
+  ];
+
+  # CSS files from cssFiles attrset
+  cssFileList = lib.mapAttrsToList (name: _: { path = "css/${name}.css"; }) cssFiles;
+
+  # JS files from jsFiles attrset
+  jsFileList = lib.mapAttrsToList (name: _: { path = "js/${name}.js"; }) jsFiles;
+
+  # Documentation HTML files from fileInfos
+  docHtmlFiles = map (f: { path = f.htmlPath; }) fileInfos;
+
+  # Group doc files by directory for tree display
+  docFilesByDir = lib.groupBy (f: dirOf f.path) docHtmlFiles;
+  docDirs = lib.filter (d: d != ".") (lib.attrNames docFilesByDir);
+
+  # Render a single file entry with tree prefix
+  renderFileEntry = prefix: file:
+    let descPart = if file ? desc then "  # ${file.desc}" else "";
+    in "${prefix}${baseNameOf file.path}${descPart}";
+
+  # Generate the tree structure
+  generatedStructure =
+    let
+      # Root files (sorted)
+      sortedRootFiles = lib.sort (a: b: a.path < b.path) rootFiles;
+      rootCount = lib.length sortedRootFiles;
+
+      # CSS directory entries
+      sortedCssFiles = lib.sort (a: b: a.path < b.path) cssFileList;
+      cssCount = lib.length sortedCssFiles;
+
+      # JS directory entries
+      sortedJsFiles = lib.sort (a: b: a.path < b.path) jsFileList;
+      jsCount = lib.length sortedJsFiles;
+
+      # Doc directories (sorted)
+      sortedDocDirs = lib.sort (a: b: a < b) docDirs;
+
+      # Render root files
+      rootEntries = lib.imap0 (i: f:
+        let prefix = if i == rootCount - 1 && sortedDocDirs == [] then "└── " else "├── ";
+        in renderFileEntry prefix f
+      ) sortedRootFiles;
+
+      # Render CSS directory
+      cssEntries = ["├── css/"] ++ lib.imap0 (i: f:
+        let prefix = if i == cssCount - 1 then "│   └── " else "│   ├── ";
+        in renderFileEntry prefix f
+      ) sortedCssFiles;
+
+      # Render JS directory
+      jsEntries = ["├── js/"] ++ lib.imap0 (i: f:
+        let prefix = if i == jsCount - 1 then "│   └── " else "│   ├── ";
+        in renderFileEntry prefix f
+      ) sortedJsFiles;
+
+      # Render doc directories
+      docDirCount = lib.length sortedDocDirs;
+      docDirEntries = lib.concatLists (lib.imap0 (di: dir:
+        let
+          isLastDir = di == docDirCount - 1;
+          dirPrefix = if isLastDir then "└── " else "├── ";
+          filePrefix = if isLastDir then "    " else "│   ";
+          dirFiles = lib.sort (a: b: a.path < b.path) docFilesByDir.${dir};
+          fileCount = lib.length dirFiles;
+        in
+        ["${dirPrefix}${dir}/"] ++ lib.imap0 (fi: f:
+          let fPrefix = if fi == fileCount - 1 then "${filePrefix}└── " else "${filePrefix}├── ";
+          in "${fPrefix}${baseNameOf f.path}"
+        ) dirFiles
+      ) sortedDocDirs);
+
+    in
+    ["qntx-docs-site/"] ++ rootEntries ++ cssEntries ++ jsEntries ++ docDirEntries;
+
   # Sitegen self-documentation page
   sitegenContent =
     htmlHead "QNTX Sitegen" "." +
@@ -601,23 +686,8 @@ ${provenanceFooter}
 
         <section class="download-section">
             <h2>Generated Structure</h2>
-            <div class="install-code">${lib.concatStringsSep "\n" [
-              "qntx-docs-site/"
-              "├── index.html              # Main documentation index"
-              "├── downloads.html          # Release downloads (GitHub API)"
-              "├── infrastructure.html     # Nix build documentation"
-              "├── sitegen.html            # This page"
-              "├── search-index.json       # Search index for client-side search"
-              "├── build-info.json         # Provenance metadata"
-              "├── css/"
-              "│   ├── core.css            # Base styles"
-              "│   └── docs.css            # Documentation-specific styles"
-              "├── js/"
-              "│   ├── search.js           # Search functionality"
-              "│   └── releases.js         # GitHub releases fetcher"
-              "├── qntx.jpg                # Logo"
-              "└── **/*.html               # Generated from docs/**/*.md"
-            ]}</div>
+            <p>This structure is generated dynamically from the actual sitegen outputs (${toString (lib.length fileInfos)} documentation files discovered):</p>
+            <div class="install-code">${lib.concatStringsSep "\n" generatedStructure}</div>
         </section>
 
         <section class="download-section">
