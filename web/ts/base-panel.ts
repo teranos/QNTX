@@ -36,6 +36,7 @@
 import { CSS, DATA, setVisibility } from './css-classes.ts';
 import * as PanelError from './base-panel-error.ts';
 import type { PanelErrorState, ErrorHandlingContext } from './base-panel-error.ts';
+import { tooltip as tooltipManager, type TooltipConfig } from './tooltip.ts';
 
 export interface PanelConfig {
     id: string;
@@ -44,13 +45,17 @@ export interface PanelConfig {
     closeOnEscape?: boolean;
     closeOnOverlayClick?: boolean;
     insertAfter?: string;  // Selector, e.g., '#symbolPalette'
+    /** Enable interactive tooltips for elements with data-tooltip attribute */
+    enableTooltips?: boolean;
+    /** Custom tooltip configuration */
+    tooltipConfig?: TooltipConfig;
 }
 
 export abstract class BasePanel {
     protected panel: HTMLElement | null = null;
     protected overlay: HTMLElement | null = null;
     protected isVisible: boolean = false;
-    protected config: Required<PanelConfig>;
+    protected config: Required<Omit<PanelConfig, 'tooltipConfig'>> & { tooltipConfig?: TooltipConfig };
 
     /** Error state management */
     protected errorState: PanelErrorState = {
@@ -60,6 +65,7 @@ export abstract class BasePanel {
 
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private clickOutsideHandler: ((e: Event) => void) | null = null;
+    private tooltipCleanup: (() => void) | null = null;
 
     constructor(config: PanelConfig) {
         this.config = {
@@ -68,6 +74,7 @@ export abstract class BasePanel {
             closeOnEscape: true,
             closeOnOverlayClick: true,
             insertAfter: '',
+            enableTooltips: true, // Enable by default for observability
             ...config
         };
         this.initialize();
@@ -88,6 +95,11 @@ export abstract class BasePanel {
 
         // Attach common handlers
         this.attachCommonListeners();
+
+        // Setup tooltips if enabled
+        if (this.config.enableTooltips && this.panel) {
+            this.setupTooltips();
+        }
 
         // Error boundary: wrap setupEventListeners() to catch initialization errors
         try {
@@ -248,11 +260,41 @@ export abstract class BasePanel {
         if (this.clickOutsideHandler) {
             document.removeEventListener('click', this.clickOutsideHandler);
         }
+        if (this.tooltipCleanup) {
+            this.tooltipCleanup();
+            this.tooltipCleanup = null;
+        }
 
         this.panel?.remove();
         this.overlay?.remove();
         this.panel = null;
         this.overlay = null;
+    }
+
+    /**
+     * Setup interactive tooltips for elements with data-tooltip attribute
+     * Uses the shared tooltip manager for consistent styling
+     */
+    protected setupTooltips(): void {
+        if (!this.panel) return;
+
+        // Use 'has-tooltip' class by default, can be customized via config
+        const selector = this.config.tooltipConfig?.triggerClass
+            ? `.${this.config.tooltipConfig.triggerClass}`
+            : '.has-tooltip';
+
+        this.tooltipCleanup = tooltipManager.attach(this.panel, selector);
+    }
+
+    /**
+     * Manually refresh tooltip bindings
+     * Useful after dynamic content updates that add new tooltip elements
+     */
+    protected refreshTooltips(): void {
+        if (this.tooltipCleanup) {
+            this.tooltipCleanup();
+        }
+        this.setupTooltips();
     }
 
     // Utility methods

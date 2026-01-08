@@ -79,8 +79,6 @@ export class PluginPanel extends BasePanel {
     private expandedPlugin: string | null = null;
     private configState: ConfigFormState | null = null;
     private serverHealth: ServerHealth | null = null;
-    private tooltip: HTMLElement | null = null;
-    private tooltipTimeout: number | null = null;
 
     constructor() {
         super({
@@ -88,6 +86,7 @@ export class PluginPanel extends BasePanel {
             classes: ['panel-slide-left', 'plugin-panel'],
             useOverlay: true,
             closeOnEscape: true
+            // Uses shared tooltip system via 'has-tooltip' class (enabled by default)
         });
     }
 
@@ -193,23 +192,8 @@ export class PluginPanel extends BasePanel {
             }
         });
 
-        // Tooltip handlers (event delegation)
-        content?.addEventListener('mouseenter', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('plugin-name-interactive') || target.classList.contains('plugin-version-interactive')) {
-                const tooltipText = target.dataset.tooltip;
-                if (tooltipText) {
-                    this.showTooltip(target, tooltipText);
-                }
-            }
-        }, true);
-
-        content?.addEventListener('mouseleave', (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('plugin-name-interactive') || target.classList.contains('plugin-version-interactive')) {
-                this.hideTooltip();
-            }
-        }, true);
+        // Note: Tooltips are now handled by BasePanel's shared tooltip system
+        // Elements with 'has-tooltip' class and data-tooltip attribute will show tooltips
     }
 
     protected async onShow(): Promise<void> {
@@ -225,42 +209,6 @@ export class PluginPanel extends BasePanel {
         const searchInput = this.$<HTMLInputElement>('.plugin-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
-        }
-    }
-
-    private showTooltip(target: HTMLElement, text: string): void {
-        // Clear any existing timeout
-        if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
-        }
-
-        // Show tooltip quickly (300ms delay)
-        this.tooltipTimeout = window.setTimeout(() => {
-            // Remove old tooltip if exists
-            this.hideTooltip();
-
-            // Create new tooltip
-            this.tooltip = document.createElement('div');
-            this.tooltip.className = 'plugin-tooltip';
-            this.tooltip.textContent = text;
-
-            // Position tooltip
-            const rect = target.getBoundingClientRect();
-            this.tooltip.style.left = `${rect.left}px`;
-            this.tooltip.style.top = `${rect.bottom + 8}px`;
-
-            document.body.appendChild(this.tooltip);
-        }, 300);
-    }
-
-    private hideTooltip(): void {
-        if (this.tooltipTimeout) {
-            clearTimeout(this.tooltipTimeout);
-            this.tooltipTimeout = null;
-        }
-        if (this.tooltip) {
-            this.tooltip.remove();
-            this.tooltip = null;
         }
     }
 
@@ -450,8 +398,8 @@ export class PluginPanel extends BasePanel {
             <div class="panel-card plugin-card ${isExpanded ? 'plugin-card-expanded' : ''}" data-plugin="${plugin.name}">
                 <div class="plugin-card-header">
                     <div class="plugin-name-row">
-                        <span class="plugin-name plugin-name-interactive" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
-                        <span class="plugin-version plugin-version-interactive panel-code" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
+                        <span class="plugin-name has-tooltip" data-tooltip="${escapeHtml(nameTooltip)}">${escapeHtml(plugin.name)}</span>
+                        <span class="plugin-version has-tooltip panel-code" data-tooltip="${escapeHtml(versionTooltip)}">${escapeHtml(plugin.version)}</span>
                     </div>
                     <div class="plugin-badges">
                         <div class="plugin-state ${stateClass}">
