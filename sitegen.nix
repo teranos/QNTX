@@ -15,9 +15,9 @@ let
   allFiles = lib.filesystem.listFilesRecursive docsDir;
   markdownFiles =
     let filtered = lib.filter (path: lib.hasSuffix ".md" (toString path)) allFiles;
-    in if filtered == []
-       then throw "No markdown files found in docs/ directory"
-       else filtered;
+    in if filtered == [ ]
+    then throw "No markdown files found in docs/ directory"
+    else filtered;
 
   # Calculate relative path from docs/ directory
   getRelativePath = path:
@@ -32,7 +32,8 @@ let
       htmlPath = lib.removeSuffix ".md" relPath + ".html";
       depth = lib.length (lib.filter (x: x != "") (lib.splitString "/" (if dir == "." then "" else dir)));
       prefix = if depth == 0 then "." else lib.concatStringsSep "/" (lib.genList (_: "..") depth);
-    in {
+    in
+    {
       inherit mdPath relPath dir name htmlPath depth prefix;
     };
 
@@ -44,8 +45,8 @@ let
 
   # HTML escaping function to prevent XSS from malicious filenames
   escapeHtml = s: builtins.replaceStrings
-    ["<" ">" "&" "\"" "'"]
-    ["&lt;" "&gt;" "&amp;" "&quot;" "&#39;"]
+    [ "<" ">" "&" "\"" "'" ]
+    [ "&lt;" "&gt;" "&amp;" "&quot;" "&#39;" ]
     s;
 
   # HTML template functions (pure Nix)
@@ -107,45 +108,53 @@ let
       sortedFiles = lib.sort (a: b: a.name < b.name) files;
       categoryTitle = lib.toUpper (lib.substring 0 1 category) + lib.substring 1 (lib.stringLength category) category;
       fileLinks = map (f: ''          <li><a href="${f.htmlPath}">${escapeHtml f.name}</a></li>'') sortedFiles;
-    in ''
-        <h2>${escapeHtml categoryTitle}</h2>
-        <ul>
-${lib.concatStringsSep "\n" fileLinks}
-        </ul>'';
+    in
+    ''
+              <h2>${escapeHtml categoryTitle}</h2>
+              <ul>
+      ${lib.concatStringsSep "\n" fileLinks}
+              </ul>'';
 
   # Generate full index content
   indexContent =
     let
-      rootFiles = groupedFiles._root or [];
+      rootFiles = groupedFiles._root or [ ];
       categories = lib.filterAttrs (k: v: k != "_root") groupedFiles;
-      rootSection = if rootFiles != [] then genIndexSection "Documentation" rootFiles else "";
+      rootSection = if rootFiles != [ ] then genIndexSection "Documentation" rootFiles else "";
       categorySections = lib.mapAttrsToList genIndexSection categories;
     in
-      htmlHead "QNTX Documentation" "." +
-      indexStyles +
-      rootSection +
-      lib.concatStringsSep "\n" categorySections +
-      ''
-    </body>
-</html>'';
+    htmlHead "QNTX Documentation" "." +
+    indexStyles +
+    rootSection +
+    lib.concatStringsSep "\n" categorySections +
+    ''
+          </body>
+      </html>'';
 
   # Create a separate derivation for each markdown file (enables incremental rebuilds)
   mkHtmlDerivation = fileInfo:
+    let
+      # Read markdown content and rewrite .md links to .html (pure Nix)
+      mdContent = builtins.readFile fileInfo.mdPath;
+      rewrittenMd = builtins.replaceStrings [ ".md)" ] [ ".html)" ] mdContent;
+    in
     pkgs.runCommand "qntx-doc-${fileInfo.name}"
       {
         nativeBuildInputs = [ pkgs.pulldown-cmark ];
       }
       ''
-        mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
-        {
-          cat <<'EOF'
-${htmlHead "QNTX - ${fileInfo.name}" fileInfo.prefix}
-${docStyles fileInfo.prefix}
-EOF
-          ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F < "${fileInfo.mdPath}"
-          echo "    </body>"
-          echo "</html>"
-        } > "$out/${fileInfo.htmlPath}"
+                mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
+                {
+                  cat <<'EOF'
+        ${htmlHead "QNTX - ${fileInfo.name}" fileInfo.prefix}
+        ${docStyles fileInfo.prefix}
+        EOF
+                  cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
+        ${rewrittenMd}
+        EOF
+                  echo "    </body>"
+                  echo "</html>"
+                } > "$out/${fileInfo.htmlPath}"
       '';
 
   # Generate all HTML file derivations

@@ -6,9 +6,9 @@
 This document shows Go type definitions from the codebase.
 
 **Generated types**:
-- TypeScript: [`types/generated/server.ts`](../server.ts)
-- Rust: [`types/generated/server.rs`](../server.rs)
-- Python: [`types/generated/server.py`](../server.py)
+- TypeScript: [`types/generated/typescript/server.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/server.ts)
+- Rust: [`types/generated/rust/server.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/server.rs)
+- Python: [`types/generated/python/server.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/server.py)
 
 ## ChildJobInfo
 
