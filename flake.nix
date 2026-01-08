@@ -483,11 +483,18 @@
             type = "app";
             program = toString (pkgs.writeShellScript "check-types" ''
               set -e
-              # Ensure typegen is built
-              ${pkgs.nix}/bin/nix build .#typegen
-
-              # Run typegen check
-              ./result/bin/typegen check
+              # Run typegen check inside dev environment where Go is available.
+              #
+              # NOTE: typegen uses golang.org/x/tools/go/packages which requires
+              # the 'go' command at runtime to load and parse Go packages. This is
+              # a known limitation of go/packages - it shells out to 'go list' for
+              # module resolution and type checking.
+              #
+              # Current approach: Run inside 'nix develop' where Go is in PATH.
+              # More proper solution: Wrap the typegen binary with makeWrapper to
+              # include Go in its runtime closure. This would make the binary truly
+              # self-contained but requires changes to the typegen package definition.
+              ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
             '');
           };
 
