@@ -119,6 +119,9 @@ func initializePluginRegistry() {
 		os.Exit(1)
 	}
 
+	// Store manager globally for server access
+	grpc.SetDefaultPluginManager(manager)
+
 	// Register loaded plugins with registry
 	loadedPlugins := manager.GetAllPlugins()
 	pluginLogger.Infof("Registering %d loaded plugins with registry", len(loadedPlugins))
