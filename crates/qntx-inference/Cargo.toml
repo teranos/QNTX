@@ -1,0 +1,46 @@
+[package]
+name = "qntx-inference"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QNTX local inference plugin for embeddings and semantic search"
+publish = false
+
+[[bin]]
+name = "qntx-inference"
+path = "src/main.rs"
+
+[dependencies]
+# QNTX shared library
+qntx = { path = "../qntx", features = ["plugin"] }
+
+# gRPC and async
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Error handling
+thiserror.workspace = true
+
+# Inference runtime - using ort (ONNX Runtime) for broad model support
+ort = { version = "2.0.0-rc.9", default-features = false, features = ["ndarray"] }
+ndarray = "0.16"
+
+# Tokenization
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+
+# Utilities
+parking_lot.workspace = true
