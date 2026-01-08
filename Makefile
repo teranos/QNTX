@@ -172,12 +172,8 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
 
-proto: ## Generate Go code from protobuf definitions
-	@echo "Generating gRPC code from proto files..."
-	@protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		plugin/grpc/protocol/domain.proto
-	@echo "✓ Proto files generated in plugin/grpc/protocol/"
+proto: ## Generate Go code from protobuf definitions (via Nix)
+	@nix run .#generate-proto
 
 plugins: ## Build and install all external plugin binaries to ~/.qntx/plugins/
 	@echo "Building external plugins..."
