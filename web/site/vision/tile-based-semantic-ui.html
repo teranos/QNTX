@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - tile-based-semantic-ui</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>Tile-Based Semantic UI - Vision</h1>
+<p><strong>Status:</strong> Aspirational - Core concepts for future UI evolution</p>
+<h2>Core Concept</h2>
+<p>Transform entity visualization from <strong>nodes as dots</strong> to <strong>tiles as always-on surfaces</strong> - a paradigm shift toward pane-based semantic computing where data is visible without interaction.</p>
+<h2>Key Principles</h2>
+<h3>1. Tiles as Surfaces, Not Tooltips</h3>
+<p><strong>Current Pattern:</strong> Hover to reveal entity details
+<strong>Vision:</strong> Data always visible on tile surface</p>
+<p>Tiles are <strong>persistent information surfaces</strong> displaying contextual data at all zoom levels. No interaction required to see entity state.</p>
+<h3>2. Semantic Zoom (Progressive Modes)</h3>
+<p>Progressive detail disclosure through <strong>meaning density</strong>, not pixel scaling. The true shape will emerge during development - current thinking:</p>
+<table><thead><tr><th>Mode</th><th>Gesture (Mobile)</th><th>Display</th><th>Use Case</th></tr></thead><tbody>
+<tr><td><strong>Focus</strong></td><td>Pinch in (max zoom)</td><td>Single tile fills screen, full detail</td><td>Deep inspection of one entity</td></tr>
+<tr><td><strong>Relational</strong></td><td>Pinch out slightly</td><td>Focused tile + half of connected tiles visible</td><td>Navigate relationships, jump between entities</td></tr>
+<tr><td><strong>Overview</strong></td><td>Pinch out fully</td><td>Full force-directed graph</td><td>Landscape view, see all connections</td></tr>
+</tbody></table>
+<p><strong>Mobile-First Insight:</strong> Relational mode is the key innovation - shows relationship context without losing focus. Drag connected tile to center to navigate.</p>
+<p><strong>Desktop:</strong> Same three modes, plus potential intermediate levels for specific workflows (will emerge organically).</p>
+<p><strong>Philosophy:</strong> Each mode serves a distinct cognitive task - focus for depth, relational for exploration, overview for orientation.</p>
+<h3>3. Pane-Based Computing</h3>
+<p>Inspired by Smalltalk's pane model - tiles are <strong>compositional surfaces</strong> that can be:</p>
+<ul>
+<li>Arranged in layouts (grid, hierarchy, timeline, pipeline)</li>
+<li>Configured per entity type</li>
+<li>Stacked and organized by user</li>
+</ul>
+<h3>4. Config-Driven Field Display</h3>
+<p>Define what data appears at each zoom level:</p>
+<pre><code class="language-toml"># tiles/contact.tile.toml
+[fields]
+zoom_0 = ["⌬"]  # Symbol only
+zoom_50 = ["⌬", "name"]
+zoom_100 = ["⌬", "name", "org", "role"]
+zoom_150 = ["⌬", "name", "org", "role", "last_contact", "status"]
+zoom_200 = ["relationships"]  # Embed graph slice
+</code></pre>
+<p>Non-technical users (recruiters, analysts) can customize views by editing TOML configs.</p>
+<h2>Design Goals</h2>
+<h3>Visual Hierarchy</h3>
+<ul>
+<li><strong>Type → Label → Fields → Detail → Context</strong></li>
+<li>Each zoom level serves distinct use case</li>
+<li>Clear visual differentiation between levels</li>
+</ul>
+<h3>Layout Flexibility</h3>
+<ul>
+<li><strong>Views (⧉) as Layout Modes:</strong>
+<ul>
+<li>Grid: Alphabetical/chronological arrangement</li>
+<li>Hierarchy: Parent-child tree structure</li>
+<li>Timeline: Temporal progression</li>
+<li>Pipeline: Workflow stages</li>
+<li>Graph: Force-directed relationships (current default)</li>
+</ul>
+</li>
+</ul>
+<h3>Always-On Data</h3>
+<ul>
+<li>Most important fields visible without interaction</li>
+<li>Hover/click for supplementary actions, not primary data</li>
+<li>Tile surface = <strong>first-class information display</strong></li>
+</ul>
+<h2>Technical Approach</h2>
+<h3>Progressive Enhancement Path</h3>
+<ol>
+<li><strong>Phase 1:</strong> Render entities as rectangles (vs circles) ✅ <em>Implemented</em>
+<ul>
+<li>Tiles render as rectangles with multi-line text (label, type, metadata)</li>
+<li>Focus mode expands tiles to fill viewport</li>
+<li>Tile-to-tile focus transitions working</li>
+</ul>
+</li>
+<li><strong>Phase 2:</strong> Add multi-line text to tile surface ✅ <em>In Progress</em>
+<ul>
+<li>Basic multi-line text rendering complete</li>
+<li>Header/footer controls in focus mode</li>
+</ul>
+</li>
+<li><strong>Phase 3:</strong> Implement semantic zoom thresholds</li>
+<li><strong>Phase 4:</strong> Add layout modes (grid, hierarchy)</li>
+<li><strong>Phase 5:</strong> Config-driven field selection</li>
+</ol>
+<h3>Implementation Considerations</h3>
+<ul>
+<li>Compatible with existing D3/graph visualization</li>
+<li>Works with WebSocket real-time updates</li>
+<li>Responsive to different screen sizes</li>
+<li>Smooth transitions between zoom levels</li>
+<li>Tile size adapts to content (min/max bounds)</li>
+</ul>
+<h2>Symbols at Different Zoom Levels</h2>
+<p>Core QNTX symbols appear progressively:</p>
+<ul>
+<li><strong>⌬</strong> (Actor/Agent) - Zoom level 0+</li>
+<li><strong>≡</strong> (Configuration) - Zoom level 2+ (if entity has config)</li>
+<li><strong>꩜</strong> (Pulse) - Zoom level 2+ (if entity has async jobs)</li>
+<li><strong>⧉</strong> (View) - Controls layout mode switching</li>
+</ul>
+<h2>Use Cases</h2>
+<h3>Mobile Exploratory Session (30 min)</h3>
+<p><strong>Scenario:</strong> Biology researcher on morning commute, analyzing gene clusters from overnight metagenomic pipeline run</p>
+<ol>
+<li><strong>Overview mode:</strong> Pinch out - see full gene network, identify novel cluster</li>
+<li><strong>Focus mode:</strong> Tap target gene tile - see full sequence annotations, expression data</li>
+<li><strong>Relational mode:</strong> Pinch out slightly - view connected genes (homologs, co-expressed partners)</li>
+<li><strong>Navigate:</strong> Drag candidate protein-coding gene to center - examine function predictions</li>
+<li><strong>Discovery:</strong> Pinch to relational mode - see this gene's regulatory network</li>
+<li><strong>Backtrack:</strong> Swipe back gesture - return to original cluster for comparison</li>
+</ol>
+<p><strong>Key insight:</strong> Discovers potential novel protein function before arriving at lab - gestural exploration enables hypothesis formation during commute.</p>
+<h3>Desktop Deep Dive (Zoom levels emerge organically)</h3>
+<p><strong>Working context:</strong> See key fields without interaction
+<strong>Deep inspection:</strong> Full metadata for detailed comparison
+<strong>Neighborhood exploration:</strong> Embedded relationship graphs</p>
+<h2>Comparison to Current UI</h2>
+<table><thead><tr><th>Aspect</th><th>Current (Nodes)</th><th>Vision (Tiles)</th></tr></thead><tbody>
+<tr><td><strong>Default state</strong></td><td>Label on hover</td><td>Key fields always visible</td></tr>
+<tr><td><strong>Zoom behavior</strong></td><td>Pixel scaling</td><td>Semantic detail levels</td></tr>
+<tr><td><strong>Layout</strong></td><td>Force-directed physics</td><td>Intentional layouts (grid/tree/timeline)</td></tr>
+<tr><td><strong>Customization</strong></td><td>Hardcoded</td><td>Config-driven per entity type</td></tr>
+<tr><td><strong>Information density</strong></td><td>Low (interaction required)</td><td>High (data always on)</td></tr>
+</tbody></table>
+<h2>Mobile-First Considerations</h2>
+<p><strong>Deep Exploratory Analysis</strong> (30+ min sessions on mobile):</p>
+<ul>
+<li><strong>Fast navigation</strong> via gesture shortcuts (swipe patterns, drag-to-center)</li>
+<li><strong>Threshold-based zoom:</strong> Smooth pinch within modes, discrete snap between modes</li>
+<li><strong>Simplified physics:</strong> Less movement at overview level for touch stability</li>
+<li><strong>Adaptive detail:</strong> Entity type determines what fields show at each mode</li>
+<li><strong>Landscape enhancement:</strong> Show 2-3 tiles side-by-side when horizontal</li>
+</ul>
+<p><strong>Gesture Mapping:</strong></p>
+<ul>
+<li>Pinch in → Focus mode (single tile, full detail)</li>
+<li>Pinch out slightly → Relational mode (show connected tiles)</li>
+<li>Pinch out fully → Overview mode (full graph)</li>
+<li>Drag tile to center → Navigate to that tile (in relational mode)</li>
+<li>Swipe → Gesture shortcuts (back, related entities, etc)</li>
+</ul>
+<p><strong>Key Design Principle:</strong> Mobile is not a compromise - it's the primary exploratory interface. Desktop adds power-user features.</p>
+<h2>Open Questions</h2>
+<ol>
+<li><strong>Tile sizing:</strong> Fixed dimensions vs dynamic based on content?</li>
+<li><strong>Transition animations:</strong> Smooth zoom interpolation or discrete snapping? <em>Answer: Threshold-based - smooth within, snap between</em></li>
+<li><strong>Relational mode polish:</strong> Exactly how much of connected tiles? <em>Answer: Half-tile (symbol, label, 1-2 fields visible)</em></li>
+<li><strong>Performance:</strong> Can we render 1000+ tiles without degradation?</li>
+<li><strong>Gesture vocabulary:</strong> What swipe patterns for shortcuts? (back, forward, star, hide, etc)</li>
+</ol>
+<h2>Success Criteria</h2>
+<p>A successful tile-based UI should:</p>
+<ul>
+<li>✅ Show more information without user interaction</li>
+<li>✅ Support multiple layout modes for different workflows</li>
+<li>✅ Enable non-technical users to customize via config</li>
+<li>✅ Scale from 10 to 1000+ entities</li>
+<li>✅ Maintain real-time update responsiveness</li>
+<li>✅ Preserve existing graph capabilities where valuable</li>
+</ul>
+<h2>Related Concepts</h2>
+<ul>
+<li><strong>Semantic Zoom</strong> - Progressive detail disclosure</li>
+<li><strong>Pane-Based Computing</strong> - Smalltalk's compositional window model</li>
+<li><strong>Information Density</strong> - Tufte's principles of data visualization</li>
+<li><strong>Always-On Interfaces</strong> - Data visibility without interaction</li>
+</ul>
+<h2>When to Build This</h2>
+<p><strong>Prerequisites:</strong></p>
+<ol>
+<li>Stable entity model and attestation system</li>
+<li>Clear use cases demanding more visible data</li>
+<li>User feedback that current graph UI is limiting</li>
+<li>Resources for UI/UX iteration</li>
+</ol>
+<p><strong>Trigger conditions:</strong></p>
+<ul>
+<li>Users frequently hover to see data (interaction overhead)</li>
+<li>Need to compare multiple entities visually</li>
+<li>Different workflows require different layouts (not just force-directed)</li>
+<li>Non-technical users want to customize views</li>
+</ul>
+<h2>Status</h2>
+<p><strong>Current:</strong> Vision document - concepts not yet implemented</p>
+<p><strong>Future:</strong> Consider prototype when core attestation system stabilizes and user feedback indicates need for enhanced visualization.</p>
+<h2>Key Architectural Patterns</h2>
+<h3>Real-Time Updates via WebSocket</h3>
+<p><strong>Delta update protocol</strong> for live tile changes:</p>
+<ul>
+<li>Client subscribes to view updates</li>
+<li>Server pushes only changed tiles (not full re-query)</li>
+<li>Client merges updates into existing tile set</li>
+<li>Update types: <code>tile_update</code>, <code>tile_added</code>, <code>tile_removed</code></li>
+</ul>
+<p><strong>Benefits:</strong> Efficient bandwidth usage, smooth live updates, maintains user context.</p>
+<h3>Result Limiting Strategy</h3>
+<p><strong>Hard cap at 500 tiles per view:</strong></p>
+<ul>
+<li>Backend returns <code>limited: true</code> flag when capped</li>
+<li>Frontend shows warning banner</li>
+<li>User prompted to refine query or switch to more specific view</li>
+</ul>
+<p><strong>Rationale:</strong> Prevent performance degradation, encourage focused views over "show everything."</p>
+<h3>Fail-Fast Config Validation</h3>
+<p><strong>System refuses to start with invalid configs:</strong></p>
+<ul>
+<li>TOML syntax validation at parse time</li>
+<li>Schema validation for required fields</li>
+<li>Reference validation (tile types must exist)</li>
+<li>Clear error messages with line numbers</li>
+</ul>
+<p><strong>Philosophy:</strong> Runtime reliability over permissive startup. Better to fail immediately than serve broken views.</p>
+<h3>Per-View Zoom State Persistence</h3>
+<p>Each view maintains independent zoom level:</p>
+<ul>
+<li>Saved to session storage</li>
+<li>Restored when switching between views</li>
+<li>Users can zoom in on detail view, zoom out on landscape view</li>
+<li>State lost on browser close (intentional - fresh start each session)</li>
+</ul>
+<h3>Orthogonal Edge Rendering</h3>
+<p><strong>L-shaped connectors</strong> (not straight lines):</p>
+<ul>
+<li>Vertical then horizontal paths between tiles</li>
+<li>Clearer visual hierarchy in grid/tree layouts</li>
+<li>Edges hidden by default, appear on hover</li>
+<li>Labels shown only when edges visible</li>
+</ul>
+<h3>Responsive Column Layout</h3>
+<p><strong>Viewport-aware grid:</strong></p>
+<ul>
+<li>Mobile (&lt; 640px): 1 column</li>
+<li>Tablet (640-1024px): 2 columns</li>
+<li>Desktop (1024-1536px): 3 columns</li>
+<li>Wide (&gt; 1536px): 4 columns</li>
+</ul>
+<p><strong>Hierarchy respect:</strong> Grid arrangement maintains parent-child relationships across column breaks.</p>
+<h3>Field Visibility Based on Rendered Size</h3>
+<p><strong>Not just zoom level - actual pixel dimensions:</strong></p>
+<ul>
+<li>Each field has <code>min_size</code> threshold (e.g., 200px)</li>
+<li>Fields appear when tile width exceeds threshold</li>
+<li>Allows different tile types to have different size requirements</li>
+<li>Smooth progressive disclosure as tiles grow</li>
+</ul>
+<h3>Caching Strategy</h3>
+<p><strong>Session cache only:</strong></p>
+<ul>
+<li>Tile data cached in memory during session</li>
+<li>Cleared on page reload (no persistent cache)</li>
+<li>WebSocket updates keep cache fresh</li>
+<li>Avoids cache invalidation complexity</li>
+</ul>
+<p><strong>Trade-off:</strong> Slight reload penalty for simpler architecture and no stale data risk.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><strong>Symbols System:</strong> <a href="../../sym/README.html"><code>sym/README.md</code></a> - QNTX symbol definitions</li>
+</ul>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+</body>
+</html>
