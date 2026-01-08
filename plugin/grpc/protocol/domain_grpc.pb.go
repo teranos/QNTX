@@ -29,6 +29,8 @@ type DomainPluginServiceClient interface {
 	HandleWebSocket(ctx context.Context, opts ...grpc.CallOption) (DomainPluginService_HandleWebSocketClient, error)
 	// Health checks plugin health
 	Health(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*HealthResponse, error)
+	// ConfigSchema returns the configuration schema for this plugin
+	ConfigSchema(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ConfigSchemaResponse, error)
 }
 
 type domainPluginServiceClient struct {
@@ -115,6 +117,15 @@ func (c *domainPluginServiceClient) Health(ctx context.Context, in *Empty, opts 
 	return out, nil
 }
 
+func (c *domainPluginServiceClient) ConfigSchema(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ConfigSchemaResponse, error) {
+	out := new(ConfigSchemaResponse)
+	err := c.cc.Invoke(ctx, "/protocol.DomainPluginService/ConfigSchema", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DomainPluginServiceServer is the server API for DomainPluginService service.
 // All implementations must embed UnimplementedDomainPluginServiceServer
 // for forward compatibility
@@ -131,6 +142,8 @@ type DomainPluginServiceServer interface {
 	HandleWebSocket(DomainPluginService_HandleWebSocketServer) error
 	// Health checks plugin health
 	Health(context.Context, *Empty) (*HealthResponse, error)
+	// ConfigSchema returns the configuration schema for this plugin
+	ConfigSchema(context.Context, *Empty) (*ConfigSchemaResponse, error)
 	mustEmbedUnimplementedDomainPluginServiceServer()
 }
 
@@ -155,6 +168,9 @@ func (UnimplementedDomainPluginServiceServer) HandleWebSocket(DomainPluginServic
 }
 func (UnimplementedDomainPluginServiceServer) Health(context.Context, *Empty) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
+}
+func (UnimplementedDomainPluginServiceServer) ConfigSchema(context.Context, *Empty) (*ConfigSchemaResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConfigSchema not implemented")
 }
 func (UnimplementedDomainPluginServiceServer) mustEmbedUnimplementedDomainPluginServiceServer() {}
 
@@ -285,6 +301,24 @@ func _DomainPluginService_Health_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DomainPluginService_ConfigSchema_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DomainPluginServiceServer).ConfigSchema(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/protocol.DomainPluginService/ConfigSchema",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DomainPluginServiceServer).ConfigSchema(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _DomainPluginService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "protocol.DomainPluginService",
 	HandlerType: (*DomainPluginServiceServer)(nil),
@@ -308,6 +342,10 @@ var _DomainPluginService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Health",
 			Handler:    _DomainPluginService_Health_Handler,
+		},
+		{
+			MethodName: "ConfigSchema",
+			Handler:    _DomainPluginService_ConfigSchema_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

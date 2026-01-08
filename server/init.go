@@ -23,23 +23,29 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// serverDependencies holds all dependencies created for QNTXServer
+// serverDependencies holds dependencies created for QNTXServer
+// Refactored: Adding a new dependency requires changes in 3-4 places (down from 6):
+// 1. QNTXServer struct (server.go)
+// 2. This struct
+// 3. createServerDependencies() - create and add to return
+// 4. (Optional) Global storage if needed (e.g., SetDefaultPluginManager)
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service // Language service for ATS LSP features
+	langService   *lsp.Service
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
-	config        *appcfg.Config // Opening/Closing Phase 2 optimization: reuse for daemon recreation
+	pluginManager *grpcplugin.PluginManager
+	config        *appcfg.Config
 }
 
 // NewQNTXServer creates a new QNTX server
-func NewQNTXServer(db *sql.DB, dbPath string, verbosity int) (*QNTXServer, error) {
-	return NewQNTXServerWithInitialQuery(db, dbPath, verbosity, "")
-}
-
-// NewQNTXServerWithInitialQuery creates a QNTXServer with an optional pre-loaded Ax query
-func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, initialQuery string) (*QNTXServer, error) {
+// Optional initialQuery can be provided to pre-load an Ax query on connection
+func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...string) (*QNTXServer, error) {
+	query := ""
+	if len(initialQuery) > 0 {
+		query = initialQuery[0]
+	}
 	// Defensive: Validate critical inputs
 	if db == nil {
 		return nil, errors.New("database connection cannot be nil")
@@ -143,23 +149,28 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
-		daemon:        daemon, // Use daemon with server context
-		ticker:        nil,    // Will be set below after passing server as broadcaster
+		daemon:        daemon,             // Use daemon with server context
+		pluginManager: deps.pluginManager, // May be nil if no plugins enabled
+		ticker:        nil,                // Will be set below after passing server as broadcaster
 		clients:       make(map[*Client]bool),
 		broadcast:     make(chan *graph.Graph, MaxClientMessageQueueSize),
+		broadcastReq:  make(chan *broadcastRequest, MaxClientMessageQueueSize*2), // 2x buffer for multiple message types
 		register:      make(chan *Client),
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
 		logTransport:  wsTransport,
 		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
-		initialQuery:  initialQuery,
+		initialQuery:  query,
 		ctx:           ctx,
 		cancel:        cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.graphLimit.Store(1000)                 // Default graph node limit
 	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
+
+	// Configure log transport to route sends through broadcast worker (thread-safe)
+	wsTransport.SetSendFunc(server.sendLogBatch)
 
 	// Initialize domain plugin registry
 	pluginRegistry := plugin.GetDefaultRegistry()
@@ -199,8 +210,9 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 			serverLogger.Infow("Domain plugins initialized", "count", len(pluginRegistry.List()))
 		}
 
-		// Store services manager for shutdown
+		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
+		server.services = services
 	}
 
 	// Create ticker with server as broadcaster for real-time execution updates
@@ -252,8 +264,8 @@ func createGraphLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCore
 	return serverLogger, wsCore, wsTransport, nil
 }
 
-// createServerDependencies creates all dependencies needed by QNTXServer
-func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocketCore, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
+// createServerDependencies creates all components needed for QNTXServer initialization
+func createServerDependencies(db *sql.DB, verbosity int, wsCore zapcore.Core, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
 	start := time.Now()
 
 	// Create builder with server logger
@@ -299,6 +311,9 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	daemon := async.NewWorkerPool(db, cfg, async.DefaultWorkerPoolConfig(), serverLogger)
 	serverLogger.Debugw("Daemon created", "duration_ms", time.Since(daemonStart).Milliseconds())
 
+	// Retrieve plugin manager from global storage (set by main.go during plugin initialization)
+	pluginManager := grpcplugin.GetDefaultPluginManager()
+
 	serverLogger.Debugw("All dependencies created", "total_duration_ms", time.Since(start).Milliseconds())
 
 	return &serverDependencies{
@@ -307,7 +322,8 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
-		config:        cfg, // GRACE Phase 2 optimization: save for reuse
+		pluginManager: pluginManager, // May be nil if no plugins are enabled
+		config:        cfg,           // GRACE Phase 2 optimization: save for reuse
 	}, nil
 }
 

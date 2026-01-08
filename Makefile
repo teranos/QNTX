@@ -17,19 +17,11 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
 	@go build -o bin/typegen ./cmd/typegen
 
-types: typegen ## Generate TypeScript, Python, Rust types and markdown docs from Go source
-	@echo "Generating types and documentation..."
-	@./bin/typegen --lang typescript --output types/generated/
-	@./bin/typegen --lang python --output types/generated/
-	@./bin/typegen --lang rust --output types/generated/
-	@./bin/typegen --lang markdown  # Defaults to docs/types/
-	@echo "✓ TypeScript types generated in types/generated/typescript/"
-	@echo "✓ Python types generated in types/generated/python/"
-	@echo "✓ Rust types generated in types/generated/rust/"
-	@echo "✓ Markdown docs generated in docs/types/"
+types: ## Generate TypeScript, Python, Rust types and markdown docs from Go source (via Nix)
+	@nix run .#generate-types
 
-types-check: typegen ## Check if generated types are up to date (uses standalone typegen, no plugins)
-	@./bin/typegen check
+types-check: ## Check if generated types are up to date (via Nix)
+	@nix run .#check-types
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
@@ -180,12 +172,8 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
 
-proto: ## Generate Go code from protobuf definitions
-	@echo "Generating gRPC code from proto files..."
-	@protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		plugin/grpc/protocol/domain.proto
-	@echo "✓ Proto files generated in plugin/grpc/protocol/"
+proto: ## Generate Go code from protobuf definitions (via Nix)
+	@nix run .#generate-proto
 
 plugins: ## Build and install all external plugin binaries to ~/.qntx/plugins/
 	@echo "Building external plugins..."

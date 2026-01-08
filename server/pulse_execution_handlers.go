@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/schedule"
 )
 
@@ -104,7 +105,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	execStore := s.getExecutionStore()
 	execution, err := execStore.GetExecution(executionID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.IsNotFoundError(err) {
 			writeError(w, http.StatusNotFound, "Execution not found")
 			return
 		}

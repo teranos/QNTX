@@ -106,44 +106,40 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
 
-	// Pass common configuration keys to plugin
-	// Note: Config interface doesn't support enumerating all keys, so we manually
-	// specify known configuration keys. Plugins that need custom config should
-	// document their keys.
-	//
-	// TODO: Add AllSettings() method to Config interface for complete config passing
-
-	// String configuration
-	stringKeys := []string{
-		"workspace_root", "api_token", "base_url", "model",
-		"github.token", "gopls.workspace_root",
-	}
-	for _, key := range stringKeys {
-		if val := pluginConfig.GetString(key); val != "" {
-			config[key] = val
+	// Pass all configuration keys from the plugin's namespace
+	// This includes both built-in keys and custom keys from ~/.qntx/plugins/{name}.toml [config] sections
+	for _, key := range pluginConfig.GetKeys() {
+		// Skip internal keys (prefixed with _)
+		if len(key) > 0 && key[0] == '_' {
+			continue
 		}
-	}
 
-	// Boolean configuration
-	boolKeys := []string{"enabled", "gopls.enabled"}
-	for _, key := range boolKeys {
-		// Always pass boolean values (even false) to avoid ambiguity
-		config[key] = fmt.Sprintf("%v", pluginConfig.GetBool(key))
-	}
-
-	// Integer configuration
-	intKeys := []string{"context_size", "timeout_seconds"}
-	for _, key := range intKeys {
-		if val := pluginConfig.GetInt(key); val != 0 {
-			config[key] = fmt.Sprintf("%d", val)
+		// Get raw value and convert to string for protobuf
+		val := pluginConfig.Get(key)
+		if val == nil {
+			continue
 		}
-	}
 
-	// String slice configuration (JSON-encoded)
-	sliceKeys := []string{"allowed_domains", "blocked_domains"}
-	for _, key := range sliceKeys {
-		if slice := pluginConfig.GetStringSlice(key); len(slice) > 0 {
-			if jsonBytes, err := json.Marshal(slice); err == nil {
+		// Type-based conversion to string
+		switch v := val.(type) {
+		case string:
+			if v != "" {
+				config[key] = v
+			}
+		case int, int8, int16, int32, int64:
+			config[key] = fmt.Sprintf("%d", v)
+		case float32, float64:
+			config[key] = fmt.Sprintf("%f", v)
+		case bool:
+			config[key] = fmt.Sprintf("%v", v)
+		case []interface{}:
+			// Array types - serialize as JSON
+			if jsonBytes, err := json.Marshal(v); err == nil {
+				config[key] = string(jsonBytes)
+			}
+		default:
+			// Try JSON marshaling for complex types
+			if jsonBytes, err := json.Marshal(v); err == nil {
 				config[key] = string(jsonBytes)
 			}
 		}
@@ -185,6 +181,15 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		"queue", queueEndpoint != "",
 	)
 	return nil
+}
+
+// ConfigSchema returns the configuration schema from the remote plugin.
+func (c *ExternalDomainProxy) ConfigSchema(ctx context.Context) (*protocol.ConfigSchemaResponse, error) {
+	resp, err := c.client.ConfigSchema(ctx, &protocol.Empty{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get config schema from plugin %s at %s", c.metadata.Name, c.addr)
+	}
+	return resp, nil
 }
 
 // Shutdown shuts down the remote plugin.
