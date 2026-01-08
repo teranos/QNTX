@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - bounded-storage</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>Bounded Storage Architecture</h1>
+<h2>Overview</h2>
+<p>QNTX implements a <strong>configurable bounded storage strategy</strong> to prevent unbounded database growth while maintaining attestation history. The system automatically enforces storage limits and provides observability through telemetry.</p>
+<h2>Storage Limits (16/64/64 Strategy)</h2>
+<p>The default strategy enforces three complementary limits:</p>
+<ul>
+<li><strong>16 attestations</strong> per (actor, context) pair</li>
+<li><strong>64 contexts</strong> per actor</li>
+<li><strong>64 actors</strong> per entity (subject)</li>
+</ul>
+<p>All limits are configurable via <code>am.toml</code> (see Configuration section below).</p>
+<h3>Why These Limits?</h3>
+<p><strong>Actor/Context Limit (16)</strong>: Prevents spam from a single source claiming repeatedly about the same entity in the same context.</p>
+<p><strong>Actor Contexts Limit (64)</strong>: Prevents a single actor from proliferating across too many contexts.</p>
+<p><strong>Entity Actors Limit (64)</strong>: Prevents unbounded growth of actors making claims about a single entity.</p>
+<h3>Enforcement Behavior</h3>
+<p>When a limit is exceeded:</p>
+<ol>
+<li>The <strong>oldest attestations</strong> for that constraint are deleted</li>
+<li>The deletion event is logged to the <code>storage_events</code> table with full context</li>
+<li>The new attestation is created normally</li>
+</ol>
+<p>This maintains a rolling window of recent attestations while preventing unbounded growth.</p>
+<h2>Self-Certifying ASIDs</h2>
+<blockquote>
+<p><strong>For bulk ingestion, self-certifying ASIDs are required, not optional.</strong> Without them, the 64-actor limit will cause silent data loss once exceeded. There is currently no other workaround.</p>
+</blockquote>
+<h3>The Problem</h3>
+<p>Using the same actor string (e.g., <code>"processor@system"</code>) for all ingestion operations creates a hard limit:</p>
+<pre><code class="language-go">// ❌ PROBLEMATIC: Shared actor hits 64-entity limit
+for _, entity := range entities {
+    attestation := &amp;types.As{
+        Subjects:   []string{entity.ID},
+        Predicates: []string{"processed"},
+        Actors:     []string{"processor@system"},  // Same actor for all!
+    }
+}
+// After 64 entities, attestations for the 65th trigger deletion
+</code></pre>
+<h3>The Solution</h3>
+<p><strong>Use the attestation's own ASID as its actor</strong> (self-certifying pattern):</p>
+<pre><code class="language-go">// ✅ CORRECT: Self-certifying ASIDs bypass the 64-actor limit
+import "github.com/teranos/vanity-id"
+
+for _, entity := range entities {
+    // Generate ASID with empty actor seed
+    asid, err := id.GenerateASID(
+        entity.ID,      // subject
+        "processed",    // predicate
+        context,        // object
+        "",             // empty actor seed
+    )
+
+    // Use ASID as its own actor (self-referential)
+    attestation := &amp;types.As{
+        ID:         asid,
+        Subjects:   []string{entity.ID},
+        Predicates: []string{"processed"},
+        Actors:     []string{asid},  // Self-certifying!
+        // ...
+    }
+}
+</code></pre>
+<h3>Benefits of Self-Certifying ASIDs</h3>
+<ol>
+<li><strong>Bounded storage compliance</strong> - Each attestation has unique actor, bypasses 64-actor limit</li>
+<li><strong>Self-certifying</strong> - Attestation vouches for itself, no external authority needed</li>
+<li><strong>Perfect provenance</strong> - ASID directly traces to the creating attestation</li>
+<li><strong>Immutable attribution</strong> - Actor IS the attestation, cannot be spoofed</li>
+<li><strong>Temporal ordering</strong> - ASIDs encode timestamps for chronological queries</li>
+</ol>
+<h3>When NOT to Use Self-Certifying</h3>
+<p>Self-certifying ASIDs are the <strong>default best practice</strong>, but there are specific cases where shared actors are appropriate:</p>
+<ul>
+<li><strong>Testing bounded storage</strong> - Need predictable actor counts to verify limits</li>
+<li><strong>Authority-based claims</strong> - When actor identity matters (e.g., <code>"github@oauth"</code> for verified GitHub data)</li>
+<li><strong>Source tracking</strong> - When grouping attestations by originating system</li>
+</ul>
+<p>In these cases, be aware of the 64-actor limit and monitor enforcement via <code>qntx db stats</code>.</p>
+<h2>Configuration</h2>
+<h3>Default Configuration</h3>
+<p>QNTX uses sensible defaults (16/64/64) that work for most use cases. No configuration required.</p>
+<h3>Custom Configuration</h3>
+<p>Create or edit <code>~/.qntx/am.toml</code> (or use project-specific <code>am.toml</code>):</p>
+<pre><code class="language-toml">[database.bounded_storage]
+actor_context_limit = 16  # attestations per (actor, context) pair
+actor_contexts_limit = 64 # contexts per actor
+entity_actors_limit = 64  # actors per entity (subject)
+</code></pre>
+<p><strong>Example: Higher limits for archival systems:</strong></p>
+<pre><code class="language-toml">[database.bounded_storage]
+actor_context_limit = 100  # More history per actor/context
+actor_contexts_limit = 200 # Allow more diverse contexts
+entity_actors_limit = 200  # More actors can claim about entities
+</code></pre>
+<p><strong>Example: Stricter limits for constrained environments:</strong></p>
+<pre><code class="language-toml">[database.bounded_storage]
+actor_context_limit = 8   # Minimal history
+actor_contexts_limit = 32
+entity_actors_limit = 32
+</code></pre>
+<p>See <a href="../../am.example.toml"><code>am.example.toml</code></a> for full configuration template. For configuration system details, see <a href="../../am/README.html">am package</a>.</p>
+<h3>Validation</h3>
+<p>The system validates configuration on startup:</p>
+<ul>
+<li>Zero or negative values automatically fallback to defaults (16/64/64)</li>
+<li>Invalid configurations are logged but don't prevent startup</li>
+</ul>
+<h2>Observability</h2>
+<h3>Storage Events Table</h3>
+<p>All enforcement events are logged to the <code>storage_events</code> table:</p>
+<pre><code class="language-sql">CREATE TABLE storage_events (
+    id INTEGER PRIMARY KEY,
+    event_type TEXT NOT NULL,        -- which limit was enforced
+    actor TEXT,                       -- actor involved (may be null)
+    context TEXT,                     -- context involved (may be null)
+    entity TEXT,                      -- entity involved (may be null)
+    deletions_count INTEGER NOT NULL, -- how many attestations deleted
+    timestamp TEXT NOT NULL,          -- when enforcement happened
+    created_at TEXT NOT NULL          -- database record time
+);
+</code></pre>
+<h3>CLI Commands</h3>
+<p><strong>View recent enforcement events:</strong></p>
+<pre><code class="language-bash"># Show database stats with last 5 enforcement events
+qntx db stats --limit 5
+
+# Show more events
+qntx db stats --limit 20
+</code></pre>
+<p><strong>Query enforcement events directly:</strong></p>
+<pre><code class="language-bash"># Recent actor_context_limit enforcement
+sqlite3 ~/.qntx/db/sqlite.db \
+  "SELECT * FROM storage_events
+   WHERE event_type = 'actor_context_limit'
+   ORDER BY created_at DESC
+   LIMIT 10"
+
+# Count enforcement events by type
+sqlite3 ~/.qntx/db/sqlite.db \
+  "SELECT event_type, COUNT(*) as count
+   FROM storage_events
+   GROUP BY event_type"
+</code></pre>
+<h3>Telemetry Fields</h3>
+<ul>
+<li><strong>event_type</strong>: <code>actor_context_limit</code> | <code>actor_contexts_limit</code> | <code>entity_actors_limit</code></li>
+<li><strong>actor</strong>: The actor that triggered enforcement (null for entity limits)</li>
+<li><strong>context</strong>: The context involved (null for actor limits)</li>
+<li><strong>entity</strong>: The entity/subject involved (null for context limits)</li>
+<li><strong>deletions_count</strong>: Number of attestations deleted to enforce limit</li>
+<li><strong>timestamp</strong>: When the enforcement happened (ISO 8601)</li>
+<li><strong>created_at</strong>: When the event was logged to database</li>
+</ul>
+<h2>Implementation Details</h2>
+<h3>Code Organization</h3>
+<p>Bounded storage implementation is split into focused files:</p>
+<ul>
+<li><strong><code>ats/storage/bounded_store.go</code></strong> - Main interface and coordination</li>
+<li><strong><code>ats/storage/bounded_store_config.go</code></strong> - Configuration structures and defaults</li>
+<li><strong><code>ats/storage/bounded_store_enforcement.go</code></strong> - Limit enforcement logic</li>
+<li><strong><code>ats/storage/bounded_store_telemetry.go</code></strong> - Event logging and observability</li>
+</ul>
+<h3>Enforcement Flow</h3>
+<pre><code>User creates attestation
+    ↓
+BoundedStore.CreateAttestation()
+    ↓
+SQLStore.CreateAttestation() [writes to DB]
+    ↓
+enforceActorContextLimit()
+    ├─ Count attestations for (actor, context)
+    ├─ If &gt; limit: DELETE oldest
+    └─ Log event to storage_events
+    ↓
+enforceActorContextsLimit()
+    ├─ Count unique contexts for actor
+    ├─ If &gt; limit: DELETE oldest context's attestations
+    └─ Log event to storage_events
+    ↓
+enforceEntityActorsLimit()
+    ├─ Count unique actors for entity
+    ├─ If &gt; limit: DELETE oldest actor's attestations
+    └─ Log event to storage_events
+</code></pre>
+<h3>SQL Queries</h3>
+<p><strong>Actor/Context Limit:</strong></p>
+<pre><code class="language-sql">-- Count attestations per (actor, context)
+SELECT COUNT(*)
+FROM attestations, json_each(actors) as a, json_each(contexts) as c
+WHERE a.value = ? AND c.value = ?
+
+-- Delete oldest when over limit
+DELETE FROM attestations
+WHERE id IN (
+    SELECT id FROM attestations, json_each(actors) as a, json_each(contexts) as c
+    WHERE a.value = ? AND c.value = ?
+    ORDER BY timestamp ASC
+    LIMIT ?
+)
+</code></pre>
+<p>Similar queries exist for actor_contexts_limit and entity_actors_limit.</p>
+<h2>Migration</h2>
+<h3>Database Migration</h3>
+<p>The <code>storage_events</code> table is created automatically via migration <code>010_create_storage_events_table.sql</code>:</p>
+<pre><code class="language-sql">CREATE TABLE IF NOT EXISTS storage_events (...);
+CREATE INDEX IF NOT EXISTS idx_storage_events_created_at ON storage_events(created_at DESC);
+-- ... other indexes
+</code></pre>
+<p>Migrations are idempotent and safe to run multiple times.</p>
+<h3>From Unbounded to Bounded Storage</h3>
+<p>If migrating from an unbounded system:</p>
+<ol>
+<li><strong>Backup your database</strong> before enabling bounded storage</li>
+<li><strong>Review current data</strong> to understand actor/entity distribution</li>
+<li><strong>Configure appropriate limits</strong> based on your data patterns</li>
+<li><strong>Monitor enforcement events</strong> after enabling to tune limits</li>
+</ol>
+<pre><code class="language-bash"># Backup before migration
+cp ~/.qntx/db/sqlite.db ~/.qntx/db/sqlite.db.backup
+
+# Check current statistics
+qntx db stats
+
+# Configure limits in am.toml based on current data
+# Start conservative, increase as needed
+
+# Monitor enforcement after enabling
+qntx db stats --limit 20
+</code></pre>
+<h2>Testing</h2>
+<h3>Test Scripts</h3>
+<p>Test bounded storage behavior using explicit actors:</p>
+<pre><code class="language-bash"># Test actor_context_limit (16 attestations max)
+for i in {1..18}; do
+  qntx as ALICE is status_$i of PROJECT by test@user
+done
+qntx db stats --limit 5
+# Should show 2 deletions at attestation #17 and #18
+
+# Test entity_actors_limit (64 actors max)
+for i in {1..66}; do
+  qntx as BOB is role of context_$i by actor_$i
+done
+qntx db stats --limit 5
+# Should show deletions starting at actor #65
+</code></pre>
+<h3>Unit Tests</h3>
+<p>See <code>ats/storage/bounded_storage_integration_test.go</code> for comprehensive test coverage:</p>
+<ul>
+<li><code>TestBoundedStorage_DeletesWhenExceeding16PerActorContext</code></li>
+<li><code>TestBoundedStorage_DoesNotDeleteDifferentContexts</code></li>
+<li><code>TestBoundedStorage_ExactDomainReproduction</code></li>
+</ul>
+<h2>Best Practices</h2>
+<h3>For Application Developers</h3>
+<ol>
+<li><strong>Default to self-certifying ASIDs</strong> unless you have a specific reason not to</li>
+<li><strong>Monitor enforcement events</strong> in production via <code>qntx db stats</code></li>
+<li><strong>Configure limits based on data patterns</strong>, not arbitrary numbers</li>
+<li><strong>Test enforcement behavior</strong> before deploying to production</li>
+<li><strong>Document actor semantics</strong> when using shared actors</li>
+</ol>
+<h3>For Library Authors</h3>
+<ol>
+<li><strong>Provide configuration hooks</strong> for bounded storage limits</li>
+<li><strong>Log enforcement events</strong> to help users tune their systems</li>
+<li><strong>Document actor patterns</strong> and their bounded storage implications</li>
+<li><strong>Use self-certifying by default</strong> in examples and documentation</li>
+</ol>
+<h3>For System Administrators</h3>
+<ol>
+<li><strong>Monitor <code>storage_events</code> table</strong> for unexpected enforcement patterns</li>
+<li><strong>Tune limits based on telemetry</strong>, not assumptions</li>
+<li><strong>Plan for growth</strong> - increase limits before hitting them frequently</li>
+<li><strong>Backup databases regularly</strong>, especially when tuning limits</li>
+</ol>
+<h2>FAQ</h2>
+<p><strong>Q: What happens if I set limits to 0?</strong>
+A: Zero or negative limits automatically fallback to defaults (16/64/64). Bounded storage requires positive limits.</p>
+<p><strong>Q: Can I disable bounded storage entirely?</strong>
+A: No. Bounded storage is fundamental to QNTX's architecture. Use very high limits if you need more space.</p>
+<p><strong>Q: How do I know if my limits are too low?</strong>
+A: Monitor <code>qntx db stats</code> for frequent enforcement events. If you're seeing deletions constantly, increase limits.</p>
+<p><strong>Q: Does enforcement happen synchronously?</strong>
+A: Yes. Limits are enforced immediately after creating each attestation. This ensures consistent state.</p>
+<p><strong>Q: What if enforcement deletes important data?</strong>
+A: This is why self-certifying ASIDs are recommended - they bypass the 64-actor limit. If using shared actors, configure higher limits or use multiple actors.</p>
+<h2>See Also</h2>
+<ul>
+<li><a href="../../am/README.html">am package configuration</a></li>
+<li><a href="../../am.example.toml">am.example.toml</a> - Full configuration template</li>
+<li><a href="../../ats/storage/">Storage implementation</a> - Source code</li>
+<li><a href="../../db/sqlite/migrations/010_create_storage_events_table.sql">Migration 010</a> - Storage events schema</li>
+</ul>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+</body>
+</html>

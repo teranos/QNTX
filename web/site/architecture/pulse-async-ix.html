@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - pulse-async-ix</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>Pulse &amp; Async IX: Budget-Controlled Asynchronous Job Processing</h1>
+<h2>Overview</h2>
+<p><strong>Pulse</strong> is QNTX's rate-limiting and budget control system for asynchronous operations. It enables long-running, cost-sensitive operations to run asynchronously while adhering to API rate limits and money budgets.</p>
+<h2>Motivation</h2>
+<p>Modern AI-powered applications often involve:</p>
+<ul>
+<li><strong>Multiple API calls</strong> per operation (batch processing)</li>
+<li><strong>Real money costs</strong> (~$0.002+ per API call)</li>
+<li><strong>Time-intensive operations</strong> (10-30+ seconds)</li>
+<li><strong>Batch processing needs</strong> (multiple items, re-processing)</li>
+</ul>
+<p>Without controls:</p>
+<ul>
+<li>❌ Blocking operations during processing (poor UX)</li>
+<li>❌ Uncontrolled API costs (budget overrun)</li>
+<li>❌ Rate limit violations (429 errors)</li>
+<li>❌ No visibility into running operations</li>
+<li>❌ Can't pause/stop expensive operations</li>
+</ul>
+<h2>Architecture</h2>
+<h3>Pulse System</h3>
+<p>Pulse acts as a <strong>smart rate limiter and budget manager</strong> for outgoing API calls.</p>
+<pre><code>┌─────────────────────────────────────────┐
+│          Pulse Controller               │
+├─────────────────────────────────────────┤
+│  ├─ Rate Limiter (calls/minute)         │
+│  ├─ Budget Tracker (daily/monthly USD)  │
+│  ├─ Cost Estimator (per operation)      │
+│  ├─ Pause/Resume Control                │
+│  └─ Observability Integration           │
+└─────────────────────────────────────────┘
+              ↓  ↑
+       ┌──────────────┐
+       │ Async Job    │
+       └──────────────┘
+</code></pre>
+<p><strong>Key Responsibilities:</strong></p>
+<ul>
+<li><strong>Rate limiting</strong>: Enforce max API calls per minute (sliding window algorithm)</li>
+<li><strong>Budget tracking</strong>: Monitor daily/monthly spend in USD</li>
+<li><strong>Cost estimation</strong>: Calculate projected costs before operations</li>
+<li><strong>Pause control</strong>: Stop operations when budget exceeded</li>
+<li><strong>Observability</strong>: Integrate with usage tracker</li>
+</ul>
+<h3>Async Job System</h3>
+<p>Jobs run asynchronously with pulse control using a generic handler-based architecture.</p>
+<pre><code class="language-go">// Generic Async Job (handler-based architecture)
+type Job struct {
+    ID           string          // Unique job ID (ASID)
+    HandlerName  string          // Handler identifier (e.g., "domain.operation")
+    Payload      json.RawMessage // Handler-specific data (domain-owned)
+    Source       string          // Data source (for deduplication)
+    Status       JobStatus       // "queued", "running", "paused", "completed", "failed"
+    Progress     Progress        // Current/total operations
+    CostEstimate float64         // Estimated USD cost
+    CostActual   float64         // Actual USD cost so far
+    PulseState   *PulseState     // Rate limit, budget status
+    Error        string          // Error message if failed
+    ParentJobID  string          // For task hierarchies
+    RetryCount   int             // Retry attempts (max 2)
+    CreatedAt    time.Time
+    StartedAt    *time.Time
+    CompletedAt  *time.Time
+    UpdatedAt    time.Time
+}
+
+type PulseState struct {
+    CallsThisMinute  int
+    CallsRemaining   int
+    SpendToday       float64
+    SpendThisMonth   float64
+    BudgetRemaining  float64
+    IsPaused         bool
+    PauseReason      string  // "budget_exceeded", "rate_limit", "user_requested"
+}
+
+// Handler-based execution
+type JobHandler interface {
+    Name() string                                    // "domain.operation"
+    Execute(ctx context.Context, job *Job) error
+}
+</code></pre>
+<blockquote>
+<p><strong>Type Reference</strong>: See <a href="../types/async.md#job">Job</a>, <a href="../types/async.md#pulsestate">PulseState</a>, and <a href="../types/async.md#progress">Progress</a> type definitions.</p>
+</blockquote>
+<p><strong>Generic Architecture:</strong></p>
+<ul>
+<li>No JobType enum - handlers identified by string name</li>
+<li>JobMetadata exists for phase tracking in two-phase jobs (ingest/aggregate patterns)</li>
+<li>Domain packages define their own payload types</li>
+<li>Infrastructure (async package) is domain-agnostic with minimal job coordination support</li>
+</ul>
+<h3>Configuration</h3>
+<p>Example Pulse configuration (see <a href="../../am/README.html">am package</a> for full config system):</p>
+<pre><code class="language-toml">[pulse]
+max_calls_per_minute = 10
+daily_budget_usd = 5.0
+monthly_budget_usd = 100.0
+pause_on_budget_exceeded = true
+</code></pre>
+<h2>Implementation</h2>
+<h3>Database Schema</h3>
+<h4>Pulse Budget Tracking</h4>
+<pre><code class="language-sql">CREATE TABLE pulse_budget (
+    date TEXT PRIMARY KEY,           -- "2025-11-23" for daily, "2025-11" for monthly
+    type TEXT NOT NULL,              -- "daily" or "monthly"
+    spend_usd REAL NOT NULL,         -- Current spend in USD
+    operations_count INTEGER NOT NULL,
+    created_at DATETIME,
+    updated_at DATETIME
+);
+
+CREATE INDEX idx_pulse_budget_type ON pulse_budget(type);
+</code></pre>
+<h4>Async Job Queue</h4>
+<pre><code class="language-sql">CREATE TABLE async_ix_jobs (
+    id TEXT PRIMARY KEY,             -- Job ID (ASID)
+    handler_name TEXT,               -- Handler identifier
+    source TEXT NOT NULL,            -- Data source (for deduplication)
+    status TEXT NOT NULL,            -- "queued", "running", "paused", "completed", "failed"
+    progress_current INTEGER,        -- Current operations completed
+    progress_total INTEGER,          -- Total operations
+    cost_estimate REAL,              -- Estimated USD cost
+    cost_actual REAL,                -- Actual USD cost
+    pulse_state TEXT,                -- JSON: PulseState
+    error TEXT,                      -- Error message if failed
+    payload TEXT,                    -- JSON: Handler-specific data
+    parent_job_id TEXT,              -- Parent job for task hierarchies
+    retry_count INTEGER DEFAULT 0,   -- Retry attempts (max 2)
+    created_at DATETIME,
+    started_at DATETIME,
+    completed_at DATETIME,
+    updated_at DATETIME
+);
+
+CREATE INDEX idx_async_ix_jobs_status ON async_ix_jobs(status);
+CREATE INDEX idx_async_ix_jobs_created ON async_ix_jobs(created_at DESC);
+CREATE INDEX idx_async_ix_jobs_handler ON async_ix_jobs(handler_name);
+CREATE INDEX idx_async_ix_jobs_source_handler ON async_ix_jobs(source, handler_name);
+</code></pre>
+<h3>Core Components</h3>
+<h4>Rate Limiter (<code>pulse/budget/limiter.go</code>)</h4>
+<p>Sliding window rate limiter with configurable calls per minute:</p>
+<pre><code class="language-go">type Limiter struct {
+    maxCallsPerMinute int
+    window            time.Duration
+    mu                sync.Mutex
+    callTimes         []time.Time
+}
+
+func (r *Limiter) Allow() error {
+    // Check if call allowed within rate limit
+    // Returns error if rate limit exceeded
+}
+
+func (r *Limiter) Wait(ctx context.Context) error {
+    // Blocks until call is allowed or context cancelled
+}
+</code></pre>
+<p><strong>Features:</strong></p>
+<ul>
+<li>Thread-safe concurrent access</li>
+<li>Sliding 60-second window</li>
+<li>Automatic expiration of old calls</li>
+<li>Stats tracking (calls in window, remaining)</li>
+<li>Context-aware blocking with Wait()</li>
+</ul>
+<h4>Budget Tracker (<code>internal/pulse/budget/tracker.go</code>)</h4>
+<p>Tracks daily/monthly spend with persistence:</p>
+<pre><code class="language-go">type Tracker struct {
+    store  *Store
+    config BudgetConfig
+    mu     sync.RWMutex
+}
+
+func (b *Tracker) CheckBudget(estimatedCost float64) error {
+    // Check if operation would exceed budget
+}
+
+func (b *Tracker) RecordOperation(actualCost float64) error {
+    // Record actual cost in database
+}
+
+func (b *Tracker) GetStatus() (*Status, error) {
+    // Returns current budget status from ai_model_usage table
+}
+</code></pre>
+<blockquote>
+<p><strong>Type Reference</strong>: See <a href="../types/budget.md#limiter">Limiter</a>, <a href="../types/budget.md#tracker">Tracker</a>, <a href="../types/budget.md#budgetconfig">BudgetConfig</a>, and <a href="../types/budget.md#status">Status</a> type definitions.</p>
+</blockquote>
+<p><strong>Package:</strong> <code>pulse/budget</code> - Separated from async to eliminate import cycles</p>
+<h4>Job Queue (<code>pulse/async/queue.go</code>)</h4>
+<p>Manages async job lifecycle:</p>
+<pre><code class="language-go">type Queue struct {
+    store *Store
+}
+
+// Enqueue adds job to queue
+func (q *Queue) Enqueue(job *Job) error
+
+// Dequeue gets next runnable job (queued or scheduled, not paused)
+func (q *Queue) Dequeue() (*Job, error)
+
+// PauseJob pauses a running job
+func (q *Queue) PauseJob(jobID string, reason string) error
+
+// ResumeJob resumes a paused job
+func (q *Queue) ResumeJob(jobID string) error
+
+// CompleteJob marks job as completed
+func (q *Queue) CompleteJob(jobID string) error
+
+// FailJob marks job as failed with error
+func (q *Queue) FailJob(jobID string, err error) error
+</code></pre>
+<h4>Worker Pool (<code>pulse/async/worker.go</code>)</h4>
+<p>Processes jobs with pulse integration:</p>
+<pre><code class="language-go">type WorkerPool struct {
+    queue         *Queue
+    budgetTracker *budget.Tracker  // Optional - can be nil for tests
+    rateLimiter   *budget.Limiter  // Optional - can be nil for tests
+    workers       int
+    executor      JobExecutor
+}
+
+// Start begins processing jobs
+func (wp *WorkerPool) Start()
+
+// Stop gracefully stops workers
+func (wp *WorkerPool) Stop()
+
+// processNextJob processes one job with rate limiting and budget checks
+func (wp *WorkerPool) processNextJob() error {
+    // 1. Dequeue job
+    // 2. Check rate limit (pause if exceeded)
+    // 3. Check budget (pause if exceeded)
+    // 4. Execute job via handler registry
+    // 5. Mark complete/failed
+}
+</code></pre>
+<p><strong>Worker Pool Features:</strong></p>
+<ul>
+<li>Configurable worker count</li>
+<li>Gradual startup (1s → 5s polling interval)</li>
+<li>Graceful shutdown with 2s timeout</li>
+<li>Rate limiting before budget checks</li>
+<li>Job pause/resume on limit violations</li>
+</ul>
+<h2>Implementation Status</h2>
+<h3>Phase 1: Pulse Foundation ✅ COMPLETE</h3>
+<ul>
+<li>✅ Configuration system</li>
+<li>✅ Budget tracking (pulse_budget table)</li>
+<li>✅ Budget checking before operations</li>
+<li>✅ Cost recording after operations</li>
+<li>✅ Database migrations</li>
+<li>✅ <strong>Refactored (Dec 2025)</strong>: Separated budget/rate limiting into <code>pulse/budget</code> package</li>
+</ul>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>pulse/budget/limiter.go</code> - Rate limiter</li>
+<li><code>pulse/budget/tracker.go</code> - Budget tracker</li>
+<li><code>pulse/budget/store.go</code> - Budget persistence</li>
+</ul>
+<p><strong>Architecture Benefits:</strong></p>
+<ul>
+<li>Clean separation of concerns (budget tracking vs job execution)</li>
+<li>Eliminates import cycles</li>
+<li>Budget/rate limiting reusable across packages</li>
+<li>Simpler testing (budget and async tested independently)</li>
+</ul>
+<h3>Phase 2: Async Job System ✅ COMPLETE</h3>
+<ul>
+<li>✅ Async job queue (async_ix_jobs table)</li>
+<li>✅ Job models and state management</li>
+<li>✅ Job store (CRUD operations)</li>
+<li>✅ Queue with pub/sub</li>
+<li>✅ Worker pool with pulse integration</li>
+<li>✅ Rate limiting enforcement</li>
+<li>✅ Unit tests (41/41 passing)</li>
+<li>✅ <strong>Refactored (Dec 2025)</strong>: Generic handler-based architecture</li>
+<li>✅ <strong>Opening (✿) and Closing (❀) (Dec 2025)</strong>: Graceful startup/shutdown with orphan recovery</li>
+</ul>
+<p><strong>Files:</strong></p>
+<ul>
+<li><code>pulse/async/job.go</code> - Generic job model (handler-based)</li>
+<li><code>pulse/async/handler.go</code> - JobHandler interface and registry</li>
+<li><code>pulse/async/store.go</code> - Job persistence</li>
+<li><code>pulse/async/queue.go</code> - Queue operations</li>
+<li><code>pulse/async/worker.go</code> - Worker pool with budget integration</li>
+<li><code>pulse/async/grace_test.go</code> - Opening/Closing tests</li>
+</ul>
+<h2>Testing Strategy</h2>
+<h3>Unit Tests</h3>
+<ul>
+<li><code>pulse/budget/limiter_test.go</code> - Rate limiting (9/9 tests)</li>
+<li><code>pulse/budget/tracker_test.go</code> - Budget calculations</li>
+<li><code>pulse/async/job_test.go</code> - Job models and state</li>
+<li><code>pulse/async/queue_test.go</code> - Queue operations</li>
+<li><code>pulse/async/store_test.go</code> - Persistence</li>
+<li><code>pulse/async/worker_test.go</code> - Worker pool and integration</li>
+</ul>
+<p><strong>Total: 41/41 tests passing</strong></p>
+<h3>Integration Tests</h3>
+<p>Full async workflow end-to-end:</p>
+<ul>
+<li>Job enqueueing and dequeuing</li>
+<li>Budget exceeded scenarios</li>
+<li>Rate limiting enforcement</li>
+<li>Pause/resume functionality</li>
+<li>Worker pool lifecycle</li>
+<li>Graceful shutdown (Opening ✿ / Closing ❀)</li>
+</ul>
+<h2>Future Enhancements</h2>
+<h3>Dynamic Cost Estimation</h3>
+<p>Query pricing APIs for real-time cost updates:</p>
+<ul>
+<li>Automatic pricing updates when providers change rates</li>
+<li>Support for multiple models with different pricing</li>
+<li>Config override vs API pricing</li>
+</ul>
+<h3>Priority Queues</h3>
+<p>Allow high-priority jobs to skip the queue:</p>
+<ul>
+<li>High/normal/low priority levels</li>
+<li>Fair scheduling to prevent starvation</li>
+<li>Priority flags in job creation</li>
+</ul>
+<h3>Scheduling</h3>
+<p>Schedule expensive operations for specific times:</p>
+<ul>
+<li>Specific time scheduling</li>
+<li>Cron expressions</li>
+<li>Timezone handling</li>
+</ul>
+<h3>Multi-Model Support</h3>
+<p>Configure different models for different operations:</p>
+<ul>
+<li>Fast/cheap model for screening</li>
+<li>Better model for detailed processing</li>
+<li>Smart fallback when budget low</li>
+<li>Budget-aware model selection</li>
+</ul>
+<h3>Cost Optimization</h3>
+<p>Reduce API costs through intelligent caching:</p>
+<ul>
+<li>Cache results for similar inputs</li>
+<li>Similarity detection</li>
+<li>Time-based cache expiration</li>
+<li>Batch API calls (when supported)</li>
+</ul>
+<h2>Use Case Examples</h2>
+<h3>Example 1: Batch Data Processing</h3>
+<pre><code class="language-go">// Define payload type for your domain
+type BatchProcessPayload struct {
+    SourceURL string   `json:"source_url"`
+    RecordIDs []string `json:"record_ids"`
+    BatchType string   `json:"batch_type"`
+}
+
+// Implement handler
+type BatchProcessHandler struct {
+    dataService DataService
+    queue       *async.Queue
+    logger      *zap.Logger
+}
+
+func (h *BatchProcessHandler) Name() string {
+    return "data.batch-process"
+}
+
+func (h *BatchProcessHandler) Execute(ctx context.Context, job *async.Job) error {
+    var payload BatchProcessPayload
+    if err := json.Unmarshal(job.Payload, &amp;payload); err != nil {
+        return fmt.Errorf("invalid payload: %w", err)
+    }
+
+    // Process with progress tracking and cost recording
+    for i, recordID := range payload.RecordIDs {
+        // Check for cancellation
+        select {
+        case &lt;-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+
+        // Process record (with API call cost)
+        if err := h.dataService.ProcessRecord(ctx, recordID); err != nil {
+            return fmt.Errorf("failed to process record %s: %w", recordID, err)
+        }
+
+        // Update progress
+        job.Progress.Current = i + 1
+        job.CostActual += 0.001 // $0.001 per API call
+        if err := h.queue.UpdateJob(job); err != nil {
+            h.logger.Warn("Failed to update job progress", zap.Error(err))
+        }
+    }
+
+    return nil
+}
+
+// Register handler
+registry := async.NewHandlerRegistry()
+registry.Register(&amp;BatchProcessHandler{
+    dataService: myDataService,
+    queue:       queue,
+    logger:      logger,
+})
+</code></pre>
+<h3>Example 2: ML Model Inference</h3>
+<pre><code class="language-go">type InferencePayload struct {
+    ModelName  string   `json:"model_name"`
+    InputData  []string `json:"input_data"`
+    BatchSize  int      `json:"batch_size"`
+}
+
+type InferenceHandler struct {
+    mlService MLService
+    queue     *async.Queue
+}
+
+func (h *InferenceHandler) Name() string {
+    return "ml.inference"
+}
+
+func (h *InferenceHandler) Execute(ctx context.Context, job *async.Job) error {
+    var payload InferencePayload
+    if err := json.Unmarshal(job.Payload, &amp;payload); err != nil {
+        return fmt.Errorf("invalid payload: %w", err)
+    }
+
+    // Run inference with cost tracking
+    results, cost, err := h.mlService.RunInference(ctx, payload.ModelName, payload.InputData)
+    if err != nil {
+        return err
+    }
+
+    job.CostActual += cost
+    return h.queue.UpdateJob(job)
+}
+</code></pre>
+<h2>Budget Exceeded Workflow</h2>
+<p>When daily or monthly budget is exceeded, jobs are automatically paused:</p>
+<pre><code>User Operation:
+  → Pulse checks budget
+  → Daily budget exceeded: $5.02 / $5.00
+
+Response:
+  ✗ Daily budget exceeded: $5.02 / $5.00
+    Projected cost: $0.040 USD
+    Options:
+      1. Reduce batch size
+      2. Increase daily budget (config: pulse.daily_budget_usd)
+      3. Wait until tomorrow (budget resets at midnight UTC)
+</code></pre>
+<p><strong>Automatic Pause Behavior:</strong></p>
+<ul>
+<li>Job transitions to <code>paused</code> status</li>
+<li><code>PulseState.IsPaused = true</code></li>
+<li><code>PauseReason = "budget_exceeded"</code></li>
+<li>Workers skip paused jobs</li>
+<li>User can manually resume after budget increase</li>
+</ul>
+<p><strong>Budget Reset:</strong></p>
+<ul>
+<li>Daily budgets reset at midnight UTC</li>
+<li>Monthly budgets reset on 1st of month</li>
+<li>Paused jobs automatically resume on reset (if configured)</li>
+</ul>
+<h2>Related Documentation</h2>
+<ul>
+<li><strong>Opening (✿) and Closing (❀)</strong>: <code>docs/development/grace.md</code> - Graceful startup/shutdown system</li>
+<li><strong>Handler Implementation</strong>: Applications define domain-specific handlers implementing the JobHandler interface</li>
+<li><strong>Configuration</strong>: <code>docs/architecture/config-system.md</code> - Configuration system including Pulse settings</li>
+<li><strong>Resource Coordination</strong>: <code>docs/architecture/pulse-resource-coordination.md</code> - GPU and system resource management</li>
+</ul>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+</body>
+</html>

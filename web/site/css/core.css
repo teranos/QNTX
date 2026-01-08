@@ -1,0 +1,334 @@
+/* Core Styles - Foundation, Layout, Shared Components */
+
+/* CSS Variables - Consolidated for reuse */
+:root {
+    /* Font Stacks */
+    --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
+
+    /* Status Colors */
+    --color-success: #22c55e;
+    --color-error: #ef4444;
+    --color-warning: #ffaa00;
+    --color-info: #3b82f6;
+
+    /* Box Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Base */
+body {
+    /* Virtue #5: System Fonts - "Leverage OS defaults for performance and familiarity" */
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+}
+
+/* Accessibility: Focus Styles */
+:focus-visible {
+    outline: 2px solid var(--accent-color, #0066cc);
+    outline-offset: 2px;
+}
+
+/* Remove default outline only when focus-visible is supported */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Skip to content link for keyboard users */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--bg-primary, #fff);
+    color: var(--text-primary, #000);
+    padding: 8px 16px;
+    z-index: 10001;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Main Container */
+#container {
+    display: flex;
+    height: 100vh;
+    transition: filter 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Disconnected state - desaturate and dim to indicate inactive state */
+body.disconnected #container {
+    filter: saturate(0.3);
+    opacity: 0.7;
+}
+
+/* Attestation Feed - Matrix style background */
+#attestation-feed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+    padding: 20px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.4;
+    /* Improved contrast: 0.15 -> 0.35 for better visibility */
+    color: rgba(100, 255, 100, 0.35);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.attestation-line {
+    opacity: 0;
+    animation: fadeIn 0.5s ease-in forwards;
+    display: inline;
+}
+
+.attestation-line:not(:last-child)::after {
+    content: ' | ';
+    /* Improved contrast: 0.15 -> 0.35 */
+    color: rgba(170, 170, 170, 0.35);
+}
+
+.attestation-line .entity {
+    /* Improved contrast: 0.2 -> 0.4 */
+    color: rgba(126, 179, 255, 0.4);
+}
+
+.attestation-line .relation {
+    /* Improved contrast: 0.15 -> 0.35 */
+    color: rgba(170, 170, 170, 0.35);
+    font-style: italic;
+}
+
+.attestation-line .value {
+    /* Improved contrast: 0.2 -> 0.4 */
+    color: rgba(136, 201, 153, 0.4);
+}
+
+/* Common Animations - Consolidated for reuse */
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .attestation-line {
+        animation: none;
+        opacity: 1;
+    }
+
+    #container {
+        transition: none;
+    }
+}
+
+/* Left Panel Structure */
+#left-panel {
+    width: 360px;
+    background: #f8f8f8;
+    border-right: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+#header {
+    padding: 16px;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
+}
+
+#header h1 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #000;
+}
+
+#header .subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+/* Stats */
+#stats {
+    padding: 12px 16px;
+    margin-bottom: 32px; /* Space for fixed log panel at bottom */
+    background: #fff;
+    border-top: 1px solid #ddd;
+    font-size: 11px;
+    color: #666;
+}
+
+#stats .stat-item {
+    display: inline-block;
+    margin-right: 16px;
+}
+
+#stats .stat-value {
+    color: #000;
+    font-weight: 600;
+}
+
+
+/* LLM Streaming Styles */
+.progress-event.llm-stream {
+    background: #1e1e1e;
+    border-left: 3px solid #4ade80;
+}
+
+.llm-stream-content {
+    font-family: Courier New, monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 8px;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.llm-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: #4ade80;
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+.llm-model, .llm-stage {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.llm-model {
+    background: #2a2a4a;
+    color: #a5b4fc;
+}
+
+.llm-stage {
+    background: #2a4a2a;
+    color: #86efac;
+}
+
+/* Responsive Utility Classes */
+@media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none !important;
+    }
+}
+
+/* Mobile Layout - Full screen graph with bottom input bar */
+@media (max-width: 768px) {
+    /* Hide left panel chrome on mobile */
+    #left-panel {
+        position: static;
+        width: auto;
+        background: transparent;
+        border: none;
+        display: contents; /* Let children escape the container */
+    }
+
+    #header,
+    #stats {
+        display: none;
+    }
+
+    /* Query container becomes fixed bottom bar */
+    #query-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: #fff;
+        border-top: 1px solid #ddd;
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Editor area - compact on mobile */
+    #query-drop-zone {
+        padding: 8px;
+        background: #f8f8f8;
+    }
+
+    #codemirror-container {
+        max-height: 80px;
+        overflow-y: auto;
+    }
+
+    /* Hide run button on mobile - use keyboard submit */
+    #run-ix-button {
+        display: none !important;
+    }
+
+    /* Graph takes full viewport minus bottom bar */
+    #graph-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 140px; /* Space for bottom bar */
+        height: auto !important;
+    }
+}
+
