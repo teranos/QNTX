@@ -67,13 +67,13 @@ func handleError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, co
 
 	statusCode := http.StatusInternalServerError
 	switch {
-	case IsNotFoundError(err):
+	case errors.IsNotFoundError(err):
 		statusCode = http.StatusNotFound
-	case errors.Is(err, ErrInvalidRequest):
+	case errors.Is(err, errors.ErrInvalidRequest):
 		statusCode = http.StatusBadRequest
-	case errors.Is(err, ErrUnauthorized):
+	case errors.Is(err, errors.ErrUnauthorized):
 		statusCode = http.StatusUnauthorized
-	case errors.Is(err, ErrForbidden):
+	case errors.Is(err, errors.ErrForbidden):
 		statusCode = http.StatusForbidden
 	}
 
@@ -110,5 +110,4 @@ func requireMethods(w http.ResponseWriter, r *http.Request, methods ...string) b
 }
 
 // Note: extractPathParts() moved to util.go
-// Note: isNotFoundError() replaced with IsNotFoundError() in errors.go
 // Note: shortID() removed - we show full IDs, never truncate
