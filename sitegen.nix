@@ -11,6 +11,7 @@ let
   };
   jsFiles = {
     search = ./web/js/search.js;
+    releases = ./web/js/releases.js;
   };
   logo = ./web/qntx.jpg;
 
@@ -110,6 +111,14 @@ let
             <input type="search" id="search-input" class="search-input" placeholder="Search documentation..." aria-label="Search documentation">
             <div id="search-results" class="search-results" hidden></div>
         </div>
+
+        <section class="download-section quick-download">
+            <h2>Quick Download</h2>
+            <div id="latest-release">
+                <p class="loading">Loading latest release...</p>
+            </div>
+            <p style="margin-top: 12px;"><a href="./downloads.html">View all downloads and installation options</a></p>
+        </section>
   '';
 
   # Category order for consistent display
@@ -155,6 +164,7 @@ let
     lib.concatStringsSep "\n" categorySections +
     ''
         <script src="./js/search.js"></script>
+        <script src="./js/releases.js"></script>
     </body>
     </html>'';
 
@@ -233,6 +243,7 @@ EOF
     { name = "css/utilities.css"; path = cssFiles.utilities; }
     { name = "css/docs.css"; path = cssFiles.docs; }
     { name = "js/search.js"; path = jsFiles.search; }
+    { name = "js/releases.js"; path = jsFiles.releases; }
     { name = "qntx.jpg"; path = logo; }
   ];
 
@@ -243,9 +254,88 @@ EOF
     destination = "/index.html";
   };
 
+  # GitHub release base URL
+  githubRepo = "teranos/QNTX";
+  githubReleasesUrl = "https://github.com/${githubRepo}/releases";
+
+  # Downloads page content
+  downloadsContent =
+    htmlHead "QNTX Downloads" "." +
+    ''
+    <body>
+        <nav class="doc-nav"><a href="./index.html"><img src="./qntx.jpg" alt="QNTX" class="site-logo">Documentation Home</a></nav>
+
+        <h1>Download QNTX</h1>
+
+        <section class="download-section">
+            <h2>Recommended: Install via Nix</h2>
+            <p>The easiest way to install QNTX is using the Nix package manager:</p>
+            <div class="install-code">nix profile install github:${githubRepo}</div>
+            <p>This installs the latest version and handles all dependencies automatically.</p>
+        </section>
+
+        <section class="download-section">
+            <h2>Release Downloads</h2>
+            <div id="release-downloads">
+                <p class="loading">Loading releases...</p>
+            </div>
+        </section>
+
+        <section class="download-section">
+            <h2>Docker Images</h2>
+            <div class="download-cards">
+                <div class="download-card">
+                    <div class="download-card-header">
+                        <span class="download-card-icon">📦</span>
+                        <span class="download-card-title">QNTX Core</span>
+                    </div>
+                    <p class="download-card-desc">Main QNTX container image with all core functionality.</p>
+                    <a href="https://github.com/${githubRepo}/pkgs/container/qntx" class="download-btn">View Image</a>
+                </div>
+
+                <div class="download-card">
+                    <div class="download-card-header">
+                        <span class="download-card-icon">📦</span>
+                        <span class="download-card-title">qntx-code Plugin</span>
+                    </div>
+                    <p class="download-card-desc">Code analysis and Git integration plugin.</p>
+                    <a href="https://github.com/${githubRepo}/pkgs/container/qntx-code-plugin" class="download-btn">View Image</a>
+                </div>
+
+                <div class="download-card">
+                    <div class="download-card-header">
+                        <span class="download-card-icon">📦</span>
+                        <span class="download-card-title">qntx-python Plugin</span>
+                    </div>
+                    <p class="download-card-desc">Python runtime plugin with PyO3 integration.</p>
+                    <a href="https://github.com/${githubRepo}/pkgs/container/qntx-python-plugin" class="download-btn">View Image</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="download-section">
+            <h2>Build from Source</h2>
+            <p>Clone the repository and build with Go 1.24+:</p>
+            <div class="install-code">git clone https://github.com/${githubRepo}.git
+cd QNTX
+make build</div>
+            <p>Or use Nix for reproducible builds:</p>
+            <div class="install-code">nix build github:${githubRepo}</div>
+        </section>
+
+        <script src="./js/releases.js"></script>
+    </body>
+    </html>'';
+
+  downloadsFile = pkgs.writeTextFile {
+    name = "qntx-docs-downloads";
+    text = downloadsContent;
+    destination = "/downloads.html";
+  };
+
 in
-# Compositional assembly: combine static assets, index, search index, and all HTML files
+# Compositional assembly: combine static assets, index, downloads, search index, and all HTML files
 pkgs.symlinkJoin {
   name = "qntx-docs-site";
-  paths = [ staticAssets indexFile searchIndexFile ] ++ htmlDerivations;
+  paths = [ staticAssets indexFile downloadsFile searchIndexFile ] ++ htmlDerivations;
 }
