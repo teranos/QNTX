@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/logger"
 	"go.uber.org/zap"
 )
 
@@ -129,8 +130,12 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
 	}
 
-	p.logger.Infow(fmt.Sprintf("⊔ Storage eviction: %s - %s/%s (%d deleted)",
-		eventType, actor, context, deletionsCount))
+	logger.AddDBSymbol(p.logger).Infow("Storage eviction",
+		"event_type", eventType,
+		"actor", actor,
+		"context", context,
+		"deletions_count", deletionsCount,
+	)
 
 	// Broadcast as storage_eviction message
 	msg := map[string]interface{}{
@@ -151,8 +156,13 @@ func (p *StorageEventsPoller) broadcastWarning(actor, context string, current, l
 	// For warnings, deletionsCount field contains current attestation count
 	fillPercent := float64(current) / float64(limit)
 
-	p.logger.Infow(fmt.Sprintf("⊔ Storage warning: %s/%s at %d%% (%d/%d)",
-		actor, context, int(fillPercent*100), current, limit))
+	logger.AddDBSymbol(p.logger).Infow("Storage warning",
+		"actor", actor,
+		"context", context,
+		"fill_percent", int(fillPercent*100),
+		"current", current,
+		"limit", limit,
+	)
 
 	// Broadcast using existing storage_warning message type
 	msg := map[string]interface{}{
