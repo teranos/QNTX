@@ -732,5 +732,9 @@ func (s *QNTXServer) sendLogBatch(clientID string, batch *wslogs.Batch) {
 		// Server shutting down
 	default:
 		// Queue full - drop log batch (prevent blocking)
+		s.logger.Warnw("Broadcast request queue full, dropping log batch",
+			"client_id", clientID,
+			"messages", len(batch.Messages),
+		)
 	}
 }

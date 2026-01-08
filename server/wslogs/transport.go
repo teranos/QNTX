@@ -59,6 +59,7 @@ func (t *Transport) SendBatch(batch *Batch) {
 	if sendFunc == nil {
 		// Fallback mode for tests: send directly to registered channels
 		// Production code should always set sendFunc via SetSendFunc()
+		// Note: This path indicates SetSendFunc was not called during initialization
 		for _, ch := range t.clients {
 			select {
 			case ch <- batch:
