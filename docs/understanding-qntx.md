@@ -47,7 +47,7 @@ Each layer has a clear contract. You can work on graph rendering without touchin
 
 ### 3. Real-Time Everything
 
-The WebSocket architecture reveals intent:
+The WebSocket architecture reveals intent (see [WebSocket API](api/websocket.md) for protocol details):
 
 - Custom `/ws` endpoint for parse_response (semantic tokens, diagnostics)
 - Standard `/lsp` endpoint for LSP protocol (completions, hover)

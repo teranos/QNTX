@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Pulse** is QNTX's rate-limiting and budget control system for asynchronous operations. It enables long-running, cost-sensitive operations to run asynchronously while adhering to API rate limits and money budgets.
+**Pulse** is QNTX's rate-limiting and budget control system for asynchronous operations. It enables long-running, cost-sensitive operations to run asynchronously while adhering to API rate limits and money budgets. For the HTTP API that controls Pulse, see the [Pulse API Documentation](../api/pulse-jobs.md).
 
 ## Motivation
 

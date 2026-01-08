@@ -53,7 +53,7 @@ Infrastructure and lifecycle markers:
 
 | Symbol | Name | Purpose |
 |--------|------|---------|
-| `꩜` | Pulse | Async operations, always prefix Pulse-related logs |
+| `꩜` | Pulse | Async operations, always prefix Pulse-related logs. See [API](api/pulse-jobs.md) |
 | `✿` | PulseOpen | Graceful startup with orphaned job recovery |
 | `❀` | PulseClose | Graceful shutdown with checkpoint preservation |
 | `⊔` | DB | Database/storage layer |
