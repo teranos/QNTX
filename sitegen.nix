@@ -336,37 +336,7 @@ EOF
             </div>
         </section>
 
-        <section class="download-section">
-            <h2>Docker Images</h2>
-            <div class="download-cards">
-                <div class="download-card">
-                    <div class="download-card-header">
-                        <span class="download-card-icon">📦</span>
-                        <span class="download-card-title">QNTX Core</span>
-                    </div>
-                    <p class="download-card-desc">Main QNTX container image with all core functionality.</p>
-                    <a href="https://github.com/${githubRepo}/pkgs/container/qntx" class="download-btn">View Image</a>
-                </div>
-
-                <div class="download-card">
-                    <div class="download-card-header">
-                        <span class="download-card-icon">📦</span>
-                        <span class="download-card-title">qntx-code Plugin</span>
-                    </div>
-                    <p class="download-card-desc">Code analysis and Git integration plugin.</p>
-                    <a href="https://github.com/${githubRepo}/pkgs/container/qntx-code-plugin" class="download-btn">View Image</a>
-                </div>
-
-                <div class="download-card">
-                    <div class="download-card-header">
-                        <span class="download-card-icon">📦</span>
-                        <span class="download-card-title">qntx-python Plugin</span>
-                    </div>
-                    <p class="download-card-desc">Python runtime plugin with PyO3 integration.</p>
-                    <a href="https://github.com/${githubRepo}/pkgs/container/qntx-python-plugin" class="download-btn">View Image</a>
-                </div>
-            </div>
-        </section>
+${downloadContainersSection}
 
         <section class="download-section">
             <h2>Build from Source</h2>
@@ -438,6 +408,47 @@ ${provenanceFooter}
                     ${if ctr.ports != [] then ''<p><strong>Ports:</strong> ${escapeHtml (lib.concatStringsSep ", " ctr.ports)}</p>'' else ""}
                 </div>
             </div>'';
+
+  # Simpler container card for downloads page (links to GitHub packages)
+  renderDownloadContainer = ctr:
+    let
+      # Extract package name from image URL for GitHub link
+      imageParts = lib.splitString "/" ctr.image;
+      packageName = lib.last imageParts;
+      # Remove :tag if present
+      cleanName = lib.head (lib.splitString ":" packageName);
+    in ''
+                <div class="download-card">
+                    <div class="download-card-header">
+                        <span class="download-card-icon">📦</span>
+                        <span class="download-card-title">${escapeHtml ctr.name}</span>
+                    </div>
+                    <p class="download-card-desc">${escapeHtml ctr.description}</p>
+                    <a href="https://github.com/${githubRepo}/pkgs/container/${escapeHtml cleanName}" class="download-btn">View Image</a>
+                </div>'';
+
+  # Generate downloads page container section from nixContainers
+  downloadContainersSection = if nixContainers == [] then "" else ''
+        <section class="download-section">
+            <h2>Docker Images</h2>
+            <div class="download-cards">
+${lib.concatStringsSep "\n" (map renderDownloadContainer nixContainers)}
+            </div>
+        </section>
+  '';
+
+  # Generate SEG category mapping table from categoryMeta
+  segCategoryRows =
+    let
+      # Filter out _root and sort by categoryOrder
+      categories = lib.filter (c: c != "_root") (lib.attrNames categoryMeta);
+      sortedCategories = lib.filter (c: lib.elem c categories) categoryOrder
+        ++ lib.filter (c: !(lib.elem c categoryOrder) && c != "_root") categories;
+    in
+    lib.concatStringsSep "\n" (map (cat:
+      let meta = categoryMeta.${cat};
+      in ''                    <tr><td><code>${escapeHtml cat}/</code></td><td>${meta.symbol}</td><td>${escapeHtml meta.desc}</td></tr>''
+    ) sortedCategories);
 
   packagesSection = if nixPackages == [] then "" else ''
         <section class="download-section">
@@ -821,7 +832,7 @@ cd result && python -m http.server 8000</div>
 
         <section class="download-section">
             <h2>SEG Category Mapping</h2>
-            <p>Directories are mapped to SEG symbols for semantic navigation:</p>
+            <p>Directories are mapped to SEG symbols for semantic navigation (${toString (lib.length (lib.filter (c: c != "_root") (lib.attrNames categoryMeta)))} categories defined):</p>
             <table class="nix-table">
                 <thead>
                     <tr>
@@ -831,14 +842,7 @@ cd result && python -m http.server 8000</div>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td><code>getting-started/</code></td><td>⍟</td><td>Entry points</td></tr>
-                    <tr><td><code>architecture/</code></td><td>⌬</td><td>System design</td></tr>
-                    <tr><td><code>development/</code></td><td>⨳</td><td>Workflows</td></tr>
-                    <tr><td><code>types/</code></td><td>≡</td><td>Type reference</td></tr>
-                    <tr><td><code>api/</code></td><td>⋈</td><td>API reference</td></tr>
-                    <tr><td><code>testing/</code></td><td>✦</td><td>Test guides</td></tr>
-                    <tr><td><code>security/</code></td><td>+</td><td>Security</td></tr>
-                    <tr><td><code>vision/</code></td><td>⟶</td><td>Future direction</td></tr>
+${segCategoryRows}
                 </tbody>
             </table>
         </section>
