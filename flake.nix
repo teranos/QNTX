@@ -328,7 +328,13 @@
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
-          # Static documentation site
+          # Static documentation site with provenance
+          # For CI builds with full provenance, call sitegen.nix directly:
+          #   nix-build -E 'with import <nixpkgs> {}; callPackage ./sitegen.nix {
+          #     gitRevision = "abc123..."; gitShortRev = "abc123";
+          #     buildDate = "2025-01-08"; ciUser = "github-actions";
+          #     ciPipeline = "docs"; ciRunId = "12345678";
+          #   }'
           docs-site = pkgs.callPackage ./sitegen.nix {
             gitRevision = self.rev or self.dirtyRev or "unknown";
             gitShortRev = self.shortRev or self.dirtyShortRev or "unknown";
