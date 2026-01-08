@@ -37,6 +37,11 @@ class WebscraperPanel extends BasePanel {
     private currentResults: ScrapeResult[] = [];
     private isScraping: boolean = false;
 
+    // Two-click confirmation state
+    private needsConfirmation: boolean = false;
+    private confirmationTimeout: number | null = null;
+    private pendingUrl: string = '';
+
     constructor() {
         super({
             id: 'webscraper-panel',
@@ -207,6 +212,15 @@ class WebscraperPanel extends BasePanel {
             }
         });
 
+        // Reset confirmation when URL changes
+        urlInput?.addEventListener('input', () => {
+            if (this.needsConfirmation) {
+                this.needsConfirmation = false;
+                this.pendingUrl = '';
+                this.updateSubmitButton();
+            }
+        });
+
         // Submit button
         this.$('#scraper-submit')?.addEventListener('click', () => {
             this.handleScrape();
@@ -239,6 +253,33 @@ class WebscraperPanel extends BasePanel {
         if (this.isScraping) {
             toast.warning('Already scraping, please wait...');
             return;
+        }
+
+        // First click: show confirmation state
+        if (!this.needsConfirmation || this.pendingUrl !== url) {
+            this.needsConfirmation = true;
+            this.pendingUrl = url;
+            this.updateSubmitButton();
+
+            // Auto-reset confirmation after 5 seconds
+            if (this.confirmationTimeout) {
+                clearTimeout(this.confirmationTimeout);
+            }
+            this.confirmationTimeout = window.setTimeout(() => {
+                this.needsConfirmation = false;
+                this.pendingUrl = '';
+                this.updateSubmitButton();
+            }, 5000);
+
+            return;
+        }
+
+        // Second click: actually scrape
+        this.needsConfirmation = false;
+        this.pendingUrl = '';
+        if (this.confirmationTimeout) {
+            clearTimeout(this.confirmationTimeout);
+            this.confirmationTimeout = null;
         }
 
         // Get options
@@ -302,11 +343,7 @@ class WebscraperPanel extends BasePanel {
         this.isScraping = true;
 
         // Update UI
-        const submitBtn = this.$<HTMLButtonElement>('#scraper-submit');
-        if (submitBtn) {
-            submitBtn.textContent = 'Scraping...';
-            submitBtn.disabled = true;
-        }
+        this.updateSubmitButton();
 
         // Show status
         this.updateStatus(`Scraping ${url}...`, 'info');
@@ -323,13 +360,42 @@ class WebscraperPanel extends BasePanel {
         this.isScraping = false;
 
         // Update UI
+        this.updateSubmitButton();
+
+        this.hideProgress();
+    }
+
+    private updateSubmitButton(): void {
         const submitBtn = this.$<HTMLButtonElement>('#scraper-submit');
-        if (submitBtn) {
+        if (!submitBtn) return;
+
+        // Remove existing state classes
+        submitBtn.classList.remove('panel-btn-warning', 'panel-btn-success');
+
+        if (this.isScraping) {
+            submitBtn.textContent = 'Scraping...';
+            submitBtn.disabled = true;
+        } else if (this.needsConfirmation) {
+            submitBtn.textContent = 'Confirm Scrape';
+            submitBtn.classList.add('panel-btn-warning');
+            submitBtn.disabled = false;
+        } else {
             submitBtn.textContent = 'Scrape';
             submitBtn.disabled = false;
         }
 
-        this.hideProgress();
+        // Update or remove hint
+        const existingHint = this.$('.scraper-confirm-hint');
+        if (this.needsConfirmation && !this.isScraping) {
+            if (!existingHint) {
+                const hint = document.createElement('div');
+                hint.className = 'scraper-confirm-hint panel-confirm-hint';
+                hint.textContent = 'Click again to start scraping';
+                submitBtn.parentElement?.appendChild(hint);
+            }
+        } else {
+            existingHint?.remove();
+        }
     }
 
     private updateStatus(message: string, type: 'info' | 'success' | 'error' = 'info'): void {
@@ -379,7 +445,7 @@ class WebscraperPanel extends BasePanel {
                     const urlInput = this.$<HTMLInputElement>('#scraper-url');
                     if (urlInput && result.url) {
                         urlInput.value = result.url;
-                        this.handleSubmit();
+                        this.handleScrape();
                     }
                 }));
             } else {

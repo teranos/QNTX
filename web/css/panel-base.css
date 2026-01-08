@@ -349,6 +349,36 @@
     font-size: 11px;
 }
 
+/* Warning button - for two-click confirmation pattern */
+.panel-btn-warning {
+    background: #fff3e0;
+    border-color: #ef6c00;
+    color: #e65100;
+}
+
+.panel-btn-warning:hover:not(:disabled) {
+    background: #ffe0b2;
+}
+
+/* Success/confirm button - for validated state in two-click pattern */
+.panel-btn-success {
+    background: #e8f5e9;
+    border-color: #388e3c;
+    color: #2e7d32;
+}
+
+.panel-btn-success:hover:not(:disabled) {
+    background: #c8e6c9;
+}
+
+/* Confirmation hint - shows below button during confirmation state */
+.panel-confirm-hint {
+    font-size: 11px;
+    color: #e65100;
+    margin-top: 4px;
+    font-style: italic;
+}
+
 /* === DIVIDERS === */
 
 .panel-divider {
