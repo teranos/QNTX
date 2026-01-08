@@ -6,9 +6,9 @@
 This document shows Go type definitions from the codebase.
 
 **Generated types**:
-- TypeScript: [`types/generated/github.ts`](../github.ts)
-- Rust: [`types/generated/github.rs`](../github.rs)
-- Python: [`types/generated/github.py`](../github.py)
+- TypeScript: [`types/generated/typescript/github.ts`](https://github.com/teranos/QNTX/blob/main/types/generated/typescript/github.ts)
+- Rust: [`types/generated/rust/github.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/github.rs)
+- Python: [`types/generated/python/github.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/github.py)
 
 ## CachedPatch
 
