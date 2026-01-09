@@ -41,8 +41,10 @@ class GoEditorPanel extends BasePanel {
     private saveIndicator: HTMLElement | null = null;
     private statusElement: HTMLElement | null = null;
 
-    // Save keyboard handler
+    // Event handler references for cleanup
     private saveHandler: ((e: KeyboardEvent) => void) | null = null;
+    private closeBtnHandler: (() => void) | null = null;
+    private tabClickHandlers: Map<Element, (e: Event) => void> = new Map();
 
     constructor() {
         super({
@@ -105,16 +107,21 @@ class GoEditorPanel extends BasePanel {
         // Note: Close button (.go-editor-close) needs manual handling since it uses
         // a custom class. BasePanel only auto-handles .panel-close
         const closeBtn = this.$('.go-editor-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        if (closeBtn) {
+            this.closeBtnHandler = () => this.hide();
+            closeBtn.addEventListener('click', this.closeBtnHandler);
+        }
 
         // Tab switching
         const tabs = this.panel?.querySelectorAll('.go-editor-tab');
         tabs?.forEach(tab => {
-            tab.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 const target = e.target as HTMLElement;
                 const tabName = target.dataset.tab as 'editor' | 'suggestions';
                 this.switchTab(tabName);
-            });
+            };
+            this.tabClickHandlers.set(tab, handler);
+            tab.addEventListener('click', handler);
         });
 
         // Save on Cmd/Ctrl+S
@@ -171,10 +178,26 @@ class GoEditorPanel extends BasePanel {
     protected onDestroy(): void {
         this.destroyEditor();
 
+        // Clean up keyboard handler
         if (this.saveHandler) {
             document.removeEventListener('keydown', this.saveHandler);
             this.saveHandler = null;
         }
+
+        // Clean up close button handler
+        if (this.closeBtnHandler) {
+            const closeBtn = this.$('.go-editor-close');
+            if (closeBtn) {
+                closeBtn.removeEventListener('click', this.closeBtnHandler);
+            }
+            this.closeBtnHandler = null;
+        }
+
+        // Clean up tab click handlers
+        this.tabClickHandlers.forEach((handler, element) => {
+            element.removeEventListener('click', handler);
+        });
+        this.tabClickHandlers.clear();
     }
 
     async loadFile(path: string): Promise<void> {

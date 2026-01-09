@@ -44,8 +44,10 @@ class PythonEditorPanel extends BasePanel {
     private needsConfirmation: boolean = false;
     private confirmationTimeout: number | null = null;
 
-    // Keyboard handler
+    // Event handler references for cleanup
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
+    private closeBtnHandler: (() => void) | null = null;
+    private tabClickHandlers: Map<Element, (e: Event) => void> = new Map();
 
     constructor() {
         super({
@@ -84,16 +86,21 @@ class PythonEditorPanel extends BasePanel {
     protected setupEventListeners(): void {
         // Close button
         const closeBtn = this.$('.python-editor-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        if (closeBtn) {
+            this.closeBtnHandler = () => this.hide();
+            closeBtn.addEventListener('click', this.closeBtnHandler);
+        }
 
         // Tab switching
         const tabs = this.panel?.querySelectorAll('.python-editor-tab');
         tabs?.forEach(tab => {
-            tab.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 const target = e.target as HTMLElement;
                 const tabName = target.dataset.tab as 'editor' | 'output';
                 this.switchTab(tabName);
-            });
+            };
+            this.tabClickHandlers.set(tab, handler);
+            tab.addEventListener('click', handler);
         });
 
         // Execute on Cmd/Ctrl+Enter
@@ -123,10 +130,27 @@ class PythonEditorPanel extends BasePanel {
 
     protected onDestroy(): void {
         this.destroyEditor();
+
+        // Clean up keyboard handler
         if (this.executeHandler) {
             document.removeEventListener('keydown', this.executeHandler);
             this.executeHandler = null;
         }
+
+        // Clean up close button handler
+        if (this.closeBtnHandler) {
+            const closeBtn = this.$('.python-editor-close');
+            if (closeBtn) {
+                closeBtn.removeEventListener('click', this.closeBtnHandler);
+            }
+            this.closeBtnHandler = null;
+        }
+
+        // Clean up tab click handlers
+        this.tabClickHandlers.forEach((handler, element) => {
+            element.removeEventListener('click', handler);
+        });
+        this.tabClickHandlers.clear();
     }
 
     private async checkPluginStatus(): Promise<void> {
