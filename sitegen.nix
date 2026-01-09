@@ -840,6 +840,12 @@ let
       text = buildInfoContent;
       destination = "/build-info.json";
     };
+
+    "CNAME" = pkgs.writeTextFile {
+      name = "qntx-docs-cname";
+      text = "qntx.sbvh.nl\n";
+      destination = "/CNAME";
+    };
   };
 
 in
