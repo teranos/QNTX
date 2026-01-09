@@ -1,4 +1,4 @@
-# QNTX Video Ingestion (ix-video)
+# QNTX Video Streaming (vidstream)
 
 Real-time video frame processing for QNTX attestation generation via CGO.
 
@@ -7,7 +7,7 @@ Real-time video frame processing for QNTX attestation generation via CGO.
 ```
 ┌─────────────────┐     CGO      ┌──────────────────────┐
 │  Go Application │─────────────▶│  Rust VideoEngine    │
-│  (ixvideo pkg)  │              │  • Frame processing  │
+│ (vidstream pkg) │              │  • Frame processing  │
 └─────────────────┘              │  • ONNX inference    │
                                  │  • Detection output  │
                                  └──────────────────────┘
@@ -18,11 +18,11 @@ Real-time video frame processing for QNTX attestation generation via CGO.
 ### Rust Library
 
 ```bash
-cd ats/video/ix-video
+cd ats/vidstream
 cargo build --release
 ```
 
-This produces `target/release/libqntx_ix_video.so` (Linux) or equivalent.
+This produces `target/release/libqntx_vidstream.so` (Linux) or equivalent.
 
 ### Go with CGO
 
@@ -43,32 +43,32 @@ package main
 
 import (
     "log"
-    "github.com/teranos/QNTX/ats/video/ix-video/ixvideo"
+    "github.com/teranos/QNTX/ats/vidstream/vidstream"
 )
 
 func main() {
     // Create engine with default config
-    engine, err := ixvideo.NewVideoEngine()
+    engine, err := vidstream.NewVideoEngine()
     if err != nil {
         log.Fatal(err)
     }
     defer engine.Close()
 
     // Or with custom config
-    cfg := ixvideo.Config{
+    cfg := vidstream.Config{
         ModelPath:           "/path/to/yolov8n.onnx",
         ConfidenceThreshold: 0.5,
         NMSThreshold:        0.45,
         InputWidth:          640,
         InputHeight:         640,
     }
-    engine, err = ixvideo.NewVideoEngineWithConfig(cfg)
+    engine, err = vidstream.NewVideoEngineWithConfig(cfg)
 
     // Process frames
     result, err := engine.ProcessFrame(
         frameData,           // []byte - raw pixel data
         width, height,       // uint32 - frame dimensions
-        ixvideo.FormatRGB8,  // pixel format
+        vidstream.FormatRGB8,  // pixel format
         timestampUs,         // uint64 - frame timestamp
     )
     if err != nil {
@@ -115,7 +115,7 @@ as := &types.As{
     Contexts:   []string{det.Label, fmt.Sprintf("confidence:%.2f", det.Confidence)},
     Actors:     []string{"video-processor@ai"},
     Timestamp:  time.Now(),
-    Source:     "ix-video",
+    Source:     "vidstream",
     Attributes: map[string]interface{}{
         "bbox":      []float32{det.BBox.X, det.BBox.Y, det.BBox.Width, det.BBox.Height},
         "class_id":  det.ClassID,
@@ -148,8 +148,8 @@ cargo build --release --features full
 When built without CGO or the `rustvideo` tag, the Go package provides stub implementations that return `ErrNotAvailable`. This allows the codebase to compile on systems without Rust.
 
 ```go
-engine, err := ixvideo.NewVideoEngine()
-// err == ixvideo.ErrNotAvailable when CGO is disabled
+engine, err := vidstream.NewVideoEngine()
+// err == vidstream.ErrNotAvailable when CGO is disabled
 ```
 
 ## Performance Considerations
@@ -163,9 +163,9 @@ engine, err := ixvideo.NewVideoEngine()
 
 ```bash
 # Rust tests
-cd ats/video/ix-video
+cd ats/vidstream
 cargo test
 
 # Go tests (requires built Rust library)
-CGO_ENABLED=1 go test -tags rustvideo ./ats/video/ix-video/ixvideo/...
+CGO_ENABLED=1 go test -tags rustvideo ./ats/vidstream/vidstream/...
 ```

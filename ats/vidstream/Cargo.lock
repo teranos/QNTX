@@ -1163,7 +1163,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qntx-ix-video"
+name = "qntx-vidstream"
 version = "0.1.0"
 dependencies = [
  "ahash",

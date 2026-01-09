@@ -1,6 +1,6 @@
 //go:build !cgo || !rustvideo
 
-package ixvideo
+package vidstream
 
 import "errors"
 

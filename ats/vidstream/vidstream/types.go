@@ -1,4 +1,4 @@
-// Package ixvideo provides video processing for QNTX attestation generation.
+// Package vidstream provides video processing for QNTX attestation generation.
 //
 // This package supports two modes:
 //   - CGO mode: Links with Rust library for high-performance inference
@@ -8,7 +8,7 @@
 //
 //	CGO_ENABLED=1 go build -tags rustvideo
 //	export LD_LIBRARY_PATH=/path/to/QNTX/target/release
-package ixvideo
+package vidstream
 
 // FrameFormat specifies the pixel format of input frames
 type FrameFormat int
