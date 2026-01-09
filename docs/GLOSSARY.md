@@ -1,9 +1,11 @@
 # QNTX Glossary & Definitive Terms
 
+This glossary defines the core concepts and symbols used throughout QNTX. For a conceptual overview, see [Understanding QNTX](understanding-qntx.md). For system architecture patterns, see [Two-Phase Jobs](architecture/two-phase-jobs.md).
+
 ## Core Concepts
 
 ### ATS (Attestation Type System)
-Both a type system AND storage system for attestations. It defines:
+Both a type system AND storage system for attestations. For storage details, see [Bounded Storage](architecture/bounded-storage.md). It defines:
 - The data model for attestations (type system)
 - Storage and retrieval mechanisms (storage system)
 - The query language for accessing attestations (ax)
@@ -51,7 +53,7 @@ Infrastructure and lifecycle markers:
 
 | Symbol | Name | Purpose |
 |--------|------|---------|
-| `꩜` | Pulse | Async operations, always prefix Pulse-related logs |
+| `꩜` | Pulse | Async operations, always prefix Pulse-related logs. See [API](api/pulse-jobs.md) |
 | `✿` | PulseOpen | Graceful startup with orphaned job recovery |
 | `❀` | PulseClose | Graceful shutdown with checkpoint preservation |
 | `⊔` | DB | Database/storage layer |
@@ -170,7 +172,6 @@ qntx am get pulse.workers         # Get specific value
 
 ## See Also
 
-- [Symbol Package](../sym/README.md) - Complete symbol definitions
 - [Understanding QNTX](understanding-qntx.md) - Architectural overview
 - [Installation Guide](installation.md) - Getting started
 - [Configuration Architecture](architecture/config-system.md) - Config system details
