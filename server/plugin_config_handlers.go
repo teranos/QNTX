@@ -319,6 +319,31 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 				}
 			}
 
+		case "number":
+			floatVal, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				errors[fieldName] = "Must be a valid number"
+				continue
+			}
+
+			// Check min_value constraint
+			if fieldSchema.MinValue != "" {
+				minVal, err := strconv.ParseFloat(fieldSchema.MinValue, 64)
+				if err == nil && floatVal < minVal {
+					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
+					continue
+				}
+			}
+
+			// Check max_value constraint
+			if fieldSchema.MaxValue != "" {
+				maxVal, err := strconv.ParseFloat(fieldSchema.MaxValue, 64)
+				if err == nil && floatVal > maxVal {
+					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
+					continue
+				}
+			}
+
 		case "boolean":
 			if value != "true" && value != "false" {
 				errors[fieldName] = "Must be 'true' or 'false'"

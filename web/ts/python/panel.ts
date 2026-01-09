@@ -556,7 +556,9 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             </div>
             <div class="prose-editor-container">
                 <div id="python-editor-container" class="python-editor-container">
-                    <!-- CodeMirror will be initialized here -->
+                    <!-- TODO(HIGH PRIO): CodeMirror editor initialization is broken - editor not showing up.
+                         Need to investigate why editor instance isn't being created properly.
+                         This blocks Python panel testing and should be fixed after PR #241 merges. -->
                 </div>
             </div>
         `;
