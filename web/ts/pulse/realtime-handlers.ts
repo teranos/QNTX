@@ -20,7 +20,7 @@
  * - Add batch execution status updates (reduce message frequency)
  */
 
-import { debugLog } from '../debug';
+import { log, SEG } from '../logger';
 
 // ========================================================================
 // ATS Block Execution State Subscriptions
@@ -56,7 +56,7 @@ export function subscribeATSBlock(
     }
     atsBlockSubscribers.get(scheduledJobId)!.add(callback);
 
-    debugLog('[ATS Block] Subscribed to job:', scheduledJobId);
+    log.debug(SEG.PULSE, 'ATS Block subscribed to job:', scheduledJobId);
 
     // Return unsubscribe function
     return () => {
@@ -67,7 +67,7 @@ export function subscribeATSBlock(
                 atsBlockSubscribers.delete(scheduledJobId);
             }
         }
-        debugLog('[ATS Block] Unsubscribed from job:', scheduledJobId);
+        log.debug(SEG.PULSE, 'ATS Block unsubscribed from job:', scheduledJobId);
     };
 }
 
@@ -81,12 +81,12 @@ function notifyATSBlockSubscribers(
 ): void {
     const subscribers = atsBlockSubscribers.get(scheduledJobId);
     if (subscribers) {
-        debugLog('[ATS Block] Notifying', subscribers.size, 'subscribers for job:', scheduledJobId, 'state:', state);
+        log.debug(SEG.PULSE, 'ATS Block notifying', subscribers.size, 'subscribers for job:', scheduledJobId, 'state:', state);
         for (const callback of subscribers) {
             try {
                 callback(state, executionId);
             } catch (error) {
-                console.error('[ATS Block] Subscriber callback error:', error);
+                log.error(SEG.PULSE, 'ATS Block subscriber callback error:', error);
             }
         }
     }
@@ -115,7 +115,7 @@ import {
  * - Dispatches custom event for panels (pulse-panel, job-detail-panel)
  */
 export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage): void {
-    debugLog('[Pulse Realtime] Execution started:', {
+    log.debug(SEG.PULSE, 'Execution started:', {
         job_id: data.scheduled_job_id,
         execution_id: data.execution_id,
         ats_code: data.ats_code
@@ -141,7 +141,7 @@ export function handlePulseExecutionStarted(data: PulseExecutionStartedMessage):
  * - Shows failure toast notification
  */
 export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): void {
-    debugLog('[Pulse Realtime] Execution failed:', {
+    log.debug(SEG.PULSE, 'Execution failed:', {
         job_id: data.scheduled_job_id,
         execution_id: data.execution_id,
         error: data.error_message,
@@ -172,7 +172,7 @@ export function handlePulseExecutionFailed(data: PulseExecutionFailedMessage): v
  * - Dispatches custom event for panels
  */
 export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessage): void {
-    debugLog('[Pulse Realtime] Execution completed:', {
+    log.debug(SEG.PULSE, 'Execution completed:', {
         job_id: data.scheduled_job_id,
         execution_id: data.execution_id,
         async_job_id: data.async_job_id,
@@ -199,7 +199,7 @@ export function handlePulseExecutionCompleted(data: PulseExecutionCompletedMessa
  * - Dispatches custom event for panels to handle log streaming
  */
 export function handlePulseExecutionLogStream(data: PulseExecutionLogStreamMessage): void {
-    debugLog('[Pulse Realtime] Log chunk received:', {
+    log.debug(SEG.PULSE, 'Log chunk received:', {
         job_id: data.scheduled_job_id,
         execution_id: data.execution_id,
         chunk_length: data.log_chunk.length

@@ -7,8 +7,8 @@
  * - Individual execution details and logs
  */
 
-import { debugLog } from '../debug.ts';
 import { CSS } from '../css-classes.ts';
+import { log, SEG } from '../logger';
 import type { ScheduledJobResponse } from './types.ts';
 import type { Execution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
 import {
@@ -137,7 +137,7 @@ class JobDetailPanel {
     this.currentJob = job;
     this.currentPage = 0;
 
-    debugLog('[Job Detail] Showing panel for job:', job.id);
+    log.debug(SEG.PULSE, 'Showing panel for job:', job.id);
 
     // Show panel and overlay
     this.panel.classList.add(CSS.STATE.VISIBLE);
@@ -270,7 +270,7 @@ class JobDetailPanel {
   }
 
   private async loadExecutionStages(executionId: string, jobId: string): Promise<void> {
-    debugLog('[Job Detail] Loading stages for execution:', executionId, 'job:', jobId);
+    log.debug(SEG.PULSE, 'Loading stages for execution:', executionId, 'job:', jobId);
 
     try {
       const stages = await getJobStages(jobId);
@@ -278,7 +278,7 @@ class JobDetailPanel {
 
       // If no stages, try loading children (job might be an orchestrator)
       if (stages.stages.length === 0) {
-        debugLog('[Job Detail] No stages found, loading children for job:', jobId);
+        log.debug(SEG.PULSE, 'No stages found, loading children for job:', jobId);
         const children = await getJobChildren(jobId);
         this.executionChildren.set(executionId, children);
       }
@@ -286,7 +286,7 @@ class JobDetailPanel {
       // Re-render to show loaded stages or children
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load stages:', error);
+      log.error(SEG.PULSE, 'Failed to load stages:', error);
       // Store empty stages response on error
       this.executionStages.set(executionId, {
         job_id: jobId,
@@ -315,14 +315,14 @@ class JobDetailPanel {
 
   private async loadTaskLogs(jobId: string, taskId: string): Promise<void> {
     const taskKey = `${jobId}:${taskId}`;
-    debugLog('[Job Detail] Loading logs for task:', {jobId, taskId});
+    log.debug(SEG.PULSE, 'Loading logs for task:', {jobId, taskId});
 
     try {
       const logs = await getTaskLogsForJob(jobId, taskId);
       this.taskLogs.set(taskKey, logs);
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load task logs:', error);
+      log.error(SEG.PULSE, 'Failed to load task logs:', error);
       this.taskLogs.set(taskKey, {
         task_id: taskId,
         logs: []
@@ -488,14 +488,14 @@ class JobDetailPanel {
   }
 
   private async loadChildStages(childId: string): Promise<void> {
-    debugLog('[Job Detail] Loading stages for child job:', childId);
+    log.debug(SEG.PULSE, 'Loading stages for child job:', childId);
 
     try {
       const stages = await getJobStages(childId);
       this.childStages.set(childId, stages);
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load child stages:', error);
+      log.error(SEG.PULSE, 'Failed to load child stages:', error);
       this.childStages.set(childId, {
         job_id: childId,
         stages: []
@@ -763,7 +763,7 @@ class JobDetailPanel {
     if (!this.currentJob) return;
 
     try {
-      debugLog('[Job Detail] Force triggering job:', this.currentJob.ats_code);
+      log.debug(SEG.PULSE, 'Force triggering job:', this.currentJob.ats_code);
 
       // Call API to create one-time force trigger job
       await forceTriggerJob(this.currentJob.ats_code);
@@ -771,9 +771,9 @@ class JobDetailPanel {
       // Reload executions to show the new forced execution
       await this.loadExecutions();
 
-      debugLog('[Job Detail] Force trigger successful');
+      log.debug(SEG.PULSE, 'Force trigger successful');
     } catch (error) {
-      console.error('[Job Detail] Force trigger failed:', error);
+      log.error(SEG.PULSE, 'Force trigger failed:', error);
       toast.error(
         `Force trigger failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         true
