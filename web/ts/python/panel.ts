@@ -311,7 +311,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section">
                     <div class="output-label">stdout:</div>
-                    <pre class="output-content">${this.escapeHtml(result.stdout)}</pre>
+                    <pre class="output-content">${escapeHtml(result.stdout)}</pre>
                 </div>
             `;
         }
@@ -320,7 +320,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section output-stderr">
                     <div class="output-label">stderr:</div>
-                    <pre class="output-content">${this.escapeHtml(result.stderr)}</pre>
+                    <pre class="output-content">${escapeHtml(result.stderr)}</pre>
                 </div>
             `;
         }
@@ -329,7 +329,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section output-error-section">
                     <div class="output-label">Error:</div>
-                    <pre class="output-content output-error-text">${this.escapeHtml(result.error)}</pre>
+                    <pre class="output-content output-error-text">${escapeHtml(result.error)}</pre>
                 </div>
             `;
         }
@@ -338,7 +338,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section">
                     <div class="output-label">Result:</div>
-                    <pre class="output-content output-result">${this.escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
+                    <pre class="output-content output-result">${escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
                 </div>
             `;
         }
@@ -349,7 +349,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
                     <div class="output-label">Variables:</div>
                     <div class="output-variables">
                         ${Object.entries(result.variables).map(([k, v]) =>
-                            `<div class="var-item"><span class="var-name">${this.escapeHtml(k)}</span> = <span class="var-value">${this.escapeHtml(v)}</span></div>`
+                            `<div class="var-item"><span class="var-name">${escapeHtml(k)}</span> = <span class="var-value">${escapeHtml(v)}</span></div>`
                         ).join('')}
                     </div>
                 </div>
