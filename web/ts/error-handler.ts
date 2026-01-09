@@ -63,8 +63,6 @@ export interface ErrorHandlerOptions {
     silent?: boolean;
     /** If true, show build info in toast (default: false for errors) */
     showBuildInfo?: boolean;
-    /** Custom toast duration in ms (default: 5000) */
-    duration?: number;
 }
 
 /**
@@ -119,7 +117,6 @@ export function handleError(
         context = SEG.ERROR,
         silent = false,
         showBuildInfo = false,
-        duration = 5000,
     } = options;
 
     const err = normalizeError(error);
