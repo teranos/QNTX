@@ -132,7 +132,7 @@ actor_contexts_limit = 32
 entity_actors_limit = 32
 ```
 
-See [`am.example.toml`](../../am.example.toml) for full configuration template. For configuration system details, see [am package](../../am/README.md).
+For configuration system details, see [Configuration System](config-system.md).
 
 ### Validation
 
@@ -365,7 +365,6 @@ A: This is why self-certifying ASIDs are recommended - they bypass the 64-actor 
 
 ## See Also
 
-- [am package configuration](../../am/README.md)
-- [am.example.toml](../../am.example.toml) - Full configuration template
-- [Storage implementation](../../ats/storage/) - Source code
-- [Migration 010](../../db/sqlite/migrations/010_create_storage_events_table.sql) - Storage events schema
+- [Configuration System](config-system.md) - Configuration architecture
+- [Pulse Architecture](pulse-async-ix.md) - How Pulse uses bounded storage
+- [Understanding QNTX](../understanding-qntx.md) - Core concepts overview

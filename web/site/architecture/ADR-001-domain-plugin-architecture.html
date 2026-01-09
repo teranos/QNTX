@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - ADR-001-domain-plugin-architecture</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>ADR-001: Domain Plugin Architecture</h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-01-04
+<strong>Deciders:</strong> QNTX Core Team</p>
+<h2>Context</h2>
+<p>QNTX initially had software development functionality (git ingestion, GitHub integration, gopls language server, code editor) tightly coupled to the core. This created challenges:</p>
+<ol>
+<li><strong>Scope Creep</strong>: Core repository accumulated domain-specific code (code, biotech, finance, etc.)</li>
+<li><strong>Coupling</strong>: Domain logic mixed with core attestation/graph infrastructure</li>
+<li><strong>Maintenance</strong>: Changes to one domain risked breaking others</li>
+<li><strong>Third-Party Extensions</strong>: No mechanism for private/external domain implementations</li>
+</ol>
+<h2>Decision</h2>
+<p>We adopt a <strong>domain plugin architecture</strong> where functional domains are implemented as plugins with:</p>
+<h3>Minimal Core Philosophy</h3>
+<p>QNTX core is minimal and runs without any plugins:</p>
+<ul>
+<li><strong>Core components</strong>: ATS (attestation system), Database (⊔), Pulse (꩜), Server</li>
+<li><strong>All domains are plugins</strong>: Code, finance, legal, biotech, etc. are external plugins</li>
+<li><strong>Optional by default</strong>: No plugins enabled in default configuration</li>
+<li><strong>Explicit opt-in</strong>: Users configure which plugins to load via <code>am.toml</code></li>
+</ul>
+<p>This ensures QNTX core remains focused on infrastructure, not domain logic.</p>
+<h3>Plugin Boundary</h3>
+<ul>
+<li><strong>One plugin per domain</strong> (code, biotech, finance, legal, etc.)</li>
+<li>Each plugin encapsulates all domain functionality (ingestion, API, UI, language servers)</li>
+<li>Plugins are <strong>isolated</strong> - they communicate only via shared database (attestations)</li>
+<li>No direct plugin-to-plugin method calls or dependencies</li>
+</ul>
+<h3>Unified Plugin Model</h3>
+<p>All plugins are <strong>external</strong> - standalone binaries loaded at runtime via gRPC:</p>
+<ul>
+<li>Plugins implement <code>DomainPlugin</code> interface inside their own binaries</li>
+<li><code>ExternalDomainProxy</code> adapter implements <code>DomainPlugin</code> by proxying gRPC calls to plugin processes</li>
+<li><code>PluginServer</code> wrapper exposes plugin's <code>DomainPlugin</code> implementation via gRPC</li>
+</ul>
+<p>From the Registry's perspective, all plugins are identical:</p>
+<pre><code class="language-go">// All plugins registered the same way
+registry.Register(externalProxy)  // Loaded via gRPC from ~/.qntx/plugins/
+</code></pre>
+<p>Plugin characteristics:</p>
+<ul>
+<li>Standalone binaries with their own repositories</li>
+<li>Communicate via gRPC only (using <code>PluginServer</code> wrapper)</li>
+<li>Configured via main <code>am.toml</code> file (whitelist model)</li>
+<li>Run in separate processes for isolation</li>
+<li>Discovered from configured search paths</li>
+</ul>
+<h3>Interface Contract</h3>
+<pre><code class="language-go">type DomainPlugin interface {
+    Metadata() Metadata                                              // Plugin info, version
+    Initialize(ctx context.Context, services ServiceRegistry) error  // Lifecycle
+    Shutdown(ctx context.Context) error
+    Commands() []*cobra.Command                                      // CLI integration
+    RegisterHTTP(mux *http.ServeMux) error                          // HTTP API
+    RegisterWebSocket() (map[string]WebSocketHandler, error)        // Real-time features
+    Health(ctx context.Context) HealthStatus                         // Monitoring
+}
+</code></pre>
+<h3>Security Model</h3>
+<ul>
+<li><strong>gRPC sandbox</strong>: Plugins run in separate processes with limited access</li>
+<li><strong>Service Registry</strong>: Plugins access QNTX via controlled ServiceRegistry interface</li>
+<li><strong>No direct access</strong>: Plugins cannot access QNTX internals, only exposed services</li>
+</ul>
+<h3>Failure Handling</h3>
+<ul>
+<li><strong>Optional by default</strong>: QNTX runs in minimal core mode without any plugins</li>
+<li><strong>Warning on failure</strong>: If enabled plugin fails to load, log warning and continue without it</li>
+<li><strong>Runtime error notification</strong>: Plugin errors broadcast to UI for user awareness</li>
+<li>Rationale: Minimal core philosophy - plugins are optional enhancements, not essential features</li>
+</ul>
+<h3>Versioning</h3>
+<ul>
+<li><strong>Strict semver</strong>: Plugins declare required QNTX version using semver constraints</li>
+<li><strong>Validation at registration</strong>: Registry checks compatibility before loading plugin</li>
+<li>Breaking changes in QNTX API trigger major version bump</li>
+</ul>
+<h3>HTTP Routing</h3>
+<ul>
+<li><strong>Namespace enforcement</strong>: All plugin routes must be <code>/api/&lt;domain&gt;/*</code></li>
+<li><strong>No conflicts by design</strong>: Domain namespaces prevent routing collisions</li>
+<li>Example: code plugin owns all <code>/api/code/*</code> routes</li>
+</ul>
+<h2>Consequences</h2>
+<h3>Positive</h3>
+<p>✅ <strong>Isolation</strong>: Domain failures don't cascade to core or other domains
+✅ <strong>Scalability</strong>: Each plugin can be developed/deployed independently
+✅ <strong>Third-party</strong>: External developers can build private plugins (finance, legal, etc.)
+✅ <strong>Process isolation</strong>: Plugin crashes don't crash QNTX server
+✅ <strong>Language agnostic</strong>: gRPC enables plugins in any language (Go, Python, Rust)</p>
+<h3>Negative</h3>
+<p>⚠️ <strong>gRPC overhead</strong>: Extra hop for plugin calls vs in-process
+⚠️ <strong>Complexity</strong>: More moving parts (multiple processes, config files, gRPC)
+⚠️ <strong>No shared state</strong>: Plugins can't share in-memory caches (intentional isolation)</p>
+<h3>Neutral</h3>
+<ul>
+<li>Code domain (qntx-code-plugin) serves as reference implementation</li>
+<li>First-party plugins maintained by QNTX team follow same patterns as third-party plugins</li>
+</ul>
+<h2>Implementation Plan</h2>
+<h3>Phase 1: Restructure to plugin/ (Completed - PR #130)</h3>
+<ul>
+<li>✅ DomainPlugin interface and Registry</li>
+<li>✅ ServiceRegistry for dependency injection</li>
+<li>✅ Moved domains → plugin, code → qntx-code</li>
+<li>✅ HTTP and WebSocket handler registration</li>
+</ul>
+<h3>Phase 2: Decouple Server Handlers (Completed - PR #134)</h3>
+<ul>
+<li>✅ Migrated gopls lifecycle to qntx-code plugin</li>
+<li>✅ Server dynamically registers plugin WebSocket handlers</li>
+<li>✅ Removed server code dependencies (350+ lines)</li>
+<li>✅ Server now domain-agnostic</li>
+</ul>
+<h3>Phase 3: Plugin Discovery and Optional Loading (Completed - PR #136)</h3>
+<ul>
+<li>✅ Plugin configuration via <code>am.toml</code> (whitelist model)</li>
+<li>✅ Plugin discovery from configured search paths</li>
+<li>✅ Removed all built-in plugin fallbacks</li>
+<li>✅ QNTX runs in minimal core mode without plugins</li>
+<li>✅ gRPC-only communication (no Go plugin .so files)</li>
+</ul>
+<h3>Phase 4: Extract to Separate Repository (Planned - Issue #135)</h3>
+<ul>
+<li>Create <code>teranos/qntx-code-plugin</code> repository</li>
+<li>Extract <code>qntx-code/</code> from QNTX monorepo</li>
+<li>Distribute plugin binaries via GitHub releases</li>
+<li>Plugin development guide and documentation</li>
+</ul>
+<h2>Alternatives Considered</h2>
+<h3>Monolithic with Feature Flags</h3>
+<ul>
+<li><strong>Rejected</strong>: Doesn't solve coupling, still requires rebuilding for extensions</li>
+</ul>
+<h3>Microservices per Domain</h3>
+<ul>
+<li><strong>Rejected</strong>: Too heavyweight, networking complexity, no shared DB access</li>
+</ul>
+<h3>Lua/WebAssembly Scripting</h3>
+<ul>
+<li><strong>Rejected</strong>: Limited to small extensions, not suitable for full domains (gopls, git)</li>
+</ul>
+<h2>Related</h2>
+<ul>
+<li><a href="./ADR-002-plugin-configuration.html">ADR-002: Plugin Configuration Management</a></li>
+<li><a href="./ADR-003-plugin-communication.html">ADR-003: Plugin Communication Patterns</a></li>
+<li>PR #130: Domain Plugin Architecture</li>
+<li>Issue #128: Implement gRPC Protocol and Externalize Code Domain</li>
+</ul>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/b664e41fac56a47a886ef727bc4342996b929f1d-dirty">b664e41-dirty</a></p>
+</footer>
+</body>
+</html>
