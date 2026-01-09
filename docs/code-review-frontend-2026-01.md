@@ -20,43 +20,96 @@ The frontend codebase demonstrates strong architectural patterns with well-desig
 ## Critical Issues
 
 ### 1. Event Listener Memory Leaks (High Risk)
-**Severity:** Critical
+**Severity:** Critical → ~~**PARTIALLY RESOLVED**~~ (PR #251)
 **Impact:** Memory leaks, performance degradation, event handlers firing on destroyed DOM
 
 **Finding:** Significant mismatch between addEventListener (107 occurrences) and removeEventListener (19 occurrences) - 82% of event listeners are not cleaned up.
 
 **Affected Files:**
-- `web/ts/pulse/panel-events.ts` - 6 additions, 4 removals
-- `web/ts/pulse/scheduling-controls.ts` - 7 additions, 0 removals
-- `web/ts/python/panel.ts` - 8 additions, 1 removal
+- ~~`web/ts/pulse/panel-events.ts` - 6 additions, 4 removals~~ ✅ **FIXED** (PR #251)
+- ~~`web/ts/python/panel.ts` - 8 additions, 1 removal~~ ✅ **FIXED** (PR #251)
+- ~~`web/ts/code/panel.ts` - 3 additions, 1 removal~~ ✅ **FIXED** (PR #251)
+- `web/ts/pulse/scheduling-controls.ts` - 7 additions, 0 removals (low priority - DOM elements replaced)
 - `web/ts/tooltip.ts` - 4 additions, 4 removals (✓ good pattern)
 
-**Example Problem** (python/panel.ts:82-104):
+**Remaining leak sources:**
+- `web/ts/ai-provider-panel.ts` - 6 additions, 0 removals
+- `web/ts/filetree/navigator.ts` - 5 additions, 0 removals
+- `web/ts/webscraper-panel.ts` - 4 additions, 0 removals
+- `web/ts/usage-badge.ts` - 6 additions, 0 removals (low priority - single instance)
+- Various other panels with 1-3 leaks each
+
+**Example Problem** (python/panel.ts:82-104) - ~~**FIXED in PR #251**~~:
 ```typescript
+// BEFORE (leaked 3 listeners per panel lifecycle):
 protected setupEventListeners(): void {
-    // Event listeners added but never removed
+    const closeBtn = this.$('.python-editor-close');
+    closeBtn?.addEventListener('click', () => this.hide());  // LEAK
+
     const tabs = this.panel?.querySelectorAll('.python-editor-tab');
     tabs?.forEach(tab => {
-        tab.addEventListener('click', (e) => { ... });  // LEAK
+        tab.addEventListener('click', (e) => { ... });  // LEAK (2x)
     });
 
-    // Only executeHandler is properly cleaned up
+    this.executeHandler = (e: KeyboardEvent) => { ... };
+    document.addEventListener('keydown', this.executeHandler);  // ✓ cleaned up
+}
+
+protected onDestroy(): void {
+    if (this.executeHandler) {
+        document.removeEventListener('keydown', this.executeHandler);
+    }
+    // Missing cleanup for closeBtn and tabs!
+}
+
+// AFTER (all listeners cleaned up):
+protected setupEventListeners(): void {
+    const closeBtn = this.$('.python-editor-close');
+    if (closeBtn) {
+        this.closeBtnHandler = () => this.hide();
+        closeBtn.addEventListener('click', this.closeBtnHandler);
+    }
+
+    const tabs = this.panel?.querySelectorAll('.python-editor-tab');
+    tabs?.forEach(tab => {
+        const handler = (e: Event) => { ... };
+        this.tabClickHandlers.set(tab, handler);
+        tab.addEventListener('click', handler);
+    });
+
     this.executeHandler = (e: KeyboardEvent) => { ... };
     document.addEventListener('keydown', this.executeHandler);
 }
 
 protected onDestroy(): void {
-    // Only executeHandler is removed, tab listeners leak
+    // Clean up keyboard handler
     if (this.executeHandler) {
         document.removeEventListener('keydown', this.executeHandler);
+        this.executeHandler = null;
     }
+
+    // Clean up close button handler
+    if (this.closeBtnHandler) {
+        const closeBtn = this.$('.python-editor-close');
+        if (closeBtn) {
+            closeBtn.removeEventListener('click', this.closeBtnHandler);
+        }
+        this.closeBtnHandler = null;
+    }
+
+    // Clean up tab click handlers
+    this.tabClickHandlers.forEach((handler, element) => {
+        element.removeEventListener('click', handler);
+    });
+    this.tabClickHandlers.clear();
 }
 ```
 
-**Recommendation:**
-- Store all event listener references
+**Recommendation for remaining leak sources:**
+- Store all event listener references in class fields
 - Clean up in `onDestroy()` or component-specific cleanup methods
 - Consider using `AbortController` for automatic cleanup
+- Pattern established in PR #251 can be replicated for other panels
 
 ---
 
@@ -396,8 +449,8 @@ const domCache: DOMCache = {
 
 ### Immediate (Critical)
 1. **Fix Python panel CodeMirror initialization** - Blocking user functionality
-2. ~~**Audit innerHTML usage for XSS vulnerabilities**~~ - ✅ **COMPLETED** - No vulnerabilities found (see `xss-audit-2026-01.md`)
-3. **Add event listener cleanup to all panels** - Memory leaks
+2. ~~**Audit innerHTML usage for XSS vulnerabilities**~~ - ✅ **COMPLETED** (PR #250) - No vulnerabilities found (see `xss-audit-2026-01.md`)
+3. ~~**Add event listener cleanup to critical panels**~~ - ✅ **PARTIALLY COMPLETED** (PR #251) - Fixed pulse, python, and code panels (most critical leak sources). Remaining: ai-provider-panel, filetree/navigator, webscraper-panel, and others.
 
 ### Short-term (Major)
 4. **Complete migration to centralized logger.ts** - 43 files to migrate
@@ -423,11 +476,12 @@ const domCache: DOMCache = {
 
 This review identifies issues to be addressed in separate focused PRs:
 
-1. **PR: Fix memory leaks** - Event listener cleanup across all panels
-2. **PR: Fix Python panel editor** - CodeMirror initialization
-3. **PR: XSS audit and fixes** - Review and fix innerHTML usage
-4. **PR: Logger migration** - Complete move to logger.ts
-5. **PR: Error handler migration** - Complete move to error-handler.ts
-6. **PR: Extract shared patterns** - Tab switching, status management
-7. **PR: TypeScript type safety** - Add proper types for external libraries
-8. **PR: Accessibility improvements** - Apply patterns across all panels
+1. ~~**PR #250: XSS audit and fixes**~~ - ✅ **COMPLETED** - Comprehensive audit, no vulnerabilities found
+2. ~~**PR #251: Fix critical memory leaks**~~ - ✅ **COMPLETED** - Fixed pulse, python, and code panels
+3. **PR: Fix remaining memory leaks** - Event listener cleanup in ai-provider-panel, filetree/navigator, webscraper-panel
+4. **PR: Fix Python panel editor** - CodeMirror initialization (HIGH PRIORITY)
+5. **PR: Logger migration** - Complete move to logger.ts (43 files remaining)
+6. **PR: Error handler migration** - Complete move to error-handler.ts (15+ files)
+7. **PR: Extract shared patterns** - Tab switching, status management
+8. **PR: TypeScript type safety** - Add proper types for external libraries (30 `any` types)
+9. **PR: Accessibility improvements** - Apply patterns across all panels
