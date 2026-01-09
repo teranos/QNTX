@@ -114,7 +114,7 @@ protected onDestroy(): void {
 ---
 
 ### 2. Python Panel Editor Initialization Bug
-**Severity:** Critical
+**Severity:** Critical → ~~**RESOLVED**~~ (PR #252)
 **Impact:** Python panel is non-functional, blocking user testing
 
 **Location:** `web/ts/python/panel.ts:559`
@@ -126,7 +126,16 @@ protected onDestroy(): void {
      This blocks Python panel testing and should be fixed after PR #241 merges. -->
 ```
 
-**Recommendation:** Investigate and fix CodeMirror initialization in separate focused PR.
+**Root Cause (PR #252):**
+1. **Initialization timing bug**: `tabClickHandlers` field initializer runs AFTER `super()`, but `setupEventListeners()` is called DURING `super()`, causing `undefined` error
+2. **Early return on first show**: `currentTab` initialized to `'editor'` caused `switchTab('editor')` to return early without rendering
+
+**Solution:**
+- Added defensive check: `if (!this.tabClickHandlers) this.tabClickHandlers = new Map()`
+- Changed `currentTab` initial value from `'editor'` to `null` to force first render
+- Added comprehensive debug logging throughout initialization flow
+
+**Verification:** ✅ Panel opens, editor displays with syntax highlighting, code execution works via qntx-python-plugin
 
 ---
 
@@ -448,7 +457,7 @@ const domCache: DOMCache = {
 ## Prioritized Recommendations
 
 ### Immediate (Critical)
-1. **Fix Python panel CodeMirror initialization** - Blocking user functionality
+1. ~~**Fix Python panel CodeMirror initialization**~~ - ✅ **COMPLETED** (PR #252) - Editor now displays and executes code correctly
 2. ~~**Audit innerHTML usage for XSS vulnerabilities**~~ - ✅ **COMPLETED** (PR #250) - No vulnerabilities found (see `xss-audit-2026-01.md`)
 3. ~~**Add event listener cleanup to critical panels**~~ - ✅ **PARTIALLY COMPLETED** (PR #251) - Fixed pulse, python, and code panels (most critical leak sources). Remaining: ai-provider-panel, filetree/navigator, webscraper-panel, and others.
 
@@ -478,8 +487,8 @@ This review identifies issues to be addressed in separate focused PRs:
 
 1. ~~**PR #250: XSS audit and fixes**~~ - ✅ **COMPLETED** - Comprehensive audit, no vulnerabilities found
 2. ~~**PR #251: Fix critical memory leaks**~~ - ✅ **COMPLETED** - Fixed pulse, python, and code panels
-3. **PR: Fix remaining memory leaks** - Event listener cleanup in ai-provider-panel, filetree/navigator, webscraper-panel
-4. **PR: Fix Python panel editor** - CodeMirror initialization (HIGH PRIORITY)
+3. ~~**PR #252: Fix Python panel editor**~~ - ✅ **COMPLETED** - CodeMirror initialization fixed, panel fully functional
+4. **PR: Fix remaining memory leaks** - Event listener cleanup in ai-provider-panel, filetree/navigator, webscraper-panel
 5. **PR: Logger migration** - Complete move to logger.ts (43 files remaining)
 6. **PR: Error handler migration** - Complete move to error-handler.ts (15+ files)
 7. **PR: Extract shared patterns** - Tab switching, status management
