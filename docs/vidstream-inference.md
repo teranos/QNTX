@@ -18,6 +18,19 @@ Enable real-time video stream analysis where each frame can generate attestation
 
 ## Architecture
 
+### High-Level Flow
+
+```
+┌─────────────────┐     CGO      ┌──────────────────────┐
+│  Go Application │─────────────▶│  Rust VideoEngine    │
+│ (vidstream pkg) │              │  • Frame processing  │
+└─────────────────┘              │  • ONNX inference    │
+                                 │  • Detection output  │
+                                 └──────────────────────┘
+```
+
+### Detailed Structure
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Go Application                          │
