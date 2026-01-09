@@ -73,9 +73,3 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd vidstream && CGO_ENABLED=1 go test -tags rustvideo -v
-
-      - name: Verify library artifacts
-        run: |
-          ls -lh ats/vidstream/target/release/libqntx_vidstream.*
-          file ats/vidstream/target/release/libqntx_vidstream.so || true
-          file ats/vidstream/target/release/libqntx_vidstream.a || true
