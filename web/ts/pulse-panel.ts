@@ -90,7 +90,24 @@ class PulsePanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Event listeners are attached dynamically in renderSchedules()
+        // Attach panel event listeners once using event delegation
+        const ctx = this.getActionContext();
+        const cleanup = attachPanelEventListeners(this.panel!, {
+            onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
+            onForceTrigger: (jobId) => handleForceTrigger(jobId, ctx),
+            onJobAction: (jobId, action) => handleJobAction(jobId, action, ctx),
+            onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
+            onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
+            onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
+            onProseLocation: (docId) => handleProseLocationClick(docId)
+        });
+
+        // Store cleanup function for onDestroy
+        // Note: unsubscribers array is initialized by field initializer after super() returns
+        if (!this.unsubscribers) {
+            this.unsubscribers = [];
+        }
+        this.unsubscribers.push(cleanup);
     }
 
     protected async onShow(): Promise<void> {
@@ -176,16 +193,8 @@ class PulsePanel extends BasePanel {
 
             container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
 
-            const ctx = this.getActionContext();
-            attachPanelEventListeners(this.panel!, {
-                onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
-                onForceTrigger: (jobId) => handleForceTrigger(jobId, ctx),
-                onJobAction: (jobId, action) => handleJobAction(jobId, action, ctx),
-                onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
-                onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
-                onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
-                onProseLocation: (docId) => handleProseLocationClick(docId)
-            });
+            // Event listeners attached once in setupEventListeners() via event delegation
+            // No need to re-attach on every render
         });
     }
 
