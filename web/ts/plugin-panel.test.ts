@@ -346,7 +346,8 @@ describe('PluginPanel error handling', () => {
             validationErrors: {
                 max_workers: 'Must be a valid integer'
             },
-            needsConfirmation: false
+            needsConfirmation: false,
+            editingFields: new Set()
         };
         (panel as any).expandedPlugin = 'test-plugin';
 
@@ -378,14 +379,15 @@ describe('PluginPanel error handling', () => {
                 }
             },
             validationErrors: {},
-            needsConfirmation: true
+            needsConfirmation: true,
+            editingFields: new Set()
         };
         (panel as any).expandedPlugin = 'test-plugin';
 
         (panel as any).render();
 
         const html = dom.window.document.body.innerHTML;
-        expect(html).toContain('Restart Plugin');
+        expect(html).toContain('Confirm Restart');
         expect(html).toContain('This will apply your changes and reinitialize the plugin');
     });
 });

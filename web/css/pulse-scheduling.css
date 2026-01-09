@@ -136,6 +136,26 @@
   background: var(--color-success-dark, #388e3c);
 }
 
+/* Two-click confirmation state for confirm button */
+.pulse-btn-confirm-active {
+  background: #fff3e0;
+  border-color: #ef6c00;
+  color: #e65100;
+  min-width: 70px;
+}
+
+.pulse-btn-confirm-active:hover {
+  background: #ffe0b2;
+}
+
+/* Confirmation hint (shows below interval picker) */
+.pulse-confirm-hint {
+  font-size: 11px;
+  color: #e65100;
+  margin-left: auto;
+  font-style: italic;
+}
+
 .pulse-btn-cancel {
   color: var(--color-text-secondary, #757575);
 }

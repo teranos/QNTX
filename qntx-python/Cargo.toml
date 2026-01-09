@@ -1,9 +1,9 @@
 [package]
 name = "qntx-python-plugin"
 version = "0.2.1"
-edition = "2021"
+edition.workspace = true
 description = "QNTX gRPC plugin for running Python code"
-license = "MIT"
+license.workspace = true
 authors = ["QNTX Contributors"]
 
 [[bin]]
@@ -11,11 +11,14 @@ name = "qntx-python-plugin"
 path = "src/main.rs"
 
 [dependencies]
+# QNTX shared library
+qntx = { path = "../crates/qntx", features = ["plugin"] }
+
 # gRPC and async
-tonic = "0.12"
-prost = "0.13"
-tokio = { version = "1", features = ["full"] }
-tokio-stream = "0.1"
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
 
 # Python embedding via PyO3
 # REQUIRES Nix build (flake.nix) - provides Python 3.13 deterministically
@@ -23,24 +26,16 @@ tokio-stream = "0.1"
 pyo3 = { version = "0.23", features = ["auto-initialize"] }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 # CLI
 clap = { version = "4", features = ["derive"] }
 
 # Utilities
-thiserror = "2"
-parking_lot = "0.12"
-
-[build-dependencies]
-tonic-build = "0.12"
-
-[profile.release]
-lto = true
-codegen-units = 1
-opt-level = 3
+thiserror.workspace = true
+parking_lot.workspace = true
