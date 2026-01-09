@@ -5,6 +5,7 @@
  */
 
 import { Pulse } from '@generated/sym.js';
+import { log, SEG } from '../logger';
 
 /**
  * Two-click confirmation state for daemon actions
@@ -122,7 +123,7 @@ function openBudgetConfigPanel(): void {
     const closeBtn = document.getElementById('pulse-config-close');
 
     if (!overlay || !form || !dailyInput || !weeklyInput || !monthlyInput) {
-        console.error('Budget config panel elements not found');
+        log.error(SEG.PULSE, 'Budget config panel elements not found');
         return;
     }
 
@@ -135,7 +136,7 @@ function openBudgetConfigPanel(): void {
             monthlyInput.value = (config.monthly_budget_usd ?? 30.0).toString();
         })
         .catch(err => {
-            console.error('Failed to fetch pulse config:', err);
+            log.error(SEG.PULSE, 'Failed to fetch pulse config:', err);
             // Use defaults
             dailyInput.value = '1.0';
             weeklyInput.value = '7.0';
