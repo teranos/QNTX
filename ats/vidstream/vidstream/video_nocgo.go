@@ -2,7 +2,7 @@
 
 package vidstream
 
-import "errors"
+import "github.com/teranos/QNTX/errors"
 
 // ErrNotAvailable is returned when the Rust video engine is not available.
 var ErrNotAvailable = errors.New("CGO video engine not available: build with CGO_ENABLED=1 and -tags rustvideo")
