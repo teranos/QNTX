@@ -76,9 +76,9 @@ Plugin health status update
 
 | Field | Description |
 |-------|-------------|
+| name | Plugin name |
 | healthy | Health status |
 | state | Plugin state (running/paused) |
-| name | Plugin name |
 
 ## Type References
 

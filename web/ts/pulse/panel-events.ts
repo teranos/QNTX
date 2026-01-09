@@ -2,8 +2,8 @@
  * Pulse Panel Event Handlers
  *
  * Manages all DOM event listeners for the pulse panel using event delegation.
- * Separated from PulsePanel class to maintain clean separation between
- * event handling infrastructure and business logic.
+ * Uses a single delegated listener to prevent memory leaks from re-attaching
+ * listeners on every render.
  */
 
 export interface PanelEventHandlers {
@@ -17,33 +17,37 @@ export interface PanelEventHandlers {
 }
 
 /**
- * Attach all event listeners to the pulse panel using event delegation.
- * Called after each render to wire up interactions.
+ * Attach event listeners using event delegation.
+ * Should be called ONCE during panel initialization.
+ * Returns cleanup function to remove the listener.
  */
 export function attachPanelEventListeners(
     panel: HTMLElement,
     handlers: PanelEventHandlers
-): void {
-    // Expand/collapse toggle buttons
-    panel.querySelectorAll('[data-action="toggle-expand"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+): () => void {
+    // Single delegated click handler for all pulse panel interactions
+    const clickHandler = async (e: Event) => {
+        const target = e.target as HTMLElement;
+
+        // Handle toggle expand buttons
+        const toggleBtn = target.closest('[data-action="toggle-expand"]') as HTMLElement | null;
+        if (toggleBtn) {
             e.stopPropagation();
-            const card = (e.currentTarget as HTMLElement).closest('.pulse-job-card') as HTMLElement;
+            const card = toggleBtn.closest('.pulse-job-card') as HTMLElement;
             const jobId = card?.dataset.jobId;
             if (jobId) {
                 await handlers.onToggleExpansion(jobId);
             }
-        });
-    });
+            return;
+        }
 
-    // Job action buttons (pause, resume, delete, force-trigger)
-    panel.querySelectorAll('.pulse-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        // Handle job action buttons (pause, resume, delete, force-trigger)
+        const actionBtn = target.closest('.pulse-btn') as HTMLElement | null;
+        if (actionBtn) {
             e.stopPropagation();
-            const button = e.currentTarget as HTMLElement;
-            const card = button.closest('.pulse-job-card') as HTMLElement;
+            const card = actionBtn.closest('.pulse-job-card') as HTMLElement;
             const jobId = card?.dataset.jobId;
-            const action = button.dataset.action;
+            const action = actionBtn.dataset.action;
 
             if (!jobId || !action) return;
 
@@ -52,56 +56,63 @@ export function attachPanelEventListeners(
             } else {
                 await handlers.onJobAction(jobId, action);
             }
-        });
-    });
+            return;
+        }
 
-    // "View detailed history" links
-    panel.querySelectorAll('[data-action="view-detailed"]').forEach(link => {
-        link.addEventListener('click', async (e) => {
+        // Handle "View detailed history" links
+        const detailedLink = target.closest('[data-action="view-detailed"]') as HTMLElement | null;
+        if (detailedLink) {
             e.preventDefault();
             e.stopPropagation();
-            const card = (e.currentTarget as HTMLElement).closest('.pulse-job-card') as HTMLElement;
+            const card = detailedLink.closest('.pulse-job-card') as HTMLElement;
             const jobId = card?.dataset.jobId;
             if (jobId) {
                 await handlers.onViewDetailed(jobId);
             }
-        });
-    });
+            return;
+        }
 
-    // "Load more" buttons
-    panel.querySelectorAll('[data-action="load-more"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        // Handle "Load more" buttons
+        const loadMoreBtn = target.closest('[data-action="load-more"]') as HTMLElement | null;
+        if (loadMoreBtn) {
             e.stopPropagation();
-            const card = (e.currentTarget as HTMLElement).closest('.pulse-job-card') as HTMLElement;
+            const card = loadMoreBtn.closest('.pulse-job-card') as HTMLElement;
             const jobId = card?.dataset.jobId;
             if (jobId) {
                 await handlers.onLoadMore(jobId);
             }
-        });
-    });
+            return;
+        }
 
-    // "Retry" buttons (for execution fetch errors)
-    panel.querySelectorAll('[data-action="retry-executions"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        // Handle "Retry" buttons (for execution fetch errors)
+        const retryBtn = target.closest('[data-action="retry-executions"]') as HTMLElement | null;
+        if (retryBtn) {
             e.stopPropagation();
-            const jobId = (e.currentTarget as HTMLElement).dataset.jobId;
+            const jobId = retryBtn.dataset.jobId;
             if (jobId) {
                 await handlers.onRetryExecutions(jobId);
             }
-        });
-    });
+            return;
+        }
 
-    // Prose location links
-    panel.querySelectorAll('.pulse-prose-link').forEach(link => {
-        link.addEventListener('click', async (e) => {
+        // Handle prose location links
+        const proseLink = target.closest('.pulse-prose-link') as HTMLElement | null;
+        if (proseLink) {
             e.preventDefault();
             e.stopPropagation();
-            const anchor = e.currentTarget as HTMLElement;
-            const docId = anchor.dataset.docId;
-
+            const docId = proseLink.dataset.docId;
             if (docId) {
                 await handlers.onProseLocation(docId);
             }
-        });
-    });
+            return;
+        }
+    };
+
+    // Attach single delegated listener
+    panel.addEventListener('click', clickHandler);
+
+    // Return cleanup function
+    return () => {
+        panel.removeEventListener('click', clickHandler);
+    };
 }
