@@ -42,9 +42,10 @@ package vidstream
 import "C"
 
 import (
-	"errors"
 	"runtime"
 	"unsafe"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // VideoEngine wraps the Rust VideoEngine via CGO
@@ -57,7 +58,7 @@ type VideoEngine struct {
 func NewVideoEngine() (*VideoEngine, error) {
 	engine := C.video_engine_new()
 	if engine == nil {
-		return nil, errors.New("failed to create video engine")
+		return nil, errors.New("video_engine_new returned nil (check Rust library)")
 	}
 
 	ve := &VideoEngine{engine: engine}
@@ -98,7 +99,7 @@ func NewVideoEngineWithConfig(cfg Config) (*VideoEngine, error) {
 
 	engine := C.video_engine_new_with_config(&cConfig)
 	if engine == nil {
-		return nil, errors.New("failed to create video engine with config")
+		return nil, errors.Newf("video_engine_new_with_config returned nil (model: %s)", cfg.ModelPath)
 	}
 
 	ve := &VideoEngine{engine: engine}
@@ -156,7 +157,7 @@ func (v *VideoEngine) ProcessFrame(
 
 	if !result.success {
 		errMsg := C.GoString(result.error_msg)
-		return nil, errors.New(errMsg)
+		return nil, errors.Newf("frame processing failed: %s", errMsg)
 	}
 
 	// Convert detections
