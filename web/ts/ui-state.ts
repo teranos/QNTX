@@ -19,6 +19,7 @@
 
 import type { PanelState, Transform } from '../types/core';
 import { getItem, setItem, removeItem } from './storage';
+import { log, SEG } from './logger';
 
 // ============================================================================
 // State Types
@@ -410,14 +411,11 @@ class UIState {
             this.subscriberFailures.set(callback, failures);
 
             if (failures >= MAX_SUBSCRIBER_FAILURES) {
-                console.error(
-                    `[UIState] Subscriber for ${context} failed ${failures} times, auto-unsubscribing:`,
-                    e
-                );
+                log.error(SEG.UI, `Subscriber for ${context} failed ${failures} times, auto-unsubscribing:`, e);
                 return false;
             }
 
-            console.error(`[UIState] Subscriber error for ${context} (${failures}/${MAX_SUBSCRIBER_FAILURES}):`, e);
+            log.error(SEG.UI, `Subscriber error for ${context} (${failures}/${MAX_SUBSCRIBER_FAILURES}):`, e);
             return true;
         }
     }

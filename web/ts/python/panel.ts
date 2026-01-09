@@ -8,6 +8,8 @@
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { escapeHtml } from '../html-utils.ts';
+import { log, SEG } from '../logger.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -111,12 +113,12 @@ class PythonEditorPanel extends BasePanel {
         // Initialize editor tab
         this.switchTab('editor');
 
-        console.log('[Python Editor] Panel shown');
+        log.debug(SEG.UI, 'Python Editor panel shown');
     }
 
     protected onHide(): void {
         this.destroyEditor();
-        console.log('[Python Editor] Panel closed');
+        log.debug(SEG.UI, 'Python Editor panel closed');
     }
 
     protected onDestroy(): void {
@@ -146,7 +148,7 @@ class PythonEditorPanel extends BasePanel {
                 this.updateStatus('unavailable');
             }
         } catch (error) {
-            console.error('[Python Editor] Failed to check plugin status:', error);
+            log.error(SEG.UI, 'Failed to check Python plugin status:', error);
             this.updateStatus('error');
         }
     }
@@ -169,7 +171,7 @@ class PythonEditorPanel extends BasePanel {
                 const pythonModule = await import('@codemirror/lang-python');
                 pythonExtension = pythonModule.python();
             } catch (err) {
-                console.warn('[Python Editor] Failed to load Python language support:', err);
+                log.warn(SEG.UI, 'Failed to load Python language support:', err);
                 pythonExtension = [];
             }
 
@@ -198,9 +200,9 @@ class PythonEditorPanel extends BasePanel {
                 parent: container
             });
 
-            console.log('[Python Editor] Editor initialized');
+            log.debug(SEG.UI, 'Python Editor initialized');
         } catch (error) {
-            console.error('[Python Editor] Failed to initialize editor:', error);
+            log.error(SEG.UI, 'Failed to initialize Python Editor:', error);
             this.showError(error instanceof Error ? error.message : String(error));
         }
     }
@@ -273,9 +275,9 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             // Auto-switch to output tab
             this.switchTab('output');
 
-            console.log('[Python Editor] Code executed:', result.success ? 'success' : 'error');
+            log.debug(SEG.UI, 'Python code executed:', result.success ? 'success' : 'error');
         } catch (error) {
-            console.error('[Python Editor] Execution error:', error);
+            log.error(SEG.UI, 'Python execution error:', error);
             this.lastOutput = {
                 success: false,
                 stdout: '',
@@ -310,7 +312,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section">
                     <div class="output-label">stdout:</div>
-                    <pre class="output-content">${this.escapeHtml(result.stdout)}</pre>
+                    <pre class="output-content">${escapeHtml(result.stdout)}</pre>
                 </div>
             `;
         }
@@ -319,7 +321,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section output-stderr">
                     <div class="output-label">stderr:</div>
-                    <pre class="output-content">${this.escapeHtml(result.stderr)}</pre>
+                    <pre class="output-content">${escapeHtml(result.stderr)}</pre>
                 </div>
             `;
         }
@@ -328,7 +330,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section output-error-section">
                     <div class="output-label">Error:</div>
-                    <pre class="output-content output-error-text">${this.escapeHtml(result.error)}</pre>
+                    <pre class="output-content output-error-text">${escapeHtml(result.error)}</pre>
                 </div>
             `;
         }
@@ -337,7 +339,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section">
                     <div class="output-label">Result:</div>
-                    <pre class="output-content output-result">${this.escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
+                    <pre class="output-content output-result">${escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
                 </div>
             `;
         }
@@ -348,7 +350,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
                     <div class="output-label">Variables:</div>
                     <div class="output-variables">
                         ${Object.entries(result.variables).map(([k, v]) =>
-                            `<div class="var-item"><span class="var-name">${this.escapeHtml(k)}</span> = <span class="var-value">${this.escapeHtml(v)}</span></div>`
+                            `<div class="var-item"><span class="var-name">${escapeHtml(k)}</span> = <span class="var-value">${escapeHtml(v)}</span></div>`
                         ).join('')}
                     </div>
                 </div>
@@ -358,11 +360,6 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         outputEl.innerHTML = html;
     }
 
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     private updateExecuteButton(executing: boolean): void {
         const btn = this.$('#python-execute-btn') as HTMLButtonElement;
@@ -518,7 +515,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             try {
                 this.editor.destroy();
             } catch (err) {
-                console.warn('[Python Editor] Error destroying editor:', err);
+                log.warn(SEG.UI, 'Error destroying Python Editor:', err);
             }
             this.editor = null;
         }
