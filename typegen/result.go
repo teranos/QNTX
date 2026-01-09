@@ -14,6 +14,11 @@ type Result struct {
 	// e.g., "sym/symbols.go" - used for documentation links
 	SourceFile string
 
+	// GitHubBaseURL is the base URL for linking to source files on GitHub
+	// e.g., "https://github.com/teranos/QNTX/blob/main"
+	// Detected from go.mod module path (github.com/owner/repo → https://github.com/owner/repo/blob/main)
+	GitHubBaseURL string
+
 	// TypePositions maps type names to their source location
 	// Used for generating documentation links
 	TypePositions map[string]Position

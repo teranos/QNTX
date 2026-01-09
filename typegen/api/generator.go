@@ -525,7 +525,12 @@ func (g *Generator) generateGRPCDoc() string {
 	sb.WriteString("<!-- Regenerate with: make types -->\n\n")
 
 	sb.WriteString("gRPC interface for external QNTX domain plugins.\n\n")
-	sb.WriteString("**Proto file**: [`plugin/grpc/protocol/domain.proto`](../../plugin/grpc/protocol/domain.proto)\n\n")
+
+	// Link to proto file if GitHub URL is available
+	if g.result.GitHubBaseURL != "" {
+		protoURL := g.result.GitHubBaseURL + "/plugin/grpc/protocol/domain.proto"
+		sb.WriteString(fmt.Sprintf("**Proto file**: [`plugin/grpc/protocol/domain.proto`](%s)\n\n", protoURL))
+	}
 
 	// Service methods
 	sb.WriteString("## Service Methods\n\n")

@@ -24,10 +24,10 @@ Execute an ATS query
 
 | Field | Description |
 |-------|-------------|
-| query | ATS query string |
-| line | Cursor line position |
 | cursor | Cursor column position |
 | filename | Source file name |
+| query | ATS query string |
+| line | Cursor line position |
 
 ### Server → Client
 
