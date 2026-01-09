@@ -44,7 +44,7 @@ jobs:
         run: nix run .#check-types
 
       - name: Run pre-commit checks
-        run: nix flake check --show-trace .#checks.${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit
+        run: nix build --show-trace .#checks.${{ matrix.os == 'ubuntu-latest' && 'x86_64-linux' || 'aarch64-darwin' }}.pre-commit
 
   # Core Go binaries (parallel builds per OS)
   build-go:
@@ -129,8 +129,8 @@ jobs:
 
       - name: Build and validate docs
         run: |
-          nix flake check --show-trace .#checks.x86_64-linux.docs-site-builds
-          nix flake check --show-trace .#checks.x86_64-linux.docs-site-links
+          nix build --show-trace .#checks.x86_64-linux.docs-site-builds
+          nix build --show-trace .#checks.x86_64-linux.docs-site-links
 
       - name: Push to Cachix
         if: github.ref == 'refs/heads/main'
