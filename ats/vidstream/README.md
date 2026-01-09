@@ -253,6 +253,38 @@ cd vidstream
 CGO_ENABLED=1 go test -tags rustvideo -v
 ```
 
+### Performance Benchmarks
+
+The `examples/benchmark.rs` measures real-world inference latency:
+
+```bash
+cd ats/vidstream
+
+# Download a model first (see "Downloading Models for Development" above)
+gh release download v8.3.0 --repo ultralytics/assets --pattern "yolo11n.onnx" --dir models
+
+# Run benchmark
+cargo run --release --features onnx --example benchmark
+```
+
+**Output includes:**
+- Per-frame latency breakdown (preprocess, inference, postprocess)
+- Average latency and throughput (FPS)
+- Detection counts (raw and after NMS filtering)
+- Sample detections
+
+**Example Results (YOLO11n on Apple Silicon M-series):**
+```
+Average latency: 40.83 ms per frame
+Throughput:      24.5 FPS
+Breakdown:
+  - Preprocess:    973 μs (2.3%)
+  - Inference:   41430 μs (97%)
+  - Postprocess:     0 μs (negligible)
+```
+
+The benchmark uses synthetic gradient frames (640x480 RGB). For realistic testing, modify the example to load actual images or video frames.
+
 ### CI Pipeline
 
 The GitHub Actions workflow (`.github/workflows/vidstream.yml`) runs:
