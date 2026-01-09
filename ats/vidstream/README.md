@@ -174,6 +174,31 @@ Currently using `ort` version 2.0.0-rc.11, which supports:
 - CPU inference (default)
 - GPU inference (requires additional configuration)
 
+**Downloading Models for Development**
+
+To test with a real YOLO model:
+
+```bash
+cd ats/vidstream
+mkdir -p models
+
+# Download YOLO11n (nano) - 10MB, ~40ms latency at 640x480
+gh release download v8.3.0 --repo ultralytics/assets --pattern "yolo11n.onnx" --dir models
+
+# Or download YOLOv8n for comparison
+gh release download v8.3.0 --repo ultralytics/assets --pattern "yolov8n.onnx" --dir models
+
+# Run benchmark
+cargo run --release --features onnx --example benchmark
+```
+
+Performance with YOLO11n on CPU:
+- Average latency: 40.83 ms per frame
+- Throughput: 24.5 FPS (640x480 input)
+- Inference: 39ms (97%), Preprocessing: 1ms (2.3%)
+
+**Note:** The `models/` directory is gitignored. Models must be downloaded separately for development/testing.
+
 ### FFmpeg Video Decoding (Future)
 
 ```bash
