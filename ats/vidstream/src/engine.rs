@@ -5,9 +5,13 @@
 
 use std::time::Instant;
 
-use parking_lot::{Mutex, RwLock};
+#[cfg(feature = "onnx")]
+use parking_lot::Mutex;
+use parking_lot::RwLock;
 
-use crate::types::{BoundingBox, Detection, FrameFormat, ProcessingStats, VideoEngineConfig};
+use crate::types::{Detection, FrameFormat, ProcessingStats, VideoEngineConfig};
+#[cfg(feature = "onnx")]
+use crate::types::BoundingBox;
 
 #[cfg(feature = "onnx")]
 use ort::{
@@ -591,8 +595,10 @@ mod tests {
 
     #[test]
     fn test_invalid_threshold() {
-        let mut config = VideoEngineConfig::default();
-        config.confidence_threshold = 1.5;
+        let config = VideoEngineConfig {
+            confidence_threshold: 1.5,
+            ..Default::default()
+        };
         assert!(VideoEngine::new(config).is_err());
     }
 
