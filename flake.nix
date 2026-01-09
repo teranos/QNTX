@@ -434,6 +434,9 @@
           qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds
         };
 
+        # Formatter for 'nix fmt'
+        formatter = pkgs.nixpkgs-fmt;
+
         # Apps for common tasks
         apps = {
           build-docs-site = {

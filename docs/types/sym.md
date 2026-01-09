@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/sym.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/sym.rs)
 - Python: [`types/generated/python/sym.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/sym.py)
 
-## Constants
+## Constants {#constants}
 
 **Source**: [`sym/symbols.go`](https://github.com/teranos/QNTX/blob/main/sym/symbols.go)
 
@@ -35,7 +35,7 @@ const SO = "⟶"
 
 ## Collections
 
-### PaletteOrder
+### PaletteOrder {#paletteorder}
 
 ```go
 var PaletteOrder = []string{
@@ -49,7 +49,7 @@ var PaletteOrder = []string{
 }
 ```
 
-### CommandDescriptions
+### CommandDescriptions {#commanddescriptions}
 
 ```go
 var CommandDescriptions = map[string]string{
@@ -66,7 +66,7 @@ var CommandDescriptions = map[string]string{
 }
 ```
 
-### CommandToSymbol
+### CommandToSymbol {#commandtosymbol}
 
 ```go
 var CommandToSymbol = map[string]string{
@@ -83,7 +83,7 @@ var CommandToSymbol = map[string]string{
 }
 ```
 
-### SymbolToCommand
+### SymbolToCommand {#symboltocommand}
 
 ```go
 var SymbolToCommand = map[string]string{

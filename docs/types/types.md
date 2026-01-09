@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/types.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/types.rs)
 - Python: [`types/generated/python/types.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/types.py)
 
-## As
+## As {#as}
 
 **Source**: [`ats/types/attestation.go:9`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L9)
 
@@ -29,7 +29,7 @@ type As struct {
 }
 ```
 
-## AsCommand
+## AsCommand {#ascommand}
 
 **Source**: [`ats/types/attestation.go:22`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L22)
 
@@ -45,7 +45,7 @@ type AsCommand struct {
 }
 ```
 
-## AxDebug
+## AxDebug {#axdebug}
 
 **Source**: [`ats/types/attestation.go:104`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L104)
 
@@ -62,7 +62,7 @@ type AxDebug struct {
 }
 ```
 
-## AxFilter
+## AxFilter {#axfilter}
 
 **Source**: [`ats/types/attestation.go:81`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L81)
 
@@ -82,7 +82,7 @@ type AxFilter struct {
 }
 ```
 
-## AxResult
+## AxResult {#axresult}
 
 **Source**: [`ats/types/attestation.go:95`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L95)
 
@@ -97,7 +97,7 @@ type AxResult struct {
 }
 ```
 
-## AxSummary
+## AxSummary {#axsummary}
 
 **Source**: [`ats/types/attestation.go:115`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L115)
 
@@ -112,7 +112,7 @@ type AxSummary struct {
 }
 ```
 
-## CompletionItem
+## CompletionItem {#completionitem}
 
 **Source**: [`ats/types/lsp.go:4`](https://github.com/teranos/QNTX/blob/main/ats/types/lsp.go#L4)
 
@@ -128,7 +128,7 @@ type CompletionItem struct {
 }
 ```
 
-## Conflict
+## Conflict {#conflict}
 
 **Source**: [`ats/types/attestation.go:124`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L124)
 
@@ -143,7 +143,7 @@ type Conflict struct {
 }
 ```
 
-## OverFilter
+## OverFilter {#overfilter}
 
 **Source**: [`ats/types/attestation.go:74`](https://github.com/teranos/QNTX/blob/main/ats/types/attestation.go#L74)
 
@@ -156,7 +156,7 @@ type OverFilter struct {
 }
 ```
 
-## RelationshipTypeDef
+## RelationshipTypeDef {#relationshiptypedef}
 
 **Source**: [`ats/types/type_definitions.go:30`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L30)
 
@@ -172,7 +172,7 @@ type RelationshipTypeDef struct {
 }
 ```
 
-## TypeDef
+## TypeDef {#typedef}
 
 **Source**: [`ats/types/type_definitions.go:19`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L19)
 

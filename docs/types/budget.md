@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/budget.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/budget.rs)
 - Python: [`types/generated/python/budget.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/budget.py)
 
-## BudgetConfig
+## BudgetConfig {#budgetconfig}
 
 **Source**: [`pulse/budget/tracker.go:14`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L14)
 
@@ -24,7 +24,7 @@ type BudgetConfig struct {
 }
 ```
 
-## Limiter
+## Limiter {#limiter}
 
 **Source**: [`pulse/budget/limiter.go:12`](https://github.com/teranos/QNTX/blob/main/pulse/budget/limiter.go#L12)
 
@@ -34,7 +34,7 @@ type Limiter struct {
 }
 ```
 
-## Status
+## Status {#status}
 
 **Source**: [`pulse/budget/tracker.go:22`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L22)
 
@@ -53,7 +53,7 @@ type Status struct {
 }
 ```
 
-## Tracker
+## Tracker {#tracker}
 
 **Source**: [`pulse/budget/tracker.go:35`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L35)
 
