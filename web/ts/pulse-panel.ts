@@ -124,6 +124,9 @@ class PulsePanel extends BasePanel {
         await this.renderSystemStatus();
         await this.renderActiveQueue();
         this.renderSchedules();
+
+        // Refresh tooltips after dynamic content updates
+        this.refreshTooltips();
     }
 
     private async renderSystemStatus(): Promise<void> {
@@ -208,11 +211,21 @@ class PulsePanel extends BasePanel {
                 await this.handleSystemStatusAction('edit-budget');
             });
         }
+
+        // Listen for confirmation reset events (triggered when 5s timeout expires)
+        container.addEventListener('daemon-confirm-reset', async () => {
+            await this.renderSystemStatus();
+        });
     }
 
     private async handleSystemStatusAction(action: string): Promise<void> {
         const { handleSystemStatusAction } = await import('./pulse/system-status.ts');
-        await handleSystemStatusAction(action);
+        const executed = await handleSystemStatusAction(action);
+
+        // If action wasn't executed (waiting for confirmation), re-render to show confirm state
+        if (!executed) {
+            await this.renderSystemStatus();
+        }
     }
 
     /**
