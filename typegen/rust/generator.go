@@ -435,10 +435,12 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 		}
 
 		// Add documentation link as #[doc] attribute (preferred for generated code)
-		// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
-		anchor := strings.ToLower(strings.ReplaceAll(util.ToSnakeCase(name), "_", ""))
-		docLink := fmt.Sprintf("https://github.com/teranos/QNTX/blob/main/docs/types/%s.md#%s", result.PackageName, anchor)
-		sb.WriteString(fmt.Sprintf("#[doc = \"Documentation: <%s>\"]\n", docLink))
+		if result.GitHubBaseURL != "" {
+			// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
+			anchor := strings.ToLower(strings.ReplaceAll(util.ToSnakeCase(name), "_", ""))
+			docLink := fmt.Sprintf("%s/docs/types/%s.md#%s", result.GitHubBaseURL, result.PackageName, anchor)
+			sb.WriteString(fmt.Sprintf("#[doc = \"Documentation: <%s>\"]\n", docLink))
+		}
 
 		sb.WriteString(result.Types[name])
 		if i < len(names)-1 {
