@@ -48,7 +48,7 @@ func CompareDirectories(tempDir string) (*CheckResult, error) {
 	// Check Rust (ignore metadata comments)
 	if diffs := compareDirectory(
 		filepath.Join(tempDir, "rust"),
-		"types/generated/rust",
+		"crates/qntx/src/types",
 		true, // Ignore metadata for Rust
 	); len(diffs) > 0 {
 		differences["Rust"] = diffs

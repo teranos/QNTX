@@ -52,6 +52,43 @@ var ExcludedTypes = map[string]bool{
 	"QNTXServer":          true, // Internal server
 }
 
+// DetectGitHubBaseURL detects the GitHub base URL from the Go module path.
+// Uses the same 'go' command that go/packages shells out to.
+// Returns empty string if detection fails or module isn't hosted on GitHub.
+func DetectGitHubBaseURL() string {
+	cmd := exec.Command("go", "list", "-m", "-json")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	// Parse JSON output to extract module path
+	// Output format: {"Path": "github.com/owner/repo", ...}
+	modulePath := ""
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "\"Path\":") {
+			// Extract value: "Path": "github.com/owner/repo",
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				modulePath = strings.Trim(strings.TrimSuffix(strings.TrimSpace(parts[1]), ","), "\"")
+				break
+			}
+		}
+	}
+
+	if modulePath == "" {
+		return ""
+	}
+
+	// Convert github.com/owner/repo to https://github.com/owner/repo/blob/main
+	if strings.HasPrefix(modulePath, "github.com/") {
+		return "https://" + modulePath + "/blob/main"
+	}
+
+	return ""
+}
+
 // GenerateFromPackage parses a Go package and generates type definitions
 // for all exported struct types using the provided generator.
 //
@@ -83,13 +120,14 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 
 	// Create language-agnostic result
 	result := &Result{
-		Types:         make(map[string]string),
-		PackageName:   pkg.Name,
-		TypePositions: make(map[string]Position),
-		TypeComments:  make(map[string]string),
-		Consts:        make(map[string]string),
-		Arrays:        make(map[string][]string),
-		Maps:          make(map[string]map[string]string),
+		Types:          make(map[string]string),
+		PackageName:    pkg.Name,
+		GitHubBaseURL:  DetectGitHubBaseURL(), // Detect from go.mod
+		TypePositions:  make(map[string]Position),
+		TypeComments:   make(map[string]string),
+		Consts:         make(map[string]string),
+		Arrays:         make(map[string][]string),
+		Maps:           make(map[string]map[string]string),
 	}
 
 	// Process all files in the package

@@ -12,7 +12,7 @@ Go-to-Python integration via CGo is fragile and version-dependent. This plugin r
 
 Uses PyO3 for memory-safe Python embedding and Nix for reproducible Python environments.
 
-See [External Plugin Development Guide](../docs/development/external-plugin-guide.md) for plugin architecture details and [domain.proto](../plugin/grpc/protocol/domain.proto) for the gRPC interface specification.
+See [External Plugin Development Guide](../docs/development/external-plugin-guide.md) for plugin architecture details.
 
 ## Features
 

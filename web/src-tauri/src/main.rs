@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use qntx_types::sym;
+use qntx::types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
@@ -19,7 +19,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 // Import generated types from Go source (single source of truth)
 // These types are kept in sync with the backend via `make types`
 #[allow(unused_imports)]
-use qntx_types::{
+use qntx::types::{
     async_types::{Job, JobStatus},
     server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
 };
