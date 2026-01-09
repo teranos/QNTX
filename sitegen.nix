@@ -37,10 +37,22 @@ let
     core = ./web/css/core.css;
     utilities = ./web/css/utilities.css;
     docs = ./web/css/docs.css;
+    prism = pkgs.fetchurl {
+      url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css";
+      hash = "sha256-GxX+KXGZigSK67YPJvbu12EiBx257zuZWr0AMiT1Kpg=";
+    };
   };
 
   jsFiles = {
     releases = ./web/js/releases.js;
+    prismCore = pkgs.fetchurl {
+      url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js";
+      hash = "sha256-4mJNT2bMXxcc1GCJaxBmMPdmah5ji0Ldnd79DKd1hoM=";
+    };
+    prismAutoloader = pkgs.fetchurl {
+      url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js";
+      hash = "sha256-AjM0J5XIbiB590BrznLEgZGLnOQWrt62s3BEq65Q/I0=";
+    };
   };
 
   logo = ./web/qntx.jpg;
@@ -186,6 +198,7 @@ let
       <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
       <link rel="stylesheet" href="${prefix}/css/core.css">
       <link rel="stylesheet" href="${prefix}/css/docs.css">
+      <link rel="stylesheet" href="${prefix}/css/prism.css">
     </head>'';
 
   mkNav = { prefix }: ''
@@ -194,6 +207,21 @@ let
         <img src="${prefix}/qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
       </a>
     </nav>'';
+
+  mkBreadcrumb = fileInfo:
+    let
+      category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+      categoryMeta = if category == null then null else getCategoryMeta category;
+      categoryTitle = if category == null then null else toTitleCase category;
+      categorySymbol = if categoryMeta == null then "" else categoryMeta.symbol;
+      documentTitle = toTitleCase fileInfo.name;
+
+      homeCrumb = ''<a href="${fileInfo.prefix}/index.html">Home</a>'';
+      categoryCrumb = if category == null then "" else
+      ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-category">${categorySymbol} ${categoryTitle}</span>'';
+      documentCrumb = ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${documentTitle}</span>'';
+    in
+    ''<nav class="breadcrumb">${homeCrumb}${categoryCrumb}${documentCrumb}</nav>'';
 
   provenanceFooter =
     let
@@ -766,12 +794,15 @@ let
         ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; }}
         <body>
         ${mkNav { prefix = fileInfo.prefix; }}
+        ${mkBreadcrumb fileInfo}
         EOF
           cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
         ${rewrittenMd}
         EOF
           cat <<'EOF'
         ${provenanceFooter}
+        <script src="${fileInfo.prefix}/js/prismCore.js"></script>
+        <script src="${fileInfo.prefix}/js/prismAutoloader.js"></script>
         </body>
         </html>
         EOF

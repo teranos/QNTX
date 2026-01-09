@@ -36,8 +36,8 @@ func (g *Generator) FileExtension() string {
 func (g *Generator) GenerateInterface(name string, structType *ast.StructType) string {
 	var sb strings.Builder
 
-	// Header with type name
-	sb.WriteString(fmt.Sprintf("## %s\n\n", name))
+	// Header with type name and anchor ID
+	sb.WriteString(fmt.Sprintf("## %s {#%s}\n\n", name, toHeadingID(name)))
 
 	// Build Go struct source
 	sb.WriteString("```go\n")
@@ -76,7 +76,7 @@ func (g *Generator) GenerateUnionType(name string, values []string) string {
 	// Sort values for deterministic output
 	sort.Strings(values)
 
-	sb.WriteString(fmt.Sprintf("## %s\n\n", name))
+	sb.WriteString(fmt.Sprintf("## %s {#%s}\n\n", name, toHeadingID(name)))
 
 	// Build Go type alias with const values
 	sb.WriteString("```go\n")
@@ -120,7 +120,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	// Generate const documentation (untyped consts)
 	if len(result.Consts) > 0 {
-		sb.WriteString("## Constants\n\n")
+		sb.WriteString("## Constants {#constants}\n\n")
 
 		// Add source link to the file
 		if result.SourceFile != "" && result.GitHubBaseURL != "" {
@@ -187,7 +187,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 		for _, name := range arrayNames {
 			elements := result.Arrays[name]
-			sb.WriteString(fmt.Sprintf("### %s\n\n", name))
+			sb.WriteString(fmt.Sprintf("### %s {#%s}\n\n", name, toHeadingID(name)))
 			sb.WriteString("```go\n")
 			sb.WriteString(fmt.Sprintf("var %s = []string{\n", name))
 			for _, elem := range elements {
@@ -208,7 +208,7 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 		for _, name := range mapNames {
 			mapData := result.Maps[name]
-			sb.WriteString(fmt.Sprintf("### %s\n\n", name))
+			sb.WriteString(fmt.Sprintf("### %s {#%s}\n\n", name, toHeadingID(name)))
 			sb.WriteString("```go\n")
 			sb.WriteString(fmt.Sprintf("var %s = map[string]string{\n", name))
 
@@ -271,4 +271,9 @@ func formatFieldType(expr ast.Expr) string {
 	default:
 		return "unknown"
 	}
+}
+
+// toHeadingID converts a type name to a lowercase heading ID for anchor links
+func toHeadingID(name string) string {
+	return strings.ToLower(name)
 }
