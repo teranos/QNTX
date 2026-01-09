@@ -174,7 +174,7 @@ type LLMStreamMessage struct {
 
 ## ListExecutionsResponse
 
-**Source**: [`server/pulse_execution_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L17)
+**Source**: [`server/pulse_execution_handlers.go:18`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L18)
 
 
 ```go
@@ -243,7 +243,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo
 
-**Source**: [`server/handlers.go:606`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L606)
+**Source**: [`server/handlers.go:598`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L598)
 
 
 ```go

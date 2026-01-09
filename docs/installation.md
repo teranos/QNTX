@@ -1,6 +1,6 @@
 # Installing QNTX
 
-QNTX is available through multiple installation methods. Choose the one that best fits your workflow.
+QNTX is available through multiple installation methods. Choose the one that best fits your workflow. After installation, see [Understanding QNTX](understanding-qntx.md) to learn the core concepts and [Configuration System](architecture/config-system.md) for setup options.
 
 ## Nix (Recommended)
 
@@ -324,9 +324,9 @@ make cli-nocgo
 
 After installing QNTX:
 
-1. **Configuration**: See [Configuration Guide](../am/README.md)
-2. **Development**: See [Nix Development Guide](./nix-development.md)
-3. **Segments**: Explore QNTX components in the [main README](../README.md#segments)
+1. **Configuration**: See [Configuration System](architecture/config-system.md)
+2. **Development**: See [Nix Development Guide](nix-development.md)
+3. **Segments**: Explore QNTX symbols in the [Glossary](GLOSSARY.md#symbol-categories)
 
 ---
 
