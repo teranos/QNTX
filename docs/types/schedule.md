@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/schedule.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/schedule.rs)
 - Python: [`types/generated/python/schedule.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/schedule.py)
 
-## Constants
+## Constants {#constants}
 
 **Source**: [`pulse/schedule/execution.go`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/execution.go)
 
@@ -25,7 +25,7 @@ const StatePaused = "paused"
 const StateStopping = "stopping"
 ```
 
-## Execution
+## Execution {#execution}
 
 **Source**: [`pulse/schedule/execution.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/schedule/execution.go#L13)
 
