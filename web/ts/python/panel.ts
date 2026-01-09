@@ -35,7 +35,7 @@ interface ExecutionResult {
 
 class PythonEditorPanel extends BasePanel {
     private editor: any | null = null;
-    private currentTab: 'editor' | 'output' = 'editor';
+    private currentTab: 'editor' | 'output' | null = null;
     private lastOutput: ExecutionResult | null = null;
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
@@ -84,6 +84,11 @@ class PythonEditorPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
+        // Initialize maps if not already initialized (field initializers run after super())
+        if (!this.tabClickHandlers) {
+            this.tabClickHandlers = new Map();
+        }
+
         // Close button
         const closeBtn = this.$('.python-editor-close');
         if (closeBtn) {
