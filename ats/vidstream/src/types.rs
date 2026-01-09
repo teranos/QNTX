@@ -40,7 +40,12 @@ pub struct BoundingBox {
 
 impl BoundingBox {
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     /// Calculate intersection over union with another box
@@ -88,7 +93,12 @@ pub struct Detection {
 }
 
 impl Detection {
-    pub fn new(class_id: u32, label: impl Into<String>, confidence: f32, bbox: BoundingBox) -> Self {
+    pub fn new(
+        class_id: u32,
+        label: impl Into<String>,
+        confidence: f32,
+        bbox: BoundingBox,
+    ) -> Self {
         Self {
             class_id,
             label: label.into(),

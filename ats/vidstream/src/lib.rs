@@ -43,6 +43,4 @@ pub use engine::VideoEngine;
 pub use types::{BoundingBox, Detection, FrameFormat, ProcessingStats};
 
 // Re-export FFI types for C consumers
-pub use ffi::{
-    BoundingBoxC, DetectionC, ProcessingStatsC, VideoEngineConfigC, VideoResultC,
-};
+pub use ffi::{BoundingBoxC, DetectionC, ProcessingStatsC, VideoEngineConfigC, VideoResultC};

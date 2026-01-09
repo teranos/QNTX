@@ -177,7 +177,9 @@ pub extern "C" fn video_engine_new() -> *mut VideoEngine {
 /// Caller owns the pointer and must call `video_engine_free` to deallocate.
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn video_engine_new_with_config(config: *const VideoEngineConfigC) -> *mut VideoEngine {
+pub extern "C" fn video_engine_new_with_config(
+    config: *const VideoEngineConfigC,
+) -> *mut VideoEngine {
     if config.is_null() {
         return ptr::null_mut();
     }
@@ -304,13 +306,8 @@ pub extern "C" fn video_engine_process_frame(
     let frame_slice = unsafe { slice::from_raw_parts(frame_data, frame_len) };
 
     // Process frame
-    let (detections, stats) = engine.process_frame(
-        frame_slice,
-        width,
-        height,
-        frame_format,
-        timestamp_us,
-    );
+    let (detections, stats) =
+        engine.process_frame(frame_slice, width, height, frame_format, timestamp_us);
 
     // Convert to C types
     let c_detections: Vec<DetectionC> = detections
@@ -477,15 +474,7 @@ mod tests {
 
     #[test]
     fn test_null_engine_handling() {
-        let result = video_engine_process_frame(
-            ptr::null(),
-            ptr::null(),
-            0,
-            640,
-            480,
-            0,
-            0,
-        );
+        let result = video_engine_process_frame(ptr::null(), ptr::null(), 0, 640, 480, 0, 0);
         assert!(!result.success);
         video_result_free(result);
     }
@@ -525,7 +514,7 @@ mod tests {
     fn test_expected_frame_size() {
         assert_eq!(video_expected_frame_size(640, 480, 0), 640 * 480 * 3); // RGB8
         assert_eq!(video_expected_frame_size(640, 480, 1), 640 * 480 * 4); // RGBA8
-        assert_eq!(video_expected_frame_size(640, 480, 4), 640 * 480);     // Gray8
-        assert_eq!(video_expected_frame_size(640, 480, 99), 0);            // Invalid
+        assert_eq!(video_expected_frame_size(640, 480, 4), 640 * 480); // Gray8
+        assert_eq!(video_expected_frame_size(640, 480, 99), 0); // Invalid
     }
 }
