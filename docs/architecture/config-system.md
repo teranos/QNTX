@@ -2,7 +2,7 @@
 
 ## Overview
 
-QNTX uses a layered configuration system with five sources, merged with clear precedence rules. This design allows system-wide defaults, user preferences, team settings, and environment overrides to coexist cleanly.
+QNTX uses a layered configuration system with five sources, merged with clear precedence rules. This design allows system-wide defaults, user preferences, team settings, and environment overrides to coexist cleanly. For the UI implementation of this system, see [Config Panel](../development/config-panel.md). For the REST API, see [Configuration API](../api/configuration.md).
 
 ## Configuration Sources
 
@@ -230,10 +230,9 @@ toml.Marshal(config)
 
 ## Related Documentation
 
-- **Package**: [`am/README.md`](../../am/README.md) - Configuration package overview and philosophy
-- **UI Design**: [`docs/development/config-panel.md`](../development/config-panel.md) - Config panel UI/UX specification and future vision
+- **UI Design**: [Config Panel](../development/config-panel.md) - Config panel UI/UX specification and future vision
+- **Glossary**: [Configuration Terms](../GLOSSARY.md#configuration) - Symbol and command reference
 - **User Guide**: How to configure QNTX (TBD)
-- **API**: `internal/config/config.go` (implementation)
 
 ## Future Enhancements
 
