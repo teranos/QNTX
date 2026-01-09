@@ -31,6 +31,9 @@
             # Nix formatting
             nixpkgs-fmt.enable = true;
 
+            # Rust formatting
+            rustfmt.enable = true;
+
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.
             # gofmt.enable = true;
@@ -92,21 +95,11 @@
           pname = "qntx-python-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
+          # and qntx-python is part of the workspace
           src = ./.;
 
-          # Create workspace-style Cargo.toml/lock at root for Nix
-          postUnpack = ''
-                        # Copy files from qntx-python to root
-                        cp $sourceRoot/qntx-python/Cargo.lock $sourceRoot/
-                        # Create minimal workspace Cargo.toml
-                        cat > $sourceRoot/Cargo.toml <<'EOF'
-            [workspace]
-            members = ["qntx-python"]
-            EOF
-          '';
-
           cargoLock = {
-            lockFile = ./qntx-python/Cargo.lock;
+            lockFile = ./Cargo.lock;
           };
 
           nativeBuildInputs = [
@@ -325,8 +318,52 @@
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
-          # Static documentation site
-          docs-site = pkgs.callPackage ./sitegen.nix { };
+          # Static documentation site with provenance and infrastructure docs
+          # For CI builds with full provenance, pass additional args
+          docs-site = pkgs.callPackage ./sitegen.nix {
+            gitRevision = self.rev or self.dirtyRev or "unknown";
+            gitShortRev = self.shortRev or self.dirtyShortRev or "unknown";
+
+            # Nix infrastructure metadata for self-documenting builds
+            nixPackages = [
+              { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
+              { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
+              { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
+              { name = "qntx-python"; description = "Python runtime plugin with PyO3"; }
+              { name = "docs-site"; description = "Static documentation website"; }
+            ];
+
+            nixApps = [
+              { name = "build-docs-site"; description = "Build documentation and copy to web/site/"; }
+              { name = "generate-types"; description = "Generate types for all languages"; }
+              { name = "check-types"; description = "Verify generated types are up-to-date"; }
+              { name = "generate-proto"; description = "Generate gRPC code from proto files"; }
+            ];
+
+            nixContainers = [
+              {
+                name = "CI Image";
+                description = "Full development environment for CI/CD pipelines";
+                image = "ghcr.io/teranos/qntx:latest";
+                architectures = [ "amd64" "arm64" ];
+                ports = [ ];
+              }
+              {
+                name = "qntx-code Plugin";
+                description = "Code analysis plugin container";
+                image = "ghcr.io/teranos/qntx-code-plugin:latest";
+                architectures = [ "amd64" "arm64" ];
+                ports = [ "9000/tcp" ];
+              }
+              {
+                name = "qntx-python Plugin";
+                description = "Python runtime plugin container";
+                image = "ghcr.io/teranos/qntx-python-plugin:latest";
+                architectures = [ "amd64" "arm64" ];
+                ports = [ "9000/tcp" ];
+              }
+            ];
+          };
 
           # Default: CLI binary for easy installation
           default = qntx;
@@ -398,24 +435,86 @@
         };
 
         # Apps for common tasks
-        apps.build-docs-site = {
-          type = "app";
-          program = toString (pkgs.writeShellScript "build-docs-site" ''
-            set -e
-            echo "Building documentation site..."
-            ${pkgs.nix}/bin/nix build .#docs-site
+        apps = {
+          build-docs-site = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "build-docs-site" ''
+              set -e
+              echo "Building documentation site..."
+              ${pkgs.nix}/bin/nix build .#docs-site
 
-            echo "Copying to web/site/..."
-            mkdir -p web/site
-            chmod -R +w web/site 2>/dev/null || true
-            rm -rf web/site/*
-            cp -r result/* web/site/
-            chmod -R +w web/site
+              echo "Copying to web/site/..."
+              mkdir -p web/site
+              chmod -R +w web/site 2>/dev/null || true
+              rm -rf web/site/*
+              cp -r result/* web/site/
+              chmod -R +w web/site
 
-            echo "Documentation site built and copied to web/site/"
-            echo "Files:"
-            ls -lh web/site/
-          '');
+              echo "Documentation site built and copied to web/site/"
+              echo "Files:"
+              ls -lh web/site/
+            '');
+          };
+
+          generate-types = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "generate-types" ''
+              set -e
+              echo "Generating types and documentation..."
+
+              # Ensure typegen is built
+              ${pkgs.nix}/bin/nix build .#typegen
+
+              # Run typegen for each language
+              # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
+              ./result/bin/typegen --lang typescript --output types/generated/
+              ./result/bin/typegen --lang python --output types/generated/
+              ./result/bin/typegen --lang rust
+              ./result/bin/typegen --lang markdown
+
+              echo "✓ TypeScript types generated in types/generated/typescript/"
+              echo "✓ Python types generated in types/generated/python/"
+              echo "✓ Rust types generated in crates/qntx/src/types/"
+              echo "✓ Markdown docs generated in docs/types/"
+            '');
+          };
+
+          check-types = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "check-types" ''
+              set -e
+              # Run typegen check inside dev environment where Go is available.
+              #
+              # NOTE: typegen uses golang.org/x/tools/go/packages which requires
+              # the 'go' command at runtime to load and parse Go packages. This is
+              # a known limitation of go/packages - it shells out to 'go list' for
+              # module resolution and type checking.
+              #
+              # Current approach: Run inside 'nix develop' where Go is in PATH.
+              # More proper solution: Wrap the typegen binary with makeWrapper to
+              # include Go in its runtime closure. This would make the binary truly
+              # self-contained but requires changes to the typegen package definition.
+              ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
+            '');
+          };
+
+          generate-proto = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "generate-proto" ''
+              set -e
+              echo "Generating gRPC code from proto files..."
+
+              # Use protoc from nixpkgs with Go plugins
+              ${pkgs.protobuf}/bin/protoc \
+                --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
+                --plugin=${pkgs.protoc-gen-go-grpc}/bin/protoc-gen-go-grpc \
+                --go_out=. --go_opt=paths=source_relative \
+                --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+                plugin/grpc/protocol/domain.proto
+
+              echo "✓ Proto files generated in plugin/grpc/protocol/"
+            '');
+          };
         };
       }
     );

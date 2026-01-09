@@ -59,6 +59,7 @@ func (s *QNTXServer) startBackgroundServices() {
 		}
 	}
 
+	// Broadcast worker is started in Run() method
 	// Start usage update broadcaster
 	s.startUsageUpdateTicker()
 

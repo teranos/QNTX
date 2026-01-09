@@ -5,36 +5,54 @@ package server
 // - Usage statistics (AI model usage costs)
 // - Job updates (async IX job progress)
 // - Daemon status (worker pool activity, budget tracking)
+//
+// Architecture: Dedicated broadcast worker goroutine
+// All client channel sends go through a single worker goroutine to eliminate
+// race conditions from concurrent sends during client unregistration.
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/server/wslogs"
 )
 
-// broadcastMessage sends a message to all connected clients.
-// Returns the number of clients that accepted the message (channel not full).
-func (s *QNTXServer) broadcastMessage(msg interface{}) int {
-	s.mu.RLock()
-	clients := make([]*Client, 0, len(s.clients))
-	for client := range s.clients {
-		clients = append(clients, client)
-	}
-	s.mu.RUnlock()
+// broadcastRequest represents a request to broadcast data to clients.
+// All broadcasts go through a dedicated worker goroutine to prevent race conditions.
+type broadcastRequest struct {
+	reqType  string        // "message", "graph", "log", "close"
+	msg      interface{}   // Generic message (for reqType="message")
+	graph    *graph.Graph  // Graph data (for reqType="graph")
+	logBatch *wslogs.Batch // Log batch (for reqType="log")
+	clientID string        // Target client ID (empty = all clients)
+	client   *Client       // Client to close (for reqType="close")
+}
 
-	sent := 0
-	for _, client := range clients {
-		select {
-		case client.sendMsg <- msg:
-			sent++
-		default:
-			// Channel full - skip
-		}
+// broadcastMessage sends a message to all connected clients.
+// This is now thread-safe - all sends go through the dedicated broadcast worker.
+func (s *QNTXServer) broadcastMessage(msg interface{}) int {
+	// Send request to broadcast worker
+	req := &broadcastRequest{
+		reqType: "message",
+		msg:     msg,
 	}
-	return sent
+
+	select {
+	case s.broadcastReq <- req:
+		// Request queued successfully
+		// Note: We can't return exact count anymore since sending is async,
+		// but the worker will handle it properly
+		s.mu.RLock()
+		count := len(s.clients)
+		s.mu.RUnlock()
+		return count
+	case <-s.ctx.Done():
+		return 0
+	}
 }
 
 func (s *QNTXServer) broadcastUsageUpdate() {
@@ -569,4 +587,154 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 		"state", state,
 		"clients", sent,
 	)
+}
+
+// runBroadcastWorker is the dedicated worker goroutine that owns all client channel sends.
+// This eliminates race conditions by ensuring only one goroutine ever sends to client channels.
+// The worker processes broadcast requests and handles client channel closure.
+func (s *QNTXServer) runBroadcastWorker() {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			s.logger.Debugw("Broadcast worker stopping due to context cancellation")
+			return
+
+		case req := <-s.broadcastReq:
+			s.processBroadcastRequest(req)
+		}
+	}
+}
+
+// processBroadcastRequest handles a single broadcast request.
+// This function has exclusive access to client channels - no other goroutine sends to them.
+func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
+	switch req.reqType {
+	case "message":
+		s.sendMessageToClients(req.msg, req.clientID)
+	case "graph":
+		s.sendGraphToClients(req.graph)
+	case "log":
+		s.sendLogToClient(req.clientID, req.logBatch)
+	case "close":
+		s.closeClientChannels(req.client)
+	default:
+		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
+	}
+}
+
+// sendMessageToClients sends a generic message to all clients (or specific client if clientID set).
+// Only called from broadcast worker - no concurrent access to client channels.
+func (s *QNTXServer) sendMessageToClients(msg interface{}, targetClientID string) {
+	s.mu.RLock()
+	clients := make([]*Client, 0, len(s.clients))
+	for client := range s.clients {
+		if targetClientID == "" || client.id == targetClientID {
+			clients = append(clients, client)
+		}
+	}
+	s.mu.RUnlock()
+
+	sent := 0
+	for _, client := range clients {
+		select {
+		case client.sendMsg <- msg:
+			sent++
+		default:
+			// Channel full - client can't keep up, will be removed
+			s.removeSlowClient(client)
+		}
+	}
+}
+
+// sendGraphToClients sends a graph to all clients.
+// Only called from broadcast worker - no concurrent access to client channels.
+func (s *QNTXServer) sendGraphToClients(g *graph.Graph) {
+	s.mu.RLock()
+	clients := make([]*Client, 0, len(s.clients))
+	for client := range s.clients {
+		clients = append(clients, client)
+	}
+	s.mu.RUnlock()
+
+	dropped := 0
+	for _, client := range clients {
+		select {
+		case client.send <- g:
+			// Success
+		default:
+			// Channel full - remove slow client
+			dropped++
+			s.broadcastDrops.Add(1)
+			s.removeSlowClient(client)
+		}
+	}
+
+	if dropped > 0 {
+		s.logger.Warnw("Graph broadcast had drops",
+			"clients", len(clients),
+			"dropped", dropped,
+			"total_drops", s.broadcastDrops.Load(),
+		)
+	}
+}
+
+// sendLogToClient sends a log batch to a specific client.
+// Only called from broadcast worker - no concurrent access to client channels.
+func (s *QNTXServer) sendLogToClient(clientID string, batch *wslogs.Batch) {
+	s.mu.RLock()
+	var targetClient *Client
+	for client := range s.clients {
+		if client.id == clientID {
+			targetClient = client
+			break
+		}
+	}
+	s.mu.RUnlock()
+
+	if targetClient == nil {
+		return // Client already disconnected
+	}
+
+	select {
+	case targetClient.sendLog <- batch:
+		// Success
+	default:
+		// Channel full
+		s.logger.Warnw("Log channel full for client", "client_id", clientID)
+	}
+}
+
+// closeClientChannels closes all channels for a client.
+// Only called from broadcast worker - no concurrent access to client channels.
+// This ensures all pending messages are sent before channels are closed.
+func (s *QNTXServer) closeClientChannels(client *Client) {
+	// Close channels in order: send, sendLog, sendMsg
+	// These will be called via client.close() which uses sync.Once
+	client.close()
+}
+
+// sendLogBatch is the callback used by wslogs.Transport to route log sends
+// through the broadcast worker (thread-safe)
+func (s *QNTXServer) sendLogBatch(clientID string, batch *wslogs.Batch) {
+	req := &broadcastRequest{
+		reqType:  "log",
+		clientID: clientID,
+		logBatch: batch,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		// Request queued
+	case <-s.ctx.Done():
+		// Server shutting down
+	default:
+		// Queue full - drop log batch (prevent blocking)
+		s.logger.Warnw("Broadcast request queue full, dropping log batch",
+			"client_id", clientID,
+			"messages", len(batch.Messages),
+		)
+	}
 }

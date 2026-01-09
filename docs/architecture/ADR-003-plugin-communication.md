@@ -211,6 +211,5 @@ No code→finance dependency, finance reads code's public data (attestations).
 
 ## Related
 
-- [ADR-001: Domain Plugin Architecture](./ADR-001-domain-plugin-architecture.md)
-- [Attestation System Documentation](../../README.md#attestation-system)
-- [Pulse Job System](../../pulse/README.md)
+- [ADR-001: Domain Plugin Architecture](ADR-001-domain-plugin-architecture.md)
+- [ADR-002: Plugin Configuration](ADR-002-plugin-configuration.md)

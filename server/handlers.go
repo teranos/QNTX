@@ -23,6 +23,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/internal/version"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/wslogs"
@@ -231,6 +232,7 @@ func (s *QNTXServer) loadJobHistoryForClient(client *Client) []*async.Job {
 }
 
 // sendJobToClient sends a job update message to a specific client.
+// Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial bool) {
 	metadata := map[string]interface{}{
 		"timestamp": time.Now().Unix(),
@@ -243,10 +245,19 @@ func (s *QNTXServer) sendJobToClient(client *Client, job *async.Job, isInitial b
 		Metadata: metadata,
 	}
 
+	// Send to broadcast worker (thread-safe)
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id, // Send to specific client only
+	}
+
 	select {
-	case client.sendMsg <- msg:
+	case s.broadcastReq <- req:
+	case <-s.ctx.Done():
+		return
 	default:
-		s.logger.Warnw("Client sendMsg channel full, skipping job",
+		s.logger.Warnw("Broadcast request queue full, skipping job",
 			"client_id", client.id,
 			"job_id", job.ID,
 		)
@@ -535,11 +546,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceEnabled(enabled); err != nil {
-					s.logger.Errorw("Failed to update local_inference.enabled",
-						"enabled", enabled,
-						"error", err,
-					)
-					http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
+					writeWrappedError(w, s.logger, err, "failed to update local_inference.enabled", http.StatusInternalServerError)
 					return
 				}
 				s.logger.Infow("Config updated via REST API",
@@ -555,11 +562,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceModel(model); err != nil {
-					s.logger.Errorw("Failed to update local_inference.model",
-						"model", model,
-						"error", err,
-					)
-					http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusInternalServerError)
+					writeWrappedError(w, s.logger, err, "failed to update local_inference.model", http.StatusInternalServerError)
 					return
 				}
 				s.logger.Infow("Config updated via REST API",
@@ -580,17 +583,14 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Handle Pulse budget updates
+	pulseLog := logger.AddPulseSymbol(s.logger)
 	if req.Pulse.DailyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateDailyBudget(*req.Pulse.DailyBudgetUSD); err != nil {
-			s.logger.Errorw("Failed to update daily budget",
-				"daily_budget", *req.Pulse.DailyBudgetUSD,
-				"error", err,
-			)
-			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			writeWrappedError(w, s.logger, err, "failed to update daily budget", http.StatusBadRequest)
 			return
 		}
 
-		s.logger.Infow("Config updated via REST API",
+		pulseLog.Infow("Daily budget updated via REST API",
 			"daily_budget", *req.Pulse.DailyBudgetUSD,
 			"client", r.RemoteAddr,
 		)
@@ -598,15 +598,11 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 	if req.Pulse.WeeklyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateWeeklyBudget(*req.Pulse.WeeklyBudgetUSD); err != nil {
-			s.logger.Errorw("Failed to update weekly budget",
-				"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
-				"error", err,
-			)
-			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			writeWrappedError(w, s.logger, err, "failed to update weekly budget", http.StatusBadRequest)
 			return
 		}
 
-		s.logger.Infow("Config updated via REST API",
+		pulseLog.Infow("Weekly budget updated via REST API",
 			"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
 			"client", r.RemoteAddr,
 		)
@@ -614,15 +610,11 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 
 	if req.Pulse.MonthlyBudgetUSD != nil {
 		if err := s.budgetTracker.UpdateMonthlyBudget(*req.Pulse.MonthlyBudgetUSD); err != nil {
-			s.logger.Errorw("Failed to update monthly budget",
-				"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
-				"error", err,
-			)
-			http.Error(w, fmt.Sprintf("Failed to update config: %v", err), http.StatusBadRequest)
+			writeWrappedError(w, s.logger, err, "failed to update monthly budget", http.StatusBadRequest)
 			return
 		}
 
-		s.logger.Infow("Config updated via REST API",
+		pulseLog.Infow("Monthly budget updated via REST API",
 			"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
 			"client", r.RemoteAddr,
 		)

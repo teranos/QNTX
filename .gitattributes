@@ -1,0 +1,5 @@
+# Generated documentation site - collapse in GitHub PR diffs
+web/site/** linguist-generated=true
+
+# Generated Rust types - collapse in GitHub PR diffs
+types/generated/rust/** linguist-generated=true
