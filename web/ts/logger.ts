@@ -63,32 +63,35 @@
  *   - graph/tile/controls.ts (3)
  */
 
+// Import core QNTX symbols from generated types
+import * as CoreSEG from '../../types/generated/typescript/sym.js';
+
 /**
  * Log levels in order of severity
  */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 /**
- * Common SEG symbols for logging context
- * Use these as the first argument to log methods for consistency
+ * SEG symbols for logging context
+ * Combines core QNTX symbols with UI-specific extensions
  */
 export const SEG = {
-    // Primary operators
-    SELF: '⍟',      // i - Self/vantage point
-    CONFIG: '≡',    // am - Configuration
-    INGEST: '⨳',    // ix - Data ingestion
-    QUERY: '⋈',     // ax - Query/expand
-    ACTOR: '⌬',     // by - Actor/catalyst
-    TIME: '✦',      // at - Temporal marker
-    FLOW: '⟶',      // so - Consequent action
+    // Core QNTX symbols (from generated types)
+    SELF: CoreSEG.I,        // ⍟ - Self/vantage point
+    CONFIG: CoreSEG.AM,     // ≡ - Configuration
+    INGEST: CoreSEG.IX,     // ⨳ - Data ingestion
+    QUERY: CoreSEG.AX,      // ⋈ - Query/expand
+    ACTOR: CoreSEG.BY,      // ⌬ - Actor/catalyst
+    TIME: CoreSEG.AT,       // ✦ - Temporal marker
+    FLOW: CoreSEG.SO,       // ⟶ - Consequent action
+    PULSE: CoreSEG.Pulse,   // ꩜ - Async operations
+    DB: CoreSEG.DB,         // ⊔ - Database/storage
 
-    // System symbols
-    PULSE: '꩜',     // Async operations
-    DB: '⊔',        // Database/storage
-    WS: '📡',       // WebSocket (using emoji for visibility)
-    UI: '🖼',       // UI components
-    GRAPH: '◇',     // Graph visualization
-    ERROR: '⚠',     // Errors/warnings
+    // UI-specific extensions (not in core)
+    WS: '⥂' as const,       // WebSocket communications
+    UI: '▦' as const,       // UI components
+    GRAPH: '◇' as const,    // Graph visualization
+    ERROR: '⚠' as const,    // Errors/warnings
 } as const;
 
 /**

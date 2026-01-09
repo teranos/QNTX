@@ -9,13 +9,13 @@
  * - Delete: Permanently removes job, needs confirmation
  */
 
-import { debugLog } from '../debug';
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
 import { toast } from '../toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 import { handleError, SEG } from '../error-handler';
+import { log } from '../logger';
 
 /**
  * Two-click confirmation state for job actions
@@ -120,7 +120,7 @@ export async function handleForceTrigger(
     }
 
     try {
-        debugLog('[Pulse Panel] Force triggering job:', job.ats_code);
+        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
 
         await forceTriggerJob(job.ats_code);
 
