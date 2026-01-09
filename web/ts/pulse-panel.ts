@@ -103,6 +103,10 @@ class PulsePanel extends BasePanel {
         });
 
         // Store cleanup function for onDestroy
+        // Note: unsubscribers array is initialized by field initializer after super() returns
+        if (!this.unsubscribers) {
+            this.unsubscribers = [];
+        }
         this.unsubscribers.push(cleanup);
     }
 
