@@ -17,7 +17,7 @@
  *   log.warn('⚠', 'Rate limit approaching');
  *   log.error('⊔', 'Database connection failed', error);
  *
- * TODO: Migrate remaining 43 files from console.* to log.*:
+ * TODO: Migrate remaining 42 files from console.* to log.*:
  *   - system-drawer.ts (3)
  *   - codemirror-editor.ts (5)
  *   - ai-provider-panel.ts (9)
@@ -56,7 +56,6 @@
  *   - websocket-handlers/system-capabilities.ts (1)
  *   - graph/renderer.ts (3)
  *   - storage.ts (6)
- *   - websocket-handlers/plugin-health.ts (1)
  *   - graph/focus.ts (9)
  *   - graph/focus/dimensions.ts (1)
  *   - graph/focus/physics.ts (2)
