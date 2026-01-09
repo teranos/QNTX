@@ -52,10 +52,10 @@ var ExcludedTypes = map[string]bool{
 	"QNTXServer":          true, // Internal server
 }
 
-// detectGitHubBaseURL detects the GitHub base URL from the Go module path.
+// DetectGitHubBaseURL detects the GitHub base URL from the Go module path.
 // Uses the same 'go' command that go/packages shells out to.
 // Returns empty string if detection fails or module isn't hosted on GitHub.
-func detectGitHubBaseURL() string {
+func DetectGitHubBaseURL() string {
 	cmd := exec.Command("go", "list", "-m", "-json")
 	output, err := cmd.Output()
 	if err != nil {
@@ -122,7 +122,7 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 	result := &Result{
 		Types:          make(map[string]string),
 		PackageName:    pkg.Name,
-		GitHubBaseURL:  detectGitHubBaseURL(), // Detect from go.mod
+		GitHubBaseURL:  DetectGitHubBaseURL(), // Detect from go.mod
 		TypePositions:  make(map[string]Position),
 		TypeComments:   make(map[string]string),
 		Consts:         make(map[string]string),

@@ -24,10 +24,10 @@ Execute an ATS query
 
 | Field | Description |
 |-------|-------------|
-| cursor | Cursor column position |
-| filename | Source file name |
 | query | ATS query string |
 | line | Cursor line position |
+| cursor | Cursor column position |
+| filename | Source file name |
 
 ### Server → Client
 
@@ -37,8 +37,8 @@ Async job status update
 
 | Field | Description |
 |-------|-------------|
-| metadata | Additional metadata about the update |
 | job | Job object with status, progress, etc. |
+| metadata | Additional metadata about the update |
 
 #### `daemon_status`
 

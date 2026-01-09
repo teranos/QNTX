@@ -527,8 +527,8 @@ func (g *Generator) generateGRPCDoc() string {
 	sb.WriteString("gRPC interface for external QNTX domain plugins.\n\n")
 
 	// Link to proto file if GitHub URL is available
-	if g.result.GitHubBaseURL != "" {
-		protoURL := g.result.GitHubBaseURL + "/plugin/grpc/protocol/domain.proto"
+	if gitHubBaseURL := typegen.DetectGitHubBaseURL(); gitHubBaseURL != "" {
+		protoURL := gitHubBaseURL + "/plugin/grpc/protocol/domain.proto"
 		sb.WriteString(fmt.Sprintf("**Proto file**: [`plugin/grpc/protocol/domain.proto`](%s)\n\n", protoURL))
 	}
 
