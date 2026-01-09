@@ -4,7 +4,7 @@
 
 ## What This Is
 
-QNTX is an **attestation-based continuous intelligence system**. Not a knowledge base, not a note-taking app, not a database GUI. It's an attempt to answer: *"How do I build understanding that stays current?"*
+QNTX is an **attestation-based continuous intelligence system**. Not a knowledge base, not a note-taking app, not a database GUI. It's an attempt to answer: *"How do I build understanding that stays current?"* For quick definitions, see the [Glossary](GLOSSARY.md).
 
 The core primitive is the **attestation**: structured facts of the form "X has property Y in context Z". Everything flows from this:
 
@@ -47,7 +47,7 @@ Each layer has a clear contract. You can work on graph rendering without touchin
 
 ### 3. Real-Time Everything
 
-The WebSocket architecture reveals intent:
+The WebSocket architecture reveals intent (see [WebSocket API](api/websocket.md) for protocol details):
 
 - Custom `/ws` endpoint for parse_response (semantic tokens, diagnostics)
 - Standard `/lsp` endpoint for LSP protocol (completions, hover)

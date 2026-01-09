@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/typegen"
+	"github.com/teranos/QNTX/typegen/api"
 	"github.com/teranos/QNTX/typegen/markdown"
 	"github.com/teranos/QNTX/typegen/python"
 	"github.com/teranos/QNTX/typegen/rust"
@@ -86,10 +87,12 @@ It handles:
   - Pointer types as optional fields
   - time.Time as string
   - map[string]interface{} as Record/dict/HashMap
+  - API endpoint documentation (generated with markdown to docs/api/)
 
 Examples:
   qntx typegen                                    # Generate TypeScript to stdout
   qntx typegen --lang typescript                  # Explicit language
+  qntx typegen --lang markdown                    # Generate docs/types/ and docs/api/
   qntx typegen --lang all                         # All languages
   qntx typegen --output types/generated/          # Write to directory (creates typescript/ subdir)
   qntx typegen --packages pulse/async             # Specific package only`,
@@ -254,6 +257,9 @@ type genResult struct {
 
 // generateForLanguage generates types for a specific language
 func generateForLanguage(lang string, packages []string, generateIndex bool) error {
+	// Determine output directory for this language
+	outputDir, fileExt := getOutputConfig(lang)
+
 	// Create the appropriate generator
 	var gen typegen.Generator
 	switch lang {
@@ -262,7 +268,12 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 	case "markdown":
 		gen = markdown.NewGenerator()
 	case "rust":
-		gen = rust.NewGenerator()
+		// Use embedded generator if outputting to an embedded module location
+		if isEmbeddedRustLocation(outputDir) {
+			gen = rust.NewEmbeddedGenerator()
+		} else {
+			gen = rust.NewGenerator()
+		}
 	case "python":
 		gen = python.NewGenerator()
 	case "dart":
@@ -283,8 +294,7 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		addCrossPackageImports(results, typeToPackage)
 	}
 
-	// Determine output configuration
-	outputDir, fileExt := getOutputConfig(lang)
+	// outputDir and fileExt already determined above
 
 	// Write generated files
 	if err := writeGeneratedOutput(results, outputDir, fileExt, lang); err != nil {
@@ -302,20 +312,27 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 
 	// Generate mod.rs index for Rust
 	// Only generate when processing all default packages to avoid partial indices
+	// Skip scaffolding files (lib.rs, Cargo.toml, README.md, mod.rs) for embedded locations
 	if outputDir != "" && lang == "rust" && generateIndex {
 		exports := convertToRustPackageExports(results)
-		if err := rust.GenerateIndexFile(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate mod.rs: %w", err)
+		isEmbedded := isEmbeddedRustLocation(outputDir)
+
+		if !isEmbedded {
+			// Standalone crate: generate all scaffolding
+			if err := rust.GenerateIndexFile(outputDir, exports); err != nil {
+				return fmt.Errorf("failed to generate mod.rs: %w", err)
+			}
+			if err := rust.GenerateLibRs(outputDir, exports); err != nil {
+				return fmt.Errorf("failed to generate lib.rs: %w", err)
+			}
+			if err := rust.GenerateCargoToml(outputDir); err != nil {
+				return fmt.Errorf("failed to generate Cargo.toml: %w", err)
+			}
+			if err := rust.GenerateReadme(outputDir, exports); err != nil {
+				return fmt.Errorf("failed to generate README.md: %w", err)
+			}
 		}
-		if err := rust.GenerateLibRs(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate lib.rs: %w", err)
-		}
-		if err := rust.GenerateCargoToml(outputDir); err != nil {
-			return fmt.Errorf("failed to generate Cargo.toml: %w", err)
-		}
-		if err := rust.GenerateReadme(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate README.md: %w", err)
-		}
+		// Embedded location: skip scaffolding (custom mod.rs exists in parent crate)
 	}
 
 	// Generate __init__.py for Python
@@ -342,6 +359,12 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 			return fmt.Errorf("failed to write README: %w", err)
 		}
 		fmt.Printf("✓ Generated %s (index)\n", readmePath)
+
+		// Also generate API documentation (part of markdown output)
+		apiOutputDir := "docs/api"
+		if err := api.GenerateAPIDoc("server", apiOutputDir); err != nil {
+			return fmt.Errorf("failed to generate API docs: %w", err)
+		}
 	}
 
 	return nil
@@ -405,18 +428,34 @@ func addCrossPackageImports(results []genResult, typeToPackage map[string]string
 	}
 }
 
+// isEmbeddedRustLocation returns true if the output directory is an embedded location
+// within an existing Rust crate (not a standalone generated crate)
+func isEmbeddedRustLocation(outputDir string) bool {
+	// Embedded locations are within crates/ and contain /src/
+	return strings.Contains(outputDir, "crates/") && strings.Contains(outputDir, "/src/")
+}
+
 // getOutputConfig determines the output directory and file extension for a language
 func getOutputConfig(lang string) (outputDir, fileExt string) {
 	if typegenOutput == "" {
-		// No output specified: markdown defaults to docs/types, others to stdout
+		// No output specified: markdown defaults to docs/types, rust to embedded crate, others to stdout
 		if lang == "markdown" {
 			outputDir = "docs/types"
+		} else if lang == "rust" {
+			outputDir = "crates/qntx/src/types"
 		} else {
 			outputDir = "" // stdout mode
 		}
 	} else {
 		// Output specified: use it for all languages
-		outputDir = filepath.Join(typegenOutput, lang)
+		// For Rust and markdown, preserve the actual output structure to ensure correct import generation
+		if lang == "rust" {
+			outputDir = filepath.Join(typegenOutput, "crates/qntx/src/types")
+		} else if lang == "markdown" {
+			outputDir = filepath.Join(typegenOutput, "docs/types")
+		} else {
+			outputDir = filepath.Join(typegenOutput, lang)
+		}
 	}
 
 	switch lang {
