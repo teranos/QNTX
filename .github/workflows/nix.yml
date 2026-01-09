@@ -125,11 +125,10 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Build docs site
-        run: nix build .#docs-site --show-trace
-
-      - name: Check docs links
-        run: nix flake check --show-trace .#checks.x86_64-linux.docs-site-links
+      - name: Build and validate docs
+        run: |
+          nix flake check --show-trace .#checks.x86_64-linux.docs-site-builds
+          nix flake check --show-trace .#checks.x86_64-linux.docs-site-links
 
       - name: Push to Cachix
         if: github.ref == 'refs/heads/main'
