@@ -12,7 +12,6 @@
 import { debugLog } from '../debug';
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { formatInterval } from './types';
 import { toast } from '../toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
@@ -148,8 +147,6 @@ export async function handleJobAction(
     ctx: JobActionContext,
     buttonElement?: HTMLElement
 ): Promise<void> {
-    const job = ctx.jobs.get(jobId);
-
     // Handle delete with two-click confirmation
     if (action === 'delete') {
         const button = buttonElement || document.querySelector(
