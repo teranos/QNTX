@@ -8,7 +8,7 @@
   position: fixed;
   left: 0;
   top: 0;
-  width: 50%;
+  width: 66.66%;
   height: 100%;
   background: #fff;
   border-right: 1px solid #ddd;
@@ -34,9 +34,9 @@
 /* Overlay - darken right side when panel is open */
 .panel-overlay {
   position: fixed;
-  left: 50%;
+  left: 66.66%;
   top: 0;
-  width: 50%;
+  width: 33.33%;
   height: 100%;
   background: rgba(0, 0, 0, 0.3);
   z-index: 999;
