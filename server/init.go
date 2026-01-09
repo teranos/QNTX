@@ -10,6 +10,7 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/auth"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
@@ -230,6 +231,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
+
+	// Initialize auth service if enabled
+	setupAuth(server, db, deps.config, serverLogger)
 
 	return server, nil
 }
@@ -485,4 +489,34 @@ func (c *pluginConfigWithEndpoints) Set(key string, value interface{}) {
 
 func (c *pluginConfigWithEndpoints) GetKeys() []string {
 	return c.base.GetKeys()
+}
+
+// setupAuth initializes the authentication service if enabled
+func setupAuth(server *QNTXServer, db *sql.DB, config *appcfg.Config, serverLogger *zap.SugaredLogger) {
+	if !config.Auth.Enabled {
+		serverLogger.Infow("Authentication disabled (local-only mode)")
+		return
+	}
+
+	// Create auth store
+	authStore := auth.NewStore(db)
+	server.authStore = authStore
+
+	// Create auth service
+	authService, err := auth.NewService(db, &config.Auth, serverLogger)
+	if err != nil {
+		serverLogger.Warnw("Failed to initialize auth service, auth will be disabled", "error", err)
+		return
+	}
+
+	server.authService = authService
+
+	// Create middleware and handlers
+	server.authMiddleware = auth.NewMiddleware(authService, authStore, serverLogger)
+	server.authHandlers = auth.NewHandlers(authService, authStore, serverLogger)
+
+	serverLogger.Infow("Authentication enabled",
+		"providers", authService.ListProviders(),
+		"tls_enabled", config.Auth.TLS.Enabled,
+	)
 }
