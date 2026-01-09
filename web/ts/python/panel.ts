@@ -8,6 +8,7 @@
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { escapeHtml } from '../html-utils.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -358,11 +359,6 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         outputEl.innerHTML = html;
     }
 
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     private updateExecuteButton(executing: boolean): void {
         const btn = this.$('#python-execute-btn') as HTMLButtonElement;
