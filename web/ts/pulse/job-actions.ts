@@ -287,7 +287,7 @@ export async function handleViewDetailed(
  * Open prose document that created this job
  */
 export async function handleProseLocationClick(docId: string): Promise<void> {
-    debugLog('[Pulse Panel] Opening prose document:', docId);
+    log.debug(SEG.PULSE, 'Opening prose document:', docId);
 
     const { showProseDocument } = await import('../prose/panel.js');
     await showProseDocument(docId);
