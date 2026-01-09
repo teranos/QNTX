@@ -4,10 +4,11 @@
 //! types in the FFI layer.
 
 /// Supported frame formats for input
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[repr(C)]
 pub enum FrameFormat {
     /// RGB with 8 bits per channel (24 bits per pixel)
+    #[default]
     RGB8 = 0,
     /// RGBA with 8 bits per channel (32 bits per pixel)
     RGBA8 = 1,
@@ -17,12 +18,6 @@ pub enum FrameFormat {
     YUV420 = 3,
     /// Grayscale 8-bit
     Gray8 = 4,
-}
-
-impl Default for FrameFormat {
-    fn default() -> Self {
-        Self::RGB8
-    }
 }
 
 /// Bounding box for detected objects
