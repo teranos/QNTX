@@ -6,6 +6,17 @@
  * - Configuring scraping options
  * - Viewing scraping results
  * - Monitoring job status
+ *
+ * TODO: Add visual indicator for disabled/unavailable plugin state
+ * When the webscraper plugin is not loaded or unavailable, the panel should:
+ * 1. Show diagonal gray stripes background (CSS repeating-linear-gradient pattern)
+ * 2. Disable interactive elements
+ * 3. Display "Plugin Unavailable" message
+ * This requires:
+ * - Backend API to indicate plugin availability status
+ * - CSS class `.panel-unavailable` with diagonal stripes
+ * - Symbol palette integration to show stripes on symbols for disabled plugins
+ * - Similar to how fuzzy-ax shows availability in command palette
  */
 
 import { BasePanel } from './base-panel.ts';
@@ -437,6 +448,10 @@ class WebscraperPanel extends BasePanel {
         card.className = 'scraper-result-card';
 
         if (result.error) {
+            // TODO: Error is displayed both in panel error state and in results box,
+            // causing duplication. Should only show in one place or clearly differentiate
+            // between inline panel errors and result history errors.
+
             // Use rich error display if available
             const richError = (result as ScrapeResult & { _richError?: RichError })._richError;
             if (richError) {

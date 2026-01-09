@@ -13,7 +13,8 @@
  * - 300ms delay to prevent hover noise
  * - Terminal-style dark background with monospace font
  * - Multi-line support (use \n in tooltip text)
- * - Arrow pointer positioning
+ * - Viewport-constrained positioning
+ * - Touch support with tap-to-toggle
  * - Auto-cleanup on container removal
  */
 
@@ -75,13 +76,52 @@ class TooltipManager {
             }
         };
 
+        // Touch support: long press to show tooltip
+        // Use passive touchstart to track touch position, then check on touchend
+        let touchStartTarget: HTMLElement | null = null;
+        let touchStartTime = 0;
+
+        const handleTouchStart = (e: TouchEvent) => {
+            const target = e.target as HTMLElement;
+            touchStartTarget = target.closest(selector) as HTMLElement | null;
+            touchStartTime = Date.now();
+        };
+
+        const handleTouchEnd = (e: TouchEvent) => {
+            const target = e.target as HTMLElement;
+            const trigger = target.closest(selector) as HTMLElement | null;
+
+            // Only handle if touch ended on same element it started
+            if (trigger && trigger === touchStartTarget) {
+                const touchDuration = Date.now() - touchStartTime;
+                const tooltipText = trigger.dataset.tooltip;
+
+                if (tooltipText) {
+                    // If tooltip is already showing for this trigger, hide it
+                    if (this.currentTrigger === trigger && this.tooltip) {
+                        this.hide();
+                    } else if (touchDuration < 500) {
+                        // Quick tap: show tooltip immediately
+                        this.hideImmediate();
+                        this.showImmediate(trigger, tooltipText);
+                    }
+                }
+            }
+
+            touchStartTarget = null;
+        };
+
         container.addEventListener('mouseenter', handleMouseEnter, true);
         container.addEventListener('mouseleave', handleMouseLeave, true);
+        container.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
+        container.addEventListener('touchend', handleTouchEnd, { capture: true, passive: true });
 
         // Return cleanup function
         return () => {
             container.removeEventListener('mouseenter', handleMouseEnter, true);
             container.removeEventListener('mouseleave', handleMouseLeave, true);
+            container.removeEventListener('touchstart', handleTouchStart, true);
+            container.removeEventListener('touchend', handleTouchEnd, true);
             this.hide();
         };
     }
@@ -111,11 +151,37 @@ class TooltipManager {
             this.tooltip.textContent = text;
             this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
 
+            // Append to DOM before positioning (getBoundingClientRect needs element in DOM)
+            document.body.appendChild(this.tooltip);
+
             // Position tooltip
             this.positionTooltip(trigger);
-
-            document.body.appendChild(this.tooltip);
         }, this.config.delay);
+    }
+
+    /**
+     * Show tooltip immediately without delay (for touch events)
+     */
+    showImmediate(trigger: HTMLElement, text: string): void {
+        this.currentTrigger = trigger;
+
+        // Remove old tooltip if exists
+        this.hideImmediate();
+
+        // Create new tooltip
+        this.tooltip = document.createElement('div');
+        this.tooltip.className = 'panel-tooltip';
+        if (this.config.position === 'top') {
+            this.tooltip.classList.add('panel-tooltip-top');
+        }
+        this.tooltip.textContent = text;
+        this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
+
+        // Append to DOM before positioning (getBoundingClientRect needs element in DOM)
+        document.body.appendChild(this.tooltip);
+
+        // Position tooltip
+        this.positionTooltip(trigger);
     }
 
     /**
