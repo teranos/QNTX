@@ -32,9 +32,9 @@ package vidstream
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_vidstream -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_vidstream -lpthread -ldl -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_vidstream -lws2_32 -luserenv
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_vidstream -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_vidstream -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_vidstream -lws2_32 -luserenv
 
 #include "video_engine.h"
 #include <stdlib.h>

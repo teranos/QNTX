@@ -1,0 +1,81 @@
+name: VidStream
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ats/vidstream/**/*.rs'
+      - 'ats/vidstream/Cargo.toml'
+      - 'ats/vidstream/**/*.go'
+      - 'ats/vidstream/include/**'
+      - '.github/workflows/vidstream.yml'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'ats/vidstream/**/*.rs'
+      - 'ats/vidstream/Cargo.toml'
+      - 'ats/vidstream/**/*.go'
+      - 'ats/vidstream/include/**'
+  workflow_dispatch:
+
+jobs:
+  vidstream:
+    name: VidStream (CGO + ONNX)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ats/vidstream
+
+      - name: Check formatting
+        run: cd ats/vidstream && cargo fmt --check
+
+      - name: Clippy (without ONNX)
+        run: cd ats/vidstream && cargo clippy --all-targets
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Clippy (with ONNX)
+        run: cd ats/vidstream && cargo clippy --all-targets --features onnx
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test (without ONNX - stub mode)
+        run: cd ats/vidstream && cargo test --lib
+
+      - name: Test (with ONNX - inference mode)
+        run: cd ats/vidstream && cargo test --lib --features onnx
+
+      - name: Build release (without ONNX)
+        run: cd ats/vidstream && cargo build --release --lib
+
+      - name: Build release (with ONNX)
+        run: cd ats/vidstream && cargo build --release --lib --features onnx
+
+      - name: Test CGO integration
+        run: |
+          cd ats/vidstream && cargo build --release --lib
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+          cd vidstream && CGO_ENABLED=1 go test -tags rustvideo -v
+
+      - name: Verify library artifacts
+        run: |
+          ls -lh ats/vidstream/target/release/libqntx_vidstream.*
+          file ats/vidstream/target/release/libqntx_vidstream.so || true
+          file ats/vidstream/target/release/libqntx_vidstream.a || true

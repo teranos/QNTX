@@ -387,8 +387,6 @@
 
         # Development shell with same tools
         devShells.default = pkgs.mkShell {
-          inherit (pre-commit-check) shellHook;
-
           buildInputs = [
             pkgs.go
             pkgs.rustc
@@ -398,10 +396,19 @@
             pkgs.python313
             pkgs.pkg-config
             pkgs.protobuf
+            pkgs.onnxruntime
           ] ++ pre-commit-check.enabledPackages;
 
           # Make Python available to PyO3 builds in dev shell
           PYO3_PYTHON = "${pkgs.python313}/bin/python3";
+
+          # Make ONNX Runtime available to Rust builds (vidstream)
+          shellHook = pre-commit-check.shellHook + ''
+            export LD_LIBRARY_PATH="${pkgs.onnxruntime}/lib:''${LD_LIBRARY_PATH:-}"
+            export DYLD_LIBRARY_PATH="${pkgs.onnxruntime}/lib:''${DYLD_LIBRARY_PATH:-}"
+            export ORT_DYLIB_PATH="${pkgs.onnxruntime}/lib"
+            export ORT_LIB_LOCATION="${pkgs.onnxruntime}/lib"
+          '';
         };
 
         # Expose pre-commit checks
