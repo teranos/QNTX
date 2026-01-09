@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/qntx",
+    "crates/qntx-inference",
     "qntx-python",
     "web/src-tauri",
 ]
