@@ -44,16 +44,19 @@ fn main() {
     for y in 0..test_height {
         for x in 0..test_width {
             let idx = ((y * test_width + x) * 3) as usize;
-            frame_data[idx] = (x % 256) as u8;     // R
+            frame_data[idx] = (x % 256) as u8; // R
             frame_data[idx + 1] = (y % 256) as u8; // G
-            frame_data[idx + 2] = 128;              // B
+            frame_data[idx + 2] = 128; // B
         }
     }
 
     println!("\nRunning warmup pass...");
     let _ = engine.process_frame(&frame_data, test_width, test_height, FrameFormat::RGB8, 0);
 
-    println!("\nBenchmarking {} frames at {}x{}...", 10, test_width, test_height);
+    println!(
+        "\nBenchmarking {} frames at {}x{}...",
+        10, test_width, test_height
+    );
     let mut total_time = 0u128;
     let iterations = 10;
 
@@ -74,7 +77,10 @@ fn main() {
         println!("  Inference:   {:6} μs", stats.inference_us);
         println!("  Postprocess: {:6} μs", stats.postprocess_us);
         println!("  Total:       {:6} μs", stats.total_us);
-        println!("  Detections:  {} (raw: {})", stats.detections_final, stats.detections_raw);
+        println!(
+            "  Detections:  {} (raw: {})",
+            stats.detections_final, stats.detections_raw
+        );
 
         if !detections.is_empty() {
             println!("  First detection: {:?}", detections[0]);
@@ -85,6 +91,10 @@ fn main() {
     let fps = 1_000_000.0 / avg_time as f64;
 
     println!("\n=== Results ===");
-    println!("Average latency: {} μs ({:.2} ms)", avg_time, avg_time as f64 / 1000.0);
+    println!(
+        "Average latency: {} μs ({:.2} ms)",
+        avg_time,
+        avg_time as f64 / 1000.0
+    );
     println!("Throughput: {:.1} FPS", fps);
 }
