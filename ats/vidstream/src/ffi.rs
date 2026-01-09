@@ -467,7 +467,9 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(feature = "onnx"))]
     fn test_engine_lifecycle() {
+        // Only test without onnx feature (no model file required)
         let engine = video_engine_new();
         assert!(!engine.is_null());
         video_engine_free(engine);
@@ -489,7 +491,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "onnx"))]
     fn test_frame_processing() {
+        // Only test without onnx feature (no model file required)
         let engine = video_engine_new();
         assert!(!engine.is_null());
 

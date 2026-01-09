@@ -12,8 +12,11 @@ authors = ["QNTX Contributors"]
 ffmpeg-next = { version = "7", optional = true }
 
 # ML inference via ONNX Runtime (recommended for portability)
-# Note: Version 2 is still in RC, use explicit version
-ort = { version = "2.0.0-rc.9", optional = true }
+# Note: Version 2 is still in RC, using latest compatible version
+# download-binaries: Auto-download ONNX Runtime binaries for the target platform
+# tls-native: Use system's native TLS for HTTPS downloads
+ort = { version = "2.0.0-rc.11", default-features = false, features = ["ndarray", "download-binaries", "tls-native"], optional = true }
+ndarray = { version = "0.16", optional = true }
 
 # Image processing
 image = "0.25"
@@ -36,7 +39,7 @@ default = []
 # Enable ffmpeg video decoding
 ffmpeg = ["dep:ffmpeg-next"]
 # Enable ONNX inference
-onnx = ["dep:ort"]
+onnx = ["dep:ort", "dep:ndarray"]
 # Full video processing pipeline
 full = ["ffmpeg", "onnx"]
 

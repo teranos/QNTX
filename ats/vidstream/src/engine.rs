@@ -5,14 +5,26 @@
 
 use std::time::Instant;
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 
-use crate::types::{Detection, FrameFormat, ProcessingStats, VideoEngineConfig};
+use crate::types::{BoundingBox, Detection, FrameFormat, ProcessingStats, VideoEngineConfig};
+
+#[cfg(feature = "onnx")]
+use ort::{
+    session::{builder::GraphOptimizationLevel, Session},
+    value::Value,
+};
+#[cfg(feature = "onnx")]
+use std::fs;
 
 /// Thread-safe video processing engine
 pub struct VideoEngine {
     config: VideoEngineConfig,
     labels: Vec<String>,
+    /// ONNX inference session (when onnx feature is enabled)
+    /// Wrapped in Mutex because Session::run() requires &mut self
+    #[cfg(feature = "onnx")]
+    session: Mutex<Session>,
     /// Reusable buffers to minimize allocations
     state: RwLock<EngineState>,
 }
@@ -55,12 +67,38 @@ impl VideoEngine {
         let input_size = (config.input_width * config.input_height * 3) as usize;
         let input_buffer = vec![0.0f32; input_size];
 
-        // TODO: When onnx feature is enabled, load the model here
-        // For now, we provide a working stub that demonstrates the API
+        // Load ONNX model when feature is enabled
+        #[cfg(feature = "onnx")]
+        let session = {
+            if config.model_path.is_empty() {
+                return Err("model_path is required when onnx feature is enabled".to_string());
+            }
+
+            // Load model file into memory
+            // TODO: Update to commit_from_file when qntx-inference branch uses ort rc.11
+            let model_bytes = fs::read(&config.model_path)
+                .map_err(|e| format!("Failed to read model file {}: {}", config.model_path, e))?;
+
+            // Build session with model bytes
+            Session::builder()
+                .map_err(|e| format!("Failed to create session builder: {}", e))?
+                .with_optimization_level(GraphOptimizationLevel::Level3)
+                .map_err(|e| format!("Failed to set optimization level: {}", e))?
+                .with_intra_threads(if config.num_threads > 0 {
+                    config.num_threads as usize
+                } else {
+                    1
+                })
+                .map_err(|e| format!("Failed to set thread count: {}", e))?
+                .commit_from_memory(&model_bytes)
+                .map_err(|e| format!("Failed to load model from {}: {}", config.model_path, e))?
+        };
 
         Ok(Self {
             config,
             labels,
+            #[cfg(feature = "onnx")]
+            session: Mutex::new(session),
             state: RwLock::new(EngineState {
                 input_buffer,
                 raw_detections: Vec::with_capacity(100),
@@ -120,7 +158,7 @@ impl VideoEngine {
 
         // Run model inference
         // Note: We pass the whole state to avoid split borrow issues
-        Self::run_inference(&mut state);
+        self.run_inference(&mut state);
 
         stats.inference_us = inference_start.elapsed().as_micros() as u64;
         stats.detections_raw = state.raw_detections.len() as u32;
@@ -156,8 +194,16 @@ impl VideoEngine {
 
     /// Check if the engine is ready for inference
     pub fn is_ready(&self) -> bool {
-        // TODO: Check if model is loaded when onnx feature is enabled
-        true
+        #[cfg(feature = "onnx")]
+        {
+            // Model is loaded during construction, so always ready
+            true
+        }
+        #[cfg(not(feature = "onnx"))]
+        {
+            // Without ONNX, we're in stub mode
+            false
+        }
     }
 
     /// Get the model input dimensions
@@ -244,28 +290,120 @@ impl VideoEngine {
         }
     }
 
-    fn run_inference(state: &mut EngineState) {
+    fn run_inference(&self, state: &mut EngineState) {
         // Clear previous detections
         state.raw_detections.clear();
 
-        // TODO: When onnx feature is enabled, run actual model inference
-        //
-        // For now, this is a stub that demonstrates the API structure.
-        // In production, this would:
-        // 1. Copy state.input_buffer to ONNX tensor
-        // 2. Run session.run()
-        // 3. Parse output tensors into state.raw_detections
-        //
-        // Example with ort crate:
-        // ```rust
-        // let outputs = session.run(ort::inputs![&state.input_buffer]?)?;
-        // let output = outputs[0].extract_tensor::<f32>()?;
-        // // Parse YOLO output format into state.raw_detections...
-        // ```
+        #[cfg(feature = "onnx")]
+        {
+            // Convert input buffer to NCHW format [1, 3, H, W]
+            // input_buffer is currently in HWC format (height * width * 3)
+            let h = self.config.input_height as usize;
+            let w = self.config.input_width as usize;
 
-        // Stub: return no detections
-        // Access input_buffer to silence unused warning
-        let _ = &state.input_buffer;
+            // Reshape from HWC to CHW (ONNX expects channels-first)
+            let mut chw_buffer = vec![0.0f32; h * w * 3];
+            for y in 0..h {
+                for x in 0..w {
+                    let hwc_idx = (y * w + x) * 3;
+                    let hw_idx = y * w + x;
+                    // R channel
+                    chw_buffer[hw_idx] = state.input_buffer[hwc_idx];
+                    // G channel
+                    chw_buffer[h * w + hw_idx] = state.input_buffer[hwc_idx + 1];
+                    // B channel
+                    chw_buffer[2 * h * w + hw_idx] = state.input_buffer[hwc_idx + 2];
+                }
+            }
+
+            // Create ONNX value directly from shape and data
+            // Shape: [1, 3, H, W]
+            let shape_vec = vec![1i64, 3, h as i64, w as i64];
+
+            // Convert to ONNX Value
+            // TODO: Simplify when ort rc.11 has better ndarray support
+            let input_value = match Value::from_array((shape_vec.as_slice(), chw_buffer)) {
+                Ok(v) => v,
+                Err(_) => return,
+            };
+
+            // Run inference (lock session for mutable access)
+            let mut session = self.session.lock();
+            let outputs = match session.run(ort::inputs![input_value]) {
+                Ok(outputs) => outputs,
+                Err(_) => return, // Inference failed, return no detections
+            };
+
+            // Extract output tensor (YOLOv8 format: [1, 84, 8400])
+            // 84 = 4 (bbox) + 80 (class scores)
+            // 8400 = number of detection candidates
+            let (shape, data_slice) = match outputs[0].try_extract_tensor::<f32>() {
+                Ok(tensor) => tensor,
+                Err(_) => return,
+            };
+
+            // Verify expected output shape [1, 84, 8400]
+            if shape.len() != 3 || shape[0] != 1 {
+                return;
+            }
+
+            let num_features = shape[1] as usize; // 84 = 4 bbox + 80 classes
+            let num_detections = shape[2] as usize; // 8400 candidates
+            let num_classes = num_features - 4; // 80 classes
+
+            // Helper function to index into flat output slice
+            // For shape [1, 84, 8400], flat index = feature * 8400 + detection
+            let get_value = |feature: usize, detection: usize| -> f32 {
+                data_slice[feature * num_detections + detection]
+            };
+
+            // Parse YOLOv8 output
+            for i in 0..num_detections {
+                // Extract bounding box (center_x, center_y, width, height)
+                let cx = get_value(0, i);
+                let cy = get_value(1, i);
+                let w = get_value(2, i);
+                let h = get_value(3, i);
+
+                // Find best class and confidence
+                let mut best_class = 0;
+                let mut best_conf = 0.0f32;
+                for c in 0..num_classes {
+                    let conf = get_value(4 + c, i);
+                    if conf > best_conf {
+                        best_conf = conf;
+                        best_class = c;
+                    }
+                }
+
+                // Only keep detections above a pre-NMS threshold
+                // (final threshold is applied in postprocessing)
+                if best_conf > 0.25 {
+                    let detection = Detection {
+                        class_id: best_class as u32,
+                        label: self.get_label(best_class as u32)
+                            .unwrap_or("unknown")
+                            .to_string(),
+                        confidence: best_conf,
+                        bbox: BoundingBox {
+                            x: cx - w / 2.0,  // Convert center to top-left
+                            y: cy - h / 2.0,
+                            width: w,
+                            height: h,
+                        },
+                        track_id: 0,
+                    };
+                    state.raw_detections.push(detection);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "onnx"))]
+        {
+            // Stub mode: no detections
+            // Access input_buffer to silence unused warning
+            let _ = &state.input_buffer;
+        }
     }
 
     fn postprocess_detections(
@@ -374,10 +512,12 @@ mod tests {
     use crate::types::BoundingBox;
 
     #[test]
+    #[cfg(not(feature = "onnx"))]
     fn test_engine_creation() {
+        // Only test without onnx feature (stub mode)
         let config = VideoEngineConfig::default();
         let engine = VideoEngine::new(config).unwrap();
-        assert!(engine.is_ready());
+        assert!(!engine.is_ready()); // Stub mode
     }
 
     #[test]
@@ -415,5 +555,154 @@ mod tests {
         let json = r#"["person", "car", "bike"]"#;
         let labels = parse_labels(json);
         assert_eq!(labels, vec!["person", "car", "bike"]);
+    }
+
+    #[test]
+    #[cfg(not(feature = "onnx"))]
+    fn test_nms_filters_overlapping_detections() {
+        // Test that NMS suppresses overlapping detections of the same class
+        let config = VideoEngineConfig {
+            confidence_threshold: 0.25,
+            nms_threshold: 0.5,
+            input_width: 640,
+            input_height: 640,
+            ..Default::default()
+        };
+        let engine = VideoEngine::new(config).unwrap();
+
+        // Create overlapping detections of the same class (person = 0)
+        let det1 = Detection {
+            class_id: 0,
+            label: "person".to_string(),
+            confidence: 0.9,
+            bbox: BoundingBox::new(100.0, 100.0, 200.0, 300.0),
+            track_id: 0,
+        };
+        let det2 = Detection {
+            class_id: 0,
+            label: "person".to_string(),
+            confidence: 0.7, // Lower confidence, should be suppressed
+            bbox: BoundingBox::new(120.0, 110.0, 200.0, 300.0), // Overlaps with det1
+            track_id: 0,
+        };
+        let det3 = Detection {
+            class_id: 0,
+            label: "person".to_string(),
+            confidence: 0.85,
+            bbox: BoundingBox::new(400.0, 100.0, 150.0, 250.0), // No overlap, should keep
+            track_id: 0,
+        };
+
+        let raw_detections = vec![det1, det2, det3];
+        let result = engine.postprocess_detections(&raw_detections, 1280, 720, 0);
+
+        // Should keep 2 detections (det1 and det3), det2 should be suppressed
+        assert_eq!(result.len(), 2);
+        assert!((result[0].confidence - 0.9).abs() < 0.01); // Highest confidence kept
+        assert!((result[1].confidence - 0.85).abs() < 0.01);
+    }
+
+    #[test]
+    #[cfg(not(feature = "onnx"))]
+    fn test_nms_keeps_different_classes() {
+        // Test that NMS doesn't suppress detections of different classes
+        let config = VideoEngineConfig {
+            confidence_threshold: 0.25,
+            nms_threshold: 0.5,
+            input_width: 640,
+            input_height: 640,
+            ..Default::default()
+        };
+        let engine = VideoEngine::new(config).unwrap();
+
+        // Create overlapping detections of DIFFERENT classes
+        let det1 = Detection {
+            class_id: 0, // person
+            label: "person".to_string(),
+            confidence: 0.9,
+            bbox: BoundingBox::new(100.0, 100.0, 200.0, 300.0),
+            track_id: 0,
+        };
+        let det2 = Detection {
+            class_id: 2, // car
+            label: "car".to_string(),
+            confidence: 0.8,
+            bbox: BoundingBox::new(110.0, 110.0, 200.0, 300.0), // Overlaps but different class
+            track_id: 0,
+        };
+
+        let raw_detections = vec![det1, det2];
+        let result = engine.postprocess_detections(&raw_detections, 1280, 720, 0);
+
+        // Should keep both detections (different classes)
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    #[cfg(not(feature = "onnx"))]
+    fn test_confidence_threshold_filtering() {
+        // Test that low confidence detections are filtered out
+        let config = VideoEngineConfig {
+            confidence_threshold: 0.6, // Higher threshold
+            nms_threshold: 0.5,
+            input_width: 640,
+            input_height: 640,
+            ..Default::default()
+        };
+        let engine = VideoEngine::new(config).unwrap();
+
+        let det1 = Detection {
+            class_id: 0,
+            label: "person".to_string(),
+            confidence: 0.9, // Above threshold, should keep
+            bbox: BoundingBox::new(100.0, 100.0, 200.0, 300.0),
+            track_id: 0,
+        };
+        let det2 = Detection {
+            class_id: 0,
+            label: "person".to_string(),
+            confidence: 0.4, // Below threshold, should filter out
+            bbox: BoundingBox::new(400.0, 100.0, 150.0, 250.0),
+            track_id: 0,
+        };
+
+        let raw_detections = vec![det1, det2];
+        let result = engine.postprocess_detections(&raw_detections, 1280, 720, 0);
+
+        // Should keep only 1 detection
+        assert_eq!(result.len(), 1);
+        assert!((result[0].confidence - 0.9).abs() < 0.01);
+    }
+
+    #[test]
+    #[cfg(not(feature = "onnx"))]
+    fn test_bbox_scaling() {
+        // Test that bounding boxes are scaled from model input to frame size
+        let config = VideoEngineConfig {
+            confidence_threshold: 0.25,
+            nms_threshold: 0.5,
+            input_width: 640,  // Model input
+            input_height: 640,
+            ..Default::default()
+        };
+        let engine = VideoEngine::new(config).unwrap();
+
+        let det = Detection {
+            class_id: 0,
+            label: "person".to_string(),
+            confidence: 0.9,
+            bbox: BoundingBox::new(320.0, 320.0, 100.0, 100.0), // Center of 640x640
+            track_id: 0,
+        };
+
+        let raw_detections = vec![det];
+        let result = engine.postprocess_detections(&raw_detections, 1280, 1280, 0); // 2x scale
+
+        // Bbox should be scaled by 2x (1280/640)
+        assert_eq!(result.len(), 1);
+        assert!((result[0].bbox.x - 640.0).abs() < 0.1);
+        assert!((result[0].bbox.y - 640.0).abs() < 0.1);
+        assert!((result[0].bbox.width - 200.0).abs() < 0.1);
+        assert!((result[0].bbox.height - 200.0).abs() < 0.1);
     }
 }

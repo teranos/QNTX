@@ -15,14 +15,16 @@ Real-time video frame processing for QNTX attestation generation via CGO.
 
 ## Build Requirements
 
-### Rust Library
+### Rust Library (Basic)
 
 ```bash
 cd ats/vidstream
 cargo build --release
 ```
 
-This produces `target/release/libqntx_vidstream.so` (Linux) or equivalent.
+This produces `target/release/libqntx_vidstream.so` (Linux), `.dylib` (macOS), or `.dll` (Windows).
+
+**Note:** The basic build runs in stub mode (no real inference). For actual ML inference, see [ONNX Feature](#onnx-runtime-inference) below.
 
 ### Go with CGO
 
@@ -126,22 +128,63 @@ as := &types.As{
 
 ## Optional Features
 
-The Rust library supports optional features for extended functionality:
+The Rust library supports optional features for extended functionality.
+
+### ONNX Runtime Inference
+
+**Automatic Setup (Recommended)**
+
+The `onnx` feature automatically downloads ONNX Runtime binaries for your platform:
 
 ```bash
-# Build with ONNX inference support
+cd ats/vidstream
 cargo build --release --features onnx
+```
 
-# Build with FFmpeg video decoding
+This uses the `download-binaries` feature from the `ort` crate, which:
+- Downloads pre-built ONNX Runtime for your OS/arch
+- Caches binaries in `target/` directory
+- Requires network access on first build
+- Works on: Linux (x86_64, aarch64), macOS (x86_64, arm64), Windows (x86_64)
+
+**Manual ONNX Runtime (Advanced)**
+
+If you prefer to use a system-installed ONNX Runtime:
+
+```bash
+# Install ONNX Runtime via package manager
+# Ubuntu/Debian:
+apt-get install libonnxruntime-dev
+
+# macOS (Homebrew):
+brew install onnxruntime
+
+# Or via Nix (recommended for QNTX developers):
+nix develop  # ONNX Runtime available in dev shell
+
+# Then build without download-binaries
+export ORT_LIB_LOCATION=/path/to/onnxruntime/lib
+cargo build --release --features onnx
+```
+
+**ONNX Runtime Version**
+
+Currently using `ort` version 2.0.0-rc.11, which supports:
+- ONNX Runtime 1.22.x
+- CPU inference (default)
+- GPU inference (requires additional configuration)
+
+### FFmpeg Video Decoding (Future)
+
+```bash
+# Build with FFmpeg video decoding (NOT YET IMPLEMENTED)
 cargo build --release --features ffmpeg
 
 # Build with all features
 cargo build --release --features full
 ```
 
-**Note:** Features require additional system dependencies:
-- `onnx`: ONNX Runtime libraries
-- `ffmpeg`: FFmpeg development libraries
+**Note:** FFmpeg feature requires FFmpeg development libraries installed on your system.
 
 ## Fallback Mode
 
@@ -161,11 +204,35 @@ engine, err := vidstream.NewVideoEngine()
 
 ## Testing
 
-```bash
-# Rust tests
-cd ats/vidstream
-cargo test
+### Rust Tests
 
-# Go tests (requires built Rust library)
-CGO_ENABLED=1 go test -tags rustvideo ./ats/vidstream/vidstream/...
+```bash
+cd ats/vidstream
+
+# Test without ONNX (stub mode - fast)
+cargo test --lib
+
+# Test with ONNX (inference mode - downloads ONNX Runtime on first run)
+cargo test --lib --features onnx
 ```
+
+### Go CGO Tests
+
+```bash
+# Build Rust library first
+cd ats/vidstream
+cargo build --release
+
+# Run Go tests
+cd vidstream
+CGO_ENABLED=1 go test -tags rustvideo -v
+```
+
+### CI Pipeline
+
+The GitHub Actions workflow (`.github/workflows/vidstream.yml`) runs:
+- Rust format checking (`cargo fmt`)
+- Clippy linting (with and without ONNX)
+- Unit tests (with and without ONNX)
+- CGO integration tests
+- Release builds
