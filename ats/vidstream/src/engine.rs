@@ -167,12 +167,8 @@ impl VideoEngine {
         let postprocess_start = Instant::now();
 
         // Apply NMS and threshold filtering
-        let detections = self.postprocess_detections(
-            &state.raw_detections,
-            width,
-            height,
-            timestamp_us,
-        );
+        let detections =
+            self.postprocess_detections(&state.raw_detections, width, height, timestamp_us);
 
         stats.postprocess_us = postprocess_start.elapsed().as_micros() as u64;
         stats.detections_final = detections.len() as u32;
@@ -243,8 +239,12 @@ impl VideoEngine {
 
         for y in 0..target_h {
             for x in 0..target_w {
-                let src_x = ((x as f32 + 0.5) * scale_x - 0.5).max(0.0).min((width - 1) as f32);
-                let src_y = ((y as f32 + 0.5) * scale_y - 0.5).max(0.0).min((height - 1) as f32);
+                let src_x = ((x as f32 + 0.5) * scale_x - 0.5)
+                    .max(0.0)
+                    .min((width - 1) as f32);
+                let src_y = ((y as f32 + 0.5) * scale_y - 0.5)
+                    .max(0.0)
+                    .min((height - 1) as f32);
 
                 let src_xi = src_x as u32;
                 let src_yi = src_y as u32;
@@ -381,12 +381,13 @@ impl VideoEngine {
                 if best_conf > 0.25 {
                     let detection = Detection {
                         class_id: best_class as u32,
-                        label: self.get_label(best_class as u32)
+                        label: self
+                            .get_label(best_class as u32)
                             .unwrap_or("unknown")
                             .to_string(),
                         confidence: best_conf,
                         bbox: BoundingBox {
-                            x: cx - w / 2.0,  // Convert center to top-left
+                            x: cx - w / 2.0, // Convert center to top-left
                             y: cy - h / 2.0,
                             width: w,
                             height: h,
@@ -485,17 +486,85 @@ fn parse_labels(labels_str: &str) -> Vec<String> {
 /// Default COCO class labels
 fn default_coco_labels() -> Vec<String> {
     vec![
-        "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
-        "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench",
-        "bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra",
-        "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-        "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove",
-        "skateboard", "surfboard", "tennis racket", "bottle", "wine glass", "cup",
-        "fork", "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
-        "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
-        "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
-        "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
-        "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "airplane",
+        "bus",
+        "train",
+        "truck",
+        "boat",
+        "traffic light",
+        "fire hydrant",
+        "stop sign",
+        "parking meter",
+        "bench",
+        "bird",
+        "cat",
+        "dog",
+        "horse",
+        "sheep",
+        "cow",
+        "elephant",
+        "bear",
+        "zebra",
+        "giraffe",
+        "backpack",
+        "umbrella",
+        "handbag",
+        "tie",
+        "suitcase",
+        "frisbee",
+        "skis",
+        "snowboard",
+        "sports ball",
+        "kite",
+        "baseball bat",
+        "baseball glove",
+        "skateboard",
+        "surfboard",
+        "tennis racket",
+        "bottle",
+        "wine glass",
+        "cup",
+        "fork",
+        "knife",
+        "spoon",
+        "bowl",
+        "banana",
+        "apple",
+        "sandwich",
+        "orange",
+        "broccoli",
+        "carrot",
+        "hot dog",
+        "pizza",
+        "donut",
+        "cake",
+        "chair",
+        "couch",
+        "potted plant",
+        "bed",
+        "dining table",
+        "toilet",
+        "tv",
+        "laptop",
+        "mouse",
+        "remote",
+        "keyboard",
+        "cell phone",
+        "microwave",
+        "oven",
+        "toaster",
+        "sink",
+        "refrigerator",
+        "book",
+        "clock",
+        "vase",
+        "scissors",
+        "teddy bear",
+        "hair drier",
         "toothbrush",
     ]
     .into_iter()
@@ -541,9 +610,18 @@ mod tests {
 
     #[test]
     fn test_frame_size_calculation() {
-        assert_eq!(VideoEngine::expected_frame_size(640, 480, FrameFormat::RGB8), 640 * 480 * 3);
-        assert_eq!(VideoEngine::expected_frame_size(640, 480, FrameFormat::RGBA8), 640 * 480 * 4);
-        assert_eq!(VideoEngine::expected_frame_size(640, 480, FrameFormat::Gray8), 640 * 480);
+        assert_eq!(
+            VideoEngine::expected_frame_size(640, 480, FrameFormat::RGB8),
+            640 * 480 * 3
+        );
+        assert_eq!(
+            VideoEngine::expected_frame_size(640, 480, FrameFormat::RGBA8),
+            640 * 480 * 4
+        );
+        assert_eq!(
+            VideoEngine::expected_frame_size(640, 480, FrameFormat::Gray8),
+            640 * 480
+        );
     }
 
     #[test]
@@ -681,7 +759,7 @@ mod tests {
         let config = VideoEngineConfig {
             confidence_threshold: 0.25,
             nms_threshold: 0.5,
-            input_width: 640,  // Model input
+            input_width: 640, // Model input
             input_height: 640,
             ..Default::default()
         };

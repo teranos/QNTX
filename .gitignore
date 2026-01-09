@@ -58,3 +58,6 @@ result
 
 # Generated documentation site (built by GitHub Actions)
 web/site/
+
+# ML models (downloaded separately)
+ats/vidstream/models/
