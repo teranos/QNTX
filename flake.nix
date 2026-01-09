@@ -95,21 +95,11 @@
           pname = "qntx-python-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
+          # and qntx-python is part of the workspace
           src = ./.;
 
-          # Create workspace-style Cargo.toml/lock at root for Nix
-          postUnpack = ''
-                        # Copy files from qntx-python to root
-                        cp $sourceRoot/qntx-python/Cargo.lock $sourceRoot/
-                        # Create minimal workspace Cargo.toml
-                        cat > $sourceRoot/Cargo.toml <<'EOF'
-            [workspace]
-            members = ["qntx-python"]
-            EOF
-          '';
-
           cargoLock = {
-            lockFile = ./qntx-python/Cargo.lock;
+            lockFile = ./Cargo.lock;
           };
 
           nativeBuildInputs = [
@@ -476,14 +466,15 @@
               ${pkgs.nix}/bin/nix build .#typegen
 
               # Run typegen for each language
+              # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
               ./result/bin/typegen --lang typescript --output types/generated/
               ./result/bin/typegen --lang python --output types/generated/
-              ./result/bin/typegen --lang rust --output types/generated/
+              ./result/bin/typegen --lang rust
               ./result/bin/typegen --lang markdown
 
               echo "✓ TypeScript types generated in types/generated/typescript/"
               echo "✓ Python types generated in types/generated/python/"
-              echo "✓ Rust types generated in types/generated/rust/"
+              echo "✓ Rust types generated in crates/qntx/src/types/"
               echo "✓ Markdown docs generated in docs/types/"
             '');
           };
@@ -492,11 +483,18 @@
             type = "app";
             program = toString (pkgs.writeShellScript "check-types" ''
               set -e
-              # Ensure typegen is built
-              ${pkgs.nix}/bin/nix build .#typegen
-
-              # Run typegen check
-              ./result/bin/typegen check
+              # Run typegen check inside dev environment where Go is available.
+              #
+              # NOTE: typegen uses golang.org/x/tools/go/packages which requires
+              # the 'go' command at runtime to load and parse Go packages. This is
+              # a known limitation of go/packages - it shells out to 'go list' for
+              # module resolution and type checking.
+              #
+              # Current approach: Run inside 'nix develop' where Go is in PATH.
+              # More proper solution: Wrap the typegen binary with makeWrapper to
+              # include Go in its runtime closure. This would make the binary truly
+              # self-contained but requires changes to the typegen package definition.
+              ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
             '');
           };
 

@@ -1,0 +1,38 @@
+[package]
+name = "qntx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QNTX shared Rust library - types, plugin infrastructure, and utilities"
+publish = false
+
+[dependencies]
+# Serialization (always needed for types)
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Types utilities
+lazy_static = "1.4"
+
+# Plugin dependencies (optional)
+tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+tonic = { workspace = true, optional = true }
+prost = { workspace = true, optional = true }
+http = { version = "1", optional = true }
+
+[build-dependencies]
+tonic-build = { workspace = true, optional = true }
+
+[features]
+default = ["types"]
+types = []
+plugin = ["dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:http", "dep:tonic-build"]

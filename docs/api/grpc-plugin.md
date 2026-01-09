@@ -5,7 +5,7 @@
 
 gRPC interface for external QNTX domain plugins.
 
-**Proto file**: [`plugin/grpc/protocol/domain.proto`](../../plugin/grpc/protocol/domain.proto)
+**Proto file**: [`plugin/grpc/protocol/domain.proto`](https://github.com/teranos/QNTX/blob/main/plugin/grpc/protocol/domain.proto)
 
 ## Service Methods
 

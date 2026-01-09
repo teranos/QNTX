@@ -17,11 +17,19 @@ func ParseFieldTags(tag *ast.BasicLit) util.FieldTagInfo {
 }
 
 // Generator implements typegen.Generator for Rust
-type Generator struct{}
+type Generator struct {
+	// IsEmbedded indicates if generating for an embedded module (uses super:: instead of crate::)
+	IsEmbedded bool
+}
 
 // NewGenerator creates a new Rust generator
 func NewGenerator() *Generator {
-	return &Generator{}
+	return &Generator{IsEmbedded: false}
+}
+
+// NewEmbeddedGenerator creates a Rust generator for embedded modules
+func NewEmbeddedGenerator() *Generator {
+	return &Generator{IsEmbedded: true}
 }
 
 // Language returns "rust"
@@ -386,7 +394,12 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 	// Generate imports for external types
 	externalTypes := collectExternalTypes(result)
 	if len(externalTypes) > 0 {
-		sb.WriteString("use crate::{")
+		// Use super:: for embedded modules, crate:: for standalone
+		importPrefix := "crate"
+		if g.IsEmbedded {
+			importPrefix = "super"
+		}
+		sb.WriteString(fmt.Sprintf("use %s::{", importPrefix))
 		for i, typeName := range externalTypes {
 			if i > 0 {
 				sb.WriteString(", ")
@@ -422,10 +435,12 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 		}
 
 		// Add documentation link as #[doc] attribute (preferred for generated code)
-		// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
-		anchor := strings.ToLower(strings.ReplaceAll(util.ToSnakeCase(name), "_", ""))
-		docLink := fmt.Sprintf("https://github.com/teranos/QNTX/blob/main/docs/types/%s.md#%s", result.PackageName, anchor)
-		sb.WriteString(fmt.Sprintf("#[doc = \"Documentation: <%s>\"]\n", docLink))
+		if result.GitHubBaseURL != "" {
+			// Convert type name to markdown anchor (lowercase with hyphens for multi-word names)
+			anchor := strings.ToLower(strings.ReplaceAll(util.ToSnakeCase(name), "_", ""))
+			docLink := fmt.Sprintf("%s/docs/types/%s.md#%s", result.GitHubBaseURL, result.PackageName, anchor)
+			sb.WriteString(fmt.Sprintf("#[doc = \"Documentation: <%s>\"]\n", docLink))
+		}
 
 		sb.WriteString(result.Types[name])
 		if i < len(names)-1 {
