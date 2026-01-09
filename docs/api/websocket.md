@@ -37,8 +37,8 @@ Async job status update
 
 | Field | Description |
 |-------|-------------|
-| metadata | Additional metadata about the update |
 | job | Job object with status, progress, etc. |
+| metadata | Additional metadata about the update |
 
 #### `daemon_status`
 

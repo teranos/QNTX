@@ -8,6 +8,10 @@ on:
       - '**.nix'
       - 'flake.lock'
       - 'docs/**'
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/typegen/**'
       - '.github/workflows/nix.yml'
 
 jobs:
@@ -35,6 +39,9 @@ jobs:
       - name: Check Nix formatting
         run: |
           nix run nixpkgs#nixpkgs-fmt -- --check *.nix
+
+      - name: Check generated types are up to date
+        run: nix run .#check-types
 
       - name: Run flake checks
         run: nix flake check --show-trace

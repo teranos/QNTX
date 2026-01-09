@@ -442,5 +442,6 @@ After successful internal plugin migration:
 ## References
 
 - [ADR-001: Domain Plugin Architecture](../architecture/ADR-001-domain-plugin-architecture.md)
-- [Domain Plugin API Reference](./domain-plugin-api-reference.md)
-- [Code Domain Plugin](../../domains/code/plugin.go) (reference implementation)
+- [Domain Plugin API Reference](domain-plugin-api-reference.md)
+- [External Plugin Guide](external-plugin-guide.md) for building plugins
+- [Rust Plugin Guide](rust-plugin-guide.md) for Rust-based plugins

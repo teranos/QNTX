@@ -8,13 +8,14 @@
 //!
 //! ## Usage
 //!
-//! ```rust
-//! use qntx_types::async::Job;
-//! use qntx_types::sym::*;
+//! ```rust,ignore
+//! use qntx::types::{Job, JobStatus, sym};
 //! ```
 
 // Re-export all generated modules
-pub mod r#async;
+// Note: 'async' is a reserved keyword in Rust, so we use 'async_types'
+#[path = "async.rs"]
+pub mod async_types;
 pub mod budget;
 pub mod schedule;
 pub mod server;
@@ -22,6 +23,7 @@ pub mod sym;
 pub mod types;
 
 // Re-export commonly used types for convenience
+pub use async_types::{ErrorCode, ErrorContext, Job, JobStatus, Progress, PulseState};
 pub use budget::{Limiter, Tracker};
-pub use r#async::{ErrorCode, ErrorContext, Job, JobStatus, Progress, PulseState};
 pub use schedule::Execution;
+pub use server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage};
