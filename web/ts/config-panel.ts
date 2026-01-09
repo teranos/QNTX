@@ -143,6 +143,11 @@ class ConfigPanel extends BasePanel {
             setTimeout(() => toast.remove(), 2000);
         }).catch(err => {
             console.error('[Config Panel] Failed to copy path:', err);
+            const toast = document.createElement('div');
+            toast.className = 'config-toast config-toast-error';
+            toast.textContent = `Failed to copy: ${err.message || 'Clipboard access denied'}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
         });
     }
 
@@ -688,6 +693,14 @@ class ConfigPanel extends BasePanel {
         }
 
         return await response.json();
+    }
+
+    protected override onDestroy(): void {
+        // Clean up pending timeouts to prevent memory leaks
+        if (this.saveConfirmTimeout) {
+            clearTimeout(this.saveConfirmTimeout);
+            this.saveConfirmTimeout = null;
+        }
     }
 }
 
