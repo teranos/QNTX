@@ -1,5 +1,5 @@
 [package]
-name = "qntx-ix-video"
+name = "qntx-vidstream"
 version = "0.1.0"
 edition = "2021"
 description = "Real-time video ingestion (⨳) with frame attestation for QNTX (CGO)"
@@ -46,7 +46,7 @@ codegen-units = 1
 opt-level = 3
 
 [lib]
-name = "qntx_ix_video"
+name = "qntx_vidstream"
 path = "src/lib.rs"
 # cdylib for shared library (.so/.dylib/.dll)
 # staticlib for static library (.a/.lib)

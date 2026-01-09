@@ -1,6 +1,6 @@
-# ix-video Development Handover
+# vidstream Development Handover
 
-**Module**: `ats/video/ix-video`
+**Module**: `ats/vidstream`
 **Status**: Foundation complete, inference stub
 **Last Updated**: 2026-01-09
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-ix-video provides CGO-based real-time video frame processing for QNTX attestation generation. It follows the established `fuzzy-ax` pattern for Rust/Go integration via CGO.
+vidstream provides CGO-based real-time video frame processing for QNTX attestation generation. It follows the established `fuzzy-ax` pattern for Rust/Go integration via CGO.
 
 ### Purpose
 
@@ -22,7 +22,7 @@ Enable real-time video stream analysis where each frame can generate attestation
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Go Application                          │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │                  ixvideo package                         │   │
+│  │                 vidstream package                        │   │
 │  │  video_cgo.go (build tag: cgo && rustvideo)             │   │
 │  │  video_nocgo.go (fallback stub)                         │   │
 │  │  types.go (shared types)                                │   │
@@ -31,7 +31,7 @@ Enable real-time video stream analysis where each frame can generate attestation
                               │ CGO
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Rust Library (libqntx_ix_video)             │
+│                     Rust Library (libqntx_vidstream)            │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │   ffi.rs     │  │  engine.rs   │  │     types.rs         │  │
 │  │  C-ABI layer │──│  Processing  │──│  Detection, BBox,    │  │
@@ -63,9 +63,9 @@ Enable real-time video stream analysis where each frame can generate attestation
 | Video engine | `src/engine.rs` | ✓ (stub inference) |
 | FFI layer | `src/ffi.rs` | ✓ |
 | C header | `include/video_engine.h` | ✓ |
-| Go CGO bindings | `ixvideo/video_cgo.go` | ✓ |
-| Go fallback | `ixvideo/video_nocgo.go` | ✓ |
-| Shared Go types | `ixvideo/types.go` | ✓ |
+| Go CGO bindings | `vidstream/video_cgo.go` | ✓ |
+| Go fallback | `vidstream/video_nocgo.go` | ✓ |
+| Shared Go types | `vidstream/types.go` | ✓ |
 | Unit tests | 9 tests passing | ✓ |
 | Documentation | `README.md` | ✓ |
 
@@ -93,7 +93,7 @@ engine.rs       - VideoEngine with process_frame pipeline
 ffi.rs          - C-compatible FFI functions and types
 ```
 
-### Go (`ixvideo/`)
+### Go (`vidstream/`)
 
 ```
 types.go        - Shared types (no build tags)
@@ -114,7 +114,7 @@ video_engine.h  - C API declarations for CGO
 ### Rust Library
 
 ```bash
-cd ats/video/ix-video
+cd ats/vidstream
 
 # Development
 cargo build
@@ -243,7 +243,7 @@ fn parse_yolo_output(output: &ort::Value, detections: &mut Vec<Detection>) {
 ### Current Tests
 
 ```bash
-cd ats/video/ix-video
+cd ats/vidstream
 cargo test
 ```
 
@@ -281,7 +281,7 @@ test ffi::tests::test_frame_processing ... ok
 
 | File | Purpose |
 |------|---------|
-| `/home/user/QNTX/Cargo.toml` | Workspace excludes ix-video |
+| `/home/user/QNTX/Cargo.toml` | Workspace excludes vidstream |
 | `/home/user/QNTX/ats/ax/fuzzy-ax/` | Reference CGO implementation |
 | `/home/user/QNTX/ats/types/attestation.go` | Attestation structure for output |
 

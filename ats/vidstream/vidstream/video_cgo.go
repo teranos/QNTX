@@ -1,26 +1,26 @@
 //go:build cgo && rustvideo
 
-// Package ixvideo provides a CGO wrapper for the Rust video processing engine.
+// Package vidstream provides a CGO wrapper for the Rust video processing engine.
 //
 // This package links directly with the Rust library via CGO, providing
 // real-time video frame processing for attestation generation.
 //
 // Build Requirements:
 //
-//	Rust toolchain (cargo build --release in ats/video/ix-video)
+//	Rust toolchain (cargo build --release in ats/vidstream)
 //	CGO enabled (CGO_ENABLED=1)
 //	Build tag: -tags rustvideo
 //	Library path set correctly for your platform
 //
 // Usage:
 //
-//	engine, err := ixvideo.NewVideoEngine()
+//	engine, err := vidstream.NewVideoEngine()
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
 //	defer engine.Close()
 //
-//	result, err := engine.ProcessFrame(frameData, width, height, ixvideo.FormatRGB8, timestamp)
+//	result, err := engine.ProcessFrame(frameData, width, height, vidstream.FormatRGB8, timestamp)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -28,13 +28,13 @@
 //	for _, detection := range result.Detections {
 //	    // Create attestation from detection
 //	}
-package ixvideo
+package vidstream
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_ix_video -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_ix_video -lpthread -ldl -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_ix_video -lws2_32 -luserenv
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_vidstream -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_vidstream -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_vidstream -lws2_32 -luserenv
 
 #include "video_engine.h"
 #include <stdlib.h>
