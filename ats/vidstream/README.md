@@ -15,10 +15,6 @@ cargo build --release
 
 This produces `target/release/libqntx_vidstream.so` (Linux), `.dylib` (macOS), or `.dll` (Windows).
 
-## Usage
-
-See Go package docs and [docs/vidstream-inference.md](../../docs/vidstream-inference.md) for API details.
-
 ## Optional Features
 
 The Rust library supports optional features for extended functionality.
