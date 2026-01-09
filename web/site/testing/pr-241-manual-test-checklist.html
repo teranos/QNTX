@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QNTX - pr-241-manual-test-checklist</title>
+  <link rel="icon" type="image/jpeg" href="../qntx.jpg">
+  <link rel="stylesheet" href="../css/core.css">
+  <link rel="stylesheet" href="../css/docs.css">
+</head>
+<body>
+<nav class="doc-nav">
+  <a href="../index.html">
+    <img src="../qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
+  </a>
+</nav>
+<h1>Manual Testing Checklist - PR #241: Panel Improvements</h1>
+<p><strong>PR:</strong> #241 - Add shared tooltip system for improved observability across panels
+<strong>Branch:</strong> <code>claude/apply-panel-improvements-oRIwb</code>
+<strong>Date:</strong> 2026-01-08</p>
+<p><strong>Note:</strong> This checklist only includes tests that require manual verification. Automated tests (unit and JSDOM) cover 85%+ of functionality.</p>
+<hr />
+<h2>Setup</h2>
+<ul>
+<li>[ ] Ensure QNTX server is running (<code>./bin/qntx server</code>)</li>
+<li>[ ] Open browser to <code>http://localhost:8080</code></li>
+<li>[ ] Open browser console (F12) to watch for errors</li>
+</ul>
+<hr />
+<h2>1. Backend Integration &amp; Real Data</h2>
+<h3>Python Panel Execute</h3>
+<p><strong>SKIPPED</strong></p>
+<p>Python panel needs further development, right now editor is not showing up. <strong>HIGH PRIO</strong></p>
+<ul>
+<li>[ ] Write real Python code (e.g., <code>print("hello")</code>)</li>
+<li>[ ] Click "Run" → Orange "Confirm Execute"</li>
+<li>[ ] Click "Confirm Execute" → Code executes</li>
+<li>[ ] Output appears correctly</li>
+<li>[ ] Button returns to "Run (⌘↵)"</li>
+</ul>
+<h3>Webscraper Panel</h3>
+<ul>
+<li>[X] Enter real URL (e.g., <code>https://example.com</code>)</li>
+<li>[X] Click "Scrape URL" → Orange "Confirm Scrape"
+The button remains black colored, and clicking on 'SCRAPE' jumps the button to the left because the text (in organge) 'Click again to start scraping' is shown right from the button, instead the text should appear under the button and not move the button away. click click should just work and not require user to move cursor to the left in order to click the 'CONFIRM SCRAPE' button again.</li>
+<li>[X] Click "Confirm Scrape" → URL is scraped
+Correctly fails and show's error inside of the panel, but error is repeated in result's box as well. The endpoint is not available because the python-webscraper is not loaded right now, so this is correct behaviour, but what would be even better is if the panel had diagonal gray stripes indicating the panel is not usable right now unless the webscraper plugin is enabled, also we should have gray stripes in the symbol just like we do with other symbols in the command palette (like with fuzzy-ax being available or not)</li>
+<li>[ ] Results display correctly
+worked previously, but havent tested this, <strong>SKIP</strong></li>
+</ul>
+<h3>Config Panel Save</h3>
+<p><strong>SKIP</strong>
+the panel is not wide enough in order to accommodate for everything, config panel deserves more screen real estate.</p>
+<ul>
+<li>[ ] Edit a config value</li>
+<li>[ ] Click "Save" twice (confirmation)</li>
+<li>[ ] Value persists after page reload</li>
+<li>[ ] Backend validation errors display correctly</li>
+</ul>
+<h3>Plugin Config Save</h3>
+<ul>
+<li>[X] Expand a plugin with config</li>
+<li>[X] Edit a config value
+pencil symbol show's up, and allows me to change the existing value. however right now, it is required to click on the pencil button, what i want instead is that clicking on the value allows me to edit, and hovering over the key should reveal the hint not the value.</li>
+<li>[X] Click "Save Configuration" twice
+<strong>CRITICAL MUST FIX NOW</strong>
+'SAVE' button is nowhere to be found anymore! ideally we have button that says 'apply' and then change into 'restart plugin', clicking apply should in fact persist the config and pressing restart plugin should in fact restart the plugin, the button should appear in place of the pencil icon.</li>
+<li>[ ] Plugin restarts successfully
+<strong>SKIP</strong>, impossible to test without save button</li>
+<li>[ ] New config takes effect
+<strong>SKIP</strong>, impossible to test without save button</li>
+</ul>
+<h3>Network Error Recovery</h3>
+<p><strong>SKIP</strong>
+impossible to test until we fix panel width</p>
+<ul>
+<li>[ ] Open Config panel</li>
+<li>[ ] Disable network (DevTools → Network → Offline)</li>
+<li>[ ] Try to save a config value</li>
+<li>[ ] Rich error displays: "Network Error"</li>
+<li>[ ] Re-enable network</li>
+<li>[ ] Click "Retry" → Save succeeds</li>
+</ul>
+<hr />
+<h2>2. Performance &amp; Memory</h2>
+<h3>Long Session Memory Check</h3>
+<p><strong>SKIP</strong>
+i have better things to do than doing this.</p>
+<ul>
+<li>[ ] Keep QNTX open for 10+ minutes</li>
+<li>[ ] Open/close panels 20+ times</li>
+<li>[ ] Hover tooltips frequently</li>
+<li>[ ] Check browser memory (DevTools → Memory → Take snapshot)</li>
+<li>[ ] Memory should not continuously grow (expect &lt; 50MB growth)</li>
+</ul>
+<h3>Rapid Tooltip Hovering</h3>
+<p><strong>SKIP</strong></p>
+<ul>
+<li>[ ] Open Pulse panel with 10+ jobs</li>
+<li>[ ] Rapidly hover over 20+ job badges</li>
+<li>[ ] No lag or stuttering</li>
+<li>[ ] Tooltips appear/disappear smoothly</li>
+<li>[ ] CPU usage remains reasonable (&lt; 30%)</li>
+</ul>
+<h3>Large Dataset Rendering</h3>
+<p><strong>SKIP</strong></p>
+<ul>
+<li>[ ] Open Pulse panel with 20+ scheduled jobs</li>
+<li>[ ] All tooltips work on all job badges</li>
+<li>[ ] No slowdown when hovering</li>
+<li>[ ] Panel scrolls smoothly</li>
+</ul>
+<hr />
+<h2>3. Visual &amp; UX Verification</h2>
+<h3>Tooltip Styling</h3>
+<ul>
+<li>[X] Hover over any tooltip trigger
+works in config panel, does not work in plugin config area</li>
+<li>[X] <strong>Dark background</strong> - Terminal-style dark theme</li>
+<li>[X] <strong>Monospace font</strong> - Code/data font family</li>
+<li>[X] <strong>Proper padding</strong> - 8-10px comfortable spacing</li>
+<li>[ ] <strong>Border radius</strong> - 4px rounded corners
+let's not have rounded corners, not sure why you are such a fan of them, i want square pointy dangerous corners</li>
+<li>[ ] <strong>Arrow pointer</strong> - Aligns with trigger element (near screen edges)
+It exists, but doesn't point to the actual thing i'm hovering on. this 'feature' is deceptive right now.</li>
+<li>[X] <strong>Max width</strong> - Constrains to ~400px, wraps long text
+but also, let's try to make this work in responsive design as well, on mobile and tabled tapping on a key or tooltip available item should make it show up the tooltip and also respect screensize, tapping on the tooltip again should hide it.</li>
+</ul>
+<h3>Confirmation Button Colors</h3>
+<p><strong>BLOCKED</strong> until python panel development enables us to test this.</p>
+<ul>
+<li>[ ] Click "Run" in Python panel</li>
+<li>[ ] <strong>Warning state</strong>: Orange background (#fff3e0)</li>
+<li>[ ] Click "✕" (delete) on a Pulse job</li>
+<li>[ ] <strong>Danger state</strong>: Red background (#ffebee)</li>
+<li>[ ] Both return to normal state after timeout (5s)</li>
+</ul>
+<h3>Error Display Styling</h3>
+<ul>
+<li>[X] Trigger any validation error
+verified in plugin panel python config</li>
+<li>[X] <strong>Error title</strong>: Bold, red text</li>
+<li>[ ] <strong>Details section</strong>: Expandable with "▼ Error Details"
+I'm not seeing the ▼, but this is also a non-feature, we should always show the details dammit.</li>
+<li>[ ] <strong>Code blocks</strong>: Monospace font, gray background
+i tried to test the creation of an ATS code block, but i cannot seem to progress further than clicking on 'Add Schedule', also i suspect the panel is not wide enough because it seems like the text is not wrapping worrectly on the border</li>
+<li>[ ] Click to expand/collapse → Smooth transition
+<strong>SKIP</strong></li>
+</ul>
+<h3>Responsive Design</h3>
+<ul>
+<li>
+<p>[X] <strong>Mobile viewport</strong> (&lt; 640px width)</p>
+<ul>
+<li>Tooltips constrain to viewport edges
+Yes, they do so this works.</li>
+<li>Confirmation buttons remain tappable (44px touch targets)
+yes they remain tappable</li>
+<li>Error details readable without horizontal scroll
+confirmed.</li>
+</ul>
+</li>
+<li>
+<p>[X] <strong>Wide viewport</strong> (&gt; 1536px width)</p>
+<ul>
+<li>Layouts maintain proper spacing</li>
+<li>Tooltips don't become too wide (400px max)</li>
+<li>Panel content uses available space well</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2>4. Accessibility Testing</h2>
+<h3>Screen Reader (if available)</h3>
+<p><strong>SKIP</strong></p>
+<ul>
+<li>[ ] Enable screen reader (VoiceOver, NVDA, JAWS)</li>
+<li>[ ] Tab to element with tooltip</li>
+<li>[ ] Tooltip content is announced</li>
+<li>[ ] Tab to "Run" button in Python panel</li>
+<li>[ ] Click once → Confirmation state announced</li>
+<li>[ ] Click again → Action announced</li>
+</ul>
+<h3>Keyboard Navigation Flow</h3>
+<p><strong>SKIP</strong></p>
+<ul>
+<li>[ ] Tab through Pulse panel</li>
+<li>[ ] Job actions (⏵, ⏸, ✕) are reachable</li>
+<li>[ ] Tab order feels logical</li>
+<li>[ ] Press Enter on "Run" in Python panel</li>
+<li>[ ] Orange confirmation state</li>
+<li>[ ] Press Enter again → Executes</li>
+<li>[ ] Tab to "Error Details" (if error present)</li>
+<li>[ ] Press Enter → Expands</li>
+<li>[ ] Press Enter again → Collapses</li>
+</ul>
+<h3>Touch Target Usability (Mobile/Tablet)</h3>
+<p><strong>SKIP</strong></p>
+<ul>
+<li>[ ] Open on mobile device or use DevTools mobile emulation</li>
+<li>[ ] All buttons comfortable to tap (44px minimum)</li>
+<li>[ ] Confirmation buttons don't accidentally trigger</li>
+<li>[ ] Tooltips don't block important UI elements</li>
+</ul>
+<hr />
+<h2>5. Console &amp; Error Monitoring</h2>
+<p><strong>SKIP</strong>, too vague, not actionable.</p>
+<h3>Normal Operation</h3>
+<ul>
+<li>[ ] Perform typical workflows for 5+ minutes</li>
+<li>[ ] <strong>No console errors</strong> (red messages)</li>
+<li>[ ] <strong>No warnings</strong> about missing properties or deprecated APIs</li>
+<li>[ ] <strong>No unhandled promise rejections</strong></li>
+</ul>
+<h3>Expected Debug Logs (Optional)</h3>
+<ul>
+<li>[ ] Console filtering for <code>[tooltip]</code> shows tooltip events</li>
+<li>[ ] Console filtering for <code>[panel]</code> shows panel lifecycle</li>
+<li>[ ] Logs are helpful for debugging (not excessive noise)</li>
+</ul>
+<hr />
+<h2>6. Edge Cases &amp; Unusual Interactions</h2>
+<p><strong>SKIP</strong></p>
+<h3>Click During Tooltip Transition</h3>
+<ul>
+<li>[ ] Hover to start showing tooltip</li>
+<li>[ ] Immediately click element before tooltip fully appears</li>
+<li>[ ] No broken state or orphaned tooltips</li>
+<li>[ ] Normal interaction continues</li>
+</ul>
+<h3>Window Resize During Tooltip</h3>
+<ul>
+<li>[ ] Show a tooltip near screen edge</li>
+<li>[ ] Resize browser window smaller</li>
+<li>[ ] Tooltip repositions to stay in bounds</li>
+<li>[ ] No visual glitches</li>
+</ul>
+<h3>Multiple Rapid Panel Switches</h3>
+<ul>
+<li>[ ] Open Pulse panel</li>
+<li>[ ] Immediately switch to Config panel (before fully loaded)</li>
+<li>[ ] Immediately switch to Plugin panel</li>
+<li>[ ] All panels render correctly</li>
+<li>[ ] No state leakage between panels</li>
+<li>[ ] No console errors</li>
+</ul>
+<h3>Confirmation State During Panel Close</h3>
+<ul>
+<li>[ ] Click "Run" in Python panel (orange state)</li>
+<li>[ ] Close panel with Escape</li>
+<li>[ ] Reopen Python panel</li>
+<li>[ ] Button should be "Run (⌘↵)" (not orange)</li>
+</ul>
+<hr />
+<h2>7. Cross-Browser Compatibility</h2>
+<p><strong>SKIP</strong></p>
+<h3>Chrome</h3>
+<ul>
+<li>[ ] All features work</li>
+<li>[ ] Tooltips display correctly</li>
+<li>[ ] Confirmations function properly</li>
+<li>[ ] No visual issues</li>
+</ul>
+<h3>Firefox</h3>
+<ul>
+<li>[ ] All features work</li>
+<li>[ ] Tooltips display correctly</li>
+<li>[ ] Confirmations function properly</li>
+<li>[ ] No visual issues</li>
+</ul>
+<h3>Safari (macOS/iOS)</h3>
+<ul>
+<li>[ ] All features work</li>
+<li>[ ] Tooltips display correctly</li>
+<li>[ ] Confirmations function properly</li>
+<li>[ ] No visual issues</li>
+</ul>
+<hr />
+<h2>Test Completion Summary</h2>
+<p><strong>Total Manual Tests:</strong> 32 items
+<strong>Automated Coverage:</strong> 85%+ (unit + JSDOM tests)</p>
+<p><strong>Recommended testing order:</strong></p>
+<ol>
+<li><strong>Backend Integration</strong> (5 min) - Verify real API calls work</li>
+<li><strong>Visual &amp; UX</strong> (5 min) - Check styling and responsiveness</li>
+<li><strong>Console &amp; Errors</strong> (2 min) - Monitor for runtime issues</li>
+<li><strong>Performance</strong> (10 min) - Long session and stress tests</li>
+<li><strong>Accessibility</strong> (10 min if tools available)</li>
+<li><strong>Edge Cases</strong> (5 min) - Unusual interactions</li>
+<li><strong>Cross-Browser</strong> (10 min if needed)</li>
+</ol>
+<p><strong>Minimum viable testing</strong> (15 min):</p>
+<ul>
+<li>Backend Integration (Python execute, config save)</li>
+<li>Visual verification (tooltip styling, button colors)</li>
+<li>Console monitoring during normal use</li>
+</ul>
+<p><strong>Comprehensive testing</strong> (45-60 min):</p>
+<ul>
+<li>All items in checklist</li>
+</ul>
+<hr />
+<h2>Notes Section</h2>
+<h3>Issues Found</h3>
+<pre><code>Issue #1:
+- Description:
+- Steps to reproduce:
+- Expected behavior:
+- Actual behavior:
+- Severity: [Critical/High/Medium/Low]
+
+Issue #2:
+...
+</code></pre>
+<h3>Observations</h3>
+<pre><code>- Positive feedback:
+- Performance notes:
+- UX suggestions:
+</code></pre>
+<h3>Browser-Specific Issues</h3>
+<pre><code>- Chrome:
+- Firefox:
+- Safari:
+</code></pre>
+<hr />
+<h2>Automated Test Coverage</h2>
+<p><strong>Already covered by existing tests:</strong></p>
+<ul>
+<li>Plugin panel build time formatting</li>
+<li>Plugin config validation errors</li>
+<li>Retry button functionality</li>
+<li>Toast notifications</li>
+<li>Error display with retry</li>
+<li>Base panel error boundaries</li>
+</ul>
+<p><strong>Will be covered by new tests (recommended Priority 1):</strong></p>
+<ul>
+<li>Tooltip show/hide behavior (tooltip.dom.test.ts)</li>
+<li>Tooltip viewport constraints (tooltip.dom.test.ts)</li>
+<li>Two-click confirmation state machine (python/panel.test.ts, webscraper-panel.test.ts)</li>
+<li>Pulse job action confirmations (pulse/job-actions.test.ts)</li>
+<li>Config inline editing flow (config-panel.test.ts)</li>
+<li>Timeout and reset logic (tooltip.test.ts)</li>
+</ul>
+<p>See code review findings for additional test recommendations.</p>
+<hr />
+<p><strong>Tester:</strong> _________________
+<strong>Date:</strong> _________________
+<strong>Duration:</strong> _________________
+<strong>Overall Result:</strong> [ ] Pass [ ] Pass with issues [ ] Fail</p>
+<footer class="site-footer">
+  <p class="provenance">Generated by sitegen.nix at commit <a href="https://github.com/teranos/QNTX/commit/0e7ca38dd1dcce5d67e9797b91950b21353f137a-dirty">0e7ca38-dirty</a></p>
+</footer>
+</body>
+</html>
