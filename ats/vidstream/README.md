@@ -2,7 +2,7 @@
 
 Real-time video frame processing for QNTX attestation generation via CGO.
 
-**Development Documentation**: See [docs/vidstream-inference.md](../../docs/vidstream-inference.md) for architecture details and design decisions.
+**Development Documentation**: See [docs/vidstream-inference.md](../../docs/vidstream-inference.md) for details and design decisions.
 
 ## Architecture
 
@@ -25,8 +25,6 @@ cargo build --release
 ```
 
 This produces `target/release/libqntx_vidstream.so` (Linux), `.dylib` (macOS), or `.dll` (Windows).
-
-**Note:** The basic build runs in stub mode (no real inference). For actual ML inference, see [ONNX Feature](#onnx-runtime-inference) below.
 
 ### Go with CGO
 
@@ -144,6 +142,7 @@ cargo build --release --features onnx
 ```
 
 This uses the `download-binaries` feature from the `ort` crate, which:
+
 - Downloads pre-built ONNX Runtime for your OS/arch
 - Caches binaries in `target/` directory
 - Requires network access on first build
@@ -172,6 +171,7 @@ cargo build --release --features onnx
 **ONNX Runtime Version**
 
 Currently using `ort` version 2.0.0-rc.11, which supports:
+
 - ONNX Runtime 1.22.x
 - CPU inference (default)
 - GPU inference (requires additional configuration)
@@ -195,6 +195,7 @@ cargo run --release --features onnx --example benchmark
 ```
 
 Performance with YOLO11n on CPU:
+
 - Average latency: 40.83 ms per frame
 - Throughput: 24.5 FPS (640x480 input)
 - Inference: 39ms (97%), Preprocessing: 1ms (2.3%)
@@ -270,12 +271,14 @@ cargo run --release --features onnx --example benchmark
 ```
 
 **Output includes:**
+
 - Per-frame latency breakdown (preprocess, inference, postprocess)
 - Average latency and throughput (FPS)
 - Detection counts (raw and after NMS filtering)
 - Sample detections
 
 **Example Results (YOLO11n on Apple Silicon M-series):**
+
 ```
 Average latency: 40.83 ms per frame
 Throughput:      24.5 FPS
@@ -290,6 +293,7 @@ The benchmark uses synthetic gradient frames (640x480 RGB). For realistic testin
 ### CI Pipeline
 
 The GitHub Actions workflow (`.github/workflows/vidstream.yml`) runs:
+
 - Rust format checking (`cargo fmt`)
 - Clippy linting (with and without ONNX)
 - Unit tests (with and without ONNX)
