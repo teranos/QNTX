@@ -109,20 +109,22 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 
 	sb.WriteString("This document shows Go type definitions from the codebase.\n\n")
 
-	// Add links to generated type files (using GitHub URLs for consistency with source links)
-	sb.WriteString("**Generated types**:\n")
-	sb.WriteString(fmt.Sprintf("- TypeScript: [`%s/typescript/%s.ts`](https://github.com/teranos/QNTX/blob/main/%s/typescript/%s.ts)\n", g.generatedTypesDir, result.PackageName, g.generatedTypesDir, result.PackageName))
-	sb.WriteString(fmt.Sprintf("- Rust: [`%s/rust/%s.rs`](https://github.com/teranos/QNTX/blob/main/%s/rust/%s.rs)\n", g.generatedTypesDir, result.PackageName, g.generatedTypesDir, result.PackageName))
-	sb.WriteString(fmt.Sprintf("- Python: [`%s/python/%s.py`](https://github.com/teranos/QNTX/blob/main/%s/python/%s.py)\n", g.generatedTypesDir, result.PackageName, g.generatedTypesDir, result.PackageName))
-	sb.WriteString("\n")
+	// Add links to generated type files
+	if result.GitHubBaseURL != "" {
+		sb.WriteString("**Generated types**:\n")
+		sb.WriteString(fmt.Sprintf("- TypeScript: [`%s/typescript/%s.ts`](%s/%s/typescript/%s.ts)\n", g.generatedTypesDir, result.PackageName, result.GitHubBaseURL, g.generatedTypesDir, result.PackageName))
+		sb.WriteString(fmt.Sprintf("- Rust: [`%s/rust/%s.rs`](%s/%s/rust/%s.rs)\n", g.generatedTypesDir, result.PackageName, result.GitHubBaseURL, g.generatedTypesDir, result.PackageName))
+		sb.WriteString(fmt.Sprintf("- Python: [`%s/python/%s.py`](%s/%s/python/%s.py)\n", g.generatedTypesDir, result.PackageName, result.GitHubBaseURL, g.generatedTypesDir, result.PackageName))
+		sb.WriteString("\n")
+	}
 
 	// Generate const documentation (untyped consts)
 	if len(result.Consts) > 0 {
 		sb.WriteString("## Constants\n\n")
 
 		// Add source link to the file
-		if result.SourceFile != "" {
-			sb.WriteString(fmt.Sprintf("**Source**: [`%s`](https://github.com/teranos/QNTX/blob/main/%s)\n\n", result.SourceFile, result.SourceFile))
+		if result.SourceFile != "" && result.GitHubBaseURL != "" {
+			sb.WriteString(fmt.Sprintf("**Source**: [`%s`](%s/%s)\n\n", result.SourceFile, result.GitHubBaseURL, result.SourceFile))
 		}
 
 		sb.WriteString("```go\n")
@@ -157,10 +159,10 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 		if pos, ok := result.TypePositions[name]; ok {
 			// Find the heading line (## TypeName)
 			lines := strings.Split(typeMarkdown, "\n")
-			if len(lines) > 0 && strings.HasPrefix(lines[0], "## ") {
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "## ") && result.GitHubBaseURL != "" {
 				// Insert source link after heading
-				sourceLink := fmt.Sprintf("\n**Source**: [`%s:%d`](https://github.com/teranos/QNTX/blob/main/%s#L%d)\n",
-					pos.File, pos.Line, pos.File, pos.Line)
+				sourceLink := fmt.Sprintf("\n**Source**: [`%s:%d`](%s/%s#L%d)\n",
+					pos.File, pos.Line, result.GitHubBaseURL, pos.File, pos.Line)
 				lines = append(lines[:1], append([]string{sourceLink}, lines[1:]...)...)
 				typeMarkdown = strings.Join(lines, "\n")
 			}

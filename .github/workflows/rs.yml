@@ -6,7 +6,7 @@ on:
     paths:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
-      - 'types/generated/rust/Cargo.toml'
+      - 'crates/qntx/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
@@ -17,44 +17,12 @@ on:
     paths:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
-      - 'types/generated/rust/Cargo.toml'
+      - 'crates/qntx/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
   workflow_dispatch:
 
 jobs:
-  generated-types:
-    name: Generated Types
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/teranos/qntx:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure git safe directory
-        run: git config --global --add safe.directory /__w/QNTX/QNTX
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: types/generated/rust
-
-      - name: Check formatting
-        run: cd types/generated/rust && cargo fmt --check
-
-      - name: Clippy
-        run: cd types/generated/rust && cargo clippy --all-targets --all-features
-        env:
-          RUSTFLAGS: "-Dwarnings"
-
-      - name: Check
-        run: cd types/generated/rust && cargo check
-
   fuzzy-ax:
     name: Fuzzy Ax
     runs-on: ubuntu-latest
