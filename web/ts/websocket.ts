@@ -17,6 +17,7 @@ import type {
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
+import { log, SEG } from './logger';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -28,17 +29,17 @@ let messageHandlers: MessageHandlers = {};
  */
 const MESSAGE_HANDLERS = {
     reload: (data: ReloadMessage) => {
-        console.log('🔄 Dev server triggered reload', data.reason);
+        log.info(SEG.WS, 'Dev server triggered reload', data.reason);
         window.location.reload();
     },
 
     backend_status: (data: BackendStatusMessage) => {
-        console.log(`📡 Backend status: ${data.status}`, data);
+        log.info(SEG.WS, `Backend status: ${data.status}`, data);
         // Could update UI to show backend health status
     },
 
     job_update: (data: JobUpdateMessage) => {
-        console.log('📦 Job update:', data.job.id, data.job.status);
+        log.info(SEG.PULSE, 'Job update:', data.job.id, data.job.status);
 
         // Send native desktop notification if in Tauri
         handleJobNotification({
@@ -53,8 +54,7 @@ const MESSAGE_HANDLERS = {
     },
 
     daemon_status: (data: DaemonStatusMessage) => {
-        console.log(
-            '⚙️  Daemon status:',
+        log.info(SEG.PULSE, 'Daemon status:',
             data.server_state || 'running',
             `${data.active_jobs} active`,
             `${data.queued_jobs} queued`,
@@ -73,12 +73,12 @@ const MESSAGE_HANDLERS = {
     },
 
     llm_stream: (data: LLMStreamMessage) => {
-        console.log('🤖 LLM stream:', data.job_id, data.content.length, 'chars', data.done ? '(done)' : '');
+        log.debug(SEG.PULSE, 'LLM stream:', data.job_id, data.content.length, 'chars', data.done ? '(done)' : '');
         messageHandlers['llm_stream']?.(data);
     },
 
     storage_warning: (data: StorageWarningMessage) => {
-        console.log('⚠️ Storage warning:', data.actor, `${(data.fill_percent * 100).toFixed(0)}%`);
+        log.warn(SEG.DB, 'Storage warning:', data.actor, `${(data.fill_percent * 100).toFixed(0)}%`);
 
         // Send native desktop notification if in Tauri
         notifyStorageWarning(data.actor, data.fill_percent);
@@ -88,7 +88,7 @@ const MESSAGE_HANDLERS = {
     },
 
     plugin_health: (data: PluginHealthMessage) => {
-        console.log('🔌 Plugin health:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
+        log.info(SEG.PULSE, 'Plugin health:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
 
         // Handle toast notification and indicator update
         handlePluginHealth(data);
@@ -98,7 +98,7 @@ const MESSAGE_HANDLERS = {
     },
 
     system_capabilities: (data: SystemCapabilitiesMessage) => {
-        console.log('⚙️  System capabilities:', {
+        log.info(SEG.CONFIG, 'System capabilities:', {
             fuzzy_backend: data.fuzzy_backend,
             fuzzy_optimized: data.fuzzy_optimized ? 'optimized' : 'fallback'
         });
@@ -179,8 +179,8 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     const validatedUrl = validateBackendURL(rawUrl);
 
     if (!validatedUrl) {
-        console.error('Invalid backend URL:', rawUrl);
-        console.log('Falling back to same-origin');
+        log.error(SEG.WS, 'Invalid backend URL:', rawUrl);
+        log.info(SEG.WS, 'Falling back to same-origin');
     }
 
     const backendUrl = validatedUrl || window.location.origin;
@@ -191,7 +191,7 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = function(): void {
-        console.log('WebSocket connected');
+        log.info(SEG.WS, 'WebSocket connected');
         updateConnectionStatus(true);
     };
 
@@ -199,25 +199,25 @@ export function connectWebSocket(handlers: MessageHandlers): void {
         const data = JSON.parse(event.data) as WebSocketMessage;
 
         // Debug: Log all WebSocket messages
-        console.log('📨 WS message:', data.type, data);
+        log.debug(SEG.WS, 'Message:', data.type, data);
 
         // Route message to appropriate handler
         const result = routeMessage(data, messageHandlers);
 
         // Warn if no handler was found
         if (!result.handled) {
-            console.warn('⚠️  No handler for message type:', data.type);
+            log.warn(SEG.WS, 'No handler for message type:', data.type);
         }
     };
 
     ws.onerror = function(error: Event): void {
-        console.error('WebSocket error:', error);
+        log.error(SEG.WS, 'WebSocket error:', error);
         updateConnectionStatus(false);
     };
 
     // Virtue #12: Graceful Degradation - Handle disconnection without crashing, auto-reconnect
     ws.onclose = function(): void {
-        console.log('WebSocket disconnected');
+        log.info(SEG.WS, 'WebSocket disconnected');
         updateConnectionStatus(false);
         // Clear any existing timer
         if (reconnectTimer) {

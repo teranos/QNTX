@@ -462,7 +462,8 @@ describe('BasePanel Integration - Error Boundaries', () => {
         // Panel should still be created despite error
         expect(document.getElementById('test-panel')).toBeTruthy();
         expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('[test-panel] Error in setupEventListeners()'),
+            '[▦]',
+            expect.stringContaining('[test-panel] Error in setupEventListeners():'),
             expect.any(Error)
         );
 
@@ -491,8 +492,9 @@ describe('BasePanel Integration - Error Boundaries', () => {
         const panel = new TestPanel(config);
         panel.hide();
 
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('[test-panel] Error in beforeHide()'),
+        expect(consoleSpy).toHaveBeenLastCalledWith(
+            '[▦]',
+            expect.stringContaining('[test-panel] Error in beforeHide():'),
             expect.any(Error)
         );
 
@@ -521,8 +523,9 @@ describe('BasePanel Integration - Error Boundaries', () => {
         const panel = new TestPanel(config);
         panel.hide();
 
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('[test-panel] Error in onHide()'),
+        expect(consoleSpy).toHaveBeenLastCalledWith(
+            '[▦]',
+            expect.stringContaining('[test-panel] Error in onHide():'),
             expect.any(Error)
         );
 

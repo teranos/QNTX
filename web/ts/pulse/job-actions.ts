@@ -9,13 +9,13 @@
  * - Delete: Permanently removes job, needs confirmation
  */
 
-import { debugLog } from '../debug';
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { formatInterval } from './types';
 import { toast } from '../toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
+import { handleError, SEG } from '../error-handler';
+import { log } from '../logger';
 
 /**
  * Two-click confirmation state for job actions
@@ -120,7 +120,7 @@ export async function handleForceTrigger(
     }
 
     try {
-        debugLog('[Pulse Panel] Force triggering job:', job.ats_code);
+        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
 
         await forceTriggerJob(job.ats_code);
 
@@ -133,8 +133,7 @@ export async function handleForceTrigger(
 
         toast.success('Force trigger started - check execution history below');
     } catch (error) {
-        console.error('[Pulse Panel] Force trigger failed:', error);
-        toast.error(`Force trigger failed: ${(error as Error).message}`, true);
+        handleError(error, 'Force trigger failed', { context: SEG.PULSE, showBuildInfo: true });
     }
 }
 
@@ -148,8 +147,6 @@ export async function handleJobAction(
     ctx: JobActionContext,
     buttonElement?: HTMLElement
 ): Promise<void> {
-    const job = ctx.jobs.get(jobId);
-
     // Handle delete with two-click confirmation
     if (action === 'delete') {
         const button = buttonElement || document.querySelector(
@@ -199,19 +196,7 @@ export async function handleJobAction(
 
         await ctx.loadJobs();
     } catch (error) {
-        console.error(`[Pulse Panel] Failed to ${action} job:`, error);
-
-        let errorMsg = `Failed to ${action} job: ${(error as Error).message}`;
-
-        if (job) {
-            errorMsg += `\n\nATS Code:\n${job.ats_code}`;
-            errorMsg += `\nInterval: ${formatInterval(job.interval_seconds ?? 0)}`;
-            if (job.created_from_doc) {
-                errorMsg += `\nDocument: ${job.created_from_doc}`;
-            }
-        }
-
-        toast.error(errorMsg);
+        handleError(error, `Failed to ${action} job`, { context: SEG.PULSE });
     }
 }
 
@@ -253,10 +238,8 @@ export async function loadExecutionsForJob(
         ctx.state.jobExecutions.set(jobId, response.executions);
         ctx.state.executionErrors.delete(jobId);
     } catch (error) {
-        console.error('[Pulse Panel] Failed to load executions:', error);
-        const errorMessage = (error as Error).message || 'Unknown error';
-        ctx.state.executionErrors.set(jobId, errorMessage);
-        toast.error(`Failed to load execution history: ${errorMessage}`);
+        const err = handleError(error, 'Failed to load execution history', { context: SEG.PULSE });
+        ctx.state.executionErrors.set(jobId, err.message);
     } finally {
         ctx.state.loadingExecutions.delete(jobId);
         await ctx.render();
@@ -304,7 +287,7 @@ export async function handleViewDetailed(
  * Open prose document that created this job
  */
 export async function handleProseLocationClick(docId: string): Promise<void> {
-    debugLog('[Pulse Panel] Opening prose document:', docId);
+    log.debug(SEG.PULSE, 'Opening prose document:', docId);
 
     const { showProseDocument } = await import('../prose/panel.js');
     await showProseDocument(docId);
