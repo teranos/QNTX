@@ -9,9 +9,9 @@ use std::time::Instant;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 
-use crate::types::{Detection, FrameFormat, ProcessingStats, VideoEngineConfig};
 #[cfg(feature = "onnx")]
 use crate::types::BoundingBox;
+use crate::types::{Detection, FrameFormat, ProcessingStats, VideoEngineConfig};
 
 #[cfg(feature = "onnx")]
 use ort::{
