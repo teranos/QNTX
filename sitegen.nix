@@ -218,7 +218,7 @@ let
 
       homeCrumb = ''<a href="${fileInfo.prefix}/index.html">Home</a>'';
       categoryCrumb = if category == null then "" else
-        ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-category">${categorySymbol} ${categoryTitle}</span>'';
+      ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-category">${categorySymbol} ${categoryTitle}</span>'';
       documentCrumb = ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${documentTitle}</span>'';
     in
     ''<nav class="breadcrumb">${homeCrumb}${categoryCrumb}${documentCrumb}</nav>'';
