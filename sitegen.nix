@@ -40,7 +40,6 @@ let
   };
 
   jsFiles = {
-    search = ./web/js/search.js;
     releases = ./web/js/releases.js;
   };
 
@@ -357,17 +356,11 @@ let
     mkPage {
       title = "QNTX Documentation";
       nav = false;
-      scripts = [ "search.js" "releases.js" ];
+      scripts = [ "releases.js" ];
       content = ''
         <div class="doc-header">
           <img src="./qntx.jpg" alt="QNTX Logo">
           <h1>QNTX Documentation</h1>
-        </div>
-
-        <div class="search-container">
-          <input type="search" id="search-input" class="search-input"
-                 placeholder="Search documentation..." aria-label="Search documentation">
-          <div id="search-results" class="search-results" hidden></div>
         </div>
 
         <nav class="quick-links">
@@ -546,7 +539,6 @@ let
         { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
         { path = "infrastructure.html"; desc = "Nix build documentation"; }
         { path = "sitegen.html"; desc = "This page"; }
-        { path = "search-index.json"; desc = "Search index for client-side search"; }
         { path = "build-info.json"; desc = "Provenance metadata"; }
         { path = "qntx.jpg"; desc = "Logo"; }
       ];
@@ -617,7 +609,6 @@ let
             [ "<strong>Pure Nix</strong>" "Entire generator written in Nix - no shell scripts, no external build tools" ]
             [ "<strong>Markdown to HTML</strong>" ''Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a>'' ]
             [ "<strong>SEG Symbol Navigation</strong>" "Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API" ]
-            [ "<strong>Client-side Search</strong>" "Build-time JSON index with JavaScript search - no server required" ]
             [ "<strong>Dark Mode</strong>" "Automatic dark/light theme via <code>prefers-color-scheme</code>" ]
             [ "<strong>GitHub Releases</strong>" "Dynamic release downloads fetched client-side from GitHub API" ]
             [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
@@ -790,22 +781,8 @@ let
   htmlDerivations = map mkHtmlDerivation fileInfos;
 
   # ============================================================================
-  # Search Index & Build Info
+  # Build Info
   # ============================================================================
-
-  mkSearchEntry = fileInfo:
-    let
-      mdContent = builtins.readFile fileInfo.mdPath;
-      stripped = stripMarkdown mdContent;
-      truncated = lib.substring 0 500 stripped;
-      category =
-        if fileInfo.dir == "."
-        then "General"
-        else toTitleCase (lib.head (lib.splitString "/" fileInfo.dir));
-    in
-    ''{"title":"${html.escapeJson (toTitleCase fileInfo.name)}","path":"${fileInfo.htmlPath}","category":"${html.escapeJson category}","content":"${html.escapeJson truncated}"}'';
-
-  searchIndexContent = "[${lib.concatMapStringsSep "," mkSearchEntry fileInfos}]";
 
   buildInfoContent = builtins.toJSON (lib.filterAttrs (_: v: v != null) {
     generator = provenance.generator;
@@ -858,16 +835,16 @@ let
       destination = "/sitegen.html";
     };
 
-    "search-index.json" = pkgs.writeTextFile {
-      name = "qntx-docs-search-index";
-      text = searchIndexContent;
-      destination = "/search-index.json";
-    };
-
     "build-info.json" = pkgs.writeTextFile {
       name = "qntx-docs-build-info";
       text = buildInfoContent;
       destination = "/build-info.json";
+    };
+
+    "CNAME" = pkgs.writeTextFile {
+      name = "qntx-docs-cname";
+      text = "qntx.sbvh.nl\n";
+      destination = "/CNAME";
     };
   };
 
