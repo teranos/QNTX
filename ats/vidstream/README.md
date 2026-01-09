@@ -2,6 +2,8 @@
 
 Real-time video frame processing for QNTX attestation generation via CGO.
 
+**Development Documentation**: See [docs/vidstream-inference.md](../../docs/vidstream-inference.md) for architecture details and design decisions.
+
 ## Architecture
 
 ```
