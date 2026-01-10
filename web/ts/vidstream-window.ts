@@ -3,6 +3,12 @@
  *
  * Real-time webcam + ONNX inference in a draggable/resizable window.
  * Uses VID (⮀) segment for logging.
+ *
+ * CAMERA ACCESS:
+ * Desktop: Uses CrabCamera 0.7.0 plugin (https://github.com/Michael-A-Kuykendall/crabcamera)
+ * Workaround: CrabCamera lacks Tauri v2 ACL support - see issue #266
+ * Temporary ACL bypass: web/src-tauri/capabilities/crabcamera-dev.json
+ * TODO: Remove bypass once CrabCamera implements ACL (watch releases)
  */
 
 import { invoke } from '@tauri-apps/api/core';
@@ -103,7 +109,7 @@ export class VidStreamWindow {
                         class="panel-btn panel-btn-sm panel-btn-primary"
                     >Start Camera</button>
                     <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
-                    <span id="vs-status" class="window-status">${isTauri ? 'Desktop mode (native camera + ONNX)' : 'Browser mode (webcam only, no ONNX)'}</span>
+                    <span id="vs-status" class="window-status">${isTauri ? 'Ready for camera + ONNX' : 'Browser mode (webcam only, no ONNX)'}</span>
                 </div>
 
                 <div id="vs-error" class="window-error" style="display: none;"></div>
@@ -229,8 +235,8 @@ export class VidStreamWindow {
 
         try {
             if (isTauri) {
-                // Desktop mode: Use CrabCamera plugin
-                debug(SEG.VID, 'Using CrabCamera plugin for native camera access');
+                // Desktop mode: Use CrabCamera 0.7 plugin
+                debug(SEG.VID, 'Using CrabCamera 0.7 plugin for native camera access');
 
                 // Get available cameras
                 const cameras = await invoke<any[]>('plugin:crabcamera|get_available_cameras');
@@ -254,7 +260,7 @@ export class VidStreamWindow {
                     }
                 });
 
-                info(SEG.VID, 'CrabCamera initialized successfully');
+                info(SEG.VID, 'CrabCamera 0.7 initialized successfully');
                 this.startProcessing();
 
             } else {
