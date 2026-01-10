@@ -100,11 +100,10 @@ export class VidStreamWindow {
                     >Initialize ONNX</button>
                     <button
                         id="vs-start-btn"
-                        class="panel-btn panel-btn-sm panel-btn-primary ${isTauri ? 'btn-unavailable' : ''}"
-                        ${isTauri ? 'disabled title="Camera access requires browser mode (navigator.mediaDevices not available in Tauri webview)"' : ''}
+                        class="panel-btn panel-btn-sm panel-btn-primary"
                     >Start Camera</button>
                     <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
-                    <span id="vs-status" class="window-status">${isTauri ? 'Desktop mode (ONNX available, camera requires browser)' : 'Browser mode (camera available, ONNX requires desktop)'}</span>
+                    <span id="vs-status" class="window-status">${isTauri ? 'Desktop mode (native camera + ONNX)' : 'Browser mode (webcam only, no ONNX)'}</span>
                 </div>
 
                 <div id="vs-error" class="window-error" style="display: none;"></div>
@@ -223,35 +222,58 @@ export class VidStreamWindow {
     private async startCamera(): Promise<void> {
         debug(SEG.VID, 'startCamera() called');
 
+        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+        this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
+        this.ctx = this.canvas?.getContext('2d') || null;
+
         try {
-            debug(SEG.VID, 'Requesting camera access...');
-            this.stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480 },
-                audio: false,
-            });
-            info(SEG.VID, 'Camera access granted', this.stream);
+            if (isTauri) {
+                // Desktop mode: Use CrabCamera plugin
+                debug(SEG.VID, 'Using CrabCamera plugin for native camera access');
 
-            this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
-            this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
-            this.ctx = this.canvas?.getContext('2d') || null;
+                // Get available cameras
+                const cameras = await invoke<any[]>('plugin:crabcamera|get_available_cameras');
+                debug(SEG.VID, 'Available cameras:', cameras);
 
-            debug(SEG.VID, 'Elements found:', {
-                video: !!this.video,
-                canvas: !!this.canvas,
-                ctx: !!this.ctx
-            });
+                if (cameras.length === 0) {
+                    throw new Error('No cameras found');
+                }
 
-            if (this.video) {
-                debug(SEG.VID, 'Attaching stream to video element');
-                this.video.srcObject = this.stream;
-                this.video.onloadedmetadata = () => {
-                    debug(SEG.VID, 'Video metadata loaded, starting playback');
-                    this.video?.play();
-                    debug(SEG.VID, 'Starting frame processing');
-                    this.startProcessing();
-                };
+                // Use first camera
+                const camera = cameras[0];
+                debug(SEG.VID, 'Initializing camera:', camera);
+
+                // Initialize camera system
+                await invoke('plugin:crabcamera|initialize_camera_system', {
+                    device_id: camera.id,
+                    format: {
+                        width: 640,
+                        height: 480,
+                        fps: 30.0
+                    }
+                });
+
+                info(SEG.VID, 'CrabCamera initialized successfully');
+                this.startProcessing();
+
             } else {
-                error(SEG.VID, 'Video element not found!');
+                // Browser mode: Use MediaDevices API
+                debug(SEG.VID, 'Using browser MediaDevices API');
+
+                this.stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 },
+                    audio: false,
+                });
+
+                this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
+                if (this.video) {
+                    this.video.srcObject = this.stream;
+                    this.video.onloadedmetadata = () => {
+                        this.video?.play();
+                        this.startProcessing();
+                    };
+                }
             }
 
             const mode = this.engineReady ? 'with inference' : 'preview only';
@@ -262,22 +284,35 @@ export class VidStreamWindow {
         }
     }
 
-    private stopCamera(): void {
+    private async stopCamera(): Promise<void> {
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
 
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-
-        if (this.video) {
-            this.video.srcObject = null;
-        }
-
         this.isProcessing = false;
+
+        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+        if (isTauri) {
+            // Desktop: Release CrabCamera
+            try {
+                await invoke('plugin:crabcamera|release_camera');
+            } catch (err) {
+                error(SEG.VID, 'Error releasing camera', err);
+            }
+        } else {
+            // Browser: Stop MediaStream
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+
+            if (this.video) {
+                this.video.srcObject = null;
+            }
+        }
+
         info(SEG.VID, 'Camera stopped');
     }
 
@@ -288,39 +323,75 @@ export class VidStreamWindow {
     }
 
     private async processFrame(): Promise<void> {
-        if (!this.isProcessing || !this.video || !this.canvas || !this.ctx) return;
+        if (!this.isProcessing || !this.canvas || !this.ctx) return;
 
         const frameStart = performance.now();
+        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-        // Draw video to canvas
-        this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-        // Only run inference if engine is ready
-        if (this.engineReady) {
-            // Get RGBA data
-            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-            const frameData = Array.from(imageData.data);
-
-            try {
-                const result = await invoke<ProcessResult>('vidstream_process_frame', {
-                    frameData,
-                    width: this.canvas.width,
-                    height: this.canvas.height,
-                    format: 'rgba8',
-                    timestampUs: BigInt(Date.now() * 1000),
+        try {
+            if (isTauri) {
+                // Desktop: Capture frame from CrabCamera
+                const photo = await invoke<any>('plugin:crabcamera|capture_single_photo', {
+                    quality: 0.9
                 });
 
-                this.drawDetections(result.detections);
-                this.updateStats(result, performance.now() - frameStart);
-            } catch (err) {
-                handleError(err, 'Frame processing error', { context: SEG.VID });
-            }
-        } else {
-            // Preview mode - just update FPS
-            this.updatePreviewStats();
-        }
+                // photo.data is base64 encoded image
+                const img = new Image();
+                img.onload = async () => {
+                    this.ctx!.drawImage(img, 0, 0, this.canvas!.width, this.canvas!.height);
 
-        this.animationFrameId = requestAnimationFrame(() => this.processFrame());
+                    // Run inference if engine ready
+                    if (this.engineReady) {
+                        await this.runInference(frameStart);
+                    } else {
+                        this.updatePreviewStats();
+                    }
+
+                    // Continue loop
+                    this.animationFrameId = requestAnimationFrame(() => this.processFrame());
+                };
+                img.src = `data:image/jpeg;base64,${photo.data}`;
+
+            } else {
+                // Browser: Draw from video element
+                if (!this.video) return;
+
+                this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.engineReady) {
+                    await this.runInference(frameStart);
+                } else {
+                    this.updatePreviewStats();
+                }
+
+                this.animationFrameId = requestAnimationFrame(() => this.processFrame());
+            }
+        } catch (err) {
+            error(SEG.VID, 'Frame processing error', err);
+            this.animationFrameId = requestAnimationFrame(() => this.processFrame());
+        }
+    }
+
+    private async runInference(frameStart: number): Promise<void> {
+        if (!this.ctx || !this.canvas) return;
+
+        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const frameData = Array.from(imageData.data);
+
+        try {
+            const result = await invoke<ProcessResult>('vidstream_process_frame', {
+                frameData,
+                width: this.canvas.width,
+                height: this.canvas.height,
+                format: 'rgba8',
+                timestampUs: BigInt(Date.now() * 1000),
+            });
+
+            this.drawDetections(result.detections);
+            this.updateStats(result, performance.now() - frameStart);
+        } catch (err) {
+            error(SEG.VID, 'Inference error', err);
+        }
     }
 
     private drawDetections(detections: Detection[]): void {
