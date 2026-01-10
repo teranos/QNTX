@@ -1,5 +1,5 @@
 /**
- * Console Reporter - Captures browser console logs and sends to backend
+ * Debug Interceptor - Captures browser console logs and sends to backend
  *
  * In dev mode, intercepts console methods and reports them to /api/debug
  * endpoint, enabling automated tools to see frontend errors without manual
@@ -83,18 +83,19 @@ async function sendLog(level: string, args: any[]): Promise<void> {
         }).catch(err => {
             // Silently fail if backend is unavailable
             // Use original console to avoid infinite loop
-            originalConsole.debug('[Console Reporter] Failed to send log:', err);
+            // Use original console to avoid infinite loop and logging infrastructure issues
+            originalConsole.debug('[Debug Interceptor] Failed to send log:', err);
         });
     } catch (err) {
-        // Silently fail
-        originalConsole.debug('[Console Reporter] Failed to send log:', err);
+        // Silently fail - use original console to avoid infinite loop
+        originalConsole.debug('[Debug Interceptor] Failed to send log:', err);
     }
 }
 
 /**
- * Initialize console reporter (dev mode only)
+ * Initialize debug interceptor (dev mode only)
  */
-export async function initConsoleReporter(): Promise<void> {
+export async function initDebugInterceptor(): Promise<void> {
     if (isInitialized) {
         return;
     }
@@ -102,7 +103,7 @@ export async function initConsoleReporter(): Promise<void> {
     // Fetch dev mode status
     const devModeEnabled = await fetchDevMode();
     if (!devModeEnabled) {
-        originalConsole.log('[Console Reporter] Dev mode disabled, console reporting disabled');
+        originalConsole.log('[Debug Interceptor] Dev mode disabled, debug interception disabled');
         return;
     }
 
@@ -134,13 +135,14 @@ export async function initConsoleReporter(): Promise<void> {
         sendLog('debug', args);
     };
 
-    console.log('[Console Reporter] Initialized - console logs will be sent to backend');
+    // Log to original console since we've already hooked it
+    originalConsole.log('[Debug Interceptor] Initialized - console logs will be sent to backend');
 }
 
 /**
  * Restore original console methods
  */
-export function disableConsoleReporter(): void {
+export function disableDebugInterceptor(): void {
     if (!isInitialized) {
         return;
     }
@@ -152,5 +154,5 @@ export function disableConsoleReporter(): void {
     console.debug = originalConsole.debug;
 
     isInitialized = false;
-    originalConsole.log('[Console Reporter] Disabled');
+    originalConsole.log('[Debug Interceptor] Disabled');
 }
