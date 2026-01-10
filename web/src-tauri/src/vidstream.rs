@@ -1,10 +1,15 @@
 //! Video processing commands for Tauri desktop app
 //!
 //! Provides Tauri commands to interact with the vidstream inference engine.
-//! Desktop-only - requires ONNX Runtime support and CrabCamera for native camera access.
+//! Desktop-only - requires ONNX Runtime support and nokhwa for native camera access.
 //! The entire module is conditionally compiled in main.rs.
 
-use crabcamera::camera::{Camera, CameraFormat};
+use nokhwa::pixel_format::RgbFormat;
+use nokhwa::utils::{
+    ApiBackend, CameraFormat, CameraIndex, FrameFormat as NokhwaFrameFormat, RequestedFormat,
+    RequestedFormatType, Resolution,
+};
+use nokhwa::{query, Camera};
 use qntx_vidstream::types::VideoEngineConfig;
 use qntx_vidstream::{FrameFormat, VideoEngine};
 use serde::{Deserialize, Serialize};
@@ -252,14 +257,23 @@ pub struct CameraFrame {
 #[tauri::command]
 pub fn vidstream_list_cameras() -> Result<Vec<CameraDevice>, String> {
     println!("[vidstream] Listing available cameras");
-    let cameras = Camera::list().map_err(|e| format!("Failed to list cameras: {}", e))?;
+
+    // Use platform-specific backend (AVFoundation on macOS, etc.)
+    #[cfg(target_os = "macos")]
+    let backend = ApiBackend::AVFoundation;
+    #[cfg(target_os = "windows")]
+    let backend = ApiBackend::MediaFoundation;
+    #[cfg(target_os = "linux")]
+    let backend = ApiBackend::Video4Linux;
+
+    let cameras = query(backend).map_err(|e| format!("Failed to query cameras: {}", e))?;
 
     let devices: Vec<CameraDevice> = cameras
         .into_iter()
         .enumerate()
         .map(|(i, info)| CameraDevice {
             index: i,
-            name: info.name().to_string(),
+            name: info.human_name().to_string(),
             description: info.description().to_string(),
         })
         .collect();
@@ -281,15 +295,18 @@ pub fn vidstream_start_camera(
         camera_index, width, height
     );
 
-    let cameras = Camera::list().map_err(|e| format!("Failed to list cameras: {}", e))?;
+    // Create camera format with RGB format (most compatible)
+    let requested_format = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Exact(
+        CameraFormat::new(Resolution::new(width, height), NokhwaFrameFormat::MJPEG, 30),
+    ));
 
-    if camera_index >= cameras.len() {
-        return Err(format!("Camera index {} out of range", camera_index));
-    }
-
-    let format = CameraFormat::new(width, height, 30.0); // 30 fps
-    let camera = Camera::new(&cameras[camera_index], format)
+    let mut camera = Camera::new(CameraIndex::Index(camera_index as u32), requested_format)
         .map_err(|e| format!("Failed to open camera: {}", e))?;
+
+    // Open the camera stream
+    camera
+        .open_stream()
+        .map_err(|e| format!("Failed to start stream: {}", e))?;
 
     println!("[vidstream] Camera opened successfully");
     *state.camera.lock().unwrap() = Some(camera);
@@ -314,7 +331,7 @@ pub fn vidstream_get_frame(state: State<CameraState>) -> Result<CameraFrame, Str
     let camera = camera_lock.as_mut().ok_or("Camera not started")?;
 
     let frame = camera
-        .next_frame()
+        .frame()
         .map_err(|e| format!("Failed to get frame: {}", e))?;
 
     let timestamp_us = std::time::SystemTime::now()
@@ -322,11 +339,16 @@ pub fn vidstream_get_frame(state: State<CameraState>) -> Result<CameraFrame, Str
         .unwrap()
         .as_micros() as u64;
 
+    // Decode frame to RGB
+    let decoded = frame
+        .decode_image::<RgbFormat>()
+        .map_err(|e| format!("Failed to decode frame: {}", e))?;
+
     Ok(CameraFrame {
-        data: frame.data().to_vec(),
-        width: frame.width(),
-        height: frame.height(),
-        format: "rgb8".to_string(), // CrabCamera provides RGB8
+        data: decoded.into_raw(),
+        width: frame.resolution().width(),
+        height: frame.resolution().height(),
+        format: "rgb8".to_string(),
         timestamp_us,
     })
 }
