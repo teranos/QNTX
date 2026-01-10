@@ -21,6 +21,7 @@
  */
 
 import { log, SEG } from '../logger';
+import { handleError } from '../error-handler';
 
 // ========================================================================
 // ATS Block Execution State Subscriptions
@@ -86,7 +87,7 @@ function notifyATSBlockSubscribers(
             try {
                 callback(state, executionId);
             } catch (error) {
-                log.error(SEG.PULSE, 'ATS Block subscriber callback error:', error);
+                handleError(error, 'ATS Block subscriber callback error', { context: SEG.PULSE, silent: true });
             }
         }
     }

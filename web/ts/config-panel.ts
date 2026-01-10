@@ -14,6 +14,7 @@ import { apiFetch } from './api.ts';
 import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
+import { handleError, SEG } from './error-handler.ts';
 
 interface ConfigSetting {
     key: string;
@@ -171,7 +172,7 @@ class ConfigPanel extends BasePanel {
             this.appConfig = data;
             console.log('[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
         } catch (error) {
-            console.error('[Config Panel] Failed to fetch config:', error);
+            handleError(error, 'Failed to fetch config', { context: SEG.ERROR, silent: true });
 
             // Build rich error for display
             this.configError = this.buildConfigError(error);
@@ -625,7 +626,7 @@ class ConfigPanel extends BasePanel {
             await this.fetchConfig();
             this.render();
         } catch (error) {
-            console.error('[Config Panel] Failed to save config:', error);
+            handleError(error, 'Failed to save config', { context: SEG.ERROR, silent: true });
             this.showToast(`Failed to save: ${(error as Error).message}`, 'error');
 
             // Reset button state
