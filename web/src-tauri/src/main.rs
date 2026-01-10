@@ -351,7 +351,10 @@ fn main() {
 
                 // Initialize video processing state (desktop only)
                 #[cfg(not(any(target_os = "ios", target_os = "android")))]
-                app.manage(vidstream::VideoEngineState::new());
+                {
+                    app.manage(vidstream::VideoEngineState::new());
+                    app.manage(vidstream::CameraState::new());
+                }
 
                 // Set up deep link handler for macOS (events) and check startup URL
                 // On Windows/Linux, deep links come through single-instance CLI args
@@ -723,7 +726,16 @@ fn main() {
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
             vidstream::vidstream_process_frame,
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            vidstream::vidstream_get_info
+            vidstream::vidstream_get_info,
+            // Camera access (desktop only)
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_list_cameras,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_start_camera,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_stop_camera,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_get_frame
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,8 +1,10 @@
 //! Video processing commands for Tauri desktop app
 //!
 //! Provides Tauri commands to interact with the vidstream inference engine.
-//! Desktop-only - requires ONNX Runtime support.
+//! Desktop-only - requires ONNX Runtime support and CrabCamera for native camera access.
+//! The entire module is conditionally compiled in main.rs.
 
+use crabcamera::{Camera, CameraFormat};
 use qntx_vidstream::types::VideoEngineConfig;
 use qntx_vidstream::{FrameFormat, VideoEngine};
 use serde::{Deserialize, Serialize};
@@ -18,6 +20,19 @@ impl VideoEngineState {
     pub fn new() -> Self {
         Self {
             engine: Mutex::new(None),
+        }
+    }
+}
+
+/// Shared camera state (thread-safe)
+pub struct CameraState {
+    camera: Mutex<Option<Camera>>,
+}
+
+impl CameraState {
+    pub fn new() -> Self {
+        Self {
+            camera: Mutex::new(None),
         }
     }
 }
@@ -212,5 +227,106 @@ pub fn vidstream_get_info(state: State<VideoEngineState>) -> Result<EngineInfo, 
         ready,
         input_width: width,
         input_height: height,
+    })
+}
+
+// === Camera Commands ===
+
+#[derive(Debug, Serialize)]
+pub struct CameraDevice {
+    pub index: usize,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CameraFrame {
+    pub data: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
+    pub timestamp_us: u64,
+}
+
+/// List available cameras
+#[tauri::command]
+pub fn vidstream_list_cameras() -> Result<Vec<CameraDevice>, String> {
+    println!("[vidstream] Listing available cameras");
+    let cameras = Camera::list().map_err(|e| format!("Failed to list cameras: {}", e))?;
+
+    let devices: Vec<CameraDevice> = cameras
+        .iter()
+        .enumerate()
+        .map(|(i, info)| CameraDevice {
+            index: i,
+            name: info.name().to_string(),
+            description: info.description().to_string(),
+        })
+        .collect();
+
+    println!("[vidstream] Found {} cameras", devices.len());
+    Ok(devices)
+}
+
+/// Start camera capture
+#[tauri::command]
+pub fn vidstream_start_camera(
+    camera_index: usize,
+    width: u32,
+    height: u32,
+    state: State<CameraState>,
+) -> Result<(), String> {
+    println!(
+        "[vidstream] Starting camera {} with resolution {}x{}",
+        camera_index, width, height
+    );
+
+    let cameras = Camera::list().map_err(|e| format!("Failed to list cameras: {}", e))?;
+
+    if camera_index >= cameras.len() {
+        return Err(format!("Camera index {} out of range", camera_index));
+    }
+
+    let format = CameraFormat::new(width, height);
+    let camera = Camera::new(&cameras[camera_index], format)
+        .map_err(|e| format!("Failed to open camera: {}", e))?;
+
+    println!("[vidstream] Camera opened successfully");
+    *state.camera.lock().unwrap() = Some(camera);
+
+    Ok(())
+}
+
+/// Stop camera capture
+#[tauri::command]
+pub fn vidstream_stop_camera(state: State<CameraState>) -> Result<(), String> {
+    println!("[vidstream] Stopping camera");
+    let mut camera_lock = state.camera.lock().unwrap();
+    *camera_lock = None;
+    println!("[vidstream] Camera stopped");
+    Ok(())
+}
+
+/// Get next camera frame
+#[tauri::command]
+pub fn vidstream_get_frame(state: State<CameraState>) -> Result<CameraFrame, String> {
+    let mut camera_lock = state.camera.lock().unwrap();
+    let camera = camera_lock.as_mut().ok_or("Camera not started")?;
+
+    let frame = camera
+        .next_frame()
+        .map_err(|e| format!("Failed to get frame: {}", e))?;
+
+    let timestamp_us = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64;
+
+    Ok(CameraFrame {
+        data: frame.data().to_vec(),
+        width: frame.width(),
+        height: frame.height(),
+        format: "rgb8".to_string(), // CrabCamera provides RGB8
+        timestamp_us,
     })
 }

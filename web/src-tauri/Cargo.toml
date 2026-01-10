@@ -34,6 +34,7 @@ tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-deep-link = "2"
 qntx-vidstream = { path = "../../ats/vidstream", features = ["onnx"] }
+crabcamera = "0.4.0"
 
 [features]
 default = ["custom-protocol"]
