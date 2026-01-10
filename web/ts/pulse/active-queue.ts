@@ -4,6 +4,7 @@
 
 import { formatRelativeTime, escapeHtml } from './panel.ts';
 import { log, SEG } from '../logger';
+import { handleError } from '../error-handler';
 
 /**
  * Render Active Queue section
@@ -72,7 +73,7 @@ export async function fetchActiveJobs(): Promise<any[]> {
             job.status === 'paused'
         );
     } catch (error) {
-        log.error(SEG.PULSE, 'Error fetching active jobs:', error);
+        handleError(error, 'Error fetching active jobs', { context: SEG.PULSE, silent: true });
         return [];
     }
 }

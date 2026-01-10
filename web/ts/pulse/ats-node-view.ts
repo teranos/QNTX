@@ -11,6 +11,7 @@ import type { ScheduledJobResponse } from "./types.ts";
 import { createSchedulingControls } from "./scheduling-controls.ts";
 import { subscribeATSBlock, type ATSExecutionState } from "./realtime-handlers.ts";
 import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 
 export interface ATSNodeViewOptions {
   documentId?: string;
@@ -96,7 +97,7 @@ export class ATSNodeView implements NodeView {
         this.renderSchedulingControls();
       }
     } catch (error) {
-      log.error(SEG.PULSE, "Failed to load scheduled job:", error);
+      handleError(error, 'Failed to load scheduled job', { context: SEG.PULSE, silent: true });
       this.renderSchedulingControls();
     }
   }

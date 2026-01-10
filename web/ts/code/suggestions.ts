@@ -7,6 +7,7 @@
 import { apiFetch } from '../api.ts';
 import type { FixSuggestion, PRInfo } from '../../../types/generated/typescript/github.ts';
 import { escapeHtml } from '../html-utils.ts';
+import { handleError, SEG } from '../error-handler.ts';
 
 export interface SuggestionsOptions {
     panel: HTMLElement;
@@ -75,7 +76,7 @@ export class CodeSuggestions {
             };
             prSelect.addEventListener('change', this.prSelectListener);
         } catch (error) {
-            console.error('[Go Editor] Failed to load open PRs:', error);
+            handleError(error, 'Failed to load open PRs', { context: SEG.ERROR, silent: true });
             prSelect.innerHTML = '<option value="">Failed to load PRs</option>';
         }
     }
@@ -110,7 +111,7 @@ export class CodeSuggestions {
                 suggestionCount.textContent = `${suggestions.length} suggestion${suggestions.length !== 1 ? 's' : ''}`;
             }
         } catch (error) {
-            console.error('[Go Editor] Failed to load PR suggestions:', error);
+            handleError(error, `Failed to load PR suggestions for PR #${prNumber}`, { context: SEG.ERROR, silent: true });
             this.showError(`Failed to load suggestions for PR #${prNumber}`);
         }
     }

@@ -10,6 +10,7 @@ import { apiFetch } from '../api.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger.ts';
+import { handleError } from '../error-handler.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -177,7 +178,7 @@ class PythonEditorPanel extends BasePanel {
                 this.updateStatus('unavailable');
             }
         } catch (error) {
-            log.error(SEG.UI, 'Failed to check Python plugin status:', error);
+            handleError(error, 'Failed to check Python plugin status', { context: SEG.UI, silent: true });
             this.updateStatus('error');
         }
     }
@@ -206,7 +207,7 @@ class PythonEditorPanel extends BasePanel {
                 pythonExtension = pythonModule.python();
                 log.debug(SEG.UI, 'Python language support loaded');
             } catch (err) {
-                log.warn(SEG.UI, 'Failed to load Python language support:', err);
+                handleError(err, 'Failed to load Python language support', { context: SEG.UI, silent: true });
                 pythonExtension = [];
             }
 
@@ -243,7 +244,7 @@ class PythonEditorPanel extends BasePanel {
 
             log.info(SEG.UI, 'Python Editor initialized successfully');
         } catch (error) {
-            log.error(SEG.UI, 'Failed to initialize Python Editor:', error);
+            handleError(error, 'Failed to initialize Python Editor', { context: SEG.UI, silent: true });
             this.showError(error instanceof Error ? error.message : String(error));
         }
     }
@@ -318,7 +319,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
             log.debug(SEG.UI, 'Python code executed:', result.success ? 'success' : 'error');
         } catch (error) {
-            log.error(SEG.UI, 'Python execution error:', error);
+            handleError(error, 'Python execution error', { context: SEG.UI, silent: true });
             this.lastOutput = {
                 success: false,
                 stdout: '',
@@ -556,7 +557,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             try {
                 this.editor.destroy();
             } catch (err) {
-                log.warn(SEG.UI, 'Error destroying Python Editor:', err);
+                handleError(err, 'Error destroying Python Editor', { context: SEG.UI, silent: true });
             }
             this.editor = null;
         }

@@ -5,6 +5,7 @@
  */
 
 import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 import type {
   ScheduledJobResponse,
   CreateScheduledJobRequest,
@@ -83,6 +84,7 @@ export async function createScheduledJob(
       const errorJson = JSON.parse(responseText);
       errorMessage = errorJson.error || errorJson.message || response.statusText;
     } catch (e) {
+      handleError(e, 'Failed to parse API error response', { context: SEG.PULSE, silent: true });
       // Response wasn't JSON, use raw text
       errorMessage = responseText || response.statusText;
     }
