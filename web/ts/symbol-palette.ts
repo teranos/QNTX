@@ -32,7 +32,7 @@ import { uiState } from './ui-state.ts';
 import { log, SEG } from './logger';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -44,6 +44,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'py') return 'py';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
     if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
+    if (cmd === 'vidstream') return '📽'; // Film projector - video inference
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -223,6 +224,10 @@ function handleSymbolClick(e: Event): void {
             // Web Scraper - show scraping panel
             showWebscraperPanel();
             break;
+        case 'vidstream':
+            // VidStream - show video inference window
+            showVidStreamWindow();
+            break;
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -303,6 +308,18 @@ async function showPluginPanel(): Promise<void> {
 async function showWebscraperPanel(): Promise<void> {
     const { webscraperPanel } = await import('./webscraper-panel.js');
     webscraperPanel.toggle();
+}
+
+/**
+ * Show VidStream window - real-time video inference (desktop only)
+ */
+let vidstreamWindowInstance: any = null;
+async function showVidStreamWindow(): Promise<void> {
+    if (!vidstreamWindowInstance) {
+        const { VidStreamWindow } = await import('./vidstream-window.js');
+        vidstreamWindowInstance = new VidStreamWindow();
+    }
+    vidstreamWindowInstance.toggle();
 }
 
 /**
