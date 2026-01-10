@@ -66,6 +66,36 @@
     outline-offset: 1px;
 }
 
+.window-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Unavailable button - diagonal striped pattern */
+.btn-unavailable {
+    position: relative;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-unavailable::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 4px,
+        rgba(0, 0, 0, 0.1) 4px,
+        rgba(0, 0, 0, 0.1) 8px
+    );
+    pointer-events: none;
+    border-radius: inherit;
+}
+
 /* Controls row */
 .window-controls {
     display: flex;
@@ -98,6 +128,21 @@
     left: 0;
     width: 100%;
     height: 100%;
+}
+
+/* Error display */
+.window-error {
+    padding: 8px 12px;
+    background: #fee;
+    border: 1px solid #c88;
+    border-radius: var(--panel-border-radius);
+    color: #a00;
+    font-size: 11px;
+    margin-bottom: 8px;
+    font-family: inherit;
+    word-break: break-word;
+    user-select: text;
+    cursor: text;
 }
 
 /* Stats grid */

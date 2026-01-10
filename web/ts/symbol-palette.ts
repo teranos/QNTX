@@ -30,6 +30,19 @@ import {
 } from '@generated/sym.js';
 import { uiState } from './ui-state.ts';
 import { log, SEG } from './logger';
+import { handleError } from './error-handler.ts';
+
+// Import all panel/window modules statically
+import { toggleConfig } from './config-panel.js';
+import { toggleAIProvider } from './ai-provider-panel.js';
+import { togglePulsePanel } from './pulse-panel.js';
+import { toggleProsePanel } from './prose/panel.js';
+import { toggleGoEditor } from './code/panel.js';
+import { togglePythonEditor } from './python/panel.js';
+import { togglePluginPanel } from './plugin-panel.js';
+import { webscraperPanel } from './webscraper-panel.js';
+import { VidStreamWindow } from './vidstream-window.js';
+import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream';
@@ -44,7 +57,7 @@ function getSymbol(cmd: string): string {
     if (cmd === 'py') return 'py';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
     if (cmd === 'scraper') return '⛶'; // White draughts king - extraction/capture
-    if (cmd === 'vidstream') return '📽'; // Film projector - video inference
+    if (cmd === 'vidstream') return '⮀'; // VidStream - video inference
     return CommandToSymbol[cmd] || cmd;
 }
 
@@ -226,6 +239,7 @@ function handleSymbolClick(e: Event): void {
             break;
         case 'vidstream':
             // VidStream - show video inference window
+            log(SEG.VID, 'VidStream button clicked');
             showVidStreamWindow();
             break;
         default:
@@ -247,87 +261,83 @@ function activateSearchMode(mode: string): void {
 
 /**
  * Show config panel - displays configuration introspection
- * Avoid Sin #6: Blocking Main Thread - Dynamic import defers loading until needed
  */
-async function showConfigPanel(): Promise<void> {
-    const { toggleConfig } = await import('./config-panel.js');
+function showConfigPanel(): void {
     toggleConfig();
 }
 
 /**
  * Show AI provider panel - displays actor/agent configuration
  */
-async function showAIProviderPanel(): Promise<void> {
-    const { toggleAIProvider } = await import('./ai-provider-panel.js');
+function showAIProviderPanel(): void {
     toggleAIProvider();
 }
 
 /**
  * Show pulse panel - displays scheduled jobs dashboard
  */
-async function showPulsePanel(): Promise<void> {
-    const { togglePulsePanel } = await import('./pulse-panel.js');
+function showPulsePanel(): void {
     togglePulsePanel();
 }
 
 /**
  * Show prose panel - displays documentation viewer/editor
  */
-async function showProsePanel(): Promise<void> {
-    const { toggleProsePanel } = await import('./prose/panel.js');
+function showProsePanel(): void {
     toggleProsePanel();
 }
 
 /**
  * Show Go editor - displays Go code editor with gopls LSP integration
  */
-async function showGoEditor(): Promise<void> {
-    const { toggleGoEditor } = await import('./code/panel.js');
+function showGoEditor(): void {
     toggleGoEditor();
 }
 
 /**
  * Show Python editor - displays Python code editor with execution support
  */
-async function showPythonEditor(): Promise<void> {
-    const { togglePythonEditor } = await import('./python/panel.js');
+function showPythonEditor(): void {
     togglePythonEditor();
 }
 
 /**
  * Show plugin panel - displays installed domain plugins and their status
  */
-async function showPluginPanel(): Promise<void> {
-    const { togglePluginPanel } = await import('./plugin-panel.js');
+function showPluginPanel(): void {
     togglePluginPanel();
 }
 
 /**
  * Show webscraper panel - UI for web scraping operations
  */
-async function showWebscraperPanel(): Promise<void> {
-    const { webscraperPanel } = await import('./webscraper-panel.js');
+function showWebscraperPanel(): void {
     webscraperPanel.toggle();
 }
 
 /**
  * Show VidStream window - real-time video inference (desktop only)
  */
-let vidstreamWindowInstance: any = null;
-async function showVidStreamWindow(): Promise<void> {
-    if (!vidstreamWindowInstance) {
-        const { VidStreamWindow } = await import('./vidstream-window.js');
-        vidstreamWindowInstance = new VidStreamWindow();
+let vidstreamWindowInstance: VidStreamWindow | null = null;
+function showVidStreamWindow(): void {
+    log(SEG.VID, 'showVidStreamWindow() called');
+    try {
+        if (!vidstreamWindowInstance) {
+            log(SEG.VID, 'Creating new VidStreamWindow instance...');
+            vidstreamWindowInstance = new VidStreamWindow();
+            log(SEG.VID, 'VidStreamWindow instance created');
+        }
+        log(SEG.VID, 'Calling toggle()');
+        vidstreamWindowInstance.toggle();
+    } catch (err) {
+        handleError(err, 'Failed to show VidStream window', { context: SEG.VID });
     }
-    vidstreamWindowInstance.toggle();
 }
 
 /**
  * Activate ingestion mode - show running IX jobs panel
  */
-async function activateIngestMode(mode: string): Promise<void> {
-    // Show job list panel (IMPLEMENTED)
-    const { toggleJobList } = await import('./hixtory-panel.js');
+function activateIngestMode(mode: string): void {
     toggleJobList();
     log.debug(SEG.SELF, `${getSymbol(mode)} ingest mode - showing job list`);
 }
