@@ -99,9 +99,13 @@ pub fn vidstream_init(
         "[vidstream] Initializing engine with model: {}",
         config.model_path
     );
+    println!(
+        "[vidstream] Config: confidence={}, nms={}, input={}x{}",
+        config.confidence_threshold, config.nms_threshold, config.input_width, config.input_height
+    );
 
     let engine_config = VideoEngineConfig {
-        model_path: config.model_path,
+        model_path: config.model_path.clone(),
         confidence_threshold: config.confidence_threshold,
         nms_threshold: config.nms_threshold,
         input_width: config.input_width,
@@ -111,16 +115,29 @@ pub fn vidstream_init(
         labels: None,
     };
 
-    let engine = VideoEngine::new(engine_config)?;
+    println!("[vidstream] Creating VideoEngine...");
+    let engine = match VideoEngine::new(engine_config) {
+        Ok(e) => {
+            println!("[vidstream] VideoEngine created successfully");
+            e
+        }
+        Err(e) => {
+            println!("[vidstream] ERROR creating VideoEngine: {}", e);
+            return Err(format!("Failed to create engine: {}", e));
+        }
+    };
+
     let (width, height) = engine.input_dimensions();
     let ready = engine.is_ready();
 
-    *state.engine.lock().unwrap() = Some(engine);
-
     println!(
-        "[vidstream] Engine initialized: {}x{}, ready={}",
+        "[vidstream] Engine dimensions: {}x{}, ready={}",
         width, height, ready
     );
+
+    *state.engine.lock().unwrap() = Some(engine);
+
+    println!("[vidstream] Engine stored in state, initialization complete");
 
     Ok(EngineInfo {
         ready,
