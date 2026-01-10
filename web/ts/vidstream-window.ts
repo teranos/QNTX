@@ -95,7 +95,6 @@ export class VidStreamWindow {
                 user-select: none;
             ">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="font-size: 1.2rem; filter: grayscale(100%);">📽</span>
                     <span style="font-weight: 600;">VidStream</span>
                 </div>
                 <button class="vidstream-close" style="
