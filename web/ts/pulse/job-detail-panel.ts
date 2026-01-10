@@ -9,6 +9,7 @@
 
 import { CSS } from '../css-classes.ts';
 import { log, SEG } from '../logger';
+import { handleError } from '../error-handler';
 import type { ScheduledJobResponse } from './types.ts';
 import type { Execution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
 import {
@@ -21,7 +22,6 @@ import {
   getStatusColorClass,
 } from './execution-api.ts';
 import { forceTriggerJob } from './api.ts';
-import { toast } from '../toast.ts';
 import {
   onExecutionStarted,
   onExecutionCompleted,
@@ -171,7 +171,7 @@ class JobDetailPanel {
 
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load executions:', error);
+      handleError(error, 'Failed to load execution history', { context: SEG.PULSE, silent: true });
       this.renderError('Failed to load execution history');
     }
   }
@@ -286,7 +286,7 @@ class JobDetailPanel {
       // Re-render to show loaded stages or children
       this.render();
     } catch (error) {
-      log.error(SEG.PULSE, 'Failed to load stages:', error);
+      handleError(error, 'Failed to load execution stages', { context: SEG.PULSE, silent: true });
       // Store empty stages response on error
       this.executionStages.set(executionId, {
         job_id: jobId,
@@ -322,7 +322,7 @@ class JobDetailPanel {
       this.taskLogs.set(taskKey, logs);
       this.render();
     } catch (error) {
-      log.error(SEG.PULSE, 'Failed to load task logs:', error);
+      handleError(error, 'Failed to load task logs', { context: SEG.PULSE, silent: true });
       this.taskLogs.set(taskKey, {
         task_id: taskId,
         logs: []
@@ -495,7 +495,7 @@ class JobDetailPanel {
       this.childStages.set(childId, stages);
       this.render();
     } catch (error) {
-      log.error(SEG.PULSE, 'Failed to load child stages:', error);
+      handleError(error, 'Failed to load child job stages', { context: SEG.PULSE, silent: true });
       this.childStages.set(childId, {
         job_id: childId,
         stages: []
@@ -773,11 +773,7 @@ class JobDetailPanel {
 
       log.debug(SEG.PULSE, 'Force trigger successful');
     } catch (error) {
-      log.error(SEG.PULSE, 'Force trigger failed:', error);
-      toast.error(
-        `Force trigger failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        true
-      );
+      handleError(error, 'Force trigger failed', { context: SEG.PULSE });
     }
   }
 
