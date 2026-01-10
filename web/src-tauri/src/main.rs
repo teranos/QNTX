@@ -1,12 +1,15 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use log::info;
 use qntx::types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
 
-// Desktop-only features (menu bar, tray, autostart, deep-link)
+// Desktop-only features (menu bar, tray, autostart, deep-link, camera)
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use crabcamera;
 #[cfg(not(target_os = "ios"))]
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 #[cfg(not(target_os = "ios"))]
@@ -244,6 +247,14 @@ fn set_taskbar_progress(app: tauri::AppHandle, state: String, progress: Option<u
 
 fn main() {
     let mut builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -267,18 +278,25 @@ fn main() {
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
     {
-        builder = builder
-            .plugin(tauri_plugin_autostart::init(
-                MacosLauncher::LaunchAgent,
-                Some(vec!["--minimized"]),
-            ))
-            .plugin(tauri_plugin_deep_link::init());
+        info!("Loading desktop plugins...");
+
+        info!("  ✓ autostart");
+        builder = builder.plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ));
+
+        info!("  ✓ deep-link");
+        builder = builder.plugin(tauri_plugin_deep_link::init());
 
         // Camera plugin (desktop only, not Android either)
         #[cfg(not(target_os = "android"))]
         {
+            info!("  ✓ crabcamera 0.7");
             builder = builder.plugin(crabcamera::init());
         }
+
+        info!("Desktop plugins loaded");
     }
 
     builder

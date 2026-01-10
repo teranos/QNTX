@@ -4,5 +4,7 @@
 <dict>
     <key>NSCameraUsageDescription</key>
     <string>QNTX needs camera access for real-time video inference with VidStream</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>QNTX may request microphone access for media capture</string>
 </dict>
 </plist>
