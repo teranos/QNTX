@@ -90,9 +90,6 @@ export class VidStreamWindow {
         this.window.className = 'draggable-window';
         this.window.style.width = '664px'; // 640px viewport + padding
 
-        // Check if running in Tauri (desktop) or browser
-        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
         this.window.innerHTML = `
             <div class="draggable-window-header">
                 <span class="draggable-window-title">VidStream</span>
@@ -106,21 +103,19 @@ export class VidStreamWindow {
                     class="window-input"
                     value="ats/vidstream/models/yolo11n.onnx"
                     placeholder="path/to/model.onnx"
-                    ${!isTauri ? 'disabled' : ''}
                 />
 
                 <div class="window-controls">
                     <button
                         id="vs-init-btn"
-                        class="panel-btn panel-btn-sm ${!isTauri ? 'btn-unavailable' : ''}"
-                        ${!isTauri ? 'disabled title="ONNX inference requires desktop mode (Tauri)"' : ''}
+                        class="panel-btn panel-btn-sm"
                     >Initialize ONNX</button>
                     <button
                         id="vs-start-btn"
                         class="panel-btn panel-btn-sm panel-btn-primary"
                     >Start Camera</button>
                     <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
-                    <span id="vs-status" class="window-status">${isTauri ? 'Ready for camera + ONNX' : 'Browser mode (webcam only, no ONNX)'}</span>
+                    <span id="vs-status" class="window-status">Ready (camera + ONNX via WebSocket)</span>
                 </div>
 
                 <div id="vs-error" class="window-error" style="display: none;"></div>
