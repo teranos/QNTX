@@ -4,6 +4,7 @@ import { MAX_LOGS, appState } from './config.ts';
 import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
 import { formatTimestamp } from './html-utils.ts';
+import { log, SEG } from './logger.ts';
 import type { LogsMessage, LogEntry } from '../types/websocket';
 
 // Make this a module
@@ -19,14 +20,14 @@ const LOG_LEVEL_MAP: Record<string, string> = {
 
 // Log handling - accepts the full WebSocket message type
 export function handleLogBatch(data: LogsMessage): void {
-    console.log('📋 handleLogBatch called:', data);
+    log.info(SEG.WS, '📋 handleLogBatch called:', data);
 
     if (!data.data || !data.data.messages) {
-        console.warn('⚠️  No data.data.messages in log batch:', data);
+        log.warn(SEG.WS, '⚠️  No data.data.messages in log batch:', data);
         return;
     }
 
-    console.log(`📝 Processing ${data.data.messages.length} log messages`);
+    log.info(SEG.WS, `📝 Processing ${data.data.messages.length} log messages`);
 
     data.data.messages.forEach(msg => {
         appendLog(msg);
