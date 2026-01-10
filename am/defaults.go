@@ -25,6 +25,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("local_inference.model", "llama3.2:3b")
 	v.SetDefault("local_inference.context_size", 16384)
 	v.SetDefault("local_inference.timeout_seconds", 3600)
+	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
 
 	// OpenRouter defaults
 	v.SetDefault("openrouter.model", "openai/gpt-4o-mini") // Cost-effective default

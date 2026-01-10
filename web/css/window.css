@@ -158,3 +158,18 @@
     font-weight: 600;
     color: var(--panel-text-primary, #333);
 }
+
+/* Model info */
+.window-model-info {
+    font-size: 10px;
+    color: var(--panel-text-secondary, #666);
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background: var(--panel-bg-secondary, #f8f8f8);
+    border-radius: var(--panel-border-radius);
+}
+
+.window-model-info span {
+    font-family: monospace;
+    color: var(--panel-text-primary, #333);
+}
