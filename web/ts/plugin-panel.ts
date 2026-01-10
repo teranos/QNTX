@@ -13,6 +13,8 @@ import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
 import { toast } from './toast';
 import { escapeHtml } from './html-utils.ts';
+import { log, SEG } from './logger';
+import { handleError } from './error-handler.ts';
 
 interface PluginInfo {
     name: string;
@@ -254,14 +256,14 @@ export class PluginPanel extends BasePanel {
             }
             this.serverHealth = await response.json();
         } catch (error) {
-            console.error('[Plugin Panel] Failed to fetch server health:', error);
+            handleError(error, 'Failed to fetch server health', { context: SEG.UI, silent: true });
             this.serverHealth = null;
         }
     }
 
     private async fetchPlugins(): Promise<void> {
         try {
-            console.log('[Plugin Panel] Fetching plugins from /api/plugins...');
+            log.debug(SEG.UI, 'Fetching plugins from /api/plugins...');
             const response = await apiFetch('/api/plugins');
 
             if (!response.ok) {
@@ -276,9 +278,9 @@ export class PluginPanel extends BasePanel {
             }
 
             this.plugins = data.plugins;
-            console.log('[Plugin Panel] Successfully loaded', this.plugins.length, 'plugins');
+            log.debug(SEG.UI, 'Successfully loaded', this.plugins.length, 'plugins');
         } catch (error) {
-            console.error('[Plugin Panel] Failed to fetch plugins:', error);
+            handleError(error, 'Failed to fetch plugins', { context: SEG.UI, silent: true });
             this.plugins = [];
         }
     }
@@ -473,7 +475,7 @@ export class PluginPanel extends BasePanel {
 
     private async pausePlugin(name: string): Promise<void> {
         try {
-            console.log('[Plugin Panel] Pausing plugin:', name);
+            log.debug(SEG.UI, 'Pausing plugin:', name);
             const response = await apiFetch(`/api/plugins/${name}/pause`, {
                 method: 'POST'
             });
@@ -486,16 +488,15 @@ export class PluginPanel extends BasePanel {
             // Refresh the list to show updated state
             await this.fetchPlugins();
             this.render();
-            console.log('[Plugin Panel] Plugin paused:', name);
+            log.debug(SEG.UI, 'Plugin paused:', name);
         } catch (error) {
-            console.error('[Plugin Panel] Failed to pause plugin:', error);
-            toast.error(`Failed to pause plugin: ${error}`);
+            handleError(error, 'Failed to pause plugin', { context: SEG.UI });
         }
     }
 
     private async resumePlugin(name: string): Promise<void> {
         try {
-            console.log('[Plugin Panel] Resuming plugin:', name);
+            log.debug(SEG.UI, 'Resuming plugin:', name);
             const response = await apiFetch(`/api/plugins/${name}/resume`, {
                 method: 'POST'
             });
@@ -508,10 +509,9 @@ export class PluginPanel extends BasePanel {
             // Refresh the list to show updated state
             await this.fetchPlugins();
             this.render();
-            console.log('[Plugin Panel] Plugin resumed:', name);
+            log.debug(SEG.UI, 'Plugin resumed:', name);
         } catch (error) {
-            console.error('[Plugin Panel] Failed to resume plugin:', error);
-            toast.error(`Failed to resume plugin: ${error}`);
+            handleError(error, 'Failed to resume plugin', { context: SEG.UI });
         }
     }
 
@@ -575,7 +575,7 @@ export class PluginPanel extends BasePanel {
                 editingFields: new Set()
             };
         } catch (error) {
-            console.error('[Plugin Panel] Failed to fetch config:', pluginName, error);
+            handleError(error, `Failed to fetch config for ${pluginName}`, { context: SEG.UI, silent: true });
             this.configState = {
                 pluginName,
                 currentConfig: {},
@@ -763,9 +763,9 @@ export class PluginPanel extends BasePanel {
         // Second click: actually save
         try {
             const requestPayload = { config: this.configState.newConfig };
-            console.log('[Plugin Config] Saving config for', this.configState.pluginName);
-            console.log('[Plugin Config] Request payload:', requestPayload);
-            console.log('[Plugin Config] Payload JSON:', JSON.stringify(requestPayload, null, 2));
+            log.debug(SEG.UI, 'Saving config for', this.configState.pluginName);
+            log.debug(SEG.UI, 'Request payload:', requestPayload);
+            log.debug(SEG.UI, 'Payload JSON:', JSON.stringify(requestPayload, null, 2));
 
             const response = await apiFetch(`/api/plugins/${this.configState.pluginName}/config`, {
                 method: 'PUT',
@@ -773,11 +773,11 @@ export class PluginPanel extends BasePanel {
                 body: JSON.stringify(requestPayload)
             });
 
-            console.log('[Plugin Config] Response status:', response.status);
+            log.debug(SEG.UI, 'Response status:', response.status);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                console.log('[Plugin Config] Error response:', errorData);
+                log.debug(SEG.UI, 'Error response:', errorData);
 
                 // Format error details - handle backend validation errors
                 let errorDetails = errorData.details || '';
@@ -811,7 +811,7 @@ export class PluginPanel extends BasePanel {
             await this.fetchPlugins();
             this.render();
         } catch (error) {
-            console.error('[Plugin Panel] Failed to save config:', error);
+            handleError(error, 'Failed to save config', { context: SEG.UI, silent: true });
 
             // Set error in config state and reset confirmation
             if (this.configState) {

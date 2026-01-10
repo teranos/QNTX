@@ -37,6 +37,7 @@ import { CSS, DATA, setVisibility } from './css-classes.ts';
 import * as PanelError from './base-panel-error.ts';
 import type { PanelErrorState, ErrorHandlingContext } from './base-panel-error.ts';
 import { tooltip as tooltipManager, type TooltipConfig } from './tooltip.ts';
+import { log, SEG } from './logger.ts';
 
 export interface PanelConfig {
     id: string;
@@ -107,7 +108,7 @@ export abstract class BasePanel {
             this.setupEventListeners();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in setupEventListeners():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in setupEventListeners():`, err);
             // Log error but allow panel to be created - it may still be partially functional
         }
     }
@@ -189,7 +190,7 @@ export abstract class BasePanel {
             if (!await this.beforeShow()) return;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in beforeShow():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in beforeShow():`, err);
             this.showErrorState(err);
             return;
         }
@@ -202,7 +203,7 @@ export abstract class BasePanel {
             await this.onShow();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in onShow():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in onShow():`, err);
             this.showErrorState(err);
         }
     }
@@ -216,7 +217,7 @@ export abstract class BasePanel {
             if (!this.beforeHide()) return;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in beforeHide():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in beforeHide():`, err);
             // Don't show error state during hide, just log and continue
         }
 
@@ -227,7 +228,7 @@ export abstract class BasePanel {
             this.onHide();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in onHide():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in onHide():`, err);
             // Don't show error state during hide, just log
         }
     }

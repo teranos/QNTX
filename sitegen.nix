@@ -37,11 +37,22 @@ let
     core = ./web/css/core.css;
     utilities = ./web/css/utilities.css;
     docs = ./web/css/docs.css;
+    prism = pkgs.fetchurl {
+      url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css";
+      hash = "sha256-GxX+KXGZigSK67YPJvbu12EiBx257zuZWr0AMiT1Kpg=";
+    };
   };
 
   jsFiles = {
-    search = ./web/js/search.js;
     releases = ./web/js/releases.js;
+    prismCore = pkgs.fetchurl {
+      url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js";
+      hash = "sha256-4mJNT2bMXxcc1GCJaxBmMPdmah5ji0Ldnd79DKd1hoM=";
+    };
+    prismAutoloader = pkgs.fetchurl {
+      url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js";
+      hash = "sha256-AjM0J5XIbiB590BrznLEgZGLnOQWrt62s3BEq65Q/I0=";
+    };
   };
 
   logo = ./web/qntx.jpg;
@@ -187,6 +198,7 @@ let
       <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
       <link rel="stylesheet" href="${prefix}/css/core.css">
       <link rel="stylesheet" href="${prefix}/css/docs.css">
+      <link rel="stylesheet" href="${prefix}/css/prism.css">
     </head>'';
 
   mkNav = { prefix }: ''
@@ -195,6 +207,21 @@ let
         <img src="${prefix}/qntx.jpg" alt="QNTX" class="site-logo">Documentation Home
       </a>
     </nav>'';
+
+  mkBreadcrumb = fileInfo:
+    let
+      category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+      categoryMeta = if category == null then null else getCategoryMeta category;
+      categoryTitle = if category == null then null else toTitleCase category;
+      categorySymbol = if categoryMeta == null then "" else categoryMeta.symbol;
+      documentTitle = toTitleCase fileInfo.name;
+
+      homeCrumb = ''<a href="${fileInfo.prefix}/index.html">Home</a>'';
+      categoryCrumb = if category == null then "" else
+      ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-category">${categorySymbol} ${categoryTitle}</span>'';
+      documentCrumb = ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${documentTitle}</span>'';
+    in
+    ''<nav class="breadcrumb">${homeCrumb}${categoryCrumb}${documentCrumb}</nav>'';
 
   provenanceFooter =
     let
@@ -357,17 +384,11 @@ let
     mkPage {
       title = "QNTX Documentation";
       nav = false;
-      scripts = [ "search.js" "releases.js" ];
+      scripts = [ "releases.js" ];
       content = ''
         <div class="doc-header">
           <img src="./qntx.jpg" alt="QNTX Logo">
           <h1>QNTX Documentation</h1>
-        </div>
-
-        <div class="search-container">
-          <input type="search" id="search-input" class="search-input"
-                 placeholder="Search documentation..." aria-label="Search documentation">
-          <div id="search-results" class="search-results" hidden></div>
         </div>
 
         <nav class="quick-links">
@@ -546,7 +567,6 @@ let
         { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
         { path = "infrastructure.html"; desc = "Nix build documentation"; }
         { path = "sitegen.html"; desc = "This page"; }
-        { path = "search-index.json"; desc = "Search index for client-side search"; }
         { path = "build-info.json"; desc = "Provenance metadata"; }
         { path = "qntx.jpg"; desc = "Logo"; }
       ];
@@ -617,7 +637,6 @@ let
             [ "<strong>Pure Nix</strong>" "Entire generator written in Nix - no shell scripts, no external build tools" ]
             [ "<strong>Markdown to HTML</strong>" ''Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a>'' ]
             [ "<strong>SEG Symbol Navigation</strong>" "Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API" ]
-            [ "<strong>Client-side Search</strong>" "Build-time JSON index with JavaScript search - no server required" ]
             [ "<strong>Dark Mode</strong>" "Automatic dark/light theme via <code>prefers-color-scheme</code>" ]
             [ "<strong>GitHub Releases</strong>" "Dynamic release downloads fetched client-side from GitHub API" ]
             [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
@@ -775,12 +794,15 @@ let
         ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; }}
         <body>
         ${mkNav { prefix = fileInfo.prefix; }}
+        ${mkBreadcrumb fileInfo}
         EOF
           cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
         ${rewrittenMd}
         EOF
           cat <<'EOF'
         ${provenanceFooter}
+        <script src="${fileInfo.prefix}/js/prismCore.js"></script>
+        <script src="${fileInfo.prefix}/js/prismAutoloader.js"></script>
         </body>
         </html>
         EOF
@@ -790,22 +812,8 @@ let
   htmlDerivations = map mkHtmlDerivation fileInfos;
 
   # ============================================================================
-  # Search Index & Build Info
+  # Build Info
   # ============================================================================
-
-  mkSearchEntry = fileInfo:
-    let
-      mdContent = builtins.readFile fileInfo.mdPath;
-      stripped = stripMarkdown mdContent;
-      truncated = lib.substring 0 500 stripped;
-      category =
-        if fileInfo.dir == "."
-        then "General"
-        else toTitleCase (lib.head (lib.splitString "/" fileInfo.dir));
-    in
-    ''{"title":"${html.escapeJson (toTitleCase fileInfo.name)}","path":"${fileInfo.htmlPath}","category":"${html.escapeJson category}","content":"${html.escapeJson truncated}"}'';
-
-  searchIndexContent = "[${lib.concatMapStringsSep "," mkSearchEntry fileInfos}]";
 
   buildInfoContent = builtins.toJSON (lib.filterAttrs (_: v: v != null) {
     generator = provenance.generator;
@@ -858,16 +866,16 @@ let
       destination = "/sitegen.html";
     };
 
-    "search-index.json" = pkgs.writeTextFile {
-      name = "qntx-docs-search-index";
-      text = searchIndexContent;
-      destination = "/search-index.json";
-    };
-
     "build-info.json" = pkgs.writeTextFile {
       name = "qntx-docs-build-info";
       text = buildInfoContent;
       destination = "/build-info.json";
+    };
+
+    "CNAME" = pkgs.writeTextFile {
+      name = "qntx-docs-cname";
+      text = "qntx.sbvh.nl\n";
+      destination = "/CNAME";
     };
   };
 

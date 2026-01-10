@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/github.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/github.rs)
 - Python: [`types/generated/python/github.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/github.py)
 
-## CachedPatch
+## CachedPatch {#cachedpatch}
 
 **Source**: [`qntx-code/vcs/github/types.go:60`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/types.go#L60)
 
@@ -27,7 +27,7 @@ type CachedPatch struct {
 }
 ```
 
-## FixContext
+## FixContext {#fixcontext}
 
 **Source**: [`qntx-code/vcs/github/types.go:29`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/types.go#L29)
 
@@ -40,7 +40,7 @@ type FixContext struct {
 }
 ```
 
-## FixResult
+## FixResult {#fixresult}
 
 **Source**: [`qntx-code/vcs/github/types.go:38`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/types.go#L38)
 
@@ -53,7 +53,7 @@ type FixResult struct {
 }
 ```
 
-## FixSuggestion
+## FixSuggestion {#fixsuggestion}
 
 **Source**: [`qntx-code/vcs/github/types.go:13`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/types.go#L13)
 
@@ -73,7 +73,7 @@ type FixSuggestion struct {
 }
 ```
 
-## GitHubPR
+## GitHubPR {#githubpr}
 
 **Source**: [`qntx-code/vcs/github/pr_detection.go:18`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/pr_detection.go#L18)
 
@@ -86,7 +86,7 @@ type GitHubPR struct {
 }
 ```
 
-## PRInfo
+## PRInfo {#prinfo}
 
 **Source**: [`qntx-code/vcs/github/github.go:337`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/github.go#L337)
 
@@ -100,7 +100,7 @@ type PRInfo struct {
 }
 ```
 
-## PatchResult
+## PatchResult {#patchresult}
 
 **Source**: [`qntx-code/vcs/github/types.go:50`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/types.go#L50)
 
@@ -114,7 +114,7 @@ type PatchResult struct {
 }
 ```
 
-## StalenessInfo
+## StalenessInfo {#stalenessinfo}
 
 **Source**: [`qntx-code/vcs/github/types.go:72`](https://github.com/teranos/QNTX/blob/main/qntx-code/vcs/github/types.go#L72)
 

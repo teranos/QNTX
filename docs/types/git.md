@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/git.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/git.rs)
 - Python: [`types/generated/python/git.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/git.py)
 
-## CargoLock
+## CargoLock {#cargolock}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:404`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L404)
 
@@ -21,7 +21,7 @@ type CargoLock struct {
 }
 ```
 
-## CargoToml
+## CargoToml {#cargotoml}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:331`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L331)
 
@@ -34,7 +34,7 @@ type CargoToml struct {
 }
 ```
 
-## DepsIngestionResult
+## DepsIngestionResult {#depsingestionresult}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:33`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L33)
 
@@ -48,7 +48,7 @@ type DepsIngestionResult struct {
 }
 ```
 
-## DepsIxProcessor
+## DepsIxProcessor {#depsixprocessor}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:50`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L50)
 
@@ -58,7 +58,7 @@ type DepsIxProcessor struct {
 }
 ```
 
-## FlakeLock
+## FlakeLock {#flakelock}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:539`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L539)
 
@@ -69,7 +69,7 @@ type FlakeLock struct {
 }
 ```
 
-## GitBranchResult
+## GitBranchResult {#gitbranchresult}
 
 **Source**: [`qntx-code/ixgest/git/ingest.go:86`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L86)
 
@@ -83,7 +83,7 @@ type GitBranchResult struct {
 }
 ```
 
-## GitCommitResult
+## GitCommitResult {#gitcommitresult}
 
 **Source**: [`qntx-code/ixgest/git/ingest.go:74`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L74)
 
@@ -101,7 +101,7 @@ type GitCommitResult struct {
 }
 ```
 
-## GitIngestionHandler
+## GitIngestionHandler {#gitingestionhandler}
 
 **Source**: [`qntx-code/ixgest/git/async.go:16`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L16)
 
@@ -111,7 +111,7 @@ type GitIngestionHandler struct {
 }
 ```
 
-## GitIngestionPayload
+## GitIngestionPayload {#gitingestionpayload}
 
 **Source**: [`qntx-code/ixgest/git/async.go:30`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/async.go#L30)
 
@@ -126,7 +126,7 @@ type GitIngestionPayload struct {
 }
 ```
 
-## GitIxProcessor
+## GitIxProcessor {#gitixprocessor}
 
 **Source**: [`qntx-code/ixgest/git/ingest.go:45`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L45)
 
@@ -136,7 +136,7 @@ type GitIxProcessor struct {
 }
 ```
 
-## GitProcessingResult
+## GitProcessingResult {#gitprocessingresult}
 
 **Source**: [`qntx-code/ixgest/git/ingest.go:58`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L58)
 
@@ -158,7 +158,7 @@ type GitProcessingResult struct {
 }
 ```
 
-## GoPackageInfo
+## GoPackageInfo {#gopackageinfo}
 
 **Source**: [`qntx-code/ixgest/git/ingest.go:732`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/ingest.go#L732)
 
@@ -170,7 +170,7 @@ type GoPackageInfo struct {
 }
 ```
 
-## PackageJSON
+## PackageJSON {#packagejson}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:437`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L437)
 
@@ -184,7 +184,7 @@ type PackageJSON struct {
 }
 ```
 
-## ProjectFile
+## ProjectFile {#projectfile}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:26`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L26)
 
@@ -197,7 +197,7 @@ type ProjectFile struct {
 }
 ```
 
-## ProjectFileResult
+## ProjectFileResult {#projectfileresult}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:41`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L41)
 
@@ -212,7 +212,7 @@ type ProjectFileResult struct {
 }
 ```
 
-## PyprojectToml
+## PyprojectToml {#pyprojecttoml}
 
 **Source**: [`qntx-code/ixgest/git/deps.go:595`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/deps.go#L595)
 
@@ -224,7 +224,7 @@ type PyprojectToml struct {
 }
 ```
 
-## RepoSource
+## RepoSource {#reposource}
 
 **Source**: [`qntx-code/ixgest/git/repo.go:23`](https://github.com/teranos/QNTX/blob/main/qntx-code/ixgest/git/repo.go#L23)
 

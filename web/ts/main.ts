@@ -34,7 +34,7 @@ import './command-explorer-panel.ts';
 import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
-import { initConsoleReporter } from './console-reporter.ts';
+import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -136,13 +136,13 @@ async function init(): Promise<void> {
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
-    // Initialize console reporter (dev mode only)
+    // Initialize debug interceptor (dev mode only)
     // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
     try {
-        await initConsoleReporter();
+        await initDebugInterceptor();
     } catch (err) {
-        console.error('[Init] Failed to initialize console reporter:', err);
-        // Continue anyway - console reporting is not critical to app function
+        console.error('[Init] Failed to initialize debug interceptor:', err);
+        // Continue anyway - debug interception is not critical to app function
     }
 
     // Restore previous session if exists

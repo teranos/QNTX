@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/async.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/async.rs)
 - Python: [`types/generated/python/async.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/async.py)
 
-## ErrorCode
+## ErrorCode {#errorcode}
 
 **Source**: [`pulse/async/error.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L13)
 
@@ -30,7 +30,7 @@ const (
 )
 ```
 
-## ErrorContext
+## ErrorContext {#errorcontext}
 
 **Source**: [`pulse/async/error.go:27`](https://github.com/teranos/QNTX/blob/main/pulse/async/error.go#L27)
 
@@ -45,7 +45,7 @@ type ErrorContext struct {
 }
 ```
 
-## Job
+## Job {#job}
 
 **Source**: [`pulse/async/job.go:67`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L67)
 
@@ -71,7 +71,7 @@ type Job struct {
 }
 ```
 
-## JobStatus
+## JobStatus {#jobstatus}
 
 **Source**: [`pulse/async/job.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L13)
 
@@ -89,7 +89,7 @@ const (
 )
 ```
 
-## Progress
+## Progress {#progress}
 
 **Source**: [`pulse/async/job.go:47`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L47)
 
@@ -101,7 +101,7 @@ type Progress struct {
 }
 ```
 
-## PulseState
+## PulseState {#pulsestate}
 
 **Source**: [`pulse/async/job.go:36`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L36)
 
@@ -118,7 +118,7 @@ type PulseState struct {
 }
 ```
 
-## QueueStats
+## QueueStats {#queuestats}
 
 **Source**: [`pulse/async/queue.go:330`](https://github.com/teranos/QNTX/blob/main/pulse/async/queue.go#L330)
 
@@ -134,7 +134,7 @@ type QueueStats struct {
 }
 ```
 
-## SystemMetrics
+## SystemMetrics {#systemmetrics}
 
 **Source**: [`pulse/async/system_metrics.go:8`](https://github.com/teranos/QNTX/blob/main/pulse/async/system_metrics.go#L8)
 
@@ -151,7 +151,7 @@ type SystemMetrics struct {
 }
 ```
 
-## WorkerPoolConfig
+## WorkerPoolConfig {#workerpoolconfig}
 
 **Source**: [`pulse/async/worker.go:88`](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go#L88)
 

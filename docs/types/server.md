@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/server.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/server.rs)
 - Python: [`types/generated/python/server.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/server.py)
 
-## ChildJobInfo
+## ChildJobInfo {#childjobinfo}
 
 **Source**: [`server/pulse_types.go:87`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L87)
 
@@ -31,7 +31,7 @@ type ChildJobInfo struct {
 }
 ```
 
-## CompleteMessage
+## CompleteMessage {#completemessage}
 
 **Source**: [`server/types.go:94`](https://github.com/teranos/QNTX/blob/main/server/types.go#L94)
 
@@ -43,7 +43,7 @@ type CompleteMessage struct {
 }
 ```
 
-## ConsoleFormatter
+## ConsoleFormatter {#consoleformatter}
 
 **Source**: [`server/console_formatter.go:10`](https://github.com/teranos/QNTX/blob/main/server/console_formatter.go#L10)
 
@@ -53,7 +53,7 @@ type ConsoleFormatter struct {
 }
 ```
 
-## ConsoleLog
+## ConsoleLog {#consolelog}
 
 **Source**: [`server/debug_handler.go:11`](https://github.com/teranos/QNTX/blob/main/server/debug_handler.go#L11)
 
@@ -68,7 +68,7 @@ type ConsoleLog struct {
 }
 ```
 
-## CreateScheduledJobRequest
+## CreateScheduledJobRequest {#createscheduledjobrequest}
 
 **Source**: [`server/pulse_types.go:14`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L14)
 
@@ -83,7 +83,7 @@ type CreateScheduledJobRequest struct {
 }
 ```
 
-## DaemonStatusMessage
+## DaemonStatusMessage {#daemonstatusmessage}
 
 **Source**: [`server/types.go:119`](https://github.com/teranos/QNTX/blob/main/server/types.go#L119)
 
@@ -106,7 +106,7 @@ type DaemonStatusMessage struct {
 }
 ```
 
-## ErrorResponse
+## ErrorResponse {#errorresponse}
 
 **Source**: [`server/pulse_types.go:50`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L50)
 
@@ -117,7 +117,7 @@ type ErrorResponse struct {
 }
 ```
 
-## JobChildrenResponse
+## JobChildrenResponse {#jobchildrenresponse}
 
 **Source**: [`server/pulse_types.go:102`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L102)
 
@@ -129,7 +129,7 @@ type JobChildrenResponse struct {
 }
 ```
 
-## JobStagesResponse
+## JobStagesResponse {#jobstagesresponse}
 
 **Source**: [`server/pulse_types.go:67`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L67)
 
@@ -141,7 +141,7 @@ type JobStagesResponse struct {
 }
 ```
 
-## JobUpdateMessage
+## JobUpdateMessage {#jobupdatemessage}
 
 **Source**: [`server/types.go:112`](https://github.com/teranos/QNTX/blob/main/server/types.go#L112)
 
@@ -154,7 +154,7 @@ type JobUpdateMessage struct {
 }
 ```
 
-## LLMStreamMessage
+## LLMStreamMessage {#llmstreammessage}
 
 **Source**: [`server/types.go:136`](https://github.com/teranos/QNTX/blob/main/server/types.go#L136)
 
@@ -172,7 +172,7 @@ type LLMStreamMessage struct {
 }
 ```
 
-## ListExecutionsResponse
+## ListExecutionsResponse {#listexecutionsresponse}
 
 **Source**: [`server/pulse_execution_handlers.go:18`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L18)
 
@@ -186,7 +186,7 @@ type ListExecutionsResponse struct {
 }
 ```
 
-## ListScheduledJobsResponse
+## ListScheduledJobsResponse {#listscheduledjobsresponse}
 
 **Source**: [`server/pulse_types.go:44`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L44)
 
@@ -198,7 +198,7 @@ type ListScheduledJobsResponse struct {
 }
 ```
 
-## LogEntry
+## LogEntry {#logentry}
 
 **Source**: [`server/pulse_types.go:73`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L73)
 
@@ -212,7 +212,7 @@ type LogEntry struct {
 }
 ```
 
-## ParsedATSCode
+## ParsedATSCode {#parsedatscode}
 
 **Source**: [`server/ats_parser.go:22`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L22)
 
@@ -225,7 +225,7 @@ type ParsedATSCode struct {
 }
 ```
 
-## PluginHealthMessage
+## PluginHealthMessage {#pluginhealthmessage}
 
 **Source**: [`server/types.go:202`](https://github.com/teranos/QNTX/blob/main/server/types.go#L202)
 
@@ -241,7 +241,7 @@ type PluginHealthMessage struct {
 }
 ```
 
-## PluginInfo
+## PluginInfo {#plugininfo}
 
 **Source**: [`server/handlers.go:598`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L598)
 
@@ -262,7 +262,7 @@ type PluginInfo struct {
 }
 ```
 
-## ProgressMessage
+## ProgressMessage {#progressmessage}
 
 **Source**: [`server/types.go:78`](https://github.com/teranos/QNTX/blob/main/server/types.go#L78)
 
@@ -276,7 +276,7 @@ type ProgressMessage struct {
 }
 ```
 
-## ProseEntry
+## ProseEntry {#proseentry}
 
 **Source**: [`server/prose_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L16)
 
@@ -290,7 +290,7 @@ type ProseEntry struct {
 }
 ```
 
-## PulseExecutionCompletedMessage
+## PulseExecutionCompletedMessage {#pulseexecutioncompletedmessage}
 
 **Source**: [`server/types.go:168`](https://github.com/teranos/QNTX/blob/main/server/types.go#L168)
 
@@ -308,7 +308,7 @@ type PulseExecutionCompletedMessage struct {
 }
 ```
 
-## PulseExecutionFailedMessage
+## PulseExecutionFailedMessage {#pulseexecutionfailedmessage}
 
 **Source**: [`server/types.go:157`](https://github.com/teranos/QNTX/blob/main/server/types.go#L157)
 
@@ -325,7 +325,7 @@ type PulseExecutionFailedMessage struct {
 }
 ```
 
-## PulseExecutionLogStreamMessage
+## PulseExecutionLogStreamMessage {#pulseexecutionlogstreammessage}
 
 **Source**: [`server/types.go:180`](https://github.com/teranos/QNTX/blob/main/server/types.go#L180)
 
@@ -340,7 +340,7 @@ type PulseExecutionLogStreamMessage struct {
 }
 ```
 
-## PulseExecutionStartedMessage
+## PulseExecutionStartedMessage {#pulseexecutionstartedmessage}
 
 **Source**: [`server/types.go:148`](https://github.com/teranos/QNTX/blob/main/server/types.go#L148)
 
@@ -355,7 +355,7 @@ type PulseExecutionStartedMessage struct {
 }
 ```
 
-## QueryMessage
+## QueryMessage {#querymessage}
 
 **Source**: [`server/types.go:58`](https://github.com/teranos/QNTX/blob/main/server/types.go#L58)
 
@@ -381,7 +381,7 @@ type QueryMessage struct {
 }
 ```
 
-## ScheduledJobResponse
+## ScheduledJobResponse {#scheduledjobresponse}
 
 **Source**: [`server/pulse_types.go:29`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L29)
 
@@ -402,7 +402,7 @@ type ScheduledJobResponse struct {
 }
 ```
 
-## StageInfo
+## StageInfo {#stageinfo}
 
 **Source**: [`server/pulse_types.go:61`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L61)
 
@@ -414,7 +414,7 @@ type StageInfo struct {
 }
 ```
 
-## StatsMessage
+## StatsMessage {#statsmessage}
 
 **Source**: [`server/types.go:86`](https://github.com/teranos/QNTX/blob/main/server/types.go#L86)
 
@@ -428,7 +428,7 @@ type StatsMessage struct {
 }
 ```
 
-## StorageWarningMessage
+## StorageWarningMessage {#storagewarningmessage}
 
 **Source**: [`server/types.go:189`](https://github.com/teranos/QNTX/blob/main/server/types.go#L189)
 
@@ -446,7 +446,7 @@ type StorageWarningMessage struct {
 }
 ```
 
-## SystemCapabilitiesMessage
+## SystemCapabilitiesMessage {#systemcapabilitiesmessage}
 
 **Source**: [`server/types.go:213`](https://github.com/teranos/QNTX/blob/main/server/types.go#L213)
 
@@ -459,7 +459,7 @@ type SystemCapabilitiesMessage struct {
 }
 ```
 
-## TaskInfo
+## TaskInfo {#taskinfo}
 
 **Source**: [`server/pulse_types.go:55`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L55)
 
@@ -471,7 +471,7 @@ type TaskInfo struct {
 }
 ```
 
-## TaskLogsResponse
+## TaskLogsResponse {#tasklogsresponse}
 
 **Source**: [`server/pulse_types.go:81`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L81)
 
@@ -483,7 +483,7 @@ type TaskLogsResponse struct {
 }
 ```
 
-## UpdateScheduledJobRequest
+## UpdateScheduledJobRequest {#updatescheduledjobrequest}
 
 **Source**: [`server/pulse_types.go:23`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L23)
 
@@ -495,7 +495,7 @@ type UpdateScheduledJobRequest struct {
 }
 ```
 
-## UsageUpdateMessage
+## UsageUpdateMessage {#usageupdatemessage}
 
 **Source**: [`server/types.go:100`](https://github.com/teranos/QNTX/blob/main/server/types.go#L100)
 

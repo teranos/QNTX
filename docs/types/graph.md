@@ -10,7 +10,7 @@ This document shows Go type definitions from the codebase.
 - Rust: [`types/generated/rust/graph.rs`](https://github.com/teranos/QNTX/blob/main/types/generated/rust/graph.rs)
 - Python: [`types/generated/python/graph.py`](https://github.com/teranos/QNTX/blob/main/types/generated/python/graph.py)
 
-## AxGraphBuilder
+## AxGraphBuilder {#axgraphbuilder}
 
 **Source**: [`graph/builder.go:12`](https://github.com/teranos/QNTX/blob/main/graph/builder.go#L12)
 
@@ -20,7 +20,7 @@ type AxGraphBuilder struct {
 }
 ```
 
-## Claim
+## Claim {#claim}
 
 **Source**: [`graph/graph_build.go:181`](https://github.com/teranos/QNTX/blob/main/graph/graph_build.go#L181)
 
@@ -35,7 +35,7 @@ type Claim struct {
 }
 ```
 
-## Graph
+## Graph {#graph}
 
 **Source**: [`graph/models.go:8`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L8)
 
@@ -48,7 +48,7 @@ type Graph struct {
 }
 ```
 
-## Link
+## Link {#link}
 
 **Source**: [`graph/models.go:26`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L26)
 
@@ -64,7 +64,7 @@ type Link struct {
 }
 ```
 
-## Meta
+## Meta {#meta}
 
 **Source**: [`graph/models.go:36`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L36)
 
@@ -79,7 +79,7 @@ type Meta struct {
 }
 ```
 
-## Node
+## Node {#node}
 
 **Source**: [`graph/models.go:15`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L15)
 
@@ -96,7 +96,7 @@ type Node struct {
 }
 ```
 
-## NodeTypeInfo
+## NodeTypeInfo {#nodetypeinfo}
 
 **Source**: [`graph/models.go:45`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L45)
 
@@ -110,7 +110,7 @@ type NodeTypeInfo struct {
 }
 ```
 
-## RelationshipDefinition
+## RelationshipDefinition {#relationshipdefinition}
 
 **Source**: [`graph/relationship_types.go:11`](https://github.com/teranos/QNTX/blob/main/graph/relationship_types.go#L11)
 
@@ -126,7 +126,7 @@ type RelationshipDefinition struct {
 }
 ```
 
-## RelationshipTypeInfo
+## RelationshipTypeInfo {#relationshiptypeinfo}
 
 **Source**: [`graph/models.go:53`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L53)
 
@@ -142,7 +142,7 @@ type RelationshipTypeInfo struct {
 }
 ```
 
-## Stats
+## Stats {#stats}
 
 **Source**: [`graph/models.go:63`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L63)
 
@@ -154,7 +154,7 @@ type Stats struct {
 }
 ```
 
-## TypeDefinition
+## TypeDefinition {#typedefinition}
 
 **Source**: [`graph/node_types.go:11`](https://github.com/teranos/QNTX/blob/main/graph/node_types.go#L11)
 

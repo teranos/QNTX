@@ -9,6 +9,7 @@
  */
 
 import { apiFetch } from '../api.ts';
+import { handleError, SEG } from '../error-handler.ts';
 
 export interface FileEntry {
     name: string;
@@ -81,7 +82,7 @@ export class FileTreeNavigator {
             const data = await response.json();
             this.fileTree = data || [];
         } catch (error) {
-            console.error(`Failed to fetch file tree from ${this.config.apiEndpoint}:`, error);
+            handleError(error, `Failed to fetch file tree from ${this.config.apiEndpoint}`, { context: SEG.ERROR, silent: true });
             this.fileTree = [];
         }
     }
@@ -242,7 +243,7 @@ export class FileTreeNavigator {
                 this.recentFiles = JSON.parse(stored);
             }
         } catch (error) {
-            console.warn('Failed to load recent files:', error);
+            handleError(error, 'Failed to load recent files', { context: SEG.ERROR, silent: true });
             this.recentFiles = [];
         }
     }
@@ -251,7 +252,7 @@ export class FileTreeNavigator {
         try {
             localStorage.setItem(this.config.storageKey, JSON.stringify(this.recentFiles));
         } catch (error) {
-            console.warn('Failed to save recent files:', error);
+            handleError(error, 'Failed to save recent files', { context: SEG.ERROR, silent: true });
         }
     }
 

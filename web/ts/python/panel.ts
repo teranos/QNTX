@@ -8,6 +8,9 @@
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { escapeHtml } from '../html-utils.ts';
+import { log, SEG } from '../logger.ts';
+import { handleError } from '../error-handler.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -33,7 +36,7 @@ interface ExecutionResult {
 
 class PythonEditorPanel extends BasePanel {
     private editor: any | null = null;
-    private currentTab: 'editor' | 'output' = 'editor';
+    private currentTab: 'editor' | 'output' | null = null;
     private lastOutput: ExecutionResult | null = null;
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
@@ -42,8 +45,10 @@ class PythonEditorPanel extends BasePanel {
     private needsConfirmation: boolean = false;
     private confirmationTimeout: number | null = null;
 
-    // Keyboard handler
+    // Event handler references for cleanup
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
+    private closeBtnHandler: (() => void) | null = null;
+    private tabClickHandlers: Map<Element, (e: Event) => void> = new Map();
 
     constructor() {
         super({
@@ -80,18 +85,28 @@ class PythonEditorPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
+        // Initialize maps if not already initialized (field initializers run after super())
+        if (!this.tabClickHandlers) {
+            this.tabClickHandlers = new Map();
+        }
+
         // Close button
         const closeBtn = this.$('.python-editor-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        if (closeBtn) {
+            this.closeBtnHandler = () => this.hide();
+            closeBtn.addEventListener('click', this.closeBtnHandler);
+        }
 
         // Tab switching
         const tabs = this.panel?.querySelectorAll('.python-editor-tab');
         tabs?.forEach(tab => {
-            tab.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 const target = e.target as HTMLElement;
                 const tabName = target.dataset.tab as 'editor' | 'output';
                 this.switchTab(tabName);
-            });
+            };
+            this.tabClickHandlers.set(tab, handler);
+            tab.addEventListener('click', handler);
         });
 
         // Execute on Cmd/Ctrl+Enter
@@ -111,20 +126,37 @@ class PythonEditorPanel extends BasePanel {
         // Initialize editor tab
         this.switchTab('editor');
 
-        console.log('[Python Editor] Panel shown');
+        log.debug(SEG.UI, 'Python Editor panel shown');
     }
 
     protected onHide(): void {
         this.destroyEditor();
-        console.log('[Python Editor] Panel closed');
+        log.debug(SEG.UI, 'Python Editor panel closed');
     }
 
     protected onDestroy(): void {
         this.destroyEditor();
+
+        // Clean up keyboard handler
         if (this.executeHandler) {
             document.removeEventListener('keydown', this.executeHandler);
             this.executeHandler = null;
         }
+
+        // Clean up close button handler
+        if (this.closeBtnHandler) {
+            const closeBtn = this.$('.python-editor-close');
+            if (closeBtn) {
+                closeBtn.removeEventListener('click', this.closeBtnHandler);
+            }
+            this.closeBtnHandler = null;
+        }
+
+        // Clean up tab click handlers
+        this.tabClickHandlers.forEach((handler, element) => {
+            element.removeEventListener('click', handler);
+        });
+        this.tabClickHandlers.clear();
     }
 
     private async checkPluginStatus(): Promise<void> {
@@ -146,38 +178,50 @@ class PythonEditorPanel extends BasePanel {
                 this.updateStatus('unavailable');
             }
         } catch (error) {
-            console.error('[Python Editor] Failed to check plugin status:', error);
+            handleError(error, 'Failed to check Python plugin status', { context: SEG.UI, silent: true });
             this.updateStatus('error');
         }
     }
 
     private async initializeEditor(content: string = ''): Promise<void> {
+        log.debug(SEG.UI, 'initializeEditor called with content length:', content.length);
+
         if (this.editor) {
             this.editor.destroy();
             this.editor = null;
         }
 
         try {
+            log.debug(SEG.UI, 'Loading CodeMirror modules...');
             const { EditorView, keymap } = await import('@codemirror/view');
             const { EditorState } = await import('@codemirror/state');
             const { defaultKeymap } = await import('@codemirror/commands');
             const { oneDark } = await import('@codemirror/theme-one-dark');
+            log.debug(SEG.UI, 'CodeMirror core modules loaded');
 
             // Import Python language support
             let pythonExtension;
             try {
+                log.debug(SEG.UI, 'Loading Python language support...');
                 const pythonModule = await import('@codemirror/lang-python');
                 pythonExtension = pythonModule.python();
+                log.debug(SEG.UI, 'Python language support loaded');
             } catch (err) {
-                console.warn('[Python Editor] Failed to load Python language support:', err);
+                handleError(err, 'Failed to load Python language support', { context: SEG.UI, silent: true });
                 pythonExtension = [];
             }
 
+            log.debug(SEG.UI, 'Looking for container #python-editor-container...');
             const container = this.$('#python-editor-container');
             if (!container) {
+                const allContainers = document.querySelectorAll('[id*="python"]');
+                log.error(SEG.UI, 'Container not found! Available python-related elements:',
+                    Array.from(allContainers).map(el => el.id));
                 throw new Error('Editor container not found');
             }
+            log.debug(SEG.UI, 'Container found:', container.id, 'classList:', Array.from(container.classList));
 
+            log.debug(SEG.UI, 'Creating EditorView...');
             this.editor = new EditorView({
                 state: EditorState.create({
                     doc: content || this.getDefaultCode(),
@@ -198,9 +242,9 @@ class PythonEditorPanel extends BasePanel {
                 parent: container
             });
 
-            console.log('[Python Editor] Editor initialized');
+            log.info(SEG.UI, 'Python Editor initialized successfully');
         } catch (error) {
-            console.error('[Python Editor] Failed to initialize editor:', error);
+            handleError(error, 'Failed to initialize Python Editor', { context: SEG.UI, silent: true });
             this.showError(error instanceof Error ? error.message : String(error));
         }
     }
@@ -273,9 +317,9 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             // Auto-switch to output tab
             this.switchTab('output');
 
-            console.log('[Python Editor] Code executed:', result.success ? 'success' : 'error');
+            log.debug(SEG.UI, 'Python code executed:', result.success ? 'success' : 'error');
         } catch (error) {
-            console.error('[Python Editor] Execution error:', error);
+            handleError(error, 'Python execution error', { context: SEG.UI, silent: true });
             this.lastOutput = {
                 success: false,
                 stdout: '',
@@ -310,7 +354,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section">
                     <div class="output-label">stdout:</div>
-                    <pre class="output-content">${this.escapeHtml(result.stdout)}</pre>
+                    <pre class="output-content">${escapeHtml(result.stdout)}</pre>
                 </div>
             `;
         }
@@ -319,7 +363,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section output-stderr">
                     <div class="output-label">stderr:</div>
-                    <pre class="output-content">${this.escapeHtml(result.stderr)}</pre>
+                    <pre class="output-content">${escapeHtml(result.stderr)}</pre>
                 </div>
             `;
         }
@@ -328,7 +372,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section output-error-section">
                     <div class="output-label">Error:</div>
-                    <pre class="output-content output-error-text">${this.escapeHtml(result.error)}</pre>
+                    <pre class="output-content output-error-text">${escapeHtml(result.error)}</pre>
                 </div>
             `;
         }
@@ -337,7 +381,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             html += `
                 <div class="output-section">
                     <div class="output-label">Result:</div>
-                    <pre class="output-content output-result">${this.escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
+                    <pre class="output-content output-result">${escapeHtml(JSON.stringify(result.result, null, 2))}</pre>
                 </div>
             `;
         }
@@ -348,7 +392,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
                     <div class="output-label">Variables:</div>
                     <div class="output-variables">
                         ${Object.entries(result.variables).map(([k, v]) =>
-                            `<div class="var-item"><span class="var-name">${this.escapeHtml(k)}</span> = <span class="var-value">${this.escapeHtml(v)}</span></div>`
+                            `<div class="var-item"><span class="var-name">${escapeHtml(k)}</span> = <span class="var-value">${escapeHtml(v)}</span></div>`
                         ).join('')}
                     </div>
                 </div>
@@ -358,11 +402,6 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         outputEl.innerHTML = html;
     }
 
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     private updateExecuteButton(executing: boolean): void {
         const btn = this.$('#python-execute-btn') as HTMLButtonElement;
@@ -518,7 +557,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             try {
                 this.editor.destroy();
             } catch (err) {
-                console.warn('[Python Editor] Error destroying editor:', err);
+                handleError(err, 'Error destroying Python Editor', { context: SEG.UI, silent: true });
             }
             this.editor = null;
         }
@@ -556,9 +595,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             </div>
             <div class="prose-editor-container">
                 <div id="python-editor-container" class="python-editor-container">
-                    <!-- TODO(HIGH PRIO): CodeMirror editor initialization is broken - editor not showing up.
-                         Need to investigate why editor instance isn't being created properly.
-                         This blocks Python panel testing and should be fixed after PR #241 merges. -->
+                    <!-- CodeMirror editor will be initialized here -->
                 </div>
             </div>
         `;
@@ -669,12 +706,18 @@ _result = data
     }
 
     async switchTab(tab: 'editor' | 'output'): Promise<void> {
-        if (tab === this.currentTab) return;
+        log.debug(SEG.UI, `switchTab called: ${this.currentTab} -> ${tab}`);
+
+        if (tab === this.currentTab) {
+            log.debug(SEG.UI, 'Already on this tab, skipping');
+            return;
+        }
 
         // Store editor content before switching
         let editorContent = '';
         if (this.currentTab === 'editor' && this.editor) {
             editorContent = this.editor.state.doc.toString();
+            log.debug(SEG.UI, 'Stored editor content, length:', editorContent.length);
         }
 
         this.currentTab = tab;
@@ -694,14 +737,21 @@ _result = data
         const sidebar = this.$('#tab-sidebar') as HTMLElement;
         const content = this.$('#tab-content') as HTMLElement;
 
-        if (!sidebar || !content) return;
+        if (!sidebar || !content) {
+            log.error(SEG.UI, 'Missing tab containers!', { sidebar: !!sidebar, content: !!content });
+            return;
+        }
 
         if (tab === 'editor') {
+            log.debug(SEG.UI, 'Rendering editor tab templates...');
             sidebar.innerHTML = this.getEditorSidebarTemplate();
             content.innerHTML = this.getEditorContentTemplate();
+            log.debug(SEG.UI, 'Templates rendered');
 
             // Re-initialize editor
+            log.debug(SEG.UI, 'Calling initializeEditor...');
             await this.initializeEditor(editorContent);
+            log.debug(SEG.UI, 'initializeEditor completed');
 
             // Re-check status
             await this.checkPluginStatus();
@@ -720,6 +770,8 @@ _result = data
             // Bind sidebar events
             this.bindSidebarEvents();
         }
+
+        log.debug(SEG.UI, `switchTab completed: now on ${tab} tab`);
     }
 }
 

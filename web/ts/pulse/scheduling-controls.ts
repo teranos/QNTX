@@ -4,7 +4,8 @@
  * Inline UI controls for ATS code blocks to configure Pulse scheduling
  */
 
-import { debugLog } from "../debug.ts";
+import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 import type { ScheduledJobResponse } from "./types.ts";
 import { INTERVAL_PRESETS, formatInterval } from "./types.ts";
 import {
@@ -163,6 +164,7 @@ function renderExistingJobControls(
         existingJob: updatedJob,
       });
     } catch (error) {
+      handleError(error, `Failed to ${isActive ? 'pause' : 'resume'} job`, { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: isActive ? 'pause' : 'resume',
       });
@@ -192,6 +194,7 @@ function renderExistingJobControls(
         existingJob: updatedJob,
       });
     } catch (error) {
+      handleError(error, 'Failed to update job interval', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'change interval',
         intervalSeconds: parseInt(value, 10),
@@ -209,6 +212,7 @@ function renderExistingJobControls(
       container.innerHTML = "";
       renderAddScheduleButton(container, options);
     } catch (error) {
+      handleError(error, 'Failed to delete scheduled job', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'delete',
         atsCode: job.ats_code,
@@ -394,7 +398,7 @@ function renderIntervalSelection(
         throw new Error('ATS code is empty - cannot schedule empty query. Try refreshing the page.');
       }
 
-      debugLog('[Scheduling Controls] Creating job with:', {
+      log.debug(SEG.PULSE, 'Creating job with:', {
         atsCode,
         intervalSeconds,
         documentId: options.documentId,
@@ -407,7 +411,7 @@ function renderIntervalSelection(
         created_from_doc: options.documentId,
       };
 
-      debugLog('[Scheduling Controls] API Request:', request);
+      log.debug(SEG.PULSE, 'API Request:', request);
 
       const job = await createScheduledJob(request);
 
@@ -419,6 +423,7 @@ function renderIntervalSelection(
         existingJob: job,
       });
     } catch (error) {
+      handleError(error, 'Failed to create scheduled job', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'create',
         atsCode: resolveAtsCode(options.atsCode),

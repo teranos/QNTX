@@ -22,8 +22,9 @@
 import { BasePanel } from './base-panel.ts';
 import { escapeHtml } from './html-utils.ts';
 import { toast } from './toast.ts';
-import { debugLog } from './debug.ts';
+import { log, SEG } from './logger';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
+import { handleError } from './error-handler.ts';
 
 interface ScrapeRequest {
     url: string;
@@ -335,7 +336,7 @@ class WebscraperPanel extends BasePanel {
             const data = await response.json();
             this.handleScraperResponse(data);
         } catch (error) {
-            console.error('Scraping failed:', error);
+            handleError(error, 'Scraping failed', { context: SEG.INGEST, silent: true });
 
             // Build rich error with helpful suggestions
             const richError = this.buildScraperError(error, url);
@@ -347,7 +348,7 @@ class WebscraperPanel extends BasePanel {
             } as ScrapeResult & { _richError: RichError });
         }
 
-        debugLog('WebscraperPanel', 'Sent scrape request', request);
+        log.debug(SEG.INGEST, 'Sent scrape request', request);
     }
 
     private startScraping(url: string): void {
@@ -555,7 +556,7 @@ class WebscraperPanel extends BasePanel {
      * Handle webscraper response from server
      */
     public handleScraperResponse(data: any): void {
-        debugLog('WebscraperPanel', 'Received scraper response', data);
+        log.debug(SEG.INGEST, 'Received scraper response', data);
 
         this.stopScraping();
 
