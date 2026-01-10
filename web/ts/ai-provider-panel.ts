@@ -81,7 +81,10 @@ class AIProviderPanel {
                         <option value="deepseek-r1:7b">deepseek-r1:7b (reasoning)</option>
                     </select>
                 </div>
-                <div id="onnx-model-config" class="provider-config hidden">
+                <div class="config-toggle-header" style="margin-top: 16px;">
+                    <span class="config-toggle-title">Computer Vision (ONNX)</span>
+                </div>
+                <div id="onnx-model-config" class="provider-config">
                     <label for="onnx-model-path">ONNX Model Path (VidStream):</label>
                     <div class="api-key-input-group">
                         <input
@@ -251,20 +254,17 @@ class AIProviderPanel {
         const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
         const modelSelector = windowEl.querySelector('#ollama-model-selector');
         const openrouterConfig = windowEl.querySelector('#openrouter-config');
-        const onnxConfig = windowEl.querySelector('#onnx-model-config');
 
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
             ollamaBtn?.classList.remove('active');
             modelSelector?.classList.add('u-hidden');
             openrouterConfig?.classList.remove('u-hidden');
-            onnxConfig?.classList.add('u-hidden');
         } else {
             openrouterBtn?.classList.remove('active');
             ollamaBtn?.classList.add('active');
             modelSelector?.classList.remove('u-hidden');
             openrouterConfig?.classList.add('u-hidden');
-            onnxConfig?.classList.remove('u-hidden');
         }
     }
 
