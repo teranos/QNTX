@@ -55,6 +55,10 @@ export class VidStreamWindow {
     private currentFPS: number = 0;
     private avgLatency: number = 0;
 
+    // Frame throttling (limit inference rate to avoid WebSocket overload)
+    private lastInferenceTime: number = 0;
+    private readonly INFERENCE_INTERVAL_MS = 200; // 5 FPS max for inference
+
     constructor() {
         this.createWindow();
         this.setupMessageHandlers();
@@ -323,6 +327,14 @@ export class VidStreamWindow {
 
     private async runInference(): Promise<void> {
         if (!this.ctx || !this.canvas) return;
+
+        // Throttle inference to avoid overwhelming WebSocket with massive JSON payloads
+        // 640x480 RGBA = 307KB per frame, JSON encoding = ~1MB per frame
+        const now = performance.now();
+        if (now - this.lastInferenceTime < this.INFERENCE_INTERVAL_MS) {
+            return; // Skip this frame
+        }
+        this.lastInferenceTime = now;
 
         const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
 
