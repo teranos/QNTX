@@ -7,6 +7,7 @@
  */
 
 import { toast } from '../toast';
+import { log, SEG } from '../logger';
 import type { PluginHealthMessage } from '../../types/websocket';
 
 // Track unhealthy plugins for indicator
@@ -16,7 +17,7 @@ const unhealthyPlugins = new Set<string>();
  * Handle plugin health message - display toast and update indicator
  */
 export function handlePluginHealth(data: PluginHealthMessage): void {
-    console.log('Plugin health update:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
+    log.debug(SEG.WS, 'Plugin health update:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
 
     // Update unhealthy set
     if (!data.healthy) {
