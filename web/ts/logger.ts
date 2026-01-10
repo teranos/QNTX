@@ -91,6 +91,7 @@ export const SEG = {
     UI: '▦' as const,       // UI components
     GRAPH: '◇' as const,    // Graph visualization
     ERROR: '⚠' as const,    // Errors/warnings
+    VID: '⮀' as const,     // VidStream
 } as const;
 
 /**
@@ -151,9 +152,9 @@ function formatPrefix(context: string): string {
 }
 
 /**
- * Logger interface - all methods preserve source location in dev tools
+ * Logger implementation
  */
-export const log = {
+const logger = {
     /**
      * Debug level - verbose logging for development
      * Silenced in production
@@ -206,6 +207,29 @@ export const log = {
      */
     isDevMode,
 };
+
+/**
+ * Shorthand wrapper - log() is an alias for log.info()
+ */
+function log(context: string, message: string, ...args: unknown[]): void {
+    logger.info(context, message, ...args);
+}
+
+// Attach logger methods to log function
+log.debug = logger.debug.bind(logger);
+log.info = logger.info.bind(logger);
+log.warn = logger.warn.bind(logger);
+log.error = logger.error.bind(logger);
+log.getLevel = logger.getLevel.bind(logger);
+log.isDevMode = logger.isDevMode;
+
+// Export standalone functions for ergonomics
+const debug = logger.debug.bind(logger);
+const info = logger.info.bind(logger);
+const warn = logger.warn.bind(logger);
+const error = logger.error.bind(logger);
+
+export { log, debug, info, warn, error };
 
 /**
  * Default export for convenience

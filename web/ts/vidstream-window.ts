@@ -2,11 +2,11 @@
  * VidStreamWindow - Draggable video inference window
  *
  * Real-time webcam + ONNX inference in a draggable/resizable window.
- * Uses IX (⨳) segment for logging, 📽 icon for UI (rendered monochrome).
+ * Uses VID (⮀) segment for logging.
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { log, SEG } from './logger.ts';
+import { debug, info, error, SEG } from './logger.ts';
 import { CSS } from './css-classes.ts';
 import { handleError } from './error-handler.ts';
 
@@ -73,6 +73,9 @@ export class VidStreamWindow {
         this.window.className = 'draggable-window';
         this.window.style.width = '664px'; // 640px viewport + padding
 
+        // Check if running in Tauri (desktop) or browser
+        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
         this.window.innerHTML = `
             <div class="draggable-window-header">
                 <span class="draggable-window-title">VidStream</span>
@@ -86,14 +89,25 @@ export class VidStreamWindow {
                     class="window-input"
                     value="ats/vidstream/models/yolo11n.onnx"
                     placeholder="path/to/model.onnx"
+                    ${!isTauri ? 'disabled' : ''}
                 />
 
                 <div class="window-controls">
-                    <button id="vs-init-btn" class="panel-btn panel-btn-sm">Initialize ONNX</button>
-                    <button id="vs-start-btn" class="panel-btn panel-btn-sm panel-btn-primary">Start Camera</button>
+                    <button
+                        id="vs-init-btn"
+                        class="panel-btn panel-btn-sm ${!isTauri ? 'btn-unavailable' : ''}"
+                        ${!isTauri ? 'disabled title="ONNX inference requires desktop mode (Tauri)"' : ''}
+                    >Initialize ONNX</button>
+                    <button
+                        id="vs-start-btn"
+                        class="panel-btn panel-btn-sm panel-btn-primary ${isTauri ? 'btn-unavailable' : ''}"
+                        ${isTauri ? 'disabled title="Camera access requires browser mode (navigator.mediaDevices not available in Tauri webview)"' : ''}
+                    >Start Camera</button>
                     <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
-                    <span id="vs-status" class="window-status">Preview mode (no inference)</span>
+                    <span id="vs-status" class="window-status">${isTauri ? 'Desktop mode (ONNX available, camera requires browser)' : 'Browser mode (camera available, ONNX requires desktop)'}</span>
                 </div>
+
+                <div id="vs-error" class="window-error" style="display: none;"></div>
 
                 <div class="window-viewport">
                     <video
@@ -171,14 +185,15 @@ export class VidStreamWindow {
                     status.textContent = '✓ Inference ready';
                     status.style.color = '#0a0';
                 }
-                log(SEG.INGEST, 'VidStream ONNX engine initialized');
+                info(SEG.VID, 'VidStream ONNX engine initialized');
             } catch (err) {
                 const status = this.window?.querySelector('#vs-status');
                 if (status) {
                     status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
                 }
-                handleError(err, 'ONNX engine initialization failed', { context: SEG.INGEST });
+                error(SEG.VID, 'ONNX engine initialization failed', err);
+                this.showError(err instanceof Error ? err.message : String(err));
             } finally {
                 initBtn.disabled = false;
                 initBtn.textContent = 'Initialize ONNX';
@@ -202,47 +217,48 @@ export class VidStreamWindow {
     private async initializeEngine(config: VidStreamConfig): Promise<void> {
         const result = await invoke('vidstream_init', { config });
         this.engineReady = true;
-        log(SEG.INGEST, 'Engine ready:', result);
+        debug(SEG.VID, 'Engine ready:', result);
     }
 
     private async startCamera(): Promise<void> {
-        log(SEG.INGEST, 'startCamera() called');
+        debug(SEG.VID, 'startCamera() called');
 
         try {
-            log(SEG.INGEST, 'Requesting camera access...');
+            debug(SEG.VID, 'Requesting camera access...');
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 640, height: 480 },
                 audio: false,
             });
-            log(SEG.INGEST, 'Camera access granted', this.stream);
+            info(SEG.VID, 'Camera access granted', this.stream);
 
             this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
             this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
             this.ctx = this.canvas?.getContext('2d') || null;
 
-            log(SEG.INGEST, 'Elements found:', {
+            debug(SEG.VID, 'Elements found:', {
                 video: !!this.video,
                 canvas: !!this.canvas,
                 ctx: !!this.ctx
             });
 
             if (this.video) {
-                log(SEG.INGEST, 'Attaching stream to video element');
+                debug(SEG.VID, 'Attaching stream to video element');
                 this.video.srcObject = this.stream;
                 this.video.onloadedmetadata = () => {
-                    log(SEG.INGEST, 'Video metadata loaded, starting playback');
+                    debug(SEG.VID, 'Video metadata loaded, starting playback');
                     this.video?.play();
-                    log(SEG.INGEST, 'Starting frame processing');
+                    debug(SEG.VID, 'Starting frame processing');
                     this.startProcessing();
                 };
             } else {
-                log(SEG.INGEST, 'ERROR: Video element not found!');
+                error(SEG.VID, 'Video element not found!');
             }
 
             const mode = this.engineReady ? 'with inference' : 'preview only';
-            log(SEG.INGEST, `Camera started (${mode})`);
+            info(SEG.VID, `Camera started (${mode})`);
         } catch (err) {
-            handleError(err, 'Failed to start camera', { context: SEG.INGEST });
+            error(SEG.VID, 'Failed to start camera', err);
+            this.showError(err instanceof Error ? err.message : String(err));
         }
     }
 
@@ -262,7 +278,7 @@ export class VidStreamWindow {
         }
 
         this.isProcessing = false;
-        log(SEG.INGEST, 'Camera stopped');
+        info(SEG.VID, 'Camera stopped');
     }
 
     private startProcessing(): void {
@@ -297,7 +313,7 @@ export class VidStreamWindow {
                 this.drawDetections(result.detections);
                 this.updateStats(result, performance.now() - frameStart);
             } catch (err) {
-                handleError(err, 'Frame processing error', { context: SEG.INGEST });
+                handleError(err, 'Frame processing error', { context: SEG.VID });
             }
         } else {
             // Preview mode - just update FPS
@@ -372,12 +388,12 @@ export class VidStreamWindow {
     }
 
     public show(): void {
-        log(SEG.INGEST, 'show() called');
+        debug(SEG.VID, 'show() called');
         if (this.window) {
             this.window.setAttribute('data-visible', 'true');
-            log(SEG.INGEST, 'Window visibility set to true');
+            debug(SEG.VID, 'Window visibility set to true');
         } else {
-            log(SEG.INGEST, 'ERROR: Window element not found!');
+            error(SEG.VID, 'Window element not found!');
         }
     }
 
@@ -390,11 +406,26 @@ export class VidStreamWindow {
 
     public toggle(): void {
         const isVisible = this.window?.getAttribute('data-visible') === 'true';
-        log(SEG.INGEST, `toggle() called, currently visible: ${isVisible}`);
+        debug(SEG.VID, `toggle() called, currently visible: ${isVisible}`);
         if (isVisible) {
             this.hide();
         } else {
             this.show();
+        }
+    }
+
+    private showError(message: string): void {
+        const errorEl = this.window?.querySelector('#vs-error');
+        if (errorEl) {
+            errorEl.textContent = message;
+            (errorEl as HTMLElement).style.display = 'block';
+        }
+    }
+
+    private hideError(): void {
+        const errorEl = this.window?.querySelector('#vs-error');
+        if (errorEl) {
+            (errorEl as HTMLElement).style.display = 'none';
         }
     }
 }
