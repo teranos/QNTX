@@ -4,7 +4,7 @@
 //! Desktop-only - requires ONNX Runtime support and CrabCamera for native camera access.
 //! The entire module is conditionally compiled in main.rs.
 
-use crabcamera::{Camera, CameraFormat};
+use crabcamera::camera::{Camera, CameraFormat};
 use qntx_vidstream::types::VideoEngineConfig;
 use qntx_vidstream::{FrameFormat, VideoEngine};
 use serde::{Deserialize, Serialize};
@@ -255,7 +255,7 @@ pub fn vidstream_list_cameras() -> Result<Vec<CameraDevice>, String> {
     let cameras = Camera::list().map_err(|e| format!("Failed to list cameras: {}", e))?;
 
     let devices: Vec<CameraDevice> = cameras
-        .iter()
+        .into_iter()
         .enumerate()
         .map(|(i, info)| CameraDevice {
             index: i,
@@ -287,7 +287,7 @@ pub fn vidstream_start_camera(
         return Err(format!("Camera index {} out of range", camera_index));
     }
 
-    let format = CameraFormat::new(width, height);
+    let format = CameraFormat::new(width, height, 30.0); // 30 fps
     let camera = Camera::new(&cameras[camera_index], format)
         .map_err(|e| format!("Failed to open camera: {}", e))?;
 
