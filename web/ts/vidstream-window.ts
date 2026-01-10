@@ -69,139 +69,50 @@ export class VidStreamWindow {
     private createWindow(): void {
         this.window = document.createElement('div');
         this.window.id = 'vidstream-window';
-        this.window.className = 'vidstream-window';
-        this.window.style.cssText = `
-            position: fixed;
-            top: 100px;
-            left: 100px;
-            width: 680px;
-            background: var(--bg-primary, #1a1a1a);
-            border: 1px solid var(--border-primary, #333);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 9999;
-            display: none;
-            font-family: var(--font-mono, monospace);
-        `;
+        this.window.className = 'draggable-window';
+        this.window.style.width = '664px'; // 640px viewport + padding
 
         this.window.innerHTML = `
-            <div class="vidstream-header" style="
-                padding: 0.75rem;
-                border-bottom: 1px solid var(--border-primary, #333);
-                cursor: move;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                user-select: none;
-            ">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="font-weight: 600;">VidStream</span>
-                </div>
-                <button class="vidstream-close" style="
-                    background: none;
-                    border: none;
-                    color: var(--text-secondary, #999);
-                    cursor: pointer;
-                    font-size: 1.2rem;
-                    padding: 0;
-                    line-height: 1;
-                ">&times;</button>
+            <div class="draggable-window-header">
+                <span class="draggable-window-title">VidStream</span>
+                <button class="panel-close" aria-label="Close">&times;</button>
             </div>
 
-            <div class="vidstream-content" style="padding: 1rem;">
-                <!-- Model config -->
-                <div style="margin-bottom: 1rem;">
-                    <input
-                        type="text"
-                        id="vs-model-path"
-                        value="ats/vidstream/models/yolo11n.onnx"
-                        placeholder="path/to/model.onnx"
-                        style="
-                            width: 100%;
-                            padding: 0.5rem;
-                            background: var(--bg-secondary, #222);
-                            border: 1px solid var(--border-primary, #333);
-                            color: var(--text-primary, #fff);
-                            border-radius: 4px;
-                            font-family: inherit;
-                            font-size: 0.9rem;
-                        "
-                    />
+            <div class="draggable-window-content">
+                <input
+                    type="text"
+                    id="vs-model-path"
+                    class="window-input"
+                    value="ats/vidstream/models/yolo11n.onnx"
+                    placeholder="path/to/model.onnx"
+                />
+
+                <div class="window-controls">
+                    <button id="vs-init-btn" class="panel-btn panel-btn-sm">Initialize ONNX</button>
+                    <button id="vs-start-btn" class="panel-btn panel-btn-sm panel-btn-primary">Start Camera</button>
+                    <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
+                    <span id="vs-status" class="window-status">Preview mode (no inference)</span>
                 </div>
 
-                <!-- Controls -->
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                    <button id="vs-init-btn" style="
-                        padding: 0.5rem 1rem;
-                        background: var(--accent-primary, #0066cc);
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-family: inherit;
-                    ">Initialize ONNX</button>
-                    <button id="vs-start-btn" style="
-                        padding: 0.5rem 1rem;
-                        background: var(--accent-secondary, #00aa00);
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-family: inherit;
-                    ">Start Camera</button>
-                    <button id="vs-stop-btn" style="
-                        padding: 0.5rem 1rem;
-                        background: var(--accent-danger, #aa0000);
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-family: inherit;
-                        display: none;
-                    ">Stop</button>
-                    <span id="vs-status" style="
-                        margin-left: auto;
-                        align-self: center;
-                        color: var(--text-secondary, #999);
-                        font-size: 0.85rem;
-                    ">Preview mode (no inference)</span>
-                </div>
-
-                <!-- Video viewport -->
-                <div style="
-                    position: relative;
-                    width: 640px;
-                    height: 480px;
-                    background: #000;
-                    margin-bottom: 1rem;
-                    border-radius: 4px;
-                    overflow: hidden;
-                ">
+                <div class="window-viewport">
                     <video
                         id="vs-video"
+                        class="window-video"
                         autoplay
                         playsinline
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
                     ></video>
                     <canvas
                         id="vs-canvas"
+                        class="window-canvas"
                         width="640"
                         height="480"
-                        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
                     ></canvas>
                 </div>
 
-                <!-- Stats -->
-                <div style="
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 1rem;
-                    font-size: 0.85rem;
-                    color: var(--text-secondary, #999);
-                ">
-                    <div>FPS: <span id="vs-fps">0</span></div>
-                    <div>Latency: <span id="vs-latency">0</span> ms</div>
-                    <div>Detections: <span id="vs-detections">0</span></div>
+                <div class="window-stats">
+                    <div>FPS: <span id="vs-fps" class="window-stat-value">0</span></div>
+                    <div>Latency: <span id="vs-latency" class="window-stat-value">0</span> ms</div>
+                    <div>Detections: <span id="vs-detections" class="window-stat-value">0</span></div>
                 </div>
             </div>
         `;
@@ -211,8 +122,8 @@ export class VidStreamWindow {
     }
 
     private setupEventListeners(): void {
-        const header = this.window?.querySelector('.vidstream-header') as HTMLElement;
-        const closeBtn = this.window?.querySelector('.vidstream-close') as HTMLButtonElement;
+        const header = this.window?.querySelector('.draggable-window-header') as HTMLElement;
+        const closeBtn = this.window?.querySelector('.panel-close') as HTMLButtonElement;
         const initBtn = this.window?.querySelector('#vs-init-btn') as HTMLButtonElement;
         const startBtn = this.window?.querySelector('#vs-start-btn') as HTMLButtonElement;
         const stopBtn = this.window?.querySelector('#vs-stop-btn') as HTMLButtonElement;
@@ -442,22 +353,23 @@ export class VidStreamWindow {
 
     public show(): void {
         if (this.window) {
-            this.window.style.display = 'block';
+            this.window.setAttribute('data-visible', 'true');
         }
     }
 
     public hide(): void {
         this.stopCamera();
         if (this.window) {
-            this.window.style.display = 'none';
+            this.window.setAttribute('data-visible', 'false');
         }
     }
 
     public toggle(): void {
-        if (this.window?.style.display === 'none') {
-            this.show();
-        } else {
+        const isVisible = this.window?.getAttribute('data-visible') === 'true';
+        if (isVisible) {
             this.hide();
+        } else {
+            this.show();
         }
     }
 }
