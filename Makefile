@@ -137,6 +137,8 @@ install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom
 	fi
 
 desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
+	# TODO: Add proper Nix package for Tauri desktop app (rustPlatform.buildRustPackage)
+	# This would eliminate build complexity and ensure reproducible builds across environments
 	@echo "Preparing desktop app assets..."
 	@./web/src-tauri/generate-icons.sh
 	@./web/src-tauri/prepare-sidecar.sh
