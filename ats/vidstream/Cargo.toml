@@ -35,7 +35,7 @@ ahash = "0.8"
 chrono = "0.4"
 
 [features]
-default = []
+default = ["onnx"]  # ONNX enabled by default for WebSocket video inference
 # Enable ffmpeg video decoding
 ffmpeg = ["dep:ffmpeg-next"]
 # Enable ONNX inference

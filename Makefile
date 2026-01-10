@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,7 +6,7 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy ## Build QNTX CLI binary (with Rust fuzzy optimization and ONNX video)
+cli: rust-fuzzy rust-vidstream ## Build QNTX CLI binary (with Rust fuzzy optimization and ONNX video)
 	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video)..."
 	@go build -tags "rustfuzzy,rustvideo" -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
@@ -207,6 +207,14 @@ rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
 	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
 	@echo "  Static:  libqntx_fuzzy.a"
 	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
+
+rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
+	@echo "Building Rust vidstream library with ONNX..."
+	@cd ats/vidstream && cargo build --release --features onnx --lib
+	@echo "✓ libqntx_vidstream built in ats/vidstream/target/release/"
+	@echo "  Static:  libqntx_vidstream.a"
+	@echo "  Shared:  libqntx_vidstream.so (Linux) / libqntx_vidstream.dylib (macOS)"
+	@echo "  Features: ONNX Runtime (download-binaries enabled)"
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."
