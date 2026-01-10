@@ -8,62 +8,66 @@ import (
 )
 
 // handleVidStreamInit initializes the ONNX video engine with model configuration
+// Runs asynchronously to avoid blocking the WebSocket message handler
 func (c *Client) handleVidStreamInit(msg QueryMessage) {
-	c.server.vidstreamMu.Lock()
-	defer c.server.vidstreamMu.Unlock()
-
 	c.server.logger.Infow("VidStream init request",
 		"client_id", c.id,
 		"model_path", msg.ModelPath,
 	)
 
-	// Close existing engine if any
-	if c.server.vidstreamEngine != nil {
-		c.server.vidstreamEngine.Close()
-		c.server.vidstreamEngine = nil
-	}
+	// Run initialization in background to avoid blocking WebSocket
+	go func() {
+		c.server.vidstreamMu.Lock()
+		defer c.server.vidstreamMu.Unlock()
 
-	// Create new engine with config
-	config := vidstream.Config{
-		ModelPath:           msg.ModelPath,
-		ConfidenceThreshold: msg.ConfidenceThreshold,
-		NMSThreshold:        msg.NMSThreshold,
-		InputWidth:          640, // Default YOLOv11 input size
-		InputHeight:         480,
-		NumThreads:          0,     // Auto-detect
-		UseGPU:              false, // CPU inference for now
-		Labels:              "",    // Use default COCO labels
-	}
-
-	engine, err := vidstream.NewVideoEngineWithConfig(config)
-	if err != nil {
-		c.server.logger.Errorw("VidStream init failed",
-			"error", err,
-			"client_id", c.id,
-		)
-		c.sendMsg <- map[string]interface{}{
-			"type":  "vidstream_init_error",
-			"error": err.Error(),
+		// Close existing engine if any
+		if c.server.vidstreamEngine != nil {
+			c.server.vidstreamEngine.Close()
+			c.server.vidstreamEngine = nil
 		}
-		return
-	}
 
-	c.server.vidstreamEngine = engine
-	width, height := engine.InputDimensions()
-	ready := engine.IsReady()
+		// Create new engine with config
+		config := vidstream.Config{
+			ModelPath:           msg.ModelPath,
+			ConfidenceThreshold: msg.ConfidenceThreshold,
+			NMSThreshold:        msg.NMSThreshold,
+			InputWidth:          640, // Default YOLOv11 input size
+			InputHeight:         480,
+			NumThreads:          0,     // Auto-detect
+			UseGPU:              false, // CPU inference for now
+			Labels:              "",    // Use default COCO labels
+		}
 
-	c.server.logger.Infow("VidStream engine initialized",
-		"client_id", c.id,
-		"input_dimensions", fmt.Sprintf("%dx%d", width, height),
-		"ready", ready,
-	)
+		engine, err := vidstream.NewVideoEngineWithConfig(config)
+		if err != nil {
+			c.server.logger.Errorw("VidStream init failed",
+				"error", err,
+				"client_id", c.id,
+			)
+			c.sendMsg <- map[string]interface{}{
+				"type":  "vidstream_init_error",
+				"error": err.Error(),
+			}
+			return
+		}
 
-	c.sendMsg <- map[string]interface{}{
-		"type":   "vidstream_init_success",
-		"width":  width,
-		"height": height,
-		"ready":  ready,
-	}
+		c.server.vidstreamEngine = engine
+		width, height := engine.InputDimensions()
+		ready := engine.IsReady()
+
+		c.server.logger.Infow("VidStream engine initialized",
+			"client_id", c.id,
+			"input_dimensions", fmt.Sprintf("%dx%d", width, height),
+			"ready", ready,
+		)
+
+		c.sendMsg <- map[string]interface{}{
+			"type":   "vidstream_init_success",
+			"width":  width,
+			"height": height,
+			"ready":  ready,
+		}
+	}()
 }
 
 // handleVidStreamFrame processes a video frame through ONNX inference

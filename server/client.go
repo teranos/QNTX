@@ -28,8 +28,12 @@ const (
 	// Send pings to peer with this period (must be less than pongWait)
 	pingPeriod = 54 * time.Second
 
-	// Maximum message size allowed from peer (1MB for graph data)
-	maxMessageSize = 1024 * 1024
+	// Maximum message size allowed from peer
+	// Currently 10MB to support VidStream frames (640x480 RGBA as JSON ≈ 4.4MB)
+	// TODO: Switch to binary WebSocket frames to reduce payload from 4.4MB → 1.2MB
+	//       Binary format: 12-byte header (width:u32, height:u32, format:u32) + raw bytes
+	//       This would allow reducing maxMessageSize back to 2MB
+	maxMessageSize = 10 * 1024 * 1024
 )
 
 // createErrorGraph creates an empty graph with error metadata.
@@ -153,10 +157,18 @@ func (c *Client) readPump() {
 			break
 		}
 
-		if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputDataDump) {
+		// Log message size for large messages (helps diagnose WebSocket issues)
+		msgSize := len(messageBytes)
+		if msgSize > 500000 { // Log if > 500KB
+			c.server.logger.Infow("Large WebSocket message received",
+				"client_id", c.id,
+				"size_bytes", msgSize,
+				"size_mb", float64(msgSize)/(1024*1024),
+			)
+		} else if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputDataDump) {
 			c.server.logger.Debugw("Received WebSocket message",
 				"client_id", c.id,
-				"size_bytes", len(messageBytes),
+				"size_bytes", msgSize,
 			)
 		}
 
@@ -165,6 +177,7 @@ func (c *Client) readPump() {
 			c.server.logger.Warnw("JSON unmarshal error",
 				"error", err.Error(),
 				"client_id", c.id,
+				"message_size", msgSize,
 			)
 			continue
 		}
@@ -176,6 +189,15 @@ func (c *Client) readPump() {
 // handleReadError logs unexpected WebSocket read errors.
 // Expected closure codes (going away, abnormal, no status) are silently ignored.
 func (c *Client) handleReadError(err error) {
+	// Always log close errors with full details for debugging
+	if closeErr, ok := err.(*websocket.CloseError); ok {
+		c.server.logger.Infow("WebSocket closed",
+			"client_id", c.id,
+			"code", closeErr.Code,
+			"text", closeErr.Text,
+		)
+	}
+
 	if websocket.IsUnexpectedCloseError(err,
 		websocket.CloseGoingAway,
 		websocket.CloseAbnormalClosure,
