@@ -159,7 +159,8 @@ describe('PythonEditorPanel', () => {
             // when setupEventListeners tries to call .set()
             const tabs = document.querySelectorAll('.python-editor-tab');
             expect(() => {
-                tabs.forEach(tab => tab.dispatchEvent(new Event('click')));
+                // Use window.Event to get jsdom's Event constructor
+                tabs.forEach(tab => tab.dispatchEvent(new window.Event('click')));
             }).not.toThrow();
         });
     });
