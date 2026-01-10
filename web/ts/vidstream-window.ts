@@ -23,14 +23,14 @@ interface VidStreamConfig {
 }
 
 interface Detection {
-    class_id: number;
-    label: string;
-    confidence: number;
-    bbox: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
+    ClassID: number;
+    Label: string;
+    Confidence: number;
+    BBox: {
+        X: number;
+        Y: number;
+        Width: number;
+        Height: number;
     };
 }
 
@@ -59,6 +59,9 @@ export class VidStreamWindow {
     private lastInferenceTime: number = 0;
     private readonly INFERENCE_INTERVAL_MS = 200; // 5 FPS max for inference
 
+    // Latest detections (drawn on every frame)
+    private latestDetections: Detection[] = [];
+
     constructor() {
         this.createWindow();
         this.setupMessageHandlers();
@@ -78,7 +81,8 @@ export class VidStreamWindow {
 
         // Handle frame processing response
         registerHandler('vidstream_detections', (data: any) => {
-            this.drawDetections(data.detections);
+            // Store detections to be drawn on next animation frame
+            this.latestDetections = data.detections || [];
             const totalMs = data.stats.total_us / 1000;
             this.updateStatsFromServer(data.detections.length, totalMs);
         });
@@ -312,6 +316,9 @@ export class VidStreamWindow {
 
             this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
 
+            // Draw latest detections on top of video frame
+            this.drawDetections();
+
             if (this.engineReady) {
                 await this.runInference();
             } else {
@@ -339,13 +346,21 @@ export class VidStreamWindow {
         const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
 
         try {
-            const sent = sendMessage({
+            const frameArray = Array.from(imageData.data);
+            const payload = {
                 type: 'vidstream_frame',
-                frame_data: Array.from(imageData.data),
+                frame_data: frameArray,
                 width: this.canvas.width,
                 height: this.canvas.height,
                 format: 'rgba8',
-            });
+            };
+
+            // Log payload size (JSON encoding inflates size significantly)
+            const payloadJSON = JSON.stringify(payload);
+            const payloadSizeMB = payloadJSON.length / (1024 * 1024);
+            debug(SEG.VID, `Frame payload: ${payloadSizeMB.toFixed(2)} MB (${payloadJSON.length} bytes)`);
+
+            const sent = sendMessage(payload);
 
             if (!sent) {
                 error(SEG.VID, 'Failed to send frame: WebSocket not connected');
@@ -355,14 +370,11 @@ export class VidStreamWindow {
         }
     }
 
-    private drawDetections(detections: Detection[]): void {
-        if (!this.ctx || !this.video) return;
+    private drawDetections(): void {
+        if (!this.ctx || !this.latestDetections.length) return;
 
-        // Redraw video frame
-        this.ctx.drawImage(this.video, 0, 0, this.canvas!.width, this.canvas!.height);
-
-        detections.forEach(det => {
-            const { x, y, width, height } = det.bbox;
+        this.latestDetections.forEach(det => {
+            const { X: x, Y: y, Width: width, Height: height } = det.BBox;
 
             // Bounding box
             this.ctx!.strokeStyle = '#0f0';
@@ -370,7 +382,7 @@ export class VidStreamWindow {
             this.ctx!.strokeRect(x, y, width, height);
 
             // Label
-            const label = `${det.label} ${(det.confidence * 100).toFixed(0)}%`;
+            const label = `${det.Label} ${(det.Confidence * 100).toFixed(0)}%`;
             this.ctx!.font = '12px monospace';
             const metrics = this.ctx!.measureText(label);
             this.ctx!.fillStyle = 'rgba(0, 255, 0, 0.8)';

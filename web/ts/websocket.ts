@@ -216,8 +216,12 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     };
 
     // Virtue #12: Graceful Degradation - Handle disconnection without crashing, auto-reconnect
-    ws.onclose = function(): void {
-        log.info(SEG.WS, 'WebSocket disconnected');
+    ws.onclose = function(event: CloseEvent): void {
+        log.info(SEG.WS, 'WebSocket disconnected', {
+            code: event.code,
+            reason: event.reason || '(no reason)',
+            wasClean: event.wasClean
+        });
         updateConnectionStatus(false);
         // Clear any existing timer
         if (reconnectTimer) {
