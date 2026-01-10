@@ -8,7 +8,6 @@
 
 import { apiFetch } from './api.ts';
 import { fetchDevMode } from './dev-mode.ts';
-import { log, SEG } from './logger';
 
 interface ConsoleLog {
     timestamp?: string;
