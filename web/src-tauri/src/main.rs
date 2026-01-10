@@ -7,9 +7,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
 
-// Desktop-only features (menu bar, tray, autostart, deep-link, camera)
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use crabcamera;
+// Desktop-only features (menu bar, tray, autostart, deep-link)
 #[cfg(not(target_os = "ios"))]
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 #[cfg(not(target_os = "ios"))]
@@ -288,13 +286,6 @@ fn main() {
 
         info!("  ✓ deep-link");
         builder = builder.plugin(tauri_plugin_deep_link::init());
-
-        // Camera plugin (desktop only, not Android either)
-        #[cfg(not(target_os = "android"))]
-        {
-            info!("  ✓ crabcamera 0.7");
-            builder = builder.plugin(crabcamera::init());
-        }
 
         info!("Desktop plugins loaded");
     }
