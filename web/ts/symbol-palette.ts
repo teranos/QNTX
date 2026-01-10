@@ -82,6 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeSymbolPalette(): void {
     const cmdCells = document.querySelectorAll('.palette-cell');
 
+    // Mark VidStream as degraded in desktop mode (camera not yet supported)
+    const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    if (isTauri) {
+        const vidstreamCell = document.querySelector('.palette-cell[data-cmd="vidstream"]');
+        if (vidstreamCell) {
+            vidstreamCell.classList.add('degraded');
+            vidstreamCell.setAttribute('aria-label', 'VidStream: camera not yet supported in desktop mode (browser only)');
+        }
+    }
+
     cmdCells.forEach((cell, index) => {
         cell.addEventListener('click', handleSymbolClick);
         // Tooltips now handled purely via CSS ::after pseudo-element
