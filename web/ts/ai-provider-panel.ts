@@ -5,7 +5,7 @@
  * Allows switching between OpenRouter (cloud) and Ollama (local) providers.
  */
 
-import { BasePanel } from './base-panel.ts';
+import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';
@@ -20,26 +20,24 @@ interface ConfigResponse {
     }>;
 }
 
-class AIProviderPanel extends BasePanel {
+class AIProviderPanel {
+    private window: Window;
     private appConfig: ConfigResponse | null = null;
     private ollamaAvailable: boolean = false;
 
     constructor() {
-        super({
-            id: 'ai-provider-panel',
-            classes: ['ai-provider-panel'],
-            useOverlay: false,  // No overlay, uses click-outside
-            closeOnEscape: true,
-            insertAfter: '#symbolPalette'
+        this.window = new Window({
+            id: 'ai-provider-window',
+            title: `${BY} Actor / AI Provider`,
+            width: '480px',
+            onShow: () => this.onShow(),
         });
+
+        this.setupContent();
     }
 
-    protected getTemplate(): string {
-        return `
-            <div class="ai-provider-header">
-                <h3 class="ai-provider-title">${BY} Actor / AI Provider</h3>
-                <button class="panel-close" aria-label="Close">✕</button>
-            </div>
+    private setupContent(): void {
+        const content = `
             <div class="ai-provider-content">
                 <div class="config-toggle-header">
                     <span class="config-toggle-title">AI Inference Provider</span>
@@ -75,7 +73,7 @@ class AIProviderPanel extends BasePanel {
                     </div>
                 </div>
                 <div id="ollama-model-selector" class="ollama-model-selector provider-config hidden">
-                    <label for="ollama-model-select">Model:</label>
+                    <label for="ollama-model-select">Ollama Model:</label>
                     <select id="ollama-model-select">
                         <option value="llama3.2:3b">llama3.2:3b (3B, very fast)</option>
                         <option value="mistral">mistral (7B, fast, general)</option>
@@ -83,17 +81,33 @@ class AIProviderPanel extends BasePanel {
                         <option value="deepseek-r1:7b">deepseek-r1:7b (reasoning)</option>
                     </select>
                 </div>
+                <div id="onnx-model-config" class="provider-config hidden">
+                    <label for="onnx-model-path">ONNX Model Path (VidStream):</label>
+                    <div class="api-key-input-group">
+                        <input
+                            type="text"
+                            id="onnx-model-path"
+                            class="api-key-input"
+                            placeholder="ats/vidstream/models/yolo11n.onnx"
+                            autocomplete="off"
+                        />
+                        <button id="onnx-model-save" class="api-key-save" title="Save">💾</button>
+                    </div>
+                </div>
             </div>
         `;
+
+        this.window.setContent(content);
+        this.setupEventListeners();
     }
 
-    protected setupEventListeners(): void {
-        // Close button is now handled automatically by BasePanel (.panel-close)
+    private setupEventListeners(): void {
+        const windowEl = this.window.getElement();
 
         // AI Provider toggle buttons
-        const openrouterBtn = this.$('#provider-openrouter-btn');
-        const ollamaBtn = this.$('#provider-ollama-btn');
-        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
+        const openrouterBtn = windowEl.querySelector('#provider-openrouter-btn');
+        const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
+        const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
 
         openrouterBtn?.addEventListener('click', () => this.switchToOpenRouter());
         ollamaBtn?.addEventListener('click', () => this.switchToOllama());
@@ -103,9 +117,9 @@ class AIProviderPanel extends BasePanel {
         });
 
         // OpenRouter API key handling
-        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
-        const keyToggle = this.$('#openrouter-key-toggle');
-        const keySave = this.$('#openrouter-key-save');
+        const keyInput = windowEl.querySelector<HTMLInputElement>('#openrouter-api-key');
+        const keyToggle = windowEl.querySelector('#openrouter-key-toggle');
+        const keySave = windowEl.querySelector('#openrouter-key-save');
 
         keyToggle?.addEventListener('click', () => {
             if (keyInput) {
@@ -122,12 +136,24 @@ class AIProviderPanel extends BasePanel {
                 this.saveOpenRouterKey();
             }
         });
+
+        // ONNX model path handling
+        const onnxPathInput = windowEl.querySelector<HTMLInputElement>('#onnx-model-path');
+        const onnxSave = windowEl.querySelector('#onnx-model-save');
+
+        onnxSave?.addEventListener('click', () => this.saveONNXModelPath());
+        onnxPathInput?.addEventListener('keypress', (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                this.saveONNXModelPath();
+            }
+        });
     }
 
-    protected async onShow(): Promise<void> {
+    private async onShow(): Promise<void> {
         await this.fetchConfig();
         this.setupProviderButtons();
         await this.loadOpenRouterKey();
+        await this.loadONNXModelPath();
         await this.checkOllamaStatus();
     }
 
@@ -158,7 +184,8 @@ class AIProviderPanel extends BasePanel {
         this.updateProviderUI(isOllamaEnabled ? 'ollama' : 'openrouter');
 
         // Update model dropdown
-        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
+        const windowEl = this.window.getElement();
+        const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
         if (modelSelect) {
             modelSelect.value = effectiveModel;
         }
@@ -186,7 +213,8 @@ class AIProviderPanel extends BasePanel {
 
         this.updateProviderUI('ollama');
 
-        const modelSelect = this.$<HTMLSelectElement>('#ollama-model-select');
+        const windowEl = this.window.getElement();
+        const modelSelect = windowEl.querySelector<HTMLSelectElement>('#ollama-model-select');
         const model = modelSelect ? modelSelect.value : 'llama3.2:3b';
 
         try {
@@ -218,26 +246,31 @@ class AIProviderPanel extends BasePanel {
     }
 
     private updateProviderUI(provider: 'openrouter' | 'ollama'): void {
-        const openrouterBtn = this.$('#provider-openrouter-btn');
-        const ollamaBtn = this.$('#provider-ollama-btn');
-        const modelSelector = this.$('#ollama-model-selector');
-        const openrouterConfig = this.$('#openrouter-config');
+        const windowEl = this.window.getElement();
+        const openrouterBtn = windowEl.querySelector('#provider-openrouter-btn');
+        const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
+        const modelSelector = windowEl.querySelector('#ollama-model-selector');
+        const openrouterConfig = windowEl.querySelector('#openrouter-config');
+        const onnxConfig = windowEl.querySelector('#onnx-model-config');
 
         if (provider === 'openrouter') {
             openrouterBtn?.classList.add('active');
             ollamaBtn?.classList.remove('active');
             modelSelector?.classList.add('u-hidden');
             openrouterConfig?.classList.remove('u-hidden');
+            onnxConfig?.classList.add('u-hidden');
         } else {
             openrouterBtn?.classList.remove('active');
             ollamaBtn?.classList.add('active');
             modelSelector?.classList.remove('u-hidden');
             openrouterConfig?.classList.add('u-hidden');
+            onnxConfig?.classList.remove('u-hidden');
         }
     }
 
     private updateStatus(message: string, type: 'success' | 'error' | 'warning'): void {
-        const statusEl = this.$('#ai-provider-status');
+        const windowEl = this.window.getElement();
+        const statusEl = windowEl.querySelector('#ai-provider-status');
         if (statusEl) {
             statusEl.textContent = message;
             statusEl.className = `config-toggle-status status-${type}`;
@@ -273,7 +306,8 @@ class AIProviderPanel extends BasePanel {
 
         // Find the OpenRouter API key setting
         const keySetting = this.appConfig.settings.find(s => s.key === 'openrouter.api_key');
-        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
+        const windowEl = this.window.getElement();
+        const keyInput = windowEl.querySelector<HTMLInputElement>('#openrouter-api-key');
 
         if (keyInput && keySetting?.value) {
             const keyValue = keySetting.value as string;
@@ -285,7 +319,8 @@ class AIProviderPanel extends BasePanel {
     }
 
     private async saveOpenRouterKey(): Promise<void> {
-        const keyInput = this.$<HTMLInputElement>('#openrouter-api-key');
+        const windowEl = this.window.getElement();
+        const keyInput = windowEl.querySelector<HTMLInputElement>('#openrouter-api-key');
         if (!keyInput) return;
 
         const apiKey = keyInput.value.trim();
@@ -314,6 +349,41 @@ class AIProviderPanel extends BasePanel {
         }
     }
 
+    private async loadONNXModelPath(): Promise<void> {
+        if (!this.appConfig?.settings) return;
+
+        const pathSetting = this.appConfig.settings.find(s => s.key === 'local_inference.onnx_model_path');
+        const windowEl = this.window.getElement();
+        const pathInput = windowEl.querySelector<HTMLInputElement>('#onnx-model-path');
+
+        if (pathInput && pathSetting?.value) {
+            pathInput.value = pathSetting.value as string;
+        }
+    }
+
+    private async saveONNXModelPath(): Promise<void> {
+        const windowEl = this.window.getElement();
+        const pathInput = windowEl.querySelector<HTMLInputElement>('#onnx-model-path');
+        if (!pathInput) return;
+
+        const path = pathInput.value.trim();
+        if (!path) {
+            this.updateStatus('Please enter a model path', 'warning');
+            return;
+        }
+
+        try {
+            await this.updateConfig({
+                'local_inference.onnx_model_path': path
+            });
+
+            this.updateStatus('ONNX model path saved', 'success');
+        } catch (error) {
+            handleError(error, 'Failed to save ONNX model path', { context: SEG.ACTOR, silent: true });
+            this.updateStatus('Failed to save model path', 'error');
+        }
+    }
+
     private async checkOllamaStatus(): Promise<void> {
         try {
             // Try to connect to Ollama API
@@ -324,8 +394,9 @@ class AIProviderPanel extends BasePanel {
 
             this.ollamaAvailable = response.ok;
 
-            const ollamaBtn = this.$('#provider-ollama-btn');
-            const ollamaStatus = this.$('#ollama-status');
+            const windowEl = this.window.getElement();
+            const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
+            const ollamaStatus = windowEl.querySelector('#ollama-status');
 
             if (this.ollamaAvailable) {
                 ollamaBtn?.classList.remove('ollama-unavailable');
@@ -342,8 +413,9 @@ class AIProviderPanel extends BasePanel {
             // Ollama is not running or unreachable
             this.ollamaAvailable = false;
 
-            const ollamaBtn = this.$('#provider-ollama-btn');
-            const ollamaStatus = this.$('#ollama-status');
+            const windowEl = this.window.getElement();
+            const ollamaBtn = windowEl.querySelector('#provider-ollama-btn');
+            const ollamaStatus = windowEl.querySelector('#ollama-status');
 
             ollamaBtn?.classList.add('ollama-unavailable');
             if (ollamaStatus) {
@@ -352,6 +424,18 @@ class AIProviderPanel extends BasePanel {
 
             handleError(error, 'Ollama not available', { context: SEG.ACTOR, silent: true });
         }
+    }
+
+    public toggle(): void {
+        this.window.toggle();
+    }
+
+    public show(): void {
+        this.window.show();
+    }
+
+    public hide(): void {
+        this.window.hide();
     }
 }
 

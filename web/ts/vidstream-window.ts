@@ -13,6 +13,8 @@
 
 import { debug, info, error, SEG } from './logger.ts';
 import { sendMessage, registerHandler } from './websocket.ts';
+import { Window } from './components/window.ts';
+import { apiFetch } from './api.ts';
 
 interface VidStreamConfig {
     model_path: string;
@@ -35,7 +37,7 @@ interface Detection {
 }
 
 export class VidStreamWindow {
-    private window: HTMLElement | null = null;
+    private window: Window;
     private video: HTMLVideoElement | null = null;
     private canvas: HTMLCanvasElement | null = null;
     private ctx: CanvasRenderingContext2D | null = null;
@@ -43,11 +45,6 @@ export class VidStreamWindow {
     private animationFrameId: number | null = null;
     private isProcessing: boolean = false;
     private engineReady: boolean = false;
-
-    // Drag state
-    private isDragging: boolean = false;
-    private dragOffsetX: number = 0;
-    private dragOffsetY: number = 0;
 
     // Stats tracking
     private frameCount: number = 0;
@@ -63,8 +60,67 @@ export class VidStreamWindow {
     private latestDetections: Detection[] = [];
 
     constructor() {
-        this.createWindow();
+        this.window = new Window({
+            id: 'vidstream-window',
+            title: 'VidStream',
+            width: '664px', // 640px viewport + padding
+            onClose: () => this.stopCamera(),
+            onShow: () => this.loadModelPathFromConfig(),
+        });
+
+        this.setupContent();
         this.setupMessageHandlers();
+    }
+
+    private setupContent(): void {
+        const content = `
+            <div class="window-controls">
+                <button
+                    id="vs-init-btn"
+                    class="panel-btn panel-btn-sm"
+                >Initialize ONNX</button>
+                <button
+                    id="vs-start-btn"
+                    class="panel-btn panel-btn-sm panel-btn-primary"
+                >Start Camera</button>
+                <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
+                <button
+                    id="vs-config-btn"
+                    class="panel-btn panel-btn-sm"
+                    title="Configure ONNX model"
+                >⚙️</button>
+                <span id="vs-status" class="window-status">Ready (camera + ONNX via WebSocket)</span>
+            </div>
+            <div class="window-model-info">
+                Model: <span id="vs-model-path">ats/vidstream/models/yolo11n.onnx</span>
+            </div>
+
+            <div id="vs-error" class="window-error" style="display: none;"></div>
+
+            <div class="window-viewport">
+                <video
+                    id="vs-video"
+                    class="window-video"
+                    autoplay
+                    playsinline
+                ></video>
+                <canvas
+                    id="vs-canvas"
+                    class="window-canvas"
+                    width="640"
+                    height="480"
+                ></canvas>
+            </div>
+
+            <div class="window-stats">
+                <div>FPS: <span id="vs-fps" class="window-stat-value">0</span></div>
+                <div>Latency: <span id="vs-latency" class="window-stat-value">0</span> ms</div>
+                <div>Detections: <span id="vs-detections" class="window-stat-value">0</span></div>
+            </div>
+        `;
+
+        this.window.setContent(content);
+        this.setupEventListeners();
     }
 
     private setupMessageHandlers(): void {
@@ -92,121 +148,39 @@ export class VidStreamWindow {
         });
     }
 
-    private createWindow(): void {
-        this.window = document.createElement('div');
-        this.window.id = 'vidstream-window';
-        this.window.className = 'draggable-window';
-        this.window.style.width = '664px'; // 640px viewport + padding
-
-        this.window.innerHTML = `
-            <div class="draggable-window-header">
-                <span class="draggable-window-title">VidStream</span>
-                <button class="panel-close" aria-label="Close">&times;</button>
-            </div>
-
-            <div class="draggable-window-content">
-                <input
-                    type="text"
-                    id="vs-model-path"
-                    class="window-input"
-                    value="ats/vidstream/models/yolo11n.onnx"
-                    placeholder="path/to/model.onnx"
-                />
-
-                <div class="window-controls">
-                    <button
-                        id="vs-init-btn"
-                        class="panel-btn panel-btn-sm"
-                    >Initialize ONNX</button>
-                    <button
-                        id="vs-start-btn"
-                        class="panel-btn panel-btn-sm panel-btn-primary"
-                    >Start Camera</button>
-                    <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
-                    <span id="vs-status" class="window-status">Ready (camera + ONNX via WebSocket)</span>
-                </div>
-
-                <div id="vs-error" class="window-error" style="display: none;"></div>
-
-                <div class="window-viewport">
-                    <video
-                        id="vs-video"
-                        class="window-video"
-                        autoplay
-                        playsinline
-                    ></video>
-                    <canvas
-                        id="vs-canvas"
-                        class="window-canvas"
-                        width="640"
-                        height="480"
-                    ></canvas>
-                </div>
-
-                <div class="window-stats">
-                    <div>FPS: <span id="vs-fps" class="window-stat-value">0</span></div>
-                    <div>Latency: <span id="vs-latency" class="window-stat-value">0</span> ms</div>
-                    <div>Detections: <span id="vs-detections" class="window-stat-value">0</span></div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(this.window);
-        this.setupEventListeners();
-    }
-
     private setupEventListeners(): void {
-        const header = this.window?.querySelector('.draggable-window-header') as HTMLElement;
-        const closeBtn = this.window?.querySelector('.panel-close') as HTMLButtonElement;
-        const initBtn = this.window?.querySelector('#vs-init-btn') as HTMLButtonElement;
-        const startBtn = this.window?.querySelector('#vs-start-btn') as HTMLButtonElement;
-        const stopBtn = this.window?.querySelector('#vs-stop-btn') as HTMLButtonElement;
+        const windowEl = this.window.getElement();
+        const configBtn = windowEl.querySelector('#vs-config-btn') as HTMLButtonElement;
+        const initBtn = windowEl.querySelector('#vs-init-btn') as HTMLButtonElement;
+        const startBtn = windowEl.querySelector('#vs-start-btn') as HTMLButtonElement;
+        const stopBtn = windowEl.querySelector('#vs-stop-btn') as HTMLButtonElement;
 
-        // Dragging
-        header?.addEventListener('mousedown', (e) => {
-            this.isDragging = true;
-            const rect = this.window!.getBoundingClientRect();
-            this.dragOffsetX = e.clientX - rect.left;
-            this.dragOffsetY = e.clientY - rect.top;
-            header.style.cursor = 'grabbing';
+        // Configure button - opens AI Provider panel
+        configBtn?.addEventListener('click', () => {
+            // Import and call toggleAIProvider
+            import('./ai-provider-panel.ts').then(module => {
+                module.toggleAIProvider();
+            });
         });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!this.isDragging) return;
-            const x = e.clientX - this.dragOffsetX;
-            const y = e.clientY - this.dragOffsetY;
-            this.window!.style.left = `${x}px`;
-            this.window!.style.top = `${y}px`;
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (this.isDragging) {
-                this.isDragging = false;
-                header.style.cursor = 'move';
-            }
-        });
-
-        // Close
-        closeBtn?.addEventListener('click', () => this.hide());
 
         // Initialize engine (optional - enables inference)
         initBtn?.addEventListener('click', async () => {
-            const input = this.window?.querySelector('#vs-model-path') as HTMLInputElement;
-            const modelPath = input.value.trim();
+            const modelPathSpan = windowEl.querySelector('#vs-model-path') as HTMLSpanElement;
+            const modelPath = modelPathSpan?.textContent?.trim();
             if (!modelPath) return;
 
             try {
                 initBtn.disabled = true;
                 initBtn.textContent = 'Initializing...';
                 await this.initializeEngine({ model_path: modelPath });
-                const status = this.window?.querySelector('#vs-status') as HTMLElement;
+                const status = windowEl.querySelector('#vs-status') as HTMLElement;
                 if (status) {
                     status.textContent = '✓ Inference ready';
                     status.style.color = '#0a0';
                 }
                 info(SEG.VID, 'VidStream ONNX engine initialized');
             } catch (err) {
-                const status = this.window?.querySelector('#vs-status') as HTMLElement;
+                const status = windowEl.querySelector('#vs-status') as HTMLElement;
                 if (status) {
                     status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
@@ -251,7 +225,8 @@ export class VidStreamWindow {
     private async startCamera(): Promise<void> {
         debug(SEG.VID, 'startCamera() called');
 
-        this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
+        const windowEl = this.window.getElement();
+        this.canvas = windowEl.querySelector('#vs-canvas') as HTMLCanvasElement;
         this.ctx = this.canvas?.getContext('2d') || null;
 
         try {
@@ -263,7 +238,7 @@ export class VidStreamWindow {
                 audio: false,
             });
 
-            this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
+            this.video = windowEl.querySelector('#vs-video') as HTMLVideoElement;
             if (this.video) {
                 this.video.srcObject = this.stream;
                 this.video.onloadedmetadata = () => {
@@ -402,9 +377,10 @@ export class VidStreamWindow {
             this.frameCount = 0;
             this.lastStatsUpdate = now;
 
-            const fpsEl = this.window?.querySelector('#vs-fps');
-            const latencyEl = this.window?.querySelector('#vs-latency');
-            const detectionsEl = this.window?.querySelector('#vs-detections');
+            const windowEl = this.window.getElement();
+            const fpsEl = windowEl.querySelector('#vs-fps');
+            const latencyEl = windowEl.querySelector('#vs-latency');
+            const detectionsEl = windowEl.querySelector('#vs-detections');
 
             if (fpsEl) fpsEl.textContent = this.currentFPS.toString();
             if (latencyEl) latencyEl.textContent = this.avgLatency.toFixed(1);
@@ -421,9 +397,10 @@ export class VidStreamWindow {
             this.frameCount = 0;
             this.lastStatsUpdate = now;
 
-            const fpsEl = this.window?.querySelector('#vs-fps');
-            const latencyEl = this.window?.querySelector('#vs-latency');
-            const detectionsEl = this.window?.querySelector('#vs-detections');
+            const windowEl = this.window.getElement();
+            const fpsEl = windowEl.querySelector('#vs-fps');
+            const latencyEl = windowEl.querySelector('#vs-latency');
+            const detectionsEl = windowEl.querySelector('#vs-detections');
 
             if (fpsEl) fpsEl.textContent = this.currentFPS.toString();
             if (latencyEl) latencyEl.textContent = '-';
@@ -433,36 +410,48 @@ export class VidStreamWindow {
 
     public show(): void {
         debug(SEG.VID, 'show() called');
-        if (this.window) {
-            this.window.setAttribute('data-visible', 'true');
-            debug(SEG.VID, 'Window visibility set to true');
-        } else {
-            error(SEG.VID, 'Window element not found!');
-        }
+        this.window.show();
     }
 
     public hide(): void {
         this.stopCamera();
-        if (this.window) {
-            this.window.setAttribute('data-visible', 'false');
-        }
+        this.window.hide();
     }
 
     public toggle(): void {
-        const isVisible = this.window?.getAttribute('data-visible') === 'true';
-        debug(SEG.VID, `toggle() called, currently visible: ${isVisible}`);
-        if (isVisible) {
-            this.hide();
-        } else {
-            this.show();
-        }
+        debug(SEG.VID, `toggle() called, currently visible: ${this.window.isVisible()}`);
+        this.window.toggle();
     }
 
     private showError(message: string): void {
-        const errorEl = this.window?.querySelector('#vs-error');
+        const windowEl = this.window.getElement();
+        const errorEl = windowEl.querySelector('#vs-error');
         if (errorEl) {
             errorEl.textContent = message;
             (errorEl as HTMLElement).style.display = 'block';
+        }
+    }
+
+    private async loadModelPathFromConfig(): Promise<void> {
+        try {
+            const response = await apiFetch('/api/config?introspection=true');
+            if (!response.ok) return;
+
+            const config = await response.json();
+            const pathSetting = config.settings?.find(
+                (s: any) => s.key === 'local_inference.onnx_model_path'
+            );
+
+            if (pathSetting?.value) {
+                const windowEl = this.window.getElement();
+                const modelPathSpan = windowEl.querySelector<HTMLSpanElement>('#vs-model-path');
+                if (modelPathSpan) {
+                    modelPathSpan.textContent = pathSetting.value as string;
+                }
+            }
+        } catch (err) {
+            // Silent failure - default path already set in HTML
+            debug(SEG.VID, 'Failed to load model path from config:', err);
         }
     }
 }
