@@ -13,8 +13,6 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { debug, info, error, SEG } from './logger.ts';
-import { CSS } from './css-classes.ts';
-import { handleError } from './error-handler.ts';
 
 interface VidStreamConfig {
     model_path: string;
@@ -185,14 +183,14 @@ export class VidStreamWindow {
                 initBtn.disabled = true;
                 initBtn.textContent = 'Initializing...';
                 await this.initializeEngine({ model_path: modelPath });
-                const status = this.window?.querySelector('#vs-status');
+                const status = this.window?.querySelector('#vs-status') as HTMLElement;
                 if (status) {
                     status.textContent = '✓ Inference ready';
                     status.style.color = '#0a0';
                 }
                 info(SEG.VID, 'VidStream ONNX engine initialized');
             } catch (err) {
-                const status = this.window?.querySelector('#vs-status');
+                const status = this.window?.querySelector('#vs-status') as HTMLElement;
                 if (status) {
                     status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
@@ -496,13 +494,6 @@ export class VidStreamWindow {
         if (errorEl) {
             errorEl.textContent = message;
             (errorEl as HTMLElement).style.display = 'block';
-        }
-    }
-
-    private hideError(): void {
-        const errorEl = this.window?.querySelector('#vs-error');
-        if (errorEl) {
-            (errorEl as HTMLElement).style.display = 'none';
         }
     }
 }
