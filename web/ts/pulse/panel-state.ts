@@ -11,6 +11,8 @@
  */
 
 import type { Execution } from './execution-types';
+import { log, SEG } from '../logger';
+import { handleError } from '../error-handler';
 
 export class PulsePanelState {
     // Which jobs have their execution history expanded
@@ -46,7 +48,7 @@ export class PulsePanelState {
                 this.expandedJobs = new Set(jobIds);
             }
         } catch (e) {
-            console.error('[Pulse Panel State] Failed to load expanded state:', e);
+            handleError(e, 'Failed to load expanded state from localStorage', { context: SEG.PULSE, silent: true });
         }
     }
 
@@ -58,7 +60,7 @@ export class PulsePanelState {
             const jobIds = Array.from(this.expandedJobs);
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(jobIds));
         } catch (e) {
-            console.error('[Pulse Panel State] Failed to save expanded state:', e);
+            handleError(e, 'Failed to save expanded state to localStorage', { context: SEG.PULSE, silent: true });
         }
     }
 
@@ -78,7 +80,7 @@ export class PulsePanelState {
         if (orphanedIds.length > 0) {
             orphanedIds.forEach(id => this.expandedJobs.delete(id));
             this.saveToLocalStorage();
-            console.debug(`[Pulse Panel State] Cleaned up ${orphanedIds.length} orphaned job IDs from localStorage`);
+            log.debug(SEG.PULSE, `Cleaned up ${orphanedIds.length} orphaned job IDs from localStorage`);
         }
     }
 

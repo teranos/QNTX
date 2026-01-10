@@ -6,14 +6,14 @@
  */
 
 import type { SystemCapabilitiesMessage } from '../../types/websocket';
-import { debugLog } from '../debug.ts';
+import { log, SEG } from '../logger';
 
 /**
  * Handle system capabilities message from backend
  * Updates ax button to show degraded state if using Go fallback
  */
 export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void {
-    debugLog('[System Capabilities] Received:', {
+    log.debug(SEG.PULSE, 'System capabilities received:', {
         fuzzy_backend: data.fuzzy_backend,
         fuzzy_optimized: data.fuzzy_optimized,
     });
@@ -31,12 +31,12 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         axButton.classList.add('degraded');
         axButton.setAttribute('data-fuzzy-backend', 'go');
         axButton.setAttribute('title', '⋈ ax - expand (Go fallback)\nClick for details');
-        debugLog('[System Capabilities] ax using Go fallback - showing degraded state');
+        log.debug(SEG.PULSE, 'Using Go fallback - showing degraded state');
     } else {
         // Using Rust optimization - normal state
         axButton.classList.remove('degraded');
         axButton.setAttribute('data-fuzzy-backend', 'rust');
         axButton.setAttribute('title', '⋈ ax - expand (Rust optimized)');
-        debugLog('[System Capabilities] ax using Rust optimization');
+        log.debug(SEG.PULSE, 'Using Rust optimization');
     }
 }
