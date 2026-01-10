@@ -22,7 +22,6 @@ import {
   getStatusColorClass,
 } from './execution-api.ts';
 import { forceTriggerJob } from './api.ts';
-import { toast } from '../toast.ts';
 import {
   onExecutionStarted,
   onExecutionCompleted,
