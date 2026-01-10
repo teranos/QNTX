@@ -8,6 +8,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { log, SEG } from './logger.ts';
 import { CSS } from './css-classes.ts';
+import { handleError } from './error-handler.ts';
 
 interface VidStreamConfig {
     model_path: string;
@@ -174,10 +175,10 @@ export class VidStreamWindow {
             } catch (err) {
                 const status = this.window?.querySelector('#vs-status');
                 if (status) {
-                    status.textContent = `✗ ${err}`;
+                    status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
                 }
-                log(SEG.INGEST, `ONNX init failed: ${err}`);
+                handleError(err, 'ONNX engine initialization failed', { context: SEG.INGEST });
             } finally {
                 initBtn.disabled = false;
                 initBtn.textContent = 'Initialize ONNX';
@@ -205,25 +206,44 @@ export class VidStreamWindow {
     }
 
     private async startCamera(): Promise<void> {
-        this.stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480 },
-            audio: false,
-        });
+        log(SEG.INGEST, 'startCamera() called');
 
-        this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
-        this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
-        this.ctx = this.canvas?.getContext('2d') || null;
+        try {
+            log(SEG.INGEST, 'Requesting camera access...');
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 },
+                audio: false,
+            });
+            log(SEG.INGEST, 'Camera access granted', this.stream);
 
-        if (this.video) {
-            this.video.srcObject = this.stream;
-            this.video.onloadedmetadata = () => {
-                this.video?.play();
-                this.startProcessing();
-            };
+            this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
+            this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
+            this.ctx = this.canvas?.getContext('2d') || null;
+
+            log(SEG.INGEST, 'Elements found:', {
+                video: !!this.video,
+                canvas: !!this.canvas,
+                ctx: !!this.ctx
+            });
+
+            if (this.video) {
+                log(SEG.INGEST, 'Attaching stream to video element');
+                this.video.srcObject = this.stream;
+                this.video.onloadedmetadata = () => {
+                    log(SEG.INGEST, 'Video metadata loaded, starting playback');
+                    this.video?.play();
+                    log(SEG.INGEST, 'Starting frame processing');
+                    this.startProcessing();
+                };
+            } else {
+                log(SEG.INGEST, 'ERROR: Video element not found!');
+            }
+
+            const mode = this.engineReady ? 'with inference' : 'preview only';
+            log(SEG.INGEST, `Camera started (${mode})`);
+        } catch (err) {
+            handleError(err, 'Failed to start camera', { context: SEG.INGEST });
         }
-
-        const mode = this.engineReady ? 'with inference' : 'preview only';
-        log(SEG.INGEST, `Camera started (${mode})`);
     }
 
     private stopCamera(): void {
@@ -277,7 +297,7 @@ export class VidStreamWindow {
                 this.drawDetections(result.detections);
                 this.updateStats(result, performance.now() - frameStart);
             } catch (err) {
-                console.error('Frame processing error:', err);
+                handleError(err, 'Frame processing error', { context: SEG.INGEST });
             }
         } else {
             // Preview mode - just update FPS
@@ -352,8 +372,12 @@ export class VidStreamWindow {
     }
 
     public show(): void {
+        log(SEG.INGEST, 'show() called');
         if (this.window) {
             this.window.setAttribute('data-visible', 'true');
+            log(SEG.INGEST, 'Window visibility set to true');
+        } else {
+            log(SEG.INGEST, 'ERROR: Window element not found!');
         }
     }
 
@@ -366,6 +390,7 @@ export class VidStreamWindow {
 
     public toggle(): void {
         const isVisible = this.window?.getAttribute('data-visible') === 'true';
+        log(SEG.INGEST, `toggle() called, currently visible: ${isVisible}`);
         if (isVisible) {
             this.hide();
         } else {
