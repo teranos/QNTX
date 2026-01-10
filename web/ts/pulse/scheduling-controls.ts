@@ -4,7 +4,7 @@
  * Inline UI controls for ATS code blocks to configure Pulse scheduling
  */
 
-import { debugLog } from "../debug.ts";
+import { log, SEG } from "../logger";
 import type { ScheduledJobResponse } from "./types.ts";
 import { INTERVAL_PRESETS, formatInterval } from "./types.ts";
 import {
@@ -394,7 +394,7 @@ function renderIntervalSelection(
         throw new Error('ATS code is empty - cannot schedule empty query. Try refreshing the page.');
       }
 
-      debugLog('[Scheduling Controls] Creating job with:', {
+      log.debug(SEG.PULSE, 'Creating job with:', {
         atsCode,
         intervalSeconds,
         documentId: options.documentId,
@@ -407,7 +407,7 @@ function renderIntervalSelection(
         created_from_doc: options.documentId,
       };
 
-      debugLog('[Scheduling Controls] API Request:', request);
+      log.debug(SEG.PULSE, 'API Request:', request);
 
       const job = await createScheduledJob(request);
 
