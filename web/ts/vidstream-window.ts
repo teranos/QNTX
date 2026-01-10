@@ -140,8 +140,8 @@ export class VidStreamWindow {
                         border-radius: 4px;
                         cursor: pointer;
                         font-family: inherit;
-                    ">Initialize</button>
-                    <button id="vs-start-btn" disabled style="
+                    ">Initialize ONNX</button>
+                    <button id="vs-start-btn" style="
                         padding: 0.5rem 1rem;
                         background: var(--accent-secondary, #00aa00);
                         color: white;
@@ -165,7 +165,7 @@ export class VidStreamWindow {
                         align-self: center;
                         color: var(--text-secondary, #999);
                         font-size: 0.85rem;
-                    ">Not initialized</span>
+                    ">Preview mode (no inference)</span>
                 </div>
 
                 <!-- Video viewport -->
@@ -245,7 +245,7 @@ export class VidStreamWindow {
         // Close
         closeBtn?.addEventListener('click', () => this.hide());
 
-        // Initialize engine
+        // Initialize engine (optional - enables inference)
         initBtn?.addEventListener('click', async () => {
             const input = this.window?.querySelector('#vs-model-path') as HTMLInputElement;
             const modelPath = input.value.trim();
@@ -257,20 +257,20 @@ export class VidStreamWindow {
                 await this.initializeEngine({ model_path: modelPath });
                 const status = this.window?.querySelector('#vs-status');
                 if (status) {
-                    status.textContent = '✓ Ready';
+                    status.textContent = '✓ Inference ready';
                     status.style.color = '#0a0';
                 }
-                startBtn.disabled = false;
-                log(SEG.INGEST, 'VidStream engine initialized');
+                log(SEG.INGEST, 'VidStream ONNX engine initialized');
             } catch (err) {
                 const status = this.window?.querySelector('#vs-status');
                 if (status) {
                     status.textContent = `✗ ${err}`;
                     status.style.color = '#a00';
                 }
+                log(SEG.INGEST, `ONNX init failed: ${err}`);
             } finally {
                 initBtn.disabled = false;
-                initBtn.textContent = 'Initialize';
+                initBtn.textContent = 'Initialize ONNX';
             }
         });
 
@@ -295,11 +295,6 @@ export class VidStreamWindow {
     }
 
     private async startCamera(): Promise<void> {
-        if (!this.engineReady) {
-            alert('Initialize engine first');
-            return;
-        }
-
         this.stream = await navigator.mediaDevices.getUserMedia({
             video: { width: 640, height: 480 },
             audio: false,
@@ -317,7 +312,8 @@ export class VidStreamWindow {
             };
         }
 
-        log(SEG.INGEST, 'Camera started');
+        const mode = this.engineReady ? 'with inference' : 'preview only';
+        log(SEG.INGEST, `Camera started (${mode})`);
     }
 
     private stopCamera(): void {
@@ -353,23 +349,29 @@ export class VidStreamWindow {
         // Draw video to canvas
         this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
 
-        // Get RGBA data
-        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        const frameData = Array.from(imageData.data);
+        // Only run inference if engine is ready
+        if (this.engineReady) {
+            // Get RGBA data
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const frameData = Array.from(imageData.data);
 
-        try {
-            const result = await invoke<ProcessResult>('vidstream_process_frame', {
-                frameData,
-                width: this.canvas.width,
-                height: this.canvas.height,
-                format: 'rgba8',
-                timestampUs: BigInt(Date.now() * 1000),
-            });
+            try {
+                const result = await invoke<ProcessResult>('vidstream_process_frame', {
+                    frameData,
+                    width: this.canvas.width,
+                    height: this.canvas.height,
+                    format: 'rgba8',
+                    timestampUs: BigInt(Date.now() * 1000),
+                });
 
-            this.drawDetections(result.detections);
-            this.updateStats(result, performance.now() - frameStart);
-        } catch (err) {
-            console.error('Frame processing error:', err);
+                this.drawDetections(result.detections);
+                this.updateStats(result, performance.now() - frameStart);
+            } catch (err) {
+                console.error('Frame processing error:', err);
+            }
+        } else {
+            // Preview mode - just update FPS
+            this.updatePreviewStats();
         }
 
         this.animationFrameId = requestAnimationFrame(() => this.processFrame());
@@ -417,6 +419,25 @@ export class VidStreamWindow {
             if (fpsEl) fpsEl.textContent = this.currentFPS.toString();
             if (latencyEl) latencyEl.textContent = this.avgLatency.toFixed(1);
             if (detectionsEl) detectionsEl.textContent = result.detections.length.toString();
+        }
+    }
+
+    private updatePreviewStats(): void {
+        this.frameCount++;
+        const now = Date.now();
+
+        if (now - this.lastStatsUpdate >= 1000) {
+            this.currentFPS = this.frameCount;
+            this.frameCount = 0;
+            this.lastStatsUpdate = now;
+
+            const fpsEl = this.window?.querySelector('#vs-fps');
+            const latencyEl = this.window?.querySelector('#vs-latency');
+            const detectionsEl = this.window?.querySelector('#vs-detections');
+
+            if (fpsEl) fpsEl.textContent = this.currentFPS.toString();
+            if (latencyEl) latencyEl.textContent = '-';
+            if (detectionsEl) detectionsEl.textContent = '-';
         }
     }
 
