@@ -12,11 +12,12 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	fuzzyBackend := s.builder.FuzzyBackend()
 	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust)
 
-	// Detect vidstream/ONNX availability (requires CGO build with vidstream)
+	// Detect vidstream/ONNX availability (requires CGO build with rustvideo tag)
+	vidstreamOptimized := vidstreamAvailable()
 	vidstreamBackend := "onnx"
-	vidstreamOptimized := true
-	// If vidstream is not compiled in, this will be set to false by build tags
-	// For now, assume available if CGO is enabled (vidstream requires CGO)
+	if !vidstreamOptimized {
+		vidstreamBackend = "unavailable"
+	}
 
 	// Create system capabilities message
 	msg := SystemCapabilitiesMessage{
