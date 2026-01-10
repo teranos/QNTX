@@ -14,6 +14,7 @@ import { apiFetch } from './api.ts';
 import { toast } from './toast';
 import { escapeHtml } from './html-utils.ts';
 import { log, SEG } from './logger';
+import { handleError } from './error-handler.ts';
 
 interface PluginInfo {
     name: string;
@@ -255,7 +256,7 @@ export class PluginPanel extends BasePanel {
             }
             this.serverHealth = await response.json();
         } catch (error) {
-            log.error(SEG.UI, 'Failed to fetch server health:', error);
+            handleError(error, 'Failed to fetch server health', { context: SEG.UI, silent: true });
             this.serverHealth = null;
         }
     }
@@ -279,7 +280,7 @@ export class PluginPanel extends BasePanel {
             this.plugins = data.plugins;
             log.debug(SEG.UI, 'Successfully loaded', this.plugins.length, 'plugins');
         } catch (error) {
-            log.error(SEG.UI, 'Failed to fetch plugins:', error);
+            handleError(error, 'Failed to fetch plugins', { context: SEG.UI, silent: true });
             this.plugins = [];
         }
     }
@@ -489,8 +490,7 @@ export class PluginPanel extends BasePanel {
             this.render();
             log.debug(SEG.UI, 'Plugin paused:', name);
         } catch (error) {
-            log.error(SEG.UI, 'Failed to pause plugin:', error);
-            toast.error(`Failed to pause plugin: ${error}`);
+            handleError(error, 'Failed to pause plugin', { context: SEG.UI });
         }
     }
 
@@ -511,8 +511,7 @@ export class PluginPanel extends BasePanel {
             this.render();
             log.debug(SEG.UI, 'Plugin resumed:', name);
         } catch (error) {
-            log.error(SEG.UI, 'Failed to resume plugin:', error);
-            toast.error(`Failed to resume plugin: ${error}`);
+            handleError(error, 'Failed to resume plugin', { context: SEG.UI });
         }
     }
 
@@ -576,7 +575,7 @@ export class PluginPanel extends BasePanel {
                 editingFields: new Set()
             };
         } catch (error) {
-            log.error(SEG.UI, 'Failed to fetch config:', pluginName, error);
+            handleError(error, `Failed to fetch config for ${pluginName}`, { context: SEG.UI, silent: true });
             this.configState = {
                 pluginName,
                 currentConfig: {},
@@ -812,7 +811,7 @@ export class PluginPanel extends BasePanel {
             await this.fetchPlugins();
             this.render();
         } catch (error) {
-            log.error(SEG.UI, 'Failed to save config:', error);
+            handleError(error, 'Failed to save config', { context: SEG.UI, silent: true });
 
             // Set error in config state and reset confirmation
             if (this.configState) {

@@ -5,6 +5,7 @@
  */
 
 import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 import type {
   Execution,
   ListExecutionsResponse,
@@ -36,7 +37,7 @@ async function safeFetch(url: string, options?: RequestInit): Promise<Response> 
     return response;
   } catch (error) {
     // Network error (connection refused, DNS failure, etc.)
-    log.error(SEG.PULSE, "Network error:", error);
+    handleError(error, 'Network error: Unable to connect to server', { context: SEG.PULSE, silent: true });
     throw new Error('Network error: Unable to connect to server. Please check your connection.');
   }
 }
