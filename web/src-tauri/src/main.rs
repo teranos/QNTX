@@ -24,6 +24,10 @@ use qntx::types::{
     server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
 };
 
+// Video processing module (desktop-only)
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+mod vidstream;
+
 const SERVER_PORT: &str = "877";
 
 struct ServerState {
@@ -344,6 +348,10 @@ fn main() {
                     child: Arc::new(Mutex::new(Some(child))),
                     port: SERVER_PORT.to_string(),
                 });
+
+                // Initialize video processing state (desktop only)
+                #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                app.manage(vidstream::VideoEngineState::new());
 
                 // Set up deep link handler for macOS (events) and check startup URL
                 // On Windows/Linux, deep links come through single-instance CLI args
@@ -708,7 +716,14 @@ fn main() {
             notify_storage_warning,
             notify_server_draining,
             notify_server_stopped,
-            set_taskbar_progress
+            set_taskbar_progress,
+            // Video processing (desktop only)
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_init,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_process_frame,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_get_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
