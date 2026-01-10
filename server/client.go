@@ -221,6 +221,10 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleJobControl(*msg)
 	case "visibility": // Phase 2: Handle visibility preference updates
 		c.handleVisibility(*msg)
+	case "vidstream_init":
+		c.handleVidStreamInit(*msg)
+	case "vidstream_frame":
+		c.handleVidStreamFrame(*msg)
 	case "ping":
 		// Just update deadline, handled by pong handler
 	default:
