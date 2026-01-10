@@ -4,7 +4,7 @@
  * Provides functions to fetch execution records, logs, and history
  */
 
-import { debugLog, debugError } from "../debug.ts";
+import { log, SEG } from "../logger";
 import type {
   Execution,
   ListExecutionsResponse,
@@ -36,7 +36,7 @@ async function safeFetch(url: string, options?: RequestInit): Promise<Response> 
     return response;
   } catch (error) {
     // Network error (connection refused, DNS failure, etc.)
-    debugError("[Execution API] Network error:", error);
+    log.error(SEG.PULSE, "Network error:", error);
     throw new Error('Network error: Unable to connect to server. Please check your connection.');
   }
 }
@@ -64,18 +64,18 @@ export async function listExecutions(
   }
 
   const url = `${getBaseUrl()}/jobs/${jobId}/executions?${searchParams}`;
-  debugLog("[Execution API] Listing executions:", { jobId, params, url });
+  log.debug(SEG.PULSE, "Listing executions:", { jobId, params, url });
 
   const response = await safeFetch(url);
 
   if (!response.ok) {
     const error = `Failed to list executions: ${response.statusText}`;
-    debugError("[Execution API] List failed:", error);
+    log.error(SEG.PULSE, "List failed:", error);
     throw new Error(error);
   }
 
   const data = await response.json();
-  debugLog("[Execution API] Listed executions:", {
+  log.debug(SEG.PULSE, "Listed executions:", {
     count: data.count,
     total: data.total,
     has_more: data.has_more,
@@ -94,7 +94,7 @@ export async function getExecution(
   executionId: string
 ): Promise<Execution> {
   const url = `${getBaseUrl()}/executions/${executionId}`;
-  debugLog("[Execution API] Getting execution:", { executionId, url });
+  log.debug(SEG.PULSE, "Getting execution:", { executionId, url });
 
   const response = await safeFetch(url);
 
@@ -103,12 +103,12 @@ export async function getExecution(
       throw new Error("Execution not found");
     }
     const error = `Failed to get execution: ${response.statusText}`;
-    debugError("[Execution API] Get failed:", error);
+    log.error(SEG.PULSE, "Get failed:", error);
     throw new Error(error);
   }
 
   const data = await response.json();
-  debugLog("[Execution API] Got execution:", {
+  log.debug(SEG.PULSE, "Got execution:", {
     id: data.id,
     status: data.status,
     duration_ms: data.duration_ms,
@@ -127,7 +127,7 @@ export async function getExecutionLogs(
   executionId: string
 ): Promise<string> {
   const url = `${getBaseUrl()}/executions/${executionId}/logs`;
-  debugLog("[Execution API] Getting logs:", { executionId, url });
+  log.debug(SEG.PULSE, "Getting logs:", { executionId, url });
 
   const response = await safeFetch(url);
 
@@ -136,12 +136,12 @@ export async function getExecutionLogs(
       throw new Error("No logs available");
     }
     const error = `Failed to get logs: ${response.statusText}`;
-    debugError("[Execution API] Get logs failed:", error);
+    log.error(SEG.PULSE, "Get logs failed:", error);
     throw new Error(error);
   }
 
   const logs = await response.text();
-  debugLog("[Execution API] Got logs:", { length: logs.length });
+  log.debug(SEG.PULSE, "Got logs:", { length: logs.length });
 
   return logs;
 }
@@ -200,23 +200,23 @@ export function getStatusColorClass(status: string): string {
  */
 export async function getJobStages(jobId: string): Promise<JobStagesResponse> {
   const url = `${getBaseUrl()}/jobs/${jobId}/stages`;
-  debugLog("[Execution API] Getting job stages:", { jobId, url });
+  log.debug(SEG.PULSE, "Getting job stages:", { jobId, url });
 
   const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
       // Return empty stages instead of throwing - job may not have logs yet
-      debugLog("[Execution API] No stages found for job:", jobId);
+      log.debug(SEG.PULSE, "No stages found for job:", jobId);
       return { job_id: jobId, stages: [] };
     }
     const error = `Failed to get job stages: ${response.statusText}`;
-    debugError("[Execution API] Get stages failed:", error);
+    log.error(SEG.PULSE, "Get stages failed:", error);
     throw new Error(error);
   }
 
   const data = await response.json();
-  debugLog("[Execution API] Got stages:", {
+  log.debug(SEG.PULSE, "Got stages:", {
     job_id: data.job_id,
     stage_count: data.stages.length,
   });
@@ -232,7 +232,7 @@ export async function getJobStages(jobId: string): Promise<JobStagesResponse> {
  */
 export async function getTaskLogs(taskId: string): Promise<TaskLogsResponse> {
   const url = `${getBaseUrl()}/tasks/${taskId}/logs`;
-  debugLog("[Execution API] Getting task logs:", { taskId, url });
+  log.debug(SEG.PULSE, "Getting task logs:", { taskId, url });
 
   const response = await safeFetch(url);
 
@@ -241,12 +241,12 @@ export async function getTaskLogs(taskId: string): Promise<TaskLogsResponse> {
       throw new Error("Task not found or has no logs");
     }
     const error = `Failed to get task logs: ${response.statusText}`;
-    debugError("[Execution API] Get logs failed:", error);
+    log.error(SEG.PULSE, "Get logs failed:", error);
     throw new Error(error);
   }
 
   const data = await response.json();
-  debugLog("[Execution API] Got task logs:", {
+  log.debug(SEG.PULSE, "Got task logs:", {
     task_id: data.task_id,
     log_count: data.logs.length,
   });
@@ -266,7 +266,7 @@ export async function getTaskLogsForJob(
   taskId: string
 ): Promise<TaskLogsResponse> {
   const url = `${getBaseUrl()}/jobs/${jobId}/tasks/${taskId}/logs`;
-  debugLog("[Execution API] Getting task logs for job:", { jobId, taskId, url });
+  log.debug(SEG.PULSE, "Getting task logs for job:", { jobId, taskId, url });
 
   const response = await safeFetch(url);
 
@@ -275,12 +275,12 @@ export async function getTaskLogsForJob(
       throw new Error("Task not found or has no logs");
     }
     const error = `Failed to get task logs: ${response.statusText}`;
-    debugError("[Execution API] Get logs failed:", error);
+    log.error(SEG.PULSE, "Get logs failed:", error);
     throw new Error(error);
   }
 
   const data = await response.json();
-  debugLog("[Execution API] Got task logs:", {
+  log.debug(SEG.PULSE, "Got task logs:", {
     job_id: jobId,
     task_id: data.task_id,
     log_count: data.logs.length,
@@ -299,23 +299,23 @@ export async function getJobChildren(
   jobId: string
 ): Promise<JobChildrenResponse> {
   const url = `${getBaseUrl()}/jobs/${jobId}/children`;
-  debugLog("[Execution API] Getting child jobs:", { jobId, url });
+  log.debug(SEG.PULSE, "Getting child jobs:", { jobId, url });
 
   const response = await safeFetch(url);
 
   if (!response.ok) {
     if (response.status === 404) {
       // Return empty children instead of throwing - job may not have children
-      debugLog("[Execution API] No children found for job:", jobId);
+      log.debug(SEG.PULSE, "No children found for job:", jobId);
       return { parent_job_id: jobId, children: [] };
     }
     const error = `Failed to get child jobs: ${response.statusText}`;
-    debugError("[Execution API] Get children failed:", error);
+    log.error(SEG.PULSE, "Get children failed:", error);
     throw new Error(error);
   }
 
   const data = await response.json();
-  debugLog("[Execution API] Got child jobs:", {
+  log.debug(SEG.PULSE, "Got child jobs:", {
     parent_job_id: data.parent_job_id,
     child_count: data.children.length,
   });
