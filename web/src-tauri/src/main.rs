@@ -273,12 +273,12 @@ fn main() {
                 Some(vec!["--minimized"]),
             ))
             .plugin(tauri_plugin_deep_link::init());
-    }
 
-    // Desktop camera plugin
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    {
-        builder = builder.plugin(crabcamera::init());
+        // Camera plugin (desktop only, not Android either)
+        #[cfg(not(target_os = "android"))]
+        {
+            builder = builder.plugin(crabcamera::init());
+        }
     }
 
     builder
