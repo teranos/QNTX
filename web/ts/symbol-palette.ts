@@ -127,7 +127,7 @@ function setActiveModality(cmd: string): void {
         activeCell.classList.add('active');
     }
 
-    log.debug(SEG.UI, `Modality set to: ${cmd}`);
+    log.debug(SEG.SELF, `Modality set to: ${cmd}`);
 }
 
 // Export for use by other modules
@@ -144,7 +144,7 @@ function handleSymbolClick(e: Event): void {
     if (!cmd) return;
 
     const symbol = getSymbol(cmd);
-    log.debug(SEG.UI, `${symbol} (${cmd}) clicked`);
+    log.debug(SEG.SELF, `${symbol} (${cmd}) clicked`);
 
     // Set as active modality (color inversion)
     setActiveModality(cmd);
@@ -236,7 +236,7 @@ function activateSearchMode(mode: string): void {
     if (queryInput) {
         queryInput.focus();
         queryInput.select();
-        log.debug(SEG.UI, `${getSymbol(mode)} search mode activated`);
+        log.debug(SEG.SELF, `${getSymbol(mode)} search mode activated`);
     }
 }
 
@@ -312,7 +312,7 @@ async function activateIngestMode(mode: string): Promise<void> {
     // Show job list panel (IMPLEMENTED)
     const { toggleJobList } = await import('./hixtory-panel.js');
     toggleJobList();
-    log.debug(SEG.UI, `${getSymbol(mode)} ingest mode - showing job list`);
+    log.debug(SEG.SELF, `${getSymbol(mode)} ingest mode - showing job list`);
 }
 
 /**
@@ -327,7 +327,7 @@ function activateAttestationMode(mode: string): void {
             queryInput.value = 'is ';
             queryInput.selectionStart = queryInput.value.length;
         }
-        log.debug(SEG.UI, `${getSymbol(mode)} attestation mode activated`);
+        log.debug(SEG.SELF, `${getSymbol(mode)} attestation mode activated`);
     }
 }
 
@@ -351,7 +351,7 @@ function insertSegment(segment: string): void {
     queryInput.value = text.substring(0, start) + newSegment + text.substring(end);
     queryInput.selectionStart = queryInput.selectionEnd = start + newSegment.length;
 
-    log.debug(SEG.UI, `${getSymbol(segment)} segment inserted`);
+    log.debug(SEG.SELF, `${getSymbol(segment)} segment inserted`);
 }
 
 /**
@@ -364,7 +364,7 @@ function insertSegment(segment: string): void {
  * Currently logs intent; actual implementation will emerge as use cases clarify.
  */
 function handleSoCommand(_cmd: string): void {
-    log.debug(SEG.UI, `${SO} (so/therefore) - consequent action triggered`);
+    log.debug(SEG.SELF, `${SO} (so/therefore) - consequent action triggered`);
 
     // Placeholder for future implementation
     // Possible behaviors:

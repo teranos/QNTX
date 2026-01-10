@@ -347,7 +347,7 @@ class WebscraperPanel extends BasePanel {
             } as ScrapeResult & { _richError: RichError });
         }
 
-        log.debug(SEG.UI, 'Sent scrape request', request);
+        log.debug(SEG.INGEST, 'Sent scrape request', request);
     }
 
     private startScraping(url: string): void {
@@ -555,7 +555,7 @@ class WebscraperPanel extends BasePanel {
      * Handle webscraper response from server
      */
     public handleScraperResponse(data: any): void {
-        log.debug(SEG.UI, 'Received scraper response', data);
+        log.debug(SEG.INGEST, 'Received scraper response', data);
 
         this.stopScraping();
 
