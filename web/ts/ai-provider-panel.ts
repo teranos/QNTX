@@ -8,6 +8,7 @@
 import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
 import { BY } from '@generated/sym.js';
+import { log, SEG } from './logger';
 
 interface ConfigResponse {
     config_file?: string;
@@ -137,7 +138,7 @@ class AIProviderPanel extends BasePanel {
             }
             this.appConfig = await response.json();
         } catch (error) {
-            console.error('[AI Provider Panel] Failed to fetch config:', error);
+            log.error('by', 'Failed to fetch config:', error);
         }
     }
 
@@ -163,7 +164,7 @@ class AIProviderPanel extends BasePanel {
     }
 
     private async switchToOpenRouter(): Promise<void> {
-        console.log('[AI Provider Panel] Switching to OpenRouter');
+        log.debug(SEG.ACTOR, 'Switching to OpenRouter');
 
         this.updateProviderUI('openrouter');
 
@@ -174,13 +175,13 @@ class AIProviderPanel extends BasePanel {
 
             this.updateStatus('Using OpenRouter (cloud API)', 'success');
         } catch (error) {
-            console.error('[AI Provider Panel] Failed to switch to OpenRouter:', error);
+            log.error(SEG.ACTOR, 'Failed to switch to OpenRouter:', error);
             this.updateStatus('Failed to update config', 'error');
         }
     }
 
     private async switchToOllama(): Promise<void> {
-        console.log('[AI Provider Panel] Switching to Ollama');
+        log.debug(SEG.ACTOR, 'Switching to Ollama');
 
         this.updateProviderUI('ollama');
 
@@ -195,13 +196,13 @@ class AIProviderPanel extends BasePanel {
 
             this.updateStatus(`Using Ollama (${model})`, 'success');
         } catch (error) {
-            console.error('[AI Provider Panel] Failed to switch to Ollama:', error);
+            log.error(SEG.ACTOR, 'Failed to switch to Ollama:', error);
             this.updateStatus('Failed to update config - is Ollama running?', 'error');
         }
     }
 
     private async updateOllamaModel(model: string): Promise<void> {
-        console.log('[AI Provider Panel] Updating Ollama model to:', model);
+        log.debug(SEG.ACTOR, 'Updating Ollama model to:', model);
 
         try {
             await this.updateConfig({
@@ -210,7 +211,7 @@ class AIProviderPanel extends BasePanel {
 
             this.updateStatus(`Using Ollama (${model})`, 'success');
         } catch (error) {
-            console.error('[AI Provider Panel] Failed to update Ollama model:', error);
+            log.error(SEG.ACTOR, 'Failed to update Ollama model:', error);
             this.updateStatus('Failed to update model', 'error');
         }
     }
@@ -307,7 +308,7 @@ class AIProviderPanel extends BasePanel {
             keyInput.value = ''; // Clear the input
             keyInput.placeholder = apiKey.substring(0, 10) + '...(configured)';
         } catch (error) {
-            console.error('[AI Provider Panel] Failed to save API key:', error);
+            log.error(SEG.ACTOR, 'Failed to save API key:', error);
             this.updateStatus('Failed to save API key', 'error');
         }
     }
@@ -348,7 +349,7 @@ class AIProviderPanel extends BasePanel {
                 ollamaStatus.textContent = 'Offline';
             }
 
-            console.log('[AI Provider Panel] Ollama not available:', error);
+            log.debug(SEG.ACTOR, 'Ollama not available:', error);
         }
     }
 }
