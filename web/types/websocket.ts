@@ -406,6 +406,8 @@ export interface SystemCapabilitiesMessage extends BaseMessage {
   type: 'system_capabilities';
   fuzzy_backend: 'go' | 'rust';
   fuzzy_optimized: boolean;
+  vidstream_backend: 'onnx' | 'unavailable';
+  vidstream_optimized: boolean;
 }
 
 /**

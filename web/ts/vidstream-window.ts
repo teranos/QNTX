@@ -11,8 +11,8 @@
  * TODO: Remove bypass once CrabCamera implements ACL (watch releases)
  */
 
-import { invoke } from '@tauri-apps/api/core';
 import { debug, info, error, SEG } from './logger.ts';
+import { sendMessage, registerHandler } from './websocket.ts';
 
 interface VidStreamConfig {
     model_path: string;
@@ -31,18 +31,6 @@ interface Detection {
         y: number;
         width: number;
         height: number;
-    };
-}
-
-interface ProcessResult {
-    detections: Detection[];
-    stats: {
-        preprocess_us: number;
-        inference_us: number;
-        postprocess_us: number;
-        total_us: number;
-        detections_raw: number;
-        detections_final: number;
     };
 }
 
@@ -69,6 +57,31 @@ export class VidStreamWindow {
 
     constructor() {
         this.createWindow();
+        this.setupMessageHandlers();
+    }
+
+    private setupMessageHandlers(): void {
+        // Handle engine initialization response
+        registerHandler('vidstream_init_success', (data: any) => {
+            this.engineReady = true;
+            debug(SEG.VID, 'Engine ready:', data);
+        });
+
+        registerHandler('vidstream_init_error', (data: any) => {
+            error(SEG.VID, 'Engine init error:', data.error);
+            this.showError(data.error);
+        });
+
+        // Handle frame processing response
+        registerHandler('vidstream_detections', (data: any) => {
+            this.drawDetections(data.detections);
+            const totalMs = data.stats.total_us / 1000;
+            this.updateStatsFromServer(data.detections.length, totalMs);
+        });
+
+        registerHandler('vidstream_frame_error', (data: any) => {
+            error(SEG.VID, 'Frame processing error:', data.error);
+        });
     }
 
     private createWindow(): void {
@@ -218,66 +231,42 @@ export class VidStreamWindow {
     }
 
     private async initializeEngine(config: VidStreamConfig): Promise<void> {
-        const result = await invoke('vidstream_init', { config });
-        this.engineReady = true;
-        debug(SEG.VID, 'Engine ready:', result);
+        const sent = sendMessage({
+            type: 'vidstream_init',
+            model_path: config.model_path,
+            confidence_threshold: config.confidence_threshold || 0.5,
+            nms_threshold: config.nms_threshold || 0.45,
+        });
+
+        if (!sent) {
+            throw new Error('WebSocket not connected');
+        }
+
+        debug(SEG.VID, 'Sent vidstream_init message');
     }
 
     private async startCamera(): Promise<void> {
         debug(SEG.VID, 'startCamera() called');
 
-        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
         this.canvas = this.window?.querySelector('#vs-canvas') as HTMLCanvasElement;
         this.ctx = this.canvas?.getContext('2d') || null;
 
         try {
-            if (isTauri) {
-                // Desktop mode: Use CrabCamera 0.7 plugin
-                debug(SEG.VID, 'Using CrabCamera 0.7 plugin for native camera access');
+            // Browser mode: Use MediaDevices API
+            debug(SEG.VID, 'Using browser MediaDevices API');
 
-                // Get available cameras
-                const cameras = await invoke<any[]>('plugin:crabcamera|get_available_cameras');
-                debug(SEG.VID, 'Available cameras:', cameras);
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 },
+                audio: false,
+            });
 
-                if (cameras.length === 0) {
-                    throw new Error('No cameras found');
-                }
-
-                // Use first camera
-                const camera = cameras[0];
-                debug(SEG.VID, 'Initializing camera:', camera);
-
-                // Initialize camera system
-                await invoke('plugin:crabcamera|initialize_camera_system', {
-                    device_id: camera.id,
-                    format: {
-                        width: 640,
-                        height: 480,
-                        fps: 30.0
-                    }
-                });
-
-                info(SEG.VID, 'CrabCamera 0.7 initialized successfully');
-                this.startProcessing();
-
-            } else {
-                // Browser mode: Use MediaDevices API
-                debug(SEG.VID, 'Using browser MediaDevices API');
-
-                this.stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 },
-                    audio: false,
-                });
-
-                this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
-                if (this.video) {
-                    this.video.srcObject = this.stream;
-                    this.video.onloadedmetadata = () => {
-                        this.video?.play();
-                        this.startProcessing();
-                    };
-                }
+            this.video = this.window?.querySelector('#vs-video') as HTMLVideoElement;
+            if (this.video) {
+                this.video.srcObject = this.stream;
+                this.video.onloadedmetadata = () => {
+                    this.video?.play();
+                    this.startProcessing();
+                };
             }
 
             const mode = this.engineReady ? 'with inference' : 'preview only';
@@ -296,25 +285,14 @@ export class VidStreamWindow {
 
         this.isProcessing = false;
 
-        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+        // Browser: Stop MediaStream
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
 
-        if (isTauri) {
-            // Desktop: Release CrabCamera
-            try {
-                await invoke('plugin:crabcamera|release_camera');
-            } catch (err) {
-                error(SEG.VID, 'Error releasing camera', err);
-            }
-        } else {
-            // Browser: Stop MediaStream
-            if (this.stream) {
-                this.stream.getTracks().forEach(track => track.stop());
-                this.stream = null;
-            }
-
-            if (this.video) {
-                this.video.srcObject = null;
-            }
+        if (this.video) {
+            this.video.srcObject = null;
         }
 
         info(SEG.VID, 'Camera stopped');
@@ -329,70 +307,42 @@ export class VidStreamWindow {
     private async processFrame(): Promise<void> {
         if (!this.isProcessing || !this.canvas || !this.ctx) return;
 
-        const frameStart = performance.now();
-        const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
         try {
-            if (isTauri) {
-                // Desktop: Capture frame from CrabCamera
-                const photo = await invoke<any>('plugin:crabcamera|capture_single_photo', {
-                    quality: 0.9
-                });
+            // Browser: Draw from video element
+            if (!this.video) return;
 
-                // photo.data is base64 encoded image
-                const img = new Image();
-                img.onload = async () => {
-                    this.ctx!.drawImage(img, 0, 0, this.canvas!.width, this.canvas!.height);
+            this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
 
-                    // Run inference if engine ready
-                    if (this.engineReady) {
-                        await this.runInference(frameStart);
-                    } else {
-                        this.updatePreviewStats();
-                    }
-
-                    // Continue loop
-                    this.animationFrameId = requestAnimationFrame(() => this.processFrame());
-                };
-                img.src = `data:image/jpeg;base64,${photo.data}`;
-
+            if (this.engineReady) {
+                await this.runInference();
             } else {
-                // Browser: Draw from video element
-                if (!this.video) return;
-
-                this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-                if (this.engineReady) {
-                    await this.runInference(frameStart);
-                } else {
-                    this.updatePreviewStats();
-                }
-
-                this.animationFrameId = requestAnimationFrame(() => this.processFrame());
+                this.updatePreviewStats();
             }
+
+            this.animationFrameId = requestAnimationFrame(() => this.processFrame());
         } catch (err) {
             error(SEG.VID, 'Frame processing error', err);
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
         }
     }
 
-    private async runInference(frameStart: number): Promise<void> {
+    private async runInference(): Promise<void> {
         if (!this.ctx || !this.canvas) return;
 
         const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        const frameData = Array.from(imageData.data);
 
         try {
-            const result = await invoke<ProcessResult>('vidstream_process_frame', {
-                frameData,
+            const sent = sendMessage({
+                type: 'vidstream_frame',
+                frame_data: Array.from(imageData.data),
                 width: this.canvas.width,
                 height: this.canvas.height,
                 format: 'rgba8',
-                timestampUs: BigInt(Date.now() * 1000),
             });
 
-            this.drawDetections(result.detections);
-            this.updateStats(result, performance.now() - frameStart);
+            if (!sent) {
+                error(SEG.VID, 'Failed to send frame: WebSocket not connected');
+            }
         } catch (err) {
             error(SEG.VID, 'Inference error', err);
         }
@@ -423,13 +373,13 @@ export class VidStreamWindow {
         });
     }
 
-    private updateStats(result: ProcessResult, totalMs: number): void {
+    private updateStatsFromServer(detectionCount: number, latencyMs: number): void {
         this.frameCount++;
         const now = Date.now();
 
         if (now - this.lastStatsUpdate >= 1000) {
             this.currentFPS = this.frameCount;
-            this.avgLatency = totalMs;
+            this.avgLatency = latencyMs;
             this.frameCount = 0;
             this.lastStatsUpdate = now;
 
@@ -439,7 +389,7 @@ export class VidStreamWindow {
 
             if (fpsEl) fpsEl.textContent = this.currentFPS.toString();
             if (latencyEl) latencyEl.textContent = this.avgLatency.toFixed(1);
-            if (detectionsEl) detectionsEl.textContent = result.detections.length.toString();
+            if (detectionsEl) detectionsEl.textContent = detectionCount.toString();
         }
     }
 
