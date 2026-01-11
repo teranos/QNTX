@@ -83,6 +83,15 @@ func (c *Client) handleVidStreamFrame(msg QueryMessage) {
 		return
 	}
 
+	// Validate frame dimensions before casting to uint32
+	if msg.Width <= 0 || msg.Width > 4096 || msg.Height <= 0 || msg.Height > 4096 {
+		c.sendMsg <- map[string]interface{}{
+			"type":  "vidstream_frame_error",
+			"error": fmt.Sprintf("Invalid frame dimensions: %dx%d (must be 1-4096)", msg.Width, msg.Height),
+		}
+		return
+	}
+
 	// Parse format
 	var format vidstream.FrameFormat
 	switch msg.Format {

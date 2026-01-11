@@ -34,7 +34,7 @@ import { handleError } from './error-handler.ts';
 
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
-import { toggleAIProvider } from './ai-provider-panel.js';
+import { toggleAIProvider } from './ai-provider-window.js';
 import { togglePulsePanel } from './pulse-panel.js';
 import { toggleProsePanel } from './prose/panel.js';
 import { toggleGoEditor } from './code/panel.js';

@@ -380,7 +380,9 @@ class AIProviderPanel {
             this.updateStatus('ONNX model path saved', 'success');
         } catch (error) {
             handleError(error, 'Failed to save ONNX model path', { context: SEG.ACTOR, silent: true });
-            this.updateStatus('Failed to save model path', 'error');
+            // Extract error message from Error object to show server-side error details
+            const errorMsg = error instanceof Error ? error.message : 'Failed to save model path';
+            this.updateStatus(errorMsg, 'error');
         }
     }
 

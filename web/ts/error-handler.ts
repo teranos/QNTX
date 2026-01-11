@@ -39,7 +39,7 @@
  *   - pulse/panel-state.ts (2 catch blocks)
  *   - pulse/realtime-handlers.ts (1 catch block)
  *   - pulse/execution-api.ts (1 catch block)
- *   - ai-provider-panel.ts (6 catch blocks)
+ *   - ai-provider-window.ts (6 catch blocks)
  *   - plugin-panel.ts (7 catch blocks)
  *   - config-panel.ts (2 catch blocks)
  *   - code/panel.ts (7 catch blocks)
