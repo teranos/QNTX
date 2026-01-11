@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -167,11 +166,9 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 // Helper functions for conversion
 
 func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
-	var attributes map[string]interface{}
-	if proto.AttributesJson != "" {
-		if err := json.Unmarshal([]byte(proto.AttributesJson), &attributes); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal attributes")
-		}
+	attributes, err := attributesFromJSON(proto.AttributesJson)
+	if err != nil {
+		return nil, err
 	}
 
 	return &types.As{
@@ -188,13 +185,9 @@ func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
 }
 
 func attestationToProto(as *types.As) (*protocol.Attestation, error) {
-	var attributesJSON string
-	if len(as.Attributes) > 0 {
-		bytes, err := json.Marshal(as.Attributes)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal attributes")
-		}
-		attributesJSON = string(bytes)
+	attributesJSON, err := attributesToJSON(as.Attributes)
+	if err != nil {
+		return nil, err
 	}
 
 	return &protocol.Attestation{
@@ -211,11 +204,9 @@ func attestationToProto(as *types.As) (*protocol.Attestation, error) {
 }
 
 func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
-	var attributes map[string]interface{}
-	if proto.AttributesJson != "" {
-		if err := json.Unmarshal([]byte(proto.AttributesJson), &attributes); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal attributes")
-		}
+	attributes, err := attributesFromJSON(proto.AttributesJson)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := time.Now()
