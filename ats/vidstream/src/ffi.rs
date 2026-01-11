@@ -163,7 +163,10 @@ impl VideoResultC {
 pub extern "C" fn video_engine_new() -> *mut VideoEngine {
     match VideoEngine::new(VideoEngineConfig::default()) {
         Ok(engine) => Box::into_raw(Box::new(engine)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("[vidstream] Failed to create engine: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -218,7 +221,10 @@ pub extern "C" fn video_engine_new_with_config(
 
     match VideoEngine::new(rust_config) {
         Ok(engine) => Box::into_raw(Box::new(engine)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("[vidstream] Failed to create engine: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
