@@ -368,7 +368,7 @@ pub struct PulseExecutionStartedMessage {
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#querymessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueryMessage {
-    /// "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility"
+    /// "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame"
     pub r#type: String,
     /// The Ax query text (can be multi-line)
     pub query: String,
@@ -401,6 +401,20 @@ pub struct QueryMessage {
     pub node_type: String,
     /// For visibility messages: whether to hide the node type/isolated nodes
     pub hidden: bool,
+    /// VidStream fields (for vidstream_init and vidstream_frame messages)
+    pub model_path: String,
+    /// For vidstream_init: detection confidence threshold
+    pub confidence_threshold: f32,
+    /// For vidstream_init: NMS IoU threshold
+    pub nms_threshold: f32,
+    /// For vidstream_frame: raw frame bytes (RGBA)
+    pub frame_data: Vec<u8>,
+    /// For vidstream_frame: frame width
+    pub width: i64,
+    /// For vidstream_frame: frame height
+    pub height: i64,
+    /// For vidstream_frame: "rgba8", "rgb8", etc.
+    pub format: String,
 }
 
 /// ScheduledJobResponse represents a scheduled job in API responses
@@ -485,6 +499,12 @@ pub struct SystemCapabilitiesMessage {
     pub fuzzy_backend: String,
     /// true if using Rust (optimized), false if Go fallback
     pub fuzzy_optimized: bool,
+    #[serde(rename = "vidstream_backend")]
+    /// "onnx" or "unavailable" - video inference availability
+    pub vid_stream_backend: String,
+    #[serde(rename = "vidstream_optimized")]
+    /// true if ONNX Runtime available (CGO build)
+    pub vid_stream_optimized: bool,
 }
 
 /// TaskInfo represents a task within a stage

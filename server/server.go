@@ -10,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ai/tracker"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
+	"github.com/teranos/QNTX/ats/vidstream/vidstream"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -55,6 +56,10 @@ type QNTXServer struct {
 	pluginManager       *grpcplugin.PluginManager   // External plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
+
+	// VidStream real-time video inference (browser → WS → ONNX)
+	vidstreamEngine *vidstream.VideoEngine // Singleton video processing engine
+	vidstreamMu     sync.Mutex             // Protects vidstream engine operations
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown

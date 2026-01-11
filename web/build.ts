@@ -44,8 +44,8 @@ try {
   await Bun.build({
     entrypoints: [join(sourceDir, "ts", "main.ts")],
     outdir: join(outputDir, "js"),
-    minify: true,
-    sourcemap: "none",
+    minify: false,
+    sourcemap: "inline",
     splitting: false, // Disable code splitting to ensure single bundle
     // Define aliases to force single instance of CodeMirror modules
     external: [], // Bundle everything, don't externalize anything

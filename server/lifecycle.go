@@ -234,6 +234,15 @@ func (s *QNTXServer) Stop() error {
 		}
 	}
 
+	// Clean up VidStream engine (ONNX resources)
+	s.vidstreamMu.Lock()
+	if s.vidstreamEngine != nil {
+		s.vidstreamEngine.Close()
+		s.vidstreamEngine = nil
+		s.logger.Infow("VidStream engine closed")
+	}
+	s.vidstreamMu.Unlock()
+
 	// Opening/Closing Phase 4: Mark shutdown complete
 	s.setState(ServerStateStopped)
 

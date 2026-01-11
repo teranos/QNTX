@@ -26,7 +26,7 @@ import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
-import './ai-provider-panel.ts';
+import './ai-provider-window.ts';
 import './command-explorer-panel.ts';
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
