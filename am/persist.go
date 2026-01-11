@@ -164,6 +164,28 @@ func UpdateLocalInferenceModel(model string) error {
 	return saveUIConfig(config, configPath)
 }
 
+// UpdateLocalInferenceONNXModelPath updates the local_inference.onnx_model_path setting in UI config
+func UpdateLocalInferenceONNXModelPath(path string) error {
+	config, configPath, err := loadOrInitializeUIConfig()
+	if err != nil {
+		return err
+	}
+
+	// Get or create local_inference section
+	var localInference map[string]interface{}
+	if li, ok := config["local_inference"].(map[string]interface{}); ok {
+		localInference = li
+	} else {
+		localInference = make(map[string]interface{})
+	}
+
+	// Update onnx_model_path field
+	localInference["onnx_model_path"] = path
+	config["local_inference"] = localInference
+
+	return saveUIConfig(config, configPath)
+}
+
 // UpdatePulseDailyBudget updates the daily budget in UI config
 func UpdatePulseDailyBudget(dailyBudget float64) error {
 	config, configPath, err := loadOrInitializeUIConfig()
