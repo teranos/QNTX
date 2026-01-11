@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/schedule"

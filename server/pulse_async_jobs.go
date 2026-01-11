@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
