@@ -1,13 +1,14 @@
 package geotime
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // Timezone compatibility scoring constants for evaluating timezone proximity
@@ -223,7 +224,7 @@ func NormalizeTimezone(input string) (string, error) {
 		return tz, nil
 	}
 
-	return "", fmt.Errorf("unknown timezone: %s", input)
+	return "", errors.Newf("unknown timezone: %s", input)
 }
 
 // GuessTimezoneFromLocation uses keyword heuristics to derive a timezone.
@@ -354,7 +355,7 @@ func readZoneinfoSymlink(path string) (string, error) {
 	if isValidTimezone(candidate) {
 		return candidate, nil
 	}
-	return "", fmt.Errorf("invalid timezone: %q (from %s)", candidate, path)
+	return "", errors.Newf("invalid timezone: %q (from %s)", candidate, path)
 }
 
 func sanitizeTimezone(tz string) string {
@@ -428,7 +429,7 @@ func hasIncorrectCapitalization(tz string) bool {
 // ValidateTimezone ensures the timezone string maps to a valid IANA entry.
 func ValidateTimezone(tz string) error {
 	if !isValidTimezone(tz) {
-		return fmt.Errorf("invalid timezone: %s", tz)
+		return errors.Newf("invalid timezone: %s", tz)
 	}
 	return nil
 }
