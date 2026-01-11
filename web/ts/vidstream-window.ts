@@ -15,13 +15,14 @@ import { debug, info, error, SEG } from './logger.ts';
 import { sendMessage, registerHandler } from './websocket.ts';
 import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
+import type { QueryMessage } from '@generated/server.js';
 
+// VidStream configuration (subset of QueryMessage fields for vidstream_init)
+// All fields optional since we provide defaults
 interface VidStreamConfig {
     model_path: string;
     confidence_threshold?: number;
     nms_threshold?: number;
-    input_width?: number;
-    input_height?: number;
 }
 
 interface Detection {
@@ -208,12 +209,14 @@ export class VidStreamWindow {
     }
 
     private async initializeEngine(config: VidStreamConfig): Promise<void> {
-        const sent = sendMessage({
+        const payload: Pick<QueryMessage, 'type' | 'model_path' | 'confidence_threshold' | 'nms_threshold'> = {
             type: 'vidstream_init',
             model_path: config.model_path,
             confidence_threshold: config.confidence_threshold || 0.5,
             nms_threshold: config.nms_threshold || 0.45,
-        });
+        };
+
+        const sent = sendMessage(payload);
 
         if (!sent) {
             throw new Error('WebSocket not connected');
@@ -322,7 +325,7 @@ export class VidStreamWindow {
 
         try {
             const frameArray = Array.from(imageData.data);
-            const payload = {
+            const payload: Pick<QueryMessage, 'type' | 'frame_data' | 'width' | 'height' | 'format'> = {
                 type: 'vidstream_frame',
                 frame_data: frameArray,
                 width: this.canvas.width,
