@@ -22,8 +22,7 @@ func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
 		"path", r.URL.Path,
 		"remote", r.RemoteAddr)
 
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -35,7 +34,7 @@ func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
 // Sub-resources: /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs
 func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 	// Extract job ID from URL path
-	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/pulse/jobs/"), "/")
+	pathParts := extractPathParts(r.URL.Path, "/api/pulse/jobs/")
 	if len(pathParts) == 0 || pathParts[0] == "" {
 		writeError(w, http.StatusBadRequest, "Missing job ID")
 		return
@@ -44,41 +43,37 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this is a request for child jobs
 	if len(pathParts) > 1 && pathParts[1] == "children" {
-		if r.Method == http.MethodGet {
-			logger.AddPulseSymbol(s.logger).Infow("Pulse get children", "job_id", jobID)
-			s.handleGetJobChildren(w, r, jobID)
-		} else {
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		if !requireMethod(w, r, http.MethodGet) {
+			return
 		}
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get children", "job_id", jobID)
+		s.handleGetJobChildren(w, r, jobID)
 		return
 	}
 
 	// Check if this is a request for stages
 	if len(pathParts) > 1 && pathParts[1] == "stages" {
-		if r.Method == http.MethodGet {
-			logger.AddPulseSymbol(s.logger).Infow("Pulse get stages", "job_id", jobID)
-			s.handleGetJobStages(w, r, jobID)
-		} else {
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		if !requireMethod(w, r, http.MethodGet) {
+			return
 		}
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get stages", "job_id", jobID)
+		s.handleGetJobStages(w, r, jobID)
 		return
 	}
 
 	// Check if this is a request for task logs: /api/pulse/jobs/:job_id/tasks/:task_id/logs
 	if len(pathParts) >= 4 && pathParts[1] == "tasks" && pathParts[3] == "logs" {
-		if r.Method == http.MethodGet {
-			taskID := pathParts[2]
-			logger.AddPulseSymbol(s.logger).Infow("Pulse get task logs", "job_id", jobID, "task_id", taskID)
-			s.handleGetTaskLogsForJob(w, r, jobID, taskID)
-		} else {
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		if !requireMethod(w, r, http.MethodGet) {
+			return
 		}
+		taskID := pathParts[2]
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get task logs", "job_id", jobID, "task_id", taskID)
+		s.handleGetTaskLogsForJob(w, r, jobID, taskID)
 		return
 	}
 
 	// Handle single async job operations
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 

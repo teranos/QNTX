@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -32,17 +31,10 @@ func NewATSStoreServer(store *storage.SQLStore, authToken string, logger *zap.Su
 	}
 }
 
-// validateAuth checks the authentication token
-func (s *ATSStoreServer) validateAuth(token string) error {
-	if subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
-		return errors.New("invalid authentication token")
-	}
-	return nil
-}
 
 // CreateAttestation creates a new attestation
 func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.CreateAttestationRequest) (*protocol.CreateAttestationResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.CreateAttestationResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -75,7 +67,7 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 
 // AttestationExists checks if an attestation exists
 func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.AttestationExistsRequest) (*protocol.AttestationExistsResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.AttestationExistsResponse{
 			Exists: false,
 		}, nil
@@ -90,7 +82,7 @@ func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.At
 
 // GenerateAndCreateAttestation generates an ID and creates an attestation
 func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *protocol.GenerateAttestationRequest) (*protocol.GenerateAttestationResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -134,7 +126,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 
 // GetAttestations queries attestations with filters
 func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetAttestationsRequest) (*protocol.GetAttestationsResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.GetAttestationsResponse{
 			Success: false,
 			Error:   err.Error(),

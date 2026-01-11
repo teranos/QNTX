@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"crypto/subtle"
 	"fmt"
 	"time"
 
@@ -29,17 +28,10 @@ func NewQueueServer(queue *async.Queue, authToken string, logger *zap.SugaredLog
 	}
 }
 
-// validateAuth checks the authentication token
-func (s *QueueServer) validateAuth(token string) error {
-	if subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
-		return errors.New("invalid authentication token")
-	}
-	return nil
-}
 
 // Enqueue adds a new job to the queue
 func (s *QueueServer) Enqueue(ctx context.Context, req *protocol.EnqueueRequest) (*protocol.EnqueueResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.EnqueueResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -73,7 +65,7 @@ func (s *QueueServer) Enqueue(ctx context.Context, req *protocol.EnqueueRequest)
 
 // GetJob retrieves a job by ID
 func (s *QueueServer) GetJob(ctx context.Context, req *protocol.GetJobRequest) (*protocol.GetJobResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.GetJobResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -113,7 +105,7 @@ func (s *QueueServer) GetJob(ctx context.Context, req *protocol.GetJobRequest) (
 
 // UpdateJob updates a job's status and progress
 func (s *QueueServer) UpdateJob(ctx context.Context, req *protocol.UpdateJobRequest) (*protocol.UpdateJobResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.UpdateJobResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -146,7 +138,7 @@ func (s *QueueServer) UpdateJob(ctx context.Context, req *protocol.UpdateJobRequ
 
 // ListJobs lists jobs with optional status filter
 func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsRequest) (*protocol.ListJobsResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.ListJobsResponse{
 			Success: false,
 			Error:   err.Error(),
