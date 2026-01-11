@@ -261,3 +261,9 @@ DYLD_LIBRARY_PATH=$PWD/ats/vidstream/target/release ./qntx
 | web/ts/vidstream-window.ts | Frontend camera, rendering, throttling |
 | ats/vidstream/src/engine.rs | Rust ONNX inference pipeline |
 | ats/vidstream/src/ffi.rs | CGO interface layer |
+
+---
+
+## API Reference
+
+- [WebSocket Protocol](api/websocket.md) - Complete WebSocket message type reference (including `vidstream_init` and `vidstream_frame`)
