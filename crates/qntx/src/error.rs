@@ -16,9 +16,12 @@
 //! }
 //! ```
 
+use serde::Serialize;
 use thiserror::Error;
 
 /// Common error type for QNTX operations.
+///
+/// Can be used across all Rust components and serialized for IPC/Tauri frontends.
 #[derive(Error, Debug)]
 pub enum Error {
     /// IO error
@@ -50,6 +53,15 @@ pub enum Error {
     /// Internal error with optional context chain
     #[error("{message}")]
     Internal { message: String },
+}
+
+impl Serialize for Error {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 
 impl Error {
