@@ -20,7 +20,7 @@
  * TODO: Migrate remaining 42 files from console.* to log.*:
  *   - system-drawer.ts (3)
  *   - codemirror-editor.ts (5)
- *   - ai-provider-panel.ts (9)
+ *   - ai-provider-window.ts (9)
  *   - plugin-panel.ts (17)
  *   - debug.ts (5)
  *   - legenda.ts (1)

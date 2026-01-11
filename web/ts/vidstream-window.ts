@@ -159,7 +159,7 @@ export class VidStreamWindow {
         // Configure button - opens AI Provider panel
         configBtn?.addEventListener('click', () => {
             // Import and call toggleAIProvider
-            import('./ai-provider-panel.ts').then(module => {
+            import('./ai-provider-window.ts').then(module => {
                 module.toggleAIProvider();
             });
         });
