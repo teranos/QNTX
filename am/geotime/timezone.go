@@ -1,7 +1,6 @@
 package geotime
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
