@@ -10,7 +10,6 @@ import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
-import { Window } from './components/window.ts';
 
 interface StatusIndicator {
     id: string;
