@@ -69,6 +69,8 @@ jobs:
 
       - name: Download test ONNX model
         run: |
+          # Install curl
+          apt-get update && apt-get install -y curl
           mkdir -p ats/vidstream/test-data
           cd ats/vidstream/test-data
           # Download YOLO11n (nano) - smallest YOLO model (~10MB)
