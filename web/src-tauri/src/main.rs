@@ -27,8 +27,8 @@ use qntx::types::{
 };
 
 // Video processing module (desktop-only)
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-mod vidstream;
+// #[cfg(not(any(target_os = "ios", target_os = "android")))]
+// mod vidstream;  // Disabled: blocked by CrabCamera ACL (PR #267)
 
 const SERVER_PORT: &str = "877";
 
@@ -389,8 +389,8 @@ fn main() {
                 });
 
                 // Initialize video processing state (desktop only)
-                #[cfg(not(any(target_os = "ios", target_os = "android")))]
-                app.manage(vidstream::VideoEngineState::new());
+                // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                // app.manage(vidstream::VideoEngineState::new());  // Disabled: blocked by CrabCamera ACL (PR #267)
 
                 // Set up deep link handler for macOS (events) and check startup URL
                 // On Windows/Linux, deep links come through single-instance CLI args
@@ -774,14 +774,14 @@ fn main() {
             notify_storage_warning,
             notify_server_draining,
             notify_server_stopped,
-            set_taskbar_progress,
-            // Video processing (desktop only)
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            vidstream::vidstream_init,
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            vidstream::vidstream_process_frame,
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            vidstream::vidstream_get_info
+            set_taskbar_progress
+            // Video processing (desktop only) - Disabled: blocked by CrabCamera ACL (PR #267)
+            // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            // vidstream::vidstream_init,
+            // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            // vidstream::vidstream_process_frame,
+            // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            // vidstream::vidstream_get_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
