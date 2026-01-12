@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use log::info;
 use qntx::types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
@@ -23,6 +24,10 @@ use qntx::types::{
     async_types::{Job, JobStatus},
     server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
 };
+
+// Video processing module (desktop-only)
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+mod vidstream;
 
 const SERVER_PORT: &str = "877";
 
@@ -240,6 +245,14 @@ fn set_taskbar_progress(app: tauri::AppHandle, state: String, progress: Option<u
 
 fn main() {
     let mut builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -263,12 +276,18 @@ fn main() {
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
     {
-        builder = builder
-            .plugin(tauri_plugin_autostart::init(
-                MacosLauncher::LaunchAgent,
-                Some(vec!["--minimized"]),
-            ))
-            .plugin(tauri_plugin_deep_link::init());
+        info!("Loading desktop plugins...");
+
+        info!("  ✓ autostart");
+        builder = builder.plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ));
+
+        info!("  ✓ deep-link");
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+
+        info!("Desktop plugins loaded");
     }
 
     builder
@@ -344,6 +363,10 @@ fn main() {
                     child: Arc::new(Mutex::new(Some(child))),
                     port: SERVER_PORT.to_string(),
                 });
+
+                // Initialize video processing state (desktop only)
+                #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                app.manage(vidstream::VideoEngineState::new());
 
                 // Set up deep link handler for macOS (events) and check startup URL
                 // On Windows/Linux, deep links come through single-instance CLI args
@@ -708,7 +731,14 @@ fn main() {
             notify_storage_warning,
             notify_server_draining,
             notify_server_stopped,
-            set_taskbar_progress
+            set_taskbar_progress,
+            // Video processing (desktop only)
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_init,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_process_frame,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            vidstream::vidstream_get_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

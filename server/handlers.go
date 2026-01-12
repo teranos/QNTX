@@ -514,6 +514,22 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 					"client", r.RemoteAddr,
 				)
 
+			case "local_inference.onnx_model_path":
+				path, ok := value.(string)
+				if !ok {
+					http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
+					return
+				}
+				if err := appcfg.UpdateLocalInferenceONNXModelPath(path); err != nil {
+					writeWrappedError(w, s.logger, err, "failed to update local_inference.onnx_model_path", http.StatusInternalServerError)
+					return
+				}
+				s.logger.Infow("Config updated via REST API",
+					"key", "local_inference.onnx_model_path",
+					"value", path,
+					"client", r.RemoteAddr,
+				)
+
 			default:
 				s.logger.Warnw("Unsupported config key in updates",
 					"key", key,
