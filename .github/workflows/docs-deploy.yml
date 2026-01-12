@@ -57,6 +57,14 @@ jobs:
 
               # Extract new hash
               NEW_HASH=$(grep "got:" build.log | tail -1 | awk '{print $2}')
+
+              # Validate hash was extracted
+              if [ -z "$NEW_HASH" ] || [[ ! "$NEW_HASH" =~ ^sha256- ]]; then
+                echo "ERROR: Failed to extract valid hash from build log"
+                cat build.log
+                exit 1
+              fi
+
               echo "New hash: $NEW_HASH"
 
               # Update sitegen.nix
