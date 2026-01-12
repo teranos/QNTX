@@ -46,7 +46,7 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 - **Philosophy**: Sensible defaults for immediate use; configuration optional for customization
 - **Precedence**: System < User < Project < Environment Variables
 - **File naming**: Prefers `am.toml` (new) but supports `config.toml` (backward compat)
-- **Scope**: Core infrastructure only (Pulse, REPL, Server, Code, LocalInference, Ax, Database)
+- **Scope**: Core infrastructure only (Pulse, Server, Code, LocalInference, Ax, Database)
 
 ### Key Design Decisions
 
