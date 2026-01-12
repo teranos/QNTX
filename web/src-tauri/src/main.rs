@@ -774,14 +774,13 @@ fn main() {
             notify_storage_warning,
             notify_server_draining,
             notify_server_stopped,
-            set_taskbar_progress
-            // Video processing (desktop only) - Disabled: blocked by CrabCamera ACL (PR #267)
-            // #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            // vidstream::vidstream_init,
-            // #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            // vidstream::vidstream_process_frame,
-            // #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            // vidstream::vidstream_get_info
+            set_taskbar_progress // Video processing (desktop only) - Disabled: blocked by CrabCamera ACL (PR #267)
+                                 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                                 // vidstream::vidstream_init,
+                                 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                                 // vidstream::vidstream_process_frame,
+                                 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                                 // vidstream::vidstream_get_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
