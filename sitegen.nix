@@ -21,6 +21,162 @@ let
 
   githubRepo = "teranos/QNTX";
 
+  # ============================================================================
+  # GitHub Releases Fetching (Build Time)
+  # ============================================================================
+
+  # Fetch releases from GitHub API using fixed-output derivation
+  # This allows network access during build without experimental features
+  # Update hash when releases change: set to all zeros, build, copy real hash from error
+  releasesJson = pkgs.runCommand "qntx-releases.json"
+    {
+      nativeBuildInputs = [ pkgs.curl pkgs.cacert ];
+      outputHashMode = "flat";
+      outputHashAlgo = "sha256";
+      outputHash = "sha256-GCi4Y56o9KvQYOTW3j17ad055+I67dPNK5h/1sJ/S8E=";
+    } ''
+    curl -s -L -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${githubRepo}/releases" > $out
+  '';
+
+  # Parse releases JSON (import from derivation)
+  releases = lib.importJSON releasesJson;
+
+  # Helper to determine platform from asset name
+  getPlatform = assetName:
+    let name = lib.toLower assetName;
+    in
+    if lib.hasInfix "linux" name && lib.hasInfix "amd64" name then "linux-amd64"
+    else if lib.hasInfix "linux" name && (lib.hasInfix "arm64" name || lib.hasInfix "aarch64" name) then "linux-arm64"
+    else if (lib.hasInfix "darwin" name || lib.hasInfix "macos" name) && lib.hasInfix "amd64" name then "darwin-amd64"
+    else if (lib.hasInfix "darwin" name || lib.hasInfix "macos" name) && (lib.hasInfix "arm64" name || lib.hasInfix "aarch64" name) then "darwin-arm64"
+    else if lib.hasInfix "windows" name && lib.hasInfix "amd64" name then "windows-amd64"
+    else "other";
+
+  platformNames = {
+    "linux-amd64" = "Linux x86_64";
+    "linux-arm64" = "Linux ARM64";
+    "darwin-amd64" = "macOS Intel";
+    "darwin-arm64" = "macOS Apple Silicon";
+    "windows-amd64" = "Windows x86_64";
+    "other" = "Other";
+  };
+
+  # Format file size
+  formatSize = bytes:
+    let
+      kb = bytes / 1024.0;
+      mb = bytes / (1024.0 * 1024.0);
+      # Format with one decimal place
+      formatDecimal = n:
+        let
+          whole = builtins.ceil n;
+          decimal = builtins.ceil ((n - builtins.floor n) * 10);
+        in
+        "${toString whole}.${toString decimal}";
+    in
+    if bytes < 1024 then "${toString bytes} B"
+    else if bytes < 1024 * 1024 then "${formatDecimal kb} KB"
+    else "${formatDecimal mb} MB";
+
+  # Group assets by platform
+  groupAssetsByPlatform = assets:
+    let
+      filtered = lib.filter
+        (a: !lib.hasSuffix ".sha256" a.name && !lib.hasSuffix ".sig" a.name && !lib.hasSuffix ".txt" a.name)
+        assets;
+      grouped = lib.groupBy (a: getPlatform a.name) filtered;
+    in
+    grouped;
+
+  # Render platform download list HTML
+  renderPlatformList = assets:
+    let
+      grouped = groupAssetsByPlatform assets;
+      platforms = [ "linux-amd64" "linux-arm64" "darwin-amd64" "darwin-arm64" "windows-amd64" "other" ];
+      validPlatforms = lib.filter (p: grouped ? ${p} && grouped.${p} != [ ]) platforms;
+    in
+    if validPlatforms == [ ] then
+      "<li>No downloads available</li>"
+    else
+      lib.concatMapStringsSep "\n"
+        (platform:
+          let
+            platformAssets = grouped.${platform};
+            primary = lib.head platformAssets;
+            size = formatSize primary.size;
+          in
+          ''
+            <li>
+              <span class="platform-name">${html.escape platformNames.${platform}}</span>
+              <span class="platform-link">
+                <a href="${html.escape primary.browser_download_url}" class="download-link">${html.escape primary.name}</a>
+                <span class="file-size">(${size})</span>
+              </span>
+            </li>
+          ''
+        )
+        validPlatforms;
+
+  # Get latest non-draft release
+  latestRelease =
+    let nonDraft = lib.filter (r: !(r.draft or false)) releases;
+    in if nonDraft == [ ] then null else lib.head nonDraft;
+
+  # Generate latest release HTML
+  latestReleaseHtml =
+    if latestRelease == null then
+      ''<p>No releases available yet. Visit <a href="https://github.com/${githubRepo}/releases">GitHub Releases</a>.</p>''
+    else
+      let
+        prereleaseBadge = if latestRelease.prerelease or false then '' <span class="prerelease-badge">Pre-release</span>'' else "";
+        date = lib.substring 0 10 latestRelease.published_at; # Extract YYYY-MM-DD
+      in
+      ''
+        <div class="release-version latest">
+          <div class="release-header">
+            <h3>${html.escape latestRelease.tag_name}${prereleaseBadge} <span class="latest-badge">Latest</span></h3>
+            <span class="release-date">${date}</span>
+          </div>
+          <ul class="platform-list">
+            ${renderPlatformList (latestRelease.assets or [])}
+          </ul>
+        </div>
+      '';
+
+  # Generate all releases HTML for downloads page
+  allReleasesHtml =
+    let
+      nonDraft = lib.filter (r: !(r.draft or false)) releases;
+      # Take first 5 releases
+      recent = if nonDraft == [ ] then [ ] else lib.take 5 nonDraft;
+      latestId = if nonDraft == [ ] then null else (lib.head nonDraft).id;
+    in
+    if recent == [ ] then
+      ''<p>No releases available yet. Visit <a href="https://github.com/${githubRepo}/releases">GitHub Releases</a>.</p>''
+    else
+      lib.concatMapStringsSep "\n"
+        (release:
+          let
+            isLatest = latestId != null && release.id == latestId;
+            prereleaseBadge = if release.prerelease or false then '' <span class="prerelease-badge">Pre-release</span>'' else "";
+            latestBadge = if isLatest then '' <span class="latest-badge">Latest</span>'' else "";
+            date = lib.substring 0 10 release.published_at;
+          in
+          ''
+            <div class="release-version ${if isLatest then "latest" else ""}">
+              <div class="release-header">
+                <h3>${html.escape release.tag_name}${prereleaseBadge}${latestBadge}</h3>
+                <span class="release-date">${date}</span>
+              </div>
+              <ul class="platform-list">
+                ${renderPlatformList (release.assets or [])}
+              </ul>
+            </div>
+          ''
+        )
+        recent;
+
   provenance = {
     commit = gitShortRev;
     fullCommit = gitRevision;
@@ -44,7 +200,6 @@ let
   };
 
   jsFiles = {
-    releases = ./web/js/releases.js;
     prismCore = pkgs.fetchurl {
       url = "https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js";
       hash = "sha256-4mJNT2bMXxcc1GCJaxBmMPdmah5ji0Ldnd79DKd1hoM=";
@@ -353,7 +508,6 @@ let
       sortedFiles = lib.sort (a: b: a.name < b.name) files;
       meta = getCategoryMeta category;
       categoryTitle = toTitleCase category;
-      symbolHtml = lib.optionalString (meta.symbol != "") ''<span class="category-symbol">${meta.symbol}</span>'';
       descHtml = lib.optionalString (meta.desc != "") ''<span class="category-desc">${html.escape meta.desc}</span>'';
       fileLinks = lib.concatMapStringsSep "\n"
         (f: ''<li><a href="${f.htmlPath}"><span class="doc-name">${html.escape (toTitleCase f.name)}</span></a></li>'')
@@ -362,7 +516,7 @@ let
     ''
       <section class="category-section">
         <div class="category-header">
-          ${symbolHtml}<h2 class="category-title">${html.escape categoryTitle}</h2>${descHtml}
+          <h2 class="category-title">${html.escape categoryTitle}</h2>${descHtml}
         </div>
         <ul class="doc-list">
           ${fileLinks}
@@ -376,36 +530,57 @@ let
       extraCats = lib.sort (a: b: a < b)
         (lib.filter (c: c != "_root" && !(lib.elem c categoryOrder)) (lib.attrNames groupedFiles));
       allCats = orderedCats ++ extraCats;
-      rootSection = lib.optionalString (rootFiles != [ ]) (genIndexSection "_root" rootFiles);
       categorySections = lib.concatMapStringsSep "\n"
         (cat: genIndexSection cat groupedFiles.${cat})
         allCats;
+
+      introText = ''
+        <div class="intro-section">
+          <p><strong>QNTX</strong> is an attestation-based continuous intelligence system for direct manipulation of symbolic knowledge through computational systems.</p>
+          <p>Data → Graph → Knowledge → Intelligence → Action</p>
+        </div>
+      '';
+
+      buildPipelineInfo = ''
+        <section class="build-info-section">
+          <h2>Build & CI Pipeline</h2>
+          <p>QNTX uses <strong>Nix</strong> for fully reproducible builds. Every commit triggers automated builds, tests, and container image publishing via GitHub Actions.</p>
+          <ul class="build-info-list">
+            <li><strong>Build System:</strong> Nix flakes with locked dependencies</li>
+            <li><strong>CI/CD:</strong> GitHub Actions with Cachix binary cache</li>
+            <li><strong>Artifacts:</strong> Linux/macOS/Windows binaries, OCI containers, documentation</li>
+            <li><strong>Testing:</strong> Go tests, type generation validation, integration tests</li>
+          </ul>
+          <p><a href="./infrastructure.html">View full infrastructure documentation</a></p>
+        </section>
+      '';
     in
     mkPage {
       title = "QNTX Documentation";
       nav = false;
-      scripts = [ "releases.js" ];
+      scripts = [ ];
       content = ''
         <div class="doc-header">
           <img src="./qntx.jpg" alt="QNTX Logo">
-          <h1>QNTX Documentation</h1>
+          <h1>QNTX</h1>
         </div>
 
         <nav class="quick-links">
           ${quickLinksHtml}
         </nav>
 
+        ${introText}
+
         <section class="download-section quick-download">
           <h2>Quick Download</h2>
-          <div id="latest-release">
-            <p class="loading">Loading latest release...</p>
-          </div>
-          <p style="margin-top: 12px;">
+          ${latestReleaseHtml}
+          <p style="margin-top: 8px; font-size: 0.9em;">
             <a href="./downloads.html">View all downloads and installation options</a>
           </p>
         </section>
 
-        ${rootSection}
+        ${buildPipelineInfo}
+
         ${categorySections}
       '';
     };
@@ -427,11 +602,7 @@ let
 
       releaseSection = html.section {
         title = "Release Downloads";
-        content = ''
-          <div id="release-downloads">
-            <p class="loading">Loading releases...</p>
-          </div>
-        '';
+        content = allReleasesHtml;
       };
 
       containersSection = lib.optionalString (nixContainers != [ ]) (html.section {
@@ -458,7 +629,7 @@ let
     in
     mkPage {
       title = "QNTX Downloads";
-      scripts = [ "releases.js" ];
+      scripts = [ ];
       content = ''
         <h1>Download QNTX</h1>
         ${nixInstallSection}
@@ -638,7 +809,7 @@ let
             [ "<strong>Markdown to HTML</strong>" ''Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a>'' ]
             [ "<strong>SEG Symbol Navigation</strong>" "Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API" ]
             [ "<strong>Dark Mode</strong>" "Automatic dark/light theme via <code>prefers-color-scheme</code>" ]
-            [ "<strong>GitHub Releases</strong>" "Dynamic release downloads fetched client-side from GitHub API" ]
+            [ "<strong>GitHub Releases</strong>" "Static release downloads fetched at build time via Nix fixed-output derivation" ]
             [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
             [ "<strong>Self-documenting Infra</strong>" "Nix packages, apps, and containers documented from flake metadata" ]
             [ "<strong>Incremental Builds</strong>" "Each markdown file is a separate derivation for faster rebuilds" ]
