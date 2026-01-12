@@ -31,6 +31,15 @@
     ],
     "iOS": {
       "developmentTeam": "88645J88Q8"
+    },
+    "macOS": {
+      "entitlements": "entitlements.plist",
+      "exceptionDomain": null,
+      "frameworks": [],
+      "providerShortName": null,
+      "signingIdentity": null,
+      "minimumSystemVersion": "10.13",
+      "infoPlist": "Info.plist"
     }
   },
   "app": {

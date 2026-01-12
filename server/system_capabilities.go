@@ -5,18 +5,27 @@ import (
 )
 
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
-// This informs the frontend about available optimizations (e.g., Rust fuzzy matching).
+// This informs the frontend about available optimizations (e.g., Rust fuzzy matching, ONNX video).
 // Sends are routed through broadcast worker (thread-safe).
 func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	// Get fuzzy backend from the AxGraphBuilder
 	fuzzyBackend := s.builder.FuzzyBackend()
 	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust)
 
+	// Detect vidstream/ONNX availability (requires CGO build with rustvideo tag)
+	vidstreamOptimized := vidstreamAvailable()
+	vidstreamBackend := "onnx"
+	if !vidstreamOptimized {
+		vidstreamBackend = "unavailable"
+	}
+
 	// Create system capabilities message
 	msg := SystemCapabilitiesMessage{
-		Type:           "system_capabilities",
-		FuzzyBackend:   string(fuzzyBackend),
-		FuzzyOptimized: fuzzyOptimized,
+		Type:               "system_capabilities",
+		FuzzyBackend:       string(fuzzyBackend),
+		FuzzyOptimized:     fuzzyOptimized,
+		VidStreamBackend:   vidstreamBackend,
+		VidStreamOptimized: vidstreamOptimized,
 	}
 
 	// Send to broadcast worker (thread-safe)
