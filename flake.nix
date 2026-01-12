@@ -472,15 +472,33 @@
               set -e
               echo "Generating types and documentation..."
 
-              # Ensure typegen is built
-              ${pkgs.nix}/bin/nix build .#typegen
+              # Check if typegen binary exists and is up-to-date
+              REBUILD_NEEDED=0
+              if [ ! -e ./result/bin/typegen ]; then
+                echo "Typegen binary not found, building..."
+                REBUILD_NEEDED=1
+              elif [ code/typegen -nt ./result/bin/typegen ]; then
+                echo "Typegen source changed, rebuilding..."
+                REBUILD_NEEDED=1
+              fi
 
-              # Run typegen for each language
+              # Build typegen only if needed
+              if [ $REBUILD_NEEDED -eq 1 ]; then
+                ${pkgs.nix}/bin/nix build .#typegen
+              else
+                echo "Using existing typegen binary (skip rebuild)"
+              fi
+
+              # Run typegen for each language in parallel
               # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
-              ./result/bin/typegen --lang typescript --output types/generated/
-              ./result/bin/typegen --lang python --output types/generated/
-              ./result/bin/typegen --lang rust
-              ./result/bin/typegen --lang markdown
+              echo "Running typegen for all languages in parallel..."
+              (
+                ./result/bin/typegen --lang typescript --output types/generated/ &
+                ./result/bin/typegen --lang python --output types/generated/ &
+                ./result/bin/typegen --lang rust &
+                ./result/bin/typegen --lang markdown &
+                wait
+              )
 
               echo "✓ TypeScript types generated in types/generated/typescript/"
               echo "✓ Python types generated in types/generated/python/"
