@@ -39,7 +39,7 @@
             ts-typecheck = {
               enable = true;
               name = "TypeScript typecheck";
-              entry = "${pkgs.bun}/bin/bun run typecheck";
+              entry = "sh -c 'cd web && ${pkgs.bun}/bin/bun run typecheck'";
               files = "\\.ts$";
               pass_filenames = false;
             };

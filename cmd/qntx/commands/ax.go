@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -103,16 +104,10 @@ func displayTable(result *types.AxResult) error {
 }
 
 func displayJSON(result *types.AxResult) error {
-	// Simple JSON output - just print the attestations
-	fmt.Println("[")
-	for i, a := range result.Attestations {
-		comma := ","
-		if i == len(result.Attestations)-1 {
-			comma = ""
-		}
-		fmt.Printf("  {\"id\": %q, \"subjects\": %v, \"predicates\": %v, \"contexts\": %v, \"actors\": %v}%s\n",
-			a.ID, a.Subjects, a.Predicates, a.Contexts, a.Actors, comma)
+	output, err := json.MarshalIndent(result.Attestations, "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal JSON")
 	}
-	fmt.Println("]")
+	fmt.Println(string(output))
 	return nil
 }
