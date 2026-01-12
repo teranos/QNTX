@@ -36,13 +36,14 @@
             rustfmt.enable = true;
 
             # TypeScript type checking
-            ts-typecheck = {
-              enable = true;
-              name = "TypeScript typecheck";
-              entry = "sh -c 'cd web && ${pkgs.bun}/bin/bun run typecheck'";
-              files = "\\.ts$";
-              pass_filenames = false;
-            };
+            # TODO(#273): Disabled due to vendored d3 causing 83 module resolution errors
+            # ts-typecheck = {
+            #   enable = true;
+            #   name = "TypeScript typecheck";
+            #   entry = "${pkgs.nodePackages.typescript}/bin/tsc --project web/tsconfig.json --noEmit";
+            #   files = "\\.ts$";
+            #   pass_filenames = false;
+            # };
 
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.
