@@ -64,9 +64,20 @@ let
 
   # Format file size
   formatSize = bytes:
+    let
+      kb = bytes / 1024.0;
+      mb = bytes / (1024.0 * 1024.0);
+      # Format with one decimal place
+      formatDecimal = n:
+        let
+          whole = builtins.ceil n;
+          decimal = builtins.ceil ((n - builtins.floor n) * 10);
+        in
+        "${toString whole}.${toString decimal}";
+    in
     if bytes < 1024 then "${toString bytes} B"
-    else if bytes < 1024 * 1024 then "${toString (bytes / 1024)} KB"
-    else "${toString (bytes / (1024 * 1024))} MB";
+    else if bytes < 1024 * 1024 then "${formatDecimal kb} KB"
+    else "${formatDecimal mb} MB";
 
   # Group assets by platform
   groupAssetsByPlatform = assets:
@@ -798,7 +809,7 @@ let
             [ "<strong>Markdown to HTML</strong>" ''Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a>'' ]
             [ "<strong>SEG Symbol Navigation</strong>" "Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API" ]
             [ "<strong>Dark Mode</strong>" "Automatic dark/light theme via <code>prefers-color-scheme</code>" ]
-            [ "<strong>GitHub Releases</strong>" "Dynamic release downloads fetched client-side from GitHub API" ]
+            [ "<strong>GitHub Releases</strong>" "Static release downloads fetched at build time via Nix fixed-output derivation" ]
             [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
             [ "<strong>Self-documenting Infra</strong>" "Nix packages, apps, and containers documented from flake metadata" ]
             [ "<strong>Incremental Builds</strong>" "Each markdown file is a separate derivation for faster rebuilds" ]
