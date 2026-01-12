@@ -67,9 +67,18 @@ jobs:
       - name: Build release (with ONNX)
         run: cd ats/vidstream && cargo build --release --lib --features onnx
 
+      - name: Download test ONNX model
+        run: |
+          mkdir -p ats/vidstream/test-data
+          cd ats/vidstream/test-data
+          # Download YOLO11n (nano) - smallest YOLO model (~10MB)
+          gh release download v8.3.0 --repo ultralytics/assets --pattern "yolo11n.onnx"
+          ls -lh yolo11n.onnx
+
       - name: Test CGO integration
         run: |
           cd ats/vidstream && cargo build --release --lib
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+          export QNTX_VIDSTREAM_TEST_MODEL=$PWD/test-data/yolo11n.onnx
           cd vidstream && CGO_ENABLED=1 go test -tags rustvideo -v
