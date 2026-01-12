@@ -602,19 +602,29 @@ fn main() {
                         }
                         // View menu - emit events to show panels
                         "config_panel" | "preferences" => {
-                            show_window_and_emit(app_handle, "show-config-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-config-panel", ()) {
+                                log::warn!("[menu] Failed to show config panel: {}", e);
+                            }
                         }
                         "pulse_panel" => {
-                            show_window_and_emit(app_handle, "show-pulse-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-pulse-panel", ()) {
+                                log::warn!("[menu] Failed to show pulse panel: {}", e);
+                            }
                         }
                         "prose_panel" | "documentation" => {
-                            show_window_and_emit(app_handle, "show-prose-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-prose-panel", ()) {
+                                log::warn!("[menu] Failed to show prose panel: {}", e);
+                            }
                         }
                         "code_panel" => {
-                            show_window_and_emit(app_handle, "show-code-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-code-panel", ()) {
+                                log::warn!("[menu] Failed to show code panel: {}", e);
+                            }
                         }
                         "hixtory_panel" => {
-                            show_window_and_emit(app_handle, "show-hixtory-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-hixtory-panel", ()) {
+                                log::warn!("[menu] Failed to show hixtory panel: {}", e);
+                            }
                         }
                         "refresh_graph" => {
                             if let Some(window) = app_handle.get_webview_window("main") {
@@ -701,7 +711,9 @@ fn main() {
                             app.exit(0);
                         } else if event.id == "preferences" {
                             // Open preferences (config panel) - show window and emit event
-                            show_window_and_emit(app, "show-config-panel", ());
+                            if let Err(e) = show_window_and_emit(app, "show-config-panel", ()) {
+                                log::warn!("[tray] Failed to show config panel: {}", e);
+                            }
                         } else if event.id == "toggle_pulse" {
                             // Toggle Pulse daemon (emit event to frontend)
                             if let Some(window) = app.get_webview_window("main") {
