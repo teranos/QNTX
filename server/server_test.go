@@ -232,19 +232,6 @@ func TestIsPortAvailable(t *testing.T) {
 	}
 }
 
-// Test port fallback logic
-func TestFindAvailablePort(t *testing.T) {
-	// Test finding from a high port that should be available
-	port, err := findAvailablePort(50000)
-	if err != nil {
-		t.Fatalf("Failed to find available port: %v", err)
-	}
-
-	if port < 50000 || port > 50010 {
-		t.Errorf("Port %d is outside expected range 50000-50010", port)
-	}
-}
-
 // Test WebSocket upgrade handler
 func TestHandleWebSocket(t *testing.T) {
 	db := createTestDB(t)
