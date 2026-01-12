@@ -34,6 +34,15 @@
             # Rust formatting
             rustfmt.enable = true;
 
+            # TypeScript type checking
+            ts-typecheck = {
+              enable = true;
+              name = "TypeScript typecheck";
+              entry = "${pkgs.bun}/bin/bun run typecheck";
+              files = "\\.ts$";
+              pass_filenames = false;
+            };
+
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.
             # gofmt.enable = true;
