@@ -602,27 +602,34 @@ fn main() {
                         }
                         // View menu - emit events to show panels
                         "config_panel" | "preferences" => {
-                            if let Err(e) = show_window_and_emit(app_handle, "show-config-panel", ()) {
+                            if let Err(e) =
+                                show_window_and_emit(app_handle, "show-config-panel", ())
+                            {
                                 log::warn!("[menu] Failed to show config panel: {}", e);
                             }
                         }
                         "pulse_panel" => {
-                            if let Err(e) = show_window_and_emit(app_handle, "show-pulse-panel", ()) {
+                            if let Err(e) = show_window_and_emit(app_handle, "show-pulse-panel", ())
+                            {
                                 log::warn!("[menu] Failed to show pulse panel: {}", e);
                             }
                         }
                         "prose_panel" | "documentation" => {
-                            if let Err(e) = show_window_and_emit(app_handle, "show-prose-panel", ()) {
+                            if let Err(e) = show_window_and_emit(app_handle, "show-prose-panel", ())
+                            {
                                 log::warn!("[menu] Failed to show prose panel: {}", e);
                             }
                         }
                         "code_panel" => {
-                            if let Err(e) = show_window_and_emit(app_handle, "show-code-panel", ()) {
+                            if let Err(e) = show_window_and_emit(app_handle, "show-code-panel", ())
+                            {
                                 log::warn!("[menu] Failed to show code panel: {}", e);
                             }
                         }
                         "hixtory_panel" => {
-                            if let Err(e) = show_window_and_emit(app_handle, "show-hixtory-panel", ()) {
+                            if let Err(e) =
+                                show_window_and_emit(app_handle, "show-hixtory-panel", ())
+                            {
                                 log::warn!("[menu] Failed to show hixtory panel: {}", e);
                             }
                         }
