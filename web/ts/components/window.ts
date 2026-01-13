@@ -19,6 +19,7 @@ export class Window {
     private element: HTMLElement;
     private header: HTMLElement;
     private contentContainer: HTMLElement;
+    private footerContainer: HTMLElement | null = null;
     private config: WindowConfig;
 
     // Drag state
@@ -36,6 +37,7 @@ export class Window {
         this.element = this.createElement();
         this.header = this.element.querySelector('.draggable-window-header') as HTMLElement;
         this.contentContainer = this.element.querySelector('.draggable-window-content') as HTMLElement;
+        this.footerContainer = this.element.querySelector('.draggable-window-footer') as HTMLElement | null;
 
         document.body.appendChild(this.element);
         this.setupEventListeners();
@@ -67,6 +69,7 @@ export class Window {
                 <button class="panel-close" aria-label="Close">&times;</button>
             </div>
             <div class="draggable-window-content"></div>
+            <div class="draggable-window-footer"></div>
         `;
 
         return win;
@@ -139,6 +142,38 @@ export class Window {
     }
 
     /**
+     * Get the footer container element for direct manipulation
+     * Returns null if footer doesn't exist
+     */
+    public getFooterElement(): HTMLElement | null {
+        return this.footerContainer;
+    }
+
+    /**
+     * Set footer content from HTML string or DOM element
+     * If content is empty/null, hides the footer
+     */
+    public setFooterContent(content: string | HTMLElement | null): void {
+        if (!this.footerContainer) return;
+
+        if (!content) {
+            // Hide footer if content is empty
+            this.footerContainer.style.display = 'none';
+            this.footerContainer.innerHTML = '';
+            return;
+        }
+
+        // Show and populate footer
+        this.footerContainer.style.display = '';
+        if (typeof content === 'string') {
+            this.footerContainer.innerHTML = content;
+        } else {
+            this.footerContainer.innerHTML = '';
+            this.footerContainer.appendChild(content);
+        }
+    }
+
+    /**
      * Get the root window element
      */
     public getElement(): HTMLElement {
@@ -204,12 +239,12 @@ export class Window {
     }
 
     /**
-     * Update window title
+     * Update window title (accepts HTML)
      */
     public setTitle(title: string): void {
         const titleEl = this.header.querySelector('.draggable-window-title');
         if (titleEl) {
-            titleEl.textContent = title;
+            titleEl.innerHTML = title;
         }
     }
 

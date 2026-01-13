@@ -9,7 +9,7 @@ import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml, formatDuration } from './panel.ts';
 import { Pulse } from '@generated/sym.js';
 import type { RichError } from '../base-panel-error.ts';
-import { buildTooltipText } from '../tooltip.ts';
+import { buildTooltipText } from '../components/tooltip.ts';
 
 /**
  * Build a rich error for execution history failures
@@ -153,7 +153,7 @@ export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState)
     const proseLocationHtml = job.created_from_doc ? `
         <div class="pulse-meta-row pulse-prose-location">
             <span class="pulse-meta-label">Source:</span>
-            <a href="#" class="pulse-prose-link" data-doc-id="${escapeHtml(job.created_from_doc)}" title="Open in prose editor">
+            <a href="#" class="pulse-prose-link has-tooltip" data-doc-id="${escapeHtml(job.created_from_doc)}" data-tooltip="Open in prose editor">
                 ▣ ${escapeHtml(job.created_from_doc)}
             </a>
         </div>
@@ -165,7 +165,7 @@ export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState)
     return `
         <div class="panel-card pulse-job-card ${isExpanded ? 'expanded' : ''}" data-job-id="${job.id}">
             <div class="panel-flex-between pulse-job-header">
-                <button class="pulse-expand-toggle" data-action="toggle-expand" title="${isExpanded ? 'Collapse' : 'Expand'}">
+                <button class="pulse-expand-toggle has-tooltip" data-action="toggle-expand" data-tooltip="${isExpanded ? 'Collapse' : 'Expand'}">
                     ${expandIcon}
                 </button>
                 <div class="panel-badge-icon pulse-job-badge pulse-badge-${job.state} has-tooltip"

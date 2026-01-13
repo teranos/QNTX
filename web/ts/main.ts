@@ -125,6 +125,11 @@ function handleVersion(data: VersionMessage): void {
         logVersion.textContent = data.commit.substring(0, 7);
     }
 
+    // Update Self diagnostic window if loaded
+    import('./self-window.js').then(({ selfWindow }) => {
+        selfWindow.updateVersion(data);
+    });
+
     console.log('Server version:', data);
 }
 
