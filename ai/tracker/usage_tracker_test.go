@@ -617,25 +617,6 @@ func TestGetModelBreakdown_Sqlmock(t *testing.T) {
 	}
 }
 
-// TODO: Add comprehensive sqlmock tests for edge cases and error handling:
-// - Test TrackUsage database error handling (connection failures, constraint violations)
-// - Test GetUsageStats with zero records (verify success rate calculation)
-// - Test GetModelBreakdown with multiple models and sorting order
-// - Test concurrent TrackUsage calls (race conditions)
-// - Test NULL handling for optional fields (response_timestamp, tokens_used, cost)
-// - Test very large token counts and costs (overflow/precision)
-// - Test invalid timestamps (future dates, very old dates)
-// - Test SQL injection prevention in model names and entity IDs
-// - Benchmark tests for bulk insert performance
-// - Test transaction rollback scenarios
-
-// TODO: Add integration tests for real-world usage patterns:
-// - Track multiple operations across different time periods
-// - Verify cost aggregation accuracy over extended periods
-// - Test timezone handling in timestamps
-// - Test model breakdown ordering (by cost DESC)
-// - Validate JSON serialization of ModelConfig and UsageMetadata
-
 // Helper functions for test data creation
 func intPtr(i int) *int {
 	return &i

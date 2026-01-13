@@ -8,14 +8,6 @@ import (
 	"github.com/teranos/QNTX/logger"
 )
 
-// TODO: Remove ambiguous endpoint - task_id alone isn't unique across jobs
-// Use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead (handled by HandlePulseJob)
-/*
-func (s *QNTXServer) HandlePulseTask(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusGone, "This endpoint is deprecated. Use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead")
-}
-*/
-
 // handleGetTaskLogsForJob returns logs for a specific task within a job context
 // NEW: Requires both job_id and task_id to avoid ambiguity
 // NOTE: task_id may be NULL in database (for stage-level logs), so we also check stage column

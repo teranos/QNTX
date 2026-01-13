@@ -9,6 +9,7 @@ import (
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
 	id "github.com/teranos/vanity-id"
 )
@@ -52,13 +53,13 @@ Inference Rules:
 
 func runAsCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("at least one subject is required")
+		return errors.New("at least one subject is required")
 	}
 
 	// Load configuration
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return errors.Wrap(err, "failed to load configuration")
 	}
 
 	// Open and migrate database
@@ -71,7 +72,7 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	// Parse command arguments
 	asCommand, err := parser.ParseAsCommand(args)
 	if err != nil {
-		return fmt.Errorf("failed to parse command: %w", err)
+		return errors.Wrap(err, "failed to parse command")
 	}
 
 	// Create bounded store (enforces storage limits + telemetry)
@@ -93,19 +94,19 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		// User specified actor - generate ASID but use their actor
 		asid, err := generateVanityASID(asCommand, database)
 		if err != nil {
-			return fmt.Errorf("failed to generate ASID: %w", err)
+			return errors.Wrap(err, "failed to generate ASID")
 		}
 		as = asCommand.ToAs(asid)
 		// Keep the user's specified actor (don't override with ASID)
 		err = boundedStore.CreateAttestation(as)
 		if err != nil {
-			return fmt.Errorf("failed to create attestation: %w", err)
+			return errors.Wrap(err, "failed to create attestation")
 		}
 	} else {
 		// No actor specified - use self-certifying ASID (avoids bounded storage limits)
 		as, err = boundedStore.CreateAttestationWithLimits(asCommand)
 		if err != nil {
-			return fmt.Errorf("failed to create attestation: %w", err)
+			return errors.Wrap(err, "failed to create attestation")
 		}
 	}
 

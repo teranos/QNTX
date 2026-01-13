@@ -7,6 +7,7 @@ import (
 
 	"github.com/pterm/pterm"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 // ErrorContext indicates the environment where parser errors will be displayed
@@ -229,9 +230,9 @@ func (p *axParser) contextualErrorWithVerbosity(verbosity int, message string, a
 	// Plain context: concise message without ANSI codes (for web UI, logs, etc)
 	if p.errorContext == ErrorContextPlain {
 		if p.position >= 0 && len(p.tokens) > 0 {
-			return fmt.Errorf("%s (at position %d/%d)", baseMsg, p.position, len(p.tokens))
+			return errors.Newf("%s (at position %d/%d)", baseMsg, p.position, len(p.tokens))
 		}
-		return fmt.Errorf("%s", baseMsg)
+		return errors.Newf("%s", baseMsg)
 	}
 
 	// Terminal context: rich formatting with ANSI colors for CLI
@@ -281,7 +282,7 @@ func (p *axParser) contextualErrorWithVerbosity(verbosity int, message string, a
 			pterm.Cyan("[SUBJECTS] [is|are PREDICATES] [of|from CONTEXTS] [by|via ACTORS] [temporal] [so|therefore ACTIONS]"))
 	}
 
-	return fmt.Errorf("%s%s", pterm.Red(baseMsg), context)
+	return errors.Newf("%s%s", pterm.Red(baseMsg), context)
 }
 
 // stateString returns a human-readable name for the current parsing state

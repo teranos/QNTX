@@ -73,13 +73,13 @@ type QueryMessage struct {
 	NodeType      string  `json:"node_type"`      // For visibility messages: node type to toggle
 	Hidden        bool    `json:"hidden"`         // For visibility messages: whether to hide the node type/isolated nodes
 	// VidStream fields (for vidstream_init and vidstream_frame messages)
-	ModelPath            string  `json:"model_path"`             // For vidstream_init: path to ONNX model
-	ConfidenceThreshold  float32 `json:"confidence_threshold"`   // For vidstream_init: detection confidence threshold
-	NMSThreshold         float32 `json:"nms_threshold"`          // For vidstream_init: NMS IoU threshold
-	FrameData            []byte  `json:"frame_data"`             // For vidstream_frame: raw frame bytes (RGBA)
-	Width                int     `json:"width"`                  // For vidstream_frame: frame width
-	Height               int     `json:"height"`                 // For vidstream_frame: frame height
-	Format               string  `json:"format"`                 // For vidstream_frame: "rgba8", "rgb8", etc.
+	ModelPath           string  `json:"model_path"`           // For vidstream_init: path to ONNX model
+	ConfidenceThreshold float32 `json:"confidence_threshold"` // For vidstream_init: detection confidence threshold
+	NMSThreshold        float32 `json:"nms_threshold"`        // For vidstream_init: NMS IoU threshold
+	FrameData           []byte  `json:"frame_data"`           // For vidstream_frame: raw frame bytes (RGBA)
+	Width               int     `json:"width"`                // For vidstream_frame: frame width
+	Height              int     `json:"height"`               // For vidstream_frame: frame height
+	Format              string  `json:"format"`               // For vidstream_frame: "rgba8", "rgb8", etc.
 }
 
 // ProgressMessage represents an import progress message
@@ -208,12 +208,12 @@ type StorageWarningMessage struct {
 // PluginHealthMessage represents a plugin health status update
 // Broadcast when plugin state changes (pause/resume) or health check fails
 type PluginHealthMessage struct {
-	Type      string `json:"type"`       // "plugin_health"
-	Name      string `json:"name"`       // Plugin name
-	Healthy   bool   `json:"healthy"`    // Current health status
-	State     string `json:"state"`      // "running", "paused", "stopped"
-	Message   string `json:"message"`    // Status message
-	Timestamp int64  `json:"timestamp"`  // Unix timestamp
+	Type      string `json:"type"`      // "plugin_health"
+	Name      string `json:"name"`      // Plugin name
+	Healthy   bool   `json:"healthy"`   // Current health status
+	State     string `json:"state"`     // "running", "paused", "stopped"
+	Message   string `json:"message"`   // Status message
+	Timestamp int64  `json:"timestamp"` // Unix timestamp
 }
 
 // SystemCapabilitiesMessage represents system capability information

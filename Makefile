@@ -31,7 +31,8 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	@echo "🚀 Starting development environment..."
 	@echo "  Backend:  http://localhost:877"
 	@echo "  Frontend: http://localhost:8820 (with live reload)"
-	@echo "  Database: dev-qntx.db (development)"
+	@echo "  Database: Uses am.toml configuration"
+	@# TODO(#272): Support configurable dev ports for multi-variant testing
 	@echo ""
 	@# Clean up any lingering processes on dev ports
 	@pkill -f "bun.*dev" 2>/dev/null || true
@@ -43,7 +44,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
 	set -m; \
-	DB_PATH=dev-qntx.db ./bin/qntx server --dev --no-browser -vvv & \
+	./bin/qntx server --dev --no-browser -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
@@ -67,7 +68,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 		pkill -f "bun.*dev" 2>/dev/null || true; \
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
-	DB_PATH=dev-qntx.db ./bin/qntx server --dev --no-browser -vvv & \
+	./bin/qntx server --dev --no-browser -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
