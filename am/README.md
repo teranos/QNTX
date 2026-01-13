@@ -24,7 +24,7 @@ Configuration is not mere settings - it defines the system's state of existence.
 
 **What belongs in `am`:**
 - Infrastructure: database, server, async jobs (Pulse)
-- Core interfaces: REPL, code review, attestation queries (ax)
+- Core interfaces: code review, attestation queries (ax)
 - Generic capabilities: local LLM inference, HTTP rate limiting
 
 **What does NOT belong:**
@@ -60,7 +60,6 @@ Infrastructure configured by `am`:
 - **`database`** - SQLite storage path and settings
 - **`server`** - Web UI ports, CORS origins, log themes
 - **`pulse`** - Async job workers, scheduling, HTTP rate limiting
-- **`repl`** - Interactive REPL search, display, timeouts, history
 - **`code`** - Code review system (GitHub, gopls integration)
 - **`local_inference`** - Local LLM support (Ollama, LocalAI)
 - **`ax`** - Attestation query defaults

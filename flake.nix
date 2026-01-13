@@ -17,6 +17,7 @@
   nixConfig = {
     extra-substituters = [ "https://qntx.cachix.org" ];
     extra-trusted-public-keys = [ "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg=" ];
+    extra-experimental-features = [ "impure-derivations" ];
   };
 
   outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
@@ -78,6 +79,16 @@
               # File filtering is done inside the script via git diff --cached
               always_run = true;
             };
+
+            # TypeScript type checking
+            # TODO(#273): Disabled due to vendored d3 causing 83 module resolution errors
+            # ts-typecheck = {
+            #   enable = true;
+            #   name = "TypeScript typecheck";
+            #   entry = "${pkgs.nodePackages.typescript}/bin/tsc --project web/tsconfig.json --noEmit";
+            #   files = "\\.ts$";
+            #   pass_filenames = false;
+            # };
 
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.

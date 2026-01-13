@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
@@ -58,11 +57,11 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 
 	// Marshal attributes to JSON string
 	if cmd.Attributes != nil {
-		attributesJSON, err := json.Marshal(cmd.Attributes)
+		attributesJSON, err := attributesToJSON(cmd.Attributes)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal attributes")
+			return nil, err
 		}
-		protoCmd.AttributesJson = string(attributesJSON)
+		protoCmd.AttributesJson = attributesJSON
 	}
 
 	if !cmd.Timestamp.IsZero() {
@@ -98,9 +97,12 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 
 	// Unmarshal attributes from JSON
 	if resp.Attestation.AttributesJson != "" {
-		if err := json.Unmarshal([]byte(resp.Attestation.AttributesJson), &attestation.Attributes); err != nil {
+		attributes, err := attributesFromJSON(resp.Attestation.AttributesJson)
+		if err != nil {
 			// Log warning but don't fail
 			r.logger.Warnw("Failed to unmarshal attributes", "error", err, "json", resp.Attestation.AttributesJson)
+		} else {
+			attestation.Attributes = attributes
 		}
 	}
 
@@ -166,9 +168,12 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 
 		// Unmarshal attributes from JSON
 		if protoAtt.AttributesJson != "" {
-			if err := json.Unmarshal([]byte(protoAtt.AttributesJson), &attestations[i].Attributes); err != nil {
+			attributes, err := attributesFromJSON(protoAtt.AttributesJson)
+			if err != nil {
 				// Log warning but don't fail
 				r.logger.Warnw("Failed to unmarshal attributes", "error", err, "id", protoAtt.Id)
+			} else {
+				attestations[i].Attributes = attributes
 			}
 		}
 	}

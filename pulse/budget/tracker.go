@@ -140,13 +140,6 @@ func (bt *Tracker) UpdateDailyBudget(newBudgetUSD float64) error {
 	bt.config.DailyBudgetUSD = newBudgetUSD
 	bt.mu.Unlock()
 
-	// TODO: Make config persistence optional via callback interface
-	// See handoff.md Decision 4: Config Persistence
-	// Persist to config.toml
-	// if err := am.UpdatePulseDailyBudget(newBudgetUSD); err != nil {
-	// 	return fmt.Errorf("failed to persist budget to config: %w", err)
-	// }
-
 	return nil
 }
 
@@ -162,13 +155,6 @@ func (bt *Tracker) UpdateWeeklyBudget(newBudgetUSD float64) error {
 	bt.config.WeeklyBudgetUSD = newBudgetUSD
 	bt.mu.Unlock()
 
-	// TODO: Make config persistence optional via callback interface
-	// See handoff.md Decision 4: Config Persistence
-	// Persist to config.toml
-	// if err := am.UpdatePulseWeeklyBudget(newBudgetUSD); err != nil {
-	// 	return fmt.Errorf("failed to persist budget to config: %w", err)
-	// }
-
 	return nil
 }
 
@@ -183,13 +169,6 @@ func (bt *Tracker) UpdateMonthlyBudget(newBudgetUSD float64) error {
 	bt.mu.Lock()
 	bt.config.MonthlyBudgetUSD = newBudgetUSD
 	bt.mu.Unlock()
-
-	// TODO: Make config persistence optional via callback interface
-	// See handoff.md Decision 4: Config Persistence
-	// Persist to config.toml
-	// if err := am.UpdatePulseMonthlyBudget(newBudgetUSD); err != nil {
-	// 	return fmt.Errorf("failed to persist budget to config: %w", err)
-	// }
 
 	return nil
 }

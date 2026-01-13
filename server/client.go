@@ -247,6 +247,8 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleVidStreamInit(*msg)
 	case "vidstream_frame":
 		c.handleVidStreamFrame(*msg)
+	case "get_database_stats":
+		c.handleGetDatabaseStats()
 	case "ping":
 		// Just update deadline, handled by pong handler
 	default:
@@ -765,6 +767,51 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 			"client_id", c.id,
 		)
 	}
+}
+
+// handleGetDatabaseStats retrieves database statistics and sends them to the client
+func (c *Client) handleGetDatabaseStats() {
+	c.server.logger.Infow("Database stats request",
+		"client_id", c.id,
+	)
+
+	// Get basic storage statistics from database
+	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
+	err := c.server.db.QueryRow(`
+		SELECT
+			COUNT(*) as total_attestations,
+			COUNT(DISTINCT json_extract(actors, '$[0]')) as unique_actors,
+			COUNT(DISTINCT json_extract(subjects, '$')) as unique_subjects,
+			COUNT(DISTINCT json_extract(contexts, '$')) as unique_contexts
+		FROM attestations
+	`).Scan(&totalAttestations, &uniqueActors, &uniqueSubjects, &uniqueContexts)
+
+	if err != nil {
+		c.server.logger.Errorw("Failed to query database stats",
+			"error", err,
+			"client_id", c.id,
+		)
+		c.sendJSON(map[string]interface{}{
+			"type":  "error",
+			"error": fmt.Sprintf("Failed to retrieve database statistics: %v", err),
+		})
+		return
+	}
+
+	// Send stats to client
+	c.sendJSON(map[string]interface{}{
+		"type":               "database_stats",
+		"path":               c.server.dbPath,
+		"total_attestations": totalAttestations,
+		"unique_actors":      uniqueActors,
+		"unique_subjects":    uniqueSubjects,
+		"unique_contexts":    uniqueContexts,
+	})
+
+	c.server.logger.Infow("Database stats sent",
+		"total_attestations", totalAttestations,
+		"client_id", c.id,
+	)
 }
 
 // handleVisibility updates client visibility preferences and refreshes the graph
