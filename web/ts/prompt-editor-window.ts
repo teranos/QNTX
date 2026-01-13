@@ -643,6 +643,7 @@ export function clearPromptEditor(): void {
 
 /**
  * Parse ATS code containing "so prompt" and extract prompt details
+ * Uses proper tokenization similar to ats/parser approach
  */
 interface ParsedPromptAction {
     axQuery: string;
@@ -652,44 +653,141 @@ interface ParsedPromptAction {
     model?: string;
 }
 
+/**
+ * Tokenize ATS code with quote handling
+ * Handles both single and double quotes
+ */
+function tokenizeAtsCode(code: string): string[] {
+    const tokens: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    let quoteChar = '';
+
+    for (let i = 0; i < code.length; i++) {
+        const char = code[i];
+
+        if (!inQuotes) {
+            if (char === '"' || char === "'") {
+                // Starting a quoted string
+                inQuotes = true;
+                quoteChar = char;
+                if (current.trim()) {
+                    tokens.push(current.trim());
+                    current = '';
+                }
+            } else if (/\s/.test(char)) {
+                // Whitespace outside quotes
+                if (current.trim()) {
+                    tokens.push(current.trim());
+                    current = '';
+                }
+            } else {
+                current += char;
+            }
+        } else {
+            if (char === quoteChar) {
+                // Ending quoted string
+                tokens.push(current); // Keep quoted content as-is
+                current = '';
+                inQuotes = false;
+                quoteChar = '';
+            } else {
+                current += char;
+            }
+        }
+    }
+
+    // Handle remaining content
+    if (current.trim()) {
+        tokens.push(current.trim());
+    }
+
+    return tokens;
+}
+
+/**
+ * Parse prompt action from tokenized ATS code
+ * State machine approach matching Go ats/prompt/action.go
+ */
 function parsePromptFromAtsCode(atsCode: string): ParsedPromptAction | null {
-    // Look for "so prompt" pattern
     const lines = atsCode.trim().split('\n');
-    let axQuery = '';
-    let template = '';
-    let systemPrompt = '';
-    let provider = '';
-    let model = '';
 
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
 
-        // Check for "so prompt" pattern
-        const soPromptMatch = trimmed.match(/^(.*?)\s+so\s+prompt\s+"([^"]+)"(.*)$/i);
-        if (soPromptMatch) {
-            axQuery = soPromptMatch[1].trim();
-            template = soPromptMatch[2];
-            const rest = soPromptMatch[3];
+        const tokens = tokenizeAtsCode(trimmed);
 
-            // Parse additional options from rest
-            const withMatch = rest.match(/with\s+"([^"]+)"/i);
-            if (withMatch) {
-                systemPrompt = withMatch[1];
-            }
+        // Find "so" keyword position
+        const soIndex = tokens.findIndex(t => t.toLowerCase() === 'so');
+        if (soIndex === -1) continue;
 
-            const providerMatch = rest.match(/provider\s+(\S+)/i);
-            if (providerMatch) {
-                provider = providerMatch[1];
-            }
-
-            const modelMatch = rest.match(/model\s+(\S+)/i);
-            if (modelMatch) {
-                model = modelMatch[1];
-            }
-
-            return { axQuery, template, systemPrompt, provider, model };
+        // Check if next token is "prompt"
+        if (soIndex + 1 >= tokens.length || tokens[soIndex + 1].toLowerCase() !== 'prompt') {
+            continue;
         }
+
+        // Extract ax query (everything before "so")
+        const axQuery = tokens.slice(0, soIndex).join(' ');
+
+        // Parse prompt action tokens (everything after "prompt")
+        const actionTokens = tokens.slice(soIndex + 2);
+        if (actionTokens.length === 0) {
+            return { axQuery };
+        }
+
+        // State machine for parsing
+        let state: 'template' | 'system' | 'done' = 'template';
+        const templateParts: string[] = [];
+        const systemParts: string[] = [];
+        let provider = '';
+        let model = '';
+
+        for (let i = 0; i < actionTokens.length; i++) {
+            const token = actionTokens[i];
+            const lowerToken = token.toLowerCase();
+
+            switch (lowerToken) {
+                case 'with':
+                    if (state === 'template' && templateParts.length > 0) {
+                        state = 'system';
+                    } else if (state !== 'done') {
+                        (state === 'template' ? templateParts : systemParts).push(token);
+                    }
+                    break;
+
+                case 'model':
+                    if (i + 1 < actionTokens.length) {
+                        i++;
+                        model = actionTokens[i];
+                        state = 'done';
+                    }
+                    break;
+
+                case 'provider':
+                    if (i + 1 < actionTokens.length) {
+                        i++;
+                        provider = actionTokens[i].toLowerCase();
+                        state = 'done';
+                    }
+                    break;
+
+                default:
+                    if (state === 'template') {
+                        templateParts.push(token);
+                    } else if (state === 'system') {
+                        systemParts.push(token);
+                    }
+            }
+        }
+
+        return {
+            axQuery,
+            template: templateParts.join(' ') || undefined,
+            systemPrompt: systemParts.join(' ') || undefined,
+            provider: provider || undefined,
+            model: model || undefined,
+        };
     }
 
     return null;
@@ -697,9 +795,26 @@ function parsePromptFromAtsCode(atsCode: string): ParsedPromptAction | null {
 
 /**
  * Check if ATS code contains a "so prompt" action
+ * Uses tokenization to avoid regex edge cases
  */
 export function hasPromptAction(atsCode: string): boolean {
-    return /so\s+prompt\s+"/i.test(atsCode);
+    const lines = atsCode.trim().split('\n');
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
+
+        const tokens = tokenizeAtsCode(trimmed);
+
+        // Find "so" followed by "prompt"
+        for (let i = 0; i < tokens.length - 1; i++) {
+            if (tokens[i].toLowerCase() === 'so' && tokens[i + 1].toLowerCase() === 'prompt') {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 /**
