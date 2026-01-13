@@ -369,7 +369,7 @@ class ConfigPanel extends BasePanel {
             .join(' ');
 
         const isEditable = setting.source === 'user_ui';
-        const editControl = isEditable ? `<button class="config-edit-btn" data-key="${setting.key}" title="Edit">✎</button>` : '';
+        const editControl = isEditable ? `<button class="config-edit-btn has-tooltip" data-key="${setting.key}" data-tooltip="Edit">✎</button>` : '';
 
         // Build setting key tooltip with all source values
         const keyTooltip = this.buildSettingTooltip(setting);
