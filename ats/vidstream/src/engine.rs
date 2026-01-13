@@ -3,6 +3,7 @@
 //! Core engine for frame-by-frame video processing. Designed for
 //! ultra-low latency with minimal allocations in the hot path.
 
+use qntx::error::Error;
 use std::time::Instant;
 
 #[cfg(feature = "onnx")]
@@ -50,14 +51,16 @@ impl VideoEngine {
     ///
     /// # Returns
     /// * `Ok(VideoEngine)` - Successfully initialized engine
-    /// * `Err(String)` - Initialization failed (model not found, invalid config, etc.)
-    pub fn new(config: VideoEngineConfig) -> Result<Self, String> {
+    /// * `Err(Error)` - Initialization failed (model not found, invalid config, etc.)
+    pub fn new(config: VideoEngineConfig) -> Result<Self, Error> {
         // Validate configuration
         if config.confidence_threshold < 0.0 || config.confidence_threshold > 1.0 {
-            return Err("confidence_threshold must be between 0.0 and 1.0".to_string());
+            return Err(Error::internal(
+                "confidence_threshold must be between 0.0 and 1.0",
+            ));
         }
         if config.nms_threshold < 0.0 || config.nms_threshold > 1.0 {
-            return Err("nms_threshold must be between 0.0 and 1.0".to_string());
+            return Err(Error::internal("nms_threshold must be between 0.0 and 1.0"));
         }
 
         // Parse labels if provided
@@ -75,27 +78,38 @@ impl VideoEngine {
         #[cfg(feature = "onnx")]
         let session = {
             if config.model_path.is_empty() {
-                return Err("model_path is required when onnx feature is enabled".to_string());
+                return Err(Error::internal(
+                    "model_path is required when onnx feature is enabled",
+                ));
             }
 
             // Load model file into memory
             // TODO: Update to commit_from_file when qntx-inference branch uses ort rc.11
-            let model_bytes = fs::read(&config.model_path)
-                .map_err(|e| format!("Failed to read model file {}: {}", config.model_path, e))?;
+            let model_bytes = fs::read(&config.model_path).map_err(|e| {
+                Error::context(
+                    format!("failed to read model file '{}'", config.model_path),
+                    e,
+                )
+            })?;
 
             // Build session with model bytes
             Session::builder()
-                .map_err(|e| format!("Failed to create session builder: {}", e))?
+                .map_err(|e| Error::context("failed to create ONNX session builder", e))?
                 .with_optimization_level(GraphOptimizationLevel::Level3)
-                .map_err(|e| format!("Failed to set optimization level: {}", e))?
+                .map_err(|e| Error::context("failed to set ONNX optimization level", e))?
                 .with_intra_threads(if config.num_threads > 0 {
                     config.num_threads as usize
                 } else {
                     1
                 })
-                .map_err(|e| format!("Failed to set thread count: {}", e))?
+                .map_err(|e| Error::context("failed to set ONNX thread count", e))?
                 .commit_from_memory(&model_bytes)
-                .map_err(|e| format!("Failed to load model from {}: {}", config.model_path, e))?
+                .map_err(|e| {
+                    Error::context(
+                        format!("failed to load ONNX model from '{}'", config.model_path),
+                        e,
+                    )
+                })?
         };
 
         Ok(Self {

@@ -163,7 +163,10 @@ impl VideoResultC {
 pub extern "C" fn video_engine_new() -> *mut VideoEngine {
     match VideoEngine::new(VideoEngineConfig::default()) {
         Ok(engine) => Box::into_raw(Box::new(engine)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("[vidstream] Failed to create engine: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -218,7 +221,10 @@ pub extern "C" fn video_engine_new_with_config(
 
     match VideoEngine::new(rust_config) {
         Ok(engine) => Box::into_raw(Box::new(engine)),
-        Err(_) => ptr::null_mut(),
+        Err(e) => {
+            eprintln!("[vidstream] Failed to create engine: {}", e);
+            ptr::null_mut()
+        }
     }
 }
 
@@ -457,6 +463,22 @@ pub extern "C" fn video_string_free(s: *mut c_char) {
             let _ = CString::from_raw(s);
         }
     }
+}
+
+/// Returns the library version string.
+///
+/// # Safety
+///
+/// The returned pointer is valid for the lifetime of the program.
+/// Do not free this pointer - it points to static memory.
+///
+/// # Returns
+///
+/// A null-terminated C string containing the version (e.g., "0.1.0")
+#[no_mangle]
+pub extern "C" fn video_engine_version() -> *const c_char {
+    // SAFETY: This is a compile-time constant string literal
+    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
 }
 
 #[cfg(test)]
