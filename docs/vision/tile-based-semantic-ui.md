@@ -273,6 +273,11 @@ Each view maintains independent zoom level:
 
 **Trade-off:** Slight reload penalty for simpler architecture and no stale data risk.
 
+## Related Vision
+
+- [Continuous Intelligence](./continuous-intelligence.md) - The paradigm that tiles visualize
+- [Time-Travel](./time-travel.md) - Navigate tile states across time
+
 ## Related Documentation
 
 - **Symbols System:** [`sym/README.md`](../../sym/README.md) - QNTX symbol definitions
