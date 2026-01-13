@@ -67,15 +67,36 @@ ax [query] so prompt [template]
 ```
 go test ./ats/prompt/... -v
 PASS
-ok  	github.com/teranos/QNTX/ats/prompt	0.068s
+ok  	github.com/teranos/QNTX/ats/prompt	0.063s
 ```
 
-Tests cover:
-- Prompt storage as attestations
-- Version increments on update
-- All optional fields preserved
-- Template validation (rejects unknown fields)
-- Name/template required validation
+### Test Scenario: Kitchen Inventory → Recipe Suggestions
+
+Tests use a realistic scenario demonstrating the value proposition:
+
+**Inventory Attestations:**
+```
+ALICE is inventory of fridge by smartfridge_001 at 2024-06-15
+  ATTRIBUTES{milk:240ml, eggs:6pc, butter:100g, cheese:200g}
+
+ALICE is inventory of cupboard by manual_entry at 2024-06-15
+  ATTRIBUTES{rigatoni:250g, canned_tomatoes:2pc, onion:3pc, garlic:1head}
+```
+
+**Recipe Prompt Template:**
+```
+Based on {{subject}}'s kitchen inventory from {{contexts}},
+recorded by {{actors}} at {{temporal}},
+suggest healthy dinner recipes using: {{attributes}}.
+Prioritize items expiring soon.
+```
+
+**Tests cover:**
+- `TestExecute_FridgeInventory` - Smartfridge data interpolation
+- `TestExecute_CupboardInventory` - Manual entry with multiple contexts
+- `TestExecute_RecipePromptConstruction` - Full prompt assembly
+- `TestSavePrompt_VersionIncrementsAsRecipeEvolves` - Prompt refinement over time
+- `TestSavePrompt_FullRecipeConfiguration` - Complete chef assistant setup
 
 ## Known Gaps / TODOs
 
