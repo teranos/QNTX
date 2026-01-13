@@ -65,7 +65,8 @@ export interface StoredPrompt {
 class PromptEditorPanel {
     private window: Window;
     private isExecuting: boolean = false;
-    private currentPromptId: string | null = null;
+    // Tracked for future use (e.g., update vs create detection)
+    private _currentPromptId: string | null = null;
     private currentVersion: number = 0;
 
     constructor() {
@@ -418,7 +419,7 @@ class PromptEditorPanel {
             }
 
             const saved = await response.json();
-            this.currentPromptId = saved.id;
+            this._currentPromptId = saved.id;
             this.currentVersion = saved.version;
             this.updateVersionBadge();
             this.updateStatus(`Saved as v${saved.version}`, 'success');
@@ -457,7 +458,7 @@ class PromptEditorPanel {
         if (providerSelect) providerSelect.value = prompt.provider || '';
         if (modelInput) modelInput.value = prompt.model || '';
 
-        this.currentPromptId = prompt.id;
+        this._currentPromptId = prompt.id;
         this.currentVersion = prompt.version;
         this.updateVersionBadge();
 
@@ -497,7 +498,7 @@ class PromptEditorPanel {
             resultsEl.innerHTML = '<div class="prompt-results-empty">Execute a prompt to see results here</div>';
         }
 
-        this.currentPromptId = null;
+        this._currentPromptId = null;
         this.currentVersion = 0;
         this.updateVersionBadge();
     }

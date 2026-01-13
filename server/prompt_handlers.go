@@ -396,7 +396,7 @@ func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 }
 
 // executePromptAxQuery is a helper that executes an ax query and returns the result
-func (s *QNTXServer) executePromptAxQuery(ctx context.Context, filter types.AxFilter) (*ax.AxResult, error) {
+func (s *QNTXServer) executePromptAxQuery(ctx context.Context, filter types.AxFilter) (*types.AxResult, error) {
 	executor := storage.NewExecutor(s.db)
 	return executor.ExecuteAsk(ctx, filter)
 }
