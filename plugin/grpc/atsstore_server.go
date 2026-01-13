@@ -2,15 +2,12 @@ package grpc
 
 import (
 	"context"
-	"crypto/subtle"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
-	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
 )
@@ -32,17 +29,10 @@ func NewATSStoreServer(store *storage.SQLStore, authToken string, logger *zap.Su
 	}
 }
 
-// validateAuth checks the authentication token
-func (s *ATSStoreServer) validateAuth(token string) error {
-	if subtle.ConstantTimeCompare([]byte(token), []byte(s.authToken)) != 1 {
-		return errors.New("invalid authentication token")
-	}
-	return nil
-}
 
 // CreateAttestation creates a new attestation
 func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.CreateAttestationRequest) (*protocol.CreateAttestationResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.CreateAttestationResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -75,7 +65,7 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 
 // AttestationExists checks if an attestation exists
 func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.AttestationExistsRequest) (*protocol.AttestationExistsResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.AttestationExistsResponse{
 			Exists: false,
 		}, nil
@@ -90,7 +80,7 @@ func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.At
 
 // GenerateAndCreateAttestation generates an ID and creates an attestation
 func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *protocol.GenerateAttestationRequest) (*protocol.GenerateAttestationResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -134,7 +124,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 
 // GetAttestations queries attestations with filters
 func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetAttestationsRequest) (*protocol.GetAttestationsResponse, error) {
-	if err := s.validateAuth(req.AuthToken); err != nil {
+	if err := ValidateToken(req.AuthToken, s.authToken); err != nil {
 		return &protocol.GetAttestationsResponse{
 			Success: false,
 			Error:   err.Error(),
@@ -175,11 +165,9 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 // Helper functions for conversion
 
 func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
-	var attributes map[string]interface{}
-	if proto.AttributesJson != "" {
-		if err := json.Unmarshal([]byte(proto.AttributesJson), &attributes); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal attributes")
-		}
+	attributes, err := attributesFromJSON(proto.AttributesJson)
+	if err != nil {
+		return nil, err
 	}
 
 	return &types.As{
@@ -196,13 +184,9 @@ func protoToAttestation(proto *protocol.Attestation) (*types.As, error) {
 }
 
 func attestationToProto(as *types.As) (*protocol.Attestation, error) {
-	var attributesJSON string
-	if len(as.Attributes) > 0 {
-		bytes, err := json.Marshal(as.Attributes)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshal attributes")
-		}
-		attributesJSON = string(bytes)
+	attributesJSON, err := attributesToJSON(as.Attributes)
+	if err != nil {
+		return nil, err
 	}
 
 	return &protocol.Attestation{
@@ -219,11 +203,9 @@ func attestationToProto(as *types.As) (*protocol.Attestation, error) {
 }
 
 func protoToCommand(proto *protocol.AttestationCommand) (*types.AsCommand, error) {
-	var attributes map[string]interface{}
-	if proto.AttributesJson != "" {
-		if err := json.Unmarshal([]byte(proto.AttributesJson), &attributes); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal attributes")
-		}
+	attributes, err := attributesFromJSON(proto.AttributesJson)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := time.Now()

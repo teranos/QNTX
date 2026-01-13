@@ -442,6 +442,22 @@ fn convert_string_array(arr: *const *const c_char, len: usize) -> Result<Vec<Str
     Ok(result)
 }
 
+/// Returns the library version string.
+///
+/// # Safety
+///
+/// The returned pointer is valid for the lifetime of the program.
+/// Do not free this pointer - it points to static memory.
+///
+/// # Returns
+///
+/// A null-terminated C string containing the version (e.g., "0.1.0")
+#[no_mangle]
+pub extern "C" fn fuzzy_engine_version() -> *const c_char {
+    // SAFETY: This is a compile-time constant string literal
+    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
