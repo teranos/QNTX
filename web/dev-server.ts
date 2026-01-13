@@ -11,6 +11,7 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 // Configuration
+// TODO(#272): Support configurable dev ports via env vars or am.toml for multi-variant testing
 const BACKEND_URL = "http://localhost:877";  // Go backend
 const DEV_PORT_START = 8820;  // Preferred development server port
 const DEV_PORT_MAX = 8830;     // Maximum port to try

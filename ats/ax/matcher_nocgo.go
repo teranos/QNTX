@@ -2,7 +2,7 @@
 
 package ax
 
-import "errors"
+import "github.com/teranos/QNTX/errors"
 
 // CGOMatcher is a stub when the rustfuzzy build tag is not set.
 // To enable CGO fuzzy matching, build with: go build -tags rustfuzzy

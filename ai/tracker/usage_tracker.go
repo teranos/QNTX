@@ -155,21 +155,6 @@ type UsageStats struct {
 }
 
 // GetTimeSeriesData returns daily aggregated cost and request counts
-// TODO: Research better time-series architecture - see GitHub issue for WebSocket streaming investigation
-//
-// TODO(future): Per-model breakdown support
-// Add optional model filtering to time-series queries:
-// - Parameter: modelName string (empty = all models)
-// - Query: Add WHERE model_name = ? when filter specified
-// - Response: Include model metadata in TimeSeriesPoint
-// - Consider: Multi-model response format (map[string][]TimeSeriesPoint)
-//
-// TODO(future): Period comparison queries
-// Support fetching multiple time ranges for comparison:
-// - Method: GetTimeSeriesComparison(currentDays, previousDays int)
-// - Returns: Current period + previous period data
-// - Enables: Week-over-week, month-over-month calculations
-// - Optimization: Single query with UNION or window functions
 func (t *UsageTracker) GetTimeSeriesData(days int) ([]TimeSeriesPoint, error) {
 	query := `
 		SELECT

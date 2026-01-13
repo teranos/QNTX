@@ -9,6 +9,7 @@
 import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
+import { DB } from '@generated/sym.js';
 
 interface StatusIndicator {
     id: string;
@@ -52,6 +53,7 @@ class StatusIndicatorManager {
         // Add default indicators
         this.addConnectionIndicator();
         this.addPulseIndicator();
+        this.addDatabaseIndicator();
     }
 
     /**
@@ -140,6 +142,19 @@ class StatusIndicatorManager {
     }
 
     /**
+     * Add Database indicator
+     */
+    private addDatabaseIndicator(): void {
+        this.addIndicator({
+            id: 'database',
+            label: `${DB} Loading...`,
+            clickable: true,
+            onClick: () => this.showDatabaseInfo(),
+            initialState: 'active'
+        });
+    }
+
+    /**
      * Update an indicator's state
      */
     updateIndicator(id: string, state: string, label?: string): void {
@@ -220,6 +235,14 @@ class StatusIndicatorManager {
     }
 
     /**
+     * Show database information modal
+     */
+    private async showDatabaseInfo(): Promise<void> {
+        const module = await import('./database-stats-window.js');
+        module.databaseStatsWindow.toggle();
+    }
+
+    /**
      * Handle connection status updates
      */
     handleConnectionStatus(connected: boolean): void {
@@ -249,6 +272,14 @@ class StatusIndicatorManager {
             state,
             `Pulse: ${state === 'active' ? 'ON' : 'OFF'}`
         );
+    }
+
+    /**
+     * Handle database stats update
+     */
+    handleDatabaseStats(count: number): void {
+        const formatted = count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count.toString();
+        this.updateIndicator('database', 'active', `${DB} ${formatted}`);
     }
 }
 

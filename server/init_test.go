@@ -137,12 +137,12 @@ func TestServerInitializationWithInvalidVerbosity(t *testing.T) {
 		verbosity int
 		wantErr   bool
 	}{
-		{-1, true},  // Too low
-		{0, false},  // Valid
-		{1, false},  // Valid
-		{4, false},  // Valid
-		{5, true},   // Too high
-		{10, true},  // Way too high
+		{-1, true}, // Too low
+		{0, false}, // Valid
+		{1, false}, // Valid
+		{4, false}, // Valid
+		{5, true},  // Too high
+		{10, true}, // Way too high
 	}
 
 	for _, tt := range tests {
