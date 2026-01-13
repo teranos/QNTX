@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -435,10 +436,28 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 		l.buf.WriteString(rest)
 
 		if line = strings.TrimSpace(line); line != "" {
-			if l.level == "error" {
-				l.logger.Errorf("[%s stderr] %s", l.name, line)
-			} else {
+			// Try to parse JSON log entry and extract actual level
+			var logEntry struct {
+				Level string `json:"level"`
+			}
+			actualLevel := l.level // Default to configured level (stdout=info, stderr=error)
+			if err := json.Unmarshal([]byte(line), &logEntry); err == nil && logEntry.Level != "" {
+				actualLevel = logEntry.Level
+			}
+
+			// Log at the actual level from JSON, or fallback to configured level for non-JSON
+			switch actualLevel {
+			case "debug":
+				l.logger.Debugf("[%s] %s", l.name, line)
+			case "info":
 				l.logger.Infof("[%s] %s", l.name, line)
+			case "warn":
+				l.logger.Warnf("[%s] %s", l.name, line)
+			case "error":
+				l.logger.Errorf("[%s stderr] %s", l.name, line)
+			default:
+				// Unknown level or non-JSON
+				l.logger.Warnf("[%s UNKNOWN] %s", l.name, line)
 			}
 		}
 	}

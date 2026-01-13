@@ -134,6 +134,9 @@ func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protoc
 
 // HandleHTTP handles an HTTP request via gRPC.
 func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
+	// DEBUG: Log incoming request
+	s.logger.Infow("gRPC HandleHTTP received", "method", req.Method, "path", req.Path)
+
 	// Create an HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.Path, bytes.NewReader(req.Body))
 	if err != nil {
@@ -266,5 +269,39 @@ func (s *PluginServer) Health(ctx context.Context, _ *protocol.Empty) (*protocol
 		Healthy: status.Healthy,
 		Message: status.Message,
 		Details: details,
+	}, nil
+}
+
+// ConfigSchema returns the plugin's configuration schema for UI-based configuration.
+// If the plugin implements ConfigurablePlugin, returns its schema; otherwise empty.
+func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*protocol.ConfigSchemaResponse, error) {
+	// Check if plugin implements ConfigurablePlugin
+	configurable, ok := s.plugin.(plugin.ConfigurablePlugin)
+	if !ok {
+		// Plugin doesn't support configuration schema - return empty
+		return &protocol.ConfigSchemaResponse{
+			Fields: make(map[string]*protocol.ConfigFieldSchema),
+		}, nil
+	}
+
+	// Get schema from plugin and convert to protocol format
+	schema := configurable.ConfigSchema()
+	fields := make(map[string]*protocol.ConfigFieldSchema, len(schema))
+
+	for name, field := range schema {
+		fields[name] = &protocol.ConfigFieldSchema{
+			Type:         field.Type,
+			Description:  field.Description,
+			DefaultValue: field.DefaultValue,
+			Required:     field.Required,
+			MinValue:     field.MinValue,
+			MaxValue:     field.MaxValue,
+			Pattern:      field.Pattern,
+			ElementType:  field.ElementType,
+		}
+	}
+
+	return &protocol.ConfigSchemaResponse{
+		Fields: fields,
 	}, nil
 }
