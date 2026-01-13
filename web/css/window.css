@@ -43,9 +43,32 @@
     color: var(--panel-text-primary, #333);
 }
 
+/* Version text next to title */
+.draggable-window-version {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--panel-text-tertiary, #999);
+    margin-left: 6px;
+    cursor: help;
+}
+
 /* Content */
 .draggable-window-content {
     padding: 12px;
+}
+
+/* Footer - for runtime stats and metrics */
+.draggable-window-footer {
+    padding: 8px 12px;
+    border-top: var(--panel-border);
+    background: var(--panel-bg-secondary, #f8f8f8);
+    font-size: 11px;
+    color: var(--panel-text-secondary, #666);
+    display: none;
+}
+
+.draggable-window-footer:not(:empty) {
+    display: block;
 }
 
 /* Form elements */
