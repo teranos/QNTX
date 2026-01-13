@@ -25,7 +25,7 @@
 // Import generated symbol constants and mappings from Go source
 import {
     SO,
-    Pulse, Prose,
+    Pulse, Prose, DB,
     CommandToSymbol,
 } from '@generated/sym.js';
 import { uiState } from './ui-state.ts';
@@ -45,7 +45,7 @@ import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream' | 'db';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -53,6 +53,7 @@ type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 
 function getSymbol(cmd: string): string {
     if (cmd === 'pulse') return Pulse;
     if (cmd === 'prose') return Prose;
+    if (cmd === 'db') return DB;
     if (cmd === 'go') return 'Go';
     if (cmd === 'py') return 'py';
     if (cmd === 'plugins') return '\u2699'; // Gear symbol
@@ -81,6 +82,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initializeSymbolPalette(): void {
     const cmdCells = document.querySelectorAll('.palette-cell');
+
+    // Populate symbols from generated sym.ts (single source of truth)
+    cmdCells.forEach(cell => {
+        const cmd = cell.getAttribute('data-cmd');
+        if (cmd) {
+            cell.textContent = getSymbol(cmd);
+        }
+    });
 
     // Mark VidStream as degraded in desktop mode (camera not yet supported)
     const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -227,6 +236,10 @@ function handleSymbolClick(e: Event): void {
             // Pulse - show scheduled jobs panel
             showPulsePanel();
             break;
+        case 'db':
+            // Database - show database statistics window
+            showDatabaseWindow();
+            break;
         case 'prose':
             // Prose - show documentation panel
             showProsePanel();
@@ -288,6 +301,18 @@ function showAIProviderPanel(): void {
  */
 function showPulsePanel(): void {
     togglePulsePanel();
+}
+
+/**
+ * Show database window - displays database statistics
+ */
+let databaseWindowInstance: any = null;
+async function showDatabaseWindow(): Promise<void> {
+    if (!databaseWindowInstance) {
+        const module = await import('./database-stats-window.js');
+        databaseWindowInstance = module.databaseStatsWindow;
+    }
+    databaseWindowInstance.toggle();
 }
 
 /**

@@ -3,12 +3,18 @@
  * Design philosophy: data-first hierarchy, semantic clarity, performance
  */
 
-/* Layout */
+/* Layout - Bloomberg-style dense information */
 body {
-    max-width: 900px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 40px 20px;
-    line-height: 1.6;
+    padding: 24px 20px;
+    line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+    body {
+        padding: 16px 12px;
+    }
 }
 
 /* Typography - Code blocks */
@@ -34,16 +40,24 @@ pre code {
     border: none;
 }
 
-/* Headings */
+/* Headings - Compact */
 h1 {
-    border-bottom: 2px solid #e0e0e0;
-    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+    font-size: 1.8em;
+    margin: 0.5em 0;
 }
 
 h2 {
-    margin-top: 2em;
-    border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 8px;
+    margin-top: 1.5em;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 6px;
+    font-size: 1.3em;
+}
+
+h3 {
+    margin-top: 1.25em;
+    font-size: 1.1em;
 }
 
 /* Links */
@@ -105,49 +119,127 @@ nav.doc-nav a {
     font-size: 0.95em;
 }
 
-/* Index Page */
+/* Index Page - Compact header */
 .doc-header {
     display: flex;
     align-items: center;
-    margin-bottom: 2em;
-    border-bottom: 2px solid #e0e0e0;
-    padding-bottom: 16px;
+    margin-bottom: 1.25em;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
 }
 
 .doc-header img {
-    width: 48px;
-    height: 48px;
-    margin-right: 16px;
+    width: 40px;
+    height: 40px;
+    margin-right: 12px;
 }
 
 .doc-header h1 {
     margin: 0;
     border: none;
     padding: 0;
+    font-size: 1.5em;
 }
 
-/* Quick Links Navigation */
+@media (max-width: 640px) {
+    .doc-header {
+        flex-direction: column;
+        text-align: center;
+        padding-bottom: 8px;
+    }
+
+    .doc-header img {
+        margin-right: 0;
+        margin-bottom: 8px;
+        width: 36px;
+        height: 36px;
+    }
+
+    .doc-header h1 {
+        font-size: 1.3em;
+    }
+}
+
+/* Intro Section - Compact */
+.intro-section {
+    margin: 1em 0 1.5em 0;
+    padding: 12px 16px;
+    background: #f9f9f9;
+    border-left: 3px solid #0066cc;
+    border-radius: 3px;
+}
+
+.intro-section p {
+    margin: 0.5em 0;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.intro-section p:first-child {
+    margin-top: 0;
+}
+
+.intro-section p:last-child {
+    margin-bottom: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85em;
+    color: #555;
+}
+
+/* Build Info Section - Compact */
+.build-info-section {
+    margin: 1.5em 0;
+}
+
+.build-info-section h2 {
+    font-size: 1.1em;
+    margin: 0 0 0.5em 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+}
+
+.build-info-section p {
+    margin: 0.5em 0;
+    font-size: 0.9em;
+}
+
+.build-info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.75em 0;
+    font-size: 0.9em;
+}
+
+.build-info-list li {
+    padding: 4px 0;
+    border-left: 2px solid #e0e0e0;
+    padding-left: 12px;
+    margin: 4px 0;
+}
+
+/* Quick Links Navigation - Compact */
 .quick-links {
     display: flex;
-    gap: 12px;
-    margin-bottom: 2em;
+    gap: 8px;
+    margin-bottom: 1em;
     flex-wrap: wrap;
 }
 
 .quick-link {
     display: inline-block;
-    padding: 8px 16px;
+    padding: 6px 12px;
     background: #f9f9f9;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
     color: var(--accent-color, #0066cc);
     font-weight: 500;
+    font-size: 0.9em;
     text-decoration: none;
-    transition: background 0.15s;
+    transition: background 0.1s;
 }
 
 .quick-link:hover {
-    background: #f0f0f0;
+    background: #eee;
     text-decoration: none;
 }
 
@@ -224,14 +316,108 @@ nav.doc-nav a {
     padding: 12px 0;
 }
 
-/* Downloads Page */
+/* Downloads Page - Compact */
 .download-section {
-    margin: 2em 0;
+    margin: 1em 0;
 }
 
 .download-section h2 {
-    border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+    font-size: 1.1em;
+    margin-bottom: 0.75em;
+}
+
+/* Quick Download Bar - Horizontal compact layout at top */
+.download-section.quick-download {
+    margin: 0.75em 0 1.5em 0;
+    padding: 10px 12px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.download-section.quick-download h2 {
+    font-size: 0.85em;
+    margin: 0 0 8px 0;
+    padding: 0;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    font-weight: 600;
+}
+
+.download-section.quick-download .release-version {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.download-section.quick-download .release-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.download-section.quick-download .release-header h3 {
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.download-section.quick-download .release-date {
+    font-size: 0.8em;
+}
+
+.download-section.quick-download .platform-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+}
+
+.download-section.quick-download .platform-list li {
+    padding: 0;
+    border: none;
+    display: inline-block;
+    margin: 0;
+}
+
+.download-section.quick-download .platform-link {
+    display: inline-block;
+}
+
+.download-section.quick-download .platform-name {
+    display: none;
+}
+
+.download-section.quick-download .download-link {
+    display: inline-block;
+    padding: 6px 12px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 0.85em;
+    transition: all 0.1s;
+}
+
+.download-section.quick-download .download-link:hover {
+    background: #f9f9f9;
+    border-color: #0066cc;
+}
+
+.download-section.quick-download .file-size {
+    margin-left: 4px;
+    color: #999;
+    font-size: 0.85em;
+}
+
+.download-section.quick-download p {
+    margin: 8px 0 0 0;
+    font-size: 0.85em;
 }
 
 .download-cards {
@@ -307,11 +493,12 @@ nav.doc-nav a {
 }
 
 .platform-list li {
-    padding: 8px 0;
+    padding: 6px 0;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 0.9em;
 }
 
 .platform-list li:last-child {
@@ -326,35 +513,34 @@ nav.doc-nav a {
     font-size: 0.9em;
 }
 
-/* Release Version Cards */
+/* Release Version Cards - Compact */
 .release-version {
     background: #f9f9f9;
     border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
 }
 
 .release-version.latest {
     border-color: var(--accent-color, #0066cc);
-    border-width: 2px;
 }
 
 .release-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
+    align-items: baseline;
+    margin-bottom: 8px;
 }
 
 .release-header h3 {
     margin: 0;
-    font-size: 1.1em;
+    font-size: 1em;
 }
 
 .release-date {
-    color: #666;
-    font-size: 0.85em;
+    color: #777;
+    font-size: 0.8em;
 }
 
 .latest-badge {
@@ -462,62 +648,103 @@ nav.doc-nav a {
     font-size: 0.85em;
 }
 
-/* Category sections with SEG symbols */
+/* Category sections - Dense layout */
 .category-section {
     margin-top: 2em;
 }
 
 .category-header {
     display: flex;
-    align-items: center;
-    margin-bottom: 1em;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.category-symbol {
-    font-size: 1.5em;
-    margin-right: 12px;
-    opacity: 0.7;
+    align-items: baseline;
+    margin-bottom: 0.75em;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #ddd;
+    gap: 10px;
 }
 
 .category-title {
     margin: 0;
-    font-size: 1.2em;
+    font-size: 1.1em;
     color: #333;
+    font-weight: 600;
 }
 
 .category-desc {
     font-size: 0.85em;
-    color: #666;
+    color: #777;
     margin-left: auto;
 }
 
-/* Document list */
+@media (max-width: 640px) {
+    .category-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .category-desc {
+        margin-left: 0;
+        font-size: 0.8em;
+    }
+
+    .category-section {
+        margin-top: 1.5em;
+    }
+}
+
+/* Document list - Compact grid */
 .doc-list {
     list-style: none;
     padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
 }
 
 .doc-list li {
-    margin: 8px 0;
+    margin: 0;
 }
 
 .doc-list a {
     display: block;
-    padding: 12px 16px;
+    padding: 10px 12px;
     background: #f9f9f9;
     border-radius: 4px;
-    transition: background 0.15s;
+    border: 1px solid #e0e0e0;
+    transition: all 0.1s;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: 0.95em;
 }
 
 .doc-list a:hover {
     background: #f0f0f0;
     text-decoration: none;
+    border-color: #0066cc;
 }
 
 .doc-list .doc-name {
     font-weight: 500;
+}
+
+/* Tablet: 2 columns */
+@media (max-width: 900px) {
+    .doc-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Mobile: single column */
+@media (max-width: 640px) {
+    .doc-list {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .doc-list a {
+        padding: 8px 12px;
+        font-size: 0.9em;
+    }
 }
 
 /* Tables - data-first display */
@@ -541,6 +768,18 @@ th {
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
     .doc-list a {
+        transition: none;
+    }
+
+    .doc-list a:hover {
+        transform: none;
+    }
+
+    .quick-link {
+        transition: none;
+    }
+
+    .download-btn {
         transition: none;
     }
 }
@@ -583,12 +822,59 @@ th {
         border-color: #333;
     }
 
+    .doc-list a {
+        background: #242424;
+        border-color: #333;
+    }
+
     .doc-list a:hover {
         background: #2a2a2a;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .doc-header {
         border-color: #333;
+    }
+
+    .intro-section {
+        background: #242424;
+        border-left-color: #0077cc;
+    }
+
+    .intro-section p:last-child {
+        color: #aaa;
+    }
+
+    .build-info-section h2 {
+        border-color: #333;
+    }
+
+    .build-info-list li {
+        border-left-color: #333;
+    }
+
+    .download-section.quick-download {
+        background: #222;
+        border-color: #333;
+    }
+
+    .download-section.quick-download h2 {
+        color: #888;
+    }
+
+    .download-section.quick-download .download-link {
+        background: #2a2a2a;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+
+    .download-section.quick-download .download-link:hover {
+        background: #333;
+        border-color: #0077cc;
+    }
+
+    .download-section.quick-download .file-size {
+        color: #777;
     }
 
     .quick-link {

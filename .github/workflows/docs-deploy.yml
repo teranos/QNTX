@@ -1,19 +1,22 @@
 name: Deploy Docs to GitHub Pages
 
 on:
+  workflow_dispatch:  # Allow manual triggering for testing
   push:
     branches: [main]
     paths:
       - 'docs/**'
       - 'sitegen.nix'
-      - 'web/js/**'
       - 'web/css/**'
       - 'types/generated/**'
       - '.github/workflows/docs-deploy.yml'
+  # Rebuild docs when new release is published
+  release:
+    types: [published]
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write  # Need write to commit hash updates
   pages: write
   id-token: write
 
@@ -45,7 +48,44 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Build documentation site
-        run: nix build .#docs-site --show-trace
+        run: |
+          # Try to build
+          if ! nix build .#docs-site 2>&1 | tee build.log; then
+            # Check if it's a hash mismatch for releases
+            if grep -q "hash mismatch" build.log && grep -q "qntx-releases.json" build.log; then
+              echo "GitHub releases hash mismatch detected"
+
+              # Extract new hash
+              NEW_HASH=$(grep "got:" build.log | tail -1 | awk '{print $2}')
+
+              # Validate hash was extracted
+              if [ -z "$NEW_HASH" ] || [[ ! "$NEW_HASH" =~ ^sha256- ]]; then
+                echo "ERROR: Failed to extract valid hash from build log"
+                cat build.log
+                exit 1
+              fi
+
+              echo "New hash: $NEW_HASH"
+
+              # Update sitegen.nix
+              sed -i "s|outputHash = \"sha256-[^\"]*\";|outputHash = \"$NEW_HASH\";|" sitegen.nix
+
+              # Commit the hash update
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add sitegen.nix
+              git commit -m "Update GitHub releases hash for docs build"
+              git push
+
+              # Retry build
+              echo "Retrying build with updated hash..."
+              nix build .#docs-site --show-trace
+            else
+              echo "Build failed for reason other than releases hash"
+              cat build.log
+              exit 1
+            fi
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

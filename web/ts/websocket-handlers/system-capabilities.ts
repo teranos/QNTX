@@ -17,8 +17,10 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
     log.debug(SEG.PULSE, 'System capabilities received:', {
         fuzzy_backend: data.fuzzy_backend,
         fuzzy_optimized: data.fuzzy_optimized,
+        fuzzy_version: data.fuzzy_version,
         vidstream_backend: data.vidstream_backend,
         vidstream_optimized: data.vidstream_optimized,
+        vidstream_version: data.vidstream_version,
     });
 
     // Handle ax button (fuzzy matching)
@@ -30,13 +32,13 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
             // Using Go fallback - show degraded state
             axButton.classList.add('degraded');
             axButton.setAttribute('data-fuzzy-backend', 'go');
-            axButton.setAttribute('title', '⋈ ax - expand (Go fallback)\nClick for details');
+            axButton.setAttribute('title', `⋈ ax - expand (${data.fuzzy_backend} fallback)\nClick for details`);
             log.debug(SEG.PULSE, 'Using Go fallback - showing degraded state');
         } else {
             // Using Rust optimization - normal state
             axButton.classList.remove('degraded');
             axButton.setAttribute('data-fuzzy-backend', 'rust');
-            axButton.setAttribute('title', '⋈ ax - expand (Rust optimized)');
+            axButton.setAttribute('title', `⋈ ax - expand (${data.fuzzy_backend} v${data.fuzzy_version})`);
             log.debug(SEG.PULSE, 'Using Rust optimization');
         }
     }
@@ -56,7 +58,7 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
             // ONNX available - normal state
             vidButton.classList.remove('degraded');
             vidButton.setAttribute('data-vidstream-backend', 'onnx');
-            vidButton.setAttribute('title', '⮀ vidstream - real-time video inference (ONNX Runtime)');
+            vidButton.setAttribute('title', `⮀ vidstream - real-time video inference (ONNX v${data.vidstream_version})`);
             log.debug(SEG.PULSE, 'ONNX available');
         }
     }

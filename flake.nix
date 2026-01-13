@@ -17,6 +17,7 @@
   nixConfig = {
     extra-substituters = [ "https://qntx.cachix.org" ];
     extra-trusted-public-keys = [ "qntx.cachix.org-1:sL1EkSS5871D3ycLjHzuD+/zNddU9G38HGt3qQotAtg=" ];
+    extra-experimental-features = [ "impure-derivations" ];
   };
 
   outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
@@ -33,6 +34,61 @@
 
             # Rust formatting
             rustfmt.enable = true;
+
+            # Nix container workflow verification
+            verify-nix-workflows = {
+              enable = true;
+              name = "Verify Nix container changes";
+              entry = toString (pkgs.writeShellScript "verify-nix-workflows" ''
+                # commit-msg hook receives message file as $1
+                COMMIT_MSG_FILE="$1"
+
+                # Get staged workflow files
+                WORKFLOWS=$(git diff --cached --name-only | grep "^\.github/workflows/.*\.yml$" || true)
+
+                if [ -z "$WORKFLOWS" ]; then
+                  exit 0
+                fi
+
+                # Check if any workflow file uses ghcr.io/teranos/qntx container
+                for workflow in $WORKFLOWS; do
+                  # Check file content, not diff - triggers on ANY change to workflows using Nix container
+                  if [ -f "$workflow" ] && grep -q "ghcr.io/teranos/qntx" "$workflow"; then
+                    # Read commit message from file
+                    COMMIT_MSG=$(cat "$COMMIT_MSG_FILE" 2>/dev/null || echo "")
+
+                    # Check for verification evidence
+                    if ! echo "$COMMIT_MSG" | grep -qE "Verified: flake.nix:[0-9]+"; then
+                      echo "❌ REJECTED: Workflow uses ghcr.io/teranos/qntx without flake.nix verification"
+                      echo ""
+                      echo "When modifying workflows that use the Nix container, you MUST:"
+                      echo "  1. Read flake.nix mkCiImage (lines ~137-197)"
+                      echo "  2. Check BOTH 'contents' AND 'config.Env PATH'"
+                      echo "  3. Add verification to commit message"
+                      echo ""
+                      echo "Required format:"
+                      echo "  Verified: flake.nix:166 (contents has pkgs.curl)"
+                      echo "  Verified: flake.nix:187 (PATH includes pkgs.curl)"
+                      exit 1
+                    fi
+                  fi
+                done
+              '');
+              stages = [ "commit-msg" ];
+              # Note: `files` parameter doesn't work with commit-msg hooks
+              # File filtering is done inside the script via git diff --cached
+              always_run = true;
+            };
+
+            # TypeScript type checking
+            # TODO(#273): Disabled due to vendored d3 causing 83 module resolution errors
+            # ts-typecheck = {
+            #   enable = true;
+            #   name = "TypeScript typecheck";
+            #   entry = "${pkgs.nodePackages.typescript}/bin/tsc --project web/tsconfig.json --noEmit";
+            #   files = "\\.ts$";
+            #   pass_filenames = false;
+            # };
 
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.
@@ -184,7 +240,7 @@
 
           config = {
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash ]}"
+              "PATH=${pkgs.lib.makeBinPath [ qntx pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash pkgs.curl ]}"
               "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.openssl ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
@@ -472,15 +528,33 @@
               set -e
               echo "Generating types and documentation..."
 
-              # Ensure typegen is built
-              ${pkgs.nix}/bin/nix build .#typegen
+              # Check if typegen binary exists and is up-to-date
+              REBUILD_NEEDED=0
+              if [ ! -e ./result/bin/typegen ]; then
+                echo "Typegen binary not found, building..."
+                REBUILD_NEEDED=1
+              elif [ code/typegen -nt ./result/bin/typegen ]; then
+                echo "Typegen source changed, rebuilding..."
+                REBUILD_NEEDED=1
+              fi
 
-              # Run typegen for each language
+              # Build typegen only if needed
+              if [ $REBUILD_NEEDED -eq 1 ]; then
+                ${pkgs.nix}/bin/nix build .#typegen
+              else
+                echo "Using existing typegen binary (skip rebuild)"
+              fi
+
+              # Run typegen for each language in parallel
               # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
-              ./result/bin/typegen --lang typescript --output types/generated/
-              ./result/bin/typegen --lang python --output types/generated/
-              ./result/bin/typegen --lang rust
-              ./result/bin/typegen --lang markdown
+              echo "Running typegen for all languages in parallel..."
+              (
+                ./result/bin/typegen --lang typescript --output types/generated/ &
+                ./result/bin/typegen --lang python --output types/generated/ &
+                ./result/bin/typegen --lang rust &
+                ./result/bin/typegen --lang markdown &
+                wait
+              )
 
               echo "✓ TypeScript types generated in types/generated/typescript/"
               echo "✓ Python types generated in types/generated/python/"

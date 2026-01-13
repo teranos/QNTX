@@ -2,9 +2,10 @@
 //!
 //! Provides execution capabilities for the PythonEngine.
 
-use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine, PythonError};
+use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use qntx::error::Error;
 use std::collections::HashMap;
 use std::ffi::CString;
 
@@ -44,66 +45,60 @@ impl PythonEngine {
         &self,
         code: &str,
         config: &ExecutionConfig,
-    ) -> Result<ExecutionResult, PythonError> {
+    ) -> Result<ExecutionResult, Error> {
         // Create CString for the code
         let code_cstr = CString::new(code)
-            .map_err(|e| PythonError::InvalidInput(format!("Invalid code string: {}", e)))?;
+            .map_err(|e| Error::context("invalid code string contains null bytes", e))?;
 
         Python::with_gil(|py| {
             // Set up output capture
             let io = py
                 .import("io")
-                .map_err(|e| PythonError::ExecutionError(format!("Failed to import io: {}", e)))?;
+                .map_err(|e| Error::context("failed to import io module", e))?;
             let sys = py
                 .import("sys")
-                .map_err(|e| PythonError::ExecutionError(format!("Failed to import sys: {}", e)))?;
+                .map_err(|e| Error::context("failed to import sys module", e))?;
 
             // Create StringIO objects for capturing output
-            let stdout_capture = io.call_method0("StringIO").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to create stdout capture: {}", e))
-            })?;
-            let stderr_capture = io.call_method0("StringIO").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to create stderr capture: {}", e))
-            })?;
+            let stdout_capture = io
+                .call_method0("StringIO")
+                .map_err(|e| Error::context("failed to create stdout StringIO object", e))?;
+            let stderr_capture = io
+                .call_method0("StringIO")
+                .map_err(|e| Error::context("failed to create stderr StringIO object", e))?;
 
             // Save original stdout/stderr
             let original_stdout = sys
                 .getattr("stdout")
-                .map_err(|e| PythonError::ExecutionError(format!("Failed to get stdout: {}", e)))?;
+                .map_err(|e| Error::context("failed to get original sys.stdout", e))?;
             let original_stderr = sys
                 .getattr("stderr")
-                .map_err(|e| PythonError::ExecutionError(format!("Failed to get stderr: {}", e)))?;
+                .map_err(|e| Error::context("failed to get original sys.stderr", e))?;
 
             // Redirect stdout/stderr
-            sys.setattr("stdout", &stdout_capture).map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to redirect stdout: {}", e))
-            })?;
-            sys.setattr("stderr", &stderr_capture).map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to redirect stderr: {}", e))
-            })?;
+            sys.setattr("stdout", &stdout_capture)
+                .map_err(|e| Error::context("failed to redirect sys.stdout to StringIO", e))?;
+            sys.setattr("stderr", &stderr_capture)
+                .map_err(|e| Error::context("failed to redirect sys.stderr to StringIO", e))?;
 
             // Create execution globals
             let globals = PyDict::new(py);
 
             // Add builtins
-            let builtins = py.import("builtins").map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to import builtins: {}", e))
-            })?;
+            let builtins = py
+                .import("builtins")
+                .map_err(|e| Error::context("failed to import builtins module", e))?;
             globals.set_item("__builtins__", builtins).map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to set builtins: {}", e))
+                Error::context("failed to set __builtins__ in execution globals", e)
             })?;
 
             // Add custom paths if specified
             for path in &config.python_paths {
                 let path_list: Bound<'_, PyList> = sys
                     .getattr("path")
-                    .map_err(|e| {
-                        PythonError::ExecutionError(format!("Failed to get sys.path: {}", e))
-                    })?
+                    .map_err(|e| Error::context("failed to get sys.path", e))?
                     .extract()
-                    .map_err(|e| {
-                        PythonError::ExecutionError(format!("Failed to extract sys.path: {}", e))
-                    })?;
+                    .map_err(|e| Error::context("failed to extract sys.path as list", e))?;
                 let _ = path_list.insert(0, path);
             }
 
@@ -249,22 +244,19 @@ fn format_python_error(py: Python<'_>, err: &PyErr) -> String {
 }
 
 /// Convert a Python object to JSON
-fn python_to_json(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-) -> Result<serde_json::Value, PythonError> {
+fn python_to_json(py: Python<'_>, obj: &Bound<'_, PyAny>) -> Result<serde_json::Value, Error> {
     // Try to use json.dumps for serialization
     let json_module = py
         .import("json")
-        .map_err(|e| PythonError::ExecutionError(format!("Failed to import json: {}", e)))?;
+        .map_err(|e| Error::context("failed to import json module", e))?;
 
     match json_module.call_method1("dumps", (obj,)) {
         Ok(json_str) => {
-            let s: String = json_str.extract().map_err(|e| {
-                PythonError::ExecutionError(format!("Failed to extract JSON string: {}", e))
-            })?;
+            let s: String = json_str
+                .extract()
+                .map_err(|e| Error::context("failed to extract JSON string from Python", e))?;
             serde_json::from_str(&s)
-                .map_err(|e| PythonError::ExecutionError(format!("Failed to parse JSON: {}", e)))
+                .map_err(|e| Error::context("failed to parse Python JSON output", e))
         }
         Err(_) => {
             // Fallback to string representation
