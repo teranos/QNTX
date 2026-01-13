@@ -39,6 +39,9 @@
               enable = true;
               name = "Verify Nix container changes";
               entry = toString (pkgs.writeShellScript "verify-nix-workflows" ''
+                # commit-msg hook receives message file as $1
+                COMMIT_MSG_FILE="$1"
+
                 # Get staged workflow files
                 WORKFLOWS=$(git diff --cached --name-only | grep "^\.github/workflows/.*\.yml$" || true)
 
@@ -46,11 +49,12 @@
                   exit 0
                 fi
 
-                # Check if any use ghcr.io/teranos/qntx container
+                # Check if any workflow file uses ghcr.io/teranos/qntx container
                 for workflow in $WORKFLOWS; do
-                  if git diff --cached "$workflow" | grep -q "ghcr.io/teranos/qntx"; then
-                    # Get commit message
-                    COMMIT_MSG=$(git log -1 --format=%B 2>/dev/null || cat .git/COMMIT_EDITMSG 2>/dev/null || echo "")
+                  # Check file content, not diff - triggers on ANY change to workflows using Nix container
+                  if [ -f "$workflow" ] && grep -q "ghcr.io/teranos/qntx" "$workflow"; then
+                    # Read commit message from file
+                    COMMIT_MSG=$(cat "$COMMIT_MSG_FILE" 2>/dev/null || echo "")
 
                     # Check for verification evidence
                     if ! echo "$COMMIT_MSG" | grep -qE "Verified: flake.nix:[0-9]+"; then
@@ -69,7 +73,10 @@
                   fi
                 done
               '');
-              files = "\\.github/workflows/.*\\.yml$";
+              stages = [ "commit-msg" ];
+              # Note: `files` parameter doesn't work with commit-msg hooks
+              # File filtering is done inside the script via git diff --cached
+              always_run = true;
             };
 
             # Go hooks disabled - require network access to download modules
