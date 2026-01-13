@@ -93,8 +93,8 @@
     stroke-opacity: var(--link-opacity);
 }
 
-/* Tooltip */
-.tooltip {
+/* Graph Data Tooltip - D3 visualization overlay (not UI tooltips) */
+.graph-data-tooltip {
     position: absolute;
     padding: var(--tooltip-padding);
     background: var(--tooltip-bg);
@@ -105,16 +105,16 @@
     z-index: 1000;
 }
 
-.tooltip strong {
+.graph-data-tooltip strong {
     display: block;
     margin-bottom: 4px;
 }
 
-.tooltip .meta-item {
+.graph-data-tooltip .meta-item {
     margin: 2px 0;
 }
 
-.tooltip .meta-label {
+.graph-data-tooltip .meta-label {
     font-weight: 600;
 }
 

@@ -24,10 +24,10 @@ Execute an ATS query
 
 | Field | Description |
 |-------|-------------|
-| filename | Source file name |
 | query | ATS query string |
 | line | Cursor line position |
 | cursor | Cursor column position |
+| filename | Source file name |
 
 ### Server → Client
 
@@ -66,9 +66,9 @@ Streaming LLM response chunks
 
 | Field | Description |
 |-------|-------------|
-| done | Whether streaming is complete |
 | job_id | Associated job ID |
 | content | Text content chunk |
+| done | Whether streaming is complete |
 
 #### `plugin_health`
 

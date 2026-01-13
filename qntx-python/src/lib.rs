@@ -20,5 +20,5 @@ pub mod proto;
 pub mod service;
 
 pub use config::PluginConfig;
-pub use engine::{ExecutionConfig, ExecutionResult, PythonEngine, PythonError};
+pub use engine::{ExecutionConfig, ExecutionResult, PythonEngine};
 pub use service::PythonPluginService;

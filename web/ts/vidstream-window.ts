@@ -15,6 +15,7 @@ import { debug, info, error, SEG } from './logger.ts';
 import { sendMessage, registerHandler } from './websocket.ts';
 import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
+import { tooltip } from './components/tooltip.ts';
 import type { QueryMessage } from '@generated/server.js';
 
 // VidStream configuration (subset of QueryMessage fields for vidstream_init)
@@ -60,6 +61,9 @@ export class VidStreamWindow {
     // Latest detections (drawn on every frame)
     private latestDetections: Detection[] = [];
 
+    // Version tracking
+    private version: string | null = null;
+
     constructor() {
         this.window = new Window({
             id: 'vidstream-window',
@@ -71,6 +75,7 @@ export class VidStreamWindow {
 
         this.setupContent();
         this.setupMessageHandlers();
+        this.setupTooltips();
     }
 
     private setupContent(): void {
@@ -87,8 +92,8 @@ export class VidStreamWindow {
                 <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
                 <button
                     id="vs-config-btn"
-                    class="panel-btn panel-btn-sm"
-                    title="Configure ONNX model"
+                    class="panel-btn panel-btn-sm has-tooltip"
+                    data-tooltip="Configure ONNX model"
                 >⚙️</button>
                 <span id="vs-status" class="window-status">Ready (camera + ONNX via WebSocket)</span>
             </div>
@@ -112,15 +117,20 @@ export class VidStreamWindow {
                     height="480"
                 ></canvas>
             </div>
+        `;
 
+        this.window.setContent(content);
+
+        // Set up footer with stats
+        const footerContent = `
             <div class="window-stats">
                 <div>FPS: <span id="vs-fps" class="window-stat-value">0</span></div>
                 <div>Latency: <span id="vs-latency" class="window-stat-value">0</span> ms</div>
                 <div>Detections: <span id="vs-detections" class="window-stat-value">0</span></div>
             </div>
         `;
+        this.window.setFooterContent(footerContent);
 
-        this.window.setContent(content);
         this.setupEventListeners();
     }
 
@@ -456,5 +466,40 @@ export class VidStreamWindow {
             // Silent failure - default path already set in HTML
             debug(SEG.VID, 'Failed to load model path from config:', err);
         }
+    }
+
+    /**
+     * Update window version (called from system-capabilities handler)
+     */
+    public updateVersion(version: string): void {
+        this.version = version;
+        this.updateTitle();
+        debug(SEG.VID, `VidStream version updated: ${version}`);
+    }
+
+    /**
+     * Setup tooltip system for window header elements
+     */
+    private setupTooltips(): void {
+        const windowEl = this.window.getElement();
+        const header = windowEl.querySelector('.draggable-window-header');
+        if (header) {
+            tooltip.attach(header as HTMLElement, '.has-tooltip');
+        }
+    }
+
+    /**
+     * Build and set window title with optional version
+     */
+    private updateTitle(): void {
+        let titleHTML = 'VidStream';
+
+        if (this.version) {
+            // Version with tooltip showing backend details
+            const tooltipText = `VidStream v${this.version}\nBackend: ONNX Runtime\nReal-time object detection`;
+            titleHTML += ` <span class="has-tooltip" data-tooltip="${tooltipText}" style="color: #999; font-weight: 400; font-size: 11px; cursor: help;">v${this.version}</span>`;
+        }
+
+        this.window.setTitle(titleHTML);
     }
 }

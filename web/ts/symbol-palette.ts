@@ -31,6 +31,7 @@ import {
 import { uiState } from './ui-state.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
+import { tooltip } from './components/tooltip.ts';
 
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
@@ -104,7 +105,16 @@ function initializeSymbolPalette(): void {
 
     cmdCells.forEach((cell, index) => {
         cell.addEventListener('click', handleSymbolClick);
-        // Tooltips now handled purely via CSS ::after pseudo-element
+
+        // Add has-tooltip class for proper tooltip system
+        cell.classList.add('has-tooltip');
+
+        // Set initial tooltip text (will be updated when system capabilities are received)
+        const cmd = cell.getAttribute('data-cmd');
+        if (cmd) {
+            const initialTooltip = getInitialTooltip(cmd);
+            cell.setAttribute('data-tooltip', initialTooltip);
+        }
 
         // Virtue #14: Keyboard Navigation - Full arrow key support for palette traversal
         cell.addEventListener('keydown', (e: Event) => {
@@ -141,6 +151,40 @@ function initializeSymbolPalette(): void {
             cell.setAttribute('tabindex', '-1');
         }
     });
+
+    // Attach tooltip system to palette
+    const palette = document.querySelector('.palette') as HTMLElement;
+    if (palette) {
+        tooltip.attach(palette, '.has-tooltip');
+    }
+}
+
+/**
+ * Get initial tooltip text for a palette command
+ * Will be updated with version info when system capabilities are received
+ */
+function getInitialTooltip(cmd: string): string {
+    const tooltips: Record<string, string> = {
+        'i': '⍟ Self - system diagnostic',
+        'am': '≡ Config - system configuration',
+        'ix': '⨳ Ingest - import data',
+        'ax': '⋈ Expand - contextual query\n(version info loading...)',
+        'as': '+ Assert - emit attestation',
+        'is': '= Identity - equivalence',
+        'of': '∈ Membership - belonging',
+        'by': '⌬ Actor - origin of action',
+        'at': '✦ Event - temporal marker',
+        'so': '⟶ Therefore - consequent action',
+        'pulse': '꩜ Pulse - async operations',
+        'db': '⊔ Database - storage layer',
+        'prose': '⚇ Prose - documentation',
+        'go': 'Go - code editor',
+        'py': 'py - Python editor',
+        'plugins': '⚙ Plugins - domain extensions',
+        'scraper': '⛶ Scraper - web extraction',
+        'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
+    };
+    return tooltips[cmd] || cmd;
 }
 
 /**
@@ -186,8 +230,8 @@ function handleSymbolClick(e: Event): void {
     // Route to appropriate handler
     switch(cmd) {
         case 'i':
-            // Self - operator vantage point
-            activateSearchMode(cmd);
+            // Self - operator vantage point, system diagnostic
+            showSelfWindow();
             break;
         case 'am':
             // Configuration - system configuration introspection
@@ -317,6 +361,18 @@ async function showDatabaseWindow(): Promise<void> {
 }
 
 /**
+ * Show self window - displays system diagnostic information
+ */
+let selfWindowInstance: any = null;
+async function showSelfWindow(): Promise<void> {
+    if (!selfWindowInstance) {
+        const module = await import('./self-window.js');
+        selfWindowInstance = module.selfWindow;
+    }
+    selfWindowInstance.toggle();
+}
+
+/**
  * Show prose panel - displays documentation viewer/editor
  */
 function showProsePanel(): void {
@@ -355,6 +411,26 @@ function showWebscraperPanel(): void {
  * Show VidStream window - real-time video inference (desktop only)
  */
 let vidstreamWindowInstance: VidStreamWindow | null = null;
+let vidstreamVersion: string | null = null; // Store version before window creation
+
+/**
+ * Get VidStream window instance (for system-capabilities updates)
+ */
+export function getVidStreamWindowInstance(): VidStreamWindow | null {
+    return vidstreamWindowInstance;
+}
+
+/**
+ * Set VidStream version (called from system-capabilities before window exists)
+ */
+export function setVidStreamVersion(version: string): void {
+    vidstreamVersion = version;
+    // Also update existing instance if present
+    if (vidstreamWindowInstance) {
+        vidstreamWindowInstance.updateVersion(version);
+    }
+}
+
 function showVidStreamWindow(): void {
     log(SEG.VID, 'showVidStreamWindow() called');
     try {
@@ -362,6 +438,12 @@ function showVidStreamWindow(): void {
             log(SEG.VID, 'Creating new VidStreamWindow instance...');
             vidstreamWindowInstance = new VidStreamWindow();
             log(SEG.VID, 'VidStreamWindow instance created');
+
+            // Apply stored version if received before window creation
+            if (vidstreamVersion) {
+                vidstreamWindowInstance.updateVersion(vidstreamVersion);
+                log(SEG.VID, `Applied stored version: ${vidstreamVersion}`);
+            }
         }
         log(SEG.VID, 'Calling toggle()');
         vidstreamWindowInstance.toggle();

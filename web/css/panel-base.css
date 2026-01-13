@@ -477,7 +477,7 @@
     font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
     line-height: 1.6;
     white-space: pre-wrap;
-    z-index: 10000;
+    z-index: 100000; /* Must be above windows (which start at 9999) */
     pointer-events: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     max-width: 400px;
