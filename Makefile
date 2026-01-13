@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -178,28 +178,12 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
-plugins: ## Build and install all external plugin binaries to ~/.qntx/plugins/
-	@echo "Building external plugins..."
+code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
+	@echo "Building code plugin..."
 	@mkdir -p $(PREFIX)/plugins
-	@# Build code plugin from qntx-code/cmd/qntx-code-plugin
-	@if [ -d "qntx-code/cmd/qntx-code-plugin" ]; then \
-		echo "  Building code (Go) plugin..."; \
-		go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin || exit 1; \
-		chmod +x $(PREFIX)/plugins/qntx-code-plugin; \
-		echo "  ✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"; \
-	fi
-	@# Install Python/script-based plugins (e.g., webscraper)
-	@if [ -d "qntx-webscraper" ]; then \
-		echo "  Installing webscraper (Python) plugin..."; \
-		cp qntx-webscraper/webscraper $(PREFIX)/plugins/webscraper; \
-		chmod +x $(PREFIX)/plugins/webscraper; \
-		cp qntx-webscraper/webscraper.toml $(PREFIX)/plugins/webscraper.toml 2>/dev/null || true; \
-		echo "  ✓ webscraper → $(PREFIX)/plugins/webscraper"; \
-	fi
-	@echo "✓ All plugins installed to $(PREFIX)/plugins/"
-	@echo ""
-	@echo "Installed plugins:"
-	@ls -lh $(PREFIX)/plugins/qntx-*-plugin $(PREFIX)/plugins/webscraper 2>/dev/null || echo "  (none)"
+	@go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin
+	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
+	@echo "✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"
 
 # Rust fuzzy matching library (ax segment optimization)
 rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)

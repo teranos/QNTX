@@ -45,10 +45,17 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
 	if s.pluginRegistry != nil {
 		for _, name := range s.pluginRegistry.List() {
-			// Use wildcard pattern for Go 1.22+ ServeMux
-			pattern := "/api/" + name + "/{path...}"
-			http.HandleFunc(pattern, corsPluginHandler)
-			s.logger.Infow("Registered HTTP route", "plugin", name, "pattern", pattern)
+			// Register exact match for /api/{plugin} (e.g., /api/code)
+			exactPattern := "/api/" + name
+			http.HandleFunc(exactPattern, corsPluginHandler)
+
+			// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
+			wildcardPattern := "/api/" + name + "/{path...}"
+			http.HandleFunc(wildcardPattern, corsPluginHandler)
+
+			s.logger.Infow("Registered HTTP routes", "plugin", name,
+				"exact", exactPattern,
+				"wildcard", wildcardPattern)
 		}
 	}
 

@@ -134,6 +134,9 @@ func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protoc
 
 // HandleHTTP handles an HTTP request via gRPC.
 func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
+	// DEBUG: Log incoming request
+	s.logger.Infow("gRPC HandleHTTP received", "method", req.Method, "path", req.Path)
+
 	// Create an HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.Path, bytes.NewReader(req.Body))
 	if err != nil {
