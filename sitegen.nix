@@ -539,9 +539,9 @@ let
           <h2 style="text-align: center; margin: 20px 0;">Continuous Intelligence</h2>
           <p>QNTX implements <strong>Continuous Intelligence</strong> - systems that continuously evolve their understanding through verifiable attestations.</p>
           <ul>
-            <li><strong><a href="./ats/ix/README.html">⨳ ix</a></strong> - Ingest data from plugins, APIs, and actions into attestations</li>
-            <li><strong><a href="./pulse/README.html">꩜ Pulse</a></strong> - Background jobs that enrich and connect knowledge</li>
-            <li><strong><a href="./ats/ax/README.html">⋈ ax</a></strong> - Ask questions across time, trace causality, explore relationships</li>
+            <li><strong>⨳ ix</strong> - Ingest data from plugins, APIs, and actions into attestations</li>
+            <li><strong>꩜ Pulse</strong> - Background jobs that enrich and connect knowledge</li>
+            <li><strong>⋈ ax</strong> - Ask questions across time, trace causality, explore relationships</li>
           </ul>
         </div>
       '';
