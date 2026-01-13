@@ -34,6 +34,44 @@
             # Rust formatting
             rustfmt.enable = true;
 
+            # Nix container workflow verification
+            verify-nix-workflows = {
+              enable = true;
+              name = "Verify Nix container changes";
+              entry = toString (pkgs.writeShellScript "verify-nix-workflows" ''
+                # Get staged workflow files
+                WORKFLOWS=$(git diff --cached --name-only | grep "^\.github/workflows/.*\.yml$" || true)
+
+                if [ -z "$WORKFLOWS" ]; then
+                  exit 0
+                fi
+
+                # Check if any use ghcr.io/teranos/qntx container
+                for workflow in $WORKFLOWS; do
+                  if git diff --cached "$workflow" | grep -q "ghcr.io/teranos/qntx"; then
+                    # Get commit message
+                    COMMIT_MSG=$(git log -1 --format=%B 2>/dev/null || cat .git/COMMIT_EDITMSG 2>/dev/null || echo "")
+
+                    # Check for verification evidence
+                    if ! echo "$COMMIT_MSG" | grep -qE "Verified: flake.nix:[0-9]+"; then
+                      echo "❌ REJECTED: Workflow uses ghcr.io/teranos/qntx without flake.nix verification"
+                      echo ""
+                      echo "When modifying workflows that use the Nix container, you MUST:"
+                      echo "  1. Read flake.nix mkCiImage (lines ~137-197)"
+                      echo "  2. Check BOTH 'contents' AND 'config.Env PATH'"
+                      echo "  3. Add verification to commit message"
+                      echo ""
+                      echo "Required format:"
+                      echo "  Verified: flake.nix:166 (contents has pkgs.curl)"
+                      echo "  Verified: flake.nix:187 (PATH includes pkgs.curl)"
+                      exit 1
+                    fi
+                  fi
+                done
+              '');
+              files = "\\.github/workflows/.*\\.yml$";
+            };
+
             # Go hooks disabled - require network access to download modules
             # which isn't available in Nix sandbox. Use local git hooks instead.
             # gofmt.enable = true;
