@@ -1,12 +1,12 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 // ParserOptions provides optional configuration for the AS command parser
@@ -32,7 +32,7 @@ func ParseAsCommandWithOptions(args []string, opts ParserOptions) (*types.AsComm
 	}
 
 	if len(args) == 0 {
-		return nil, fmt.Errorf("no arguments provided")
+		return nil, errors.New("no arguments provided")
 	}
 
 	cmd := &types.AsCommand{
@@ -47,7 +47,7 @@ func ParseAsCommandWithOptions(args []string, opts ParserOptions) (*types.AsComm
 	// Tokenize with quote handling
 	tokens := tokenizeWithQuotes(args)
 	if len(tokens) == 0 {
-		return nil, fmt.Errorf("no valid tokens found")
+		return nil, errors.New("no valid tokens found")
 	}
 
 	// Parse tokens
@@ -79,7 +79,7 @@ func ParseAsCommandWithOptions(args []string, opts ParserOptions) (*types.AsComm
 
 	// Validate that we have at least subjects
 	if len(cmd.Subjects) == 0 {
-		return nil, fmt.Errorf("at least one subject is required")
+		return nil, errors.New("at least one subject is required")
 	}
 
 	return cmd, nil
@@ -174,7 +174,7 @@ func parseAsTokens(tokens []string, cmd *types.AsCommand) error {
 			// Parse timestamp (simplified for now)
 			parsedTime, err := parseTimeExpression(token)
 			if err != nil {
-				return fmt.Errorf("invalid timestamp '%s': %w", token, err)
+				return errors.Wrapf(err, "invalid timestamp '%s'", token)
 			}
 			cmd.Timestamp = parsedTime
 			state = "subjects" // Reset to subjects for any remaining tokens

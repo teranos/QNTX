@@ -8,11 +8,11 @@ import (
 
 func TestValidateConfigAgainstSchema(t *testing.T) {
 	tests := []struct {
-		name          string
-		config        map[string]string
-		schema        map[string]*protocol.ConfigFieldSchema
-		wantErrors    map[string]string
-		wantNoErrors  bool
+		name         string
+		config       map[string]string
+		schema       map[string]*protocol.ConfigFieldSchema
+		wantErrors   map[string]string
+		wantNoErrors bool
 	}{
 		{
 			name: "valid config with all fields",

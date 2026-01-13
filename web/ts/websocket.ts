@@ -108,6 +108,29 @@ const MESSAGE_HANDLERS = {
 
         // Invoke registered handler
         messageHandlers['system_capabilities']?.(data);
+    },
+
+    database_stats: (data: any) => {
+        log.info(SEG.DB, 'Database stats:', {
+            total_attestations: data.total_attestations,
+            path: data.path
+        });
+
+        // Update database stats window with response
+        import('./database-stats-window.js').then(({ databaseStatsWindow }) => {
+            databaseStatsWindow.updateStats({
+                path: data.path,
+                total_attestations: data.total_attestations,
+                unique_actors: data.unique_actors,
+                unique_subjects: data.unique_subjects,
+                unique_contexts: data.unique_contexts
+            });
+        });
+
+        // Update status indicator with total count
+        import('./status-indicators.js').then(({ statusIndicators }) => {
+            statusIndicators.handleDatabaseStats(data.total_attestations);
+        });
     }
 } as const;
 
@@ -193,6 +216,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
     ws.onopen = function(): void {
         log.info(SEG.WS, 'WebSocket connected');
         updateConnectionStatus(true);
+
+        // Request database stats on connect to populate DB indicator
+        sendMessage({ type: 'get_database_stats' });
     };
 
     ws.onmessage = function(event: MessageEvent): void {

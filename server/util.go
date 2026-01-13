@@ -68,7 +68,7 @@ func isPortAvailable(port int) bool {
 }
 
 // findAvailablePort tries to find an available port starting from the requested port
-// It tries the requested port first, then tries up to 10 alternative ports (requested+1 to requested+10)
+// It tries: requested port, preferred fallbacks (877, 7878), then high-range ports (56787-56796)
 func findAvailablePort(requestedPort int) (int, error) {
 	// Try the requested port first
 	if isPortAvailable(requestedPort) {

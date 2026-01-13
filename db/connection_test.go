@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 
 	"github.com/teranos/QNTX/errors"
 )
@@ -101,9 +102,9 @@ func TestOpen_WithLogger(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	// TODO: Add logger mock/spy to verify logging calls
-	// For now, just verify it doesn't panic with a logger
-	db, err := Open(dbPath, nil)
+	// Use test logger to verify logging calls
+	logger := zaptest.NewLogger(t).Sugar()
+	db, err := Open(dbPath, logger)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 	defer db.Close()
