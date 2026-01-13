@@ -7,6 +7,7 @@
 import { Window } from './components/window.ts';
 import { sendMessage } from './websocket.ts';
 import { DB } from '@generated/sym.js';
+import { tooltip } from './components/tooltip.ts';
 
 interface DatabaseStats {
     path: string;
@@ -67,7 +68,7 @@ class DatabaseStatsWindow {
             <div class="db-stats">
                 <div class="db-stat-row">
                     <span class="db-stat-label">Database Path:</span>
-                    <span class="db-stat-value db-path" data-path="${path}" title="Click to open in file manager">${path}</span>
+                    <span class="db-stat-value db-path has-tooltip" data-path="${path}" data-tooltip="Click to open in file manager">${path}</span>
                 </div>
                 <div class="db-stat-row">
                     <span class="db-stat-label">Total Attestations:</span>
@@ -99,6 +100,14 @@ class DatabaseStatsWindow {
                 });
             });
         }
+
+        // Setup tooltips
+        this.setupTooltips();
+    }
+
+    private setupTooltips(): void {
+        const content = this.window.getContentElement();
+        tooltip.attach(content, '.has-tooltip');
     }
 }
 
