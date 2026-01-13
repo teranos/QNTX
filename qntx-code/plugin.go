@@ -41,7 +41,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "code",
-		Version:     "0.1.0",
+		Version:     "0.2.1",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Software development domain (git, GitHub, gopls, code editor)",
 		Author:      "QNTX Team",

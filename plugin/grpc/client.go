@@ -203,14 +203,21 @@ func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
 func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
-	// Register a catch-all handler for the plugin's namespace using Go 1.22+ wildcard pattern
-	pattern := fmt.Sprintf("/api/%s/{path...}", c.metadata.Name)
-
-	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+	// Register exact match for /api/{plugin} (e.g., /api/code)
+	exactPattern := fmt.Sprintf("/api/%s", c.metadata.Name)
+	mux.HandleFunc(exactPattern, func(w http.ResponseWriter, r *http.Request) {
 		c.proxyHTTPRequest(w, r)
 	})
 
-	c.logger.Infow("Registered HTTP proxy handler", "pattern", pattern)
+	// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
+	wildcardPattern := fmt.Sprintf("/api/%s/{path...}", c.metadata.Name)
+	mux.HandleFunc(wildcardPattern, func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+
+	c.logger.Infow("Registered HTTP proxy handlers",
+		"exact", exactPattern,
+		"wildcard", wildcardPattern)
 	return nil
 }
 
@@ -262,6 +269,9 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	if r.URL.RawQuery != "" {
 		req.Path = path + "?" + r.URL.RawQuery
 	}
+
+	// DEBUG: Log before calling remote plugin
+	c.logger.Infow("Proxying to plugin", "plugin", c.metadata.Name, "original_path", r.URL.Path, "stripped_path", path, "final_path", req.Path)
 
 	// Call remote plugin
 	resp, err := c.client.HandleHTTP(r.Context(), req)

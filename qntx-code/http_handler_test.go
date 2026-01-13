@@ -61,11 +61,12 @@ func TestGRPCHTTPHandler(t *testing.T) {
 	_, err = client.Initialize(context.Background(), initReq)
 	require.NoError(t, err, "Initialize RPC failed")
 
-	t.Run("GET_/api/code_returns_JSON", func(t *testing.T) {
+	t.Run("GET_/_returns_JSON", func(t *testing.T) {
 		// Create HTTP request to get code tree
+		// In production, QNTX strips /api/code prefix, so plugin receives /
 		httpReq := &protocol.HTTPRequest{
 			Method: "GET",
-			Path:   "/api/code",
+			Path:   "/",
 			Headers: []*protocol.HTTPHeader{
 				{Name: "Accept", Values: []string{"application/json"}},
 			},
@@ -93,9 +94,10 @@ func TestGRPCHTTPHandler(t *testing.T) {
 
 	t.Run("GET_invalid_file_returns_400", func(t *testing.T) {
 		// Create HTTP request to invalid file (not .go extension)
+		// In production, QNTX strips /api/code prefix
 		httpReq := &protocol.HTTPRequest{
 			Method: "GET",
-			Path:   "/api/code/nonexistent",
+			Path:   "/nonexistent",
 			Headers: []*protocol.HTTPHeader{
 				{Name: "Accept", Values: []string{"application/json"}},
 			},
@@ -112,9 +114,10 @@ func TestGRPCHTTPHandler(t *testing.T) {
 
 	t.Run("GET_nonexistent_go_file_returns_404", func(t *testing.T) {
 		// Create HTTP request to nonexistent .go file
+		// In production, QNTX strips /api/code prefix
 		httpReq := &protocol.HTTPRequest{
 			Method: "GET",
-			Path:   "/api/code/nonexistent.go",
+			Path:   "/nonexistent.go",
 			Headers: []*protocol.HTTPHeader{
 				{Name: "Accept", Values: []string{"application/json"}},
 			},
@@ -129,11 +132,12 @@ func TestGRPCHTTPHandler(t *testing.T) {
 		assert.Equal(t, int32(404), httpResp.StatusCode, "Expected 404 Not Found for nonexistent .go file")
 	})
 
-	t.Run("POST_without_body_works", func(t *testing.T) {
+	t.Run("POST_ixgest_git", func(t *testing.T) {
 		// Create HTTP POST request (git ixgest endpoint)
+		// In production, QNTX strips /api/code prefix
 		httpReq := &protocol.HTTPRequest{
 			Method: "POST",
-			Path:   "/api/code/ixgest/git",
+			Path:   "/ixgest/git",
 			Headers: []*protocol.HTTPHeader{
 				{Name: "Content-Type", Values: []string{"application/json"}},
 			},
