@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -31,8 +30,7 @@ type ListExecutionsResponse struct {
 // This is called from HandlePulseJob when the path ends with /executions
 func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request, jobID string) {
 	// Only support GET
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -84,14 +82,12 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 // GET /api/pulse/executions/{execution_id}/logs
 func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request) {
 	// Only support GET
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
 	// Extract execution ID from path
-	path := strings.TrimPrefix(r.URL.Path, "/api/pulse/executions/")
-	parts := strings.Split(path, "/")
+	parts := extractPathParts(r.URL.Path, "/api/pulse/executions/")
 	if len(parts) == 0 {
 		writeError(w, http.StatusBadRequest, "Invalid path format")
 		return

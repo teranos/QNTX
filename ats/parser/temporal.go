@@ -1,10 +1,11 @@
 package parser
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // timeNow is a variable that can be mocked for testing
@@ -69,7 +70,7 @@ var dayNameMap = map[string]time.Weekday{
 func ParseTemporalExpression(expr string) (*time.Time, error) {
 	expr = strings.TrimSpace(expr)
 	if expr == "" {
-		return nil, fmt.Errorf("empty temporal expression")
+		return nil, errors.New("empty temporal expression")
 	}
 
 	now := timeNow()
@@ -136,23 +137,23 @@ func ParseTemporalExpression(expr string) (*time.Time, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to parse temporal expression: %s", expr)
+	return nil, errors.Newf("unable to parse temporal expression: %s", expr)
 }
 
 // ParseRelativeDuration parses relative duration expressions like "3 days", "2 weeks"
 func ParseRelativeDuration(expr string) (time.Duration, error) {
 	parts := strings.Fields(strings.TrimSpace(expr))
 	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid duration format: %s (expected 'NUMBER UNIT')", expr)
+		return 0, errors.Newf("invalid duration format: %s (expected 'NUMBER UNIT')", expr)
 	}
 
 	num, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return 0, fmt.Errorf("invalid duration format: invalid number '%s'", parts[0])
+		return 0, errors.Newf("invalid duration format: invalid number '%s'", parts[0])
 	}
 
 	if num < 0 {
-		return 0, fmt.Errorf("invalid duration format: negative duration not supported")
+		return 0, errors.New("invalid duration format: negative duration not supported")
 	}
 
 	unit := strings.ToLower(parts[1])
@@ -175,7 +176,7 @@ func ParseRelativeDuration(expr string) (time.Duration, error) {
 		return time.Duration(num) * 365 * 24 * time.Hour, nil
 	}
 
-	return 0, fmt.Errorf("unsupported duration unit: %s", unit)
+	return 0, errors.Newf("unsupported duration unit: %s", unit)
 }
 
 // IsTemporalContinuation checks if a token should be considered part of a temporal expression
