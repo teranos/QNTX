@@ -226,3 +226,8 @@ func ExpectedFrameSize(width, height uint32, format FrameFormat) int {
 		C.int(format),
 	))
 }
+
+// Version returns the vidstream library version string.
+func Version() string {
+	return C.GoString(C.video_engine_version())
+}

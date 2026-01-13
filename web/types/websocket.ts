@@ -27,6 +27,7 @@ import {
   PulseExecutionFailedMessage as GeneratedPulseExecutionFailedMessage,
   PulseExecutionCompletedMessage as GeneratedPulseExecutionCompletedMessage,
   PulseExecutionLogStreamMessage as GeneratedPulseExecutionLogStreamMessage,
+  SystemCapabilitiesMessage as GeneratedSystemCapabilitiesMessage,
 } from '../../types/generated/typescript/server';
 
 // Re-export Job for convenience
@@ -399,15 +400,11 @@ export interface PluginHealthMessage extends BaseMessage {
 }
 
 /**
- * System capabilities notification
+ * System capabilities notification (from server/types.go:SystemCapabilitiesMessage)
  * Sent once on WebSocket connection to inform client of available optimizations
  */
-export interface SystemCapabilitiesMessage extends BaseMessage {
+export interface SystemCapabilitiesMessage extends Omit<GeneratedSystemCapabilitiesMessage, 'type'> {
   type: 'system_capabilities';
-  fuzzy_backend: 'go' | 'rust';
-  fuzzy_optimized: boolean;
-  vidstream_backend: 'onnx' | 'unavailable';
-  vidstream_optimized: boolean;
 }
 
 /**
