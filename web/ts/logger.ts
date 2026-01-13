@@ -80,9 +80,11 @@ export const SEG = {
     CONFIG: CoreSEG.AM,     // ≡ - Configuration
     INGEST: CoreSEG.IX,     // ⨳ - Data ingestion
     QUERY: CoreSEG.AX,      // ⋈ - Query/expand
+    AX: CoreSEG.AX,         // ⋈ - Query/expand (alias)
     ACTOR: CoreSEG.BY,      // ⌬ - Actor/catalyst
     TIME: CoreSEG.AT,       // ✦ - Temporal marker
     FLOW: CoreSEG.SO,       // ⟶ - Consequent action
+    SO: CoreSEG.SO,         // ⟶ - Consequent action (alias)
     PULSE: CoreSEG.Pulse,   // ꩜ - Async operations
     DB: CoreSEG.DB,         // ⊔ - Database/storage
 

@@ -48,3 +48,44 @@
 .ats-code-block-wrapper[data-execution-state="failed"] {
     border-left-color: var(--accent-red, #ef4444);
 }
+
+/* ============================================================================
+   Prompt Inspect Button
+   Shown when ATS code contains "so prompt" action
+   ============================================================================ */
+
+.ats-prompt-inspect {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--panel-bg-secondary, #f8f8f8);
+    border-top: 1px solid var(--border-color-light, #e0e0e0);
+}
+
+.ats-prompt-inspect-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-purple, #8b5cf6);
+    background: transparent;
+    border: 1px solid var(--accent-purple, #8b5cf6);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.ats-prompt-inspect-btn:hover {
+    background: var(--accent-purple, #8b5cf6);
+    color: #fff;
+}
+
+.prompt-inspect-icon {
+    font-size: 14px;
+}
+
+.prompt-inspect-text {
+    font-size: 12px;
+}

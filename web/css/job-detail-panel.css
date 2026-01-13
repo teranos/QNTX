@@ -404,3 +404,54 @@
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+
+/* Job Info Actions */
+.job-info-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.force-trigger-btn {
+  padding: 8px 14px;
+  border: 1px solid #7b1fa2;
+  border-radius: var(--panel-border-radius);
+  background: transparent;
+  color: #7b1fa2;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.force-trigger-btn:hover {
+  background: #7b1fa2;
+  color: #fff;
+}
+
+/* Inspect Prompt Button */
+.inspect-prompt-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--accent-purple, #8b5cf6);
+  border-radius: var(--panel-border-radius);
+  background: transparent;
+  color: var(--accent-purple, #8b5cf6);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.inspect-prompt-btn:hover {
+  background: var(--accent-purple, #8b5cf6);
+  color: #fff;
+}
+
+.inspect-prompt-icon {
+  font-size: 14px;
+}

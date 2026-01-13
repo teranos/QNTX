@@ -43,6 +43,7 @@ import { togglePluginPanel } from './plugin-panel.js';
 import { webscraperPanel } from './webscraper-panel.js';
 import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
+import { toggleSoPanel } from './so-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
 type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream' | 'db';
@@ -422,16 +423,9 @@ function insertSegment(segment: string): void {
  * "so" represents logical consequence: when data/filters/attestations occur,
  * therefore this action/trigger happens.
  *
- * Intentionally unfinalized. Behavior depends on selection context.
- * Currently logs intent; actual implementation will emerge as use cases clarify.
+ * Shows the SO panel with prompt history, similar to how IX shows hixtory.
  */
-function handleSoCommand(_cmd: string): void {
-    log.debug(SEG.SELF, `${SO} (so/therefore) - consequent action triggered`);
-
-    // Placeholder for future implementation
-    // Possible behaviors:
-    // - Context-aware trigger builder (data ingested ⟶ send notification)
-    // - Workflow automation (filter matched ⟶ execute action)
-    // - Conditional actions (attestation created ⟶ trigger webhook)
-    // - Batch operations (query results ⟶ apply transformation)
+function handleSoCommand(cmd: string): void {
+    toggleSoPanel();
+    log.debug(SEG.SELF, `${getSymbol(cmd)} so mode - showing prompt list`);
 }
