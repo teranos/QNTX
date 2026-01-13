@@ -237,6 +237,134 @@ func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.A
 	})
 }
 
+// PromptSaveRequest represents a request to save a prompt
+type PromptSaveRequest struct {
+	Name         string `json:"name"`
+	Template     string `json:"template"`
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	AxPattern    string `json:"ax_pattern,omitempty"`
+	Provider     string `json:"provider,omitempty"`
+	Model        string `json:"model,omitempty"`
+}
+
+// HandlePromptList handles GET /api/prompt/list
+// Returns all stored prompts
+func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	logger.AddSoSymbol(s.logger).Infow("Prompt list request")
+
+	store := prompt.NewPromptStore(s.db)
+	prompts, err := store.ListPrompts(r.Context(), 100)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Failed to list prompts", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"prompts": prompts,
+		"count":   len(prompts),
+	})
+}
+
+// HandlePromptGet handles GET /api/prompt/{id}
+// Returns a specific prompt by ID
+func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, promptID string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	store := prompt.NewPromptStore(s.db)
+	p, err := store.GetPromptByID(r.Context(), promptID)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Failed to get prompt", http.StatusInternalServerError)
+		return
+	}
+	if p == nil {
+		writeError(w, http.StatusNotFound, "Prompt not found")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(p)
+}
+
+// HandlePromptVersions handles GET /api/prompt/{name}/versions
+// Returns version history for a prompt
+func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request, promptName string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	store := prompt.NewPromptStore(s.db)
+	versions, err := store.GetPromptVersions(r.Context(), promptName, 16)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Failed to get prompt versions", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"versions": versions,
+		"count":    len(versions),
+	})
+}
+
+// HandlePromptSave handles POST /api/prompt/save
+// Saves a new prompt or creates a new version
+func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	logger.AddSoSymbol(s.logger).Infow("Prompt save request")
+
+	var req PromptSaveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	if strings.TrimSpace(req.Name) == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if strings.TrimSpace(req.Template) == "" {
+		writeError(w, http.StatusBadRequest, "template is required")
+		return
+	}
+
+	store := prompt.NewPromptStore(s.db)
+	storedPrompt := &prompt.StoredPrompt{
+		Name:         req.Name,
+		Template:     req.Template,
+		SystemPrompt: req.SystemPrompt,
+		AxPattern:    req.AxPattern,
+		Provider:     req.Provider,
+		Model:        req.Model,
+	}
+
+	// Default actor - could be from auth later
+	actor := "user"
+
+	saved, err := store.SavePrompt(r.Context(), storedPrompt, actor)
+	if err != nil {
+		writeWrappedError(w, s.logger, err, "Failed to save prompt", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(saved)
+}
+
 // HandlePrompt routes prompt-related requests
 func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/prompt")
@@ -246,6 +374,22 @@ func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 		s.HandlePromptPreview(w, r)
 	case path == "/execute":
 		s.HandlePromptExecute(w, r)
+	case path == "/list":
+		s.HandlePromptList(w, r)
+	case path == "/save":
+		s.HandlePromptSave(w, r)
+	case strings.HasSuffix(path, "/versions"):
+		// /api/prompt/{name}/versions
+		name := strings.TrimSuffix(strings.TrimPrefix(path, "/"), "/versions")
+		s.HandlePromptVersions(w, r, name)
+	case strings.HasPrefix(path, "/"):
+		// /api/prompt/{id}
+		promptID := strings.TrimPrefix(path, "/")
+		if promptID != "" {
+			s.HandlePromptGet(w, r, promptID)
+			return
+		}
+		fallthrough
 	default:
 		writeError(w, http.StatusNotFound, "Unknown prompt endpoint")
 	}

@@ -48,9 +48,25 @@ interface ExecuteResponse {
     error?: string;
 }
 
+// Stored prompt type for loading from so-panel
+export interface StoredPrompt {
+    id: string;
+    name: string;
+    template: string;
+    system_prompt?: string;
+    ax_pattern?: string;
+    provider?: string;
+    model?: string;
+    created_by: string;
+    created_at: string;
+    version: number;
+}
+
 class PromptEditorPanel {
     private window: Window;
     private isExecuting: boolean = false;
+    private currentPromptId: string | null = null;
+    private currentVersion: number = 0;
 
     constructor() {
         this.window = new Window({
@@ -67,6 +83,24 @@ class PromptEditorPanel {
     private setupContent(): void {
         const content = `
             <div class="prompt-editor-content">
+                <div class="prompt-editor-section prompt-editor-row">
+                    <div class="prompt-editor-col" style="flex: 2">
+                        <label class="prompt-editor-label">
+                            Prompt Name
+                            <span class="prompt-editor-hint">For saving and reuse</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="prompt-name"
+                            class="prompt-editor-input"
+                            placeholder="e.g., summarize-skills"
+                        />
+                    </div>
+                    <div class="prompt-editor-col" style="flex: 1; align-self: flex-end;">
+                        <span id="prompt-version-badge" class="prompt-version-badge hidden"></span>
+                    </div>
+                </div>
+
                 <div class="prompt-editor-section">
                     <label class="prompt-editor-label">
                         ${AX} Ax Query
@@ -144,6 +178,10 @@ class PromptEditorPanel {
                     <button id="prompt-preview-btn" class="prompt-preview-btn">
                         Preview Query
                     </button>
+                    <button id="prompt-save-btn" class="prompt-save-btn">
+                        <span class="btn-icon">💾</span>
+                        <span class="btn-text">Save</span>
+                    </button>
                     <span id="prompt-status" class="prompt-status"></span>
                 </div>
 
@@ -175,6 +213,10 @@ class PromptEditorPanel {
         // Preview button
         const previewBtn = windowEl.querySelector('#prompt-preview-btn');
         previewBtn?.addEventListener('click', () => this.previewQuery());
+
+        // Save button
+        const saveBtn = windowEl.querySelector('#prompt-save-btn');
+        saveBtn?.addEventListener('click', () => this.savePrompt());
 
         // Template field insertion
         const fieldBtns = windowEl.querySelectorAll('.prompt-field-btn');
@@ -336,6 +378,130 @@ class PromptEditorPanel {
         }
     }
 
+    private async savePrompt(): Promise<void> {
+        const windowEl = this.window.getElement();
+        const name = windowEl.querySelector<HTMLInputElement>('#prompt-name')?.value || '';
+        const axQuery = windowEl.querySelector<HTMLInputElement>('#prompt-ax-query')?.value || '';
+        const systemPrompt = windowEl.querySelector<HTMLTextAreaElement>('#prompt-system')?.value || '';
+        const template = windowEl.querySelector<HTMLTextAreaElement>('#prompt-template')?.value || '';
+        const provider = windowEl.querySelector<HTMLSelectElement>('#prompt-provider')?.value || '';
+        const model = windowEl.querySelector<HTMLInputElement>('#prompt-model')?.value || '';
+
+        if (!name.trim()) {
+            this.updateStatus('Enter a name to save', 'warning');
+            return;
+        }
+        if (!template.trim()) {
+            this.updateStatus('Enter a template to save', 'warning');
+            return;
+        }
+
+        this.updateStatus('Saving prompt...', 'info');
+
+        try {
+            const response = await apiFetch('/api/prompt/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    template: template,
+                    system_prompt: systemPrompt || undefined,
+                    ax_pattern: axQuery || undefined,
+                    provider: provider || undefined,
+                    model: model || undefined,
+                }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || `HTTP ${response.status}`);
+            }
+
+            const saved = await response.json();
+            this.currentPromptId = saved.id;
+            this.currentVersion = saved.version;
+            this.updateVersionBadge();
+            this.updateStatus(`Saved as v${saved.version}`, 'success');
+
+            // Notify so-panel to refresh
+            try {
+                const { refreshSoPanel } = await import('./so-panel.ts');
+                refreshSoPanel();
+            } catch {
+                // so-panel might not be loaded yet
+            }
+
+        } catch (error) {
+            handleError(error, 'Save failed', { context: SEG.AX, silent: true });
+            this.updateStatus(`Save failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        }
+    }
+
+    /**
+     * Load a stored prompt into the editor
+     */
+    public loadPrompt(prompt: StoredPrompt): void {
+        const windowEl = this.window.getElement();
+
+        const nameInput = windowEl.querySelector<HTMLInputElement>('#prompt-name');
+        const axInput = windowEl.querySelector<HTMLInputElement>('#prompt-ax-query');
+        const systemInput = windowEl.querySelector<HTMLTextAreaElement>('#prompt-system');
+        const templateInput = windowEl.querySelector<HTMLTextAreaElement>('#prompt-template');
+        const providerSelect = windowEl.querySelector<HTMLSelectElement>('#prompt-provider');
+        const modelInput = windowEl.querySelector<HTMLInputElement>('#prompt-model');
+
+        if (nameInput) nameInput.value = prompt.name;
+        if (axInput) axInput.value = prompt.ax_pattern || '';
+        if (systemInput) systemInput.value = prompt.system_prompt || '';
+        if (templateInput) templateInput.value = prompt.template;
+        if (providerSelect) providerSelect.value = prompt.provider || '';
+        if (modelInput) modelInput.value = prompt.model || '';
+
+        this.currentPromptId = prompt.id;
+        this.currentVersion = prompt.version;
+        this.updateVersionBadge();
+
+        log.debug(SEG.AX, `Loaded prompt: ${prompt.name} v${prompt.version}`);
+    }
+
+    private updateVersionBadge(): void {
+        const windowEl = this.window.getElement();
+        const badge = windowEl.querySelector('#prompt-version-badge');
+        if (badge) {
+            if (this.currentVersion > 0) {
+                badge.textContent = `v${this.currentVersion}`;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * Clear the editor for a new prompt
+     */
+    public clear(): void {
+        const windowEl = this.window.getElement();
+
+        const inputs = ['#prompt-name', '#prompt-ax-query', '#prompt-system', '#prompt-template', '#prompt-model'];
+        inputs.forEach(sel => {
+            const el = windowEl.querySelector<HTMLInputElement | HTMLTextAreaElement>(sel);
+            if (el) el.value = '';
+        });
+
+        const providerSelect = windowEl.querySelector<HTMLSelectElement>('#prompt-provider');
+        if (providerSelect) providerSelect.value = '';
+
+        const resultsEl = windowEl.querySelector('#prompt-results');
+        if (resultsEl) {
+            resultsEl.innerHTML = '<div class="prompt-results-empty">Execute a prompt to see results here</div>';
+        }
+
+        this.currentPromptId = null;
+        this.currentVersion = 0;
+        this.updateVersionBadge();
+    }
+
     private displayResults(data: ExecuteResponse): void {
         const windowEl = this.window.getElement();
         const resultsEl = windowEl.querySelector('#prompt-results');
@@ -447,6 +613,128 @@ export function showPromptEditor(): void {
         promptEditorPanel = new PromptEditorPanel();
     }
     promptEditorPanel.show();
+}
+
+export function hidePromptEditor(): void {
+    if (promptEditorPanel) {
+        promptEditorPanel.hide();
+    }
+}
+
+/**
+ * Open the prompt editor with a stored prompt loaded
+ */
+export function openPromptInEditor(prompt: StoredPrompt): void {
+    if (!promptEditorPanel) {
+        promptEditorPanel = new PromptEditorPanel();
+    }
+    promptEditorPanel.loadPrompt(prompt);
+    promptEditorPanel.show();
+}
+
+/**
+ * Clear the prompt editor for a new prompt
+ */
+export function clearPromptEditor(): void {
+    if (promptEditorPanel) {
+        promptEditorPanel.clear();
+    }
+}
+
+/**
+ * Parse ATS code containing "so prompt" and extract prompt details
+ */
+interface ParsedPromptAction {
+    axQuery: string;
+    template?: string;
+    systemPrompt?: string;
+    provider?: string;
+    model?: string;
+}
+
+function parsePromptFromAtsCode(atsCode: string): ParsedPromptAction | null {
+    // Look for "so prompt" pattern
+    const lines = atsCode.trim().split('\n');
+    let axQuery = '';
+    let template = '';
+    let systemPrompt = '';
+    let provider = '';
+    let model = '';
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
+
+        // Check for "so prompt" pattern
+        const soPromptMatch = trimmed.match(/^(.*?)\s+so\s+prompt\s+"([^"]+)"(.*)$/i);
+        if (soPromptMatch) {
+            axQuery = soPromptMatch[1].trim();
+            template = soPromptMatch[2];
+            const rest = soPromptMatch[3];
+
+            // Parse additional options from rest
+            const withMatch = rest.match(/with\s+"([^"]+)"/i);
+            if (withMatch) {
+                systemPrompt = withMatch[1];
+            }
+
+            const providerMatch = rest.match(/provider\s+(\S+)/i);
+            if (providerMatch) {
+                provider = providerMatch[1];
+            }
+
+            const modelMatch = rest.match(/model\s+(\S+)/i);
+            if (modelMatch) {
+                model = modelMatch[1];
+            }
+
+            return { axQuery, template, systemPrompt, provider, model };
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Check if ATS code contains a "so prompt" action
+ */
+export function hasPromptAction(atsCode: string): boolean {
+    return /so\s+prompt\s+"/i.test(atsCode);
+}
+
+/**
+ * Open the prompt editor with parsed ATS code
+ */
+export function openPromptFromAtsCode(atsCode: string): void {
+    const parsed = parsePromptFromAtsCode(atsCode);
+
+    if (!promptEditorPanel) {
+        promptEditorPanel = new PromptEditorPanel();
+    }
+
+    // Clear existing content
+    promptEditorPanel.clear();
+
+    // If we parsed a prompt action, populate the fields
+    if (parsed) {
+        const windowEl = document.getElementById('prompt-editor-window');
+        if (windowEl) {
+            const axInput = windowEl.querySelector<HTMLInputElement>('#prompt-ax-query');
+            const systemInput = windowEl.querySelector<HTMLTextAreaElement>('#prompt-system');
+            const templateInput = windowEl.querySelector<HTMLTextAreaElement>('#prompt-template');
+            const providerSelect = windowEl.querySelector<HTMLSelectElement>('#prompt-provider');
+            const modelInput = windowEl.querySelector<HTMLInputElement>('#prompt-model');
+
+            if (axInput) axInput.value = parsed.axQuery;
+            if (systemInput) systemInput.value = parsed.systemPrompt || '';
+            if (templateInput) templateInput.value = parsed.template || '';
+            if (providerSelect) providerSelect.value = parsed.provider || '';
+            if (modelInput) modelInput.value = parsed.model || '';
+        }
+    }
+
+    promptEditorPanel.show();
+    log.debug(SEG.AX, 'Opened prompt editor from ATS code');
 }
 
 export {};

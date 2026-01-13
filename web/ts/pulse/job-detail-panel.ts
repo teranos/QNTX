@@ -30,6 +30,8 @@ import {
   unixToISO,
 } from './events.ts';
 import type { RichError } from '../base-panel-error.ts';
+import { hasPromptAction, openPromptFromAtsCode } from '../prompt-editor-window';
+import { SO } from '@generated/sym.js';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;
@@ -208,6 +210,12 @@ class JobDetailPanel {
             <button class="force-trigger-btn" onclick="window.jobDetailPanel.handleForceTrigger()">
               Force Trigger
             </button>
+            ${hasPromptAction(this.currentJob.ats_code) ? `
+              <button class="inspect-prompt-btn" onclick="window.jobDetailPanel.handleInspectPrompt()">
+                <span class="inspect-prompt-icon">${SO}</span>
+                Inspect Prompt
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -775,6 +783,16 @@ class JobDetailPanel {
     } catch (error) {
       handleError(error, 'Force trigger failed', { context: SEG.PULSE });
     }
+  }
+
+  /**
+   * Open the prompt editor with the ATS code from this job
+   */
+  public handleInspectPrompt(): void {
+    if (!this.currentJob) return;
+
+    log.debug(SEG.PULSE, 'Opening prompt editor for:', this.currentJob.ats_code);
+    openPromptFromAtsCode(this.currentJob.ats_code);
   }
 
   private formatInterval(seconds: number): string {
