@@ -40,3 +40,8 @@ Traditional systems give you answers from data.
 QNTX gives you intelligence that grows from data.
 
 The difference: Intelligence understands relationships, remembers context, and evolves continuously.
+
+## Related Vision
+
+- [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Visualize continuous intelligence through always-visible data surfaces
+- [Time-Travel](./time-travel.md) - Navigate the evolution of intelligence across time
