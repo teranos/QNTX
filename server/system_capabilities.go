@@ -11,12 +11,15 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 	// Get fuzzy backend from the AxGraphBuilder
 	fuzzyBackend := s.builder.FuzzyBackend()
 	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust)
+	fuzzyVersion := fuzzyBackendVersion()
 
 	// Detect vidstream/ONNX availability (requires CGO build with rustvideo tag)
 	vidstreamOptimized := vidstreamAvailable()
 	vidstreamBackend := "onnx"
+	vidstreamVersion := vidstreamBackendVersion()
 	if !vidstreamOptimized {
 		vidstreamBackend = "unavailable"
+		vidstreamVersion = "n/a"
 	}
 
 	// Create system capabilities message
@@ -24,8 +27,10 @@ func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
 		Type:               "system_capabilities",
 		FuzzyBackend:       string(fuzzyBackend),
 		FuzzyOptimized:     fuzzyOptimized,
+		FuzzyVersion:       fuzzyVersion,
 		VidStreamBackend:   vidstreamBackend,
 		VidStreamOptimized: vidstreamOptimized,
+		VidStreamVersion:   vidstreamVersion,
 	}
 
 	// Send to broadcast worker (thread-safe)

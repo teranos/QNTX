@@ -260,3 +260,8 @@ func (f *FuzzyEngine) IsReady() bool {
 	}
 	return bool(C.fuzzy_engine_is_ready(f.engine))
 }
+
+// Version returns the fuzzy-ax library version string.
+func Version() string {
+	return C.GoString(C.fuzzy_engine_version())
+}
