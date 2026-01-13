@@ -3,12 +3,38 @@
 package vidstream
 
 import (
+	"os"
 	"testing"
 )
 
+// getTestConfig returns a Config for testing with optional model path from environment.
+// CI downloads YOLO11n model and sets QNTX_VIDSTREAM_TEST_MODEL to enable inference mode.
+// Without model, tests run in stub mode verifying FFI bindings and basic functionality.
+func getTestConfig(t *testing.T) Config {
+	cfg := Config{
+		ConfidenceThreshold: 0.5,
+		NMSThreshold:        0.4,
+		InputWidth:          640,
+		InputHeight:         640,
+		NumThreads:          1,
+		UseGPU:              false,
+	}
+
+	// Check for test model path in environment
+	if modelPath := os.Getenv("QNTX_VIDSTREAM_TEST_MODEL"); modelPath != "" {
+		t.Logf("Using test model: %s", modelPath)
+		cfg.ModelPath = modelPath
+	} else {
+		t.Log("No test model specified (set QNTX_VIDSTREAM_TEST_MODEL to test with ONNX)")
+	}
+
+	return cfg
+}
+
 func TestVideoEngineLifecycle(t *testing.T) {
 	// Test engine creation and cleanup
-	engine, err := NewVideoEngine()
+	cfg := getTestConfig(t)
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -54,7 +80,8 @@ func TestExpectedFrameSize(t *testing.T) {
 }
 
 func TestProcessFrameBasic(t *testing.T) {
-	engine, err := NewVideoEngine()
+	cfg := getTestConfig(t)
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -95,7 +122,8 @@ func TestProcessFrameBasic(t *testing.T) {
 }
 
 func TestProcessFrameEmptyData(t *testing.T) {
-	engine, err := NewVideoEngine()
+	cfg := getTestConfig(t)
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -114,7 +142,8 @@ func TestProcessFrameEmptyData(t *testing.T) {
 }
 
 func TestProcessFrameClosedEngine(t *testing.T) {
-	engine, err := NewVideoEngine()
+	cfg := getTestConfig(t)
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -129,7 +158,8 @@ func TestProcessFrameClosedEngine(t *testing.T) {
 }
 
 func TestInputDimensions(t *testing.T) {
-	engine, err := NewVideoEngine()
+	cfg := getTestConfig(t)
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -142,7 +172,8 @@ func TestInputDimensions(t *testing.T) {
 }
 
 func TestIsReady(t *testing.T) {
-	engine, err := NewVideoEngine()
+	cfg := getTestConfig(t)
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -163,7 +194,19 @@ func TestIsReady(t *testing.T) {
 // Benchmarks
 
 func BenchmarkProcessFrame640x480(b *testing.B) {
-	engine, err := NewVideoEngine()
+	cfg := Config{
+		ConfidenceThreshold: 0.5,
+		NMSThreshold:        0.4,
+		InputWidth:          640,
+		InputHeight:         640,
+		NumThreads:          1,
+		UseGPU:              false,
+	}
+	if modelPath := os.Getenv("QNTX_VIDSTREAM_TEST_MODEL"); modelPath != "" {
+		cfg.ModelPath = modelPath
+	}
+
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		b.Fatalf("Failed to create engine: %v", err)
 	}
@@ -193,7 +236,19 @@ func BenchmarkProcessFrame640x480(b *testing.B) {
 }
 
 func BenchmarkProcessFrame1920x1080(b *testing.B) {
-	engine, err := NewVideoEngine()
+	cfg := Config{
+		ConfidenceThreshold: 0.5,
+		NMSThreshold:        0.4,
+		InputWidth:          640,
+		InputHeight:         640,
+		NumThreads:          1,
+		UseGPU:              false,
+	}
+	if modelPath := os.Getenv("QNTX_VIDSTREAM_TEST_MODEL"); modelPath != "" {
+		cfg.ModelPath = modelPath
+	}
+
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		b.Fatalf("Failed to create engine: %v", err)
 	}
@@ -223,7 +278,19 @@ func BenchmarkProcessFrame1920x1080(b *testing.B) {
 }
 
 func BenchmarkProcessFrameParallel(b *testing.B) {
-	engine, err := NewVideoEngine()
+	cfg := Config{
+		ConfidenceThreshold: 0.5,
+		NMSThreshold:        0.4,
+		InputWidth:          640,
+		InputHeight:         640,
+		NumThreads:          1,
+		UseGPU:              false,
+	}
+	if modelPath := os.Getenv("QNTX_VIDSTREAM_TEST_MODEL"); modelPath != "" {
+		cfg.ModelPath = modelPath
+	}
+
+	engine, err := NewVideoEngineWithConfig(cfg)
 	if err != nil {
 		b.Fatalf("Failed to create engine: %v", err)
 	}
