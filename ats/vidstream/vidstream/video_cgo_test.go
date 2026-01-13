@@ -7,7 +7,9 @@ import (
 	"testing"
 )
 
-// getTestConfig returns a Config for testing with optional model path from environment
+// getTestConfig returns a Config for testing with optional model path from environment.
+// CI downloads YOLO11n model and sets QNTX_VIDSTREAM_TEST_MODEL to enable inference mode.
+// Without model, tests run in stub mode verifying FFI bindings and basic functionality.
 func getTestConfig(t *testing.T) Config {
 	cfg := Config{
 		ConfidenceThreshold: 0.5,
