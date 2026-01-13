@@ -1,0 +1,348 @@
+package prompt
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"time"
+
+	"github.com/teranos/QNTX/ai/openrouter"
+	"github.com/teranos/QNTX/ai/provider"
+	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/ats"
+	"github.com/teranos/QNTX/ats/alias"
+	"github.com/teranos/QNTX/ats/ax"
+	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/pulse/async"
+	id "github.com/teranos/vanity-id"
+)
+
+// HandlerName is the registered name for the prompt handler
+const HandlerName = "prompt.execute"
+
+// Payload represents the job payload for prompt execution
+type Payload struct {
+	// AxFilter defines which attestations to query
+	AxFilter types.AxFilter `json:"ax_filter"`
+
+	// Template is the prompt template with {{field}} placeholders
+	Template string `json:"template"`
+
+	// SystemPrompt is the optional system instruction for the LLM
+	SystemPrompt string `json:"system_prompt,omitempty"`
+
+	// TemporalCursor tracks the last processed timestamp for incremental processing
+	// On first run, this is zero. On subsequent runs, only attestations newer than
+	// this cursor are processed.
+	TemporalCursor *time.Time `json:"temporal_cursor,omitempty"`
+
+	// Provider specifies which LLM provider to use: "openrouter" or "local"
+	Provider string `json:"provider,omitempty"`
+
+	// Model overrides the default model for the provider
+	Model string `json:"model,omitempty"`
+
+	// ResultPredicate is the predicate used when creating result attestations
+	// Defaults to "prompt-result"
+	ResultPredicate string `json:"result_predicate,omitempty"`
+
+	// ResultActor is the actor for result attestations
+	// Defaults to the model identifier (e.g., "openai/gpt-4o-mini")
+	ResultActor string `json:"result_actor,omitempty"`
+}
+
+// Result represents the output of a prompt execution
+type Result struct {
+	// SourceAttestationID is the ID of the attestation that was processed
+	SourceAttestationID string `json:"source_attestation_id"`
+
+	// Prompt is the interpolated prompt that was sent to the LLM
+	Prompt string `json:"prompt"`
+
+	// Response is the LLM's response
+	Response string `json:"response"`
+
+	// ResultAttestationID is the ID of the created result attestation
+	ResultAttestationID string `json:"result_attestation_id,omitempty"`
+
+	// Usage tracks token usage
+	Usage openrouter.Usage `json:"usage,omitempty"`
+}
+
+// Handler implements async.JobHandler for prompt execution
+type Handler struct {
+	queryStore    ats.AttestationQueryStore
+	store         ats.AttestationStore
+	aliasResolver *alias.Resolver
+	config        *am.Config
+	db            *sql.DB
+}
+
+// NewHandler creates a new prompt handler
+func NewHandler(
+	queryStore ats.AttestationQueryStore,
+	store ats.AttestationStore,
+	aliasResolver *alias.Resolver,
+	config *am.Config,
+	db *sql.DB,
+) *Handler {
+	return &Handler{
+		queryStore:    queryStore,
+		store:         store,
+		aliasResolver: aliasResolver,
+		config:        config,
+		db:            db,
+	}
+}
+
+// Name returns the handler name for registration
+func (h *Handler) Name() string {
+	return HandlerName
+}
+
+// Execute runs the prompt job
+func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
+	// Decode payload
+	var payload Payload
+	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+		return errors.Wrap(err, "failed to decode prompt payload")
+	}
+
+	// Parse template
+	tmpl, err := Parse(payload.Template)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse prompt template")
+	}
+
+	// Apply temporal cursor filter for incremental processing
+	filter := payload.AxFilter
+	if payload.TemporalCursor != nil && !payload.TemporalCursor.IsZero() {
+		filter.TimeStart = payload.TemporalCursor
+	}
+
+	// Execute ax query
+	executor := ax.NewAxExecutor(h.queryStore, h.aliasResolver)
+	result, err := executor.ExecuteAsk(ctx, filter)
+	if err != nil {
+		return errors.Wrap(err, "failed to execute ax query")
+	}
+
+	if len(result.Attestations) == 0 {
+		// No attestations to process - this is not an error
+		job.UpdateProgress(0)
+		return nil
+	}
+
+	// Set total for progress tracking
+	job.Progress.Total = len(result.Attestations)
+
+	// Create AI client
+	client := h.createAIClient(payload)
+
+	// Process each attestation
+	var results []Result
+	var latestTimestamp time.Time
+
+	for i, as := range result.Attestations {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		// Interpolate template
+		prompt, err := tmpl.Execute(&as)
+		if err != nil {
+			return errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
+		}
+
+		// Call LLM
+		chatReq := openrouter.ChatRequest{
+			SystemPrompt: payload.SystemPrompt,
+			UserPrompt:   prompt,
+		}
+		if payload.Model != "" {
+			chatReq.Model = &payload.Model
+		}
+
+		resp, err := client.Chat(ctx, chatReq)
+		if err != nil {
+			return errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
+		}
+
+		// Create result attestation
+		resultAs, err := h.createResultAttestation(&as, resp.Content, payload)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create result attestation for %s", as.ID)
+		}
+
+		results = append(results, Result{
+			SourceAttestationID: as.ID,
+			Prompt:              prompt,
+			Response:            resp.Content,
+			ResultAttestationID: resultAs.ID,
+			Usage:               resp.Usage,
+		})
+
+		// Track latest timestamp for cursor update
+		if as.Timestamp.After(latestTimestamp) {
+			latestTimestamp = as.Timestamp
+		}
+
+		// Update progress
+		job.UpdateProgress(i + 1)
+	}
+
+	// Store results in job (as JSON in Source field for now - could add a Results field)
+	// The caller can retrieve execution history to see results
+	if len(results) > 0 {
+		resultsJSON, _ := json.Marshal(results)
+		job.Source = string(resultsJSON)
+	}
+
+	return nil
+}
+
+// createAIClient creates the appropriate AI client based on payload configuration
+func (h *Handler) createAIClient(payload Payload) provider.AIClient {
+	// Use provider from payload, or default based on config
+	if payload.Provider == "local" || (payload.Provider == "" && h.config.LocalInference.Enabled) {
+		return provider.NewLocalClient(provider.LocalClientConfig{
+			BaseURL:        h.config.LocalInference.BaseURL,
+			Model:          h.config.LocalInference.Model,
+			TimeoutSeconds: h.config.LocalInference.TimeoutSeconds,
+			DB:             h.db,
+			OperationType:  "prompt-execute",
+		})
+	}
+
+	// Default to OpenRouter
+	return openrouter.NewClient(openrouter.Config{
+		APIKey:        h.config.OpenRouter.APIKey,
+		Model:         h.config.OpenRouter.Model,
+		DB:            h.db,
+		OperationType: "prompt-execute",
+	})
+}
+
+// createResultAttestation creates an attestation from the LLM response
+func (h *Handler) createResultAttestation(
+	sourceAs *types.As,
+	response string,
+	payload Payload,
+) (*types.As, error) {
+	predicate := payload.ResultPredicate
+	if predicate == "" {
+		predicate = "prompt-result"
+	}
+
+	actor := payload.ResultActor
+	if actor == "" {
+		// Use model as actor
+		if payload.Model != "" {
+			actor = payload.Model
+		} else if h.config.LocalInference.Enabled {
+			actor = h.config.LocalInference.Model
+		} else {
+			actor = h.config.OpenRouter.Model
+		}
+	}
+
+	// Generate ASID: subject, predicate, context, actor
+	asid, err := id.GenerateASID(sourceAs.Subjects[0], predicate, sourceAs.ID, actor)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate ASID")
+	}
+
+	now := time.Now()
+	resultAs := &types.As{
+		ID:         asid,
+		Subjects:   sourceAs.Subjects, // Same subject as source
+		Predicates: []string{predicate},
+		Contexts:   []string{sourceAs.ID}, // Context links to source attestation
+		Actors:     []string{actor},
+		Timestamp:  now,
+		Source:     "prompt",
+		Attributes: map[string]interface{}{
+			"response":       response,
+			"source_id":      sourceAs.ID,
+			"template":       payload.Template,
+			"prompt_handler": HandlerName,
+		},
+	}
+
+	// Store the attestation
+	if err := h.store.CreateAttestation(resultAs); err != nil {
+		return nil, errors.Wrap(err, "failed to store result attestation")
+	}
+
+	return resultAs, nil
+}
+
+// ExecuteOneShot executes a single prompt against specific attestations without scheduling
+// This is used by the prompt editor window for testing/iteration
+func ExecuteOneShot(
+	ctx context.Context,
+	queryStore ats.AttestationQueryStore,
+	aliasResolver *alias.Resolver,
+	client provider.AIClient,
+	filter types.AxFilter,
+	template string,
+	systemPrompt string,
+) ([]Result, error) {
+	// Parse template
+	tmpl, err := Parse(template)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse prompt template")
+	}
+
+	// Execute ax query
+	executor := ax.NewAxExecutor(queryStore, aliasResolver)
+	axResult, err := executor.ExecuteAsk(ctx, filter)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute ax query")
+	}
+
+	if len(axResult.Attestations) == 0 {
+		return []Result{}, nil
+	}
+
+	// Process each attestation
+	var results []Result
+	for _, as := range axResult.Attestations {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return results, ctx.Err()
+		default:
+		}
+
+		// Interpolate template
+		prompt, err := tmpl.Execute(&as)
+		if err != nil {
+			return results, errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
+		}
+
+		// Call LLM
+		chatReq := openrouter.ChatRequest{
+			SystemPrompt: systemPrompt,
+			UserPrompt:   prompt,
+		}
+
+		resp, err := client.Chat(ctx, chatReq)
+		if err != nil {
+			return results, errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
+		}
+
+		results = append(results, Result{
+			SourceAttestationID: as.ID,
+			Prompt:              prompt,
+			Response:            resp.Content,
+			Usage:               resp.Usage,
+		})
+	}
+
+	return results, nil
+}

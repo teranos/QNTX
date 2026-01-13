@@ -1,0 +1,303 @@
+/**
+ * Prompt Editor Window Styles
+ * ax → so prompt interactive testing interface
+ */
+
+.prompt-editor-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.prompt-editor-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.prompt-editor-row {
+    flex-direction: row;
+    gap: 12px;
+}
+
+.prompt-editor-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.prompt-editor-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary, #e0e0e0);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.prompt-editor-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-secondary, #888);
+}
+
+.prompt-editor-input,
+.prompt-editor-select,
+.prompt-editor-textarea {
+    background: var(--input-bg, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-primary, #e0e0e0);
+    font-family: inherit;
+}
+
+.prompt-editor-input:focus,
+.prompt-editor-select:focus,
+.prompt-editor-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color, #4a9eff);
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+}
+
+.prompt-editor-textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.prompt-template-editor {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    min-height: 80px;
+}
+
+/* Template container with suggestions */
+.prompt-template-container {
+    position: relative;
+}
+
+.prompt-field-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--surface-bg, #1e1e1e);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+}
+
+.prompt-field-suggestions.hidden {
+    display: none;
+}
+
+.prompt-field-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 4px 8px;
+    background: var(--button-bg, #2a2a2a);
+    border: 1px solid var(--border-color, #444);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.prompt-field-btn:hover {
+    background: var(--button-hover-bg, #3a3a3a);
+    border-color: var(--accent-color, #4a9eff);
+}
+
+.prompt-field-btn .field-name {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--accent-color, #4a9eff);
+}
+
+.prompt-field-btn .field-desc {
+    font-size: 10px;
+    color: var(--text-secondary, #888);
+}
+
+/* Actions row */
+.prompt-editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.prompt-execute-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--accent-color, #4a9eff);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.prompt-execute-btn:hover:not(.executing) {
+    background: var(--accent-hover, #3a8eef);
+}
+
+.prompt-execute-btn.executing {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.prompt-preview-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--border-color, #444);
+    border-radius: 4px;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.prompt-preview-btn:hover {
+    background: var(--button-hover-bg, #2a2a2a);
+    border-color: var(--text-secondary, #666);
+}
+
+.prompt-status {
+    font-size: 12px;
+    margin-left: auto;
+}
+
+.prompt-status.status-info {
+    color: var(--text-secondary, #888);
+}
+
+.prompt-status.status-success {
+    color: var(--success-color, #4caf50);
+}
+
+.prompt-status.status-warning {
+    color: var(--warning-color, #ff9800);
+}
+
+.prompt-status.status-error {
+    color: var(--error-color, #f44336);
+}
+
+/* Results section */
+.prompt-results {
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--surface-bg, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+}
+
+.prompt-results-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-secondary, #666);
+    font-style: italic;
+}
+
+.prompt-result-item {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+.prompt-result-item:last-child {
+    border-bottom: none;
+}
+
+.prompt-preview-item {
+    background: var(--surface-hover, #252525);
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.result-index {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-color, #4a9eff);
+    background: rgba(74, 158, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.result-id {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--text-secondary, #888);
+}
+
+.result-tokens {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-secondary, #666);
+    background: var(--surface-bg, #1e1e1e);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.result-preview {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-primary, #e0e0e0);
+}
+
+.result-prompt-details {
+    margin-bottom: 8px;
+}
+
+.result-prompt-details summary {
+    font-size: 11px;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.result-prompt {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    padding: 8px;
+    background: var(--code-bg, #0d0d0d);
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 4px 0 0 0;
+    color: var(--text-secondary, #aaa);
+}
+
+.result-response {
+    background: var(--surface-hover, #222);
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.result-response-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary, #888);
+    margin-bottom: 4px;
+}
+
+.result-response-content {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-primary, #e0e0e0);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
