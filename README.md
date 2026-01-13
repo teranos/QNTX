@@ -3,7 +3,9 @@
 [![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
 [![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
 
-**QNTX** = Direct manipulation of symbolic knowledge through computational systems. A modular Continuous Intelligence Platform operated as a graph of attestations. It automates data ingestion, enrichment, and reasoning to create a continuously self-improving knowledge graph.
+**QNTX: Continuous Intelligence**
+
+A new paradigm where systems continuously evolve their understanding through verifiable attestations. Always-on, always-learning - scaling from a Raspberry Pi to distributed clusters without configuration.
 
 ```
 Data → Graph → Knowledge → Intelligence → Action

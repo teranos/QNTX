@@ -536,8 +536,13 @@ let
 
       introText = ''
         <div class="intro-section">
-          <p><strong>QNTX</strong> is an attestation-based continuous intelligence system for direct manipulation of symbolic knowledge through computational systems.</p>
-          <p>Data → Graph → Knowledge → Intelligence → Action</p>
+          <h2 style="text-align: center; margin: 20px 0;">Continuous Intelligence</h2>
+          <p>QNTX implements <strong>Continuous Intelligence</strong> - systems that continuously evolve their understanding through verifiable attestations.</p>
+          <ul>
+            <li><strong>⨳ ix</strong> - Ingest data from plugins, APIs, and actions into attestations</li>
+            <li><strong>꩜ Pulse</strong> - Background jobs that enrich and connect knowledge</li>
+            <li><strong>⋈ ax</strong> - Ask questions across time, trace causality, explore relationships</li>
+          </ul>
         </div>
       '';
 
@@ -556,13 +561,14 @@ let
       '';
     in
     mkPage {
-      title = "QNTX Documentation";
+      title = "QNTX - Continuous Intelligence";
       nav = false;
       scripts = [ ];
       content = ''
         <div class="doc-header">
           <img src="./qntx.jpg" alt="QNTX Logo">
           <h1>QNTX</h1>
+          <p style="margin-top: 0; font-size: 1.1em;">Continuous Intelligence</p>
         </div>
 
         <nav class="quick-links">

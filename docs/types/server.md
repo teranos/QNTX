@@ -463,8 +463,10 @@ type SystemCapabilitiesMessage struct {
 	Type string `json:"type"`
 	FuzzyBackend string `json:"fuzzy_backend"`
 	FuzzyOptimized bool `json:"fuzzy_optimized"`
+	FuzzyVersion string `json:"fuzzy_version"`
 	VidStreamBackend string `json:"vidstream_backend"`
 	VidStreamOptimized bool `json:"vidstream_optimized"`
+	VidStreamVersion string `json:"vidstream_version"`
 }
 ```
 

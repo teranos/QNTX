@@ -30,7 +30,7 @@ class GoEditorPanel extends BasePanel {
     private hasUnsavedChanges: boolean = false;
     private isDevMode: boolean = false;
     private workspaceRoot: string = '';
-    private currentTab: 'editor' | 'suggestions' = 'editor';
+    private currentTab: 'editor' | 'suggestions' | null = null;
     private editorContent: string = '';
 
     // Components
@@ -603,8 +603,8 @@ class GoEditorPanel extends BasePanel {
     }
 
     async switchTab(tab: 'editor' | 'suggestions'): Promise<void> {
-        // Don't switch if already on this tab
-        if (tab === this.currentTab) return;
+        // Don't switch if already on this tab (skip null check for initial render)
+        if (this.currentTab !== null && tab === this.currentTab) return;
 
         // Store editor content before switching away from editor tab
         if (this.currentTab === 'editor' && this.editor) {

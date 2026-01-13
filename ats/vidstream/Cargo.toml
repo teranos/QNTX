@@ -1,12 +1,15 @@
 [package]
 name = "qntx-vidstream"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Real-time video ingestion (⨳) with frame attestation for QNTX (CGO)"
 license = "MIT"
 authors = ["QNTX Contributors"]
 
 [dependencies]
+# QNTX core - for common error types
+qntx = { path = "../../crates/qntx" }
+
 # Video decoding - using ffmpeg-next for safe bindings
 # Note: Requires ffmpeg development libraries installed on system
 ffmpeg-next = { version = "7", optional = true }

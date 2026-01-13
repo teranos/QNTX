@@ -208,6 +208,13 @@ size_t video_expected_frame_size(uint32_t width, uint32_t height, int format);
  */
 void video_string_free(char *s);
 
+/**
+ * Get the vidstream library version string.
+ *
+ * @return Version string (e.g., "0.1.0"). Do not free - points to static memory.
+ */
+const char *video_engine_version(void);
+
 #ifdef __cplusplus
 }
 #endif

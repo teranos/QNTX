@@ -314,7 +314,7 @@ export class PluginPanel extends BasePanel {
                         <span class="plugin-server-value panel-code">${serverBuildTime}</span>
                     </div>
                 ` : ''}
-                <button class="panel-btn panel-btn-sm plugin-refresh-btn" title="Refresh">&#8635; Refresh</button>
+                <button class="panel-btn panel-btn-sm plugin-refresh-btn has-tooltip" data-tooltip="Refresh">&#8635; Refresh</button>
             </div>
             <div class="panel-list plugin-list">
                 ${this.plugins.map(plugin => this.renderPlugin(plugin)).join('')}
@@ -424,9 +424,9 @@ export class PluginPanel extends BasePanel {
         let controls = '';
         if (plugin.pausable) {
             if (plugin.state === 'running') {
-                controls = `<button class="panel-btn panel-btn-sm plugin-pause-btn" data-plugin="${plugin.name}" title="Pause plugin">&#10074;&#10074; Pause</button>`;
+                controls = `<button class="panel-btn panel-btn-sm plugin-pause-btn has-tooltip" data-plugin="${plugin.name}" data-tooltip="Pause plugin">&#10074;&#10074; Pause</button>`;
             } else if (plugin.state === 'paused') {
-                controls = `<button class="panel-btn panel-btn-sm plugin-resume-btn" data-plugin="${plugin.name}" title="Resume plugin">&#9654; Resume</button>`;
+                controls = `<button class="panel-btn panel-btn-sm plugin-resume-btn has-tooltip" data-plugin="${plugin.name}" data-tooltip="Resume plugin">&#9654; Resume</button>`;
             }
         }
 
@@ -631,7 +631,7 @@ export class PluginPanel extends BasePanel {
                                ${schema.max_value ? `max="${escapeHtml(schema.max_value)}"` : ''}
                                ${schema.pattern ? `pattern="${escapeHtml(schema.pattern)}"` : ''}
                                ${schema.required ? 'required' : ''}>
-                        <button class="plugin-config-field-cancel" data-field="${escapeHtml(fieldName)}" title="Cancel">&#10005;</button>
+                        <button class="plugin-config-field-cancel has-tooltip" data-field="${escapeHtml(fieldName)}" data-tooltip="Cancel">&#10005;</button>
                     </div>
                 `;
             } else {

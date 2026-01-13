@@ -10,6 +10,7 @@ import { apiFetch } from './api.ts';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
+import { tooltip } from './components/tooltip.ts';
 
 interface ConfigResponse {
     config_file?: string;
@@ -66,8 +67,8 @@ class AIProviderPanel {
                                 placeholder="sk-or-v1-..."
                                 autocomplete="off"
                             />
-                            <button id="openrouter-key-toggle" class="api-key-toggle" title="Show/Hide">👁</button>
-                            <button id="openrouter-key-save" class="api-key-save" title="Save">💾</button>
+                            <button id="openrouter-key-toggle" class="api-key-toggle has-tooltip" data-tooltip="Show/Hide">👁</button>
+                            <button id="openrouter-key-save" class="api-key-save has-tooltip" data-tooltip="Save">💾</button>
                         </div>
                         <div class="api-key-hint">Get your key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></div>
                     </div>
@@ -94,7 +95,7 @@ class AIProviderPanel {
                             placeholder="ats/vidstream/models/yolo11n.onnx"
                             autocomplete="off"
                         />
-                        <button id="onnx-model-save" class="api-key-save" title="Save">💾</button>
+                        <button id="onnx-model-save" class="api-key-save has-tooltip" data-tooltip="Save">💾</button>
                     </div>
                 </div>
             </div>
@@ -102,6 +103,12 @@ class AIProviderPanel {
 
         this.window.setContent(content);
         this.setupEventListeners();
+        this.setupTooltips();
+    }
+
+    private setupTooltips(): void {
+        const windowEl = this.window.getElement();
+        tooltip.attach(windowEl, '.has-tooltip');
     }
 
     private setupEventListeners(): void {
