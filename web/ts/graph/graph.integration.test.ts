@@ -51,7 +51,7 @@ describe('Graph Rendering Integration', () => {
                 </div>
                 <div id="controls"></div>
                 <div class="legenda"></div>
-                <div id="tooltip"></div>
+                <div id="tooltip" class="graph-data-tooltip"></div>
             </body>
             </html>
         `, {
