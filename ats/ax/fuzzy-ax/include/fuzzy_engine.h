@@ -180,6 +180,13 @@ bool fuzzy_engine_is_ready(const FuzzyEngine *engine);
  */
 void fuzzy_string_free(char *s);
 
+/**
+ * Get the fuzzy-ax library version string.
+ *
+ * @return Version string (e.g., "0.1.0"). Do not free - points to static memory.
+ */
+const char *fuzzy_engine_version(void);
+
 #ifdef __cplusplus
 }
 #endif

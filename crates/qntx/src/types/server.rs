@@ -499,12 +499,17 @@ pub struct SystemCapabilitiesMessage {
     pub fuzzy_backend: String,
     /// true if using Rust (optimized), false if Go fallback
     pub fuzzy_optimized: bool,
+    /// fuzzy-ax library version (e.g., "0.1.0")
+    pub fuzzy_version: String,
     #[serde(rename = "vidstream_backend")]
     /// "onnx" or "unavailable" - video inference availability
     pub vid_stream_backend: String,
     #[serde(rename = "vidstream_optimized")]
     /// true if ONNX Runtime available (CGO build)
     pub vid_stream_optimized: bool,
+    #[serde(rename = "vidstream_version")]
+    /// vidstream library version (e.g., "0.1.0")
+    pub vid_stream_version: String,
 }
 
 /// TaskInfo represents a task within a stage
