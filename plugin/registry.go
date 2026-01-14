@@ -74,6 +74,20 @@ func (r *Registry) List() []string {
 	return names
 }
 
+// ListEnabled returns all enabled plugin names (including pre-registered ones) in sorted order
+// This includes plugins that are still loading, not just fully loaded ones
+func (r *Registry) ListEnabled() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.states))
+	for name := range r.states {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // GetAll returns all registered plugins
 func (r *Registry) GetAll() map[string]DomainPlugin {
 	r.mu.RLock()
@@ -276,6 +290,35 @@ func (r *Registry) Resume(ctx context.Context, name string) error {
 	r.mu.Unlock()
 
 	return nil
+}
+
+// IsReady returns whether a plugin is ready to handle requests
+func (r *Registry) IsReady(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	state, exists := r.states[name]
+	return exists && state == StateRunning
+}
+
+// PreRegister reserves a plugin slot in loading state before async initialization
+// This allows routes to be registered immediately while plugins load in background
+func (r *Registry) PreRegister(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.states[name] = StateLoading
+	r.logger.Debugf("Pre-registered plugin '%s' in loading state", name)
+}
+
+// MarkReady marks a plugin as ready (StateRunning) after successful loading
+// Used by async plugin loading to indicate plugin is ready to handle requests
+func (r *Registry) MarkReady(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.states[name] = StateRunning
+	r.logger.Debugf("Marked plugin '%s' as ready", name)
 }
 
 // validateVersion checks if plugin version is compatible with QNTX version
