@@ -48,7 +48,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get server port from config system (env > project > user > system > default)
-	serverPort := am.GetGraphPort()
+	serverPort := am.GetServerPort()
 
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
