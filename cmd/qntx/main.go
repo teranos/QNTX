@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
+	"go.uber.org/zap"
 )
 
 var rootCmd = &cobra.Command{
@@ -79,7 +80,8 @@ func init() {
 	addPluginCommands()
 }
 
-// initializePluginRegistry sets up the domain plugin registry with plugin discovery
+// initializePluginRegistry sets up the domain plugin registry with async plugin discovery
+// Returns immediately after pre-registering plugins, loads them in background
 func initializePluginRegistry() {
 	// Initialize logger for plugin loading
 	pluginLogger := logger.Logger.Named("plugin-loader")
@@ -96,27 +98,37 @@ func initializePluginRegistry() {
 		return
 	}
 
-	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
-	// This merges [config] sections into am's viper for plugin initialization
-	if err := am.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
-		// Log detailed error but don't fail - plugins may still work with defaults
-		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
-	}
-
 	// If no plugins enabled, run in minimal mode
 	if len(cfg.Plugin.Enabled) == 0 {
 		pluginLogger.Infow("No plugins enabled - QNTX running in minimal core mode")
 		return
 	}
 
-	// Load plugins from configuration
+	// Pre-register plugin names immediately so routes can be registered
+	for _, pluginName := range cfg.Plugin.Enabled {
+		registry.PreRegister(pluginName)
+	}
+	pluginLogger.Infof("Pre-registered %d plugins, loading in background", len(cfg.Plugin.Enabled))
+
+	// Load plugins asynchronously in background
+	go loadPluginsAsync(cfg, pluginLogger, registry)
+}
+
+// loadPluginsAsync performs async plugin loading without blocking server startup
+func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry *plugin.Registry) {
+	// Load plugin-specific configs from ~/.qntx/plugins/*.toml
+	if err := am.LoadPluginConfigs(cfg.Plugin.Paths); err != nil {
+		pluginLogger.Warnw("Plugin configuration errors detected", "error", err)
+	}
+
+	// Load plugins from configuration with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	manager, err := grpc.LoadPluginsFromConfig(ctx, cfg, pluginLogger)
 	if err != nil {
 		pluginLogger.Errorw("Failed to load plugins from configuration", "error", err)
-		os.Exit(1)
+		return
 	}
 
 	// Store manager globally for server access
@@ -133,9 +145,13 @@ func initializePluginRegistry() {
 				meta.Name, meta.Version, err.Error())
 			continue
 		}
+		// Mark plugin as running since gRPC connection is already established
+		registry.MarkReady(meta.Name)
 		pluginLogger.Infof("Registered '%s' plugin v%s - %s",
 			meta.Name, meta.Version, meta.Description)
 	}
+
+	pluginLogger.Info("Plugin loading complete")
 }
 
 // addPluginCommands was used to add commands from all registered plugins.
