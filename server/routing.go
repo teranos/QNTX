@@ -152,7 +152,7 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 				s.logger.Errorw("Failed to initialize plugin",
 					"plugin", pluginName,
 					"error", err)
-				http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed", pluginName), http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed: %v", pluginName, err), http.StatusInternalServerError)
 				return
 			}
 
@@ -161,7 +161,7 @@ func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request)
 				s.logger.Errorw("Failed to register HTTP handlers for plugin",
 					"plugin", pluginName,
 					"error", err)
-				http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed", pluginName), http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed: %v", pluginName, err), http.StatusInternalServerError)
 				return
 			}
 
