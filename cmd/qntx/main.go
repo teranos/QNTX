@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/cmd/qntx/commands"
+	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
@@ -84,7 +85,7 @@ func initializePluginRegistry() {
 	pluginLogger := logger.Logger.Named("plugin-loader")
 
 	// Create registry with QNTX version and logger
-	registry := plugin.NewRegistry("0.1.0", pluginLogger)
+	registry := plugin.NewRegistry(version.VersionTag, pluginLogger)
 	plugin.SetDefaultRegistry(registry)
 
 	// Load configuration to determine which plugins to load
@@ -128,9 +129,9 @@ func initializePluginRegistry() {
 		meta := p.Metadata()
 		pluginLogger.Infof("[%d/%d] Attempting to register '%s' plugin", i+1, len(loadedPlugins), meta.Name)
 		if err := registry.Register(p); err != nil {
-			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (may be duplicate or route conflict)",
+			pluginLogger.Errorf("Failed to register '%s' plugin v%s: %s (skipping)",
 				meta.Name, meta.Version, err.Error())
-			os.Exit(1)
+			continue
 		}
 		pluginLogger.Infof("Registered '%s' plugin v%s - %s",
 			meta.Name, meta.Version, meta.Description)
