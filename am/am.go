@@ -40,9 +40,9 @@ type ServerDevConfig struct {
 
 // Server port constants
 const (
-	DefaultGraphPort      = 877  // Development port (easy to type, above privileged range)
+	DefaultServerPort     = 877  // Development port (easy to type, above privileged range)
 	DefaultGraphEventPort = 878  // Event viewer port
-	FallbackGraphPort     = 7878 // Production fallback port
+	FallbackServerPort    = 7878 // Production fallback port
 )
 
 // PulseConfig configures the Pulse async job system (core infrastructure)
