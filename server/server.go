@@ -61,6 +61,10 @@ type QNTXServer struct {
 	vidstreamEngine *vidstream.VideoEngine // Singleton video processing engine
 	vidstreamMu     sync.Mutex             // Protects vidstream engine operations
 
+	// Plugin HTTP routing (lazy initialization for async plugin loading)
+	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
+	pluginMuxInit sync.Map // map[string]bool - tracks which plugins have initialized their mux
+
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
 	cancel         context.CancelFunc // Cancels all goroutines
