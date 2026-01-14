@@ -34,7 +34,6 @@ HandleDevMode returns whether the server is in dev mode (plain text: "true" or "
 ### `GET` /api/timeseries/usage
 
 HandleUsageTimeSeries serves time-series usage data for charting
-TODO(#17): Research better time-series architecture for usage charting
 
 **Handler**: `HandleUsageTimeSeries`
 

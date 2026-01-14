@@ -11,10 +11,11 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 // Configuration
-// TODO(#272): Support configurable dev ports via env vars or am.toml for multi-variant testing
-const BACKEND_URL = "http://localhost:877";  // Go backend
-const DEV_PORT_START = 8820;  // Preferred development server port
-const DEV_PORT_MAX = 8830;     // Maximum port to try
+// Port precedence: ENV > am.toml > defaults (issue #272)
+const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || process.env.QNTX_SERVER_PORT || "877", 10);
+const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;  // Go backend
+const DEV_PORT_START = parseInt(process.env.FRONTEND_PORT || "8820", 10);  // Preferred development server port
+const DEV_PORT_MAX = DEV_PORT_START + 10;     // Try up to 10 ports above start
 const BUILD_DEBOUNCE = 300; // ms to wait before rebuilding
 
 let buildTimeout: NodeJS.Timeout | null = null;
@@ -189,10 +190,10 @@ async function startServer() {
 
     console.log(`
 ${lightPink}Development server running at http://localhost:${port}${reset}
-${dim}Backend URL: ${BACKEND_URL}${reset}
+${dim}Backend URL: ${BACKEND_URL} (port ${BACKEND_PORT})${reset}
 ${dim}Live reload enabled${reset}
 
-${dim}Make sure your Go backend is running on port ${BACKEND_URL.split(":")[2]}${reset}
+${dim}Tip: Override ports with BACKEND_PORT and FRONTEND_PORT env vars${reset}
 `);
 }
 

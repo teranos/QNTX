@@ -24,7 +24,6 @@ var ServerCmd = &cobra.Command{
 }
 
 var (
-	serverPort      int
 	serverTestMode  bool
 	serverAtsQuery  string
 	serverNoBrowser bool
@@ -34,7 +33,6 @@ var (
 
 func init() {
 	// Server command flags
-	ServerCmd.Flags().IntVar(&serverPort, "port", am.DefaultGraphPort, "Port for server")
 	ServerCmd.Flags().BoolVar(&serverTestMode, "test-mode", false, "Run with test database")
 	ServerCmd.Flags().StringVar(&serverAtsQuery, "ats", "", "Pre-load graph with an Ax query (e.g., --ats 'role:developer')")
 	ServerCmd.Flags().BoolVar(&serverNoBrowser, "no-browser", true, "Disable automatic browser opening")
@@ -48,6 +46,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if verbosity == 0 {
 		verbosity = 1
 	}
+
+	// Get server port from config system (env > project > user > system > default)
+	serverPort := am.GetGraphPort()
 
 	// Determine database path - priority: --db-path flag > --test-mode > DB_PATH env > config
 	var dbPath string
