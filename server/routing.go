@@ -1,6 +1,10 @@
 package server
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+	"strings"
+)
 
 // setupHTTPRoutes configures all HTTP handlers
 func (s *QNTXServer) setupHTTPRoutes() {
@@ -40,18 +44,19 @@ func (s *QNTXServer) setupHTTPRoutes() {
 		}
 	}
 
-	// Register plugin handlers with CORS middleware
-	// Register handlers for all loaded plugins - mux handles internal routing
+	// Register plugin handlers with CORS and readiness middleware
+	// Register routes for ALL enabled plugins (loading async), not just loaded ones
 	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
+	readyPluginHandler := s.pluginReadinessMiddleware(corsPluginHandler)
 	if s.pluginRegistry != nil {
-		for _, name := range s.pluginRegistry.List() {
+		for _, name := range s.pluginRegistry.ListEnabled() {
 			// Register exact match for /api/{plugin} (e.g., /api/code)
 			exactPattern := "/api/" + name
-			http.HandleFunc(exactPattern, corsPluginHandler)
+			http.HandleFunc(exactPattern, readyPluginHandler)
 
 			// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
 			wildcardPattern := "/api/" + name + "/{path...}"
-			http.HandleFunc(wildcardPattern, corsPluginHandler)
+			http.HandleFunc(wildcardPattern, readyPluginHandler)
 
 			s.logger.Infow("Registered HTTP routes", "plugin", name,
 				"exact", exactPattern,
@@ -107,6 +112,36 @@ func (s *QNTXServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// pluginReadinessMiddleware checks if plugin is ready before forwarding request
+// Returns 503 Service Unavailable if plugin is still loading
+func (s *QNTXServer) pluginReadinessMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract plugin name from /api/{plugin}/* path
+		path := r.URL.Path
+		if len(path) < 6 || path[:5] != "/api/" {
+			// Not a plugin route, pass through
+			next(w, r)
+			return
+		}
+
+		// Extract plugin name (between /api/ and next /)
+		remaining := path[5:]
+		pluginName := remaining
+		if idx := strings.Index(remaining, "/"); idx != -1 {
+			pluginName = remaining[:idx]
+		}
+
+		// Check if plugin is ready
+		if s.pluginRegistry != nil && !s.pluginRegistry.IsReady(pluginName) {
+			w.Header().Set("Retry-After", "5")
+			http.Error(w, fmt.Sprintf("Plugin '%s' is still loading, please retry", pluginName), http.StatusServiceUnavailable)
 			return
 		}
 

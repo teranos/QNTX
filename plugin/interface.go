@@ -82,6 +82,8 @@ type HealthStatus struct {
 type PluginState string
 
 const (
+	// StateLoading indicates the plugin is currently loading/connecting
+	StateLoading PluginState = "loading"
 	// StateRunning indicates the plugin is active and processing requests
 	StateRunning PluginState = "running"
 	// StatePaused indicates the plugin is temporarily suspended
