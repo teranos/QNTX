@@ -20,7 +20,7 @@ import (
 )
 
 // DomainPlugin defines the interface that all domain plugins must implement.
-// Both built-in and external plugins implement this interface.
+// All plugins implement this interface.
 type DomainPlugin interface {
 	// Metadata returns information about this domain plugin
 	Metadata() Metadata

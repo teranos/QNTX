@@ -18,9 +18,8 @@ import (
 )
 
 // ExternalDomainProxy implements DomainPlugin by proxying to a remote gRPC process.
-// This is the adapter that allows external plugins to be used identically to built-in plugins.
-// From the Registry's perspective, there is no difference between a built-in plugin
-// and an ExternalDomainProxy - both implement DomainPlugin.
+// This is the adapter that allows gRPC plugins to be registered with the Registry.
+// From the Registry's perspective, all plugins implement the same DomainPlugin interface.
 type ExternalDomainProxy struct {
 	conn     *grpc.ClientConn
 	client   protocol.DomainPluginServiceClient
@@ -33,9 +32,9 @@ type ExternalDomainProxy struct {
 	wsConfig        *WebSocketConfig
 }
 
-// NewExternalDomainProxy creates a new proxy to an external plugin running at the given address.
+// NewExternalDomainProxy creates a new proxy to a gRPC plugin running at the given address.
 // The returned proxy implements DomainPlugin and can be registered with the Registry
-// just like any built-in plugin.
+// just like any other plugin.
 func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDomainProxy, error) {
 	// Create gRPC connection with retry and timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

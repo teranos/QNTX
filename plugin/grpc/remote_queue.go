@@ -12,7 +12,7 @@ import (
 )
 
 // RemoteQueue is a gRPC client wrapper for async.Queue.
-// It implements the plugin.QueueService interface for external plugins.
+// It implements the plugin.QueueService interface for gRPC plugins.
 type RemoteQueue struct {
 	client    protocol.QueueServiceClient
 	conn      *grpc.ClientConn
