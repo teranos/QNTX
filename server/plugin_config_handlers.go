@@ -177,7 +177,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		// Get schema from plugin (only external plugins support ConfigSchema)
+		// Get schema from plugin via gRPC
 		if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
 			schema, err := extProxy.ConfigSchema(ctx)
 			if err != nil {

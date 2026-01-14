@@ -53,7 +53,7 @@ type QNTXServer struct {
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
 	initialQuery        string                      // Pre-loaded Ax query to execute on client connection
 	pluginRegistry      *plugin.Registry            // Domain plugin registry
-	pluginManager       *grpcplugin.PluginManager   // External plugin process manager
+	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 
