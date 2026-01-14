@@ -46,7 +46,7 @@ import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream' | 'db';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream' | 'db' | 'ctp2';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -79,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeSymbolPalette();
     // Restore modality from persisted UI state
     setActiveModality(uiState.getActiveModality());
+    // Inject CTP2 SVG glyph
+    injectCTP2Glyph();
 });
 
 function initializeSymbolPalette(): void {
@@ -87,7 +89,7 @@ function initializeSymbolPalette(): void {
     // Populate symbols from generated sym.ts (single source of truth)
     cmdCells.forEach(cell => {
         const cmd = cell.getAttribute('data-cmd');
-        if (cmd) {
+        if (cmd && cmd !== 'ctp2') { // Skip ctp2, it uses SVG injection
             cell.textContent = getSymbol(cmd);
         }
     });
@@ -159,6 +161,26 @@ function initializeSymbolPalette(): void {
 }
 
 /**
+ * Inject CTP2 SVG glyph into palette cell
+ */
+async function injectCTP2Glyph(): Promise<void> {
+    try {
+        const { generateCTP2Glyph } = await import('../ctp2/glyph.js');
+        const cell = document.getElementById('ctp2-palette-cell');
+        if (cell) {
+            cell.innerHTML = generateCTP2Glyph();
+        }
+    } catch (err) {
+        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', err);
+        // Fallback to text
+        const cell = document.getElementById('ctp2-palette-cell');
+        if (cell) {
+            cell.textContent = 'CTP2';
+        }
+    }
+}
+
+/**
  * Get initial tooltip text for a palette command
  * Will be updated with version info when system capabilities are received
  */
@@ -182,6 +204,7 @@ function getInitialTooltip(cmd: string): string {
         'plugins': '⚙ Plugins - domain extensions',
         'scraper': '⛶ Scraper - web extraction',
         'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
+        'ctp2': 'CTP2',
     };
     return tooltips[cmd] || cmd;
 }
@@ -309,6 +332,10 @@ function handleSymbolClick(e: Event): void {
             log(SEG.VID, 'VidStream button clicked');
             showVidStreamWindow();
             break;
+        case 'ctp2':
+            // CTP2 - show CTP2 window
+            showCTP2Window();
+            break;
         default:
             console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
     }
@@ -404,6 +431,18 @@ function showPluginPanel(): void {
  */
 function showWebscraperPanel(): void {
     webscraperPanel.toggle();
+}
+
+/**
+ * Show CTP2 window
+ */
+let ctp2WindowInstance: any = null;
+async function showCTP2Window(): Promise<void> {
+    if (!ctp2WindowInstance) {
+        const module = await import('../ctp2/window.js');
+        ctp2WindowInstance = new module.CTP2Window();
+    }
+    ctp2WindowInstance.toggle();
 }
 
 /**
