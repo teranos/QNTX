@@ -29,14 +29,14 @@ server: cli ## Start QNTX WebSocket server
 
 dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
 	@echo "🚀 Starting development environment..."
-	@echo "  Backend:  http://localhost:877"
-	@echo "  Frontend: http://localhost:8820 (with live reload)"
+	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
+	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
 	@echo "  Database: Uses am.toml configuration"
-	@# TODO(#272): Support configurable dev ports for multi-variant testing
+	@echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"
 	@echo ""
 	@# Clean up any lingering processes on dev ports
 	@pkill -f "bun.*dev" 2>/dev/null || true
-	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
 		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
@@ -54,13 +54,13 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 
 dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	@echo "📱 Starting mobile development environment..."
-	@echo "  Backend:  http://localhost:877"
-	@echo "  Frontend: http://localhost:8820 (with live reload)"
+	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
+	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
 	@echo "  iOS:      Launching simulator..."
 	@echo ""
 	@# Clean up any lingering processes
 	@pkill -f "bun.*dev" 2>/dev/null || true
-	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start servers in background
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
@@ -147,12 +147,12 @@ desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 
 desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "Starting QNTX Desktop in development mode..."
-	@echo "  Frontend dev server: http://localhost:8820"
-	@echo "  Backend will start as sidecar on port 877"
+	@echo "  Frontend dev server: http://localhost:$${FRONTEND_PORT:-8820}"
+	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-877}"
 	@echo ""
 	@# Clean up any lingering dev server processes
 	@pkill -f "bun.*dev" 2>/dev/null || true
-	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start dev server in background, then launch Tauri
 	@trap 'echo "Shutting down dev server..."; \
 		pkill -f "bun.*dev" 2>/dev/null || true; \
