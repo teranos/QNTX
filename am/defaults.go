@@ -47,6 +47,7 @@ func SetDefaults(v *viper.Viper) {
 
 	// Server configuration defaults
 	v.SetDefault("server.port", DefaultServerPort)
+	v.SetDefault("server.frontend_port", 8820) // Frontend dev server port
 	v.SetDefault("server.allowed_origins", []string{
 		"http://localhost",
 		"https://localhost",
@@ -55,7 +56,6 @@ func SetDefaults(v *viper.Viper) {
 		"tauri://localhost", // Allow Tauri desktop app
 	})
 	v.SetDefault("server.log_theme", "everforest")
-	v.SetDefault("server.dev.frontend_port", 8820) // Frontend dev server port
 
 	// Plugin configuration defaults
 	v.SetDefault("plugin.enabled", []string{}) // No plugins enabled by default (explicit opt-in via am.toml)

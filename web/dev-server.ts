@@ -7,14 +7,49 @@
 import { watch } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { parse as parseToml } from "smol-toml";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
 const execAsync = promisify(exec);
 
+// Read am.toml configuration
+interface AmConfig {
+    Server?: {
+        port?: number;
+        frontend_port?: number;
+    };
+}
+
+function readAmConfig(): AmConfig {
+    const configPath = join("..", "am.toml");
+    if (existsSync(configPath)) {
+        try {
+            const tomlContent = readFileSync(configPath, "utf-8");
+            return parseToml(tomlContent) as AmConfig;
+        } catch (error) {
+            console.error(`Failed to parse am.toml: ${error}`);
+        }
+    }
+    return {};
+}
+
+const config = readAmConfig();
+
 // Configuration
 // Port precedence: ENV > am.toml > defaults (issue #272)
-const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || process.env.QNTX_SERVER_PORT || "877", 10);
+const BACKEND_PORT = parseInt(
+    process.env.BACKEND_PORT ||
+    process.env.QNTX_SERVER_PORT ||
+    String(config.Server?.port || 877),
+    10
+);
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;  // Go backend
-const DEV_PORT_START = parseInt(process.env.FRONTEND_PORT || "8820", 10);  // Preferred development server port
+const DEV_PORT_START = parseInt(
+    process.env.FRONTEND_PORT ||
+    String(config.Server?.frontend_port || 8820),
+    10
+);  // Preferred development server port
 const DEV_PORT_MAX = DEV_PORT_START + 10;     // Try up to 10 ports above start
 const BUILD_DEBOUNCE = 300; // ms to wait before rebuilding
 
@@ -193,7 +228,7 @@ ${lightPink}Development server running at http://localhost:${port}${reset}
 ${dim}Backend URL: ${BACKEND_URL} (port ${BACKEND_PORT})${reset}
 ${dim}Live reload enabled${reset}
 
-${dim}Tip: Override ports with BACKEND_PORT and FRONTEND_PORT env vars${reset}
+${dim}Port config: ENV vars > am.toml > defaults (BACKEND_PORT=${BACKEND_PORT}, FRONTEND_PORT=${port})${reset}
 `);
 }
 
