@@ -10,7 +10,6 @@ import (
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/alias"
-	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/prompt"
 	"github.com/teranos/QNTX/ats/storage"
