@@ -61,3 +61,9 @@ web/site/
 
 # ML models (downloaded separately)
 ats/vidstream/models/
+
+# CTP prototypes (gitignored - for local development)
+web/ctpm1/
+web/css/ctpm1.css
+web/ctp2/
+web/css/ctp2.css
