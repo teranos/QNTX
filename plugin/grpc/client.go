@@ -303,7 +303,7 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 			"method", r.Method,
 			"path", req.Path,
 			"error", err)
-		http.Error(w, "Plugin error", http.StatusBadGateway)
+		http.Error(w, fmt.Sprintf("Plugin '%s' error: %v (%s %s)", c.metadata.Name, err, r.Method, req.Path), http.StatusBadGateway)
 		return
 	}
 
