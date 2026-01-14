@@ -4,26 +4,37 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // setupHTTPRoutes configures all HTTP handlers
 func (s *QNTXServer) setupHTTPRoutes() {
-	// Create a custom ServeMux for plugins
-	mux := http.NewServeMux()
+	// Register plugin routes with dynamic handler that waits for plugins to load
+	// This allows routes to be registered immediately while plugins load asynchronously
+	if s.pluginRegistry != nil {
+		pluginHandler := s.corsMiddleware(s.handlePluginRequest)
+		for _, name := range s.pluginRegistry.ListEnabled() {
+			// Register exact match for /api/{plugin} (e.g., /api/code)
+			exactPattern := "/api/" + name
+			http.HandleFunc(exactPattern, pluginHandler)
 
-	// Register domain plugin handlers
+			// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
+			wildcardPattern := "/api/" + name + "/{path...}"
+			http.HandleFunc(wildcardPattern, pluginHandler)
+
+			s.logger.Infow("Registered HTTP routes", "plugin", name,
+				"exact", exactPattern,
+				"wildcard", wildcardPattern)
+		}
+	}
+
+	// Register WebSocket handlers for loaded plugins
+	// These are registered separately as they don't go through the same routing
 	if s.pluginRegistry != nil {
 		for _, name := range s.pluginRegistry.List() {
 			plugin, ok := s.pluginRegistry.Get(name)
 			if !ok {
 				continue
-			}
-
-			// Register HTTP handlers
-			if err := plugin.RegisterHTTP(mux); err != nil {
-				s.logger.Errorw("Failed to register HTTP handlers for plugin",
-					"plugin", name,
-					"error", err)
 			}
 
 			// Register WebSocket handlers
@@ -41,26 +52,6 @@ func (s *QNTXServer) setupHTTPRoutes() {
 					s.logger.Infow("Registered WebSocket handler", "plugin", name, "path", path)
 				}
 			}
-		}
-	}
-
-	// Register plugin handlers with CORS and readiness middleware
-	// Register routes for ALL enabled plugins (loading async), not just loaded ones
-	corsPluginHandler := s.corsMiddleware(mux.ServeHTTP)
-	readyPluginHandler := s.pluginReadinessMiddleware(corsPluginHandler)
-	if s.pluginRegistry != nil {
-		for _, name := range s.pluginRegistry.ListEnabled() {
-			// Register exact match for /api/{plugin} (e.g., /api/code)
-			exactPattern := "/api/" + name
-			http.HandleFunc(exactPattern, readyPluginHandler)
-
-			// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
-			wildcardPattern := "/api/" + name + "/{path...}"
-			http.HandleFunc(wildcardPattern, readyPluginHandler)
-
-			s.logger.Infow("Registered HTTP routes", "plugin", name,
-				"exact", exactPattern,
-				"wildcard", wildcardPattern)
 		}
 	}
 
@@ -119,32 +110,141 @@ func (s *QNTXServer) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// pluginReadinessMiddleware checks if plugin is ready before forwarding request
-// Returns 503 Service Unavailable if plugin is still loading
-func (s *QNTXServer) pluginReadinessMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract plugin name from /api/{plugin}/* path
-		path := r.URL.Path
-		if len(path) < 6 || path[:5] != "/api/" {
-			// Not a plugin route, pass through
-			next(w, r)
-			return
-		}
+// handlePluginRequest dynamically routes requests to plugin handlers
+// This enables async plugin loading - routes are registered immediately,
+// but plugin muxes are initialized lazily when plugins finish loading
+func (s *QNTXServer) handlePluginRequest(w http.ResponseWriter, r *http.Request) {
+	// Extract plugin name from /api/{plugin}/* path
+	path := r.URL.Path
+	if len(path) < 6 || path[:5] != "/api/" {
+		http.Error(w, "Invalid plugin route", http.StatusBadRequest)
+		return
+	}
 
-		// Extract plugin name (between /api/ and next /)
-		remaining := path[5:]
-		pluginName := remaining
-		if idx := strings.Index(remaining, "/"); idx != -1 {
-			pluginName = remaining[:idx]
-		}
+	remaining := path[5:]
+	pluginName := remaining
+	if idx := strings.Index(remaining, "/"); idx != -1 {
+		pluginName = remaining[:idx]
+	}
 
-		// Check if plugin is ready
-		if s.pluginRegistry != nil && !s.pluginRegistry.IsReady(pluginName) {
-			w.Header().Set("Retry-After", "5")
-			http.Error(w, fmt.Sprintf("Plugin '%s' is still loading, please retry", pluginName), http.StatusServiceUnavailable)
-			return
-		}
+	// Check if plugin is ready
+	if s.pluginRegistry == nil || !s.pluginRegistry.IsReady(pluginName) {
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, fmt.Sprintf("Plugin '%s' is still loading, please retry", pluginName), http.StatusServiceUnavailable)
+		return
+	}
 
-		next(w, r)
+	// Lazy-initialize plugin mux on first request (after plugin loads)
+	muxVal, muxExists := s.pluginMuxes.Load(pluginName)
+	if !muxExists {
+		// Double-check initialization to avoid race
+		initVal, initExists := s.pluginMuxInit.LoadOrStore(pluginName, true)
+		if !initExists {
+			// This goroutine won the race - initialize the mux
+			plugin, ok := s.pluginRegistry.Get(pluginName)
+			if !ok {
+				http.Error(w, fmt.Sprintf("Plugin '%s' not found", pluginName), http.StatusNotFound)
+				return
+			}
+
+			// Initialize plugin with services (calls gRPC Init which populates plugin's httpMux)
+			if err := plugin.Initialize(r.Context(), s.services); err != nil {
+				s.logger.Errorw("Failed to initialize plugin",
+					"plugin", pluginName,
+					"error", err)
+				http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed", pluginName), http.StatusInternalServerError)
+				return
+			}
+
+			mux := http.NewServeMux()
+			if err := plugin.RegisterHTTP(mux); err != nil {
+				s.logger.Errorw("Failed to register HTTP handlers for plugin",
+					"plugin", pluginName,
+					"error", err)
+				http.Error(w, fmt.Sprintf("Plugin '%s' initialization failed", pluginName), http.StatusInternalServerError)
+				return
+			}
+
+			s.pluginMuxes.Store(pluginName, mux)
+			s.logger.Infow("Initialized HTTP handlers for plugin", "plugin", pluginName)
+			muxVal = mux
+		} else if initVal.(bool) {
+			// Another goroutine is initializing - wait and retry
+			// This is rare but possible during concurrent first requests
+			time.Sleep(100 * time.Millisecond)
+			muxVal, muxExists = s.pluginMuxes.Load(pluginName)
+			if !muxExists {
+				http.Error(w, fmt.Sprintf("Plugin '%s' initialization in progress, please retry", pluginName), http.StatusServiceUnavailable)
+				return
+			}
+		}
+	}
+
+	// Serve request through plugin's mux
+	// Try with stripped prefix first (e.g., /api/code/health -> /health)
+	// If that 404s, try with full path (backward compatibility)
+	// This allows plugins to register routes either way (Issue #277)
+	mux := muxVal.(*http.ServeMux)
+
+	// Strip /api/{plugin} prefix
+	strippedPath := strings.TrimPrefix(path, "/api/"+pluginName)
+	if strippedPath == "" {
+		strippedPath = "/"
+	}
+
+	// Try stripped path first (modern approach)
+	recorder := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+	newReq := r.Clone(r.Context())
+	newReq.URL.Path = strippedPath
+	newReq.RequestURI = strippedPath
+	mux.ServeHTTP(recorder, newReq)
+
+	// If 404, try full path (backward compat for plugins that include prefix)
+	if recorder.statusCode == http.StatusNotFound {
+		s.logger.Debugw("Stripped path 404, trying full path",
+			"plugin", pluginName,
+			"stripped", strippedPath,
+			"full", path)
+		mux.ServeHTTP(w, r)
+		return
+	}
+
+	// Write buffered response
+	recorder.flush()
+}
+
+// responseRecorder captures response to detect 404s
+type responseRecorder struct {
+	http.ResponseWriter
+	statusCode  int
+	body        []byte
+	wroteHeader bool
+}
+
+func (rr *responseRecorder) Header() http.Header {
+	return rr.ResponseWriter.Header()
+}
+
+func (rr *responseRecorder) WriteHeader(code int) {
+	if !rr.wroteHeader {
+		rr.statusCode = code
+		rr.wroteHeader = true
+	}
+}
+
+func (rr *responseRecorder) Write(b []byte) (int, error) {
+	if !rr.wroteHeader {
+		rr.WriteHeader(http.StatusOK)
+	}
+	rr.body = append(rr.body, b...)
+	return len(b), nil
+}
+
+func (rr *responseRecorder) flush() {
+	if rr.wroteHeader {
+		rr.ResponseWriter.WriteHeader(rr.statusCode)
+	}
+	if len(rr.body) > 0 {
+		rr.ResponseWriter.Write(rr.body)
 	}
 }

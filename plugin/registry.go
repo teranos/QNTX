@@ -328,6 +328,12 @@ func (r *Registry) validateVersion(metadata Metadata) error {
 		return nil
 	}
 
+	// Allow "dev" version without validation (development builds)
+	if r.version == "dev" {
+		r.logger.Debugf("Skipping version validation for development build (QNTX version: dev)")
+		return nil
+	}
+
 	// Parse QNTX version
 	qntxVer, err := semver.NewVersion(r.version)
 	if err != nil {
