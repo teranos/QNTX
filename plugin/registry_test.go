@@ -890,3 +890,96 @@ func TestRegistry_GetAllStates(t *testing.T) {
 	assert.Equal(t, StateStopped, states["plugin1"])
 	assert.Equal(t, StateStopped, states["plugin2"])
 }
+
+// =============================================================================
+// Async Plugin Loading Tests
+// =============================================================================
+
+func TestRegistry_AsyncLoadingReadiness(t *testing.T) {
+	t.Run("PreRegister marks plugin as loading", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+
+		// Pre-register should create loading state
+		registry.PreRegister("test")
+
+		// Should not be ready yet
+		assert.False(t, registry.IsReady("test"), "Pre-registered plugin should not be ready")
+
+		// State should be loading
+		state, ok := registry.GetState("test")
+		assert.True(t, ok)
+		assert.Equal(t, StateLoading, state)
+	})
+
+	t.Run("MarkReady transitions to running state", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+
+		// Pre-register then mark ready
+		registry.PreRegister("test")
+		registry.MarkReady("test")
+
+		// Should now be ready
+		assert.True(t, registry.IsReady("test"), "Marked plugin should be ready")
+
+		// State should be running
+		state, ok := registry.GetState("test")
+		assert.True(t, ok)
+		assert.Equal(t, StateRunning, state)
+	})
+
+	t.Run("IsReady returns false for non-existent plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+
+		assert.False(t, registry.IsReady("nonexistent"))
+	})
+
+	t.Run("IsReady returns false for stopped plugin", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+		plugin := newMockPlugin("test")
+		require.NoError(t, registry.Register(plugin))
+
+		// Registered but not initialized = stopped
+		assert.False(t, registry.IsReady("test"))
+	})
+
+	t.Run("ListEnabled returns all plugins including loading", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+
+		// Pre-register some plugins (loading state)
+		registry.PreRegister("loading1")
+		registry.PreRegister("loading2")
+
+		// Fully register one plugin
+		plugin := newMockPlugin("registered")
+		require.NoError(t, registry.Register(plugin))
+
+		// ListEnabled should return all enabled plugins (pre-registered + registered)
+		enabled := registry.ListEnabled()
+		assert.Len(t, enabled, 3)
+		assert.Contains(t, enabled, "loading1")
+		assert.Contains(t, enabled, "loading2")
+		assert.Contains(t, enabled, "registered")
+
+		// List should only return fully registered plugins
+		list := registry.List()
+		assert.Len(t, list, 1)
+		assert.Equal(t, []string{"registered"}, list)
+	})
+
+	t.Run("async loading state transitions", func(t *testing.T) {
+		registry := NewRegistry("1.0.0", testLogger(t))
+
+		// Simulate async loading workflow
+		registry.PreRegister("async")
+		assert.False(t, registry.IsReady("async"))
+
+		// Register plugin (would happen async)
+		plugin := newMockPlugin("async")
+		require.NoError(t, registry.Register(plugin))
+		assert.False(t, registry.IsReady("async"), "Still not ready after registration")
+
+		// Mark ready after successful connection
+		registry.MarkReady("async")
+		assert.True(t, registry.IsReady("async"), "Ready after MarkReady")
+	})
+}
