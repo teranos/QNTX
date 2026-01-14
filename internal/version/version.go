@@ -15,8 +15,8 @@ var (
 	// BuildTime is when the binary was built
 	BuildTime = "unknown"
 
-	// Version is the semantic version (if tagged)
-	Version = "dev"
+	// VersionTag is the git tag version (e.g., v0.20.1)
+	VersionTag = "dev"
 )
 
 // Info contains version and build information
@@ -37,7 +37,7 @@ func Get() Info {
 	return Info{
 		CommitHash:   CommitHash,
 		BuildTime:    BuildTime,
-		Version:      Version,
+		Version:      VersionTag,
 		GoVersion:    runtime.Version(),
 		Platform:     fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		FuzzyBackend: backend,
