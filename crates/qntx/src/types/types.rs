@@ -223,4 +223,8 @@ pub struct TypeDef {
     pub opacity: Option<f64>,
     /// Whether this type is being phased out
     pub deprecated: bool,
+    /// Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
+    pub rich_string_fields: Vec<String>,
+    /// Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
+    pub array_fields: Vec<String>,
 }
