@@ -174,7 +174,7 @@ type LLMStreamMessage struct {
 
 ## ListExecutionsResponse {#listexecutionsresponse}
 
-**Source**: [`server/pulse_execution_handlers.go:18`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L18)
+**Source**: [`server/pulse_execution_handlers.go:17`](https://github.com/teranos/QNTX/blob/main/server/pulse_execution_handlers.go#L17)
 
 
 ```go
@@ -243,7 +243,7 @@ type PluginHealthMessage struct {
 
 ## PluginInfo {#plugininfo}
 
-**Source**: [`server/handlers.go:614`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L614)
+**Source**: [`server/handlers.go:613`](https://github.com/teranos/QNTX/blob/main/server/handlers.go#L613)
 
 
 ```go
@@ -450,23 +450,6 @@ type StorageWarningMessage struct {
 	FillPercent float64 `json:"fill_percent"`
 	TimeUntilFull string `json:"time_until_full"`
 	Timestamp int64 `json:"timestamp"`
-}
-```
-
-## SystemCapabilitiesMessage {#systemcapabilitiesmessage}
-
-**Source**: [`server/types.go:221`](https://github.com/teranos/QNTX/blob/main/server/types.go#L221)
-
-
-```go
-type SystemCapabilitiesMessage struct {
-	Type string `json:"type"`
-	FuzzyBackend string `json:"fuzzy_backend"`
-	FuzzyOptimized bool `json:"fuzzy_optimized"`
-	FuzzyVersion string `json:"fuzzy_version"`
-	VidStreamBackend string `json:"vidstream_backend"`
-	VidStreamOptimized bool `json:"vidstream_optimized"`
-	VidStreamVersion string `json:"vidstream_version"`
 }
 ```
 
