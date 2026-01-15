@@ -6,15 +6,7 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// TypeDefinition holds display metadata for a node type from attestations.
-// Type definitions use the reserved "type" predicate in typespace.
-type TypeDefinition struct {
-	TypeName     string  // e.g., "artist", "album", "genre"
-	DisplayColor string  // Hex color or rgba() string
-	DisplayLabel string  // Human-readable label
-	Deprecated   bool    // Whether this type is deprecated
-	Opacity      float64 // Optional opacity (default 1.0)
-}
+// No longer needed - using types.TypeDef directly
 
 // extractNodeTypes extracts explicit node_type attestations from the data.
 // Returns a map of subject -> type for nodes that have explicit type declarations.
@@ -49,9 +41,9 @@ func (b *AxGraphBuilder) extractNodeTypes(attestations []types.As) map[string]st
 // Type definitions exist in typespace (separate from ASID entity space) and are self-certifying.
 // Each ixgest processor creates type definitions for its domain (ix-music, ix-weather, ix-git, etc.)
 //
-// Returns map of type name -> TypeDefinition
-func (b *AxGraphBuilder) extractTypeDefinitions(attestations []types.As) map[string]TypeDefinition {
-	typeDefinitions := make(map[string]TypeDefinition)
+// Returns map of type name -> TypeDef (using ats/types.TypeDef directly)
+func (b *AxGraphBuilder) extractTypeDefinitions(attestations []types.As) map[string]types.TypeDef {
+	typeDefinitions := make(map[string]types.TypeDef)
 
 	for _, attestation := range attestations {
 		claims := expandAttestation(attestation)
@@ -60,25 +52,44 @@ func (b *AxGraphBuilder) extractTypeDefinitions(attestations []types.As) map[str
 			if claim.Predicate == "type" && claim.Context == "graph" {
 				typeName := claim.Subject
 
-				// Extract display metadata from Attributes
-				def := TypeDefinition{
-					TypeName: typeName,
-					Opacity:  1.0, // Default full opacity
+				// Create TypeDef from attestation attributes
+				opacity := 1.0 // Default full opacity
+				def := types.TypeDef{
+					Name:    typeName,
+					Opacity: &opacity,
 				}
 
 				// Parse Attributes if present
 				if attestation.Attributes != nil {
 					if color, ok := attestation.Attributes["display_color"].(string); ok {
-						def.DisplayColor = color
+						def.Color = color
 					}
 					if label, ok := attestation.Attributes["display_label"].(string); ok {
-						def.DisplayLabel = label
+						def.Label = label
 					}
 					if deprecated, ok := attestation.Attributes["deprecated"].(bool); ok {
 						def.Deprecated = deprecated
 					}
-					if opacity, ok := attestation.Attributes["opacity"].(float64); ok {
-						def.Opacity = opacity
+					if opacityVal, ok := attestation.Attributes["opacity"].(float64); ok {
+						def.Opacity = &opacityVal
+					}
+					// Extract rich_string_fields array if present
+					if richFields, ok := attestation.Attributes["rich_string_fields"].([]interface{}); ok {
+						def.RichStringFields = make([]string, 0, len(richFields))
+						for _, field := range richFields {
+							if fieldStr, ok := field.(string); ok {
+								def.RichStringFields = append(def.RichStringFields, fieldStr)
+							}
+						}
+					}
+					// Extract array_fields array if present
+					if arrayFields, ok := attestation.Attributes["array_fields"].([]interface{}); ok {
+						def.ArrayFields = make([]string, 0, len(arrayFields))
+						for _, field := range arrayFields {
+							if fieldStr, ok := field.(string); ok {
+								def.ArrayFields = append(def.ArrayFields, fieldStr)
+							}
+						}
 					}
 				}
 
@@ -119,7 +130,7 @@ func (b *AxGraphBuilder) determineNodeType(
 // collectNodeTypeInfo collects information about node types present in the graph.
 // Uses only attested type definitions - no fallback maps or heuristics.
 // Returns a list of node type metadata including count and color for each type.
-func collectNodeTypeInfo(nodes []Node, typeDefinitions map[string]TypeDefinition) []NodeTypeInfo {
+func collectNodeTypeInfo(nodes []Node, typeDefinitions map[string]types.TypeDef) []NodeTypeInfo {
 	// Count nodes by type
 	typeCounts := make(map[string]int)
 	for _, node := range nodes {
@@ -130,11 +141,18 @@ func collectNodeTypeInfo(nodes []Node, typeDefinitions map[string]TypeDefinition
 	var nodeTypes []NodeTypeInfo
 	for nodeType, count := range typeCounts {
 		var color, label string
+		var richStringFields, arrayFields []string
+		var opacity *float64
+		var deprecated bool
 
 		// Use attested type definition if available
 		if typeDef, hasAttestedDef := typeDefinitions[nodeType]; hasAttestedDef {
-			color = typeDef.DisplayColor
-			label = typeDef.DisplayLabel
+			color = typeDef.Color
+			label = typeDef.Label
+			richStringFields = typeDef.RichStringFields
+			arrayFields = typeDef.ArrayFields
+			opacity = typeDef.Opacity
+			deprecated = typeDef.Deprecated
 		} else {
 			// No attestation - use defaults for untyped
 			color = defaultUntypedColor
@@ -142,10 +160,14 @@ func collectNodeTypeInfo(nodes []Node, typeDefinitions map[string]TypeDefinition
 		}
 
 		nodeTypes = append(nodeTypes, NodeTypeInfo{
-			Type:  nodeType,
-			Label: label,
-			Color: color,
-			Count: count,
+			Type:             nodeType,
+			Label:            label,
+			Color:            color,
+			Count:            count,
+			RichStringFields: richStringFields,
+			ArrayFields:      arrayFields,
+			Opacity:          opacity,
+			Deprecated:       deprecated,
 		})
 	}
 
