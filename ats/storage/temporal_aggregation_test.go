@@ -183,11 +183,11 @@ type neuralActivity struct {
 
 func createActivityAttestation(t *testing.T, store *SQLStore, activity *neuralActivity) {
 	metadata := map[string]interface{}{
-		"start_time":    activity.startTime.Format(time.RFC3339),
-		"end_time":      activity.endTime.Format(time.RFC3339),
-		"duration_s":    fmt.Sprintf("%.1f", activity.durationS),
-		"activity_type": activity.activityType,
-		"brain_region":  activity.region,
+		"start_time":       activity.startTime.Format(time.RFC3339),
+		"end_time":         activity.endTime.Format(time.RFC3339),
+		"duration_seconds": fmt.Sprintf("%.1f", activity.durationS),
+		"activity_type":    activity.activityType,
+		"brain_region":     activity.region,
 	}
 
 	err := store.CreateAttestation(&types.As{
