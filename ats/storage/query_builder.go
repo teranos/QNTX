@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
@@ -197,11 +198,11 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 	temporalFilter := ""
 	if filter.TimeStart != nil {
 		temporalFilter = " AND json_extract(attributes, '$.start_time') >= ?"
-		qb.args = append(qb.args, filter.TimeStart.Format("2006-01-02"))
+		qb.args = append(qb.args, filter.TimeStart.Format(time.RFC3339))
 	}
 	if filter.TimeEnd != nil {
 		temporalFilter += " AND json_extract(attributes, '$.start_time') <= ?"
-		qb.args = append(qb.args, filter.TimeEnd.Format("2006-01-02"))
+		qb.args = append(qb.args, filter.TimeEnd.Format(time.RFC3339))
 	}
 
 	// Aggregation subquery: GROUP BY subject, SUM durations, filter by threshold
