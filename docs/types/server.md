@@ -453,23 +453,6 @@ type StorageWarningMessage struct {
 }
 ```
 
-## SystemCapabilitiesMessage {#systemcapabilitiesmessage}
-
-**Source**: [`server/types.go:221`](https://github.com/teranos/QNTX/blob/main/server/types.go#L221)
-
-
-```go
-type SystemCapabilitiesMessage struct {
-	Type string `json:"type"`
-	FuzzyBackend string `json:"fuzzy_backend"`
-	FuzzyOptimized bool `json:"fuzzy_optimized"`
-	FuzzyVersion string `json:"fuzzy_version"`
-	VidStreamBackend string `json:"vidstream_backend"`
-	VidStreamOptimized bool `json:"vidstream_optimized"`
-	VidStreamVersion string `json:"vidstream_version"`
-}
-```
-
 ## TaskInfo {#taskinfo}
 
 **Source**: [`server/pulse_types.go:55`](https://github.com/teranos/QNTX/blob/main/server/pulse_types.go#L55)
