@@ -67,12 +67,18 @@ type managedPlugin struct {
 	port    int
 }
 
+const (
+	// DefaultPluginBasePort is the starting port for plugin allocation
+	// Uses 38700 to avoid conflicts with common development tools
+	DefaultPluginBasePort = 38700
+)
+
 // NewPluginManager creates a new plugin manager.
 func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 	return &PluginManager{
 		plugins:  make(map[string]*managedPlugin),
 		logger:   logger,
-		basePort: 9000, // Plugins start on port 9000+
+		basePort: DefaultPluginBasePort,
 	}
 }
 
@@ -218,12 +224,12 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 }
 
 // allocatePort finds the next available port for a plugin.
-// Uses deterministic iteration to ensure consistent port allocation.
+// Returns the next port after the highest currently allocated port.
 func (m *PluginManager) allocatePort() int {
 	port := m.basePort
 
-	// Collect all allocated ports and find max deterministically
-	// Map iteration is non-deterministic in Go, so we track the max explicitly
+	// Find the highest allocated port
+	// Note: Map iteration order is non-deterministic, but we're only finding max value
 	maxPort := m.basePort - 1
 	for _, p := range m.plugins {
 		if p.port > maxPort {

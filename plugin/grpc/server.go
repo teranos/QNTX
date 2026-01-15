@@ -38,7 +38,7 @@ type PluginServer struct {
 	// HTTP mux for handling HTTP requests via gRPC
 	httpMux *http.ServeMux
 
-	// initOnce ensures Initialize is only executed once
+	// initOnce ensures Initialize is only executed once; concurrent calls block until completion
 	initOnce sync.Once
 	initErr  error
 }
