@@ -78,20 +78,29 @@ This extends the attestation abstraction to time itself, completing QNTX's domai
 
 ## Implementation Roadmap
 
-**Phase 1: Temporal Aggregation** ✅
-- Duration accumulation across time windows ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L79))
-- Metadata-based temporal filtering ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L117))
-- Domain-agnostic query predicates
+**Phase 1: Temporal Aggregation** ✅ **COMPLETE**
+- Duration accumulation across time windows
+  - Test: [TestTemporalAggregation_SimpleSum](../../ats/storage/temporal_aggregation_test.go#L241)
+- Metadata-based temporal filtering with `since`
+  - Test: [TestTemporalAggregation_WithSinceFilter](../../ats/storage/temporal_aggregation_test.go#L370)
+- Domain-agnostic query predicates (seconds, minutes, hours, months, years)
+- SQL injection protection via whitelisted duration fields
+- Multiple test domains: [neural activity](../../ats/storage/temporal_aggregation_test.go), [recruitment](../../ats/storage/ctp2_bcs_temporal_aggregation_test.go), [meetings](../../ats/storage/temporal_aggregation_meetings_test.go)
 
 **Phase 2: Semantic Awareness** (planned)
-- Weighted aggregation via relatedness scores ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L152))
-- Embedding-based semantic distance ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L202))
-- ML-derived contribution factors ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L259))
+- Weighted aggregation via relatedness scores
+  - Test: [TestTemporalAggregation_SemanticWeightedSum](../../ats/storage/temporal_aggregation_test.go#L497) (skipped)
+- Combined temporal + semantic filtering
+  - Test: [TestTemporalAggregation_CombinedTemporalAndSemantic](../../ats/storage/temporal_aggregation_test.go#L638) (skipped)
+- Multiple predicate AND logic
+  - Test: [TestTemporalAggregation_MultiplePredicatesAND](../../ats/storage/temporal_aggregation_test.go#L1061) (skipped)
 
 **Phase 3: Temporal Overlap Detection** (planned)
-- Concurrent period merging ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L322))
-- Ongoing activity duration calculation ([test](https://github.com/teranos/QNTX/blob/55ba8b77011665f12fdd47b846d7760165429557/ats/storage/temporal_aggregation_test.go#L381))
-- Conservative double-count prevention
+- Concurrent period merging to prevent double-counting
+  - Test: [TestTemporalAggregation_OverlapDetection](../../ats/storage/temporal_aggregation_test.go#L781) (skipped)
+  - Meeting example: [TestMeetingTemporalAggregation_OverlapDetection](../../ats/storage/temporal_aggregation_meetings_test.go#L398) (skipped)
+- Ongoing activity duration calculation (missing end_time)
+  - Test: [TestTemporalAggregation_OngoingActivity](../../ats/storage/temporal_aggregation_test.go#L922) (skipped)
 
 ## Prerequisites
 
