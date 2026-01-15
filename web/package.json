@@ -51,6 +51,7 @@
     "@lezer/common": "1.4.0"
   },
   "dependencies": {
-    "@codemirror/lang-python": "^6.2.1"
+    "@codemirror/lang-python": "^6.2.1",
+    "smol-toml": "^1.6.0"
   }
 }

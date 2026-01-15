@@ -46,9 +46,9 @@ Pulse daemon status broadcast
 
 | Field | Description |
 |-------|-------------|
+| load_percent | Current load percentage |
 | running | Whether daemon is running |
 | active_jobs | Number of active jobs |
-| load_percent | Current load percentage |
 
 #### `usage_update`
 
@@ -66,9 +66,9 @@ Streaming LLM response chunks
 
 | Field | Description |
 |-------|-------------|
+| done | Whether streaming is complete |
 | job_id | Associated job ID |
 | content | Text content chunk |
-| done | Whether streaming is complete |
 
 #### `plugin_health`
 
