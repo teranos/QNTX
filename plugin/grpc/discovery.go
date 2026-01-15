@@ -123,7 +123,7 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 
 	if len(failedPlugins) > 0 {
 		m.logger.Warnf("Some plugins failed to load: %v", failedPlugins)
-		return errors.Newf("failed to load %d plugin(s): %v", len(failedPlugins), failedPlugins)
+		// Don't return error - plugin system is resilient, continue with loaded plugins
 	}
 
 	return nil
