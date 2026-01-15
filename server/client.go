@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/QNTX/server/wslogs"
 )
 
@@ -913,4 +914,36 @@ func (c *Client) close() {
 			close(c.sendMsg)
 		}
 	})
+}
+
+// sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
+// This informs the frontend about available optimizations (e.g., Rust fuzzy matching, ONNX video).
+// Sends are routed through broadcast worker (thread-safe).
+func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
+	// Get system capabilities from syscap package
+	fuzzyBackend := s.builder.FuzzyBackend()
+	msg := syscap.Get(fuzzyBackend)
+
+	// Send to broadcast worker (thread-safe)
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id, // Send to specific client only
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Queued system capabilities to client",
+			"client_id", client.id,
+			"fuzzy_backend", fuzzyBackend,
+			"fuzzy_optimized", msg.FuzzyOptimized,
+		)
+	case <-s.ctx.Done():
+		return
+	default:
+		// Broadcast queue full (should never happen with proper sizing)
+		s.logger.Warnw("Broadcast request queue full, skipping system capabilities",
+			"client_id", client.id,
+		)
+	}
 }

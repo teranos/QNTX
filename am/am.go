@@ -27,16 +27,17 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           int      `mapstructure:"port"` // Server port (default: 877)
+	Port           int      `mapstructure:"port"`            // Server port (default: 877)
+	FrontendPort   int      `mapstructure:"frontend_port"`   // Frontend dev server port (default: 8820)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
 }
 
 // Server port constants
 const (
-	DefaultGraphPort      = 877  // Development port (easy to type, above privileged range)
+	DefaultServerPort     = 877  // Development port (easy to type, above privileged range)
 	DefaultGraphEventPort = 878  // Event viewer port
-	FallbackGraphPort     = 7878 // Production fallback port
+	FallbackServerPort    = 7878 // Production fallback port
 )
 
 // PulseConfig configures the Pulse async job system (core infrastructure)
