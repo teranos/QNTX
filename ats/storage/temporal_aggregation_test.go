@@ -17,6 +17,27 @@ import (
 )
 
 // ==============================================================================
+// Temporal Aggregation Test Suite - Neural Activity Domain
+// ==============================================================================
+//
+// This file contains tests for temporal aggregation across three phases:
+//
+// PHASE 1 (✓ IMPLEMENTED):
+//   - TestTemporalAggregation_SimpleSum
+//   - TestTemporalAggregation_WithSinceFilter
+//
+// PHASE 2 (TODO - tests below marked with t.Skip):
+//   - TestTemporalAggregation_SemanticWeightedSum (semantic context matching)
+//   - TestTemporalAggregation_CombinedTemporalAndSemantic (combined filters)
+//   - TestTemporalAggregation_MultiplePredicatesAND (multiple predicate queries)
+//
+// PHASE 3 (TODO - tests below marked with t.Skip):
+//   - TestTemporalAggregation_OverlapDetection (merge overlapping periods)
+//   - TestTemporalAggregation_OngoingActivity (handle missing end_time)
+//
+// See docs/vision/time-travel.md for roadmap details.
+//
+// ==============================================================================
 // Test Domain: Neural Activity Tracking
 // ==============================================================================
 // Models neural activity periods with temporal aggregation for neuroscience research.
