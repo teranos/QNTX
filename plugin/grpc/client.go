@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -19,9 +18,8 @@ import (
 )
 
 // ExternalDomainProxy implements DomainPlugin by proxying to a remote gRPC process.
-// This is the adapter that allows external plugins to be used identically to built-in plugins.
-// From the Registry's perspective, there is no difference between a built-in plugin
-// and an ExternalDomainProxy - both implement DomainPlugin.
+// This is the adapter that allows gRPC plugins to be registered with the Registry.
+// From the Registry's perspective, all plugins implement the same DomainPlugin interface.
 type ExternalDomainProxy struct {
 	conn     *grpc.ClientConn
 	client   protocol.DomainPluginServiceClient
@@ -34,9 +32,9 @@ type ExternalDomainProxy struct {
 	wsConfig        *WebSocketConfig
 }
 
-// NewExternalDomainProxy creates a new proxy to an external plugin running at the given address.
+// NewExternalDomainProxy creates a new proxy to a gRPC plugin running at the given address.
 // The returned proxy implements DomainPlugin and can be registered with the Registry
-// just like any built-in plugin.
+// just like any other plugin.
 func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDomainProxy, error) {
 	// Create gRPC connection with retry and timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -202,26 +200,39 @@ func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 }
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
+// Uses method-specific wildcards to catch all paths including / (Issue #277).
 func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
-	// Register exact match for /api/{plugin} (e.g., /api/code)
-	exactPattern := fmt.Sprintf("/api/%s", c.metadata.Name)
-	mux.HandleFunc(exactPattern, func(w http.ResponseWriter, r *http.Request) {
+	// Register method-specific wildcards that match all paths (including /)
+	// The {path...} wildcard matches zero or more segments, so it matches / too
+	mux.HandleFunc("GET /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("POST /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("PUT /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("PATCH /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("DELETE /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("HEAD /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("OPTIONS /{path...}", func(w http.ResponseWriter, r *http.Request) {
 		c.proxyHTTPRequest(w, r)
 	})
 
-	// Register wildcard for /api/{plugin}/* (e.g., /api/code/file.go)
-	wildcardPattern := fmt.Sprintf("/api/%s/{path...}", c.metadata.Name)
-	mux.HandleFunc(wildcardPattern, func(w http.ResponseWriter, r *http.Request) {
-		c.proxyHTTPRequest(w, r)
-	})
-
-	c.logger.Infow("Registered HTTP proxy handlers",
-		"exact", exactPattern,
-		"wildcard", wildcardPattern)
+	c.logger.Infow("Registered HTTP proxy handlers", "plugin", c.metadata.Name)
 	return nil
 }
 
 // proxyHTTPRequest forwards an HTTP request to the remote plugin.
+// Tries stripped path first (without /api/{plugin}), then full path if 404 (Issue #277).
+// This allows plugins to register routes either way without friction.
 func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) {
 	// Read request body
 	var body []byte
@@ -235,7 +246,6 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Convert HTTP headers to protocol format
-	// HTTP headers can have multiple values (e.g., Set-Cookie, Accept)
 	headers := make([]*protocol.HTTPHeader, 0, len(r.Header))
 	for name, values := range r.Header {
 		headers = append(headers, &protocol.HTTPHeader{
@@ -244,45 +254,55 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		})
 	}
 
-	// Strip plugin namespace prefix from path
-	// e.g., /api/python/execute -> /execute
-	namespace := "/api/" + c.metadata.Name + "/"
-	path := strings.TrimPrefix(r.URL.Path, namespace)
-	// Ensure path starts with / (TrimPrefix removes it)
-	if path != "" && !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	// Handle exact namespace match (e.g., /api/python -> /)
-	if path == "" || path == r.URL.Path {
-		path = "/"
+	// Calculate both stripped and full paths
+	originalPath := r.URL.Path
+	prefix := "/api/" + c.metadata.Name
+	strippedPath := originalPath
+
+	if originalPath == prefix {
+		// Exact match: /api/code -> /
+		strippedPath = "/"
+	} else if len(originalPath) > len(prefix) && originalPath[:len(prefix)] == prefix {
+		// Has prefix: /api/code/... -> /...
+		strippedPath = originalPath[len(prefix):]
+		// Ensure stripped path starts with /
+		if strippedPath == "" || strippedPath[0] != '/' {
+			strippedPath = "/" + strippedPath
+		}
 	}
 
-	// Create gRPC request
+	// Add query string
+	queryString := ""
+	if r.URL.RawQuery != "" {
+		queryString = "?" + r.URL.RawQuery
+	}
+
+	// Try stripped path first (modern approach: plugins don't need to know mount point)
 	req := &protocol.HTTPRequest{
 		Method:  r.Method,
-		Path:    path,
+		Path:    strippedPath + queryString,
 		Headers: headers,
 		Body:    body,
 	}
 
-	// Add query string to path
-	if r.URL.RawQuery != "" {
-		req.Path = path + "?" + r.URL.RawQuery
+	c.logger.Debugw("Proxying to plugin (stripped)", "plugin", c.metadata.Name, "original", originalPath, "trying", strippedPath)
+	resp, err := c.client.HandleHTTP(r.Context(), req)
+
+	// If stripped path returns 404, try full path (for LLMs that naturally include prefix)
+	if err == nil && resp.StatusCode == 404 && strippedPath != originalPath {
+		c.logger.Debugw("Stripped path 404, retrying with full path", "plugin", c.metadata.Name, "full_path", originalPath)
+		req.Path = originalPath + queryString
+		resp, err = c.client.HandleHTTP(r.Context(), req)
 	}
 
-	// DEBUG: Log before calling remote plugin
-	c.logger.Infow("Proxying to plugin", "plugin", c.metadata.Name, "original_path", r.URL.Path, "stripped_path", path, "final_path", req.Path)
-
-	// Call remote plugin
-	resp, err := c.client.HandleHTTP(r.Context(), req)
+	// Handle errors
 	if err != nil {
 		c.logger.Errorw("Remote HTTP request failed",
 			"plugin", c.metadata.Name,
 			"method", r.Method,
-			"original_path", r.URL.Path,
-			"stripped_path", path,
+			"path", req.Path,
 			"error", err)
-		http.Error(w, "Plugin error", http.StatusBadGateway)
+		http.Error(w, fmt.Sprintf("Plugin '%s' error: %v (%s %s)", c.metadata.Name, err, r.Method, req.Path), http.StatusBadGateway)
 		return
 	}
 

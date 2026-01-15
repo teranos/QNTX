@@ -4,7 +4,7 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
-// QueueService provides async job queue operations for external plugins
+// QueueService provides async job queue operations for gRPC plugins
 service QueueService {
   // Enqueue adds a new job to the queue
   rpc Enqueue(EnqueueRequest) returns (EnqueueResponse);

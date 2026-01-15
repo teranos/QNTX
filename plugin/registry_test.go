@@ -258,8 +258,9 @@ func TestRegistry_InitializeAll(t *testing.T) {
 
 		mockServices := newMockServiceRegistry()
 		err := registry.InitializeAll(context.Background(), mockServices)
-		// Should not return error - continues with other plugins
-		assert.NoError(t, err)
+		// Should return error indicating failure, but continue with other plugins
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to initialize 1 plugin(s)")
 
 		// test1 should be marked as failed
 		state1, ok := registry.GetState("test1")

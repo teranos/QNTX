@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // =============================================================================
@@ -926,4 +927,85 @@ func TestPluginServer_WebSocketStreaming(t *testing.T) {
 	// Close the stream
 	err = stream.CloseSend()
 	require.NoError(t, err)
+}
+
+// TestPluginServer_PortAutoIncrement verifies that the server automatically
+// increments to the next available port when the requested port is occupied.
+func TestPluginServer_PortAutoIncrement(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	plugin := newMockPlugin()
+	server := NewPluginServer(plugin, logger)
+
+	// Find a free port to use as base
+	baseListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	baseAddr := baseListener.Addr().String()
+	_, basePortStr, err := net.SplitHostPort(baseAddr)
+	require.NoError(t, err)
+	baseListener.Close()
+
+	// Occupy the base port
+	occupiedListener, err := net.Listen("tcp", baseAddr)
+	require.NoError(t, err)
+	defer occupiedListener.Close()
+
+	t.Logf("Base port %s is occupied, server should auto-increment", basePortStr)
+
+	// Try to start server on the occupied port
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Run server in goroutine
+	serverErrChan := make(chan error, 1)
+	serverStarted := make(chan string, 1)
+
+	go func() {
+		// The server should automatically increment to basePort+1
+		err := server.Serve(ctx, baseAddr)
+		serverErrChan <- err
+	}()
+
+	// Give server time to start and announce port
+	time.Sleep(500 * time.Millisecond)
+
+	// Try to connect to basePort+1 (where server should have bound)
+	expectedPort := mustParsePort(t, basePortStr) + 1
+	expectedAddr := fmt.Sprintf("127.0.0.1:%d", expectedPort)
+
+	connCtx, connCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer connCancel()
+	conn, err := grpc.DialContext(connCtx, expectedAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	require.NoError(t, err, "Server should have bound to port %d", expectedPort)
+	defer conn.Close()
+
+	// Verify the server is responding
+	client := protocol.NewDomainPluginServiceClient(conn)
+	resp, err := client.Metadata(context.Background(), &protocol.Empty{})
+	require.NoError(t, err)
+	assert.Equal(t, "mock", resp.Name)
+
+	t.Logf("Successfully connected to server on auto-incremented port %d", expectedPort)
+
+	// Send serverStarted notification
+	serverStarted <- expectedAddr
+
+	// Cleanup
+	cancel()
+	select {
+	case err := <-serverErrChan:
+		// Server error is expected when context is cancelled
+		t.Logf("Server stopped: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Server did not stop after context cancellation")
+	}
+}
+
+// mustParsePort is a test helper to parse port from string
+func mustParsePort(t *testing.T, portStr string) int {
+	var port int
+	_, err := fmt.Sscanf(portStr, "%d", &port)
+	require.NoError(t, err)
+	return port
 }
