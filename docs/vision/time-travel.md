@@ -42,6 +42,36 @@ Watch knowledge evolution - how the system's understanding developed over time t
 - Integrates with time-series data management for metrics and performance data
 - Rolling window filters for continuous monitoring
 
+## Future: Self-Describing Temporal Schemas
+
+**Vision:** Ingesters attest their own temporal structure, making QNTX fully domain-agnostic.
+
+**Current (hardcoded):**
+```
+# Code knows temporal field names
+metadata: { "start_time": "2020-01-01", "duration_months": "36" }
+```
+
+**Future (attested):**
+```
+# Ingestor declares temporal schema via attestations
+ingester:bcs -> has_temporal_field -> "start_time"
+ingester:bcs -> has_duration_field -> "duration_months"
+ingester:bcs -> temporal_unit -> "months"
+ingester:bcs -> temporal_format -> "RFC3339"
+
+# Queries discover structure dynamically
+ax * over 5y since "2020"  # System reads attestations to know HOW to aggregate
+```
+
+**Benefits:**
+- **Zero hardcoded conventions** - no assumptions about field names
+- **Cross-domain composability** - any temporal data works without code changes
+- **Dynamic query planning** - aggregation strategy derived from attestations
+- **Self-describing ingesters** - like `node_type` attestations, but for temporal properties
+
+This extends the attestation abstraction to time itself, completing QNTX's domain-agnostic vision.
+
 ## Related Vision
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm that generates the history
 - [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Visualize time-travel through tile evolution
