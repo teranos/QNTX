@@ -201,7 +201,7 @@ func createActivityAttestation(t *testing.T, store *SQLStore, activity *neuralAc
 		Attributes: metadata,
 		CreatedAt:  activity.attestedAt,
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create activity attestation for %s", activity.activityID)
 }
 
 func formatDuration(seconds float64) string {
