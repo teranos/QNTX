@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -58,12 +59,22 @@ func TestOpenWithMigrations(t *testing.T) {
 	})
 
 	t.Run("migration errors include stack traces", func(t *testing.T) {
+		// Create a scenario where opening database will fail
+		// This tests that OpenWithMigrations properly wraps errors with stack traces
 		tmpDir := t.TempDir()
+		dbPath := filepath.Join(tmpDir, "test.db")
 
-		// Create a read-only directory to force migration failure
-		dbPath := filepath.Join(tmpDir, "readonly", "test.db")
+		// Create the database file first
+		firstDB, err := Open(dbPath, nil)
+		require.NoError(t, err)
+		firstDB.Close()
 
-		// Attempt to open - should fail because directory doesn't exist and can't be created
+		// Make directory read-only so WAL mode will fail
+		err = os.Chmod(tmpDir, 0555)
+		require.NoError(t, err)
+		defer os.Chmod(tmpDir, 0755) // Restore for cleanup
+
+		// Attempt to open with migrations - should fail at Open() step
 		db, err := OpenWithMigrations(dbPath, nil)
 		require.Error(t, err)
 		assert.Nil(t, db)

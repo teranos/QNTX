@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// RemoteServiceRegistry provides service access for external plugins.
-// External plugins receive this registry with endpoints to connect back to QNTX.
+// RemoteServiceRegistry provides service access for gRPC plugins.
+// gRPC plugins receive this registry with endpoints to connect back to QNTX.
 // Services are accessed via gRPC clients that connect to the endpoints.
 type RemoteServiceRegistry struct {
 	atsStoreEndpoint string
@@ -44,11 +44,10 @@ func NewRemoteServiceRegistry(
 }
 
 // Database returns nil for remote plugins.
-// External plugins should not have direct database access.
+// gRPC plugins do not have direct database access.
 // Use ATSStore for attestation operations.
 func (r *RemoteServiceRegistry) Database() *sql.DB {
-	// External plugins don't have direct database access
-	// They communicate via the ATSStore gRPC endpoint
+	// gRPC plugins access data via the ATSStore gRPC endpoint
 	r.logger.Warn("Database() called on remote plugin - direct DB access not available")
 	return nil
 }

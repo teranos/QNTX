@@ -2,6 +2,8 @@ package db
 
 import (
 	"database/sql"
+	"os"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
@@ -24,6 +26,17 @@ func Open(path string, log *zap.SugaredLogger) (*sql.DB, error) {
 	if log != nil {
 		logger.AddDBSymbol(log).Debugw("Opening database", "path", path)
 	}
+
+	// Ensure parent directory exists (SQLite can create file, but not directories)
+	if dir := filepath.Dir(path); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, errors.Wrapf(err, "failed to create database directory: %s", dir)
+		}
+		if log != nil {
+			logger.AddDBSymbol(log).Debugw("Created database directory", "dir", dir)
+		}
+	}
+
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open database")

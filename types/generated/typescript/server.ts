@@ -586,37 +586,6 @@ export interface StorageWarningMessage {
   timestamp: number;
 }
 
-export interface SystemCapabilitiesMessage {
-  /**
-   * "system_capabilities"
-   */
-  type: string;
-  /**
-   * "rust" or "go" - which fuzzy matching implementation is active
-   */
-  fuzzy_backend: string;
-  /**
-   * true if using Rust (optimized), false if Go fallback
-   */
-  fuzzy_optimized: boolean;
-  /**
-   * fuzzy-ax library version (e.g., "0.1.0")
-   */
-  fuzzy_version: string;
-  /**
-   * "onnx" or "unavailable" - video inference availability
-   */
-  vidstream_backend: string;
-  /**
-   * true if ONNX Runtime available (CGO build)
-   */
-  vidstream_optimized: boolean;
-  /**
-   * vidstream library version (e.g., "0.1.0")
-   */
-  vidstream_version: string;
-}
-
 export interface TaskInfo {
   task_id: string;
   log_count?: number;

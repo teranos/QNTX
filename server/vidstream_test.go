@@ -5,11 +5,12 @@ import (
 	"time"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/server/syscap"
 )
 
 // TestVidStreamMessageRouting verifies vidstream messages route to correct handlers
 func TestVidStreamMessageRouting(t *testing.T) {
-	if !vidstreamAvailable() {
+	if !syscap.VidstreamAvailable() {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
@@ -45,7 +46,7 @@ func TestVidStreamMessageRouting(t *testing.T) {
 
 // TestVidStreamFrameWithoutInit verifies error when frame sent before init
 func TestVidStreamFrameWithoutInit(t *testing.T) {
-	if !vidstreamAvailable() {
+	if !syscap.VidstreamAvailable() {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
@@ -98,7 +99,7 @@ func TestVidStreamFrameWithoutInit(t *testing.T) {
 
 // TestVidStreamInvalidFormat verifies error for unsupported pixel format
 func TestVidStreamInvalidFormat(t *testing.T) {
-	if !vidstreamAvailable() {
+	if !syscap.VidstreamAvailable() {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
@@ -144,7 +145,7 @@ func TestVidStreamInvalidFormat(t *testing.T) {
 
 // TestVidStreamAsyncInitSendsResponse verifies init goroutine completes and sends response
 func TestVidStreamAsyncInitSendsResponse(t *testing.T) {
-	if !vidstreamAvailable() {
+	if !syscap.VidstreamAvailable() {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 
@@ -210,7 +211,7 @@ func TestVidStreamAsyncInitSendsResponse(t *testing.T) {
 
 // TestVidStreamEngineReinitClosesOldEngine verifies engine reinit properly closes old engine
 func TestVidStreamEngineReinitClosesOldEngine(t *testing.T) {
-	if !vidstreamAvailable() {
+	if !syscap.VidstreamAvailable() {
 		t.Skip("Skipping vidstream test: rustvideo build tag not set")
 	}
 	if testing.Short() {
