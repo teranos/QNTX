@@ -85,7 +85,7 @@ func createMeetingAttestation(t *testing.T, store *SQLStore, meeting *meetingAtt
 		Attributes: metadata,
 		CreatedAt:  meeting.attestedAt,
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to create meeting attestation for %s", meeting.meetingID)
 }
 
 // ==============================================================================
