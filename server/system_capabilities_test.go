@@ -6,6 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/graph"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/QNTX/server/wslogs"
 )
 
@@ -40,10 +41,10 @@ func TestSendSystemCapabilities(t *testing.T) {
 	// Check if message was sent
 	select {
 	case msg := <-client.sendMsg:
-		// Verify it's a SystemCapabilitiesMessage
-		capMsg, ok := msg.(SystemCapabilitiesMessage)
+		// Verify it's a syscap.Message
+		capMsg, ok := msg.(syscap.Message)
 		if !ok {
-			t.Fatalf("Expected SystemCapabilitiesMessage, got %T", msg)
+			t.Fatalf("Expected syscap.Message, got %T", msg)
 		}
 
 		// Verify message fields
