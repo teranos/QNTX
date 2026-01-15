@@ -53,13 +53,17 @@ type QNTXServer struct {
 	consoleBuffer       *ConsoleBuffer              // Browser console log buffer for debugging (dev mode only)
 	initialQuery        string                      // Pre-loaded Ax query to execute on client connection
 	pluginRegistry      *plugin.Registry            // Domain plugin registry
-	pluginManager       *grpcplugin.PluginManager   // External plugin process manager
+	pluginManager       *grpcplugin.PluginManager   // Plugin process manager
 	services            plugin.ServiceRegistry      // Service registry for plugins
 	servicesManager     *grpcplugin.ServicesManager // gRPC services for plugin callbacks (Issue #138)
 
 	// VidStream real-time video inference (browser → WS → ONNX)
 	vidstreamEngine *vidstream.VideoEngine // Singleton video processing engine
 	vidstreamMu     sync.Mutex             // Protects vidstream engine operations
+
+	// Plugin HTTP routing (lazy initialization for async plugin loading)
+	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
+	pluginMuxInit sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
