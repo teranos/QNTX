@@ -4,7 +4,7 @@ package protocol;
 
 option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
 
-// ATSStoreService provides attestation storage operations for external plugins
+// ATSStoreService provides attestation storage operations for gRPC plugins
 service ATSStoreService {
   // CreateAttestation creates a new attestation
   rpc CreateAttestation(CreateAttestationRequest) returns (CreateAttestationResponse);

@@ -143,6 +143,7 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 
 	if len(failedPlugins) > 0 {
 		r.logger.Warnf("Some plugins failed to initialize: %v", failedPlugins)
+		return errors.Newf("failed to initialize %d plugin(s): %v", len(failedPlugins), failedPlugins)
 	}
 
 	return nil
@@ -325,6 +326,12 @@ func (r *Registry) MarkReady(name string) {
 func (r *Registry) validateVersion(metadata Metadata) error {
 	if metadata.QNTXVersion == "" {
 		// No version constraint specified
+		return nil
+	}
+
+	// Allow "dev" version without validation (development builds)
+	if r.version == "dev" {
+		r.logger.Debugf("Skipping version validation for development build (QNTX version: dev)")
 		return nil
 	}
 
