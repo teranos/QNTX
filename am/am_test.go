@@ -25,8 +25,8 @@ func TestLoad_Defaults(t *testing.T) {
 		t.Errorf("expected default database path 'qntx.db', got %q", cfg.Database.Path)
 	}
 
-	if cfg.Server.Port != DefaultGraphPort {
-		t.Errorf("expected default port %d, got %d", DefaultGraphPort, cfg.Server.Port)
+	if cfg.Server.Port != DefaultServerPort {
+		t.Errorf("expected default port %d, got %d", DefaultServerPort, cfg.Server.Port)
 	}
 
 	if cfg.Pulse.Workers != 1 {
@@ -115,7 +115,7 @@ func TestSetDefaults(t *testing.T) {
 		expected interface{}
 	}{
 		{"database.path", "qntx.db"},
-		{"server.port", DefaultGraphPort},
+		{"server.port", DefaultServerPort},
 		{"server.log_theme", "everforest"},
 		{"pulse.workers", 1},
 		{"pulse.ticker_interval_seconds", 1},
@@ -202,14 +202,19 @@ func TestFindProjectConfig(t *testing.T) {
 	})
 }
 
-func TestGetGraphPort(t *testing.T) {
-	// Reset global state
-	Reset()
+func TestGetServerPort(t *testing.T) {
+	// Create isolated viper instance without loading user/system/project config
+	v := viper.New()
+	SetDefaults(v)
 
-	// Test default behavior
-	port := GetGraphPort()
-	if port != DefaultGraphPort {
-		t.Errorf("expected default port %d, got %d", DefaultGraphPort, port)
+	cfg, err := LoadWithViper(v)
+	if err != nil {
+		t.Fatalf("LoadWithViper() failed: %v", err)
+	}
+
+	// Test that default port is set correctly
+	if cfg.Server.Port != DefaultServerPort {
+		t.Errorf("expected default port %d, got %d", DefaultServerPort, cfg.Server.Port)
 	}
 }
 

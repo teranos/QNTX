@@ -76,7 +76,7 @@ func findAvailablePort(requestedPort int) (int, error) {
 	}
 
 	// Preferred fallback ports for development and production
-	preferredPorts := []int{appcfg.DefaultGraphPort, appcfg.FallbackGraphPort}
+	preferredPorts := []int{appcfg.DefaultServerPort, appcfg.FallbackServerPort}
 
 	// Try preferred ports if they differ from requested
 	for _, port := range preferredPorts {
@@ -94,7 +94,7 @@ func findAvailablePort(requestedPort int) (int, error) {
 		}
 	}
 
-	return 0, errors.Newf("no available ports found (tried %d, %d, %d, and range 56787-56796)", requestedPort, appcfg.DefaultGraphPort, appcfg.FallbackGraphPort)
+	return 0, errors.Newf("no available ports found (tried %d, %d, %d, and range 56787-56796)", requestedPort, appcfg.DefaultServerPort, appcfg.FallbackServerPort)
 }
 
 // createFileCore creates a zap core for file logging without colors
