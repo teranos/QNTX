@@ -140,10 +140,11 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		return
 	}
 
-	// Check if this is a duration aggregation predicate (ends with _duration_months or _duration_s)
+	// Check if this is a duration aggregation predicate
+	// Supports: seconds (s/sec/seconds), minutes (m/min/minutes), hours (h/hr/hours), months, years (y/yr/years)
 	isDurationAggregation := false
 	for _, pred := range numericPredicates {
-		if strings.HasSuffix(pred, "_duration_months") || strings.HasSuffix(pred, "_duration_s") {
+		if strings.Contains(pred, "_duration_") {
 			isDurationAggregation = true
 			break
 		}
@@ -160,23 +161,73 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 	var threshold float64
 	var durationField string
 
-	// Check which duration type we're working with
+	// Determine duration unit from predicate suffix
+	// Normalize to standard field names: duration_s, duration_minutes, duration_hours, duration_months, duration_years
 	usesSeconds := false
+	usesMinutes := false
+	usesHours := false
+	usesYears := false
+
 	for _, pred := range numericPredicates {
-		if strings.HasSuffix(pred, "_duration_s") {
+		if strings.HasSuffix(pred, "_duration_s") ||
+		   strings.HasSuffix(pred, "_duration_sec") ||
+		   strings.HasSuffix(pred, "_duration_seconds") {
 			usesSeconds = true
+			break
+		}
+		if strings.HasSuffix(pred, "_duration_m") ||
+		   strings.HasSuffix(pred, "_duration_min") ||
+		   strings.HasSuffix(pred, "_duration_minutes") {
+			usesMinutes = true
+			break
+		}
+		if strings.HasSuffix(pred, "_duration_h") ||
+		   strings.HasSuffix(pred, "_duration_hr") ||
+		   strings.HasSuffix(pred, "_duration_hours") {
+			usesHours = true
+			break
+		}
+		if strings.HasSuffix(pred, "_duration_y") ||
+		   strings.HasSuffix(pred, "_duration_yr") ||
+		   strings.HasSuffix(pred, "_duration_years") {
+			usesYears = true
 			break
 		}
 	}
 
 	if usesSeconds {
 		// Duration in seconds
-		durationField = "duration_s"
+		durationField = "duration_seconds"
 		threshold = overComparison.Value
 		if overComparison.Unit == "m" {
 			threshold = overComparison.Value * 60.0 // minutes to seconds
 		} else if overComparison.Unit == "h" {
 			threshold = overComparison.Value * 3600.0 // hours to seconds
+		}
+	} else if usesMinutes {
+		// Duration in minutes
+		durationField = "duration_minutes"
+		threshold = overComparison.Value
+		if overComparison.Unit == "s" {
+			threshold = overComparison.Value / 60.0 // seconds to minutes
+		} else if overComparison.Unit == "h" {
+			threshold = overComparison.Value * 60.0 // hours to minutes
+		}
+	} else if usesHours {
+		// Duration in hours
+		durationField = "duration_hours"
+		threshold = overComparison.Value
+		if overComparison.Unit == "m" {
+			threshold = overComparison.Value / 60.0 // minutes to hours
+		} else if overComparison.Unit == "s" {
+			threshold = overComparison.Value / 3600.0 // seconds to hours
+		}
+	} else if usesYears {
+		// Duration in years
+		durationField = "duration_years"
+		threshold = overComparison.Value
+		if overComparison.Unit == "m" {
+			threshold = overComparison.Value / 12.0 // months to years
 		}
 	} else {
 		// Duration in months (default)
@@ -185,6 +236,19 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		if overComparison.Unit == "m" {
 			threshold = overComparison.Value // already in months
 		}
+	}
+
+	// Validate durationField against whitelist to prevent SQL injection
+	allowedDurationFields := map[string]bool{
+		"duration_seconds": true,
+		"duration_minutes": true,
+		"duration_hours":   true,
+		"duration_months":  true,
+		"duration_years":   true,
+	}
+	if !allowedDurationFields[durationField] {
+		// This should never happen with current code logic, but guards against future changes
+		panic(fmt.Sprintf("invalid duration field: %s (not in whitelist)", durationField))
 	}
 
 	// Build predicate conditions for subquery
