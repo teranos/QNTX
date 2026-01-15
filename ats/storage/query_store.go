@@ -129,10 +129,11 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	// Add temporal filters (attestation timestamp)
 	qb.buildTemporalFilters(filter)
 
-	// Note: Metadata temporal filters (start_time/end_time) are now handled
-	// within buildOverComparisonFilter for duration aggregation queries.
-	// This prevents double-filtering and ensures temporal constraints are
-	// applied during the aggregation GROUP BY, not after.
+	// Add metadata temporal filters to main query when using temporal aggregation
+	// This ensures we only return attestations within the time window, not all attestations for matching subjects
+	if filter.OverComparison != nil && (filter.TimeStart != nil || filter.TimeEnd != nil) {
+		qb.buildMetadataTemporalFilters(filter)
+	}
 
 	// Build full query
 	query := AttestationSelectQuery

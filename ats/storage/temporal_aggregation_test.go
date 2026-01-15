@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/teranos/QNTX/ats"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/ats/types"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // ==============================================================================
@@ -218,7 +218,8 @@ func formatDuration(seconds float64) string {
 // TestTemporalAggregation_SimpleSum tests basic duration aggregation across multiple activity periods
 // Query: ax activity_duration_s over 1.0s
 // Expected: CA1_PYRAMIDAL_N042 (1.5s) and CA3_PYRAMIDAL_N001 (2.1s) match
-//           CA1_PYRAMIDAL_N043 (0.8s) does NOT match
+//
+//	CA1_PYRAMIDAL_N043 (0.8s) does NOT match
 func TestTemporalAggregation_SimpleSum(t *testing.T) {
 	// t.Skip("Phase 1: Basic aggregation - implement buildOverComparisonFilter with GROUP BY SUM")
 
@@ -346,7 +347,8 @@ func setupTemporalFilteringTestDB(t *testing.T) *sql.DB {
 // TestTemporalAggregation_WithSinceFilter tests temporal window filtering before aggregation
 // Query: ax activity_duration_s over 1.0s since last 1h
 // Expected: Only N001 matches (1.3s in last hour)
-//           N042 and N043 excluded (their recent activity < 1.0s, old activity filtered out)
+//
+//	N042 and N043 excluded (their recent activity < 1.0s, old activity filtered out)
 func TestTemporalAggregation_WithSinceFilter(t *testing.T) {
 	// t.Skip("Phase 2: Temporal filtering - implement buildMetadataTemporalFilters")
 
@@ -458,18 +460,20 @@ func setupSemanticMatchingTestDB(t *testing.T) *sql.DB {
 // Query: ax activity_duration_s over 1.5s in "CA1 pyramidal"
 //
 // Semantic expansion (via query expander):
-//   "CA1 pyramidal" expands to:
-//     - CA1_PYRAMIDAL_* (weight: 1.0, exact match)
-//     - CA1_INTERNEURON_* (weight: 0.7, same region different type)
-//     - CA3_PYRAMIDAL_* (weight: 0.5, adjacent region same type)
-//     - V1_STELLATE_* (weight: 0.1, very distant - likely excluded)
+//
+//	"CA1 pyramidal" expands to:
+//	  - CA1_PYRAMIDAL_* (weight: 1.0, exact match)
+//	  - CA1_INTERNEURON_* (weight: 0.7, same region different type)
+//	  - CA3_PYRAMIDAL_* (weight: 0.5, adjacent region same type)
+//	  - V1_STELLATE_* (weight: 0.1, very distant - likely excluded)
 //
 // Weighted aggregation:
-//   CA1_PYRAMIDAL_N042:   1.0s × 1.0 = 1.0s
-//   CA1_INTERNEURON_N010: 0.8s × 0.7 = 0.56s
-//   CA3_PYRAMIDAL_N001:   1.2s × 0.5 = 0.6s
-//   V1_STELLATE_N020:     2.0s × 0.1 = 0.2s (or excluded)
-//   Total: ~2.16s (or 1.96s if V1 excluded)
+//
+//	CA1_PYRAMIDAL_N042:   1.0s × 1.0 = 1.0s
+//	CA1_INTERNEURON_N010: 0.8s × 0.7 = 0.56s
+//	CA3_PYRAMIDAL_N001:   1.2s × 0.5 = 0.6s
+//	V1_STELLATE_N020:     2.0s × 0.1 = 0.2s (or excluded)
+//	Total: ~2.16s (or 1.96s if V1 excluded)
 //
 // Expected: Query matches because weighted sum >= 1.5s threshold
 func TestTemporalAggregation_SemanticWeightedSum(t *testing.T) {
@@ -601,15 +605,16 @@ func setupCombinedFilteringTestDB(t *testing.T) *sql.DB {
 // Query: ax activity_duration_s over 1.0s in "CA1 pyramidal" since last 1h
 //
 // Processing order:
-//   1. Temporal filter: Only activity with start_time >= (now - 1h)
-//   2. Semantic expansion: "CA1 pyramidal" → {CA1_PYRAMIDAL: 1.0, CA1_INTERNEURON: 0.7, CA3_PYRAMIDAL: 0.5}
-//   3. Weighted aggregation: SUM(duration × semantic_weight) for recent activities only
+//  1. Temporal filter: Only activity with start_time >= (now - 1h)
+//  2. Semantic expansion: "CA1 pyramidal" → {CA1_PYRAMIDAL: 1.0, CA1_INTERNEURON: 0.7, CA3_PYRAMIDAL: 0.5}
+//  3. Weighted aggregation: SUM(duration × semantic_weight) for recent activities only
 //
 // Expected weighted sums (recent activity only):
-//   CA1_PYRAMIDAL_N042:   0.5s × 1.0 = 0.5s (old 0.6s filtered out)
-//   CA1_INTERNEURON_N010: 0.4s × 0.7 = 0.28s
-//   CA3_PYRAMIDAL_N001:   0.4s × 0.5 = 0.2s (old 0.8s filtered out)
-//   Total: 0.98s (BELOW 1.0s threshold)
+//
+//	CA1_PYRAMIDAL_N042:   0.5s × 1.0 = 0.5s (old 0.6s filtered out)
+//	CA1_INTERNEURON_N010: 0.4s × 0.7 = 0.28s
+//	CA3_PYRAMIDAL_N001:   0.4s × 0.5 = 0.2s (old 0.8s filtered out)
+//	Total: 0.98s (BELOW 1.0s threshold)
 //
 // Expected: NO results (weighted sum < threshold)
 func TestTemporalAggregation_CombinedTemporalAndSemantic(t *testing.T) {
@@ -731,27 +736,30 @@ func setupOverlapDetectionTestDB(t *testing.T) *sql.DB {
 // Query: ax activity_duration_s over 2.0s
 //
 // Overlap detection algorithm:
-//   1. Sort activity periods by start_time
-//   2. Merge overlapping periods (if period.start <= merged.last.end)
-//   3. Sum durations of merged periods
+//  1. Sort activity periods by start_time
+//  2. Merge overlapping periods (if period.start <= merged.last.end)
+//  3. Sum durations of merged periods
 //
 // Neuron N042 (overlapping activities):
-//   Period 1: T+0ms to T+1000ms (1.0s)
-//   Period 2: T+500ms to T+1500ms (1.0s, overlaps 500ms)
-//   Period 3: T+2000ms to T+2800ms (0.8s, separate)
 //
-//   Merged:
-//     Periods 1 & 2 → T+0ms to T+1500ms = 1.5s
-//     Period 3 → 0.8s
-//   Total: 2.3s (WITH overlap detection) vs 2.8s (WITHOUT)
+//	Period 1: T+0ms to T+1000ms (1.0s)
+//	Period 2: T+500ms to T+1500ms (1.0s, overlaps 500ms)
+//	Period 3: T+2000ms to T+2800ms (0.8s, separate)
+//
+//	Merged:
+//	  Periods 1 & 2 → T+0ms to T+1500ms = 1.5s
+//	  Period 3 → 0.8s
+//	Total: 2.3s (WITH overlap detection) vs 2.8s (WITHOUT)
 //
 // Neuron N043 (no overlaps):
-//   Period 1: 0.6s
-//   Period 2: 0.7s
-//   Total: 1.3s (same with or without overlap detection)
+//
+//	Period 1: 0.6s
+//	Period 2: 0.7s
+//	Total: 1.3s (same with or without overlap detection)
 //
 // Expected: Only N042 matches (2.3s >= 2.0s threshold)
-//           N043 does NOT match (1.3s < 2.0s threshold)
+//
+//	N043 does NOT match (1.3s < 2.0s threshold)
 func TestTemporalAggregation_OverlapDetection(t *testing.T) {
 	t.Skip("Phase 3: Overlap detection - implement period merging algorithm")
 
@@ -882,15 +890,17 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 //   - If end_time is empty/missing: duration = attestation_timestamp - start_time
 //
 // Test data:
-//   N042 (ongoing):   start_time = T-1.5s, end_time = "", attestation_time = T
-//                     Calculated duration: 1.5s (from start to attestation)
-//   N043 (completed): start_time = T-2.0s, end_time = T-1.2s
-//                     Explicit duration: 0.8s
-//   N001 (ongoing):   start_time = T-3.0s, end_time = "", attestation_time = T
-//                     Calculated duration: 3.0s
+//
+//	N042 (ongoing):   start_time = T-1.5s, end_time = "", attestation_time = T
+//	                  Calculated duration: 1.5s (from start to attestation)
+//	N043 (completed): start_time = T-2.0s, end_time = T-1.2s
+//	                  Explicit duration: 0.8s
+//	N001 (ongoing):   start_time = T-3.0s, end_time = "", attestation_time = T
+//	                  Calculated duration: 3.0s
 //
 // Expected: N042 (1.5s) and N001 (3.0s) match threshold >= 1.0s
-//           N043 (0.8s) does NOT match
+//
+//	N043 (0.8s) does NOT match
 func TestTemporalAggregation_OngoingActivity(t *testing.T) {
 	t.Skip("Phase 3: Ongoing activity - calculate duration from start_time to attestation timestamp when end_time missing")
 
@@ -1019,14 +1029,15 @@ func setupMultiplePredicatesTestDB(t *testing.T) *sql.DB {
 // Query: ax activity_duration_s over 1.0s AND uses_neurotransmitter glutamate
 //
 // Logic:
-//   1. Find subjects with activity_duration_s >= 1.0s (via aggregation)
-//   2. Find subjects with uses_neurotransmitter = glutamate
-//   3. Return intersection (subjects matching BOTH conditions)
+//  1. Find subjects with activity_duration_s >= 1.0s (via aggregation)
+//  2. Find subjects with uses_neurotransmitter = glutamate
+//  3. Return intersection (subjects matching BOTH conditions)
 //
 // Test data:
-//   N042: activity 1.2s + glutamate → MATCH (both conditions)
-//   N043: activity 1.5s + GABA      → NO MATCH (wrong neurotransmitter)
-//   N001: activity 0.7s + glutamate → NO MATCH (insufficient activity)
+//
+//	N042: activity 1.2s + glutamate → MATCH (both conditions)
+//	N043: activity 1.5s + GABA      → NO MATCH (wrong neurotransmitter)
+//	N001: activity 0.7s + glutamate → NO MATCH (insufficient activity)
 //
 // Expected: Only N042 matches both conditions
 func TestTemporalAggregation_MultiplePredicatesAND(t *testing.T) {

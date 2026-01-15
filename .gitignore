@@ -67,3 +67,6 @@ web/ctpm1/
 web/css/ctpm1.css
 web/ctp2/
 web/css/ctp2.css
+
+# CTP2 test files (domain-specific, not for open source)
+**/*ctp2*_test.go

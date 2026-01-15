@@ -195,6 +195,7 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 	}
 
 	// Build temporal filter for subquery if present
+	// Use RFC3339 format for full timestamp comparison
 	temporalFilter := ""
 	if filter.TimeStart != nil {
 		temporalFilter = " AND json_extract(attributes, '$.start_time') >= ?"
@@ -274,16 +275,12 @@ func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) {
 // This filters activities by when they occurred, not when attestations were created.
 // Used for temporal aggregation queries like "since last 10 years" on experience/activity data.
 func (qb *queryBuilder) buildMetadataTemporalFilters(filter types.AxFilter) {
-	// Filter by start_time in attributes metadata (when activity/experience began)
+	// Use RFC3339 format for full timestamp comparison, matching the aggregation subquery
 	if filter.TimeStart != nil {
-		// Format: ISO 8601 date comparison in JSON
-		timeStr := filter.TimeStart.Format("2006-01-02")
-		qb.addClause("json_extract(attributes, '$.start_time') >= ?", timeStr)
+		qb.addClause("json_extract(attributes, '$.start_time') >= ?", filter.TimeStart.Format(time.RFC3339))
 	}
 
-	// Filter by start_time for end boundary (activities that started before this time)
 	if filter.TimeEnd != nil {
-		timeStr := filter.TimeEnd.Format("2006-01-02")
-		qb.addClause("json_extract(attributes, '$.start_time') <= ?", timeStr)
+		qb.addClause("json_extract(attributes, '$.start_time') <= ?", filter.TimeEnd.Format(time.RFC3339))
 	}
 }
