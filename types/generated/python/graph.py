@@ -95,6 +95,10 @@ class NodeTypeInfo:
     color: str | None = None
     # Number of nodes of this type
     count: int | None = None
+    # Metadata fields for semantic search (e.g., ["notes", "description"])
+    rich_string_fields: list[str] | None = None
+    # Fields flattened into arrays (e.g., ["skills", "languages"])
+    array_fields: list[str] | None = None
 
 # RelationshipDefinition holds physics and display metadata for a relationship type from attestations.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/graph.md#relationshipdefinition
@@ -151,6 +155,10 @@ class TypeDefinition:
     deprecated: bool
     # Optional opacity (default 1.0)
     opacity: float
+    # Metadata fields for semantic search (e.g., ["notes", "description"])
+    rich_string_fields: list[str]
+    # Fields flattened into arrays (e.g., ["skills", "languages"])
+    array_fields: list[str]
 
 __all__ = [
     "AxGraphBuilder",

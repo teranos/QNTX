@@ -107,6 +107,8 @@ type NodeTypeInfo struct {
 	Label string `json:"label"`
 	Color string `json:"color,omitempty"`
 	Count int `json:"count,omitempty"`
+	RichStringFields []string `json:"rich_string_fields,omitempty"`
+	ArrayFields []string `json:"array_fields,omitempty"`
 }
 ```
 
@@ -128,7 +130,7 @@ type RelationshipDefinition struct {
 
 ## RelationshipTypeInfo {#relationshiptypeinfo}
 
-**Source**: [`graph/models.go:53`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L53)
+**Source**: [`graph/models.go:55`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L55)
 
 
 ```go
@@ -144,7 +146,7 @@ type RelationshipTypeInfo struct {
 
 ## Stats {#stats}
 
-**Source**: [`graph/models.go:63`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L63)
+**Source**: [`graph/models.go:65`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L65)
 
 
 ```go
@@ -166,5 +168,7 @@ type TypeDefinition struct {
 	DisplayLabel string
 	Deprecated bool
 	Opacity float64
+	RichStringFields []string
+	ArrayFields []string
 }
 ```
