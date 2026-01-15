@@ -40,6 +40,8 @@
   "exclude": [
     "node_modules",
     "ts/vendor",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "ctp2/**/*",
+    "ctpm1/**/*"
   ]
 }

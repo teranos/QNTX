@@ -1,6 +1,6 @@
 //go:build !cgo || !rustfuzzy
 
-package server
+package syscap
 
 // fuzzyBackendVersion returns "go" for the Go fallback implementation
 func fuzzyBackendVersion() string {

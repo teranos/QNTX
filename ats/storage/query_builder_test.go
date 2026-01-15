@@ -269,7 +269,7 @@ func TestBuildOverComparisonFilter(t *testing.T) {
 			Operator: "over",
 		}
 
-		qb.buildOverComparisonFilter(mockExpander, overFilter, false)
+		qb.buildOverComparisonFilter(mockExpander, overFilter, false, types.AxFilter{})
 
 		assert.Equal(t, 1, len(qb.whereClauses), "Should add one WHERE clause")
 		assert.Contains(t, qb.whereClauses[0], "json_extract(predicates, '$[0]')")
@@ -287,7 +287,7 @@ func TestBuildOverComparisonFilter(t *testing.T) {
 			Operator: "over",
 		}
 
-		qb.buildOverComparisonFilter(mockExpander, overFilter, true)
+		qb.buildOverComparisonFilter(mockExpander, overFilter, true, types.AxFilter{})
 
 		assert.Equal(t, 2, len(qb.whereClauses), "Should add clause to existing ones")
 		assert.Contains(t, qb.whereClauses[1], "SELECT DISTINCT")
@@ -302,7 +302,7 @@ func TestBuildOverComparisonFilter(t *testing.T) {
 			Operator: "over",
 		}
 
-		qb.buildOverComparisonFilter(mockExpander, overFilter, false)
+		qb.buildOverComparisonFilter(mockExpander, overFilter, false, types.AxFilter{})
 
 		// Should convert 24 months to 2 years
 		// Last arg should be the threshold (2.0)
@@ -312,7 +312,7 @@ func TestBuildOverComparisonFilter(t *testing.T) {
 
 	t.Run("nil OVER filter", func(t *testing.T) {
 		qb := &queryBuilder{}
-		qb.buildOverComparisonFilter(mockExpander, nil, false)
+		qb.buildOverComparisonFilter(mockExpander, nil, false, types.AxFilter{})
 
 		assert.Equal(t, 0, len(qb.whereClauses))
 		assert.Equal(t, 0, len(qb.args))
@@ -329,7 +329,7 @@ func TestBuildOverComparisonFilter(t *testing.T) {
 			Operator: "over",
 		}
 
-		qb.buildOverComparisonFilter(emptyExpander, overFilter, false)
+		qb.buildOverComparisonFilter(emptyExpander, overFilter, false, types.AxFilter{})
 
 		assert.Equal(t, 0, len(qb.whereClauses), "Should skip when no numeric predicates defined")
 	})

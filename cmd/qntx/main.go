@@ -156,8 +156,8 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 
 // addPluginCommands was used to add commands from all registered plugins.
 // This is no longer needed as plugin commands are not integrated into the CLI.
-// External plugins should provide their own CLI binaries.
-// Built-in domain functionality is exposed via the server API.
+// Plugins should provide their own CLI binaries.
+// Domain functionality is exposed via the server API.
 func addPluginCommands() {
 	// No-op: Plugin commands are no longer registered
 }

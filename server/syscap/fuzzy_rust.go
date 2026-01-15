@@ -1,6 +1,6 @@
 //go:build cgo && rustfuzzy
 
-package server
+package syscap
 
 import (
 	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"

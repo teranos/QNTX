@@ -181,12 +181,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		store := storage.NewSQLStore(db, serverLogger)
 		queue := daemon.GetQueue()
 
-		// Start gRPC services for external plugins (Issue #138)
-		// These services allow external plugins to call back to QNTX core
+		// Start gRPC services for plugins (Issue #138)
+		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(serverLogger)
 		endpoints, err := servicesManager.Start(ctx, store, queue)
 		if err != nil {
-			serverLogger.Warnw("Failed to start plugin services, external plugins will not have service access", "error", err)
+			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
 		} else {
 			serverLogger.Infow("Plugin services started",
@@ -195,7 +195,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 			)
 		}
 
-		// Wrap config provider to inject service endpoints for external plugins
+		// Wrap config provider to inject service endpoints for plugins
 		configProvider := &pluginConfigProvider{
 			base:      &simpleConfigProvider{},
 			endpoints: endpoints,
@@ -438,7 +438,7 @@ type pluginConfigWithEndpoints struct {
 }
 
 func (c *pluginConfigWithEndpoints) GetString(key string) string {
-	// Inject service endpoints for external plugins (Issue #138)
+	// Inject service endpoints for plugins (Issue #138)
 	if c.endpoints != nil {
 		switch key {
 		case "_ats_store_endpoint":
@@ -465,7 +465,7 @@ func (c *pluginConfigWithEndpoints) GetStringSlice(key string) []string {
 }
 
 func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
-	// Inject service endpoints for external plugins
+	// Inject service endpoints for plugins
 	if c.endpoints != nil {
 		switch key {
 		case "_ats_store_endpoint":

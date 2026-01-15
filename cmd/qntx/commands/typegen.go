@@ -28,6 +28,7 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
 		"github.com/teranos/QNTX/server",
+		"github.com/teranos/QNTX/server/syscap", // System capabilities types
 		"github.com/teranos/QNTX/sym",
 	},
 	"rust": {
@@ -37,6 +38,7 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
 		"github.com/teranos/QNTX/server",
+		"github.com/teranos/QNTX/server/syscap", // System capabilities types
 		"github.com/teranos/QNTX/sym",
 	},
 	"python": {
@@ -52,6 +54,7 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
 		"github.com/teranos/QNTX/server",
+		"github.com/teranos/QNTX/server/syscap", // System capabilities types
 		"github.com/teranos/QNTX/sym",
 	},
 }
