@@ -176,6 +176,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.AuthToken,
 			req.Config,
 			s.logger,
+			s.plugin, // Pass plugin reference for metadata lookup
 		)
 
 		// Initialize the plugin
