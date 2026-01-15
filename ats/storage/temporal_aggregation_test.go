@@ -220,10 +220,10 @@ func formatDuration(seconds float64) string {
 // Expected: CA1_PYRAMIDAL_N042 (1.5s) and CA3_PYRAMIDAL_N001 (2.1s) match
 //           CA1_PYRAMIDAL_N043 (0.8s) does NOT match
 func TestTemporalAggregation_SimpleSum(t *testing.T) {
-	t.Skip("Phase 1: Basic aggregation - implement buildOverComparisonFilter with GROUP BY SUM")
+	// t.Skip("Phase 1: Basic aggregation - implement buildOverComparisonFilter with GROUP BY SUM")
 
 	db := setupNeuralActivityTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.0s
 	filter := types.AxFilter{
@@ -348,10 +348,10 @@ func setupTemporalFilteringTestDB(t *testing.T) *sql.DB {
 // Expected: Only N001 matches (1.3s in last hour)
 //           N042 and N043 excluded (their recent activity < 1.0s, old activity filtered out)
 func TestTemporalAggregation_WithSinceFilter(t *testing.T) {
-	t.Skip("Phase 2: Temporal filtering - implement buildMetadataTemporalFilters")
+	// t.Skip("Phase 2: Temporal filtering - implement buildMetadataTemporalFilters")
 
 	db := setupTemporalFilteringTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	now := time.Now()
 	oneHourAgo := now.Add(-1 * time.Hour)
@@ -476,7 +476,7 @@ func TestTemporalAggregation_SemanticWeightedSum(t *testing.T) {
 	t.Skip("Phase 2: Semantic matching - implement query expander with semantic weights + weighted SUM in storage")
 
 	db := setupSemanticMatchingTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.5s in "CA1 pyramidal"
 	// Note: The "in" clause would be expanded by query expander before reaching storage
@@ -616,7 +616,7 @@ func TestTemporalAggregation_CombinedTemporalAndSemantic(t *testing.T) {
 	t.Skip("Phase 2: Combined filtering - temporal + semantic weighted aggregation")
 
 	db := setupCombinedFilteringTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	now := time.Now()
 	oneHourAgo := now.Add(-1 * time.Hour)
@@ -756,7 +756,7 @@ func TestTemporalAggregation_OverlapDetection(t *testing.T) {
 	t.Skip("Phase 3: Overlap detection - implement period merging algorithm")
 
 	db := setupOverlapDetectionTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 2.0s
 	filter := types.AxFilter{
@@ -798,14 +798,13 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 	ongoingStart := attestationTime.Add(-1500 * time.Millisecond)
 
 	// Create attestation with empty end_date to simulate ongoing activity
-	ongoingMeta := map[string]string{
+	ongoingMeta := map[string]interface{}{
 		"start_time":    ongoingStart.Format(time.RFC3339),
 		"end_time":      "", // Empty = ongoing
 		"duration_s":    "1.5",
 		"activity_type": "sustained_theta",
 		"brain_region":  "hippocampus_ca1",
 	}
-	ongoingMetaJSON, _ := json.Marshal(ongoingMeta)
 
 	err := store.CreateAttestation(&types.As{
 		ID:         "n042_ongoing",
@@ -815,7 +814,7 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 		Actors:     []string{"openbci:recording"},
 		Timestamp:  attestationTime,
 		Source:     "neural_recording",
-		Attributes: string(ongoingMetaJSON),
+		Attributes: ongoingMeta,
 		CreatedAt:  attestationTime,
 	})
 	require.NoError(t, err)
@@ -825,14 +824,13 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 	completedStart := attestationTime.Add(-2 * time.Second)
 	completedEnd := attestationTime.Add(-1200 * time.Millisecond)
 
-	completedMeta := map[string]string{
+	completedMeta := map[string]interface{}{
 		"start_time":    completedStart.Format(time.RFC3339),
 		"end_time":      completedEnd.Format(time.RFC3339),
 		"duration_s":    "0.8",
 		"activity_type": "spike_burst",
 		"brain_region":  "hippocampus_ca1",
 	}
-	completedMetaJSON, _ := json.Marshal(completedMeta)
 
 	err = store.CreateAttestation(&types.As{
 		ID:         "n043_completed",
@@ -842,7 +840,7 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 		Actors:     []string{"openbci:recording"},
 		Timestamp:  attestationTime,
 		Source:     "neural_recording",
-		Attributes: string(completedMetaJSON),
+		Attributes: completedMeta,
 		CreatedAt:  attestationTime,
 	})
 	require.NoError(t, err)
@@ -851,14 +849,13 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 	// Neuron N001: Another ongoing activity with longer duration
 	longOngoingStart := attestationTime.Add(-3 * time.Second)
 
-	longOngoingMeta := map[string]string{
+	longOngoingMeta := map[string]interface{}{
 		"start_time":    longOngoingStart.Format(time.RFC3339),
 		"end_time":      "", // Empty = ongoing
 		"duration_s":    "3.0",
 		"activity_type": "persistent_firing",
 		"brain_region":  "hippocampus_ca3",
 	}
-	longOngoingMetaJSON, _ := json.Marshal(longOngoingMeta)
 
 	err = store.CreateAttestation(&types.As{
 		ID:         "n001_ongoing",
@@ -868,7 +865,7 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 		Actors:     []string{"openbci:recording"},
 		Timestamp:  attestationTime,
 		Source:     "neural_recording",
-		Attributes: string(longOngoingMetaJSON),
+		Attributes: longOngoingMeta,
 		CreatedAt:  attestationTime,
 	})
 	require.NoError(t, err)
@@ -898,7 +895,7 @@ func TestTemporalAggregation_OngoingActivity(t *testing.T) {
 	t.Skip("Phase 3: Ongoing activity - calculate duration from start_time to attestation timestamp when end_time missing")
 
 	db := setupOngoingActivityTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.0s
 	filter := types.AxFilter{
@@ -1036,7 +1033,7 @@ func TestTemporalAggregation_MultiplePredicatesAND(t *testing.T) {
 	t.Skip("Phase 2: Multiple predicates - implement AND logic combining duration aggregation with other filters")
 
 	db := setupMultiplePredicatesTestDB(t)
-	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
+	queryStore := NewSQLQueryStoreWithExpander(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.0s AND uses_neurotransmitter glutamate
 	// Note: AND logic would need to be implemented in parser/executor
