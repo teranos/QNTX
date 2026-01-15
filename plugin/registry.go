@@ -143,6 +143,7 @@ func (r *Registry) InitializeAll(ctx context.Context, services ServiceRegistry) 
 
 	if len(failedPlugins) > 0 {
 		r.logger.Warnf("Some plugins failed to initialize: %v", failedPlugins)
+		return errors.Newf("failed to initialize %d plugin(s): %v", len(failedPlugins), failedPlugins)
 	}
 
 	return nil
