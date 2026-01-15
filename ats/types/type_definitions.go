@@ -17,11 +17,13 @@ type AttestationStore interface {
 // Types are richer than single predicates - they represent semantic categories with
 // multiple identifying patterns, relationships, and behavioral rules.
 type TypeDef struct {
-	Name       string   // Type identifier (e.g., "commit", "author")
-	Label      string   // Human-readable label for UI (e.g., "Commit", "Author")
-	Color      string   // Hex color code for graph visualization (e.g., "#34495e")
-	Opacity    *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
-	Deprecated bool     // Whether this type is being phased out
+	Name             string   // Type identifier (e.g., "commit", "author")
+	Label            string   // Human-readable label for UI (e.g., "Commit", "Author")
+	Color            string   // Hex color code for graph visualization (e.g., "#34495e")
+	Opacity          *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
+	Deprecated       bool     // Whether this type is being phased out
+	RichStringFields []string // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
+	ArrayFields      []string // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
 }
 
 // RelationshipTypeDef defines a relationship type with physics and display metadata.
@@ -45,9 +47,11 @@ type RelationshipTypeDef struct {
 //
 // Attributes typically include display metadata for graph visualization:
 //   - display_color: Hex color code (e.g., "#3498db")
-//   - display_label: Human-readable label (e.g., "Job Description")
+//   - display_label: Human-readable label (e.g., "Document")
 //   - deprecated: Boolean flag for phasing out types
 //   - opacity: Float for visual emphasis (0.0-1.0)
+//   - rich_string_fields: Array of metadata field names containing rich text (e.g., ["notes", "description"])
+//   - array_fields: Array of field names that should be flattened into arrays (e.g., ["skills", "tags"])
 //
 // But can contain any JSON-serializable data relevant to the type definition.
 //
@@ -55,11 +59,13 @@ type RelationshipTypeDef struct {
 //
 //	attrs := map[string]interface{}{
 //	    "display_color": "#e67e22",
-//	    "display_label": "Job Description",
+//	    "display_label": "Document",
 //	    "deprecated": false,
 //	    "opacity": 1.0,
+//	    "rich_string_fields": []string{"content", "summary"},
+//	    "array_fields": []string{"tags", "categories"},
 //	}
-//	err := types.AttestType(store, "jd", "ix-jd", attrs)
+//	err := types.AttestType(store, "document", "ix-content", attrs)
 func AttestType(store AttestationStore, typeName, source string, attributes map[string]interface{}) error {
 	if typeName == "" {
 		return errors.New("typeName cannot be empty")
@@ -125,6 +131,16 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 			"display_label": def.Label,
 			"deprecated":    def.Deprecated,
 			"opacity":       opacity,
+		}
+
+		// Include rich_string_fields if specified
+		if len(def.RichStringFields) > 0 {
+			attrs["rich_string_fields"] = def.RichStringFields
+		}
+
+		// Include array_fields if specified
+		if len(def.ArrayFields) > 0 {
+			attrs["array_fields"] = def.ArrayFields
 		}
 
 		if err := AttestType(store, def.Name, source, attrs); err != nil {

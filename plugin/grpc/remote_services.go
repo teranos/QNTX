@@ -24,6 +24,7 @@ type RemoteServiceRegistry struct {
 	logger           *zap.SugaredLogger
 	atsStoreClient   ats.AttestationStore // Lazy-initialized gRPC client
 	queueClient      plugin.QueueService  // Lazy-initialized gRPC client
+	pluginRef        plugin.DomainPlugin  // Reference to plugin for metadata lookup
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
@@ -33,6 +34,7 @@ func NewRemoteServiceRegistry(
 	authToken string,
 	config map[string]string,
 	logger *zap.SugaredLogger,
+	pluginRef plugin.DomainPlugin,
 ) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
 		atsStoreEndpoint: atsStoreEndpoint,
@@ -40,6 +42,7 @@ func NewRemoteServiceRegistry(
 		authToken:        authToken,
 		config:           config,
 		logger:           logger,
+		pluginRef:        pluginRef,
 	}
 }
 
@@ -52,9 +55,18 @@ func (r *RemoteServiceRegistry) Database() *sql.DB {
 	return nil
 }
 
-// Logger returns a logger for the specified domain.
+// Logger returns a logger for the specified domain with version information.
 func (r *RemoteServiceRegistry) Logger(domain string) *zap.SugaredLogger {
-	return r.logger.Named(domain)
+	// Look up plugin metadata to include version in logger name
+	loggerName := domain
+	if r.pluginRef != nil {
+		metadata := r.pluginRef.Metadata()
+		if metadata.Version != "" {
+			// Format as: domain v0.4.3
+			loggerName = domain + " v" + metadata.Version
+		}
+	}
+	return r.logger.Named(loggerName)
 }
 
 // Config returns plugin-specific configuration.
