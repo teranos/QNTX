@@ -37,8 +37,8 @@ Async job status update
 
 | Field | Description |
 |-------|-------------|
-| job | Job object with status, progress, etc. |
 | metadata | Additional metadata about the update |
+| job | Job object with status, progress, etc. |
 
 #### `daemon_status`
 
@@ -46,9 +46,9 @@ Pulse daemon status broadcast
 
 | Field | Description |
 |-------|-------------|
-| load_percent | Current load percentage |
 | running | Whether daemon is running |
 | active_jobs | Number of active jobs |
+| load_percent | Current load percentage |
 
 #### `usage_update`
 
@@ -66,9 +66,9 @@ Streaming LLM response chunks
 
 | Field | Description |
 |-------|-------------|
-| done | Whether streaming is complete |
 | job_id | Associated job ID |
 | content | Text content chunk |
+| done | Whether streaming is complete |
 
 #### `plugin_health`
 
@@ -76,9 +76,9 @@ Plugin health status update
 
 | Field | Description |
 |-------|-------------|
+| state | Plugin state (running/paused) |
 | name | Plugin name |
 | healthy | Health status |
-| state | Plugin state (running/paused) |
 
 ## Type References
 
