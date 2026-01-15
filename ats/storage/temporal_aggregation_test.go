@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/teranos/QNTX/ats"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"github.com/teranos/QNTX/ats/types"
 )
@@ -26,6 +27,29 @@ import (
 // Use case: "Find neurons with >1.0s total activity in CA1 region in last 2 hours"
 // Query: ax activity_duration_s over 1.0s in "CA1 pyramidal" since last 2h
 // ==============================================================================
+
+// mockNeuralQueryExpander provides neural domain-specific predicates for testing
+type mockNeuralQueryExpander struct{}
+
+func (m *mockNeuralQueryExpander) ExpandPredicate(predicate string, values []string) []ats.PredicateExpansion {
+	// Simple passthrough for testing
+	var expansions []ats.PredicateExpansion
+	for _, value := range values {
+		expansions = append(expansions, ats.PredicateExpansion{
+			Predicate: predicate,
+			Context:   value,
+		})
+	}
+	return expansions
+}
+
+func (m *mockNeuralQueryExpander) GetNumericPredicates() []string {
+	return []string{"activity_duration_s"}
+}
+
+func (m *mockNeuralQueryExpander) GetNaturalLanguagePredicates() []string {
+	return []string{}
+}
 
 // setupNeuralActivityTestDB creates test database with neural activity attestations
 func setupNeuralActivityTestDB(t *testing.T) *sql.DB {
@@ -158,24 +182,23 @@ type neuralActivity struct {
 }
 
 func createActivityAttestation(t *testing.T, store *SQLStore, activity *neuralActivity) {
-	metadata := map[string]string{
+	metadata := map[string]interface{}{
 		"start_time":    activity.startTime.Format(time.RFC3339),
 		"end_time":      activity.endTime.Format(time.RFC3339),
-		"duration_s":    formatDuration(activity.durationS),
+		"duration_s":    fmt.Sprintf("%.1f", activity.durationS),
 		"activity_type": activity.activityType,
 		"brain_region":  activity.region,
 	}
-	metaJSON, _ := json.Marshal(metadata)
 
 	err := store.CreateAttestation(&types.As{
 		ID:         activity.activityID,
 		Subjects:   []string{activity.neuronID},
 		Predicates: []string{"activity_duration_s"},
-		Contexts:   []string{formatDuration(activity.durationS)},
+		Contexts:   []string{fmt.Sprintf("%.1f", activity.durationS)},
 		Actors:     []string{"openbci:recording"},
 		Timestamp:  activity.attestedAt,
 		Source:     "neural_recording",
-		Attributes: string(metaJSON),
+		Attributes: metadata,
 		CreatedAt:  activity.attestedAt,
 	})
 	require.NoError(t, err)
@@ -200,7 +223,7 @@ func TestTemporalAggregation_SimpleSum(t *testing.T) {
 	t.Skip("Phase 1: Basic aggregation - implement buildOverComparisonFilter with GROUP BY SUM")
 
 	db := setupNeuralActivityTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.0s
 	filter := types.AxFilter{
@@ -211,7 +234,7 @@ func TestTemporalAggregation_SimpleSum(t *testing.T) {
 		},
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should return activity attestations for neurons with total >= 1.0s
@@ -328,7 +351,7 @@ func TestTemporalAggregation_WithSinceFilter(t *testing.T) {
 	t.Skip("Phase 2: Temporal filtering - implement buildMetadataTemporalFilters")
 
 	db := setupTemporalFilteringTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	now := time.Now()
 	oneHourAgo := now.Add(-1 * time.Hour)
@@ -343,7 +366,7 @@ func TestTemporalAggregation_WithSinceFilter(t *testing.T) {
 		TimeStart: &oneHourAgo, // Filter by start_time >= 1 hour ago
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should only return N001's 2 recent attestations
@@ -453,7 +476,7 @@ func TestTemporalAggregation_SemanticWeightedSum(t *testing.T) {
 	t.Skip("Phase 2: Semantic matching - implement query expander with semantic weights + weighted SUM in storage")
 
 	db := setupSemanticMatchingTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.5s in "CA1 pyramidal"
 	// Note: The "in" clause would be expanded by query expander before reaching storage
@@ -473,7 +496,7 @@ func TestTemporalAggregation_SemanticWeightedSum(t *testing.T) {
 		// },
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should return attestations for neurons that contribute to weighted sum >= 1.5s
@@ -593,7 +616,7 @@ func TestTemporalAggregation_CombinedTemporalAndSemantic(t *testing.T) {
 	t.Skip("Phase 2: Combined filtering - temporal + semantic weighted aggregation")
 
 	db := setupCombinedFilteringTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	now := time.Now()
 	oneHourAgo := now.Add(-1 * time.Hour)
@@ -614,7 +637,7 @@ func TestTemporalAggregation_CombinedTemporalAndSemantic(t *testing.T) {
 		// },
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should return NO results because weighted sum of recent activity (0.98s) < threshold (1.0s)
@@ -733,7 +756,7 @@ func TestTemporalAggregation_OverlapDetection(t *testing.T) {
 	t.Skip("Phase 3: Overlap detection - implement period merging algorithm")
 
 	db := setupOverlapDetectionTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 2.0s
 	filter := types.AxFilter{
@@ -744,7 +767,7 @@ func TestTemporalAggregation_OverlapDetection(t *testing.T) {
 		},
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should return only N042's 3 attestations (merged duration 2.3s >= 2.0s)
@@ -875,7 +898,7 @@ func TestTemporalAggregation_OngoingActivity(t *testing.T) {
 	t.Skip("Phase 3: Ongoing activity - calculate duration from start_time to attestation timestamp when end_time missing")
 
 	db := setupOngoingActivityTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.0s
 	filter := types.AxFilter{
@@ -886,7 +909,7 @@ func TestTemporalAggregation_OngoingActivity(t *testing.T) {
 		},
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should return N042 (1.5s) and N001 (3.0s)
@@ -1013,7 +1036,7 @@ func TestTemporalAggregation_MultiplePredicatesAND(t *testing.T) {
 	t.Skip("Phase 2: Multiple predicates - implement AND logic combining duration aggregation with other filters")
 
 	db := setupMultiplePredicatesTestDB(t)
-	store := NewSQLStore(db, nil)
+	queryStore := NewSQLQueryStore(db, &mockNeuralQueryExpander{})
 
 	// Query: ax activity_duration_s over 1.0s AND uses_neurotransmitter glutamate
 	// Note: AND logic would need to be implemented in parser/executor
@@ -1030,7 +1053,7 @@ func TestTemporalAggregation_MultiplePredicatesAND(t *testing.T) {
 		// },
 	}
 
-	results, err := store.ExecuteAxQuery(context.Background(), filter)
+	results, err := queryStore.ExecuteAxQuery(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should only return N042's attestations (both activity and neurotransmitter)

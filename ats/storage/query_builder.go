@@ -127,15 +127,10 @@ func (qb *queryBuilder) buildNaturalLanguageFilter(expander ats.QueryExpander, f
 }
 
 // buildOverComparisonFilter handles numeric comparison queries (OVER duration)
-func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, overComparison *types.OverFilter, hasOtherClauses bool) {
+// Supports temporal aggregation: sums duration values across multiple attestations per subject
+func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, overComparison *types.OverFilter, hasOtherClauses bool, filter types.AxFilter) {
 	if overComparison == nil {
 		return
-	}
-
-	// Convert threshold to years
-	threshold := overComparison.Value
-	if overComparison.Unit == "m" {
-		threshold = overComparison.Value / 12.0
 	}
 
 	// Get numeric predicates from query expander (domain-specific)
@@ -144,11 +139,97 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		return
 	}
 
+	// Check if this is a duration aggregation predicate (ends with _duration_months or _duration_s)
+	isDurationAggregation := false
+	for _, pred := range numericPredicates {
+		if strings.HasSuffix(pred, "_duration_months") || strings.HasSuffix(pred, "_duration_s") {
+			isDurationAggregation = true
+			break
+		}
+	}
+
+	if !isDurationAggregation {
+		// Legacy behavior: single-value comparison for non-duration predicates
+		qb.buildLegacyOverComparison(numericPredicates, overComparison, hasOtherClauses)
+		return
+	}
+
+	// Temporal aggregation: SUM durations across multiple attestations per subject
+	// Determine threshold in the appropriate unit
+	var threshold float64
+	var durationField string
+
+	// Check which duration type we're working with
+	usesSeconds := false
+	for _, pred := range numericPredicates {
+		if strings.HasSuffix(pred, "_duration_s") {
+			usesSeconds = true
+			break
+		}
+	}
+
+	if usesSeconds {
+		// Duration in seconds
+		durationField = "duration_s"
+		threshold = overComparison.Value
+		if overComparison.Unit == "m" {
+			threshold = overComparison.Value * 60.0 // minutes to seconds
+		} else if overComparison.Unit == "h" {
+			threshold = overComparison.Value * 3600.0 // hours to seconds
+		}
+	} else {
+		// Duration in months (default)
+		durationField = "duration_months"
+		threshold = overComparison.Value * 12.0 // years to months
+		if overComparison.Unit == "m" {
+			threshold = overComparison.Value // already in months
+		}
+	}
+
+	// Build predicate conditions for subquery
+	predicateConditions := make([]string, len(numericPredicates))
+	for i, pred := range numericPredicates {
+		predicateConditions[i] = "json_extract(predicates, '$[0]') = ?"
+		qb.args = append(qb.args, pred)
+	}
+
+	// Build temporal filter for subquery if present
+	temporalFilter := ""
+	if filter.TimeStart != nil {
+		temporalFilter = " AND json_extract(attributes, '$.start_time') >= ?"
+		qb.args = append(qb.args, filter.TimeStart.Format("2006-01-02"))
+	}
+	if filter.TimeEnd != nil {
+		temporalFilter += " AND json_extract(attributes, '$.start_time') <= ?"
+		qb.args = append(qb.args, filter.TimeEnd.Format("2006-01-02"))
+	}
+
+	// Aggregation subquery: GROUP BY subject, SUM durations, filter by threshold
+	aggregationSubquery := fmt.Sprintf(`
+		SELECT json_extract(subjects, '$[0]') as subject_id
+		FROM attestations
+		WHERE (%s)%s
+		GROUP BY json_extract(subjects, '$[0]')
+		HAVING SUM(CAST(json_extract(attributes, '$.%s') AS REAL)) >= ?
+	`, strings.Join(predicateConditions, " OR "), temporalFilter, durationField)
+
+	// Add as subject filter
+	qb.whereClauses = append(qb.whereClauses, "json_extract(subjects, '$[0]') IN ("+aggregationSubquery+")")
+	qb.args = append(qb.args, threshold)
+}
+
+// buildLegacyOverComparison handles single-value numeric comparisons (non-aggregation)
+func (qb *queryBuilder) buildLegacyOverComparison(numericPredicates []string, overComparison *types.OverFilter, hasOtherClauses bool) {
+	// Convert threshold to years
+	threshold := overComparison.Value
+	if overComparison.Unit == "m" {
+		threshold = overComparison.Value / 12.0
+	}
+
 	if hasOtherClauses {
 		// Combined query: Use subquery to find subjects with numeric values >= threshold
 		predicateConditions := make([]string, len(numericPredicates))
 		for i, pred := range numericPredicates {
-			// Use parameterized query to prevent SQL injection
 			predicateConditions[i] = "json_extract(predicates, '$[0]') = ?"
 			qb.args = append(qb.args, pred)
 		}
@@ -160,7 +241,6 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 			AND CAST(json_extract(contexts, '$[0]') AS REAL) >= ?
 		`, strings.Join(predicateConditions, " OR "))
 
-		// Add as an additional condition
 		numericCondition := "json_extract(subjects, '$[0]') IN (" + numericSubquery + ")"
 		qb.whereClauses = append(qb.whereClauses, numericCondition)
 		qb.args = append(qb.args, threshold)
@@ -168,7 +248,6 @@ func (qb *queryBuilder) buildOverComparisonFilter(expander ats.QueryExpander, ov
 		// Pure OVER query: Filter directly by numeric predicates
 		predicateConditions := make([]string, len(numericPredicates))
 		for i, pred := range numericPredicates {
-			// Use parameterized query to prevent SQL injection
 			predicateConditions[i] = "(json_extract(predicates, '$[0]') = ? AND CAST(json_extract(contexts, '$[0]') AS REAL) >= ?)"
 			qb.args = append(qb.args, pred)
 			qb.args = append(qb.args, threshold)
@@ -187,5 +266,23 @@ func (qb *queryBuilder) buildTemporalFilters(filter types.AxFilter) {
 	// TimeEnd is inclusive (<=) to include items up to and including the end time
 	if filter.TimeEnd != nil {
 		qb.addClause("timestamp <= ?", filter.TimeEnd)
+	}
+}
+
+// buildMetadataTemporalFilters adds temporal filters based on metadata fields (start_time/end_time)
+// This filters activities by when they occurred, not when attestations were created.
+// Used for temporal aggregation queries like "since last 10 years" on experience/activity data.
+func (qb *queryBuilder) buildMetadataTemporalFilters(filter types.AxFilter) {
+	// Filter by start_time in attributes metadata (when activity/experience began)
+	if filter.TimeStart != nil {
+		// Format: ISO 8601 date comparison in JSON
+		timeStr := filter.TimeStart.Format("2006-01-02")
+		qb.addClause("json_extract(attributes, '$.start_time') >= ?", timeStr)
+	}
+
+	// Filter by start_time for end boundary (activities that started before this time)
+	if filter.TimeEnd != nil {
+		timeStr := filter.TimeEnd.Format("2006-01-02")
+		qb.addClause("json_extract(attributes, '$.start_time') <= ?", timeStr)
 	}
 }

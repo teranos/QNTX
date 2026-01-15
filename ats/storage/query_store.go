@@ -123,11 +123,16 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	// Add actor filter
 	qb.buildActorFilter(filter.Actors)
 
-	// Add numeric comparison filter (OVER)
-	qb.buildOverComparisonFilter(s.queryExpander, filter.OverComparison, len(qb.whereClauses) > 0)
+	// Add numeric comparison filter (OVER) - now with temporal aggregation support
+	qb.buildOverComparisonFilter(s.queryExpander, filter.OverComparison, len(qb.whereClauses) > 0, filter)
 
-	// Add temporal filters
+	// Add temporal filters (attestation timestamp)
 	qb.buildTemporalFilters(filter)
+
+	// Note: Metadata temporal filters (start_time/end_time) are now handled
+	// within buildOverComparisonFilter for duration aggregation queries.
+	// This prevents double-filtering and ensures temporal constraints are
+	// applied during the aggregation GROUP BY, not after.
 
 	// Build full query
 	query := AttestationSelectQuery
