@@ -63,7 +63,7 @@ type QNTXServer struct {
 
 	// Plugin HTTP routing (lazy initialization for async plugin loading)
 	pluginMuxes   sync.Map // map[string]*http.ServeMux - plugin name -> dedicated mux
-	pluginMuxInit sync.Map // map[string]bool - tracks which plugins have initialized their mux
+	pluginMuxInit sync.Map // map[string]*sync.Once - ensures thread-safe one-time initialization per plugin
 
 	// Lifecycle management (defensive programming)
 	ctx            context.Context    // Cancellation context for graceful shutdown
