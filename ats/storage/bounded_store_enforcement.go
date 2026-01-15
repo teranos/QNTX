@@ -94,13 +94,40 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 	// If over limit, delete oldest ones
 	if count > limit {
 		deleteCount := count - limit
+
+		// Collect sample data before deletion
+		evictionDetails := &EvictionDetails{
+			SamplePredicates: make([]string, 0),
+			SampleSubjects:   make([]string, 0),
+		}
+		sampleRows, _ := bs.db.Query(
+			`SELECT predicates, subjects, timestamp FROM attestations, json_each(actors) as a, json_each(contexts) as c
+			WHERE a.value = ? AND c.value = ?
+			ORDER BY timestamp ASC
+			LIMIT 3`,
+			actor, context,
+		)
+		if sampleRows != nil {
+			for sampleRows.Next() {
+				var predJSON, subjJSON, timestamp string
+				if err := sampleRows.Scan(&predJSON, &subjJSON, &timestamp); err == nil {
+					evictionDetails.SamplePredicates = append(evictionDetails.SamplePredicates, predJSON)
+					evictionDetails.SampleSubjects = append(evictionDetails.SampleSubjects, subjJSON)
+					if evictionDetails.LastSeen == "" || timestamp > evictionDetails.LastSeen {
+						evictionDetails.LastSeen = timestamp
+					}
+				}
+			}
+			sampleRows.Close()
+		}
+
 		_, err = bs.db.Exec(AttestationDeleteOldestByActorContextQuery, actor, context, deleteCount)
 		if err != nil {
 			return fmt.Errorf("failed to delete old attestations: %w", err)
 		}
 
-		// Log enforcement event for observability
-		bs.logStorageEvent("actor_context_limit", actor, context, "", deleteCount, limit)
+		// Log enforcement event with details
+		bs.logStorageEventWithDetails("actor_context_limit", actor, context, "", deleteCount, limit, evictionDetails)
 	}
 
 	return nil
@@ -141,7 +168,42 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 		contextsToDelete := contexts[:len(contexts)-limit] // Keep most used (at end)
 		totalDeleted := 0
 
+		// Collect eviction details
+		evictionDetails := &EvictionDetails{
+			EvictedContexts:  make([]string, 0, len(contextsToDelete)),
+			SamplePredicates: make([]string, 0),
+			SampleSubjects:   make([]string, 0),
+		}
+
 		for _, cu := range contextsToDelete {
+			evictionDetails.EvictedContexts = append(evictionDetails.EvictedContexts, cu.contextArray)
+
+			// Collect sample data from first context being evicted
+			if len(evictionDetails.SamplePredicates) == 0 {
+				sampleRows, _ := bs.db.Query(
+					`SELECT predicates, subjects, timestamp FROM attestations
+					WHERE EXISTS (
+						SELECT 1 FROM json_each(attestations.actors)
+						WHERE value = ?
+					) AND contexts = ?
+					LIMIT 3`,
+					actor, cu.contextArray,
+				)
+				if sampleRows != nil {
+					for sampleRows.Next() {
+						var predJSON, subjJSON, timestamp string
+						if err := sampleRows.Scan(&predJSON, &subjJSON, &timestamp); err == nil {
+							evictionDetails.SamplePredicates = append(evictionDetails.SamplePredicates, predJSON)
+							evictionDetails.SampleSubjects = append(evictionDetails.SampleSubjects, subjJSON)
+							if evictionDetails.LastSeen == "" || timestamp > evictionDetails.LastSeen {
+								evictionDetails.LastSeen = timestamp
+							}
+						}
+					}
+					sampleRows.Close()
+				}
+			}
+
 			// Delete all attestations with this context array
 			result, err := bs.db.Exec(
 				`DELETE FROM attestations
@@ -161,9 +223,9 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 			}
 		}
 
-		// Log enforcement event for observability
+		// Log enforcement event with details
 		if totalDeleted > 0 {
-			bs.logStorageEvent("actor_contexts_limit", actor, "", "", totalDeleted, limit)
+			bs.logStorageEventWithDetails("actor_contexts_limit", actor, "", "", totalDeleted, limit, evictionDetails)
 		}
 	}
 
@@ -205,7 +267,44 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 		actorsToDelete := actors[:len(actors)-limit] // Keep most recent (at end)
 		totalDeleted := 0
 
+		// Collect eviction details for all actors being evicted
+		evictionDetails := &EvictionDetails{
+			EvictedActors:    make([]string, 0, len(actorsToDelete)),
+			SamplePredicates: make([]string, 0),
+			SampleSubjects:   make([]string, 0),
+		}
+
 		for _, ai := range actorsToDelete {
+			evictionDetails.EvictedActors = append(evictionDetails.EvictedActors, ai.actor)
+			if evictionDetails.LastSeen == "" || ai.lastSeen > evictionDetails.LastSeen {
+				evictionDetails.LastSeen = ai.lastSeen
+			}
+
+			// Collect sample data from attestations being evicted (first actor only, to limit output)
+			if len(evictionDetails.SamplePredicates) == 0 {
+				sampleRows, _ := bs.db.Query(
+					`SELECT predicates, subjects FROM attestations
+					WHERE EXISTS (
+						SELECT 1 FROM json_each(attestations.actors)
+						WHERE value = ?
+					) AND EXISTS (
+						SELECT 1 FROM json_each(attestations.subjects)
+						WHERE value = ?
+					) LIMIT 3`,
+					ai.actor, entity,
+				)
+				if sampleRows != nil {
+					for sampleRows.Next() {
+						var predJSON, subjJSON string
+						if err := sampleRows.Scan(&predJSON, &subjJSON); err == nil {
+							evictionDetails.SamplePredicates = append(evictionDetails.SamplePredicates, predJSON)
+							evictionDetails.SampleSubjects = append(evictionDetails.SampleSubjects, subjJSON)
+						}
+					}
+					sampleRows.Close()
+				}
+			}
+
 			// Delete all attestations by this actor that mention this entity
 			result, err := bs.db.Exec(
 				`DELETE FROM attestations
@@ -228,9 +327,9 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 			}
 		}
 
-		// Log enforcement event for observability
+		// Log enforcement event with detailed eviction data
 		if totalDeleted > 0 {
-			bs.logStorageEvent("entity_actors_limit", "", "", entity, totalDeleted, limit)
+			bs.logStorageEventWithDetails("entity_actors_limit", "", "", entity, totalDeleted, limit, evictionDetails)
 		}
 	}
 

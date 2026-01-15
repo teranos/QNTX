@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -60,7 +61,7 @@ func (p *StorageEventsPoller) Start(ctx context.Context) {
 func (p *StorageEventsPoller) pollEvents() {
 	// Query for new events since last poll
 	rows, err := p.db.Query(`
-		SELECT id, event_type, actor, context, entity, deletions_count, limit_value, timestamp
+		SELECT id, event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details
 		FROM storage_events
 		WHERE id > ?
 		ORDER BY id ASC
@@ -74,17 +75,18 @@ func (p *StorageEventsPoller) pollEvents() {
 	eventsProcessed := 0
 	for rows.Next() {
 		var (
-			id             int64
-			eventType      string
-			actor          sql.NullString
-			context        sql.NullString
-			entity         sql.NullString
-			deletionsCount int
-			limitValue     sql.NullInt64
-			timestamp      string
+			id              int64
+			eventType       string
+			actor           sql.NullString
+			context         sql.NullString
+			entity          sql.NullString
+			deletionsCount  int
+			limitValue      sql.NullInt64
+			timestamp       string
+			evictionDetails sql.NullString
 		)
 
-		if err := rows.Scan(&id, &eventType, &actor, &context, &entity, &deletionsCount, &limitValue, &timestamp); err != nil {
+		if err := rows.Scan(&id, &eventType, &actor, &context, &entity, &deletionsCount, &limitValue, &timestamp, &evictionDetails); err != nil {
 			p.logger.Warnw("Failed to scan storage event", "error", err)
 			continue
 		}
@@ -102,7 +104,7 @@ func (p *StorageEventsPoller) pollEvents() {
 				// Fallback to defaults for old events
 				limit = getDefaultLimit(eventType)
 			}
-			p.broadcastEviction(eventType, actor.String, context.String, entity.String, deletionsCount, limit)
+			p.broadcastEviction(eventType, actor.String, context.String, entity.String, deletionsCount, limit, evictionDetails.String)
 		}
 
 		// Update last processed ID
@@ -116,7 +118,15 @@ func (p *StorageEventsPoller) pollEvents() {
 }
 
 // broadcastEviction sends an eviction notification to WebSocket clients
-func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entity string, deletionsCount, limit int) {
+func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entity string, deletionsCount, limit int, evictionDetailsJSON string) {
+	// Parse eviction details if available
+	var detailsMap map[string]interface{}
+	if evictionDetailsJSON != "" {
+		if err := json.Unmarshal([]byte(evictionDetailsJSON), &detailsMap); err == nil {
+			// Successfully parsed details
+		}
+	}
+
 	// Format message based on event type
 	var message string
 	switch eventType {
@@ -130,12 +140,19 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		message = fmt.Sprintf("Evicted %d attestations (%s)", deletionsCount, eventType)
 	}
 
-	logger.AddDBSymbol(p.logger).Infow("Storage eviction",
+	// Build log fields with eviction details
+	logFields := []interface{}{
 		"event_type", eventType,
 		"actor", actor,
 		"context", context,
+		"entity", entity,
 		"deletions_count", deletionsCount,
-	)
+	}
+	if detailsMap != nil {
+		logFields = append(logFields, "eviction_details", detailsMap)
+	}
+
+	logger.AddDBSymbol(p.logger).Infow("Storage eviction", logFields...)
 
 	// Broadcast as storage_eviction message
 	msg := map[string]interface{}{
@@ -146,6 +163,9 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 		"entity":          entity,
 		"deletions_count": deletionsCount,
 		"message":         message,
+	}
+	if detailsMap != nil {
+		msg["eviction_details"] = detailsMap
 	}
 
 	p.server.broadcastMessage(msg)

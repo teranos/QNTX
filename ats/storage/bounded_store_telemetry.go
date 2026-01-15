@@ -1,15 +1,40 @@
 package storage
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+// EvictionDetails contains detailed information about what was evicted
+type EvictionDetails struct {
+	EvictedActors     []string `json:"evicted_actors,omitempty"`
+	EvictedContexts   []string `json:"evicted_contexts,omitempty"`
+	SamplePredicates  []string `json:"sample_predicates,omitempty"`
+	SampleSubjects    []string `json:"sample_subjects,omitempty"`
+	LastSeen          string   `json:"last_seen,omitempty"`
+}
 
 // logStorageEvent records a bounded storage enforcement event for observability
 func (bs *BoundedStore) logStorageEvent(eventType, actor, context, entity string, deletionsCount, limitValue int) {
+	bs.logStorageEventWithDetails(eventType, actor, context, entity, deletionsCount, limitValue, nil)
+}
+
+// logStorageEventWithDetails records a storage event with detailed eviction information
+func (bs *BoundedStore) logStorageEventWithDetails(eventType, actor, context, entity string, deletionsCount, limitValue int, details *EvictionDetails) {
 	timestamp := time.Now().Format(time.RFC3339)
+
+	// Serialize details to JSON if provided
+	var detailsJSON interface{} = nil
+	if details != nil {
+		if jsonBytes, err := json.Marshal(details); err == nil {
+			detailsJSON = string(jsonBytes)
+		}
+	}
 
 	// Log to database for historical tracking
 	_, err := bs.db.Exec(`
-		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, limit_value, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO storage_events (event_type, actor, context, entity, deletions_count, limit_value, timestamp, eviction_details)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		eventType,
 		nullIfEmpty(actor),
 		nullIfEmpty(context),
@@ -17,6 +42,7 @@ func (bs *BoundedStore) logStorageEvent(eventType, actor, context, entity string
 		deletionsCount,
 		limitValue,
 		timestamp,
+		detailsJSON,
 	)
 	if err != nil {
 		// Don't fail the operation if logging fails, but warn
