@@ -10,6 +10,7 @@ import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
+import { boundedStorageWindow } from './bounded-storage-window.ts';
 
 interface StatusIndicator {
     id: string;
@@ -22,6 +23,8 @@ interface StatusIndicator {
 class StatusIndicatorManager {
     private container: HTMLElement | null = null;
     private indicators: Map<string, HTMLElement> = new Map();
+    private currentAttestationCount: number = 0;
+    private evictionUnsubscribe: (() => void) | null = null;
 
     /**
      * Initialize the status indicator system
@@ -149,8 +152,13 @@ class StatusIndicatorManager {
             id: 'database',
             label: `${DB} Loading...`,
             clickable: true,
-            onClick: () => this.showDatabaseInfo(),
+            onClick: () => this.handleDatabaseIndicatorClick(),
             initialState: 'active'
+        });
+
+        // Subscribe to eviction updates to refresh display
+        this.evictionUnsubscribe = boundedStorageWindow.onEvictionUpdate(() => {
+            this.updateDatabaseIndicatorLabel();
         });
     }
 
@@ -278,8 +286,61 @@ class StatusIndicatorManager {
      * Handle database stats update
      */
     handleDatabaseStats(count: number): void {
+        this.currentAttestationCount = count;
+        this.updateDatabaseIndicatorLabel();
+    }
+
+    /**
+     * Update the database indicator label with current count and eviction stats
+     */
+    private updateDatabaseIndicatorLabel(): void {
+        const count = this.currentAttestationCount;
+        const weeklyEvicted = boundedStorageWindow.getWeeklyEvictedAttestations();
+
+        // Format main count
         const formatted = count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count.toString();
-        this.updateIndicator('database', 'active', `${DB} ${formatted}`);
+
+        // Build label: "⊔ 1.2k" or "⊔ 1.2k (-15)" if evictions
+        let label = `${DB} ${formatted}`;
+        if (weeklyEvicted > 0) {
+            const evictedFormatted = weeklyEvicted >= 1000
+                ? `${(weeklyEvicted / 1000).toFixed(1)}k`
+                : weeklyEvicted.toString();
+            label += ` (-${evictedFormatted})`;
+        }
+
+        // Update indicator state based on evictions
+        const state = weeklyEvicted > 0 ? 'evicting' : 'active';
+        this.updateIndicator('database', state, label);
+
+        // Update tooltip
+        const indicator = this.indicators.get('database');
+        if (indicator) {
+            let tooltip = `${count.toLocaleString()} attestations`;
+            if (weeklyEvicted > 0) {
+                tooltip += `\n${weeklyEvicted.toLocaleString()} evicted this week`;
+                tooltip += '\nClick to view bounded storage details';
+            } else {
+                tooltip += '\nClick to view database stats';
+            }
+            indicator.title = tooltip;
+        }
+    }
+
+    /**
+     * Handle click on database indicator
+     * Opens bounded storage window if there are evictions, otherwise database stats
+     */
+    private async handleDatabaseIndicatorClick(): Promise<void> {
+        const weeklyEvicted = boundedStorageWindow.getWeeklyEvictedAttestations();
+
+        if (weeklyEvicted > 0 || boundedStorageWindow.hasActiveIssues()) {
+            // Show bounded storage window when there are evictions or active issues
+            boundedStorageWindow.toggle();
+        } else {
+            // Show regular database stats otherwise
+            await this.showDatabaseInfo();
+        }
     }
 }
 

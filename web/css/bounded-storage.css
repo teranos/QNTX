@@ -1,0 +1,325 @@
+/**
+ * Bounded Storage Window and Indicator Styles
+ */
+
+/* ============================================================================
+ * Status Indicator
+ * ============================================================================ */
+
+.bounded-storage-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.15s ease;
+}
+
+.bounded-storage-indicator:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.bounded-storage-indicator:focus-visible {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+}
+
+.bounded-storage-indicator-icon {
+    font-size: 14px;
+}
+
+/* Status colors */
+.bounded-storage-indicator[data-status="healthy"] {
+    color: #2d7d46;
+}
+
+.bounded-storage-indicator[data-status="warning"] {
+    color: #b76e00;
+    background: rgba(183, 110, 0, 0.1);
+}
+
+.bounded-storage-indicator[data-status="critical"] {
+    color: #c53030;
+    background: rgba(197, 48, 48, 0.1);
+    animation: bounded-storage-pulse 2s ease-in-out infinite;
+}
+
+@keyframes bounded-storage-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* ============================================================================
+ * Window Content
+ * ============================================================================ */
+
+.bounded-storage-content {
+    padding: 12px;
+}
+
+/* Summary bar */
+.bounded-storage-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-weight: 500;
+}
+
+.bounded-storage-healthy {
+    background: #d4edda;
+    color: #155724;
+}
+
+.bounded-storage-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.bounded-storage-critical {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.bounded-storage-status-icon {
+    font-size: 16px;
+}
+
+/* Sections */
+.bounded-storage-section {
+    margin-bottom: 16px;
+}
+
+.bounded-storage-section:last-child {
+    margin-bottom: 0;
+}
+
+.bounded-storage-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #eee;
+}
+
+.bounded-storage-empty {
+    color: #888;
+    font-size: 13px;
+    font-style: italic;
+    margin: 8px 0;
+}
+
+/* Bucket list */
+.bounded-storage-buckets {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.bounded-storage-bucket {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.bounded-storage-bucket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.bounded-storage-bucket-name {
+    font-family: monospace;
+    font-size: 12px;
+    color: #333;
+}
+
+.bounded-storage-bucket-count {
+    font-size: 12px;
+    color: #666;
+}
+
+.bounded-storage-bucket-bar {
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.bounded-storage-bucket-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.bounded-storage-fill-healthy {
+    background: linear-gradient(90deg, #38a169, #48bb78);
+}
+
+.bounded-storage-fill-warning {
+    background: linear-gradient(90deg, #d69e2e, #ecc94b);
+}
+
+.bounded-storage-fill-critical {
+    background: linear-gradient(90deg, #e53e3e, #fc8181);
+}
+
+.bounded-storage-bucket-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #666;
+}
+
+.bounded-storage-bucket-time {
+    cursor: help;
+}
+
+/* Eviction list */
+.bounded-storage-evictions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.bounded-storage-eviction {
+    padding: 8px;
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.bounded-storage-eviction-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.bounded-storage-eviction-icon {
+    color: #e53e3e;
+}
+
+.bounded-storage-eviction-count {
+    flex: 1;
+    font-weight: 500;
+    color: #c53030;
+}
+
+.bounded-storage-eviction-type {
+    font-size: 10px;
+    font-weight: 600;
+    background: #e9ecef;
+    color: #495057;
+    padding: 1px 4px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    cursor: help;
+}
+
+.bounded-storage-eviction-time {
+    color: #888;
+}
+
+.bounded-storage-eviction-detail {
+    font-family: monospace;
+    color: #666;
+    padding-left: 18px;
+}
+
+.bounded-storage-more {
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+    margin: 8px 0 0 0;
+}
+
+/* ============================================================================
+ * Weekly Eviction Chart
+ * ============================================================================ */
+
+.bounded-storage-chart {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.bounded-storage-chart-bars {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 60px;
+    gap: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.bounded-storage-chart-bar-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    cursor: help;
+}
+
+.bounded-storage-chart-bar {
+    width: 100%;
+    max-width: 32px;
+    min-height: 2px;
+    background: linear-gradient(180deg, #e53e3e 0%, #fc8181 100%);
+    border-radius: 2px 2px 0 0;
+    transition: height 0.3s ease;
+    margin-top: auto;
+}
+
+.bounded-storage-chart-bar-container:hover .bounded-storage-chart-bar {
+    background: linear-gradient(180deg, #c53030 0%, #e53e3e 100%);
+}
+
+.bounded-storage-chart-label {
+    font-size: 10px;
+    color: #666;
+    margin-top: 4px;
+    text-align: center;
+}
+
+.bounded-storage-chart-total {
+    font-size: 12px;
+    color: #c53030;
+    font-weight: 500;
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ============================================================================
+ * Status Indicator State (for database indicator)
+ * ============================================================================ */
+
+.status-indicator.database-evicting .status-text {
+    color: #c53030;
+}
+
+.status-indicator.database-evicting .status-dot {
+    background: #e53e3e;
+    animation: eviction-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes eviction-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+}

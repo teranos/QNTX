@@ -1,0 +1,390 @@
+/**
+ * Button Component Tests
+ */
+
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { Button, createButton, createPrimaryButton, createDangerButton } from './button';
+
+describe('Button', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+        container = document.createElement('div');
+        document.body.appendChild(container);
+    });
+
+    afterEach(() => {
+        container.remove();
+    });
+
+    describe('creation', () => {
+        it('creates a button element with correct attributes', () => {
+            const btn = new Button({
+                label: 'Test Button',
+                onClick: () => {}
+            });
+
+            expect(btn.element.tagName).toBe('BUTTON');
+            expect(btn.element.type).toBe('button');
+            expect(btn.element.textContent).toContain('Test Button');
+            expect(btn.element.getAttribute('aria-label')).toBe('Test Button');
+        });
+
+        it('applies variant class', () => {
+            const btn = new Button({
+                label: 'Primary',
+                onClick: () => {},
+                variant: 'primary'
+            });
+
+            expect(btn.element.classList.contains('qntx-btn-primary')).toBe(true);
+        });
+
+        it('applies size class', () => {
+            const btn = new Button({
+                label: 'Small',
+                onClick: () => {},
+                size: 'small'
+            });
+
+            expect(btn.element.classList.contains('qntx-btn-small')).toBe(true);
+        });
+
+        it('applies custom className', () => {
+            const btn = new Button({
+                label: 'Custom',
+                onClick: () => {},
+                className: 'my-custom-class'
+            });
+
+            expect(btn.element.classList.contains('my-custom-class')).toBe(true);
+        });
+
+        it('sets aria-label when provided', () => {
+            const btn = new Button({
+                label: 'Save',
+                onClick: () => {},
+                ariaLabel: 'Save document'
+            });
+
+            expect(btn.element.getAttribute('aria-label')).toBe('Save document');
+        });
+    });
+
+    describe('disabled state', () => {
+        it('starts disabled when configured', () => {
+            const btn = new Button({
+                label: 'Disabled',
+                onClick: () => {},
+                disabled: true
+            });
+
+            expect(btn.element.disabled).toBe(true);
+            expect(btn.element.getAttribute('aria-disabled')).toBe('true');
+        });
+
+        it('can be disabled after creation', () => {
+            const btn = new Button({
+                label: 'Test',
+                onClick: () => {}
+            });
+
+            btn.setDisabled(true, 'Feature not available');
+
+            expect(btn.element.disabled).toBe(true);
+            expect(btn.element.title).toBe('Feature not available');
+        });
+
+        it('can be re-enabled', () => {
+            const btn = new Button({
+                label: 'Test',
+                onClick: () => {},
+                disabled: true
+            });
+
+            btn.setDisabled(false);
+
+            expect(btn.element.disabled).toBe(false);
+        });
+
+        it('ignores clicks when disabled', async () => {
+            const onClick = mock(() => {});
+            const btn = new Button({
+                label: 'Test',
+                onClick,
+                disabled: true
+            });
+
+            btn.element.click();
+
+            expect(onClick).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('loading state', () => {
+        it('shows loading state', () => {
+            const btn = new Button({
+                label: 'Save',
+                onClick: () => {}
+            });
+
+            btn.setLoading(true);
+
+            expect(btn.element.classList.contains('qntx-btn-loading')).toBe(true);
+            expect(btn.element.getAttribute('aria-busy')).toBe('true');
+            expect(btn.element.disabled).toBe(true);
+            expect(btn.element.textContent).toContain('Save...');
+        });
+
+        it('removes loading state', () => {
+            const btn = new Button({
+                label: 'Save',
+                onClick: () => {}
+            });
+
+            btn.setLoading(true);
+            btn.setLoading(false);
+
+            expect(btn.element.classList.contains('qntx-btn-loading')).toBe(false);
+            expect(btn.element.getAttribute('aria-busy')).toBe('false');
+        });
+
+        it('ignores clicks when loading', async () => {
+            const onClick = mock(() => {});
+            const btn = new Button({
+                label: 'Test',
+                onClick
+            });
+
+            btn.setLoading(true);
+            btn.element.click();
+
+            expect(onClick).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('error state', () => {
+        it('shows error display', () => {
+            const btn = new Button({
+                label: 'Submit',
+                onClick: () => {}
+            });
+            container.appendChild(btn.element);
+
+            btn.setError(new Error('Network error'));
+
+            const errorDisplay = container.querySelector('.qntx-btn-error-display');
+            expect(errorDisplay).not.toBeNull();
+            expect(errorDisplay?.textContent).toContain('Network error');
+        });
+
+        it('clears error display', () => {
+            const btn = new Button({
+                label: 'Submit',
+                onClick: () => {}
+            });
+            container.appendChild(btn.element);
+
+            btn.setError(new Error('Network error'));
+            btn.clearError();
+
+            // Error should be removed (may have animation delay)
+            const state = btn.getState();
+            expect(state.error).toBeNull();
+        });
+
+        it('error is cleared before new click', async () => {
+            let callCount = 0;
+            const btn = new Button({
+                label: 'Submit',
+                onClick: async () => {
+                    callCount++;
+                    if (callCount === 1) {
+                        throw new Error('First error');
+                    }
+                }
+            });
+            container.appendChild(btn.element);
+
+            // First click - will fail
+            btn.element.click();
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(btn.getState().error).not.toBeNull();
+
+            // Second click - error should be cleared first
+            btn.element.click();
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            // Error should be cleared (second call didn't throw)
+            expect(btn.getState().error).toBeNull();
+        });
+    });
+
+    describe('confirmation', () => {
+        it('enters confirmation state on first click', () => {
+            const onClick = mock(() => {});
+            const btn = new Button({
+                label: 'Delete',
+                onClick,
+                confirmation: {
+                    label: 'Confirm Delete',
+                    timeout: 5000
+                }
+            });
+
+            btn.element.click();
+
+            expect(btn.element.classList.contains('qntx-btn-confirming')).toBe(true);
+            expect(btn.element.textContent).toContain('Confirm Delete');
+            expect(onClick).not.toHaveBeenCalled();
+        });
+
+        it('executes action on second click', async () => {
+            const onClick = mock(() => {});
+            const btn = new Button({
+                label: 'Delete',
+                onClick,
+                confirmation: {
+                    label: 'Confirm Delete',
+                    timeout: 5000
+                }
+            });
+
+            btn.element.click(); // Enter confirmation
+            btn.element.click(); // Confirm
+
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(onClick).toHaveBeenCalledTimes(1);
+            expect(btn.element.classList.contains('qntx-btn-confirming')).toBe(false);
+        });
+
+        it('reverts after timeout', async () => {
+            const btn = new Button({
+                label: 'Delete',
+                onClick: () => {},
+                confirmation: {
+                    label: 'Confirm Delete',
+                    timeout: 50 // Short timeout for test
+                }
+            });
+
+            btn.element.click();
+            expect(btn.element.classList.contains('qntx-btn-confirming')).toBe(true);
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(btn.element.classList.contains('qntx-btn-confirming')).toBe(false);
+            expect(btn.element.textContent).toContain('Delete');
+        });
+    });
+
+    describe('click handler', () => {
+        it('calls onClick', async () => {
+            const onClick = mock(() => {});
+            const btn = new Button({
+                label: 'Click Me',
+                onClick
+            });
+
+            btn.element.click();
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(onClick).toHaveBeenCalledTimes(1);
+        });
+
+        it('handles async onClick', async () => {
+            let completed = false;
+            const btn = new Button({
+                label: 'Async',
+                onClick: async () => {
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                    completed = true;
+                }
+            });
+
+            btn.element.click();
+
+            // Should be loading
+            expect(btn.getState().loading).toBe(true);
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            expect(completed).toBe(true);
+            expect(btn.getState().loading).toBe(false);
+        });
+
+        it('catches and displays errors', async () => {
+            const btn = new Button({
+                label: 'Fail',
+                onClick: async () => {
+                    throw new Error('Async error');
+                }
+            });
+            container.appendChild(btn.element);
+
+            btn.element.click();
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(btn.getState().error?.message).toBe('Async error');
+        });
+    });
+
+    describe('factory functions', () => {
+        it('createButton creates a button', () => {
+            const btn = createButton({
+                label: 'Factory',
+                onClick: () => {}
+            });
+
+            expect(btn.element.textContent).toContain('Factory');
+        });
+
+        it('createPrimaryButton creates primary variant', () => {
+            const btn = createPrimaryButton('Primary', () => {});
+
+            expect(btn.element.classList.contains('qntx-btn-primary')).toBe(true);
+        });
+
+        it('createDangerButton creates danger variant with confirmation', () => {
+            const btn = createDangerButton('Delete', 'Confirm', () => {});
+
+            expect(btn.element.classList.contains('qntx-btn-danger')).toBe(true);
+
+            // Click to enter confirmation
+            btn.element.click();
+            expect(btn.element.textContent).toContain('Confirm');
+        });
+    });
+
+    describe('cleanup', () => {
+        it('destroy removes element', () => {
+            const btn = new Button({
+                label: 'Test',
+                onClick: () => {}
+            });
+            container.appendChild(btn.element);
+
+            expect(container.contains(btn.element)).toBe(true);
+
+            btn.destroy();
+
+            expect(container.contains(btn.element)).toBe(false);
+        });
+
+        it('destroy clears confirmation timeout', () => {
+            const btn = new Button({
+                label: 'Delete',
+                onClick: () => {},
+                confirmation: {
+                    label: 'Confirm',
+                    timeout: 5000
+                }
+            });
+
+            btn.element.click(); // Start confirmation timeout
+            btn.destroy(); // Should clear timeout without error
+        });
+    });
+});
