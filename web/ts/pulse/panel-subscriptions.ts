@@ -13,6 +13,7 @@ import {
     onExecutionFailed,
     unixToISO,
 } from './events';
+import { getButton } from '../components/button';
 
 /**
  * Context for subscription handlers
@@ -40,6 +41,12 @@ export function subscribeToExecutionEvents(ctx: SubscriptionContext): Array<() =
             const timestamp = unixToISO(detail.timestamp);
             if (job) {
                 job.last_run_at = timestamp;
+            }
+
+            // Clear force trigger button loading (confirms trigger worked)
+            const forceTriggerBtn = getButton(`force-trigger-${detail.scheduledJobId}`);
+            if (forceTriggerBtn) {
+                forceTriggerBtn.setLoading(false);
             }
 
             // Add to inline execution list if job is expanded
