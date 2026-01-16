@@ -589,6 +589,28 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 	)
 }
 
+// BroadcastScheduledJobUpdate sends a scheduled job state change to all connected clients
+// Used to notify UI when job is paused, resumed, or deleted
+func (s *QNTXServer) BroadcastScheduledJobUpdate(jobID, atsCode, state, action string) {
+	msg := ScheduledJobUpdateMessage{
+		Type:      "scheduled_job_update",
+		JobID:     jobID,
+		ATSCode:   atsCode,
+		State:     state,
+		Action:    action,
+		Timestamp: time.Now().Unix(),
+	}
+
+	sent := s.broadcastMessage(msg)
+	logger.AddPulseSymbol(s.logger).Infow("Broadcasted scheduled job update",
+		"job_id", jobID,
+		"ats_code", atsCode,
+		"state", state,
+		"action", action,
+		"clients", sent,
+	)
+}
+
 // runBroadcastWorker is the dedicated worker goroutine that owns all client channel sends.
 // This eliminates race conditions by ensuring only one goroutine ever sends to client channels.
 // The worker processes broadcast requests and handles client channel closure.

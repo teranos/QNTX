@@ -71,6 +71,7 @@ export type MessageType =
   | 'storage_warning'
   | 'storage_eviction'
   | 'plugin_health'
+  | 'scheduled_job_update'
   | 'system_capabilities'
   | 'webscraper_request'
   | 'webscraper_response'
@@ -403,6 +404,18 @@ export interface PluginHealthMessage extends BaseMessage {
 }
 
 /**
+ * Scheduled job update notification
+ * Sent when job is paused, resumed, or deleted
+ */
+export interface ScheduledJobUpdateMessage extends BaseMessage {
+  type: 'scheduled_job_update';
+  job_id: string;
+  ats_code: string;
+  state: 'active' | 'paused' | 'deleted';
+  action: 'paused' | 'resumed' | 'deleted' | 'updated';
+}
+
+/**
  * System capabilities notification (from server/syscap/types.go:Message)
  * Sent once on WebSocket connection to inform client of available optimizations
  */
@@ -535,6 +548,7 @@ export type WebSocketMessage =
   | StorageWarningMessage
   | StorageEvictionMessage
   | PluginHealthMessage
+  | ScheduledJobUpdateMessage
   | SystemCapabilitiesMessage
   | WebscraperRequestMessage
   | WebscraperResponseMessage
@@ -579,6 +593,7 @@ export interface MessageHandlers {
   storage_warning?: MessageHandler<StorageWarningMessage>;
   storage_eviction?: MessageHandler<StorageEvictionMessage>;
   plugin_health?: MessageHandler<PluginHealthMessage>;
+  scheduled_job_update?: MessageHandler<ScheduledJobUpdateMessage>;
   system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
   webscraper_request?: MessageHandler<WebscraperRequestMessage>;
   webscraper_response?: MessageHandler<WebscraperResponseMessage>;
