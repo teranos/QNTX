@@ -125,13 +125,6 @@ export class PluginPanel extends BasePanel {
         content?.addEventListener('click', async (e: Event) => {
             const target = e.target as HTMLElement;
 
-            // Refresh button
-            if (target.closest('.plugin-refresh-btn')) {
-                await this.fetchPlugins();
-                this.render();
-                return;
-            }
-
             // Note: Pause/Resume buttons are now hydrated Button components
             // that handle their own click events
 
@@ -296,7 +289,6 @@ export class PluginPanel extends BasePanel {
                         <span class="plugin-server-value panel-code">${serverBuildTime}</span>
                     </div>
                 ` : ''}
-                <button class="panel-btn panel-btn-sm plugin-refresh-btn has-tooltip" data-tooltip="Refresh">&#8635; Refresh</button>
             </div>
             <div class="panel-list plugin-list">
                 ${this.plugins.map(plugin => this.renderPlugin(plugin)).join('')}
