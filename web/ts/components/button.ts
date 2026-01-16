@@ -454,3 +454,91 @@ export function createDangerButton(
 export function createGhostButton(label: string, onClick: () => void | Promise<void>): Button {
     return new Button({ label, onClick, variant: 'ghost' });
 }
+
+/**
+ * Hydration configuration for replacing placeholder buttons
+ */
+export interface HydrateConfig {
+    [buttonId: string]: ButtonConfig;
+}
+
+/**
+ * Hydrate placeholder buttons in a container with Button instances
+ *
+ * This enables panels using HTML templates to adopt the Button component:
+ *
+ * 1. In your template, use placeholder buttons:
+ *    ```html
+ *    <button class="qntx-btn-placeholder" data-button-id="save">Save</button>
+ *    <button class="qntx-btn-placeholder" data-button-id="delete">Delete</button>
+ *    ```
+ *
+ * 2. After setting innerHTML, call hydrate:
+ *    ```typescript
+ *    content.innerHTML = template;
+ *    const buttons = hydrateButtons(content, {
+ *        save: { label: 'Save', onClick: () => this.save(), variant: 'primary' },
+ *        delete: { label: 'Delete', onClick: () => this.delete(), variant: 'danger',
+ *                  confirmation: { label: 'Confirm Delete' } }
+ *    });
+ *    // buttons.save and buttons.delete are now Button instances
+ *    ```
+ *
+ * @param container Element containing placeholder buttons
+ * @param config Map of button IDs to their configurations
+ * @returns Map of button IDs to Button instances
+ */
+export function hydrateButtons(
+    container: HTMLElement,
+    config: HydrateConfig
+): Record<string, Button> {
+    const buttons: Record<string, Button> = {};
+    const placeholders = container.querySelectorAll<HTMLElement>('.qntx-btn-placeholder');
+
+    placeholders.forEach(placeholder => {
+        const buttonId = placeholder.dataset.buttonId;
+        if (!buttonId || !config[buttonId]) {
+            return;
+        }
+
+        const buttonConfig = config[buttonId];
+        const button = new Button(buttonConfig);
+
+        // Preserve any additional classes from placeholder
+        placeholder.classList.forEach(cls => {
+            if (cls !== 'qntx-btn-placeholder' && !cls.startsWith('qntx-btn')) {
+                button.element.classList.add(cls);
+            }
+        });
+
+        // Preserve data attributes
+        Object.keys(placeholder.dataset).forEach(key => {
+            if (key !== 'buttonId') {
+                button.element.dataset[key] = placeholder.dataset[key];
+            }
+        });
+
+        // Replace placeholder with button
+        placeholder.replaceWith(button.element);
+        buttons[buttonId] = button;
+    });
+
+    return buttons;
+}
+
+/**
+ * Generate placeholder HTML for use in templates
+ *
+ * @param buttonId Unique ID for hydration matching
+ * @param label Visible label (will be replaced by Button, but shown briefly during load)
+ * @param extraClasses Additional CSS classes to preserve
+ * @returns HTML string for placeholder button
+ */
+export function buttonPlaceholder(
+    buttonId: string,
+    label: string,
+    extraClasses?: string
+): string {
+    const classes = ['qntx-btn-placeholder', extraClasses].filter(Boolean).join(' ');
+    return `<button class="${classes}" data-button-id="${buttonId}">${label}</button>`;
+}

@@ -388,3 +388,110 @@ describe('Button', () => {
         });
     });
 });
+
+describe('hydrateButtons', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+        container = document.createElement('div');
+        document.body.appendChild(container);
+    });
+
+    afterEach(() => {
+        container.remove();
+    });
+
+    it('replaces placeholder buttons with Button instances', async () => {
+        const { hydrateButtons } = await import('./button');
+
+        container.innerHTML = `
+            <div class="actions">
+                <button class="qntx-btn-placeholder" data-button-id="save">Save</button>
+                <button class="qntx-btn-placeholder" data-button-id="cancel">Cancel</button>
+            </div>
+        `;
+
+        const saveClicked = mock(() => {});
+        const cancelClicked = mock(() => {});
+
+        const buttons = hydrateButtons(container, {
+            save: { label: 'Save Changes', onClick: saveClicked, variant: 'primary' },
+            cancel: { label: 'Cancel', onClick: cancelClicked, variant: 'ghost' }
+        });
+
+        // Buttons should exist
+        expect(buttons.save).toBeDefined();
+        expect(buttons.cancel).toBeDefined();
+
+        // Placeholders should be replaced
+        expect(container.querySelectorAll('.qntx-btn-placeholder').length).toBe(0);
+
+        // Button elements should have correct classes
+        expect(buttons.save.element.classList.contains('qntx-btn-primary')).toBe(true);
+        expect(buttons.cancel.element.classList.contains('qntx-btn-ghost')).toBe(true);
+
+        // Click should work
+        buttons.save.element.click();
+        await new Promise(resolve => setTimeout(resolve, 10));
+        expect(saveClicked).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves extra classes from placeholder', async () => {
+        const { hydrateButtons } = await import('./button');
+
+        container.innerHTML = `
+            <button class="qntx-btn-placeholder my-custom-class" data-button-id="test">Test</button>
+        `;
+
+        const buttons = hydrateButtons(container, {
+            test: { label: 'Test', onClick: () => {} }
+        });
+
+        expect(buttons.test.element.classList.contains('my-custom-class')).toBe(true);
+    });
+
+    it('preserves data attributes from placeholder', async () => {
+        const { hydrateButtons } = await import('./button');
+
+        container.innerHTML = `
+            <button class="qntx-btn-placeholder" data-button-id="delete" data-item-id="123">Delete</button>
+        `;
+
+        const buttons = hydrateButtons(container, {
+            delete: { label: 'Delete', onClick: () => {}, variant: 'danger' }
+        });
+
+        expect(buttons.delete.element.dataset.itemId).toBe('123');
+    });
+
+    it('ignores placeholders without matching config', async () => {
+        const { hydrateButtons } = await import('./button');
+
+        container.innerHTML = `
+            <button class="qntx-btn-placeholder" data-button-id="missing">Missing</button>
+        `;
+
+        const buttons = hydrateButtons(container, {});
+
+        expect(buttons.missing).toBeUndefined();
+        // Placeholder should still be there
+        expect(container.querySelectorAll('.qntx-btn-placeholder').length).toBe(1);
+    });
+});
+
+describe('buttonPlaceholder', () => {
+    it('generates placeholder HTML', async () => {
+        const { buttonPlaceholder } = await import('./button');
+
+        const html = buttonPlaceholder('save', 'Save');
+        expect(html).toBe('<button class="qntx-btn-placeholder" data-button-id="save">Save</button>');
+    });
+
+    it('includes extra classes', async () => {
+        const { buttonPlaceholder } = await import('./button');
+
+        const html = buttonPlaceholder('delete', 'Delete', 'plugin-delete-btn');
+        expect(html).toContain('qntx-btn-placeholder');
+        expect(html).toContain('plugin-delete-btn');
+    });
+});
