@@ -5,9 +5,11 @@
  */
 
 import { Window } from './components/window.ts';
+import { Button } from './components/button.ts';
 import { sendMessage } from './websocket.ts';
 import { DB } from '@generated/sym.js';
 import { tooltip } from './components/tooltip.ts';
+import { boundedStorageWindow } from './bounded-storage-window.ts';
 
 interface DatabaseStats {
     path: string;
@@ -86,8 +88,24 @@ class DatabaseStatsWindow {
                     <span class="db-stat-label">Unique Contexts:</span>
                     <span class="db-stat-value">${unique_contexts.toLocaleString()}</span>
                 </div>
+                <div class="db-stat-actions"></div>
             </div>
         `;
+
+        // Add bounded storage button
+        const actionsContainer = content.querySelector('.db-stat-actions');
+        if (actionsContainer) {
+            const boundedStorageBtn = new Button({
+                label: 'View Bounded Storage',
+                onClick: () => {
+                    boundedStorageWindow.show();
+                },
+                variant: 'secondary',
+                size: 'small',
+                icon: DB
+            });
+            actionsContainer.appendChild(boundedStorageBtn.element);
+        }
 
         // Add click handler for path
         const pathElement = content.querySelector('.db-path') as HTMLElement;

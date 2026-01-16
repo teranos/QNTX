@@ -1,19 +1,21 @@
 /**
  * Storage Eviction Handler
  *
- * Handles storage_eviction WebSocket messages and displays toast notifications
- * when attestations are deleted due to bounded storage limits.
+ * Handles storage_eviction WebSocket messages and updates the bounded storage window.
+ * Evictions are NOT shown as toasts - they're tracked in the dedicated
+ * bounded storage window for persistent monitoring and history.
  */
 
-import { showToast } from '../toast';
+import { boundedStorageWindow } from '../bounded-storage-window';
+import { log, SEG } from '../logger';
 import type { StorageEvictionMessage } from '../../types/websocket';
 
 /**
- * Handle storage eviction message - display as toast
+ * Handle storage eviction message - update bounded storage window
  */
 export function handleStorageEviction(data: StorageEvictionMessage): void {
-    console.warn('⊔ Storage eviction:', data.message, 'Event type:', data.event_type);
+    log.warn(SEG.DB, `Storage eviction: ${data.message} (${data.event_type})`);
 
-    // Show toast notification with longer duration (8s) since it's important data loss info
-    showToast(data.message, { type: 'warning', duration: 8000 });
+    // Update bounded storage window (adds to history, updates indicator)
+    boundedStorageWindow.handleEviction(data);
 }
