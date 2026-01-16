@@ -495,3 +495,70 @@ describe('buttonPlaceholder', () => {
         expect(html).toContain('plugin-delete-btn');
     });
 });
+
+describe('Button Registry', () => {
+    beforeEach(async () => {
+        const { clearButtonRegistry } = await import('./button');
+        clearButtonRegistry();
+    });
+
+    it('registers and retrieves buttons by operation ID', async () => {
+        const { Button, registerButton, getButton } = await import('./button');
+
+        const btn = new Button({ label: 'Test', onClick: () => {} });
+        registerButton('op-123', btn);
+
+        const retrieved = getButton('op-123');
+        expect(retrieved).toBe(btn);
+    });
+
+    it('returns undefined for unregistered operation IDs', async () => {
+        const { getButton } = await import('./button');
+
+        const retrieved = getButton('nonexistent');
+        expect(retrieved).toBeUndefined();
+    });
+
+    it('unregisters buttons', async () => {
+        const { Button, registerButton, getButton, unregisterButton } = await import('./button');
+
+        const btn = new Button({ label: 'Test', onClick: () => {} });
+        registerButton('op-456', btn);
+
+        expect(getButton('op-456')).toBe(btn);
+
+        unregisterButton('op-456');
+
+        expect(getButton('op-456')).toBeUndefined();
+    });
+
+    it('auto-unregisters button on destroy', async () => {
+        const { Button, registerButton, getButton } = await import('./button');
+
+        const btn = new Button({ label: 'Test', onClick: () => {} });
+        registerButton('op-789', btn);
+
+        expect(getButton('op-789')).toBe(btn);
+
+        btn.destroy();
+
+        expect(getButton('op-789')).toBeUndefined();
+    });
+
+    it('clears all registered buttons', async () => {
+        const { Button, registerButton, getButton, clearButtonRegistry, getRegisteredButtonCount } = await import('./button');
+
+        const btn1 = new Button({ label: 'Test 1', onClick: () => {} });
+        const btn2 = new Button({ label: 'Test 2', onClick: () => {} });
+        registerButton('op-1', btn1);
+        registerButton('op-2', btn2);
+
+        expect(getRegisteredButtonCount()).toBe(2);
+
+        clearButtonRegistry();
+
+        expect(getRegisteredButtonCount()).toBe(0);
+        expect(getButton('op-1')).toBeUndefined();
+        expect(getButton('op-2')).toBeUndefined();
+    });
+});

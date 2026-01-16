@@ -48,6 +48,12 @@ interface EvictionEvent {
  */
 type StatusLevel = 'healthy' | 'warning' | 'critical';
 
+/** localStorage key for persisting evictions */
+const EVICTIONS_STORAGE_KEY = 'qntx-bounded-storage-evictions';
+
+/** How long to keep evictions in storage (7 days) */
+const EVICTION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
 class BoundedStorageWindow {
     private window: Window;
     private buckets: Map<string, StorageBucket> = new Map();
@@ -65,7 +71,48 @@ class BoundedStorageWindow {
             onHide: () => this.onHide()
         });
 
+        // Load persisted evictions from localStorage
+        this.loadEvictionsFromStorage();
+
         this.render();
+    }
+
+    /**
+     * Load evictions from localStorage
+     * Prunes entries older than retention period
+     */
+    private loadEvictionsFromStorage(): void {
+        try {
+            const stored = localStorage.getItem(EVICTIONS_STORAGE_KEY);
+            if (!stored) return;
+
+            const parsed: EvictionEvent[] = JSON.parse(stored);
+            const cutoff = Date.now() - EVICTION_RETENTION_MS;
+
+            // Filter out old evictions and limit to maxEvictions
+            this.evictions = parsed
+                .filter(e => e.timestamp > cutoff)
+                .slice(0, this.maxEvictions);
+
+            // If we pruned anything, save the cleaned list back
+            if (this.evictions.length < parsed.length) {
+                this.saveEvictionsToStorage();
+            }
+        } catch (e) {
+            // Invalid data, clear it
+            localStorage.removeItem(EVICTIONS_STORAGE_KEY);
+        }
+    }
+
+    /**
+     * Save evictions to localStorage
+     */
+    private saveEvictionsToStorage(): void {
+        try {
+            localStorage.setItem(EVICTIONS_STORAGE_KEY, JSON.stringify(this.evictions));
+        } catch (e) {
+            // Storage full or unavailable - continue without persistence
+        }
     }
 
     private onShow(): void {
@@ -136,6 +183,9 @@ class BoundedStorageWindow {
         if (this.evictions.length > this.maxEvictions) {
             this.evictions = this.evictions.slice(0, this.maxEvictions);
         }
+
+        // Persist to localStorage
+        this.saveEvictionsToStorage();
 
         // Re-render if window is visible
         if (this.window.isVisible()) {

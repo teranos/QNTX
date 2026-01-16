@@ -412,6 +412,16 @@ export class Button {
             this.errorElement.remove();
         }
         this.element.remove();
+
+        // Auto-unregister from button registry if registered
+        // This prevents dangling references when buttons are destroyed
+        // without explicit unregistration
+        for (const [operationId, btn] of buttonRegistry.entries()) {
+            if (btn === this) {
+                buttonRegistry.delete(operationId);
+                break;
+            }
+        }
     }
 }
 
@@ -541,4 +551,88 @@ export function buttonPlaceholder(
 ): string {
     const classes = ['qntx-btn-placeholder', extraClasses].filter(Boolean).join(' ');
     return `<button class="${classes}" data-button-id="${buttonId}">${label}</button>`;
+}
+
+// ============================================================================
+// Button Registry for WebSocket-driven updates
+// ============================================================================
+
+/**
+ * Registry for buttons that can receive server-driven state updates.
+ *
+ * Use this when you need buttons to respond to WebSocket messages.
+ * Example: Show loading state when operation starts, error when it fails.
+ *
+ * ```typescript
+ * // When creating a button for an async operation
+ * const btn = new Button({
+ *     label: 'Process',
+ *     onClick: async () => {
+ *         const operationId = await startOperation();
+ *         registerButton(operationId, btn);
+ *     }
+ * });
+ *
+ * // In WebSocket handler
+ * function handleOperationStatus(data: { operationId: string; status: string }) {
+ *     const btn = getButton(data.operationId);
+ *     if (!btn) return;
+ *
+ *     switch (data.status) {
+ *         case 'processing':
+ *             btn.setLoading(true);
+ *             break;
+ *         case 'complete':
+ *             btn.setLoading(false);
+ *             unregisterButton(data.operationId);
+ *             break;
+ *         case 'error':
+ *             btn.setError(new Error(data.message));
+ *             unregisterButton(data.operationId);
+ *             break;
+ *     }
+ * }
+ * ```
+ */
+const buttonRegistry = new Map<string, Button>();
+
+/**
+ * Register a button for server-driven updates
+ * @param operationId Unique ID to identify this operation (e.g., job ID, request ID)
+ * @param button The Button instance to update
+ */
+export function registerButton(operationId: string, button: Button): void {
+    buttonRegistry.set(operationId, button);
+}
+
+/**
+ * Get a registered button by operation ID
+ * @param operationId The operation ID used during registration
+ * @returns The Button instance, or undefined if not found
+ */
+export function getButton(operationId: string): Button | undefined {
+    return buttonRegistry.get(operationId);
+}
+
+/**
+ * Unregister a button (call when operation completes or button is destroyed)
+ * @param operationId The operation ID to unregister
+ */
+export function unregisterButton(operationId: string): void {
+    buttonRegistry.delete(operationId);
+}
+
+/**
+ * Clear all registered buttons
+ * Useful for cleanup during page transitions
+ */
+export function clearButtonRegistry(): void {
+    buttonRegistry.clear();
+}
+
+/**
+ * Get count of registered buttons (useful for debugging)
+ */
+export function getRegisteredButtonCount(): number {
+    return buttonRegistry.size;
 }
