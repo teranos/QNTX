@@ -303,3 +303,46 @@
     opacity: 1;
 }
 
+/* ============================================================================
+ * Button Component - Responsive Styles
+ * ============================================================================ */
+
+/* Mobile: Larger touch targets (44x44px minimum recommended) */
+@media (max-width: 768px) {
+    .qntx-btn {
+        min-height: 44px;
+        padding: 10px 16px;
+        font-size: 14px;
+    }
+
+    .qntx-btn-small {
+        min-height: 36px;
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    .qntx-btn-large {
+        min-height: 48px;
+        padding: 12px 20px;
+        font-size: 15px;
+    }
+
+    .qntx-btn-error-display {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+}
+
+/* Tablet Portrait: Even larger touch targets for stylus/finger */
+@media (min-width: 768px) and (max-width: 900px) and (orientation: portrait) {
+    .qntx-btn {
+        min-height: 48px;
+        padding: 12px 20px;
+    }
+
+    .qntx-btn-small {
+        min-height: 40px;
+        padding: 10px 14px;
+    }
+}
+
