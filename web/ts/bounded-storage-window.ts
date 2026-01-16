@@ -291,7 +291,7 @@ class BoundedStorageWindow {
         html += '<h4 class="bounded-storage-section-title">Storage Buckets</h4>';
 
         if (this.buckets.size === 0) {
-            html += '<p class="bounded-storage-empty">No bounded storage limits configured or no data received yet.</p>';
+            html += '<p class="bounded-storage-empty">Bounded storage is active with configurable limits (defaults: 16 attestations per actor-context, 64 contexts per actor, 64 actors per entity). No active buckets to display yet.</p>';
         } else {
             html += '<div class="bounded-storage-buckets">';
             for (const bucket of this.buckets.values()) {
