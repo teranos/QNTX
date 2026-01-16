@@ -95,7 +95,8 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 	if count > limit {
 		deleteCount := count - limit
 
-		// Collect sample data before deletion
+		// Collect sample data before deletion for development/debugging
+		// TODO: Consider making this configurable (disable in production for better performance)
 		evictionDetails := &EvictionDetails{
 			SamplePredicates: make([]string, 0),
 			SampleSubjects:   make([]string, 0),

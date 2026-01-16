@@ -122,8 +122,12 @@ func (p *StorageEventsPoller) broadcastEviction(eventType, actor, context, entit
 	// Parse eviction details if available
 	var detailsMap map[string]interface{}
 	if evictionDetailsJSON != "" {
-		if err := json.Unmarshal([]byte(evictionDetailsJSON), &detailsMap); err == nil {
-			// Successfully parsed details
+		if err := json.Unmarshal([]byte(evictionDetailsJSON), &detailsMap); err != nil {
+			p.logger.Debugw("Failed to parse eviction details JSON",
+				"error", err,
+				"event_type", eventType,
+				"raw_json", evictionDetailsJSON)
+			// Continue with nil detailsMap - the rest of the code handles this gracefully
 		}
 	}
 

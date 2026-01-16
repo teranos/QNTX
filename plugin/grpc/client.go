@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// ExternalDomainProxy implements DomainPlugin by proxying to a remote gRPC process.
-// This is the adapter that allows gRPC plugins to be registered with the Registry.
+// ExternalDomainProxy implements DomainPlugin by proxying to a gRPC plugin process.
+// All QNTX plugins run via gRPC - this is the client-side proxy that connects to them.
 // From the Registry's perspective, all plugins implement the same DomainPlugin interface.
 type ExternalDomainProxy struct {
 	conn     *grpc.ClientConn
@@ -32,9 +32,8 @@ type ExternalDomainProxy struct {
 	wsConfig        *WebSocketConfig
 }
 
-// NewExternalDomainProxy creates a new proxy to a gRPC plugin running at the given address.
-// The returned proxy implements DomainPlugin and can be registered with the Registry
-// just like any other plugin.
+// NewExternalDomainProxy creates a new client proxy to a gRPC plugin at the given address.
+// The returned proxy implements DomainPlugin and can be registered with the Registry.
 func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDomainProxy, error) {
 	// Create gRPC connection with retry and timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
