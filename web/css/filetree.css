@@ -8,6 +8,15 @@
     background: #252525;
     display: flex;
     flex-direction: column;
+    transition: width 0.3s ease, opacity 0.3s ease;
+}
+
+.prose-sidebar[data-collapsed="true"] {
+    width: 0;
+    border-right: none;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
 }
 
 .prose-sidebar-header {

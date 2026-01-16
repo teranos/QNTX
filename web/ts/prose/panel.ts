@@ -64,7 +64,12 @@ class ProsePanel extends BasePanel {
                     <span class="prose-name">Prose</span>
                     <span class="prose-breadcrumb"></span>
                 </div>
-                <button class="panel-close" aria-label="Close">✕</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button id="prose-sidebar-toggle" class="panel-action-btn" aria-label="Toggle sidebar" title="Toggle file tree">
+                        <span>⋮≡</span>
+                    </button>
+                    <button class="panel-close" aria-label="Close">✕</button>
+                </div>
             </div>
             <div class="prose-body">
                 <div class="prose-sidebar">
@@ -96,6 +101,18 @@ class ProsePanel extends BasePanel {
 
     protected setupEventListeners(): void {
         // Close button is handled automatically by BasePanel
+
+        // Sidebar toggle button
+        const sidebarToggle = this.panel?.querySelector('#prose-sidebar-toggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                const sidebar = this.panel?.querySelector('.prose-sidebar');
+                if (sidebar) {
+                    const isCollapsed = sidebar.getAttribute('data-collapsed') === 'true';
+                    sidebar.setAttribute('data-collapsed', String(!isCollapsed));
+                }
+            });
+        }
 
         // Save on Cmd/Ctrl+S
         this.saveKeyHandler = (e: KeyboardEvent) => {
