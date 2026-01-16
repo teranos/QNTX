@@ -54,6 +54,9 @@ const EVICTIONS_STORAGE_KEY = 'qntx-bounded-storage-evictions';
 /** How long to keep evictions in storage (7 days) */
 const EVICTION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** How long to show recent evictions in ticker (3 minutes) */
+const RECENT_EVICTION_THRESHOLD_MS = 3 * 60 * 1000;
+
 class BoundedStorageWindow {
     private window: Window;
     private buckets: Map<string, StorageBucket> = new Map();
@@ -505,6 +508,40 @@ class BoundedStorageWindow {
     }
 
     /**
+     * Get the most recent eviction within the ticker threshold (3 minutes)
+     * Returns null if no recent eviction
+     */
+    getMostRecentEviction(): EvictionEvent | null {
+        if (this.evictions.length === 0) return null;
+
+        const mostRecent = this.evictions[0];
+        const age = Date.now() - mostRecent.timestamp;
+
+        if (age <= RECENT_EVICTION_THRESHOLD_MS) {
+            return mostRecent;
+        }
+
+        return null;
+    }
+
+    /**
+     * Get aggregated recent evictions within the ticker threshold
+     * Sums all evictions within the window for a more comprehensive view
+     */
+    getRecentEvictionsSummary(): { count: number; totalDeleted: number; mostRecentTimestamp: number } | null {
+        const cutoff = Date.now() - RECENT_EVICTION_THRESHOLD_MS;
+        const recentEvictions = this.evictions.filter(e => e.timestamp > cutoff);
+
+        if (recentEvictions.length === 0) return null;
+
+        return {
+            count: recentEvictions.length,
+            totalDeleted: recentEvictions.reduce((sum, e) => sum + e.deletionsCount, 0),
+            mostRecentTimestamp: recentEvictions[0].timestamp
+        };
+    }
+
+    /**
      * Register a callback to be notified when eviction stats change
      */
     private evictionCallbacks: Array<() => void> = [];
@@ -567,4 +604,93 @@ export function createBoundedStorageIndicator(): HTMLElement {
     });
 
     return indicator;
+}
+
+/**
+ * Format a short relative time (e.g., "20s ago", "2m ago")
+ */
+function formatShortRelativeTime(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+    if (seconds < 60) {
+        return `${seconds}s ago`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m ago`;
+}
+
+/**
+ * Create a live eviction ticker element
+ * Shows recent evictions (within 3 minutes) with auto-updating time
+ *
+ * Usage:
+ *   const ticker = createEvictionTicker();
+ *   statusBar.appendChild(ticker);
+ *
+ * The ticker auto-updates and hides itself when no recent evictions.
+ * Call ticker.destroy() to clean up when removing from DOM.
+ */
+export function createEvictionTicker(): HTMLElement & { destroy: () => void } {
+    const ticker = document.createElement('div');
+    ticker.className = 'eviction-ticker';
+    ticker.style.display = 'none'; // Hidden by default
+
+    // Text content
+    const text = document.createElement('span');
+    text.className = 'eviction-ticker-text';
+    ticker.appendChild(text);
+
+    // We'll assign the destroy method before returning
+    let destroyFn: () => void = () => {};
+
+    let updateInterval: number | null = null;
+    let unsubscribe: (() => void) | null = null;
+
+    /**
+     * Update the ticker display
+     */
+    function update(): void {
+        const summary = boundedStorageWindow.getRecentEvictionsSummary();
+
+        if (!summary) {
+            ticker.style.display = 'none';
+            return;
+        }
+
+        ticker.style.display = 'flex';
+        const timeAgo = formatShortRelativeTime(summary.mostRecentTimestamp);
+        text.textContent = `evicted: ${summary.totalDeleted} ats, ${timeAgo}`;
+    }
+
+    // Initial update
+    update();
+
+    // Update every 10 seconds for time freshness
+    updateInterval = window.setInterval(update, 10000);
+
+    // Subscribe to eviction updates for immediate refresh
+    unsubscribe = boundedStorageWindow.onEvictionUpdate(() => {
+        update();
+        // Pulse animation on new eviction
+        ticker.classList.add('just-updated');
+        setTimeout(() => ticker.classList.remove('just-updated'), 500);
+    });
+
+    /**
+     * Cleanup function
+     */
+    destroyFn = () => {
+        if (updateInterval !== null) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+        }
+        if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+        }
+    };
+
+    // Return ticker with destroy method attached
+    return Object.assign(ticker, { destroy: destroyFn });
 }

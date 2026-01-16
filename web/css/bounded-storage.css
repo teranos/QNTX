@@ -323,3 +323,49 @@
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(1.1); }
 }
+
+/* ============================================================================
+ * Eviction Ticker
+ * Live indicator showing recent evictions (within 3 minutes)
+ * ============================================================================ */
+
+.eviction-ticker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: rgba(229, 62, 62, 0.1);
+    border: 1px solid rgba(229, 62, 62, 0.2);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #c53030;
+    animation: ticker-fade-in 0.3s ease;
+}
+
+@keyframes ticker-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.eviction-ticker-text {
+    font-family: var(--font-mono, monospace);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Subtle pulse when new eviction arrives */
+.eviction-ticker.just-updated {
+    animation: ticker-pulse 0.5s ease;
+}
+
+@keyframes ticker-pulse {
+    0% { background: rgba(229, 62, 62, 0.1); }
+    50% { background: rgba(229, 62, 62, 0.25); }
+    100% { background: rgba(229, 62, 62, 0.1); }
+}

@@ -10,7 +10,7 @@ import { sendMessage } from './websocket.ts';
 import { toast } from './toast.ts';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
-import { boundedStorageWindow } from './bounded-storage-window.ts';
+import { boundedStorageWindow, createEvictionTicker } from './bounded-storage-window.ts';
 
 interface StatusIndicator {
     id: string;
@@ -25,6 +25,7 @@ class StatusIndicatorManager {
     private indicators: Map<string, HTMLElement> = new Map();
     private currentAttestationCount: number = 0;
     private evictionUnsubscribe: (() => void) | null = null;
+    private evictionTicker: (HTMLElement & { destroy: () => void }) | null = null;
 
     /**
      * Initialize the status indicator system
@@ -57,6 +58,17 @@ class StatusIndicatorManager {
         this.addConnectionIndicator();
         this.addPulseIndicator();
         this.addDatabaseIndicator();
+        this.addEvictionTicker();
+    }
+
+    /**
+     * Add live eviction ticker (shows recent evictions within 3 minutes)
+     */
+    private addEvictionTicker(): void {
+        if (!this.container) return;
+
+        this.evictionTicker = createEvictionTicker();
+        this.container.appendChild(this.evictionTicker);
     }
 
     /**
