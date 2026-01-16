@@ -7,7 +7,7 @@ import { getTransform } from './transform.ts';
 import { calculateFocusedTileDimensions, DEFAULT_TILE_WIDTH, DEFAULT_TILE_HEIGHT } from './focus/dimensions.ts';
 import { setFocusUIVisibility, setUnfocusCallback } from './focus/ui.ts';
 import { adjustPhysicsForFocus, restoreNormalPhysics } from './focus/physics.ts';
-import { createFocusHeader, removeFocusHeader, createFocusFooter, removeFocusFooter } from './tile/controls.ts';
+import { createFocusHeader, removeFocusHeader, createFocusFooter, removeFocusFooter, createArrayFieldTags, removeArrayFieldTags, createRichStringContent, removeRichStringContent } from './tile/controls.ts';
 import type { D3Node } from '../../types/d3-graph';
 
 // Import D3 from vendor bundle
@@ -187,6 +187,12 @@ export function focusOnTile(node: D3Node): void {
 
     // Create the footer bar with contextual info
     createFocusFooter(nodeGroup, node, focusedDimensions);
+
+    // Create array field tags (skills, languages, certifications)
+    createArrayFieldTags(nodeGroup, node, focusedDimensions);
+
+    // Create rich string content (notes, description)
+    createRichStringContent(nodeGroup, node, focusedDimensions);
 }
 
 /**
@@ -221,6 +227,8 @@ export function unfocus(): void {
     // Remove the header and footer
     removeFocusHeader(nodeGroup);
     removeFocusFooter(nodeGroup);
+    removeArrayFieldTags(nodeGroup);
+    removeRichStringContent(nodeGroup);
 
     nodeGroup.select('rect')
         .transition()
