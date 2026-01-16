@@ -169,6 +169,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	server.graphLimit.Store(1000)                 // Default graph node limit
 	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
 
+	// Set as global default server for async plugin initialization
+	SetDefaultServer(server)
+
 	// Configure log transport to route sends through broadcast worker (thread-safe)
 	wsTransport.SetSendFunc(server.sendLogBatch)
 
@@ -213,6 +216,32 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
 		server.services = services
+	}
+
+	// Initialize gRPC plugins (if any are loaded)
+	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request,
+	// so that plugins can register type definitions before graph queries are executed.
+	serverLogger.Infow("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
+	if server.pluginManager != nil && server.services != nil {
+		plugins := server.pluginManager.GetAllPlugins()
+		serverLogger.Infow("Plugin manager has plugins", "count", len(plugins))
+		if len(plugins) > 0 {
+			serverLogger.Infow("Initializing plugins eagerly", "count", len(plugins))
+
+			// Initialize each plugin with the service registry
+			for _, p := range plugins {
+				meta := p.Metadata()
+				if err := p.Initialize(ctx, server.services); err != nil {
+					serverLogger.Errorw("Failed to initialize plugin",
+						"plugin", meta.Name,
+						"version", meta.Version,
+						"error", err)
+					continue
+				}
+
+				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+			}
+		}
 	}
 
 	// Create ticker with server as broadcaster for real-time execution updates

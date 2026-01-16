@@ -53,10 +53,12 @@ type PluginConfig struct {
 
 // PluginManager manages plugin processes and connections.
 type PluginManager struct {
-	mu       sync.RWMutex
-	plugins  map[string]*managedPlugin
-	logger   *zap.SugaredLogger
-	basePort int
+	mu           sync.RWMutex
+	plugins      map[string]*managedPlugin
+	logger       *zap.SugaredLogger
+	basePort     int
+	nextPort     int // Track the next port to allocate
+	portMu       sync.Mutex // Separate mutex for port allocation
 }
 
 // managedPlugin tracks a running plugin.
@@ -81,6 +83,7 @@ func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 		plugins:  make(map[string]*managedPlugin),
 		logger:   logger,
 		basePort: DefaultPluginBasePort,
+		nextPort: DefaultPluginBasePort,
 	}
 }
 
@@ -240,24 +243,16 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 }
 
 // allocatePort finds the next available port for a plugin.
-// Returns the next port after the highest currently allocated port.
+// Uses a simple counter to ensure each plugin gets a unique port.
+// Thread-safe for concurrent plugin loading.
 func (m *PluginManager) allocatePort() int {
-	port := m.basePort
+	m.portMu.Lock()
+	defer m.portMu.Unlock()
 
-	// Find the highest allocated port
-	// Note: Map iteration order is non-deterministic, but we're only finding max value
-	maxPort := m.basePort - 1
-	for _, p := range m.plugins {
-		if p.port > maxPort {
-			maxPort = p.port
-		}
-	}
+	port := m.nextPort
+	m.nextPort++ // Increment for next allocation
 
-	// Next port is one after the current maximum
-	if maxPort >= m.basePort {
-		port = maxPort + 1
-	}
-
+	m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
 	return port
 }
 

@@ -260,3 +260,272 @@ export function removeFocusFooter(nodeGroup: any): void {
         .style('opacity', 0)
         .remove();
 }
+
+/**
+ * Create array field tags (skills, languages, certifications) for focused tiles
+ * Tags are rendered as interactive badges that can be clicked for navigation
+ */
+export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: { width: number; height: number }): void {
+    console.log('[array-tags] createArrayFieldTags called', {
+        nodeId: node.id,
+        nodeType: node.type,
+        hasGraphData: !!appState.currentGraphData,
+        hasMeta: !!appState.currentGraphData?.meta,
+        nodeTypes: appState.currentGraphData?.meta?.node_types
+    });
+
+    // Remove any existing tags
+    nodeGroup.select('.focus-array-tags').remove();
+
+    // Get array fields from node type metadata
+    const nodeType = appState.currentGraphData?.meta?.node_types?.find(nt => nt.type === node.type);
+    console.log('[array-tags] nodeType lookup', { nodeType, searchingFor: node.type });
+
+    if (!nodeType || !nodeType.array_fields || nodeType.array_fields.length === 0) {
+        console.log('[array-tags] early return - no array fields', {
+            hasNodeType: !!nodeType,
+            arrayFields: nodeType?.array_fields
+        });
+        return; // No array fields defined for this type
+    }
+
+    // Collect all tag values from node metadata
+    const tags: Array<{ field: string; value: string }> = [];
+    for (const fieldName of nodeType.array_fields) {
+        const fieldValue = node.metadata?.[fieldName];
+        if (fieldValue && typeof fieldValue === 'string') {
+            // Parse comma-separated values
+            const values = fieldValue.split(',').map(v => v.trim()).filter(v => v.length > 0);
+            for (const value of values) {
+                tags.push({ field: fieldName, value });
+            }
+        }
+    }
+
+    if (tags.length === 0) {
+        return; // No tag values to display
+    }
+
+    // Tag styling constants
+    const TAG_HEIGHT = 20;
+    const TAG_PADDING_X = 8;
+    const TAG_PADDING_Y = 4;
+    const TAG_SPACING = 6;
+    const TAG_Y_OFFSET = -dimensions.height / 2 + HEADER_HEIGHT + HEADER_PADDING + 10;
+
+    // Create tags container
+    const tagsGroup = nodeGroup.append('g')
+        .attr('class', 'focus-array-tags')
+        .attr('transform', `translate(0, ${TAG_Y_OFFSET})`)
+        .style('opacity', 0);
+
+    // Render tags with dynamic positioning
+    let currentX = -dimensions.width / 2 + 10; // Start from left edge with padding
+    let currentY = 0;
+    const maxWidth = dimensions.width - 20; // Leave padding on both sides
+
+    tags.forEach((tag, index) => {
+        // Estimate tag width (rough approximation based on text length)
+        const estimatedWidth = tag.value.length * 7 + TAG_PADDING_X * 2;
+
+        // Wrap to next line if needed
+        if (currentX + estimatedWidth > dimensions.width / 2 - 10 && index > 0) {
+            currentX = -dimensions.width / 2 + 10;
+            currentY += TAG_HEIGHT + TAG_SPACING;
+        }
+
+        const tagGroup = tagsGroup.append('g')
+            .attr('class', 'focus-tag')
+            .attr('transform', `translate(${currentX}, ${currentY})`)
+            .style('cursor', 'pointer');
+
+        // Tag background
+        const tagBg = tagGroup.append('rect')
+            .attr('class', 'focus-tag-bg')
+            .attr('height', TAG_HEIGHT)
+            .attr('rx', 3)
+            .attr('ry', 3)
+            .attr('fill', '#3498db')
+            .attr('opacity', 0.8);
+
+        // Tag text
+        const tagText = tagGroup.append('text')
+            .attr('class', 'focus-tag-text')
+            .attr('x', TAG_PADDING_X)
+            .attr('y', TAG_HEIGHT / 2)
+            .attr('font-size', '11px')
+            .attr('fill', '#fff')
+            .attr('dominant-baseline', 'central')
+            .style('user-select', 'text')
+            .style('cursor', 'text')
+            .text(tag.value);
+
+        // Measure actual text width and update background
+        const textWidth = (tagText.node() as SVGTextElement).getComputedTextLength();
+        const tagWidth = textWidth + TAG_PADDING_X * 2;
+        tagBg.attr('width', tagWidth);
+
+        // Click handler for future navigation
+        tagGroup.on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            console.log(`[Tag clicked] ${tag.field}: ${tag.value}`);
+            // TODO: Implement filtering/navigation
+            // - Filter graph to show only nodes with this tag value
+            // - Or jump to another node with the same tag
+        });
+
+        // Hover effects
+        tagGroup.on('mouseenter', function(this: SVGGElement) {
+            d3.select(this).select('.focus-tag-bg')
+                .attr('opacity', 1.0);
+        });
+
+        tagGroup.on('mouseleave', function(this: SVGGElement) {
+            d3.select(this).select('.focus-tag-bg')
+                .attr('opacity', 0.8);
+        });
+
+        // Update position for next tag
+        currentX += tagWidth + TAG_SPACING;
+    });
+
+    // Animate tags in
+    tagsGroup.transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 1);
+}
+
+/**
+ * Remove array field tags from a node
+ */
+export function removeArrayFieldTags(nodeGroup: any): void {
+    nodeGroup.select('.focus-array-tags')
+        .transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 0)
+        .remove();
+}
+
+/**
+ * Create rich string content display (notes, description) for focused tiles
+ * Renders word-wrapped text content below the tile center
+ */
+export function createRichStringContent(nodeGroup: any, node: D3Node, dimensions: { width: number; height: number }): void {
+    // Remove any existing rich content
+    nodeGroup.select('.focus-rich-content').remove();
+
+    // Get rich string fields from node type metadata
+    const nodeType = appState.currentGraphData?.meta?.node_types?.find(nt => nt.type === node.type);
+    if (!nodeType || !nodeType.rich_string_fields || nodeType.rich_string_fields.length === 0) {
+        return; // No rich string fields defined for this type
+    }
+
+    // Collect rich content from node metadata
+    let richContent = '';
+    for (const fieldName of nodeType.rich_string_fields) {
+        const fieldValue = node.metadata?.[fieldName];
+        if (fieldValue && typeof fieldValue === 'string' && fieldValue.trim().length > 0) {
+            richContent = fieldValue.trim();
+            break; // Use first available rich string field
+        }
+    }
+
+    if (!richContent) {
+        return; // No content to display
+    }
+
+    // Rich content styling constants
+    const CONTENT_PADDING = 20;
+    const CONTENT_Y_OFFSET = 60; // Below tile center
+    const LINE_HEIGHT = 16;
+    const FONT_SIZE = 12;
+    const MAX_WIDTH = dimensions.width - (CONTENT_PADDING * 2);
+    const MAX_LINES = 8; // Limit to prevent overflow
+
+    // Create rich content container
+    const contentGroup = nodeGroup.append('g')
+        .attr('class', 'focus-rich-content')
+        .attr('transform', `translate(0, ${CONTENT_Y_OFFSET})`)
+        .style('opacity', 0);
+
+    // Word-wrap the text
+    const words = richContent.split(/\s+/);
+    const lines: string[] = [];
+    let currentLine = '';
+
+    // Simple word wrapping algorithm
+    const tempText = contentGroup.append('text')
+        .attr('font-size', `${FONT_SIZE}px`)
+        .style('visibility', 'hidden');
+
+    for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        tempText.text(testLine);
+        const textWidth = (tempText.node() as SVGTextElement).getComputedTextLength();
+
+        if (textWidth > MAX_WIDTH && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+        } else {
+            currentLine = testLine;
+        }
+
+        if (lines.length >= MAX_LINES - 1) {
+            break; // Stop if we've hit the line limit
+        }
+    }
+
+    if (currentLine && lines.length < MAX_LINES) {
+        lines.push(currentLine);
+    }
+
+    tempText.remove();
+
+    // Add ellipsis if truncated
+    const wasTruncated = lines.length >= MAX_LINES && words.length > lines.join(' ').split(/\s+/).length;
+    if (wasTruncated && lines.length > 0) {
+        lines[lines.length - 1] += '...';
+    }
+
+    // Calculate content height
+    const contentHeight = lines.length * LINE_HEIGHT + CONTENT_PADDING * 2;
+
+    // Background for readability
+    contentGroup.append('rect')
+        .attr('x', -MAX_WIDTH / 2 - CONTENT_PADDING)
+        .attr('y', -CONTENT_PADDING)
+        .attr('width', MAX_WIDTH + CONTENT_PADDING * 2)
+        .attr('height', contentHeight)
+        .attr('rx', 4)
+        .attr('fill', '#f8f8f8')
+        .attr('stroke', '#ddd')
+        .attr('stroke-width', 1);
+
+    // Render each line of text
+    lines.forEach((line, index) => {
+        contentGroup.append('text')
+            .attr('x', -MAX_WIDTH / 2)
+            .attr('y', index * LINE_HEIGHT)
+            .attr('font-size', `${FONT_SIZE}px`)
+            .attr('fill', '#333')
+            .style('user-select', 'text')
+            .style('cursor', 'text')
+            .text(line);
+    });
+
+    // Animate in
+    contentGroup.transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 1);
+}
+
+/**
+ * Remove rich string content from a node
+ */
+export function removeRichStringContent(nodeGroup: any): void {
+    nodeGroup.select('.focus-rich-content')
+        .transition()
+        .duration(GRAPH_PHYSICS.ANIMATION_DURATION)
+        .style('opacity', 0)
+        .remove();
+}

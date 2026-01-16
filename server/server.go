@@ -250,3 +250,28 @@ func (s *QNTXServer) Run() {
 		}
 	}
 }
+
+// Global server instance for async plugin initialization
+var (
+	defaultServer   *QNTXServer
+	defaultServerMu sync.RWMutex
+)
+
+// SetDefaultServer sets the global server instance
+func SetDefaultServer(s *QNTXServer) {
+	defaultServerMu.Lock()
+	defer defaultServerMu.Unlock()
+	defaultServer = s
+}
+
+// GetDefaultServer returns the global server instance
+func GetDefaultServer() *QNTXServer {
+	defaultServerMu.RLock()
+	defer defaultServerMu.RUnlock()
+	return defaultServer
+}
+
+// GetServices returns the service registry for plugins
+func (s *QNTXServer) GetServices() plugin.ServiceRegistry {
+	return s.services
+}
