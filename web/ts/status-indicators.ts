@@ -354,6 +354,32 @@ class StatusIndicatorManager {
             await this.showDatabaseInfo();
         }
     }
+
+    /**
+     * Cleanup all resources (for testing or page teardown)
+     */
+    destroy(): void {
+        // Unsubscribe from eviction updates
+        if (this.evictionUnsubscribe) {
+            this.evictionUnsubscribe();
+            this.evictionUnsubscribe = null;
+        }
+
+        // Destroy eviction ticker
+        if (this.evictionTicker) {
+            this.evictionTicker.destroy();
+            this.evictionTicker = null;
+        }
+
+        // Remove all indicators
+        this.indicators.clear();
+
+        // Remove container from DOM
+        if (this.container) {
+            this.container.remove();
+            this.container = null;
+        }
+    }
 }
 
 // Export singleton instance

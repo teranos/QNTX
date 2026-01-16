@@ -4,9 +4,8 @@
  * Handles all job-related actions: force trigger, pause, resume, delete,
  * expansion toggle, execution loading, and navigation.
  *
- * Uses two-click confirmation pattern for destructive actions:
- * - Force Trigger: Bypasses scheduling, needs confirmation
- * - Delete: Permanently removes job, needs confirmation
+ * Note: Two-click confirmation is now handled by the Button component
+ * via hydration in pulse-panel.ts. This module provides the action handlers.
  */
 
 import type { ScheduledJobResponse } from './types';
@@ -16,10 +15,6 @@ import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 import { handleError, SEG } from '../error-handler';
 import { log } from '../logger';
-import { Button } from '../components/button';
-
-// Note: Two-click confirmation is now handled by the Button component
-// The old manual confirmation state tracking has been removed
 
 /**
  * Context passed to job action handlers
@@ -181,99 +176,4 @@ export async function handleProseLocationClick(docId: string): Promise<void> {
 
     const { showProseDocument } = await import('../prose/panel.js');
     await showProseDocument(docId);
-}
-
-// ============================================================================
-// Button Component Factory Functions
-// Use these when creating job action buttons programmatically
-// ============================================================================
-
-/**
- * Create a Force Trigger button using the Button component
- * Includes two-stage confirmation
- */
-export function createForceTriggerButton(
-    job: ScheduledJobResponse,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Force Trigger',
-        onClick: async () => {
-            log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
-            await forceTriggerJob(job.ats_code);
-
-            if (!ctx.state.expandedJobs.has(job.id)) {
-                ctx.state.expandedJobs.add(job.id);
-                ctx.state.saveToLocalStorage();
-            }
-
-            await loadExecutionsForJob(job.id, ctx);
-            toast.success('Force trigger started - check execution history below');
-        },
-        variant: 'warning',
-        size: 'small',
-        confirmation: {
-            label: 'Confirm Trigger',
-            timeout: 5000
-        }
-    });
-}
-
-/**
- * Create a Delete button using the Button component
- * Includes two-stage confirmation
- */
-export function createDeleteButton(
-    jobId: string,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Delete',
-        onClick: async () => {
-            await deleteScheduledJob(jobId);
-            await ctx.loadJobs();
-        },
-        variant: 'danger',
-        size: 'small',
-        confirmation: {
-            label: 'Confirm Delete',
-            timeout: 5000
-        }
-    });
-}
-
-/**
- * Create a Pause button using the Button component
- */
-export function createPauseButton(
-    jobId: string,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Pause',
-        onClick: async () => {
-            await pauseScheduledJob(jobId);
-            await ctx.loadJobs();
-        },
-        variant: 'secondary',
-        size: 'small'
-    });
-}
-
-/**
- * Create a Resume button using the Button component
- */
-export function createResumeButton(
-    jobId: string,
-    ctx: JobActionContext
-): Button {
-    return new Button({
-        label: 'Resume',
-        onClick: async () => {
-            await resumeScheduledJob(jobId);
-            await ctx.loadJobs();
-        },
-        variant: 'primary',
-        size: 'small'
-    });
 }
