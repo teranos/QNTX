@@ -41,7 +41,7 @@ try {
 
   // Bundle TypeScript with Bun
   console.log(`${darkPeach}Bundling JavaScript...${reset}`);
-  await Bun.build({
+  const result = await Bun.build({
     entrypoints: [join(sourceDir, "ts", "main.ts")],
     outdir: join(outputDir, "js"),
     minify: false,
@@ -50,6 +50,15 @@ try {
     // Define aliases to force single instance of CodeMirror modules
     external: [], // Bundle everything, don't externalize anything
   });
+
+  // Check for CSS outputs from CSS module imports
+  if (result.outputs) {
+    for (const output of result.outputs) {
+      if (output.path.endsWith('.css')) {
+        console.log(`${lightPeach}   CSS module bundled: ${output.path}${reset}`);
+      }
+    }
+  }
 
   // Copy CSS
   console.log(`${darkPeach}Copying CSS...${reset}`);
