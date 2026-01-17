@@ -8,8 +8,7 @@
 
 export interface PanelEventHandlers {
     onToggleExpansion: (jobId: string) => Promise<void>;
-    onForceTrigger: (jobId: string) => Promise<void>;
-    onJobAction: (jobId: string, action: string) => Promise<void>;
+    // Note: onForceTrigger and onJobAction removed - now handled by hydrated Button components
     onLoadMore: (jobId: string) => Promise<void>;
     onRetryExecutions: (jobId: string) => Promise<void>;
     onViewDetailed: (jobId: string) => Promise<void>;
@@ -41,23 +40,8 @@ export function attachPanelEventListeners(
             return;
         }
 
-        // Handle job action buttons (pause, resume, delete, force-trigger)
-        const actionBtn = target.closest('.pulse-btn') as HTMLElement | null;
-        if (actionBtn) {
-            e.stopPropagation();
-            const card = actionBtn.closest('.pulse-job-card') as HTMLElement;
-            const jobId = card?.dataset.jobId;
-            const action = actionBtn.dataset.action;
-
-            if (!jobId || !action) return;
-
-            if (action === 'force-trigger') {
-                await handlers.onForceTrigger(jobId);
-            } else {
-                await handlers.onJobAction(jobId, action);
-            }
-            return;
-        }
+        // Note: Job action buttons (pause, resume, delete, force-trigger) are now
+        // hydrated Button components that handle their own click events
 
         // Handle "View detailed history" links
         const detailedLink = target.closest('[data-action="view-detailed"]') as HTMLElement | null;
