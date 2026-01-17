@@ -171,7 +171,7 @@ class ConfigPanel extends BasePanel {
 
             this.appConfig = data;
             console.log('[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to fetch config', { context: SEG.ERROR, silent: true });
 
             // Build rich error for display
@@ -625,7 +625,7 @@ class ConfigPanel extends BasePanel {
             this.editingKey = null;
             await this.fetchConfig();
             this.render();
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save config', { context: SEG.ERROR, silent: true });
             this.showToast(`Failed to save: ${(error as Error).message}`, 'error');
 

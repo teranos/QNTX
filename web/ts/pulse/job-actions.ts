@@ -132,7 +132,7 @@ export async function handleForceTrigger(
         await loadExecutionsForJob(jobId, ctx);
 
         toast.success('Force trigger started - check execution history below');
-    } catch (error) {
+    } catch (error: unknown) {
         handleError(error, 'Force trigger failed', { context: SEG.PULSE, showBuildInfo: true });
     }
 }
@@ -195,7 +195,7 @@ export async function handleJobAction(
         }
 
         await ctx.loadJobs();
-    } catch (error) {
+    } catch (error: unknown) {
         handleError(error, `Failed to ${action} job`, { context: SEG.PULSE });
     }
 }
@@ -237,7 +237,7 @@ export async function loadExecutionsForJob(
         const response = await listExecutions(jobId, { limit: 20, offset: 0 });
         ctx.state.jobExecutions.set(jobId, response.executions);
         ctx.state.executionErrors.delete(jobId);
-    } catch (error) {
+    } catch (error: unknown) {
         const err = handleError(error, 'Failed to load execution history', { context: SEG.PULSE });
         ctx.state.executionErrors.set(jobId, err.message);
     } finally {
