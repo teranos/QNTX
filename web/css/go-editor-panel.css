@@ -74,7 +74,7 @@
 }
 
 .go-editor-error-help code {
-    background: var(--editor-code-bg);
+    background: var(--editor-bg-alt);
     padding: 2px 6px;
     border-radius: 3px;
 }

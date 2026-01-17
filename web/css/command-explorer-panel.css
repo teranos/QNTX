@@ -4,16 +4,16 @@
 .command-explorer-panel {
     position: relative;
     width: 100%;
-    background: var(--panel-bg);
-    border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
     margin: 8px 8px 8px 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
     max-height: 400px;
     display: flex;
     flex-direction: column;
-    transition: var(--panel-transition-normal);
+    transition: var(--transition-normal);
     overflow: hidden;
 }
 
@@ -35,15 +35,15 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--panel-padding-md);
-    background: #f8f8f8;
-    border-bottom: 1px solid #ddd;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .command-explorer-title {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
-    color: #000;
+    color: var(--primary);
 }
 
 
@@ -51,7 +51,7 @@
 /* Search */
 .command-explorer-search {
     padding: 8px 16px;
-    background: var(--panel-bg);
+    background: var(--bg-primary);
     border-bottom: 1px solid #eee;
 }
 
@@ -59,14 +59,14 @@
     width: 100%;
     padding: 8px 12px;
     font-size: 12px;
-    border: var(--panel-border);
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     outline: none;
     transition: border-color 0.15s ease;
 }
 
 .command-search-input:focus {
-    border-color: #000;
+    border-color: var(--primary);
 }
 
 /* Content */
@@ -84,14 +84,14 @@
 
 /* Filter Item - uses .panel-card from panel-base.css */
 .filter-item {
-    background: #f8f8f8;
+    background: var(--bg-secondary);
     padding: 12px;
     cursor: pointer;
 }
 
 .filter-item:hover {
-    background: #f0f0f0;
-    border-color: #bbb;
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -100,13 +100,13 @@
 .filter-item.selected,
 .filter-item[data-active="selected"] {
     background: #000;
-    color: #fff;
-    border-color: #000;
+    color: var(--bg-primary);
+    border-color: var(--primary);
 }
 
 .filter-item.selected .filter-item-type,
 .filter-item[data-active="selected"] .filter-item-type {
-    color: #fff;
+    color: var(--bg-primary);
 }
 
 .filter-item.selected .filter-item-label,
@@ -115,19 +115,19 @@
 .filter-item[data-active="selected"] .filter-item-label,
 .filter-item[data-active="selected"] .filter-item-meta,
 .filter-item[data-active="selected"] .filter-item-description {
-    color: #fff;
+    color: var(--bg-primary);
 }
 
 .filter-item.selected .filter-item-count,
 .filter-item[data-active="selected"] .filter-item-count {
-    background: var(--panel-bg);
-    color: #000;
+    background: var(--bg-primary);
+    color: var(--primary);
 }
 
 .filter-item.selected code,
 .filter-item[data-active="selected"] code {
     background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    color: var(--bg-primary);
     border-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -142,33 +142,33 @@
 .filter-item-type {
     font-size: 13px;
     font-weight: 600;
-    color: #000;
+    color: var(--primary);
     font-family: 'Courier New', monospace;
 }
 
 /* Uses .panel-badge from panel-base.css */
 .filter-item-count {
     background: #000;
-    color: #fff;
+    color: var(--bg-primary);
 }
 
 /* Item Details */
 .filter-item-label {
     font-size: 12px;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 4px;
     font-weight: 500;
 }
 
 .filter-item-meta {
     font-size: 10px;
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
     margin-bottom: 8px;
 }
 
 .filter-item-description {
     font-size: 11px;
-    color: #555;
+    color: var(--text-secondary);
     margin-bottom: 8px;
     font-style: italic;
 }
@@ -182,8 +182,8 @@
 .filter-item-examples code {
     font-size: 10px;
     padding: 4px 6px;
-    background: var(--panel-bg);
-    border: var(--panel-border);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 2px;
     display: block;
     overflow: hidden;
@@ -200,12 +200,12 @@
 }
 
 .command-explorer-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .command-explorer-content::-webkit-scrollbar-thumb {
     background: #ccc;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .command-explorer-content::-webkit-scrollbar-thumb:hover {

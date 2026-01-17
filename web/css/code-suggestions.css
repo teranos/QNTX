@@ -64,7 +64,7 @@
 #load-pr-btn {
   padding: 0.5rem 1rem;
   background: var(--color-primary, #4a9eff);
-  color: #fff;
+  color: var(--bg-primary);
   border: none;
   border-radius: 4px;
   cursor: pointer;

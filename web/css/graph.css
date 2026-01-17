@@ -4,19 +4,19 @@
 /* Virtue #6: Functional Color - All colors serve a purpose, not decoration */
 :root {
     /* Node styles - white stroke for contrast against colored nodes */
-    --node-stroke-color: #fff;
+    --node-stroke-color: var(--bg-primary);
     --node-stroke-width: 2px;
     --node-text-size: 10px;
-    --node-text-color: #000;  /* Black for maximum readability */
+    --node-text-color: var(--primary);  /* Black for maximum readability */
 
     /* Link styles - neutral gray to not compete with nodes */
-    --link-color: #ddd;
+    --link-color: var(--editor-text);
     --link-opacity: 0.6;  /* Semi-transparent to reduce visual weight */
 
     /* Tooltip styles - high contrast for readability */
     --tooltip-padding: 8px 10px;
     --tooltip-bg: #000;  /* Black background for clear overlay */
-    --tooltip-color: #fff;  /* White text for maximum contrast */
+    --tooltip-color: var(--bg-primary);  /* White text for maximum contrast */
     --tooltip-font-size: 11px;
 
     /* Layout spacing */
@@ -32,14 +32,14 @@
     /* Meta overlay - gray for secondary information */
     --meta-max-width: 300px;
     --meta-font-size: 11px;
-    --meta-color: #666;  /* Mid-gray for de-emphasized text */
+    --meta-color: var(--text-secondary);  /* Mid-gray for de-emphasized text */
 }
 
 /* Graph Container */
 #graph-container {
     flex: 1;
     position: relative;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 #graph {
@@ -67,7 +67,7 @@
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
-    color: #000;
+    color: var(--primary);
 }
 
 /* Nodes and Links */
@@ -135,8 +135,8 @@
     margin: 0 0 4px 0;
     padding: 6px 12px;
     border: 1px solid var(--control-border);
-    background: #fff;
-    color: #000;
+    background: var(--bg-primary);
+    color: var(--primary);
     cursor: pointer;
     font-size: var(--meta-font-size);
     font-weight: 500;
@@ -147,7 +147,7 @@
 }
 
 #controls button:active {
-    background: #eee;
+    background: var(--bg-hover);
 }
 
 /* Connection Status (in log header) */
@@ -183,7 +183,7 @@ body.disconnected #connection-status {
     font-weight: 600;
     text-transform: uppercase;
     margin-bottom: 6px;
-    color: #000;
+    color: var(--primary);
 }
 
 .legenda-item {
@@ -198,23 +198,23 @@ body.disconnected #connection-status {
 .legenda-color {
     width: 10px;
     height: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 .reveal-related {
     font-size: 12px;
     cursor: pointer;
-    color: #888;
+    color: var(--text-muted);
     transition: color 0.2s ease;
     padding: 0 2px;
 }
 
 .reveal-related:hover {
-    color: #000;
+    color: var(--primary);
 }
 
 .reveal-related.active {
-    color: #000;
+    color: var(--primary);
     font-weight: 600;
 }
 
@@ -225,7 +225,7 @@ body.disconnected #connection-status {
 
 .legenda-count {
     font-size: 9px;
-    color: #888;
+    color: var(--text-muted);
     margin-left: auto;
     padding: 1px 4px;
     background: rgba(0, 0, 0, 0.05);

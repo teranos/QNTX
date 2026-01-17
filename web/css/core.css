@@ -11,108 +11,73 @@
     --font-system: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     /* -------------------------------------------------------------------------
-       Colors - Light Theme (default)
+       Backgrounds (light UI)
        ------------------------------------------------------------------------- */
-    /* Backgrounds */
-    --color-bg: #ffffff;
-    --color-bg-secondary: #f8f8f8;
-    --color-bg-hover: #f0f0f0;
-    --bg-primary: #ffffff;
+    --bg-primary: var(--bg-primary);
     --bg-secondary: #f8f8f8;
-    --bg-tertiary: #f0f0f0;
-
-    /* Text */
-    --color-text: #000000;
-    --color-text-secondary: #666666;
-    --color-text-tertiary: #999999;
-    --text-primary: #000000;
-    --text-secondary: #666666;
-    --text-tertiary: #999999;
-
-    /* Borders */
-    --color-border: #dddddd;
-    --color-border-hover: #bbbbbb;
-    --border-color: #dddddd;
-
-    /* Primary/Accent */
-    --color-primary: #000000;
-    --color-primary-hover: #333333;
-    --accent-color: #0066cc;
-
-    /* Status Colors - Semantic */
-    --color-success: #22c55e;
-    --color-success-dark: #16a34a;
-    --color-error: #ef4444;
-    --color-danger: #ef4444;
-    --color-warning: #ffaa00;
-    --color-info: #3b82f6;
-
-    /* Status Colors - With backgrounds (for badges/alerts) */
-    --status-pending-bg: #fff3e0;
-    --status-pending-text: #e65100;
-    --status-running-bg: #e3f2fd;
-    --status-running-text: #1976d2;
-    --status-completed-bg: #e8f5e9;
-    --status-completed-text: #388e3c;
-    --status-failed-bg: #ffebee;
-    --status-failed-text: #d32f2f;
-
-    /* Accent colors for syntax/highlights */
-    --accent-green: #4ade80;
-    --accent-blue: #60a5fa;
-    --accent-red: #f87171;
+    --bg-hover: #f0f0f0;
 
     /* -------------------------------------------------------------------------
-       Panel System
+       Text
        ------------------------------------------------------------------------- */
-    /* Spacing */
-    --panel-padding-sm: 8px 12px;
-    --panel-padding-md: 12px 16px;
-    --panel-padding-lg: 16px 20px;
-
-    /* Panel colors (light theme) */
-    --panel-bg: #ffffff;
-    --panel-bg-secondary: #f8f8f8;
-    --panel-border: 1px solid #dddddd;
-    --panel-border-color: #dddddd;
-    --panel-border-radius: 4px;
-    --panel-text-primary: #333333;
-    --panel-text-secondary: #666666;
-    --panel-text-tertiary: #999999;
-
-    /* Panel shadows */
-    --panel-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-    --panel-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --panel-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-muted: #999999;
 
     /* -------------------------------------------------------------------------
-       Editor System (dark theme for code)
+       Borders
+       ------------------------------------------------------------------------- */
+    --border-color: var(--border-color);
+    --border-hover: #bbbbbb;
+
+    /* -------------------------------------------------------------------------
+       Primary/Brand
+       ------------------------------------------------------------------------- */
+    --primary: #000000;
+    --primary-hover: #333333;
+    --accent: var(--accent);
+
+    /* -------------------------------------------------------------------------
+       Status Colors (text + background pairs)
+       ------------------------------------------------------------------------- */
+    --success: #388e3c;
+    --success-bg: #e8f5e9;
+    --error: #d32f2f;
+    --error-bg: #ffebee;
+    --warning: #e65100;
+    --warning-bg: #fff3e0;
+    --info: #1976d2;
+    --info-bg: #e3f2fd;
+
+    /* -------------------------------------------------------------------------
+       Code Editors (dark backgrounds)
        ------------------------------------------------------------------------- */
     --editor-bg: #1e1e1e;
-    --editor-info-bg: #252526;
+    --editor-bg-alt: #2a2a2a;
     --editor-border: #3e3e42;
     --editor-text: #cccccc;
-    --editor-text-muted: #858585;
-    --editor-code-bg: #2a2a2a;
-    --status-neutral: #858585;
-    --status-success: #4ec9b0;
-    --status-error: #f48771;
+    --editor-text-muted: var(--editor-text-muted);
 
     /* -------------------------------------------------------------------------
-       Shadows - Global scale
+       Shadows
        ------------------------------------------------------------------------- */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
-    --shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+    /* -------------------------------------------------------------------------
+       Spacing
+       ------------------------------------------------------------------------- */
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --border-radius: 4px;
 
     /* -------------------------------------------------------------------------
        Transitions
        ------------------------------------------------------------------------- */
     --transition-fast: all 0.15s ease;
     --transition-normal: all 0.2s ease;
-    --panel-transition-fast: all 0.15s ease;
-    --panel-transition-normal: all 0.2s ease;
 }
 
 /* Base */
@@ -121,13 +86,13 @@ body {
     font-family: system-ui, -apple-system, sans-serif;
     margin: 0;
     padding: 0;
-    background: #fff;
-    color: #000;
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }
 
 /* Accessibility: Focus Styles */
 :focus-visible {
-    outline: 2px solid var(--accent-color, #0066cc);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
@@ -141,8 +106,8 @@ body {
     position: absolute;
     top: -40px;
     left: 0;
-    background: var(--bg-primary, #fff);
-    color: var(--text-primary, #000);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     padding: 8px 16px;
     z-index: 10001;
     text-decoration: none;
@@ -264,8 +229,8 @@ body.disconnected #container {
 /* Left Panel Structure */
 #left-panel {
     width: 360px;
-    background: #f8f8f8;
-    border-right: 1px solid #ddd;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
 }
@@ -276,21 +241,21 @@ body.disconnected #container {
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    border-bottom: 1px solid #ddd;
-    background: #fff;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
 }
 
 #header h1 {
     margin: 0 0 4px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #000;
+    color: var(--primary);
 }
 
 #header .subtitle {
     margin: 0;
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 /* Header logo */
@@ -315,7 +280,7 @@ body.disconnected #container {
 /* Build hash display */
 .header-build-info {
     font-size: 11px;
-    color: #888;
+    color: var(--text-muted);
     white-space: nowrap;
 }
 
@@ -333,10 +298,10 @@ body.disconnected #container {
 #stats {
     padding: 12px 16px;
     margin-bottom: 32px; /* Space for fixed log panel at bottom */
-    background: #fff;
-    border-top: 1px solid #ddd;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 #stats .stat-item {
@@ -345,25 +310,25 @@ body.disconnected #container {
 }
 
 #stats .stat-value {
-    color: #000;
+    color: var(--primary);
     font-weight: 600;
 }
 
 /* Graph limit selector */
 #graph-limit {
-    background: #1e2021;
-    color: #d3c6aa;
-    border: 1px solid #475258;
+    background: var(--editor-bg);
+    color: var(--editor-text);
+    border: 1px solid var(--editor-border);
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     font-size: 13px;
 }
 
 
 /* LLM Streaming Styles */
 .progress-event.llm-stream {
-    background: #1e1e1e;
-    border-left: 3px solid #4ade80;
+    background: var(--editor-bg);
+    border-left: 3px solid var(--success);
 }
 
 .llm-stream-content {
@@ -371,7 +336,7 @@ body.disconnected #container {
     font-size: 11px;
     line-height: 1.4;
     padding: 8px;
-    color: #d4d4d4;
+    color: var(--editor-text);
     white-space: pre-wrap;
     word-wrap: break-word;
 }
@@ -380,7 +345,7 @@ body.disconnected #container {
     display: inline-block;
     width: 8px;
     height: 14px;
-    background: #4ade80;
+    background: var(--success);
     margin-left: 2px;
     animation: blink 1s step-end infinite;
 }
@@ -394,18 +359,18 @@ body.disconnected #container {
 .llm-model, .llm-stage {
     font-size: 9px;
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     margin-left: 8px;
 }
 
 .llm-model {
-    background: #2a2a4a;
-    color: #a5b4fc;
+    background: var(--editor-bg-alt);
+    color: var(--info);
 }
 
 .llm-stage {
-    background: #2a4a2a;
-    color: #86efac;
+    background: var(--editor-bg-alt);
+    color: var(--success);
 }
 
 /* Responsive Utility Classes */
@@ -444,9 +409,9 @@ body.disconnected #container {
         left: 0;
         right: 0;
         z-index: 1000;
-        background: #fff;
-        border-top: 1px solid #ddd;
-        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
+        background: var(--bg-primary);
+        border-top: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md);
         display: flex;
         flex-direction: column;
     }
@@ -454,7 +419,7 @@ body.disconnected #container {
     /* Editor area - compact on mobile */
     #query-drop-zone {
         padding: 8px;
-        background: #f8f8f8;
+        background: var(--bg-secondary);
     }
 
     #codemirror-container {

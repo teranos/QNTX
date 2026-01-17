@@ -16,7 +16,7 @@
     background: transparent;
     border: 1px solid transparent;
     font-size: 18px;
-    color: #666;
+    color: var(--text-secondary);
     cursor: pointer;
     padding: 0;
     width: 24px;
@@ -39,22 +39,22 @@
 /* Hover state - subtle background change, no scaling */
 .panel-close:hover,
 .toast-close:hover {
-    background: #f0f0f0;
-    color: #000;
+    background: var(--bg-hover);
+    color: var(--primary);
     transform: none; /* Explicitly prevent any scaling */
 }
 
 /* Active/pressed state */
 .panel-close:active,
 .toast-close:active {
-    background: #e0e0e0;
-    color: #000;
+    background: var(--border-color);
+    color: var(--primary);
 }
 
 /* Focus state for keyboard navigation */
 .panel-close:focus-visible,
 .toast-close:focus-visible {
-    outline: 2px solid #0066cc;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 

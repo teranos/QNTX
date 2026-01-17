@@ -5,24 +5,24 @@
 
 /* Base card component */
 .panel-card {
-    background: var(--panel-bg);
-    border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
-    padding: var(--panel-padding-md);
-    transition: var(--panel-transition-fast);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md) var(--spacing-lg);
+    transition: var(--transition-fast);
 }
 
 .panel-card:hover {
-    box-shadow: var(--panel-shadow-md);
+    box-shadow: var(--shadow-md);
 }
 
 /* Card variants */
 .panel-card-compact {
-    padding: var(--panel-padding-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .panel-card-spacious {
-    padding: var(--panel-padding-lg);
+    padding: var(--spacing-lg) 20px;
 }
 
 /* === BADGES === */
@@ -41,23 +41,23 @@
 
 /* Status badge variants */
 .panel-badge-pending {
-    background: var(--status-pending-bg);
-    color: var(--status-pending-text);
+    background: var(--warning-bg);
+    color: var(--warning);
 }
 
 .panel-badge-running {
-    background: var(--status-running-bg);
-    color: var(--status-running-text);
+    background: var(--info-bg);
+    color: var(--info);
 }
 
 .panel-badge-completed {
-    background: var(--status-completed-bg);
-    color: var(--status-completed-text);
+    background: var(--success-bg);
+    color: var(--success);
 }
 
 .panel-badge-failed {
-    background: var(--status-failed-bg);
-    color: var(--status-failed-text);
+    background: var(--error-bg);
+    color: var(--error);
 }
 
 /* Badge with icon */
@@ -73,7 +73,7 @@
 .panel-empty {
     text-align: center;
     padding: 32px 16px;
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
     font-size: 12px;
 }
 
@@ -86,14 +86,14 @@
 .panel-loading {
     text-align: center;
     padding: 32px 16px;
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
     font-size: 12px;
 }
 
 .panel-empty-hint {
     margin-top: 8px;
     font-size: 11px;
-    color: var(--panel-text-tertiary);
+    color: var(--text-muted);
 }
 
 /* === ERROR STATES === */
@@ -101,22 +101,22 @@
 .panel-error {
     text-align: center;
     padding: 32px 16px;
-    background: var(--status-failed-bg);
-    border: 1px solid var(--status-failed-text);
-    border-radius: var(--panel-border-radius);
+    background: var(--error-bg);
+    border: 1px solid var(--error);
+    border-radius: var(--border-radius);
     margin: 16px;
 }
 
 .panel-error-title {
     font-size: 14px;
     font-weight: 600;
-    color: var(--status-failed-text);
+    color: var(--error);
     margin: 0 0 8px 0;
 }
 
 .panel-error-message {
     font-size: 12px;
-    color: var(--panel-text-primary);
+    color: var(--text-primary);
     margin: 0 0 12px 0;
     word-break: break-word;
 }
@@ -124,7 +124,7 @@
 /* Suggestion text - helpful hint for resolving the error */
 .panel-error-suggestion {
     font-size: 11px;
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
     margin: 0 0 16px 0;
     font-style: italic;
 }
@@ -134,7 +134,7 @@
     text-align: left;
     margin: 16px 0;
     border: 1px solid rgba(211, 47, 47, 0.3);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: rgba(255, 255, 255, 0.5);
 }
 
@@ -142,7 +142,7 @@
     padding: 8px 12px;
     font-size: 11px;
     font-weight: 500;
-    color: var(--status-failed-text);
+    color: var(--error);
     cursor: pointer;
     user-select: none;
 }
@@ -166,21 +166,21 @@
     overflow-x: auto;
     max-height: 200px;
     overflow-y: auto;
-    background: var(--editor-code-bg);
+    background: var(--editor-bg-alt);
     color: var(--editor-text);
-    border-radius: 0 0 var(--panel-border-radius) var(--panel-border-radius);
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
 }
 
 .panel-error-retry {
-    background: var(--status-failed-text);
-    color: var(--color-bg);
+    background: var(--error);
+    color: var(--bg-primary);
     border: none;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: 8px 16px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--transition-fast);
 }
 
 .panel-error-retry:hover {
@@ -188,7 +188,7 @@
 }
 
 .panel-error-retry:focus {
-    outline: 2px solid var(--status-failed-text);
+    outline: 2px solid var(--error);
     outline-offset: 2px;
 }
 
@@ -198,11 +198,11 @@
     align-items: flex-start;
     gap: 8px;
     padding: 10px 12px;
-    background: var(--status-failed-bg);
-    border: 1px solid var(--status-failed-text);
-    border-radius: var(--panel-border-radius);
+    background: var(--error-bg);
+    border: 1px solid var(--error);
+    border-radius: var(--border-radius);
     font-size: 12px;
-    color: var(--status-failed-text);
+    color: var(--error);
     margin-top: 8px;
 }
 
@@ -222,7 +222,7 @@
 }
 
 .panel-error-inline-message {
-    color: var(--panel-text-primary);
+    color: var(--text-primary);
 }
 
 /* Loading state data attribute */
@@ -231,7 +231,7 @@
 }
 
 [data-loading="error"] {
-    background: var(--status-failed-bg);
+    background: var(--error-bg);
 }
 
 /* === LISTS === */
@@ -255,10 +255,10 @@
 .panel-section-header {
     font-size: 13px;
     font-weight: 600;
-    color: var(--panel-text-primary);
+    color: var(--text-primary);
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--panel-border-color);
+    border-bottom: 1px solid var(--border-color);
 }
 
 /* === METADATA / INFO ROWS === */
@@ -272,11 +272,11 @@
 }
 
 .panel-info-label {
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
 }
 
 .panel-info-value {
-    color: var(--panel-text-primary);
+    color: var(--text-primary);
     font-weight: 500;
 }
 
@@ -284,26 +284,26 @@
 
 .panel-btn {
     background: none;
-    border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
     padding: 6px 12px;
     font-size: 12px;
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    transition: var(--transition-fast);
 }
 
 .panel-btn:hover {
-    background: var(--panel-bg-secondary);
+    background: var(--bg-secondary);
 }
 
 .panel-btn-primary {
-    background: var(--color-primary);
-    color: var(--color-bg);
-    border-color: var(--color-primary);
+    background: var(--primary);
+    color: var(--bg-primary);
+    border-color: var(--primary);
 }
 
 .panel-btn-primary:hover {
-    background: var(--color-primary-hover);
+    background: var(--primary-hover);
 }
 
 .panel-btn-sm {
@@ -313,9 +313,9 @@
 
 /* Warning button - for two-click confirmation pattern */
 .panel-btn-warning {
-    background: var(--status-pending-bg);
-    border-color: var(--color-warning);
-    color: var(--status-pending-text);
+    background: var(--warning-bg);
+    border-color: var(--warning);
+    color: var(--warning);
 }
 
 .panel-btn-warning:hover:not(:disabled) {
@@ -324,9 +324,9 @@
 
 /* Success/confirm button - for validated state in two-click pattern */
 .panel-btn-success {
-    background: var(--status-completed-bg);
-    border-color: var(--status-completed-text);
-    color: var(--status-completed-text);
+    background: var(--success-bg);
+    border-color: var(--success);
+    color: var(--success);
 }
 
 .panel-btn-success:hover:not(:disabled) {
@@ -337,7 +337,7 @@
 .panel-confirm-hint {
     display: block;
     font-size: 11px;
-    color: var(--status-pending-text);
+    color: var(--warning);
     margin-top: 4px;
     font-style: italic;
 }
@@ -346,7 +346,7 @@
 
 .panel-divider {
     height: 1px;
-    background: var(--panel-border-color);
+    background: var(--border-color);
     margin: 16px 0;
 }
 
@@ -355,7 +355,7 @@
 .panel-code {
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
     font-size: 11px;
-    background: var(--panel-bg-secondary);
+    background: var(--bg-secondary);
     padding: 2px 6px;
     border-radius: 3px;
 }
@@ -364,14 +364,14 @@
 
 .panel-timestamp {
     font-size: 11px;
-    color: var(--panel-text-tertiary);
+    color: var(--text-muted);
 }
 
 /* === PROGRESS INDICATORS === */
 
 .panel-progress {
     font-size: 11px;
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
 }
 
 .panel-progress-text {
@@ -380,14 +380,14 @@
 
 .panel-progress-bar {
     height: 4px;
-    background: var(--panel-border-color);
+    background: var(--border-color);
     border-radius: 2px;
     overflow: hidden;
 }
 
 .panel-progress-fill {
     height: 100%;
-    background: var(--status-running-text);
+    background: var(--info);
     transition: width 0.3s ease;
 }
 
@@ -412,7 +412,7 @@
 
 /* Text utilities */
 .panel-text-muted {
-    color: var(--panel-text-secondary);
+    color: var(--text-secondary);
 }
 
 .panel-text-small {
@@ -431,7 +431,7 @@
 /* Terminal-style interactive tooltip */
 .panel-tooltip {
     position: fixed;
-    background: var(--editor-code-bg);
+    background: var(--editor-bg-alt);
     color: var(--editor-text);
     padding: 8px 12px;
     border-radius: 0;
@@ -456,13 +456,13 @@
 /* Interactive element styling - indicates hoverable for more info */
 .has-tooltip {
     cursor: help;
-    border-bottom: 1px dotted var(--panel-text-secondary);
-    transition: var(--panel-transition-fast);
+    border-bottom: 1px dotted var(--text-secondary);
+    transition: var(--transition-fast);
 }
 
 .has-tooltip:hover {
-    color: var(--panel-text-primary);
-    border-bottom-color: var(--panel-text-primary);
+    color: var(--text-primary);
+    border-bottom-color: var(--text-primary);
 }
 
 /* Tooltip content separator */

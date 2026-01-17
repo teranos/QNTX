@@ -4,16 +4,16 @@
 .job-list-panel {
     position: relative;
     width: 100%;
-    background: var(--panel-bg);
-    border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
     margin: 8px;
-    box-shadow: var(--panel-shadow-lg);
+    box-shadow: var(--shadow-lg);
     z-index: 100;
     max-height: 500px;
     display: none; /* Hidden by default */
     flex-direction: column;
-    transition: var(--panel-transition-normal);
+    transition: var(--transition-normal);
     overflow: hidden;
 }
 
@@ -32,15 +32,15 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--panel-padding-md);
-    background: var(--panel-bg-secondary);
-    border-bottom: var(--panel-border);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .job-list-title {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
-    color: #000;
+    color: var(--primary);
 }
 
 
@@ -65,22 +65,22 @@
 }
 
 .job-item:hover {
-    border-color: #999;
+    border-color: var(--text-muted);
 }
 
 .job-item.completed {
     background: #f0f9ff;
-    border-color: #4caf50;
+    border-color: var(--success);
 }
 
 .job-item.failed {
     background: #fff5f5;
-    border-color: #f44336;
+    border-color: var(--error);
 }
 
 .job-item.paused {
     background: #fffbf0;
-    border-color: #ff9800;
+    border-color: var(--warning);
 }
 
 /* Job Header - extends panel-flex-center */
@@ -96,7 +96,7 @@
     flex: 1;
     font-size: 13px;
     font-weight: 500;
-    color: #000;
+    color: var(--primary);
 }
 
 /* Status badges - use panel-badge from base */
@@ -107,7 +107,7 @@
 /* Job-specific badge state colors */
 .job-status-badge.paused {
     background: #fff3e0;
-    color: #f57c00;
+    color: var(--warning);
 }
 
 /* Job Details */
@@ -123,7 +123,7 @@
 .job-progress-bar {
     width: 100%;
     height: 6px;
-    background: #e0e0e0;
+    background: var(--border-color);
     border-radius: 3px;
     overflow: hidden;
     margin-bottom: 4px;
@@ -137,13 +137,13 @@
 
 .job-progress-text {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 /* Cost Info */
 .job-cost {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
 
@@ -159,22 +159,22 @@
     padding: 6px 12px;
     font-size: 11px;
     font-weight: 500;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: #fff;
-    color: #333;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .job-action-btn:hover {
-    background: #f5f5f5;
-    border-color: #999;
+    background: var(--bg-secondary);
+    border-color: var(--text-muted);
 }
 
 .job-action-btn.pause-btn {
-    border-color: #ff9800;
-    color: #f57c00;
+    border-color: var(--warning);
+    color: var(--warning);
 }
 
 .job-action-btn.pause-btn:hover {
@@ -182,8 +182,8 @@
 }
 
 .job-action-btn.resume-btn {
-    border-color: #4caf50;
-    color: #388e3c;
+    border-color: var(--success);
+    color: var(--success);
 }
 
 .job-action-btn.resume-btn:hover {
@@ -191,8 +191,8 @@
 }
 
 .job-action-btn.details-btn {
-    border-color: #2196f3;
-    color: #1976d2;
+    border-color: var(--info);
+    color: var(--info);
 }
 
 .job-action-btn.details-btn:hover {
@@ -200,8 +200,8 @@
 }
 
 .job-action-btn.dismiss-btn {
-    border-color: #f44336;
-    color: #d32f2f;
+    border-color: var(--error);
+    color: var(--error);
 }
 
 .job-action-btn.dismiss-btn:hover {
@@ -219,7 +219,7 @@
 }
 
 .job-header.clickable:hover {
-    background: #f9f9f9;
+    background: var(--bg-secondary);
     border-radius: 4px;
     margin: -4px;
     padding: 4px;
@@ -227,7 +227,7 @@
 
 .expand-icon {
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
     transition: transform 0.2s ease;
     width: 16px;
     text-align: center;
@@ -237,12 +237,12 @@
 .task-list {
     margin-top: 12px;
     padding-top: 8px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-color);
 }
 
 .task-list-empty {
     font-size: 11px;
-    color: #999;
+    color: var(--text-muted);
     padding: 8px;
     text-align: center;
 }
@@ -264,7 +264,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 .task-square:hover {
@@ -276,27 +276,27 @@
 /* Pending/Queued - Empty square */
 .task-square.pending,
 .task-square.queued {
-    background: #fff;
+    background: var(--bg-primary);
     border-color: #d0d0d0;
 }
 
 /* Running - Partially filled with animation */
 .task-square.running {
     background: linear-gradient(to top, #4caf50 50%, #fff 50%);
-    border-color: #4caf50;
+    border-color: var(--success);
     animation: pulse 1.5s ease-in-out infinite;
 }
 
 /* Completed - Fully filled */
 .task-square.completed {
     background: #4caf50;
-    border-color: #4caf50;
+    border-color: var(--success);
 }
 
 /* Failed - Red fill */
 .task-square.failed {
     background: #f44336;
-    border-color: #f44336;
+    border-color: var(--error);
 }
 
 /* Paused - Striped pattern */
@@ -314,8 +314,8 @@
 /* Footer */
 .job-list-footer {
     padding: 8px 12px;
-    background: #f8f8f8;
-    border-top: 1px solid #ddd;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
 }
 
 .new-ix-btn {
@@ -325,21 +325,21 @@
     font-weight: 500;
     border: 1px dashed #999;
     border-radius: 4px;
-    background: #fff;
-    color: #333;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .new-ix-btn:hover {
-    background: #f5f5f5;
-    border-color: #333;
+    background: var(--bg-secondary);
+    border-color: var(--text-primary);
     border-style: solid;
 }
 
 /* LLM Streaming Output */
 .llm-stream-output {
-    background: #1e1e1e;
+    background: var(--editor-bg);
     border: 1px solid #3d3d3d;
     border-radius: 4px;
     margin-top: 8px;
@@ -401,7 +401,7 @@
 }
 
 .stream-content::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--editor-bg);
 }
 
 .stream-content::-webkit-scrollbar-thumb {
@@ -417,18 +417,18 @@
 .job-expanded-details {
     margin-top: 12px;
     padding: 12px;
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
 }
 
 .details-header {
     font-size: 12px;
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 8px;
     padding-bottom: 6px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .details-content {
@@ -453,25 +453,25 @@
 
 .metadata-key {
     font-weight: 600;
-    color: #666;
+    color: var(--text-secondary);
     min-width: 100px;
     flex-shrink: 0;
 }
 
 .metadata-value {
-    color: #333;
+    color: var(--text-primary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
     word-break: break-word;
     flex: 1;
 }
 
 .metadata-item.error .metadata-value {
-    color: #d32f2f;
+    color: var(--error);
 }
 
 .no-metadata {
     font-size: 11px;
-    color: #999;
+    color: var(--text-muted);
     text-align: center;
     padding: 8px;
     margin: 0;
