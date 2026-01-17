@@ -1,19 +1,5 @@
 /* Go Editor Panel Styles */
-
-/* Color palette - shared dark theme colors */
-:root {
-    --editor-bg: #1e1e1e;
-    --editor-info-bg: #252526;
-    --editor-border: #3e3e42;
-    --editor-text: #cccccc;
-    --editor-text-muted: #858585;
-    --editor-code-bg: #2a2a2a;
-
-    /* Status colors */
-    --status-neutral: #858585;
-    --status-success: #4ec9b0;
-    --status-error: #f48771;
-}
+/* Editor tokens defined in core.css :root */
 
 /* Header icon styling */
 .go-editor-icon {

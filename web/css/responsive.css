@@ -1,11 +1,10 @@
 /* Responsive Utilities - Centralized mobile behavior */
-
-:root {
-    /* Breakpoint documentation (can't use in @media, but documents standards) */
-    --breakpoint-mobile: 768px;
-    --breakpoint-tablet: 900px;
-    --breakpoint-desktop: 1200px;
-}
+/*
+ * Breakpoints (CSS variables can't be used in @media queries):
+ * - Mobile: 768px
+ * - Tablet: 900px
+ * - Desktop: 1200px
+ */
 
 /* Mobile: Full-width panels and layout adjustments */
 @media (max-width: 768px) {

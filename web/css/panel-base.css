@@ -1,43 +1,5 @@
 /* Panel Base Styles - Shared components for all panels */
-
-/* Design System Tokens */
-:root {
-    /* Spacing */
-    --panel-padding-sm: 8px 12px;
-    --panel-padding-md: 12px 16px;
-    --panel-padding-lg: 16px 20px;
-
-    /* Borders */
-    --panel-border: 1px solid #ddd;
-    --panel-border-radius: 4px;
-
-    /* Colors */
-    --panel-bg: #fff;
-    --panel-bg-secondary: #f8f8f8;
-    --panel-border-color: #ddd;
-    --panel-text-primary: #333;
-    --panel-text-secondary: #666;
-    --panel-text-tertiary: #999;
-
-    /* Shadows */
-    --panel-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-    --panel-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --panel-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
-
-    /* Transitions */
-    --panel-transition-fast: all 0.15s ease;
-    --panel-transition-normal: all 0.2s ease;
-
-    /* Status colors */
-    --status-pending-bg: #fff3e0;
-    --status-pending-text: #e65100;
-    --status-running-bg: #e3f2fd;
-    --status-running-text: #1976d2;
-    --status-completed-bg: #e8f5e9;
-    --status-completed-text: #388e3c;
-    --status-failed-bg: #ffebee;
-    --status-failed-text: #d32f2f;
-}
+/* Design tokens defined in core.css :root */
 
 /* === CARDS === */
 
