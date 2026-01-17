@@ -14,6 +14,7 @@ import (
 	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	id "github.com/teranos/vanity-id"
 )
@@ -116,6 +117,10 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	// Parse template
 	tmpl, err := Parse(payload.Template)
 	if err != nil {
+		logger.AddAxSymbol(logger.Logger).Errorw("Template parsing failed",
+			"error", err,
+			"template_length", len(payload.Template),
+		)
 		return errors.Wrap(err, "failed to parse prompt template")
 	}
 
@@ -162,7 +167,7 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 			return errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
 		}
 
-		// Call LLM
+		// Call LLM with timing
 		chatReq := openrouter.ChatRequest{
 			SystemPrompt: payload.SystemPrompt,
 			UserPrompt:   prompt,
@@ -171,10 +176,27 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 			chatReq.Model = &payload.Model
 		}
 
+		startTime := time.Now()
 		resp, err := client.Chat(ctx, chatReq)
+		duration := time.Since(startTime)
+
 		if err != nil {
+			logger.AddAxSymbol(logger.Logger).Errorw("LLM call failed",
+				"error", err,
+				"attestation_id", as.ID,
+				"duration_ms", duration.Milliseconds(),
+			)
 			return errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
 		}
+
+		// Log successful LLM call with duration and token usage
+		logger.AddAxSymbol(logger.Logger).Infow("LLM call completed",
+			"attestation_id", as.ID,
+			"duration_ms", duration.Milliseconds(),
+			"prompt_tokens", resp.Usage.PromptTokens,
+			"completion_tokens", resp.Usage.CompletionTokens,
+			"total_tokens", resp.Usage.TotalTokens,
+		)
 
 		// Create result attestation
 		resultAs, err := h.createResultAttestation(&as, resp.Content, payload)
