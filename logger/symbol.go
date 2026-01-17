@@ -168,7 +168,3 @@ func AddIXSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
 	return l.With(FieldSymbol, sym.IX)
 }
 
-// AddSoSymbol wraps a logger with the SO symbol (⟶)
-func AddSoSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
-	return l.With(FieldSymbol, sym.SO)
-}
