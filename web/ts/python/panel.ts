@@ -11,6 +11,7 @@ import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger.ts';
 import { handleError } from '../error-handler.ts';
+import { buttonPlaceholder, hydrateButtons, type Button } from '../components/button.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -41,9 +42,8 @@ class PythonEditorPanel extends BasePanel {
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
 
-    // Two-click confirmation state for execute
-    private needsConfirmation: boolean = false;
-    private confirmationTimeout: number | null = null;
+    // Hydrated execute button (confirmation handled by Button component)
+    private executeButton: Button | null = null;
 
     // Event handler references for cleanup
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -137,6 +137,12 @@ class PythonEditorPanel extends BasePanel {
     protected onDestroy(): void {
         this.destroyEditor();
 
+        // Clean up execute button
+        if (this.executeButton) {
+            this.executeButton.destroy();
+            this.executeButton = null;
+        }
+
         // Clean up keyboard handler
         if (this.executeHandler) {
             document.removeEventListener('keydown', this.executeHandler);
@@ -229,14 +235,8 @@ class PythonEditorPanel extends BasePanel {
                         keymap.of(defaultKeymap),
                         pythonExtension,
                         oneDark,
-                        EditorView.lineWrapping,
-                        // Reset confirmation when code changes
-                        EditorView.updateListener.of((update) => {
-                            if (update.docChanged && this.needsConfirmation) {
-                                this.needsConfirmation = false;
-                                this.updateExecuteButton(false);
-                            }
-                        })
+                        EditorView.lineWrapping
+                        // Note: Confirmation reset handled by Button component timeout
                     ]
                 }),
                 parent: container
@@ -264,35 +264,25 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 `;
     }
 
+    /**
+     * Execute code via keyboard shortcut - triggers the hydrated button
+     */
     async executeCode(): Promise<void> {
         if (!this.editor || this.isExecuting) return;
 
-        // First click: show confirmation state
-        if (!this.needsConfirmation) {
-            this.needsConfirmation = true;
-            this.updateExecuteButton(false);
-
-            // Auto-reset confirmation after 5 seconds
-            if (this.confirmationTimeout) {
-                clearTimeout(this.confirmationTimeout);
-            }
-            this.confirmationTimeout = window.setTimeout(() => {
-                this.needsConfirmation = false;
-                this.updateExecuteButton(false);
-            }, 5000);
-
-            return;
+        // Click the hydrated button to trigger its confirmation flow
+        if (this.executeButton) {
+            this.executeButton.element.click();
         }
+    }
 
-        // Second click: actually execute
-        this.needsConfirmation = false;
-        if (this.confirmationTimeout) {
-            clearTimeout(this.confirmationTimeout);
-            this.confirmationTimeout = null;
-        }
+    /**
+     * Direct code execution (called by Button after confirmation)
+     */
+    private async executeCodeDirect(): Promise<void> {
+        if (!this.editor) return;
 
         this.isExecuting = true;
-        this.updateExecuteButton(true);
 
         try {
             const code = this.editor.state.doc.toString();
@@ -330,9 +320,9 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             };
             this.updateOutput(this.lastOutput);
             this.switchTab('output');
+            throw error; // Re-throw so Button shows error state
         } finally {
             this.isExecuting = false;
-            this.updateExecuteButton(false);
         }
     }
 
@@ -402,38 +392,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         outputEl.innerHTML = html;
     }
 
-
-    private updateExecuteButton(executing: boolean): void {
-        const btn = this.$('#python-execute-btn') as HTMLButtonElement;
-        if (!btn) return;
-
-        btn.disabled = executing;
-
-        // Remove existing state classes
-        btn.classList.remove('panel-btn-warning', 'panel-btn-success');
-
-        if (executing) {
-            btn.textContent = 'Running...';
-        } else if (this.needsConfirmation) {
-            btn.textContent = 'Confirm Execute';
-            btn.classList.add('panel-btn-warning');
-        } else {
-            btn.textContent = 'Run (⌘↵)';
-        }
-
-        // Update or remove hint
-        const existingHint = this.$('.python-execute-hint');
-        if (this.needsConfirmation && !executing) {
-            if (!existingHint) {
-                const hint = document.createElement('div');
-                hint.className = 'python-execute-hint panel-confirm-hint';
-                hint.textContent = 'Click again to execute code';
-                btn.parentElement?.insertBefore(hint, btn.nextSibling);
-            }
-        } else {
-            existingHint?.remove();
-        }
-    }
+    // Note: updateExecuteButton removed - Button component handles its own state
 
     updateStatus(status: PluginStatus): void {
         const statusEl = this.$('#python-status');
@@ -568,7 +527,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             <div class="python-sidebar-content">
                 <div class="python-sidebar-section">
                     <h4>Quick Actions</h4>
-                    <button id="python-execute-btn" class="python-action-btn">Run (⌘↵)</button>
+                    ${buttonPlaceholder('python-execute', 'Run (⌘↵)', 'python-action-btn')}
                     <button id="python-clear-btn" class="python-action-btn secondary">Clear</button>
                 </div>
                 <div class="python-sidebar-section">
@@ -622,9 +581,24 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
     }
 
     private bindSidebarEvents(): void {
-        // Execute button
-        const executeBtn = this.$('#python-execute-btn');
-        executeBtn?.addEventListener('click', () => this.executeCode());
+        // Hydrate execute button with confirmation
+        const sidebar = this.$('#tab-sidebar');
+        if (sidebar) {
+            const buttons = hydrateButtons(sidebar as HTMLElement, {
+                'python-execute': {
+                    label: 'Run (⌘↵)',
+                    onClick: async () => {
+                        await this.executeCodeDirect();
+                    },
+                    variant: 'default',
+                    confirmation: {
+                        label: 'Confirm Execute',
+                        timeout: 5000
+                    }
+                }
+            });
+            this.executeButton = buttons['python-execute'] || null;
+        }
 
         // Clear button
         const clearBtn = this.$('#python-clear-btn');
