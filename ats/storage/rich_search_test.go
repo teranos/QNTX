@@ -17,14 +17,7 @@ func TestSearchRichStringFields(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewBoundedStore(db, nil)
 
-	// Insert test types with RichStringFields
-	_, err := db.Exec(`INSERT INTO types (name, label, rich_string_fields) VALUES (?, ?, ?)`,
-		"Commit", "Git Commit", `["message", "description"]`)
-	require.NoError(t, err)
-
-	_, err = db.Exec(`INSERT INTO types (name, label, rich_string_fields) VALUES (?, ?, ?)`,
-		"Note", "Personal Note", `["content", "summary"]`)
-	require.NoError(t, err)
+	// Note: We search directly in attestation attributes, no types table needed
 
 	// Create test attestations with searchable content
 	testCases := []struct {
@@ -80,9 +73,9 @@ func TestSearchRichStringFields(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{tc.nodeID})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			tc.nodeID+"-att", subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			tc.nodeID+"-att", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 	}
 
@@ -139,9 +132,9 @@ func TestSearchRichStringFields(t *testing.T) {
 			subjectsJSON, _ := json.Marshal([]string{fmt.Sprintf("note-limit-%d", i)})
 
 			_, err := db.Exec(`
-				INSERT INTO attestations (id, subjects, attributes, timestamp)
-				VALUES (?, ?, ?, ?)`,
-				fmt.Sprintf("att-limit-%d", i), subjectsJSON, attrsJSON, time.Now().Unix())
+				INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				fmt.Sprintf("att-limit-%d", i), subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 			require.NoError(t, err)
 		}
 
@@ -165,9 +158,9 @@ func TestSearchRichStringFields(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{"note-long"})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			"att-long", subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"att-long", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 
 		matches, err := store.SearchRichStringFields(ctx, "fuzzy", 10)
@@ -195,9 +188,9 @@ func TestSearchRichStringFields(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{"commit-duplicate"})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			"att-duplicate", subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"att-duplicate", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 
 		matches, err := store.SearchRichStringFields(ctx, "fuzzy", 100)
@@ -225,9 +218,9 @@ func TestSearchRichStringFields(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{"note-with-label"})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			"att-with-label", subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"att-with-label", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 
 		matches, err := store.SearchRichStringFields(ctx, "fuzzy", 100)
@@ -252,9 +245,9 @@ func TestSearchRichStringFields(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{"note-array"})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			"att-array", subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"att-array", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 
 		matches, err := store.SearchRichStringFields(ctx, "fuzzy", 100)
@@ -297,9 +290,9 @@ func TestSearchRichStringFields_FuzzyMatching(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{td.id})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			td.id+"-att", subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			td.id+"-att", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 	}
 
@@ -407,10 +400,7 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewBoundedStore(db, nil)
 
-	// Insert type
-	_, err := db.Exec(`INSERT INTO types (name, label, rich_string_fields) VALUES (?, ?, ?)`,
-		"Commit", "Git Commit", `["message", "description"]`)
-	require.NoError(t, err)
+	// No types table needed - we search attestations directly
 
 	// Insert many attestations
 	for i := 0; i < 1000; i++ {
@@ -423,9 +413,9 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 		subjectsJSON, _ := json.Marshal([]string{fmt.Sprintf("commit-%d", i)})
 
 		_, err := db.Exec(`
-			INSERT INTO attestations (id, subjects, attributes, timestamp)
-			VALUES (?, ?, ?, ?)`,
-			fmt.Sprintf("att-%d", i), subjectsJSON, attrsJSON, time.Now().Unix())
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			fmt.Sprintf("att-%d", i), subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
 		require.NoError(t, err)
 	}
 
