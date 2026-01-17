@@ -166,14 +166,14 @@
     overflow-x: auto;
     max-height: 200px;
     overflow-y: auto;
-    background: #2d2d2d;
-    color: #f0f0f0;
+    background: var(--editor-code-bg);
+    color: var(--editor-text);
     border-radius: 0 0 var(--panel-border-radius) var(--panel-border-radius);
 }
 
 .panel-error-retry {
     background: var(--status-failed-text);
-    color: #fff;
+    color: var(--color-bg);
     border: none;
     border-radius: var(--panel-border-radius);
     padding: 8px 16px;
@@ -258,7 +258,7 @@
     color: var(--panel-text-primary);
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--panel-border-color);
 }
 
 /* === METADATA / INFO ROWS === */
@@ -297,13 +297,13 @@
 }
 
 .panel-btn-primary {
-    background: #000;
-    color: #fff;
-    border-color: #000;
+    background: var(--color-primary);
+    color: var(--color-bg);
+    border-color: var(--color-primary);
 }
 
 .panel-btn-primary:hover {
-    background: #333;
+    background: var(--color-primary-hover);
 }
 
 .panel-btn-sm {
@@ -313,9 +313,9 @@
 
 /* Warning button - for two-click confirmation pattern */
 .panel-btn-warning {
-    background: #fff3e0;
-    border-color: #ef6c00;
-    color: #e65100;
+    background: var(--status-pending-bg);
+    border-color: var(--color-warning);
+    color: var(--status-pending-text);
 }
 
 .panel-btn-warning:hover:not(:disabled) {
@@ -324,9 +324,9 @@
 
 /* Success/confirm button - for validated state in two-click pattern */
 .panel-btn-success {
-    background: #e8f5e9;
-    border-color: #388e3c;
-    color: #2e7d32;
+    background: var(--status-completed-bg);
+    border-color: var(--status-completed-text);
+    color: var(--status-completed-text);
 }
 
 .panel-btn-success:hover:not(:disabled) {
@@ -337,7 +337,7 @@
 .panel-confirm-hint {
     display: block;
     font-size: 11px;
-    color: #e65100;
+    color: var(--status-pending-text);
     margin-top: 4px;
     font-style: italic;
 }
@@ -346,7 +346,7 @@
 
 .panel-divider {
     height: 1px;
-    background: #eee;
+    background: var(--panel-border-color);
     margin: 16px 0;
 }
 
@@ -380,7 +380,7 @@
 
 .panel-progress-bar {
     height: 4px;
-    background: #eee;
+    background: var(--panel-border-color);
     border-radius: 2px;
     overflow: hidden;
 }
@@ -431,8 +431,8 @@
 /* Terminal-style interactive tooltip */
 .panel-tooltip {
     position: fixed;
-    background: #2d2d2d;
-    color: #f0f0f0;
+    background: var(--editor-code-bg);
+    color: var(--editor-text);
     padding: 8px 12px;
     border-radius: 0;
     font-size: 11px;
@@ -441,9 +441,9 @@
     white-space: pre-wrap;
     z-index: 100000; /* Must be above windows (which start at 9999) */
     pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-lg);
     max-width: 400px;
-    border: 1px solid #444;
+    border: 1px solid var(--editor-border);
 }
 
 /* Mobile/tablet: constrain tooltip to viewport */
@@ -469,6 +469,6 @@
 .panel-tooltip-separator {
     display: block;
     height: 1px;
-    background: #555;
+    background: var(--editor-border);
     margin: 6px 0;
 }
