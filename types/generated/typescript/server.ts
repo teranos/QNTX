@@ -534,6 +534,31 @@ export interface QueryMessage {
   format: string;
 }
 
+export interface Result {
+  /**
+   * SourceAttestationID is the ID of the attestation that was processed
+   */
+  source_attestation_id: string;
+  /**
+   * Prompt is the interpolated prompt that was sent to the LLM
+   */
+  prompt: string;
+  /**
+   * Response is the LLM's response
+   */
+  response: string;
+  /**
+   * ResultAttestationID is the ID of the created result attestation
+   */
+  result_attestation_id?: string;
+  /**
+   * Token usage tracking
+   */
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
 export interface ScheduledJobResponse {
   id: string;
   ats_code: string;
