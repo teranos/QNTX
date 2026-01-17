@@ -81,6 +81,13 @@
     border-top: var(--arrow-size) solid transparent;
     border-bottom: var(--arrow-size) solid transparent;
     border-right: var(--arrow-size) solid #444;
+    /* Hide when panel is not visible */
+    display: none;
+}
+
+/* Only show expand button when panel is visible */
+.prose-panel[data-visibility="visible"] .panel-expand-btn {
+    display: block;
 }
 
 .prose-panel .panel-expand-btn:hover {
