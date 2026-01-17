@@ -194,9 +194,9 @@ export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState)
             </div>
 
             <div class="pulse-job-actions">
-                ${buttonPlaceholder(`force-trigger-${job.id}`, 'Force Trigger', 'pulse-btn pulse-btn-force')}
-                ${buttonPlaceholder(`toggle-state-${job.id}`, isActive ? 'Pause' : 'Resume', `pulse-btn pulse-btn-${isActive ? 'pause' : 'resume'}`)}
-                ${buttonPlaceholder(`delete-${job.id}`, 'Delete', 'pulse-btn pulse-btn-delete')}
+                ${buttonPlaceholder(`btn:force-trigger:${job.id}`, 'Force Trigger', 'pulse-btn pulse-btn-force')}
+                ${buttonPlaceholder(`btn:toggle-state:${job.id}`, isActive ? 'Pause' : 'Resume', `pulse-btn pulse-btn-${isActive ? 'pause' : 'resume'}`)}
+                ${buttonPlaceholder(`btn:delete:${job.id}`, 'Delete', 'pulse-btn pulse-btn-delete')}
             </div>
 
             ${executionHistoryHtml}

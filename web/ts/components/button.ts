@@ -34,10 +34,13 @@
 export type ButtonVariant = 'default' | 'primary' | 'secondary' | 'danger' | 'warning' | 'ghost';
 export type ButtonSize = 'small' | 'medium' | 'large';
 
+/** Default timeout in ms for confirmation state before reverting */
+const DEFAULT_CONFIRMATION_TIMEOUT = 5000;
+
 export interface ButtonConfirmation {
     /** Label to show in confirmation state */
     label: string;
-    /** Timeout in ms before reverting to original state (default: 5000) */
+    /** Timeout in ms before reverting to original state (default: DEFAULT_CONFIRMATION_TIMEOUT) */
     timeout?: number;
 }
 
@@ -195,7 +198,7 @@ export class Button {
         this.render();
 
         // Set timeout to auto-revert
-        const timeout = this.config.confirmation?.timeout ?? 5000;
+        const timeout = this.config.confirmation?.timeout ?? DEFAULT_CONFIRMATION_TIMEOUT;
         this.confirmTimeout = window.setTimeout(() => {
             this.exitConfirmState();
         }, timeout);
@@ -320,8 +323,10 @@ export class Button {
             ? requestAnimationFrame
             : (cb: () => void) => setTimeout(cb, 0);
 
+        // Capture element in closure to avoid race condition with clearError()
+        const errorEl = this.errorElement;
         scheduleFrame(() => {
-            this.errorElement?.classList.add('qntx-btn-error-visible');
+            errorEl?.classList.add('qntx-btn-error-visible');
         });
     }
 
@@ -453,7 +458,7 @@ export function createDangerButton(
         variant: 'danger',
         confirmation: {
             label: confirmLabel,
-            timeout: 5000
+            timeout: DEFAULT_CONFIRMATION_TIMEOUT
         }
     });
 }
@@ -555,6 +560,10 @@ export function buttonPlaceholder(
 
 // ============================================================================
 // Button Registry for WebSocket-driven updates
+// NOTE: This registry is currently unused in the codebase. It was designed
+// for future WebSocket-driven button state updates but is not yet integrated
+// with any WebSocket handlers. The registry functionality is exported and
+// ready to use when needed.
 // ============================================================================
 
 /**

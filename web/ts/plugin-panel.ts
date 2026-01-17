@@ -447,9 +447,9 @@ export class PluginPanel extends BasePanel {
         let controls = '';
         if (plugin.pausable) {
             if (plugin.state === 'running') {
-                controls = buttonPlaceholder(`plugin-pause-${plugin.name}`, '❚❚ Pause', 'panel-btn panel-btn-sm plugin-pause-btn');
+                controls = buttonPlaceholder(`btn:plugin-pause:${plugin.name}`, '❚❚ Pause', 'panel-btn panel-btn-sm plugin-pause-btn');
             } else if (plugin.state === 'paused') {
-                controls = buttonPlaceholder(`plugin-resume-${plugin.name}`, '▶ Resume', 'panel-btn panel-btn-sm plugin-resume-btn');
+                controls = buttonPlaceholder(`btn:plugin-resume:${plugin.name}`, '▶ Resume', 'panel-btn panel-btn-sm plugin-resume-btn');
             }
         }
 
