@@ -247,6 +247,7 @@
     text-align: center;
 }
 
+/* POSSIBLY DEAD - task-list/task-square classes not found in TS files */
 /* Task List - Grid of Squares */
 .task-list {
     display: flex;
