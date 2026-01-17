@@ -155,6 +155,19 @@ impl RustRebuildResultC {
 // Engine Lifecycle
 // ============================================================================
 
+/// Initialize the Rust logging system.
+///
+/// This should be called once at program startup before creating any engines.
+/// The log level can be controlled via the RUST_LOG environment variable:
+/// - RUST_LOG=qntx_fuzzy=debug
+/// - RUST_LOG=qntx_fuzzy=trace
+///
+/// Safe to call multiple times (only initializes once).
+#[no_mangle]
+pub extern "C" fn fuzzy_init_logger() {
+    crate::init_logger();
+}
+
 /// Create a new FuzzyEngine instance.
 ///
 /// # Returns
@@ -165,7 +178,12 @@ impl RustRebuildResultC {
 /// The returned pointer is valid until `fuzzy_engine_free` is called.
 #[no_mangle]
 pub extern "C" fn fuzzy_engine_new() -> *mut FuzzyEngine {
-    Box::into_raw(Box::new(FuzzyEngine::new()))
+    // Initialize logging on first engine creation
+    crate::init_logger();
+
+    let engine = Box::new(FuzzyEngine::new());
+    debug!("Created new FuzzyEngine at {:p}", &*engine);
+    Box::into_raw(engine)
 }
 
 /// Free a FuzzyEngine instance.

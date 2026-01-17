@@ -50,12 +50,8 @@ func main() {
 	for _, tc := range testCases {
 		fmt.Printf("Testing: '%s' -> '%s' (%s)\n", tc.typo, tc.expected, tc.desc)
 
-		// Try fuzzy search first
-		matches, err := store.SearchRichStringFieldsFuzzy(ctx, tc.typo, 10)
-		if err != nil {
-			// Fall back to regular search
-			matches, err = store.SearchRichStringFields(ctx, tc.typo, 10)
-		}
+		// Use SearchRichStringFields which now has fuzzy matching built in
+		matches, err := store.SearchRichStringFields(ctx, tc.typo, 10)
 
 		if err != nil {
 			fmt.Printf("  ❌ ERROR: %v\n\n", err)
