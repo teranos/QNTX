@@ -841,7 +841,7 @@ func (c *Client) handleRichSearch(query string) {
 	// Create bounded store to access search functionality
 	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("search"))
 
-	// Perform search with a reasonable limit
+	// Just use the working substring search
 	ctx := c.server.ctx
 	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
 	if err != nil {
