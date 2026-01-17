@@ -25,7 +25,8 @@ class ProsePanel extends BasePanel {
             id: 'prose-panel',
             classes: ['prose-panel'],
             useOverlay: true,
-            closeOnEscape: true
+            closeOnEscape: true,
+            slideFromRight: true
         });
 
         // Initialize component modules with callbacks

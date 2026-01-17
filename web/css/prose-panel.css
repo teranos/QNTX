@@ -34,7 +34,7 @@
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, width 0.3s ease, left 0.3s ease;
 }
 
 .prose-panel[data-visibility="hidden"] {
@@ -47,8 +47,59 @@
     transform: translateX(0);
 }
 
-/* Fullscreen mode - inherits from components/base-panel.css */
-/* Additional prose-specific fullscreen styles can go here if needed */
+/* Fullscreen mode */
+.prose-panel[data-mode="fullscreen"] {
+    width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+}
+
+/* Normal mode - ensure proper reset */
+.prose-panel[data-mode="panel"] {
+    width: 50%;
+    left: auto;
+    right: 0;
+}
+
+/* Expand button for right-sliding panels - arrow shape */
+.prose-panel .panel-expand-btn {
+    --arrow-size: 14px;
+    position: absolute;
+    left: 0; /* Right tip of arrow touches the panel edge */
+    right: auto;
+    top: 10%; /* 90% up from bottom */
+    transform: translateX(calc(-2 * var(--arrow-size))) translateY(-50%);
+    width: 0;
+    height: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 1001;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+    /* Create arrow pointing left (to expand leftward) */
+    border-top: var(--arrow-size) solid transparent;
+    border-bottom: var(--arrow-size) solid transparent;
+    border-right: var(--arrow-size) solid #444;
+}
+
+.prose-panel .panel-expand-btn:hover {
+    opacity: 1;
+    border-right-color: #666;
+}
+
+/* In fullscreen mode, arrow points right to collapse */
+.prose-panel[data-mode="fullscreen"] .panel-expand-btn {
+    left: 0;
+    transform: translateX(50%) translateY(-50%);
+    /* Arrow pointing right (to collapse rightward) */
+    border-right: none;
+    border-left: var(--arrow-size) solid #444;
+}
+
+.prose-panel[data-mode="fullscreen"] .panel-expand-btn:hover {
+    border-left-color: #666;
+}
 
 /* Header */
 .prose-header {

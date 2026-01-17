@@ -17,7 +17,7 @@
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease, width 0.3s ease;
   overflow: hidden;
   transform: translateX(-100%);
   opacity: 0;
@@ -40,6 +40,50 @@
   z-index: 2000; /* Higher than normal panels */
   border-right: none;
   box-shadow: none;
+}
+
+/* Expand button - arrow shape on the edge of the panel */
+/* For left-sliding panels */
+.panel-slide-left .panel-expand-btn {
+  --arrow-size: 14px;
+  position: absolute;
+  right: calc(-1 * var(--arrow-size)); /* Position based on actual arrow size */
+  top: 10%; /* 90% up from bottom */
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1001;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  /* Create arrow pointing right (to expand rightward) */
+  border-top: var(--arrow-size) solid transparent;
+  border-bottom: var(--arrow-size) solid transparent;
+  border-left: var(--arrow-size) solid #ccc;
+}
+
+.panel-expand-btn:hover {
+  opacity: 1;
+}
+
+.panel-slide-left .panel-expand-btn:hover {
+  border-left-color: #999;
+}
+
+/* In fullscreen mode, arrow points left to collapse */
+.panel-slide-left[data-mode="fullscreen"] .panel-expand-btn {
+  right: auto;
+  left: 0;
+  transform: translateX(-50%) translateY(-50%);
+  /* Arrow pointing left (to collapse leftward) */
+  border-left: none;
+  border-right: var(--arrow-size) solid #ccc;
+}
+
+.panel-slide-left[data-mode="fullscreen"] .panel-expand-btn:hover {
+  border-right-color: #999;
 }
 
 /* Overlay - darken right side when panel is open */

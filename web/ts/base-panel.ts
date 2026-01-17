@@ -50,6 +50,8 @@ export interface PanelConfig {
     enableTooltips?: boolean;
     /** Custom tooltip configuration */
     tooltipConfig?: TooltipConfig;
+    /** Panel slides from right instead of left */
+    slideFromRight?: boolean;
 }
 
 export abstract class BasePanel {
@@ -78,6 +80,7 @@ export abstract class BasePanel {
             closeOnOverlayClick: true,
             insertAfter: '',
             enableTooltips: true, // Enable by default for observability
+            slideFromRight: false,
             ...config
         };
         this.initialize();
@@ -92,6 +95,9 @@ export abstract class BasePanel {
         // Create panel
         this.panel = this.createPanel();
         this.panel.innerHTML = this.getTemplate();
+
+        // Add expand button AFTER setting template
+        this.createExpandButton(this.panel);
 
         // Insert into DOM
         this.insertPanel();
@@ -135,7 +141,22 @@ export abstract class BasePanel {
         panel.className = this.config.classes.join(' ');
         // Start panels hidden by default using data attribute (issue #114)
         setVisibility(panel, DATA.VISIBILITY.HIDDEN);
+        // Start in normal panel mode
+        panel.setAttribute('data-mode', 'panel');
         return panel;
+    }
+
+    /**
+     * Create the expand/collapse button on the edge of the panel
+     */
+    protected createExpandButton(panel: HTMLElement): void {
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'panel-expand-btn';
+        expandBtn.setAttribute('aria-label', 'Expand panel');
+        expandBtn.setAttribute('title', 'Expand panel');
+        // No text content - button shape is created with CSS borders
+        expandBtn.addEventListener('click', () => this.toggleFullscreen());
+        panel.appendChild(expandBtn);
     }
 
     protected insertPanel(): void {
@@ -276,11 +297,19 @@ export abstract class BasePanel {
         this.isFullscreen = !this.isFullscreen;
         this.panel.setAttribute('data-mode', this.isFullscreen ? 'fullscreen' : 'panel');
 
-        // Update button icon/state
-        const btn = this.panel.querySelector('.panel-fullscreen-toggle');
-        if (btn) {
-            btn.textContent = this.isFullscreen ? '⊗' : '⛶';
-            btn.setAttribute('aria-label', this.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
+        // Update expand button tooltip
+        const expandBtn = this.panel.querySelector('.panel-expand-btn');
+        if (expandBtn) {
+            // CSS handles the arrow shape change
+            expandBtn.setAttribute('aria-label', this.isFullscreen ? 'Collapse panel' : 'Expand panel');
+            expandBtn.setAttribute('title', this.isFullscreen ? 'Collapse panel' : 'Expand panel');
+        }
+
+        // Update fullscreen button icon/state (if exists in header)
+        const fullscreenBtn = this.panel.querySelector('.panel-fullscreen-toggle');
+        if (fullscreenBtn) {
+            fullscreenBtn.textContent = this.isFullscreen ? '⊗' : '⛶';
+            fullscreenBtn.setAttribute('aria-label', this.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
         }
 
         // Hide overlay in fullscreen mode for better visibility
