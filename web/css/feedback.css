@@ -520,11 +520,6 @@ body.connecting .status-dot {
     animation: pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
     #system-drawer {
