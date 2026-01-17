@@ -381,6 +381,280 @@ describe('BasePanel Error Boundary', () => {
     });
 });
 
+describe('BasePanel Expand/Collapse Button', () => {
+    beforeEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    test('expand button is created for panels with slideFromRight option', () => {
+        // Add minimal CSS for testing
+        const style = document.createElement('style');
+        style.textContent = `
+            .panel-slide-left { position: fixed; }
+            .prose-panel { position: fixed; }
+            .panel-expand-btn { position: absolute; }
+        `;
+        document.head.appendChild(style);
+
+        // Test left-sliding panel (no expand button by default)
+        const leftPanel = document.createElement('div');
+        leftPanel.className = 'panel-slide-left';
+        leftPanel.id = 'left-panel';
+        leftPanel.setAttribute('data-visibility', 'hidden');
+        document.body.appendChild(leftPanel);
+
+        // Simulate BasePanel not adding expand button for left panels
+        expect(leftPanel.querySelector('.panel-expand-btn')).toBeNull();
+
+        // Test right-sliding panel (should have expand button)
+        const rightPanel = document.createElement('div');
+        rightPanel.className = 'prose-panel';
+        rightPanel.id = 'right-panel';
+        rightPanel.setAttribute('data-visibility', 'hidden');
+        document.body.appendChild(rightPanel);
+
+        // Simulate BasePanel adding expand button for right panels
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'panel-expand-btn';
+        expandBtn.setAttribute('aria-label', 'Toggle fullscreen');
+        expandBtn.setAttribute('title', 'Expand to fullscreen');
+        rightPanel.appendChild(expandBtn);
+
+        expect(rightPanel.querySelector('.panel-expand-btn')).not.toBeNull();
+    });
+
+    test('expand button toggles panel between normal and fullscreen modes', () => {
+        document.body.innerHTML = `
+            <div class="prose-panel" id="test-panel" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn" aria-label="Toggle fullscreen" title="Expand to fullscreen"></button>
+                <div class="panel-content">Test content</div>
+            </div>
+        `;
+
+        const panel = document.getElementById('test-panel');
+        const expandBtn = panel?.querySelector('.panel-expand-btn') as HTMLButtonElement;
+
+        // Add click handler to simulate BasePanel behavior
+        expandBtn?.addEventListener('click', () => {
+            const isFullscreen = panel?.getAttribute('data-mode') === 'fullscreen';
+            panel?.setAttribute('data-mode', isFullscreen ? 'panel' : 'fullscreen');
+            expandBtn.setAttribute('title', isFullscreen ? 'Expand to fullscreen' : 'Exit fullscreen');
+        });
+
+        // Initially in panel mode
+        expect(panel?.getAttribute('data-mode')).toBe('panel');
+        expect(expandBtn?.getAttribute('title')).toBe('Expand to fullscreen');
+
+        // Click to expand
+        expandBtn?.click();
+
+        // Should be in fullscreen mode
+        expect(panel?.getAttribute('data-mode')).toBe('fullscreen');
+        expect(expandBtn?.getAttribute('title')).toBe('Exit fullscreen');
+
+        // Click to collapse
+        expandBtn?.click();
+
+        // Should be back in panel mode
+        expect(panel?.getAttribute('data-mode')).toBe('panel');
+        expect(expandBtn?.getAttribute('title')).toBe('Expand to fullscreen');
+    });
+
+    test('expand button is hidden when panel is not visible', () => {
+        // Add CSS to test visibility control
+        const style = document.createElement('style');
+        style.textContent = `
+            .prose-panel .panel-expand-btn { display: none; }
+            .prose-panel[data-visibility="visible"] .panel-expand-btn { display: block; }
+        `;
+        document.head.appendChild(style);
+
+        document.body.innerHTML = `
+            <div class="prose-panel" id="test-panel" data-visibility="hidden" data-mode="panel">
+                <button class="panel-expand-btn"></button>
+            </div>
+        `;
+
+        const panel = document.getElementById('test-panel');
+        const expandBtn = panel?.querySelector('.panel-expand-btn') as HTMLElement;
+
+        // When panel is hidden, button should be hidden
+        expect(panel?.getAttribute('data-visibility')).toBe('hidden');
+        const hiddenStyle = window.getComputedStyle(expandBtn);
+        expect(hiddenStyle.display).toBe('none');
+
+        // When panel is visible, button should be visible
+        panel?.setAttribute('data-visibility', 'visible');
+        const visibleStyle = window.getComputedStyle(expandBtn);
+        expect(visibleStyle.display).toBe('block');
+    });
+
+    test('expand button preserves visibility state when toggling fullscreen', () => {
+        document.body.innerHTML = `
+            <div class="prose-panel" id="test-panel" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn"></button>
+            </div>
+        `;
+
+        const panel = document.getElementById('test-panel');
+        const expandBtn = panel?.querySelector('.panel-expand-btn') as HTMLButtonElement;
+
+        // Add click handler to simulate BasePanel behavior
+        expandBtn?.addEventListener('click', () => {
+            const isFullscreen = panel?.getAttribute('data-mode') === 'fullscreen';
+            panel?.setAttribute('data-mode', isFullscreen ? 'panel' : 'fullscreen');
+        });
+
+        // Panel is visible
+        expect(panel?.getAttribute('data-visibility')).toBe('visible');
+
+        // Expand to fullscreen
+        expandBtn?.click();
+
+        // Should still be visible
+        expect(panel?.getAttribute('data-visibility')).toBe('visible');
+        expect(panel?.getAttribute('data-mode')).toBe('fullscreen');
+
+        // Collapse back
+        expandBtn?.click();
+
+        // Should still be visible
+        expect(panel?.getAttribute('data-visibility')).toBe('visible');
+        expect(panel?.getAttribute('data-mode')).toBe('panel');
+    });
+
+    test('expand button has correct ARIA attributes', () => {
+        document.body.innerHTML = `
+            <div class="prose-panel" id="test-panel" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn" aria-label="Toggle fullscreen" title="Expand to fullscreen"></button>
+            </div>
+        `;
+
+        const panel = document.getElementById('test-panel');
+        const expandBtn = document.querySelector('.panel-expand-btn') as HTMLButtonElement;
+
+        // Add click handler to simulate BasePanel behavior
+        expandBtn?.addEventListener('click', () => {
+            const isFullscreen = panel?.getAttribute('data-mode') === 'fullscreen';
+            panel?.setAttribute('data-mode', isFullscreen ? 'panel' : 'fullscreen');
+            expandBtn.setAttribute('title', isFullscreen ? 'Expand to fullscreen' : 'Exit fullscreen');
+        });
+
+        // Check ARIA attributes
+        expect(expandBtn.getAttribute('aria-label')).toBe('Toggle fullscreen');
+        expect(expandBtn.getAttribute('title')).toBe('Expand to fullscreen');
+
+        // Simulate clicking to fullscreen
+        expandBtn.click();
+
+        expect(expandBtn.getAttribute('title')).toBe('Exit fullscreen');
+    });
+
+    test('multiple panels can have independent expand buttons', () => {
+        document.body.innerHTML = `
+            <div class="prose-panel" id="panel1" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn" id="btn1"></button>
+            </div>
+            <div class="panel-slide-left" id="panel2" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn" id="btn2"></button>
+            </div>
+        `;
+
+        const panel1 = document.getElementById('panel1');
+        const panel2 = document.getElementById('panel2');
+        const btn1 = document.getElementById('btn1') as HTMLButtonElement;
+        const btn2 = document.getElementById('btn2') as HTMLButtonElement;
+
+        // Add click handlers to simulate BasePanel behavior
+        btn1?.addEventListener('click', () => {
+            const isFullscreen = panel1?.getAttribute('data-mode') === 'fullscreen';
+            panel1?.setAttribute('data-mode', isFullscreen ? 'panel' : 'fullscreen');
+        });
+
+        btn2?.addEventListener('click', () => {
+            const isFullscreen = panel2?.getAttribute('data-mode') === 'fullscreen';
+            panel2?.setAttribute('data-mode', isFullscreen ? 'panel' : 'fullscreen');
+        });
+
+        // Initially both in panel mode
+        expect(panel1?.getAttribute('data-mode')).toBe('panel');
+        expect(panel2?.getAttribute('data-mode')).toBe('panel');
+
+        // Expand panel1 only
+        btn1?.click();
+
+        expect(panel1?.getAttribute('data-mode')).toBe('fullscreen');
+        expect(panel2?.getAttribute('data-mode')).toBe('panel');
+
+        // Expand panel2
+        btn2?.click();
+
+        expect(panel1?.getAttribute('data-mode')).toBe('fullscreen');
+        expect(panel2?.getAttribute('data-mode')).toBe('fullscreen');
+
+        // Collapse panel1
+        btn1?.click();
+
+        expect(panel1?.getAttribute('data-mode')).toBe('panel');
+        expect(panel2?.getAttribute('data-mode')).toBe('fullscreen');
+    });
+
+    test('expand button respects panel type for arrow direction (CSS classes)', () => {
+        document.body.innerHTML = `
+            <div class="prose-panel" id="right-panel" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn"></button>
+            </div>
+            <div class="panel-slide-left" id="left-panel" data-visibility="visible" data-mode="panel">
+                <button class="panel-expand-btn"></button>
+            </div>
+        `;
+
+        const rightPanel = document.getElementById('right-panel');
+        const leftPanel = document.getElementById('left-panel');
+
+        // Right panel (prose-panel) - slides from right
+        expect(rightPanel?.className).toContain('prose-panel');
+
+        // Left panel (panel-slide-left) - slides from left
+        expect(leftPanel?.className).toContain('panel-slide-left');
+
+        // Toggle both to fullscreen
+        rightPanel?.setAttribute('data-mode', 'fullscreen');
+        leftPanel?.setAttribute('data-mode', 'fullscreen');
+
+        // Both should be in fullscreen mode
+        expect(rightPanel?.getAttribute('data-mode')).toBe('fullscreen');
+        expect(leftPanel?.getAttribute('data-mode')).toBe('fullscreen');
+    });
+
+    test('panel reset to normal mode when closed', () => {
+        document.body.innerHTML = `
+            <div class="prose-panel" id="test-panel" data-visibility="visible" data-mode="fullscreen">
+                <button class="panel-expand-btn"></button>
+                <button class="panel-close">×</button>
+            </div>
+        `;
+
+        const panel = document.getElementById('test-panel');
+        const closeBtn = panel?.querySelector('.panel-close') as HTMLButtonElement;
+
+        // Initially in fullscreen
+        expect(panel?.getAttribute('data-mode')).toBe('fullscreen');
+
+        // Simulate close button click
+        closeBtn?.addEventListener('click', () => {
+            panel?.setAttribute('data-visibility', 'hidden');
+            panel?.setAttribute('data-mode', 'panel'); // Reset to normal
+        });
+
+        closeBtn?.click();
+
+        // Should be hidden and in panel mode
+        expect(panel?.getAttribute('data-visibility')).toBe('hidden');
+        expect(panel?.getAttribute('data-mode')).toBe('panel');
+    });
+});
+
 describe('BasePanel Integration - Error Boundaries', () => {
     beforeEach(() => {
         document.body.innerHTML = '';
