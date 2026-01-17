@@ -235,11 +235,11 @@
     <main id="container">
         <div id="left-panel">
             <!-- Virtue #4: Semantic HTML - Use <header> for page header -->
-            <header id="header" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;">
-                <div style="display: block; width: 24px; height: 24px; transition: all 0.2s ease; flex-shrink: 0;" onmouseover="this.style.filter='invert(1)'" onmouseout="this.style.filter='none'">
-                    <img src="/qntx.jpg" alt="QNTX" style="width: 100%; height: 100%; display: block;">
+            <header id="header">
+                <div class="header-logo">
+                    <img src="/qntx.jpg" alt="QNTX">
                 </div>
-                <div style="font-size: 11px; color: #888; white-space: nowrap;">
+                <div class="header-build-info">
                     <span id="build-hash"></span>
                 </div>
             </header>
@@ -275,12 +275,12 @@
                     <!-- CodeMirror 6 Editor Container -->
                     <div id="codemirror-container"></div>
 
-                    <div id="drop-indicator" style="display: none;">
+                    <div id="drop-indicator">
                         <div class="drop-icon">📄</div>
                         <div class="drop-text">Drop to create ix command</div>
                     </div>
                 </div>
-                <button id="run-ix-button" style="display: none;">
+                <button id="run-ix-button">
                     <span class="button-icon">▶</span>
                     <span class="button-text">Run</span>
                 </button>
@@ -290,7 +290,7 @@
                 <div class="stat-item">Links: <span class="stat-value" id="link-count">0</span></div>
                 <div class="stat-item">
                     Limit:
-                    <select id="graph-limit" class="stat-value" style="background: #1e2021; color: #d3c6aa; border: 1px solid #475258; padding: 2px 6px; border-radius: 3px; font-size: 13px;">
+                    <select id="graph-limit" class="stat-value">
                         <option value="100">100</option>
                         <option value="500">500</option>
                         <option value="1000" selected>1000</option>
@@ -356,7 +356,7 @@
         <div id="system-drawer-header">
             <!-- Usage badge and status indicators will be inserted here dynamically by TypeScript -->
             <div class="controls">
-                <span id="system-version" style="font-size: 9px; color: #555; margin-right: 8px;"></span>
+                <span id="system-version"></span>
                 <select id="verbosity-select">
                     <option value="0">User</option>
                     <option value="1">Info (-v)</option>
