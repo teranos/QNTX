@@ -31,7 +31,7 @@ import {
 import { uiState } from './ui-state.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
-import { tooltip } from './components/tooltip.ts';
+import { tooltip } from './components/tooltip';
 
 // Import all panel/window modules statically
 import { toggleConfig } from './config-panel.js';
@@ -165,7 +165,7 @@ function initializeSymbolPalette(): void {
  */
 async function injectCTP2Glyph(): Promise<void> {
     try {
-        const { generateCTP2Glyph } = await import('../ctp2/glyph.js');
+        const { generateCTP2Glyph } = await import('./ctp2/glyph.ts');
         const cell = document.getElementById('ctp2-palette-cell');
         if (cell) {
             cell.innerHTML = generateCTP2Glyph();
@@ -439,7 +439,7 @@ function showWebscraperPanel(): void {
 let ctp2WindowInstance: any = null;
 async function showCTP2Window(): Promise<void> {
     if (!ctp2WindowInstance) {
-        const module = await import('../ctp2/window.js');
+        const module = await import('./ctp2/window.ts');
         ctp2WindowInstance = new module.CTP2Window();
     }
     ctp2WindowInstance.toggle();
