@@ -86,9 +86,6 @@ class ProsePanel extends BasePanel {
                     <div class="prose-status">
                         <span class="prose-status-text"></span>
                         <span class="prose-save-indicator hidden">●</span>
-                        <button id="theme-toggle" aria-label="Toggle theme">
-                            <span class="theme-icon">☀</span>
-                        </button>
                     </div>
                 </div>
             </div>
