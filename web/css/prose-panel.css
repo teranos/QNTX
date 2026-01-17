@@ -47,7 +47,7 @@
     transform: translateX(0);
 }
 
-/* Fullscreen mode - inherits from left-panel.css */
+/* Fullscreen mode - inherits from components/base-panel.css */
 /* Additional prose-specific fullscreen styles can go here if needed */
 
 /* Header */

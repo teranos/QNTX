@@ -1,6 +1,7 @@
 /**
- * Shared Panel Styles
- * Used by config-panel and pulse-panel for consistent slide-in UX
+ * Base Panel Styles
+ * Core styles for all panels that extend BasePanel class
+ * Provides consistent slide-in UX, fullscreen mode, and common components
  */
 
 /* Base panel structure - slide in from left */
