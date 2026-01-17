@@ -137,6 +137,12 @@ class PythonEditorPanel extends BasePanel {
     protected onDestroy(): void {
         this.destroyEditor();
 
+        // Clean up execute button
+        if (this.executeButton) {
+            this.executeButton.destroy();
+            this.executeButton = null;
+        }
+
         // Clean up keyboard handler
         if (this.executeHandler) {
             document.removeEventListener('keydown', this.executeHandler);
