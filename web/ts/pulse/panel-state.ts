@@ -47,8 +47,8 @@ export class PulsePanelState {
                 const jobIds = JSON.parse(stored) as string[];
                 this.expandedJobs = new Set(jobIds);
             }
-        } catch (e) {
-            handleError(e, 'Failed to load expanded state from localStorage', { context: SEG.PULSE, silent: true });
+        } catch (error: unknown) {
+            handleError(error, 'Failed to load expanded state from localStorage', { context: SEG.PULSE, silent: true });
         }
     }
 
@@ -59,8 +59,8 @@ export class PulsePanelState {
         try {
             const jobIds = Array.from(this.expandedJobs);
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(jobIds));
-        } catch (e) {
-            handleError(e, 'Failed to save expanded state to localStorage', { context: SEG.PULSE, silent: true });
+        } catch (error: unknown) {
+            handleError(error, 'Failed to save expanded state to localStorage', { context: SEG.PULSE, silent: true });
         }
     }
 

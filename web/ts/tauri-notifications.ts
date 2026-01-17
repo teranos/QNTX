@@ -129,7 +129,7 @@ async function invokeIfTauri<T>(command: string, args: Record<string, unknown>):
 
     try {
         return await invoke<T>(command, args);
-    } catch (error) {
+    } catch (error: unknown) {
         console.warn(`[tauri-notifications] Failed to invoke ${command}:`, error);
         return undefined;
     }

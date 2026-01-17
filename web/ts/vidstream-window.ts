@@ -190,14 +190,14 @@ export class VidStreamWindow {
                     status.style.color = '#0a0';
                 }
                 info(SEG.VID, 'VidStream ONNX engine initialized');
-            } catch (err) {
+            } catch (error: unknown) {
                 const status = windowEl.querySelector('#vs-status') as HTMLElement;
                 if (status) {
                     status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
                 }
-                error(SEG.VID, 'ONNX engine initialization failed', err);
-                this.showError(err instanceof Error ? err.message : String(err));
+                error(SEG.VID, 'ONNX engine initialization failed', error);
+                this.showError(error instanceof Error ? error.message : String(error));
             } finally {
                 initBtn.disabled = false;
                 initBtn.textContent = 'Initialize ONNX';
@@ -262,9 +262,9 @@ export class VidStreamWindow {
 
             const mode = this.engineReady ? 'with inference' : 'preview only';
             info(SEG.VID, `Camera started (${mode})`);
-        } catch (err) {
-            error(SEG.VID, 'Failed to start camera', err);
-            this.showError(err instanceof Error ? err.message : String(err));
+        } catch (error: unknown) {
+            error(SEG.VID, 'Failed to start camera', error);
+            this.showError(error instanceof Error ? error.message : String(error));
         }
     }
 
@@ -314,8 +314,8 @@ export class VidStreamWindow {
             }
 
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
-        } catch (err) {
-            error(SEG.VID, 'Frame processing error', err);
+        } catch (error: unknown) {
+            error(SEG.VID, 'Frame processing error', error);
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
         }
     }
@@ -353,8 +353,8 @@ export class VidStreamWindow {
             if (!sent) {
                 error(SEG.VID, 'Failed to send frame: WebSocket not connected');
             }
-        } catch (err) {
-            error(SEG.VID, 'Inference error', err);
+        } catch (error: unknown) {
+            error(SEG.VID, 'Inference error', error);
         }
     }
 
@@ -462,9 +462,9 @@ export class VidStreamWindow {
                     modelPathSpan.textContent = pathSetting.value as string;
                 }
             }
-        } catch (err) {
+        } catch (error: unknown) {
             // Silent failure - default path already set in HTML
-            debug(SEG.VID, 'Failed to load model path from config:', err);
+            debug(SEG.VID, 'Failed to load model path from config:', error);
         }
     }
 
