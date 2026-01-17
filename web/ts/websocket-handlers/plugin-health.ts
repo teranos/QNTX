@@ -6,7 +6,7 @@
  * 2. Updates the plugins button indicator for unhealthy states
  */
 
-import { toast } from '../toast';
+import { toast } from '../components/toast';
 import { log, SEG } from '../logger';
 import type { PluginHealthMessage } from '../../types/websocket';
 

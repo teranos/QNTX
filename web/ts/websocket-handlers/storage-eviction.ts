@@ -5,7 +5,7 @@
  * when attestations are deleted due to bounded storage limits.
  */
 
-import { showToast } from '../toast';
+import { showToast } from '../components/toast';
 import type { StorageEvictionMessage } from '../../types/websocket';
 
 /**

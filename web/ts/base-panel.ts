@@ -36,7 +36,7 @@
 import { CSS, DATA, setVisibility } from './css-classes.ts';
 import * as PanelError from './base-panel-error.ts';
 import type { PanelErrorState, ErrorHandlingContext } from './base-panel-error.ts';
-import { tooltip as tooltipManager, type TooltipConfig } from './components/tooltip.ts';
+import { tooltip as tooltipManager, type TooltipConfig } from './components/tooltip';
 import { log, SEG } from './logger.ts';
 
 export interface PanelConfig {

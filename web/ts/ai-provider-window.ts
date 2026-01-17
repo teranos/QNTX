@@ -10,7 +10,7 @@ import { apiFetch } from './api.ts';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
-import { tooltip } from './components/tooltip.ts';
+import { tooltip } from './components/tooltip';
 
 interface ConfigResponse {
     config_file?: string;
