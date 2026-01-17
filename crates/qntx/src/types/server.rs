@@ -278,6 +278,65 @@ pub struct ProgressMessage {
     pub message: String,
 }
 
+/// PromptExecuteRequest represents a request to execute a prompt
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#promptexecuterequest>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PromptExecuteRequest {
+    pub ax_query: String,
+    pub template: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// "openrouter" or "local"
+    pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+/// PromptExecuteResponse represents the execution response
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#promptexecuteresponse>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PromptExecuteResponse {
+    pub results: Vec<Result>,
+    pub attestation_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// PromptPreviewRequest represents a request to preview ax query results
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#promptpreviewrequest>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PromptPreviewRequest {
+    pub ax_query: String,
+}
+
+/// PromptPreviewResponse represents the preview response
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#promptpreviewresponse>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PromptPreviewResponse {
+    pub attestation_count: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attestations: Option<Vec<serde_json::Map<String, serde_json::Value>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// PromptSaveRequest represents a request to save a prompt
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#promptsaverequest>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PromptSaveRequest {
+    pub name: String,
+    pub template: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ax_pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
 /// ProseEntry represents a prose content file or directory
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#proseentry>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
