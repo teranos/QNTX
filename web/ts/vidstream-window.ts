@@ -11,7 +11,7 @@
  * TODO: Remove bypass once CrabCamera implements ACL (watch releases)
  */
 
-import { debug, info, error, SEG } from './logger.ts';
+import { debug, info, error as logError, SEG } from './logger.ts';
 import { sendMessage, registerHandler } from './websocket.ts';
 import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
@@ -142,7 +142,7 @@ export class VidStreamWindow {
         });
 
         registerHandler('vidstream_init_error', (data: any) => {
-            error(SEG.VID, 'Engine init error:', data.error);
+            logError(SEG.VID, 'Engine init error:', data.error);
             this.showError(data.error);
         });
 
@@ -155,7 +155,7 @@ export class VidStreamWindow {
         });
 
         registerHandler('vidstream_frame_error', (data: any) => {
-            error(SEG.VID, 'Frame processing error:', data.error);
+            logError(SEG.VID, 'Frame processing error:', data.error);
         });
     }
 
@@ -196,7 +196,7 @@ export class VidStreamWindow {
                     status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
                 }
-                error(SEG.VID, 'ONNX engine initialization failed', error);
+                logError(SEG.VID, 'ONNX engine initialization failed', error);
                 this.showError(error instanceof Error ? error.message : String(error));
             } finally {
                 initBtn.disabled = false;
@@ -263,7 +263,7 @@ export class VidStreamWindow {
             const mode = this.engineReady ? 'with inference' : 'preview only';
             info(SEG.VID, `Camera started (${mode})`);
         } catch (error: unknown) {
-            error(SEG.VID, 'Failed to start camera', error);
+            logError(SEG.VID, 'Failed to start camera', error);
             this.showError(error instanceof Error ? error.message : String(error));
         }
     }
@@ -315,7 +315,7 @@ export class VidStreamWindow {
 
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
         } catch (error: unknown) {
-            error(SEG.VID, 'Frame processing error', error);
+            logError(SEG.VID, 'Frame processing error', error);
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
         }
     }
@@ -351,10 +351,10 @@ export class VidStreamWindow {
             const sent = sendMessage(payload);
 
             if (!sent) {
-                error(SEG.VID, 'Failed to send frame: WebSocket not connected');
+                logError(SEG.VID, 'Failed to send frame: WebSocket not connected');
             }
         } catch (error: unknown) {
-            error(SEG.VID, 'Inference error', error);
+            logError(SEG.VID, 'Inference error', error);
         }
     }
 
