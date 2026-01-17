@@ -114,12 +114,22 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		return errors.Wrap(err, "failed to decode prompt payload")
 	}
 
-	// Parse template
-	tmpl, err := Parse(payload.Template)
+	// Parse frontmatter from template
+	doc, err := ParseFrontmatter(payload.Template)
+	if err != nil {
+		logger.AddAxSymbol(logger.Logger).Errorw("Frontmatter parsing failed",
+			"error", err,
+			"template_length", len(payload.Template),
+		)
+		return errors.Wrap(err, "failed to parse frontmatter")
+	}
+
+	// Parse template body (after frontmatter)
+	tmpl, err := Parse(doc.Body)
 	if err != nil {
 		logger.AddAxSymbol(logger.Logger).Errorw("Template parsing failed",
 			"error", err,
-			"template_length", len(payload.Template),
+			"template_length", len(doc.Body),
 		)
 		return errors.Wrap(err, "failed to parse prompt template")
 	}
@@ -146,8 +156,8 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	// Set total for progress tracking
 	job.Progress.Total = len(result.Attestations)
 
-	// Create AI client
-	client := h.createAIClient(payload)
+	// Create AI client (using frontmatter metadata or payload overrides)
+	client := h.createAIClient(payload, doc)
 
 	// Process each attestation
 	var results []Result
@@ -168,12 +178,27 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		}
 
 		// Call LLM with timing
+		// Priority: payload > frontmatter > defaults
 		chatReq := openrouter.ChatRequest{
 			SystemPrompt: payload.SystemPrompt,
 			UserPrompt:   prompt,
 		}
+
+		// Model (already handled by createAIClient, but set on request for consistency)
 		if payload.Model != "" {
 			chatReq.Model = &payload.Model
+		} else if doc.Metadata.Model != "" {
+			chatReq.Model = &doc.Metadata.Model
+		}
+
+		// Temperature from frontmatter
+		if doc.Metadata.Temperature != nil {
+			chatReq.Temperature = doc.Metadata.Temperature
+		}
+
+		// MaxTokens from frontmatter
+		if doc.Metadata.MaxTokens != nil {
+			chatReq.MaxTokens = doc.Metadata.MaxTokens
 		}
 
 		startTime := time.Now()
@@ -231,13 +256,26 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	return nil
 }
 
-// createAIClient creates the appropriate AI client based on payload configuration
-func (h *Handler) createAIClient(payload Payload) provider.AIClient {
+// createAIClient creates the appropriate AI client based on payload and frontmatter configuration
+// Priority: payload.Model > frontmatter.Model > config default
+func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
+	// Determine model to use (payload overrides frontmatter overrides config)
+	model := ""
+	if payload.Model != "" {
+		model = payload.Model
+	} else if doc.Metadata.Model != "" {
+		model = doc.Metadata.Model
+	}
+
 	// Use provider from payload, or default based on config
 	if payload.Provider == "local" || (payload.Provider == "" && h.config.LocalInference.Enabled) {
+		clientModel := model
+		if clientModel == "" {
+			clientModel = h.config.LocalInference.Model
+		}
 		return provider.NewLocalClient(provider.LocalClientConfig{
 			BaseURL:        h.config.LocalInference.BaseURL,
-			Model:          h.config.LocalInference.Model,
+			Model:          clientModel,
 			TimeoutSeconds: h.config.LocalInference.TimeoutSeconds,
 			DB:             h.db,
 			OperationType:  "prompt-execute",
@@ -245,9 +283,13 @@ func (h *Handler) createAIClient(payload Payload) provider.AIClient {
 	}
 
 	// Default to OpenRouter
+	clientModel := model
+	if clientModel == "" {
+		clientModel = h.config.OpenRouter.Model
+	}
 	return openrouter.NewClient(openrouter.Config{
 		APIKey:        h.config.OpenRouter.APIKey,
-		Model:         h.config.OpenRouter.Model,
+		Model:         clientModel,
 		DB:            h.db,
 		OperationType: "prompt-execute",
 	})
