@@ -476,6 +476,28 @@ pub struct QueryMessage {
     pub format: String,
 }
 
+/// Result represents the output of a prompt execution
+#[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#result>"]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Result {
+    /// SourceAttestationID is the ID of the attestation that was processed
+    pub source_attestation_id: String,
+    /// Prompt is the interpolated prompt that was sent to the LLM
+    pub prompt: String,
+    /// Response is the LLM's response
+    pub response: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// ResultAttestationID is the ID of the created result attestation
+    pub result_attestation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Token usage tracking
+    pub prompt_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion_tokens: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_tokens: Option<i64>,
+}
+
 /// ScheduledJobResponse represents a scheduled job in API responses
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#scheduledjobresponse>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

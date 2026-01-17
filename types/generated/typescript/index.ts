@@ -113,6 +113,7 @@ export type {
   PulseExecutionLogStreamMessage,
   PulseExecutionStartedMessage,
   QueryMessage,
+  Result,
   ScheduledJobResponse,
   StageInfo,
   StatsMessage,

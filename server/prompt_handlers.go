@@ -38,11 +38,31 @@ type PromptExecuteRequest struct {
 	Model        string `json:"model,omitempty"`
 }
 
+// Result represents the output of a prompt execution
+type Result struct {
+	// SourceAttestationID is the ID of the attestation that was processed
+	SourceAttestationID string `json:"source_attestation_id"`
+
+	// Prompt is the interpolated prompt that was sent to the LLM
+	Prompt string `json:"prompt"`
+
+	// Response is the LLM's response
+	Response string `json:"response"`
+
+	// ResultAttestationID is the ID of the created result attestation
+	ResultAttestationID string `json:"result_attestation_id,omitempty"`
+
+	// Token usage tracking
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
+}
+
 // PromptExecuteResponse represents the execution response
 type PromptExecuteResponse struct {
-	Results          []prompt.Result `json:"results"`
-	AttestationCount int             `json:"attestation_count"`
-	Error            string          `json:"error,omitempty"`
+	Results          []Result `json:"results"`
+	AttestationCount int      `json:"attestation_count"`
+	Error            string   `json:"error,omitempty"`
 }
 
 // HandlePromptPreview handles POST /api/prompt/preview
@@ -160,7 +180,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	client := s.createPromptAIClient(req.Provider, req.Model)
 
 	// Execute the prompt using one-shot mode
-	results, err := prompt.ExecuteOneShot(
+	promptResults, err := prompt.ExecuteOneShot(
 		r.Context(),
 		queryStore,
 		aliasResolver,
@@ -172,6 +192,20 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
 		return
+	}
+
+	// Convert prompt.Result to server.Result
+	results := make([]Result, len(promptResults))
+	for i, pr := range promptResults {
+		results[i] = Result{
+			SourceAttestationID: pr.SourceAttestationID,
+			Prompt:              pr.Prompt,
+			Response:            pr.Response,
+			ResultAttestationID: pr.ResultAttestationID,
+			PromptTokens:        pr.Usage.PromptTokens,
+			CompletionTokens:    pr.Usage.CompletionTokens,
+			TotalTokens:         pr.Usage.TotalTokens,
+		}
 	}
 
 	resp := PromptExecuteResponse{
