@@ -12,10 +12,12 @@ import type {
     LLMStreamMessage,
     StorageWarningMessage,
     PluginHealthMessage,
+    ScheduledJobUpdateMessage,
     SystemCapabilitiesMessage
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
+import { handleScheduledJobUpdate } from './websocket-handlers/scheduled-job-update';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { log, SEG } from './logger';
 
@@ -95,6 +97,16 @@ const MESSAGE_HANDLERS = {
 
         // Invoke registered handler
         messageHandlers['plugin_health']?.(data);
+    },
+
+    scheduled_job_update: (data: ScheduledJobUpdateMessage) => {
+        log.info(SEG.PULSE, 'Scheduled job update:', data.job_id, data.action, data.state);
+
+        // Handle button state update
+        handleScheduledJobUpdate(data);
+
+        // Invoke registered handler
+        messageHandlers['scheduled_job_update']?.(data);
     },
 
     system_capabilities: (data: SystemCapabilitiesMessage) => {

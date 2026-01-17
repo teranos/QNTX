@@ -63,6 +63,9 @@
     gap: 12px;
     font-size: 16px;
     color: #e0e0e0;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
 }
 
 .prose-icon {
@@ -76,6 +79,10 @@
 .prose-breadcrumb {
     color: #888;
     font-size: 14px;
+    flex-shrink: 1;
+    min-width: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 /* Close button styles moved to components.css */
@@ -85,6 +92,7 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+    min-width: 0;
 }
 
 /* Content area */
@@ -93,18 +101,25 @@
     display: flex;
     flex-direction: column;
     background: #1e1e1e;
+    min-width: 0;
 }
 
 .prose-editor-container {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px;
+    overflow-x: hidden;
+    padding: 24px 0;
+    width: 100%;
+    min-width: 0;
 }
 
 /* ProseMirror editor styles */
 #prose-editor {
-    max-width: 800px;
-    margin: 0 auto;
+    margin: 0;
+    padding: 0 32px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 
 #prose-editor .ProseMirror {
@@ -113,12 +128,26 @@
     line-height: 1.6;
     color: #e0e0e0;
     outline: none;
-    /* Ensure text is properly rendered */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    /* Disable browser spell check styling that might interfere */
     spellcheck: false;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* Apply wrapping to all inline elements */
+#prose-editor .ProseMirror *,
+#prose-editor .ProseMirror span,
+#prose-editor .ProseMirror strong,
+#prose-editor .ProseMirror em {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 /* Ensure all text elements are visible */
@@ -150,14 +179,15 @@
     background: none !important;
 }
 
-/* Fix for potential text clipping issues */
+/* Fix for potential text clipping issues and ensure wrapping */
 #prose-editor .ProseMirror p,
 #prose-editor .ProseMirror li,
 #prose-editor .ProseMirror h1,
 #prose-editor .ProseMirror h2,
 #prose-editor .ProseMirror h3 {
-    overflow: visible;
-    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    max-width: 100%;
 }
 
 #prose-editor .ProseMirror h1 {

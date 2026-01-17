@@ -216,3 +216,14 @@ type PluginHealthMessage struct {
 	Timestamp int64  `json:"timestamp"` // Unix timestamp
 }
 
+// ScheduledJobUpdateMessage represents a scheduled job state change
+// Broadcast when job is paused, resumed, or deleted
+type ScheduledJobUpdateMessage struct {
+	Type      string `json:"type"`       // "scheduled_job_update"
+	JobID     string `json:"job_id"`     // Scheduled job ID
+	ATSCode   string `json:"ats_code"`   // ATS code for the job
+	State     string `json:"state"`      // "active", "paused", "deleted"
+	Action    string `json:"action"`     // "paused", "resumed", "deleted"
+	Timestamp int64  `json:"timestamp"`  // Unix timestamp
+}
+

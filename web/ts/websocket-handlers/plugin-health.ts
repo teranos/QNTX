@@ -9,12 +9,13 @@
 import { toast } from '../toast';
 import { log, SEG } from '../logger';
 import type { PluginHealthMessage } from '../../types/websocket';
+import { getButton } from '../components/button';
 
 // Track unhealthy plugins for indicator
 const unhealthyPlugins = new Set<string>();
 
 /**
- * Handle plugin health message - display toast and update indicator
+ * Handle plugin health message - display toast, update indicator, and update button state
  */
 export function handlePluginHealth(data: PluginHealthMessage): void {
     log.debug(SEG.WS, 'Plugin health update:', data.name, data.state, data.healthy ? 'healthy' : 'unhealthy');
@@ -28,6 +29,22 @@ export function handlePluginHealth(data: PluginHealthMessage): void {
 
     // Update button indicator
     updatePluginButtonIndicator();
+
+    // Update plugin control buttons via registry
+    // When state changes, clear loading on the button that triggered the action
+    if (data.state === 'paused') {
+        // Pause completed - clear loading on the pause button
+        const pauseBtn = getButton(`plugin-pause-${data.name}`);
+        if (pauseBtn) {
+            pauseBtn.setLoading(false);
+        }
+    } else if (data.state === 'running') {
+        // Resume completed - clear loading on the resume button
+        const resumeBtn = getButton(`plugin-resume-${data.name}`);
+        if (resumeBtn) {
+            resumeBtn.setLoading(false);
+        }
+    }
 
     // Show appropriate toast based on state
     if (data.state === 'paused') {

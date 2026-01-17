@@ -349,10 +349,28 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
+		// Get job details before update for broadcast
+		jobBeforeUpdate, err := s.getScheduleStore().GetJob(jobID)
+		if err != nil {
+			handleError(w, s.logger, err, "failed to get job for state update")
+			return
+		}
+
 		if err := s.getScheduleStore().UpdateJobState(jobID, *req.State); err != nil {
 			handleError(w, s.logger, err, "failed to update job state")
 			return
 		}
+
+		// Determine action based on state transition
+		action := "updated"
+		if *req.State == schedule.StatePaused {
+			action = "paused"
+		} else if *req.State == schedule.StateActive {
+			action = "resumed"
+		}
+
+		// Broadcast state change to WebSocket clients
+		s.BroadcastScheduledJobUpdate(jobID, jobBeforeUpdate.ATSCode, *req.State, action)
 
 		logger.AddPulseSymbol(s.logger).Infow("Updated scheduled job state",
 			"job_id", jobID,
@@ -419,6 +437,9 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 		writeWrappedError(w, s.logger, err, "failed to delete job", http.StatusInternalServerError)
 		return
 	}
+
+	// Broadcast deletion to WebSocket clients
+	s.BroadcastScheduledJobUpdate(jobID, job.ATSCode, schedule.StateDeleted, "deleted")
 
 	logger.AddPulseSymbol(s.logger).Infow("Deleted scheduled job",
 		"job_id", jobID,

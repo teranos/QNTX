@@ -11,6 +11,7 @@ import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { log, SEG } from '../logger.ts';
 import { handleError } from '../error-handler.ts';
+import { buttonPlaceholder, hydrateButtons, type Button } from '../components/button.ts';
 
 // Status type for plugin connection
 type PluginStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -41,9 +42,8 @@ class PythonEditorPanel extends BasePanel {
     private isExecuting: boolean = false;
     private pythonVersion: string = '';
 
-    // Two-click confirmation state for execute
-    private needsConfirmation: boolean = false;
-    private confirmationTimeout: number | null = null;
+    // Hydrated execute button (confirmation handled by Button component)
+    private executeButton: Button | null = null;
 
     // Event handler references for cleanup
     private executeHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -69,9 +69,9 @@ class PythonEditorPanel extends BasePanel {
                 </div>
                 <button class="prose-close python-editor-close" aria-label="Close">✕</button>
             </div>
-            <div class="python-editor-tabs">
-                <button class="python-editor-tab active" data-tab="editor">Editor</button>
-                <button class="python-editor-tab" data-tab="output">Output</button>
+            <div class="panel-tabs">
+                <button class="panel-tab active" data-tab="editor">Editor</button>
+                <button class="panel-tab" data-tab="output">Output</button>
             </div>
             <div class="prose-body">
                 <div class="prose-sidebar" id="tab-sidebar">
@@ -98,7 +98,7 @@ class PythonEditorPanel extends BasePanel {
         }
 
         // Tab switching
-        const tabs = this.panel?.querySelectorAll('.python-editor-tab');
+        const tabs = this.panel?.querySelectorAll('.panel-tab');
         tabs?.forEach(tab => {
             const handler = (e: Event) => {
                 const target = e.target as HTMLElement;
@@ -229,14 +229,8 @@ class PythonEditorPanel extends BasePanel {
                         keymap.of(defaultKeymap),
                         pythonExtension,
                         oneDark,
-                        EditorView.lineWrapping,
-                        // Reset confirmation when code changes
-                        EditorView.updateListener.of((update) => {
-                            if (update.docChanged && this.needsConfirmation) {
-                                this.needsConfirmation = false;
-                                this.updateExecuteButton(false);
-                            }
-                        })
+                        EditorView.lineWrapping
+                        // Note: Confirmation reset handled by Button component timeout
                     ]
                 }),
                 parent: container
@@ -264,35 +258,25 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 `;
     }
 
+    /**
+     * Execute code via keyboard shortcut - triggers the hydrated button
+     */
     async executeCode(): Promise<void> {
         if (!this.editor || this.isExecuting) return;
 
-        // First click: show confirmation state
-        if (!this.needsConfirmation) {
-            this.needsConfirmation = true;
-            this.updateExecuteButton(false);
-
-            // Auto-reset confirmation after 5 seconds
-            if (this.confirmationTimeout) {
-                clearTimeout(this.confirmationTimeout);
-            }
-            this.confirmationTimeout = window.setTimeout(() => {
-                this.needsConfirmation = false;
-                this.updateExecuteButton(false);
-            }, 5000);
-
-            return;
+        // Click the hydrated button to trigger its confirmation flow
+        if (this.executeButton) {
+            this.executeButton.element.click();
         }
+    }
 
-        // Second click: actually execute
-        this.needsConfirmation = false;
-        if (this.confirmationTimeout) {
-            clearTimeout(this.confirmationTimeout);
-            this.confirmationTimeout = null;
-        }
+    /**
+     * Direct code execution (called by Button after confirmation)
+     */
+    private async executeCodeDirect(): Promise<void> {
+        if (!this.editor) return;
 
         this.isExecuting = true;
-        this.updateExecuteButton(true);
 
         try {
             const code = this.editor.state.doc.toString();
@@ -330,9 +314,9 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             };
             this.updateOutput(this.lastOutput);
             this.switchTab('output');
+            throw error; // Re-throw so Button shows error state
         } finally {
             this.isExecuting = false;
-            this.updateExecuteButton(false);
         }
     }
 
@@ -402,38 +386,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         outputEl.innerHTML = html;
     }
 
-
-    private updateExecuteButton(executing: boolean): void {
-        const btn = this.$('#python-execute-btn') as HTMLButtonElement;
-        if (!btn) return;
-
-        btn.disabled = executing;
-
-        // Remove existing state classes
-        btn.classList.remove('panel-btn-warning', 'panel-btn-success');
-
-        if (executing) {
-            btn.textContent = 'Running...';
-        } else if (this.needsConfirmation) {
-            btn.textContent = 'Confirm Execute';
-            btn.classList.add('panel-btn-warning');
-        } else {
-            btn.textContent = 'Run (⌘↵)';
-        }
-
-        // Update or remove hint
-        const existingHint = this.$('.python-execute-hint');
-        if (this.needsConfirmation && !executing) {
-            if (!existingHint) {
-                const hint = document.createElement('div');
-                hint.className = 'python-execute-hint panel-confirm-hint';
-                hint.textContent = 'Click again to execute code';
-                btn.parentElement?.insertBefore(hint, btn.nextSibling);
-            }
-        } else {
-            existingHint?.remove();
-        }
-    }
+    // Note: updateExecuteButton removed - Button component handles its own state
 
     updateStatus(status: PluginStatus): void {
         const statusEl = this.$('#python-status');
@@ -565,23 +518,23 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     private getEditorSidebarTemplate(): string {
         return `
-            <div class="python-sidebar-content">
-                <div class="python-sidebar-section">
+            <div class="prose-sidebar-content">
+                <div class="prose-sidebar-section">
                     <h4>Quick Actions</h4>
-                    <button id="python-execute-btn" class="python-action-btn">Run (⌘↵)</button>
-                    <button id="python-clear-btn" class="python-action-btn secondary">Clear</button>
+                    ${buttonPlaceholder('python-execute', 'Run (⌘↵)', 'qntx-btn qntx-btn-primary')}
+                    <button id="python-clear-btn" class="qntx-btn">Clear</button>
                 </div>
-                <div class="python-sidebar-section">
+                <div class="prose-sidebar-section">
                     <h4>Status</h4>
-                    <div class="python-status-row">
+                    <div class="panel-info-row">
                         Plugin: <span id="python-status" class="python-status-connecting">connecting...</span>
                     </div>
                 </div>
-                <div class="python-sidebar-section">
+                <div class="prose-sidebar-section">
                     <h4>Examples</h4>
-                    <button class="python-example-btn" data-example="hello">Hello World</button>
-                    <button class="python-example-btn" data-example="math">Math</button>
-                    <button class="python-example-btn" data-example="json">JSON</button>
+                    <button class="qntx-btn" data-example="hello">Hello World</button>
+                    <button class="qntx-btn" data-example="math">Math</button>
+                    <button class="qntx-btn" data-example="json">JSON</button>
                 </div>
             </div>
         `;
@@ -603,11 +556,11 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     private getOutputSidebarTemplate(): string {
         return `
-            <div class="python-sidebar-content">
-                <div class="python-sidebar-section">
+            <div class="prose-sidebar-content">
+                <div class="prose-sidebar-section">
                     <h4>Actions</h4>
-                    <button id="python-back-btn" class="python-action-btn">← Back to Editor</button>
-                    <button id="python-copy-btn" class="python-action-btn secondary">Copy Output</button>
+                    <button id="python-back-btn" class="qntx-btn">← Back to Editor</button>
+                    <button id="python-copy-btn" class="qntx-btn">Copy Output</button>
                 </div>
             </div>
         `;
@@ -616,15 +569,30 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
     private getOutputContentTemplate(): string {
         return `
             <div id="python-output-content" class="python-output-content">
-                <div class="no-output">No output yet. Run some code!</div>
+                <div class="panel-empty">No output yet. Run some code!</div>
             </div>
         `;
     }
 
     private bindSidebarEvents(): void {
-        // Execute button
-        const executeBtn = this.$('#python-execute-btn');
-        executeBtn?.addEventListener('click', () => this.executeCode());
+        // Hydrate execute button with confirmation
+        const sidebar = this.$('#tab-sidebar');
+        if (sidebar) {
+            const buttons = hydrateButtons(sidebar as HTMLElement, {
+                'python-execute': {
+                    label: 'Run (⌘↵)',
+                    onClick: async () => {
+                        await this.executeCodeDirect();
+                    },
+                    variant: 'primary',
+                    confirmation: {
+                        label: 'Confirm Execute',
+                        timeout: 5000
+                    }
+                }
+            });
+            this.executeButton = buttons['python-execute'] || null;
+        }
 
         // Clear button
         const clearBtn = this.$('#python-clear-btn');
@@ -637,7 +605,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         });
 
         // Example buttons
-        const exampleBtns = this.panel?.querySelectorAll('.python-example-btn');
+        const exampleBtns = this.panel?.querySelectorAll('[data-example]');
         exampleBtns?.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const example = (e.target as HTMLElement).dataset.example;

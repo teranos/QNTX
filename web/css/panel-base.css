@@ -318,57 +318,44 @@
     font-weight: 500;
 }
 
-/* === BUTTONS === */
+/* === TABS === */
 
-.panel-btn {
-    background: none;
-    border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
-    padding: 6px 12px;
-    font-size: 12px;
+.panel-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--color-border, #333);
+    background: var(--color-bg-secondary, #1a1a1a);
+    padding: 0;
+    margin: 0;
+}
+
+.panel-tab {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--color-text-secondary, #888);
     cursor: pointer;
-    transition: var(--panel-transition-fast);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
 }
 
-.panel-btn:hover {
-    background: var(--panel-bg-secondary);
+.panel-tab:hover {
+    background: var(--color-bg-hover, #252525);
+    color: var(--color-text, #fff);
 }
 
-.panel-btn-primary {
-    background: #000;
-    color: #fff;
-    border-color: #000;
+.panel-tab.active {
+    color: var(--color-primary, #4a9eff);
+    border-bottom-color: var(--color-primary, #4a9eff);
+    background: var(--color-bg, #0d0d0d);
 }
 
-.panel-btn-primary:hover {
-    background: #333;
-}
-
-.panel-btn-sm {
-    padding: 4px 8px;
-    font-size: 11px;
-}
-
-/* Warning button - for two-click confirmation pattern */
-.panel-btn-warning {
-    background: #fff3e0;
-    border-color: #ef6c00;
-    color: #e65100;
-}
-
-.panel-btn-warning:hover:not(:disabled) {
-    background: #ffe0b2;
-}
-
-/* Success/confirm button - for validated state in two-click pattern */
-.panel-btn-success {
-    background: #e8f5e9;
-    border-color: #388e3c;
-    color: #2e7d32;
-}
-
-.panel-btn-success:hover:not(:disabled) {
-    background: #c8e6c9;
+.panel-tab:focus {
+    outline: 2px solid var(--color-primary, #4a9eff);
+    outline-offset: -2px;
 }
 
 /* Confirmation hint - shows below button during confirmation state */

@@ -1,14 +1,7 @@
 /**
- * Components - Reusable UI components used across the application
- *
- * This file contains shared component styles that are used in multiple places.
- * Component classes should be semantic and reusable.
- */
-
-/* ============================================================================
  * Close Button Component
  * Used across all panels, modals, toasts, and dismissible elements
- * ============================================================================ */
+ */
 
 .panel-close,
 .toast-close {
@@ -58,10 +51,8 @@
     outline-offset: 2px;
 }
 
-/* ============================================================================
- * Toast-specific Close Button Variant
- * Light theme default with dark theme overrides
- * ============================================================================ */
+/* Toast-specific Close Button Variant
+ * Light theme default with dark theme overrides */
 
 .toast .toast-close {
     color: #6e6e73;
@@ -85,4 +76,3 @@
 }
 
 /* No dark theme - single consistent design */
-

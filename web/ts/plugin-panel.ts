@@ -15,6 +15,7 @@ import { toast } from './toast';
 import { escapeHtml } from './html-utils.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
+import { buttonPlaceholder, hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 
 interface PluginInfo {
     name: string;
@@ -124,34 +125,8 @@ export class PluginPanel extends BasePanel {
         content?.addEventListener('click', async (e: Event) => {
             const target = e.target as HTMLElement;
 
-            // Refresh button
-            if (target.closest('.plugin-refresh-btn')) {
-                await this.fetchPlugins();
-                this.render();
-                return;
-            }
-
-            // Pause button
-            const pauseBtn = target.closest('.plugin-pause-btn') as HTMLElement | null;
-            if (pauseBtn) {
-                e.stopPropagation();
-                const pluginName = pauseBtn.dataset.plugin;
-                if (pluginName) {
-                    await this.pausePlugin(pluginName);
-                }
-                return;
-            }
-
-            // Resume button
-            const resumeBtn = target.closest('.plugin-resume-btn') as HTMLElement | null;
-            if (resumeBtn) {
-                e.stopPropagation();
-                const pluginName = resumeBtn.dataset.plugin;
-                if (pluginName) {
-                    await this.resumePlugin(pluginName);
-                }
-                return;
-            }
+            // Note: Pause/Resume buttons are now hydrated Button components
+            // that handle their own click events
 
             // Save config button
             if (target.closest('.plugin-config-save-btn')) {
@@ -314,12 +289,52 @@ export class PluginPanel extends BasePanel {
                         <span class="plugin-server-value panel-code">${serverBuildTime}</span>
                     </div>
                 ` : ''}
-                <button class="panel-btn panel-btn-sm plugin-refresh-btn has-tooltip" data-tooltip="Refresh">&#8635; Refresh</button>
             </div>
             <div class="panel-list plugin-list">
                 ${this.plugins.map(plugin => this.renderPlugin(plugin)).join('')}
             </div>
         `;
+
+        // Hydrate plugin control buttons
+        this.hydratePluginButtons(content);
+    }
+
+    /**
+     * Hydrate plugin pause/resume button placeholders with Button instances
+     */
+    private hydratePluginButtons(container: Element): void {
+        const config: HydrateConfig = {};
+
+        for (const plugin of this.plugins) {
+            if (!plugin.pausable) continue;
+
+            if (plugin.state === 'running') {
+                config[`plugin-pause-${plugin.name}`] = {
+                    label: '❚❚ Pause',
+                    onClick: async () => {
+                        await this.pausePlugin(plugin.name);
+                    },
+                    variant: 'secondary',
+                    size: 'small'
+                };
+            } else if (plugin.state === 'paused') {
+                config[`plugin-resume-${plugin.name}`] = {
+                    label: '▶ Resume',
+                    onClick: async () => {
+                        await this.resumePlugin(plugin.name);
+                    },
+                    variant: 'primary',
+                    size: 'small'
+                };
+            }
+        }
+
+        const buttons = hydrateButtons(container as HTMLElement, config);
+
+        // Register for WebSocket updates
+        for (const [buttonId, button] of Object.entries(buttons)) {
+            registerButton(buttonId, button);
+        }
     }
 
     private getHealthSummary(): string {
@@ -424,9 +439,9 @@ export class PluginPanel extends BasePanel {
         let controls = '';
         if (plugin.pausable) {
             if (plugin.state === 'running') {
-                controls = `<button class="panel-btn panel-btn-sm plugin-pause-btn has-tooltip" data-plugin="${plugin.name}" data-tooltip="Pause plugin">&#10074;&#10074; Pause</button>`;
+                controls = buttonPlaceholder(`plugin-pause-${plugin.name}`, '❚❚ Pause', 'qntx-btn qntx-btn-sm plugin-pause-btn');
             } else if (plugin.state === 'paused') {
-                controls = `<button class="panel-btn panel-btn-sm plugin-resume-btn has-tooltip" data-plugin="${plugin.name}" data-tooltip="Resume plugin">&#9654; Resume</button>`;
+                controls = buttonPlaceholder(`plugin-resume-${plugin.name}`, '▶ Resume', 'qntx-btn qntx-btn-sm plugin-resume-btn');
             }
         }
 
@@ -671,8 +686,8 @@ export class PluginPanel extends BasePanel {
                 ${(hasChanges || isEditing) ? `
                     <div class="plugin-config-actions">
                         <div class="plugin-config-actions-buttons">
-                            <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
-                            <button class="panel-btn ${this.configState.needsConfirmation ? 'panel-btn-warning' : 'panel-btn-primary'} plugin-config-save-btn"
+                            <button class="qntx-btn plugin-config-cancel-btn">Cancel</button>
+                            <button class="qntx-btn ${this.configState.needsConfirmation ? 'qntx-btn-warning' : 'qntx-btn-primary'} plugin-config-save-btn"
                                     ${hasErrors ? 'disabled' : ''}>
                                 ${this.configState.needsConfirmation ? 'Confirm Restart' : 'Save Changes'}
                             </button>

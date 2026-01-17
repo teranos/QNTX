@@ -382,14 +382,14 @@ class WebscraperPanel extends BasePanel {
         if (!submitBtn) return;
 
         // Remove existing state classes
-        submitBtn.classList.remove('panel-btn-warning', 'panel-btn-success');
+        submitBtn.classList.remove('qntx-btn-warning', 'qntx-btn-success');
 
         if (this.isScraping) {
             submitBtn.textContent = 'Scraping...';
             submitBtn.disabled = true;
         } else if (this.needsConfirmation) {
             submitBtn.textContent = 'Confirm Scrape';
-            submitBtn.classList.add('panel-btn-warning');
+            submitBtn.classList.add('qntx-btn-warning');
             submitBtn.disabled = false;
         } else {
             submitBtn.textContent = 'Scrape';

@@ -8,6 +8,32 @@
 - If something is unclear, ask - don't assume or fill in gaps
 - State only what you can directly verify
 
+## CSS Policy - CRITICAL
+
+**Before proposing ANY new CSS, you MUST:**
+
+1. **Read these files FIRST:**
+   - `web/css/components/button.css` - THE canonical button (`.qntx-btn`)
+   - `web/css/panel-base.css` - Shared panel components (tabs, badges, empty states)
+   - `web/css/prose-panel.css` - Panel layout system (header, body, sidebar)
+   - `web/css/core.css` - CSS variables and tokens
+
+2. **Show me what exists** that could solve the problem
+
+3. **Explain why existing styles cannot be used**
+
+4. **Only if approved**, propose minimal new CSS
+
+**Canonical components (use these, don't recreate):**
+- **Button**: `.qntx-btn`, `.qntx-btn-primary`, `.qntx-btn-secondary`, `.qntx-btn-danger`, `.qntx-btn-small/medium/large`
+- **Tabs**: `.panel-tabs`, `.panel-tab`, `.panel-tab.active`
+- **Empty states**: `.panel-empty`, `.panel-empty-icon`, `.panel-empty-hint`
+- **Badges**: `.panel-badge`, `.panel-badge-pending/running/completed/failed`
+- **Layout**: `.prose-panel`, `.prose-header`, `.prose-body`, `.prose-sidebar`
+- **Close button**: `.panel-close`
+
+**If you propose CSS without first reading and showing these files, your work will be rejected.**
+
 ## Segments
 
 QNTX uses segments across the project:

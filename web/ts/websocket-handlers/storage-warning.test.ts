@@ -2,19 +2,25 @@
  * Test for storage warning handler
  */
 
-import { describe, test, expect, mock } from 'bun:test';
+import { describe, test, expect, mock, beforeEach } from 'bun:test';
 import { handleStorageWarning } from './storage-warning';
-
-// Mock the toast module
-mock.module('../toast', () => ({
-    toast: {
-        warning: mock(() => {}),
-    },
-}));
+import { boundedStorageWindow } from '../bounded-storage-window';
 
 describe('Storage Warning Handler', () => {
-    test('storage warning shows correct fill percentage', () => {
-        const { toast } = require('../toast');
+    beforeEach(() => {
+        // Reset the bounded storage window state
+        // The window tracks warnings internally
+    });
+
+    test('storage warning updates bounded storage window', () => {
+        // Create a spy for handleWarning
+        const originalHandleWarning = boundedStorageWindow.handleWarning.bind(boundedStorageWindow);
+        let capturedData: any = null;
+
+        boundedStorageWindow.handleWarning = (data: any) => {
+            capturedData = data;
+            originalHandleWarning(data);
+        };
 
         handleStorageWarning({
             type: 'storage_warning',
@@ -27,9 +33,46 @@ describe('Storage Warning Handler', () => {
             timestamp: Date.now(),
         });
 
-        // Should display "Storage 85% full for user@test/work (85/100)"
-        const message = toast.warning.mock.calls[0][0];
-        expect(message).toContain('85%');
-        expect(message).toContain('85/100');
+        // Verify the bounded storage window received the data
+        expect(capturedData).not.toBeNull();
+        expect(capturedData.actor).toBe('user@test');
+        expect(capturedData.context).toBe('work');
+        expect(capturedData.fill_percent).toBe(0.85);
+
+        // Restore original
+        boundedStorageWindow.handleWarning = originalHandleWarning;
+    });
+
+    test('bounded storage window tracks bucket status', () => {
+        handleStorageWarning({
+            type: 'storage_warning',
+            actor: 'plugin@github',
+            context: 'repos',
+            current: 950,
+            limit: 1000,
+            fill_percent: 0.95,
+            time_until_full: '6 hours',
+            timestamp: Date.now(),
+        });
+
+        // Check status level reflects critical state (>90%)
+        const status = boundedStorageWindow.getStatusLevel();
+        expect(status).toBe('critical');
+    });
+
+    test('storage at 70% triggers warning status', () => {
+        handleStorageWarning({
+            type: 'storage_warning',
+            actor: 'user@example',
+            context: 'default',
+            current: 70,
+            limit: 100,
+            fill_percent: 0.70,
+            time_until_full: '1 week',
+            timestamp: Date.now(),
+        });
+
+        // Window should report active issues at 70%+
+        expect(boundedStorageWindow.hasActiveIssues()).toBe(true);
     });
 });

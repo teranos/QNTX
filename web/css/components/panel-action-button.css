@@ -1,0 +1,39 @@
+/**
+ * Panel Action Button Component
+ * Generic action buttons for panel headers (similar to close button)
+ */
+
+.panel-action-btn {
+    /* Base styles - similar to panel-close */
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 16px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.panel-action-btn:hover {
+    background: #f0f0f0;
+    color: #000;
+    transform: none;
+}
+
+.panel-action-btn:active {
+    background: #e0e0e0;
+    color: #000;
+}
+
+.panel-action-btn:focus-visible {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+}

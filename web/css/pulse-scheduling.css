@@ -10,10 +10,11 @@
   flex-direction: column;
   gap: 4px;
   padding: 4px 8px;
-  background: var(--color-bg-secondary, #f5f5f5);
-  border-top: 1px solid var(--color-border, #e0e0e0);
+  background: #2a2a2a;
+  border-top: 1px solid #444;
   border-radius: 0 0 4px 4px;
   font-size: 13px;
+  color: #cccccc;
 }
 
 /* Inline error display */
@@ -96,9 +97,10 @@
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border: 1px solid var(--color-border, #e0e0e0);
+  border: 1px solid #555;
   border-radius: 4px;
-  background: white;
+  background: #333;
+  color: #cccccc;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
@@ -109,12 +111,12 @@
 .pulse-btn-delete:hover,
 .pulse-btn-confirm:hover,
 .pulse-btn-cancel:hover {
-  background: var(--color-bg-hover, #f0f0f0);
-  border-color: var(--color-border-hover, #d0d0d0);
+  background: #3a3a3a;
+  border-color: #666;
 }
 
 .pulse-btn-add-schedule {
-  color: var(--color-primary, #1976d2);
+  color: #66b3ff;
 }
 
 .pulse-btn-pause {
@@ -163,17 +165,18 @@
 /* Interval select dropdown */
 .pulse-interval-select {
   padding: 4px 8px;
-  border: 1px solid var(--color-border, #e0e0e0);
+  border: 1px solid #555;
   border-radius: 4px;
-  background: white;
+  background: #333;
+  color: #cccccc;
   font-size: 13px;
   cursor: pointer;
 }
 
 .pulse-interval-select:focus {
   outline: none;
-  border-color: var(--color-primary, #1976d2);
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+  border-color: #66b3ff;
+  box-shadow: 0 0 0 2px rgba(102, 179, 255, 0.1);
 }
 
 /* Interval picker (expanded state) */
@@ -185,7 +188,7 @@
 
 .pulse-label {
   font-size: 13px;
-  color: var(--color-text-secondary, #757575);
+  color: #aaa;
 }
 
 /* Animation for schedule badge pulse effect */

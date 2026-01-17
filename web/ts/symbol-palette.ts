@@ -434,13 +434,25 @@ function showWebscraperPanel(): void {
 }
 
 /**
- * Show CTP2 window
+ * Show CTP2 window (gracefully handles missing private module)
  */
 let ctp2WindowInstance: any = null;
+let ctp2Failed = false;
 async function showCTP2Window(): Promise<void> {
+    if (ctp2Failed) {
+        console.warn('[CTP2] Private module not available');
+        return;
+    }
+
     if (!ctp2WindowInstance) {
-        const module = await import('../ctp2/window.js');
-        ctp2WindowInstance = new module.CTP2Window();
+        try {
+            const module = await import('../ctp2/window.js');
+            ctp2WindowInstance = new module.CTP2Window();
+        } catch (err) {
+            console.warn('[CTP2] Private module not available:', err);
+            ctp2Failed = true;
+            return;
+        }
     }
     ctp2WindowInstance.toggle();
 }
