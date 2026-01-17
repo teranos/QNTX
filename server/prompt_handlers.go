@@ -254,7 +254,7 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.AddSoSymbol(s.logger).Infow("Prompt list request")
+	logger.AddAxSymbol(s.logger).Infow("Prompt list request")
 
 	store := prompt.NewPromptStore(s.db)
 	prompts, err := store.ListPrompts(r.Context(), 100)
@@ -323,7 +323,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.AddSoSymbol(s.logger).Infow("Prompt save request")
+	logger.AddAxSymbol(s.logger).Infow("Prompt save request")
 
 	var req PromptSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
