@@ -36,7 +36,7 @@
     padding: 8px;
     width: 320px;
     height: 180px;
-    color: #fff;
+    color: var(--bg-primary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     z-index: 999;

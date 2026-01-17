@@ -23,7 +23,7 @@ pre {
     padding: 12px 16px;
     overflow-x: auto;
     border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
 }
 
 code {
@@ -42,7 +42,7 @@ pre code {
 
 /* Headings - Compact */
 h1 {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 8px;
     font-size: 1.8em;
     margin: 0.5em 0;
@@ -62,7 +62,7 @@ h3 {
 
 /* Links */
 a {
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color, var(--accent));
     text-decoration: none;
 }
 
@@ -74,7 +74,7 @@ a:hover {
 nav.doc-nav {
     margin-bottom: 2em;
     padding: 12px;
-    background: #f9f9f9;
+    background: var(--bg-secondary);
     border-radius: 4px;
 }
 
@@ -91,8 +91,8 @@ nav.doc-nav a {
 
 /* Table of Contents */
 .toc {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 16px 24px;
     margin-bottom: 2em;
@@ -102,7 +102,7 @@ nav.doc-nav a {
     font-weight: 600;
     margin: 0 0 12px 0;
     font-size: 0.9em;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 .toc ul {
@@ -124,7 +124,7 @@ nav.doc-nav a {
     display: flex;
     align-items: center;
     margin-bottom: 1.25em;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 10px;
 }
 
@@ -164,8 +164,8 @@ nav.doc-nav a {
 .intro-section {
     margin: 1em 0 1.5em 0;
     padding: 12px 16px;
-    background: #f9f9f9;
-    border-left: 3px solid #0066cc;
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--accent);
     border-radius: 3px;
 }
 
@@ -183,7 +183,7 @@ nav.doc-nav a {
     margin-bottom: 0;
     font-family: var(--font-mono, monospace);
     font-size: 0.85em;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 /* Build Info Section - Compact */
@@ -194,7 +194,7 @@ nav.doc-nav a {
 .build-info-section h2 {
     font-size: 1.1em;
     margin: 0 0 0.5em 0;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 4px;
 }
 
@@ -228,10 +228,10 @@ nav.doc-nav a {
 .quick-link {
     display: inline-block;
     padding: 6px 12px;
-    background: #f9f9f9;
-    border: 1px solid #ddd;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 3px;
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color, var(--accent));
     font-weight: 500;
     font-size: 0.9em;
     text-decoration: none;
@@ -239,7 +239,7 @@ nav.doc-nav a {
 }
 
 .quick-link:hover {
-    background: #eee;
+    background: var(--bg-hover);
     text-decoration: none;
 }
 
@@ -252,21 +252,21 @@ nav.doc-nav a {
     width: 100%;
     padding: 12px 16px;
     font-size: 1em;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: #fff;
-    color: #000;
+    background: var(--bg-primary);
+    color: var(--primary);
     box-sizing: border-box;
 }
 
 .search-input:focus {
-    outline: 2px solid var(--accent-color, #0066cc);
+    outline: 2px solid var(--accent-color, var(--accent));
     outline-offset: -1px;
     border-color: transparent;
 }
 
 .search-input::placeholder {
-    color: #999;
+    color: var(--text-muted);
 }
 
 .search-results {
@@ -276,7 +276,7 @@ nav.doc-nav a {
 .search-result {
     padding: 12px 16px;
     margin: 8px 0;
-    background: #f9f9f9;
+    background: var(--bg-secondary);
     border-radius: 4px;
     display: block;
     text-decoration: none;
@@ -284,24 +284,24 @@ nav.doc-nav a {
 }
 
 .search-result:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     text-decoration: none;
 }
 
 .search-result-title {
     font-weight: 500;
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color, var(--accent));
 }
 
 .search-result-category {
     font-size: 0.85em;
-    color: #666;
+    color: var(--text-secondary);
     margin-left: 8px;
 }
 
 .search-result-snippet {
     font-size: 0.9em;
-    color: #555;
+    color: var(--text-secondary);
     margin-top: 4px;
 }
 
@@ -312,7 +312,7 @@ nav.doc-nav a {
 }
 
 .search-no-results {
-    color: #666;
+    color: var(--text-secondary);
     padding: 12px 0;
 }
 
@@ -322,7 +322,7 @@ nav.doc-nav a {
 }
 
 .download-section h2 {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 4px;
     font-size: 1.1em;
     margin-bottom: 0.75em;
@@ -332,9 +332,9 @@ nav.doc-nav a {
 .download-section.quick-download {
     margin: 0.75em 0 1.5em 0;
     padding: 10px 12px;
-    background: #f5f5f5;
+    background: var(--bg-secondary);
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 .download-section.quick-download h2 {
@@ -344,7 +344,7 @@ nav.doc-nav a {
     border: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #666;
+    color: var(--text-secondary);
     font-weight: 600;
 }
 
@@ -397,21 +397,21 @@ nav.doc-nav a {
 .download-section.quick-download .download-link {
     display: inline-block;
     padding: 6px 12px;
-    background: #fff;
-    border: 1px solid #ddd;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     font-size: 0.85em;
     transition: all 0.1s;
 }
 
 .download-section.quick-download .download-link:hover {
-    background: #f9f9f9;
-    border-color: #0066cc;
+    background: var(--bg-secondary);
+    border-color: var(--accent);
 }
 
 .download-section.quick-download .file-size {
     margin-left: 4px;
-    color: #999;
+    color: var(--text-muted);
     font-size: 0.85em;
 }
 
@@ -428,8 +428,8 @@ nav.doc-nav a {
 }
 
 .download-card {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
     display: flex;
@@ -453,7 +453,7 @@ nav.doc-nav a {
 }
 
 .download-card-desc {
-    color: #555;
+    color: var(--text-secondary);
     font-size: 0.9em;
     flex-grow: 1;
     margin-bottom: 16px;
@@ -461,8 +461,8 @@ nav.doc-nav a {
 
 .download-btn {
     display: inline-block;
-    background: var(--accent-color, #0066cc);
-    color: #fff;
+    background: var(--accent-color, var(--accent));
+    color: var(--bg-primary);
     padding: 10px 20px;
     border-radius: 4px;
     text-align: center;
@@ -476,7 +476,7 @@ nav.doc-nav a {
 }
 
 .install-code {
-    background: #2a2a2a;
+    background: var(--editor-bg-alt);
     color: #e0e0e0;
     padding: 12px 16px;
     border-radius: 4px;
@@ -494,7 +494,7 @@ nav.doc-nav a {
 
 .platform-list li {
     padding: 6px 0;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -515,15 +515,15 @@ nav.doc-nav a {
 
 /* Release Version Cards - Compact */
 .release-version {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 12px 16px;
     margin-bottom: 12px;
 }
 
 .release-version.latest {
-    border-color: var(--accent-color, #0066cc);
+    border-color: var(--accent-color, var(--accent));
 }
 
 .release-header {
@@ -544,8 +544,8 @@ nav.doc-nav a {
 }
 
 .latest-badge {
-    background: var(--accent-color, #0066cc);
-    color: #fff;
+    background: var(--accent-color, var(--accent));
+    color: var(--bg-primary);
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 0.75em;
@@ -556,7 +556,7 @@ nav.doc-nav a {
 
 .prerelease-badge {
     background: var(--color-warning, #ffaa00);
-    color: #000;
+    color: var(--primary);
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 0.75em;
@@ -570,13 +570,13 @@ nav.doc-nav a {
 }
 
 .file-size {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.85em;
     margin-left: 4px;
 }
 
 .loading {
-    color: #666;
+    color: var(--text-secondary);
     font-style: italic;
 }
 
@@ -588,22 +588,22 @@ nav.doc-nav a {
 .site-footer {
     margin-top: 4em;
     padding-top: 1em;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-color);
 }
 
 .provenance {
     font-size: 0.8em;
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
 }
 
 .provenance a {
-    color: #888;
+    color: var(--text-muted);
     font-family: var(--font-mono, monospace);
 }
 
 .provenance a:hover {
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color, var(--accent));
 }
 
 /* Nix Infrastructure Tables */
@@ -617,11 +617,11 @@ nav.doc-nav a {
 .nix-table td {
     text-align: left;
     padding: 10px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .nix-table th {
-    background: #f9f9f9;
+    background: var(--bg-secondary);
     font-weight: 600;
 }
 
@@ -658,14 +658,14 @@ nav.doc-nav a {
     align-items: baseline;
     margin-bottom: 0.75em;
     padding-bottom: 6px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     gap: 10px;
 }
 
 .category-title {
     margin: 0;
     font-size: 1.1em;
-    color: #333;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -708,9 +708,9 @@ nav.doc-nav a {
 .doc-list a {
     display: block;
     padding: 10px 12px;
-    background: #f9f9f9;
+    background: var(--bg-secondary);
     border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-color);
     transition: all 0.1s;
     height: 100%;
     box-sizing: border-box;
@@ -718,9 +718,9 @@ nav.doc-nav a {
 }
 
 .doc-list a:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     text-decoration: none;
-    border-color: #0066cc;
+    border-color: var(--accent);
 }
 
 .doc-list .doc-name {
@@ -757,11 +757,11 @@ table {
 th, td {
     text-align: left;
     padding: 8px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
 }
 
 th {
-    background: #f9f9f9;
+    background: var(--bg-secondary);
     font-weight: 600;
 }
 
@@ -787,12 +787,12 @@ th {
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
     body {
-        background: #1a1a1a;
+        background: var(--editor-bg);
         color: #e0e0e0;
     }
 
     h1, h2 {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     h2 {
@@ -800,11 +800,11 @@ th {
     }
 
     pre, code {
-        background: #2a2a2a;
+        background: var(--editor-bg-alt);
     }
 
     pre {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     a {
@@ -819,21 +819,21 @@ th {
     }
 
     .toc {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .doc-list a {
         background: #242424;
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .doc-list a:hover {
-        background: #2a2a2a;
+        background: var(--editor-bg-alt);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .doc-header {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .intro-section {
@@ -842,34 +842,34 @@ th {
     }
 
     .intro-section p:last-child {
-        color: #aaa;
+        color: var(--text-muted);
     }
 
     .build-info-section h2 {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .build-info-list li {
-        border-left-color: #333;
+        border-left-color: var(--text-primary);
     }
 
     .download-section.quick-download {
         background: #222;
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .download-section.quick-download h2 {
-        color: #888;
+        color: var(--text-muted);
     }
 
     .download-section.quick-download .download-link {
-        background: #2a2a2a;
-        border-color: #444;
+        background: var(--editor-bg-alt);
+        border-color: var(--editor-border);
         color: #e0e0e0;
     }
 
     .download-section.quick-download .download-link:hover {
-        background: #333;
+        background: var(--editor-border);
         border-color: #0077cc;
     }
 
@@ -879,15 +879,15 @@ th {
 
     .quick-link {
         background: #242424;
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .quick-link:hover {
-        background: #2a2a2a;
+        background: var(--editor-bg-alt);
     }
 
     .category-header {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .category-title {
@@ -895,25 +895,25 @@ th {
     }
 
     .category-desc {
-        color: #999;
+        color: var(--text-muted);
     }
 
     .toc-title {
-        color: #aaa;
+        color: var(--text-muted);
     }
 
     th, td {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .search-input {
-        background: #2a2a2a;
-        border-color: #333;
+        background: var(--editor-bg-alt);
+        border-color: var(--text-primary);
         color: #e0e0e0;
     }
 
     .search-input::placeholder {
-        color: #666;
+        color: var(--text-secondary);
     }
 
     .search-result {
@@ -921,33 +921,33 @@ th {
     }
 
     .search-result:hover {
-        background: #2a2a2a;
+        background: var(--editor-bg-alt);
     }
 
     .search-result-category {
-        color: #888;
+        color: var(--text-muted);
     }
 
     .search-result-snippet {
-        color: #aaa;
+        color: var(--text-muted);
     }
 
     .search-result-snippet mark {
         background: #5c4a00;
-        color: #fff;
+        color: var(--bg-primary);
     }
 
     .search-no-results {
-        color: #888;
+        color: var(--text-muted);
     }
 
     .download-card {
         background: #242424;
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .download-card-desc {
-        color: #aaa;
+        color: var(--text-muted);
     }
 
     .download-btn {
@@ -959,12 +959,12 @@ th {
     }
 
     .platform-list li {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .release-version {
         background: #242424;
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .release-version.latest {
@@ -972,19 +972,19 @@ th {
     }
 
     .release-date {
-        color: #888;
+        color: var(--text-muted);
     }
 
     .file-size {
-        color: #666;
+        color: var(--text-secondary);
     }
 
     .loading {
-        color: #888;
+        color: var(--text-muted);
     }
 
     .site-footer {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .provenance a:hover {
@@ -993,7 +993,7 @@ th {
 
     .nix-table th,
     .nix-table td {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .nix-table th {
@@ -1002,7 +1002,7 @@ th {
 
     .nix-table code,
     .container-details code {
-        background: #2a2a2a;
+        background: var(--editor-bg-alt);
     }
 }
 

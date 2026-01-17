@@ -32,7 +32,7 @@
 #codemirror-container .cm-gutters {
     background: transparent;
     border-right: 1px solid #333;
-    color: #555;
+    color: var(--text-secondary);
     padding-right: 8px;
 }
 
@@ -57,8 +57,8 @@
 
 /* Completion popup */
 .cm-tooltip-autocomplete {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--editor-bg-alt);
+    border: 1px solid var(--editor-border);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
@@ -69,12 +69,12 @@
 
 .cm-tooltip-autocomplete li {
     padding: 4px 8px;
-    color: #ccc;
+    color: var(--editor-text);
 }
 
 .cm-tooltip-autocomplete li[aria-selected] {
     background: rgba(74, 222, 128, 0.2);
-    color: #fff;
+    color: var(--bg-primary);
 }
 
 /* Match bracket highlighting */

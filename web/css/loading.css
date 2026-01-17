@@ -16,7 +16,7 @@
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    color: #888;
+    color: var(--text-muted);
     animation: fadeInLoader 300ms ease-out;
 }
 
@@ -38,7 +38,7 @@
 #loading-screen .progress-bar-container {
     width: 200px;
     height: 2px;
-    background: #333;
+    background: var(--editor-border);
     border-radius: 1px;
     overflow: hidden;
     margin-bottom: 12px;
@@ -53,7 +53,7 @@
 
 #loading-status {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
     margin-bottom: 16px;
 }
 
@@ -67,7 +67,7 @@
     padding: 8px 10px;
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 10px;
-    color: #666;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin-bottom: 16px;
 }
@@ -75,8 +75,8 @@
 #metamask-warning {
     display: none;
     padding: 12px 16px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--editor-bg-alt);
+    border: 1px solid var(--editor-border);
     border-radius: 4px;
     max-width: 400px;
     text-align: center;
@@ -90,7 +90,7 @@
 
 #metamask-warning .warning-text {
     font-size: 11px;
-    color: #888;
+    color: var(--text-muted);
     line-height: 1.4;
 }
 
@@ -115,16 +115,16 @@
 }
 
 #loader-logs::-webkit-scrollbar-track {
-    background: #1a1a1a;
+    background: var(--editor-bg);
 }
 
 #loader-logs::-webkit-scrollbar-thumb {
-    background: #333;
+    background: var(--editor-border);
     border-radius: 2px;
 }
 
 #loader-logs::-webkit-scrollbar-thumb:hover {
-    background: #444;
+    background: var(--editor-border);
 }
 
 /* Reduced motion preference */

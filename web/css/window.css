@@ -8,9 +8,9 @@
     top: 100px;
     left: 100px;
     background: var(--panel-bg, #fff);
-    border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
-    box-shadow: var(--panel-shadow-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
     z-index: 9999;
     display: none;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
@@ -24,7 +24,7 @@
 /* Header */
 .draggable-window-header {
     padding: 8px 12px;
-    border-bottom: var(--panel-border);
+    border-bottom: 1px solid var(--border-color);
     cursor: move;
     display: flex;
     align-items: center;
@@ -60,7 +60,7 @@
 /* Footer - for runtime stats and metrics */
 .draggable-window-footer {
     padding: 8px 12px;
-    border-top: var(--panel-border);
+    border-top: 1px solid var(--border-color);
     background: var(--panel-bg-secondary, #f8f8f8);
     font-size: 11px;
     color: var(--panel-text-secondary, #666);
@@ -76,16 +76,16 @@
     width: 100%;
     padding: 6px 8px;
     background: var(--panel-bg, #fff);
-    border: var(--panel-border);
+    border: 1px solid var(--border-color);
     color: var(--panel-text-primary, #333);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-family: inherit;
     font-size: 11px;
     margin-bottom: 8px;
 }
 
 .window-input:focus {
-    outline: 2px solid #0066cc;
+    outline: 2px solid var(--accent);
     outline-offset: 1px;
 }
 
@@ -140,7 +140,7 @@
     height: 480px;
     background: #000;
     margin-bottom: 8px;
-    border: var(--panel-border);
+    border: 1px solid var(--border-color);
     overflow: hidden;
 }
 
@@ -158,7 +158,7 @@
     padding: 8px 12px;
     background: #fee;
     border: 1px solid #c88;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     color: #a00;
     font-size: 11px;
     margin-bottom: 8px;
@@ -189,7 +189,7 @@
     margin-bottom: 8px;
     padding: 4px 8px;
     background: var(--panel-bg-secondary, #f8f8f8);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .window-model-info span {

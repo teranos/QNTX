@@ -57,7 +57,7 @@
 }
 
 .pulse-schedule-badge.paused {
-  background: #f5f5f5;
+  background: var(--bg-secondary);
   color: #757575;
 }
 

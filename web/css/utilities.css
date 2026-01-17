@@ -101,10 +101,10 @@
 /* Color utilities - using CSS variables */
 .u-color-success { color: var(--color-success) !important; }
 .u-color-error { color: var(--color-error) !important; }
-.u-color-warning { color: var(--color-warning) !important; }
+.u-color-warning { color: var(--warning) !important; }
 .u-color-info { color: var(--color-info) !important; }
 
 .u-bg-success { background-color: var(--color-success) !important; }
 .u-bg-error { background-color: var(--color-error) !important; }
-.u-bg-warning { background-color: var(--color-warning) !important; }
+.u-bg-warning { background-color: var(--warning) !important; }
 .u-bg-info { background-color: var(--color-info) !important; }
