@@ -83,16 +83,16 @@ export class VidStreamWindow {
             <div class="window-controls">
                 <button
                     id="vs-init-btn"
-                    class="panel-btn panel-btn-sm"
+                    class="qntx-btn qntx-btn-sm"
                 >Initialize ONNX</button>
                 <button
                     id="vs-start-btn"
-                    class="panel-btn panel-btn-sm panel-btn-primary"
+                    class="qntx-btn qntx-btn-sm qntx-btn-primary"
                 >Start Camera</button>
-                <button id="vs-stop-btn" class="panel-btn panel-btn-sm" style="display: none;">Stop</button>
+                <button id="vs-stop-btn" class="qntx-btn qntx-btn-sm" style="display: none;">Stop</button>
                 <button
                     id="vs-config-btn"
-                    class="panel-btn panel-btn-sm has-tooltip"
+                    class="qntx-btn qntx-btn-sm has-tooltip"
                     data-tooltip="Configure ONNX model"
                 >⚙️</button>
                 <span id="vs-status" class="window-status">Ready (camera + ONNX via WebSocket)</span>

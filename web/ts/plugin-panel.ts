@@ -439,9 +439,9 @@ export class PluginPanel extends BasePanel {
         let controls = '';
         if (plugin.pausable) {
             if (plugin.state === 'running') {
-                controls = buttonPlaceholder(`plugin-pause-${plugin.name}`, '❚❚ Pause', 'panel-btn panel-btn-sm plugin-pause-btn');
+                controls = buttonPlaceholder(`plugin-pause-${plugin.name}`, '❚❚ Pause', 'qntx-btn qntx-btn-sm plugin-pause-btn');
             } else if (plugin.state === 'paused') {
-                controls = buttonPlaceholder(`plugin-resume-${plugin.name}`, '▶ Resume', 'panel-btn panel-btn-sm plugin-resume-btn');
+                controls = buttonPlaceholder(`plugin-resume-${plugin.name}`, '▶ Resume', 'qntx-btn qntx-btn-sm plugin-resume-btn');
             }
         }
 
@@ -686,8 +686,8 @@ export class PluginPanel extends BasePanel {
                 ${(hasChanges || isEditing) ? `
                     <div class="plugin-config-actions">
                         <div class="plugin-config-actions-buttons">
-                            <button class="panel-btn plugin-config-cancel-btn">Cancel</button>
-                            <button class="panel-btn ${this.configState.needsConfirmation ? 'panel-btn-warning' : 'panel-btn-primary'} plugin-config-save-btn"
+                            <button class="qntx-btn plugin-config-cancel-btn">Cancel</button>
+                            <button class="qntx-btn ${this.configState.needsConfirmation ? 'qntx-btn-warning' : 'qntx-btn-primary'} plugin-config-save-btn"
                                     ${hasErrors ? 'disabled' : ''}>
                                 ${this.configState.needsConfirmation ? 'Confirm Restart' : 'Save Changes'}
                             </button>

@@ -1,135 +1,7 @@
 /**
- * Components - Reusable UI components used across the application
- *
- * This file contains shared component styles that are used in multiple places.
- * Component classes should be semantic and reusable.
- */
-
-/* ============================================================================
- * Close Button Component
- * Used across all panels, modals, toasts, and dismissible elements
- * ============================================================================ */
-
-.panel-close,
-.toast-close {
-    /* Base styles */
-    background: transparent;
-    border: 1px solid transparent;
-    font-size: 18px;
-    color: #666;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    /* Square appearance - no rounded corners */
-    border-radius: 0;
-
-    /* Smooth color transitions, no size changes */
-    transition: background-color 0.15s ease, color 0.15s ease;
-
-    /* Accessibility: Minimum touch target size */
-    min-width: 24px;
-    min-height: 24px;
-}
-
-/* Hover state - subtle background change, no scaling */
-.panel-close:hover,
-.toast-close:hover {
-    background: #f0f0f0;
-    color: #000;
-    transform: none; /* Explicitly prevent any scaling */
-}
-
-/* Active/pressed state */
-.panel-close:active,
-.toast-close:active {
-    background: #e0e0e0;
-    color: #000;
-}
-
-/* Focus state for keyboard navigation */
-.panel-close:focus-visible,
-.toast-close:focus-visible {
-    outline: 2px solid #0066cc;
-    outline-offset: 2px;
-}
-
-/* ============================================================================
- * Toast-specific Close Button Variant
- * Light theme default with dark theme overrides
- * ============================================================================ */
-
-.toast .toast-close {
-    color: #6e6e73;
-    opacity: 0.9;
-    background: transparent;
-    width: 20px;
-    height: 20px;
-    font-size: 14px;
-    border: none;
-}
-
-.toast .toast-close:hover {
-    opacity: 1;
-    background: rgba(0, 0, 0, 0.05);
-    color: #3a3a3c;
-}
-
-.toast .toast-close:active {
-    background: rgba(0, 0, 0, 0.08);
-    color: #1d1d1f;
-}
-
-/* No dark theme - single consistent design */
-
-/* ============================================================================
- * Panel Action Button Component
- * Generic action buttons for panel headers (similar to close button)
- * ============================================================================ */
-
-.panel-action-btn {
-    /* Base styles - similar to panel-close */
-    background: transparent;
-    border: 1px solid transparent;
-    font-size: 16px;
-    color: #666;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0;
-    transition: background-color 0.15s ease, color 0.15s ease;
-    min-width: 24px;
-    min-height: 24px;
-}
-
-.panel-action-btn:hover {
-    background: #f0f0f0;
-    color: #000;
-    transform: none;
-}
-
-.panel-action-btn:active {
-    background: #e0e0e0;
-    color: #000;
-}
-
-.panel-action-btn:focus-visible {
-    outline: 2px solid #0066cc;
-    outline-offset: 2px;
-}
-
-/* ============================================================================
  * Button Component (qntx-btn)
  * Standardized button with loading, error, and confirmation states
- * ============================================================================ */
+ */
 
 .qntx-btn {
     /* Base styles */
@@ -343,9 +215,7 @@
     opacity: 1;
 }
 
-/* ============================================================================
- * Button Component - Responsive Styles
- * ============================================================================ */
+/* Button Component - Responsive Styles */
 
 /* Mobile: Larger touch targets (44x44px minimum recommended) */
 @media (max-width: 768px) {
