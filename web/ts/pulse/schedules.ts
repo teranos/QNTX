@@ -9,7 +9,7 @@ import { formatInterval } from './types';
 import { formatRelativeTime, escapeHtml, formatDuration } from './panel.ts';
 import { Pulse } from '@generated/sym.js';
 import type { RichError } from '../base-panel-error.ts';
-import { buildTooltipText } from '../components/tooltip.ts';
+import { buildTooltipText } from '../components/tooltip';
 
 /**
  * Build a rich error for execution history failures

@@ -98,7 +98,7 @@ import {
     PulseExecutionCompletedMessage,
     PulseExecutionLogStreamMessage
 } from '../../types/websocket';
-import { toast } from '../toast';
+import { toast } from '../components/toast';
 import {
     dispatchExecutionStarted,
     dispatchExecutionCompleted,

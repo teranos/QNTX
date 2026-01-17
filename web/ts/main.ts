@@ -87,7 +87,7 @@ async function handleWebscraperProgress(data: any): Promise<void> {
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
     // Cache build info for error toasts
-    import('./toast').then(({ cacheBuildInfo }) => {
+    import('./components/toast').then(({ cacheBuildInfo }) => {
         cacheBuildInfo(data);
     });
 

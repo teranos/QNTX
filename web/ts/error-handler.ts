@@ -51,7 +51,7 @@
  */
 
 import { log, SEG } from './logger';
-import { toast } from './toast';
+import { toast } from './components/toast';
 
 /**
  * Options for error handling behavior

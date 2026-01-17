@@ -1,0 +1,28 @@
+/* Terminal-style interactive tooltip popup */
+.tooltip {
+    position: fixed;
+    background: var(--editor-bg-alt);
+    color: var(--editor-text);
+    padding: 8px 12px;
+    border-radius: 0;
+    font-size: 11px;
+    font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    z-index: 100000; /* Must be above windows (which start at 9999) */
+    pointer-events: none;
+    box-shadow: var(--shadow-lg);
+    max-width: 400px;
+    border: 1px solid var(--editor-border);
+}
+
+/* Mobile/tablet: constrain tooltip to viewport */
+@media (max-width: 768px) {
+    .tooltip {
+        max-width: calc(100vw - 32px);
+    }
+}
+
+.tooltipTop {
+    composes: tooltip;
+}

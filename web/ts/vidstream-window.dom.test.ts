@@ -9,7 +9,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { VidStreamWindow } from './vidstream-window.ts';
-import { Window } from './components/window.ts';
+import { Window } from './components/window';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';

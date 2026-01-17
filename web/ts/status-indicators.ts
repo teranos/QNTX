@@ -7,7 +7,7 @@
  */
 
 import { sendMessage } from './websocket.ts';
-import { toast } from './toast.ts';
+import { toast } from './components/toast';
 import type { DaemonStatusMessage } from '../types/websocket';
 import { DB } from '@generated/sym.js';
 

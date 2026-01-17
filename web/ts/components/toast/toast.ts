@@ -1,11 +1,13 @@
 /**
- * Toast notification system
+ * Toast notification system (CSS Modules version)
  *
  * Lightweight notifications for non-critical errors and status updates
+ * Styles are scoped via CSS Modules - no global class name collisions
  */
 
-import type { BuildInfo } from '../types/core';
-import { formatRelativeTime } from './html-utils';
+import type { BuildInfo } from '../../../types/core';
+import { formatRelativeTime } from '../../html-utils';
+import styles from './toast.module.css';
 
 let cachedBuildInfo: BuildInfo | null = null;
 
@@ -39,32 +41,33 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
+        container.className = styles.container;
         document.body.appendChild(container);
     }
 
     // Create toast element
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.className = `${styles.toast} ${styles[type]}`;
 
     // Icon for toast type
-    const icons = {
+    const icons: Record<ToastType, string> = {
         error: '⚠',
         warning: '⚠',
         success: '✓',
         info: 'ℹ'
     };
 
-    // Build toast structure safely using createElement
+    // Build toast structure
     const header = document.createElement('div');
-    header.className = 'toast-header';
+    header.className = styles.header;
 
     const iconEl = document.createElement('div');
-    iconEl.className = 'toast-icon';
+    iconEl.className = styles.icon;
     iconEl.textContent = icons[type];
 
     const messageEl = document.createElement('div');
-    messageEl.className = 'toast-message';
-    messageEl.textContent = message;  // Safe - auto-escapes HTML
+    messageEl.className = styles.message;
+    messageEl.textContent = message;
 
     header.appendChild(iconEl);
     header.appendChild(messageEl);
@@ -74,7 +77,6 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     if (showBuildInfo && cachedBuildInfo) {
         const commitShort = cachedBuildInfo.commit.substring(0, 7);
 
-        // Format build time using formatRelativeTime
         let buildTime = 'unknown';
         if (cachedBuildInfo.build_time) {
             try {
@@ -85,14 +87,14 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         }
 
         const buildInfo = document.createElement('div');
-        buildInfo.className = 'toast-build-info';
+        buildInfo.className = styles.buildInfo;
 
         const buildLabel = document.createElement('span');
-        buildLabel.className = 'toast-build-label';
+        buildLabel.className = styles.buildLabel;
         buildLabel.textContent = 'SERVER BUILD';
 
         const buildValue = document.createElement('span');
-        buildValue.className = 'toast-build-value';
+        buildValue.className = styles.buildValue;
         buildValue.textContent = `${commitShort} · ${buildTime}`;
 
         buildInfo.appendChild(buildLabel);
@@ -102,28 +104,28 @@ export function showToast(message: string, options: ToastOptions = {}): void {
 
     // Add close button
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'toast-close';
+    closeBtn.className = styles.close;
     closeBtn.textContent = '×';
     toast.appendChild(closeBtn);
 
     container.appendChild(toast);
 
     // Trigger animation
-    setTimeout(() => toast.classList.add('toast-visible'), 10);
+    setTimeout(() => toast.classList.add(styles.visible), 10);
 
     // Auto-dismiss after duration
     const dismissToast = () => {
-        toast.classList.add('toast-dismissing');
-        toast.classList.remove('toast-visible');
-        setTimeout(() => toast.remove(), 400); // Slower fade out
+        toast.classList.add(styles.dismissing);
+        toast.classList.remove(styles.visible);
+        setTimeout(() => toast.remove(), 400);
     };
 
     const timeoutId = setTimeout(dismissToast, duration);
 
-    // Manual dismiss on close button - instant removal
+    // Manual dismiss on close button
     closeBtn.addEventListener('click', () => {
         clearTimeout(timeoutId);
-        toast.remove(); // Instant removal when clicking close
+        toast.remove();
     });
 }
 

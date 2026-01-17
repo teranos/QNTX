@@ -7,7 +7,7 @@
     gap: 2px;
     width: 100%;
     padding: 6px 8px;
-    background: #fff;
+    background: var(--bg-primary);
     font-family: 'Courier New', monospace;
     user-select: none;
     margin-bottom: 4px;
@@ -24,9 +24,9 @@
     justify-content: center;
     text-align: center;
     font-size: 13px; /* Default size for mobile */
-    color: #000;
-    background: #f8f8f8;
-    border: 1px solid #ddd;
+    color: var(--primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     cursor: pointer;
     transition: all 0.15s ease;
     position: relative;
@@ -44,7 +44,7 @@
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.85);
-    color: #fff;
+    color: var(--bg-primary);
     padding: 4px 8px;
     border-radius: 3px;
     font-size: 11px; /* Slightly larger tooltip text */
@@ -59,7 +59,7 @@
 /* Hover State - reveals tooltip */
 .palette-cell:hover {
     background: #e8e8e8;
-    border-color: #bbb;
+    border-color: var(--text-muted);
 }
 
 .palette-cell:hover::after {
@@ -70,7 +70,7 @@
 .palette-cell:focus {
     outline: none;
     background: #e8e8e8;
-    border-color: #999;
+    border-color: var(--text-muted);
     transform: scale(1.05);
 }
 
@@ -88,7 +88,7 @@
 
     .palette-cell.active {
         background: #000;
-        color: #fff;
+        color: var(--bg-primary);
     }
 }
 
@@ -106,8 +106,8 @@
 /* Active/Selected State - Color Inversion */
 .palette-cell.active {
     background: #000;
-    color: #fff;
-    border-color: #000;
+    color: var(--bg-primary);
+    border-color: var(--primary);
     font-weight: 600;
 }
 
@@ -130,7 +130,7 @@
         gap: 1px;
         padding: 6px 4px;
         padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-        background: #fff;
+        background: var(--bg-primary);
         margin-bottom: 0;
     }
 
@@ -199,7 +199,7 @@
         #e8e8e8 4px,
         #e8e8e8 8px
     );
-    border-color: #ccc;
+    border-color: var(--editor-text);
     cursor: help;
 }
 
@@ -211,7 +211,7 @@
         #d8d8d8 4px,
         #d8d8d8 8px
     );
-    border-color: #aaa;
+    border-color: var(--text-muted);
 }
 
 /* Active degraded state */
@@ -223,8 +223,8 @@
         #000 4px,
         #000 8px
     );
-    color: #fff;
-    border-color: #000;
+    color: var(--bg-primary);
+    border-color: var(--primary);
 }
 
 /* Note: Responsive breakpoints are handled in responsive.css */

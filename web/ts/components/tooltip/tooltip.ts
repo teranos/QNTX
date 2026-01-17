@@ -6,7 +6,7 @@
  *
  * Usage:
  * 1. Add data-tooltip attribute with tooltip text to elements
- * 2. Add an interactive class (e.g., 'has-tooltip') to trigger tooltip behavior
+ * 2. Add 'has-tooltip' class to trigger tooltip behavior
  * 3. Call tooltip.attach(container, selector) to enable tooltips
  *
  * Features:
@@ -18,10 +18,12 @@
  * - Auto-cleanup on container removal
  */
 
+import styles from './tooltip.module.css';
+
 export interface TooltipConfig {
     /** Delay in ms before showing tooltip (default: 300) */
     delay?: number;
-    /** CSS class for interactive elements (default: 'has-tooltip') */
+    /** CSS class for interactive elements (default: styles.trigger) */
     triggerClass?: string;
     /** Max width of tooltip in pixels (default: 400) */
     maxWidth?: number;
@@ -31,7 +33,7 @@ export interface TooltipConfig {
 
 const DEFAULT_CONFIG: Required<TooltipConfig> = {
     delay: 300,
-    triggerClass: 'has-tooltip',
+    triggerClass: 'has-tooltip',  // Keep global class for backward compatibility
     maxWidth: 400,
     position: 'bottom'
 };
@@ -44,6 +46,11 @@ class TooltipManager {
 
     constructor(config: TooltipConfig = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
+    }
+
+    /** Expose styles for consumers to apply trigger class */
+    static get styles() {
+        return styles;
     }
 
     /**
@@ -144,9 +151,9 @@ class TooltipManager {
 
             // Create new tooltip
             this.tooltip = document.createElement('div');
-            this.tooltip.className = 'panel-tooltip';
+            this.tooltip.className = styles.tooltip;
             if (this.config.position === 'top') {
-                this.tooltip.classList.add('panel-tooltip-top');
+                this.tooltip.classList.add(styles.tooltipTop);
             }
             this.tooltip.textContent = text;
             this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
@@ -170,9 +177,9 @@ class TooltipManager {
 
         // Create new tooltip
         this.tooltip = document.createElement('div');
-        this.tooltip.className = 'panel-tooltip';
+        this.tooltip.className = styles.tooltip;
         if (this.config.position === 'top') {
-            this.tooltip.classList.add('panel-tooltip-top');
+            this.tooltip.classList.add(styles.tooltipTop);
         }
         this.tooltip.textContent = text;
         this.tooltip.style.maxWidth = `${this.config.maxWidth}px`;
@@ -250,7 +257,7 @@ class TooltipManager {
             if (trigger) {
                 const triggerRect = trigger.getBoundingClientRect();
                 this.tooltip.style.top = `${triggerRect.top - rect.height - 8}px`;
-                this.tooltip.classList.add('panel-tooltip-top');
+                this.tooltip.classList.add(styles.tooltipTop);
             }
         }
     }

@@ -1,16 +1,11 @@
 /**
- * Components - Reusable UI components used across the application
+ * Close Button - Shared styles for all dismissible elements
  *
- * NOTE: Toast now uses CSS Modules (web/ts/components/toast/)
- * Panel close button remains here until panels migrate to CSS Modules
+ * Used by: toast, panel, window, modal
+ * Import via `composes` in component CSS modules
  */
 
-/* ============================================================================
- * Close Button Component
- * Used by panels (until migrated to CSS Modules)
- * ============================================================================ */
-
-.panel-close {
+.close {
     /* Base styles */
     background: transparent;
     border: 1px solid transparent;
@@ -36,20 +31,30 @@
 }
 
 /* Hover state - subtle background change, no scaling */
-.panel-close:hover {
+.close:hover {
     background: var(--bg-hover);
     color: var(--primary);
     transform: none; /* Explicitly prevent any scaling */
 }
 
 /* Active/pressed state */
-.panel-close:active {
+.close:active {
     background: var(--border-color);
     color: var(--primary);
 }
 
 /* Focus state for keyboard navigation */
-.panel-close:focus-visible {
+.close:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+}
+
+/* Small variant */
+.closeSmall {
+    composes: close;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    font-size: 14px;
 }
