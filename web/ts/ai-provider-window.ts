@@ -5,7 +5,7 @@
  * Allows switching between OpenRouter (cloud) and Ollama (local) providers.
  */
 
-import { Window } from './components/window.ts';
+import { Window } from './components/window';
 import { apiFetch } from './api.ts';
 import { BY } from '@generated/sym.js';
 import { log, SEG } from './logger';

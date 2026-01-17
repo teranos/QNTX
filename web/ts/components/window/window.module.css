@@ -1,13 +1,13 @@
 /**
- * Draggable Window Component
- * Used for floating UI elements like VidStream
+ * Draggable Window Component (CSS Module)
+ * Used for floating UI elements like VidStream, AI Provider, etc.
  */
 
-.draggable-window {
+.window {
     position: fixed;
     top: 100px;
     left: 100px;
-    background: var(--panel-bg, #fff);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-md);
@@ -17,12 +17,12 @@
     font-size: 12px;
 }
 
-.draggable-window[data-visible="true"] {
+.window[data-visible="true"] {
     display: block;
 }
 
 /* Header */
-.draggable-window-header {
+.header {
     padding: 8px 12px;
     border-bottom: 1px solid var(--border-color);
     cursor: move;
@@ -30,78 +30,83 @@
     align-items: center;
     justify-content: space-between;
     user-select: none;
-    background: var(--panel-bg-secondary, #f8f8f8);
+    background: var(--bg-secondary);
 }
 
-.draggable-window-header:active {
+.header:active {
     cursor: grabbing;
 }
 
-.draggable-window-title {
+.title {
     font-weight: 600;
     font-size: 13px;
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary);
 }
 
 /* Version text next to title */
-.draggable-window-version {
+.version {
     font-weight: 400;
     font-size: 11px;
-    color: var(--panel-text-tertiary, #999);
+    color: var(--text-muted);
     margin-left: 6px;
     cursor: help;
 }
 
+/* Close button - composes from shared module */
+.close {
+    composes: close from '../close-button/close-button.module.css';
+}
+
 /* Content */
-.draggable-window-content {
+.content {
     padding: 12px;
 }
 
 /* Footer - for runtime stats and metrics */
-.draggable-window-footer {
+.footer {
     padding: 8px 12px;
     border-top: 1px solid var(--border-color);
-    background: var(--panel-bg-secondary, #f8f8f8);
+    background: var(--bg-secondary);
     font-size: 11px;
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary);
     display: none;
 }
 
-.draggable-window-footer:not(:empty) {
+.footer:not(:empty) {
     display: block;
 }
 
 /* Form elements */
-.window-input {
+.input {
     width: 100%;
     padding: 6px 8px;
-    background: var(--panel-bg, #fff);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary);
     border-radius: var(--border-radius);
     font-family: inherit;
     font-size: 11px;
     margin-bottom: 8px;
 }
 
-.window-input:focus {
+.input:focus {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
 }
 
-.window-input:disabled {
+.input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
 /* Unavailable button - diagonal striped pattern */
-.btn-unavailable {
+.btnUnavailable {
     position: relative;
     cursor: not-allowed;
     opacity: 0.6;
 }
 
-.btn-unavailable::before {
+.btnUnavailable::before {
     content: '';
     position: absolute;
     top: 0;
@@ -120,21 +125,21 @@
 }
 
 /* Controls row */
-.window-controls {
+.controls {
     display: flex;
     gap: 6px;
     margin-bottom: 8px;
 }
 
-.window-status {
+.status {
     margin-left: auto;
     align-self: center;
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary);
     font-size: 11px;
 }
 
 /* Video viewport */
-.window-viewport {
+.viewport {
     position: relative;
     width: 640px;
     height: 480px;
@@ -144,8 +149,8 @@
     overflow: hidden;
 }
 
-.window-video,
-.window-canvas {
+.video,
+.canvas {
     position: absolute;
     top: 0;
     left: 0;
@@ -154,12 +159,12 @@
 }
 
 /* Error display */
-.window-error {
+.error {
     padding: 8px 12px;
-    background: #fee;
-    border: 1px solid #c88;
+    background: var(--error-bg);
+    border: 1px solid var(--error);
     border-radius: var(--border-radius);
-    color: #a00;
+    color: var(--error);
     font-size: 11px;
     margin-bottom: 8px;
     font-family: inherit;
@@ -169,30 +174,30 @@
 }
 
 /* Stats grid */
-.window-stats {
+.stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     font-size: 11px;
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary);
 }
 
-.window-stat-value {
+.statValue {
     font-weight: 600;
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary);
 }
 
 /* Model info */
-.window-model-info {
+.modelInfo {
     font-size: 10px;
-    color: var(--panel-text-secondary, #666);
+    color: var(--text-secondary);
     margin-bottom: 8px;
     padding: 4px 8px;
-    background: var(--panel-bg-secondary, #f8f8f8);
+    background: var(--bg-secondary);
     border-radius: var(--border-radius);
 }
 
-.window-model-info span {
+.modelInfo span {
     font-family: monospace;
-    color: var(--panel-text-primary, #333);
+    color: var(--text-primary);
 }
