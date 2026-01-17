@@ -21,7 +21,7 @@ pub mod engine;
 pub mod ffi;
 
 // Re-export main types
-pub use engine::{EngineConfig, FuzzyEngine, RankedMatch, VocabularyType};
+pub use engine::{AttributeMatch, EngineConfig, FuzzyEngine, RankedMatch, VocabularyType};
 
 // Re-export FFI types for C consumers
 pub use ffi::{RustMatchC, RustMatchResultC, RustRebuildResultC};
