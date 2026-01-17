@@ -186,6 +186,9 @@ impl FuzzyEngine {
             return (Vec::new(), start.elapsed().as_micros() as u64);
         }
 
+        debug!("Finding matches for query: '{}' (type: {:?}, limit: {}, min_score: {})",
+               query, vocabulary_type, limit, min_score);
+
         // Get the appropriate vocabulary
         let (vocabulary, vocabulary_lower) = match vocabulary_type {
             VocabularyType::Predicates => (self.predicates.read(), self.predicates_lower.read()),
