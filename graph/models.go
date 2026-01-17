@@ -42,11 +42,17 @@ type Meta struct {
 }
 
 // NodeTypeInfo describes a node type and its visual configuration
+// Embeds TypeDef to avoid duplication of type metadata
 type NodeTypeInfo struct {
 	Type  string `json:"type"`            // e.g., "artist", "album", "genre"
 	Label string `json:"label"`           // Human-readable display name (e.g., "Artist", "Album")
 	Color string `json:"color,omitempty"` // Hex color code
 	Count int    `json:"count,omitempty"` // Number of nodes of this type
+	// Fields from TypeDef
+	RichStringFields []string `json:"rich_string_fields,omitempty"` // Metadata fields for semantic search
+	ArrayFields      []string `json:"array_fields,omitempty"`       // Fields flattened into arrays
+	Opacity          *float64 `json:"opacity,omitempty"`            // Visual opacity
+	Deprecated       bool     `json:"deprecated,omitempty"`         // Whether this type is being phased out
 }
 
 // RelationshipTypeInfo describes a relationship type with physics and visual configuration

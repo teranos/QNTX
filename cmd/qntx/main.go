@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/plugin/grpc"
+	"github.com/teranos/QNTX/server"
 	"go.uber.org/zap"
 )
 
@@ -152,6 +153,22 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 	}
 
 	pluginLogger.Info("Plugin loading complete")
+
+	// CRITICAL: Initialize all loaded plugins now that they're registered
+	// This must happen HERE (not in server/init.go) because plugins load asynchronously
+	// and the server starts before plugin loading completes.
+	// Get the server's service registry (this is a bit hacky but necessary for async loading)
+	defaultServer := server.GetDefaultServer()
+	if defaultServer != nil && defaultServer.GetServices() != nil {
+		pluginLogger.Infow("Initializing loaded plugins with services", "count", len(loadedPlugins))
+		if err := registry.InitializeAll(context.Background(), defaultServer.GetServices()); err != nil {
+			pluginLogger.Errorw("Failed to initialize plugins", "error", err)
+		} else {
+			pluginLogger.Infow("Successfully initialized all plugins")
+		}
+	} else {
+		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet")
+	}
 }
 
 // addPluginCommands was used to add commands from all registered plugins.

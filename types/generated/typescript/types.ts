@@ -260,5 +260,13 @@ export interface TypeDef {
    * Whether this type is being phased out
    */
   Deprecated: boolean;
+  /**
+   * Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
+   */
+  RichStringFields: string[];
+  /**
+   * Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
+   */
+  ArrayFields: string[];
 }
 

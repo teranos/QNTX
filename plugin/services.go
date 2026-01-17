@@ -69,11 +69,12 @@ type Config interface {
 
 // DefaultServiceRegistry is the standard implementation of ServiceRegistry
 type DefaultServiceRegistry struct {
-	db     *sql.DB
-	logger *zap.SugaredLogger
-	store  ats.AttestationStore
-	config ConfigProvider
-	queue  QueueService
+	db       *sql.DB
+	logger   *zap.SugaredLogger
+	store    ats.AttestationStore
+	config   ConfigProvider
+	queue    QueueService
+	registry *Registry // Reference to plugin registry for metadata lookup
 }
 
 // ConfigProvider provides configuration for plugins
@@ -85,11 +86,12 @@ type ConfigProvider interface {
 // NewServiceRegistry creates a new service registry
 func NewServiceRegistry(db *sql.DB, logger *zap.SugaredLogger, store ats.AttestationStore, config ConfigProvider, queue QueueService) ServiceRegistry {
 	return &DefaultServiceRegistry{
-		db:     db,
-		logger: logger,
-		store:  store,
-		config: config,
-		queue:  queue,
+		db:       db,
+		logger:   logger,
+		store:    store,
+		config:   config,
+		queue:    queue,
+		registry: GetDefaultRegistry(), // Access global registry for plugin metadata
 	}
 }
 
@@ -98,9 +100,20 @@ func (r *DefaultServiceRegistry) Database() *sql.DB {
 	return r.db
 }
 
-// Logger returns a logger for the specified domain
+// Logger returns a logger for the specified domain with version information
 func (r *DefaultServiceRegistry) Logger(domain string) *zap.SugaredLogger {
-	return r.logger.Named(domain)
+	// Look up plugin metadata to include version in logger name
+	loggerName := domain
+	if r.registry != nil {
+		if plugin, ok := r.registry.Get(domain); ok {
+			metadata := plugin.Metadata()
+			if metadata.Version != "" {
+				// Format as: domain v0.4.3 (version in separate field for coloring)
+				loggerName = domain + " v" + metadata.Version
+			}
+		}
+	}
+	return r.logger.Named(loggerName)
 }
 
 // Config returns plugin-specific configuration

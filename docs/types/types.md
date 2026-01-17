@@ -158,7 +158,7 @@ type OverFilter struct {
 
 ## RelationshipTypeDef {#relationshiptypedef}
 
-**Source**: [`ats/types/type_definitions.go:30`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L30)
+**Source**: [`ats/types/type_definitions.go:32`](https://github.com/teranos/QNTX/blob/main/ats/types/type_definitions.go#L32)
 
 
 ```go
@@ -184,5 +184,7 @@ type TypeDef struct {
 	Color string
 	Opacity *float64
 	Deprecated bool
+	RichStringFields []string
+	ArrayFields []string
 }
 ```
