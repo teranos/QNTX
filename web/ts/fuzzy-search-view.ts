@@ -14,6 +14,7 @@ export interface FuzzySearchMatch {
     strategy: string;
     display_label: string;
     attributes: Record<string, any>;
+    matched_words?: string[];  // The actual words that were matched for highlighting
 }
 
 export interface FuzzySearchResultsMessage {
@@ -223,7 +224,7 @@ export class FuzzySearchView {
             text-overflow: ellipsis;
             white-space: nowrap;
         `;
-        excerpt.innerHTML = this.highlightMatch(match.excerpt, this.currentQuery);
+        excerpt.innerHTML = this.highlightMatch(match.excerpt, this.currentQuery, match.matched_words);
 
         // Score indicator
         const score = document.createElement('span');
@@ -249,10 +250,23 @@ export class FuzzySearchView {
     /**
      * Highlight the matching text in the excerpt
      */
-    private highlightMatch(text: string, query: string): string {
-        if (!query) return text;
+    private highlightMatch(text: string, query: string, matchedWords?: string[]): string {
+        if (!query && !matchedWords) return text;
 
-        // Case-insensitive highlighting
+        // If we have matched words from fuzzy search, use those for highlighting
+        if (matchedWords && matchedWords.length > 0) {
+            let highlightedText = text;
+            // Sort by length descending to avoid replacing parts of longer words
+            const sortedWords = [...matchedWords].sort((a, b) => b.length - a.length);
+
+            for (const word of sortedWords) {
+                const regex = new RegExp(`\\b(${this.escapeRegex(word)})\\b`, 'gi');
+                highlightedText = highlightedText.replace(regex, '<mark style="background: rgba(255, 200, 0, 0.3); color: #ffc800;">$1</mark>');
+            }
+            return highlightedText;
+        }
+
+        // Fallback to exact query matching
         const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
         return text.replace(regex, '<mark style="background: rgba(255, 200, 0, 0.3); color: #ffc800;">$1</mark>');
     }
