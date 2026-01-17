@@ -244,6 +244,7 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 			"test-token",
 			configMap,
 			nil, // logger
+			nil, // plugin
 		)
 
 		config := registry.Config("test-domain")

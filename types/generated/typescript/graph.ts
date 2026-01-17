@@ -96,6 +96,14 @@ export interface NodeTypeInfo {
    * Number of nodes of this type
    */
   count?: number;
+  /**
+   * Metadata fields for semantic search (e.g., ["notes", "description"])
+   */
+  rich_string_fields?: string[];
+  /**
+   * Fields flattened into arrays (e.g., ["skills", "languages"])
+   */
+  array_fields?: string[];
 }
 
 export interface RelationshipDefinition {
@@ -178,5 +186,13 @@ export interface TypeDefinition {
    * Optional opacity (default 1.0)
    */
   Opacity: number;
+  /**
+   * Metadata fields for semantic search (e.g., ["notes", "description"])
+   */
+  RichStringFields: string[];
+  /**
+   * Fields flattened into arrays (e.g., ["skills", "languages"])
+   */
+  ArrayFields: string[];
 }
 

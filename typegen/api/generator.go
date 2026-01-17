@@ -633,8 +633,14 @@ func (g *Generator) generateWebSocketDoc() string {
 			if len(mt.Fields) > 0 {
 				sb.WriteString("| Field | Description |\n")
 				sb.WriteString("|-------|-------------|\n")
-				for name, desc := range mt.Fields {
-					sb.WriteString(fmt.Sprintf("| %s | %s |\n", name, desc))
+				// Sort field names for deterministic output
+				fieldNames := make([]string, 0, len(mt.Fields))
+				for name := range mt.Fields {
+					fieldNames = append(fieldNames, name)
+				}
+				sort.Strings(fieldNames)
+				for _, name := range fieldNames {
+					sb.WriteString(fmt.Sprintf("| %s | %s |\n", name, mt.Fields[name]))
 				}
 				sb.WriteString("\n")
 			}
@@ -649,8 +655,14 @@ func (g *Generator) generateWebSocketDoc() string {
 			if len(mt.Fields) > 0 {
 				sb.WriteString("| Field | Description |\n")
 				sb.WriteString("|-------|-------------|\n")
-				for name, desc := range mt.Fields {
-					sb.WriteString(fmt.Sprintf("| %s | %s |\n", name, desc))
+				// Sort field names for deterministic output
+				fieldNames := make([]string, 0, len(mt.Fields))
+				for name := range mt.Fields {
+					fieldNames = append(fieldNames, name)
+				}
+				sort.Strings(fieldNames)
+				for _, name := range fieldNames {
+					sb.WriteString(fmt.Sprintf("| %s | %s |\n", name, mt.Fields[name]))
 				}
 				sb.WriteString("\n")
 			}
