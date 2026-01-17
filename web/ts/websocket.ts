@@ -131,6 +131,15 @@ const MESSAGE_HANDLERS = {
         import('./status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
         });
+    },
+
+    rich_search_results: (data: any) => {
+        log.info(SEG.AX, 'Rich search results:', data.total, 'matches');
+
+        // Pass results to the CodeMirror editor's fuzzy search view
+        import('./codemirror-editor.js').then(({ handleFuzzySearchResults }) => {
+            handleFuzzySearchResults(data);
+        });
     }
 } as const;
 

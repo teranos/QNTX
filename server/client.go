@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
@@ -244,6 +245,8 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleJobControl(*msg)
 	case "visibility": // Phase 2: Handle visibility preference updates
 		c.handleVisibility(*msg)
+	case "rich_search":
+		c.handleRichSearch(msg.Query)
 	case "vidstream_init":
 		c.handleVidStreamInit(*msg)
 	case "vidstream_frame":
@@ -811,6 +814,60 @@ func (c *Client) handleGetDatabaseStats() {
 
 	c.server.logger.Infow("Database stats sent",
 		"total_attestations", totalAttestations,
+		"client_id", c.id,
+	)
+}
+
+// handleRichSearch performs fuzzy search on RichStringFields
+func (c *Client) handleRichSearch(query string) {
+	// Trim and validate query
+	query = strings.TrimSpace(query)
+	if query == "" {
+		// Send empty result for empty query
+		c.sendJSON(map[string]interface{}{
+			"type":    "rich_search_results",
+			"query":   query,
+			"matches": []interface{}{},
+			"total":   0,
+		})
+		return
+	}
+
+	c.server.logger.Infow("RichStringFields search",
+		"query", query,
+		"client_id", c.id,
+	)
+
+	// Create bounded store to access search functionality
+	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("search"))
+
+	// Perform search with a reasonable limit
+	ctx := c.server.ctx
+	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
+	if err != nil {
+		c.server.logger.Warnw("RichStringFields search failed",
+			"query", query,
+			"error", err,
+			"client_id", c.id,
+		)
+		c.sendJSON(map[string]interface{}{
+			"type":  "rich_search_error",
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Send results to client
+	c.sendJSON(map[string]interface{}{
+		"type":    "rich_search_results",
+		"query":   query,
+		"matches": matches,
+		"total":   len(matches),
+	})
+
+	c.server.logger.Infow("RichStringFields search results sent",
+		"query", query,
+		"matches", len(matches),
 		"client_id", c.id,
 	)
 }
