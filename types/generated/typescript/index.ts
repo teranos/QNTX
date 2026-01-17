@@ -75,7 +75,6 @@ export type {
   RelationshipDefinition,
   RelationshipTypeInfo,
   Stats,
-  TypeDefinition,
 } from './graph';
 
 // Types from schedule
@@ -103,6 +102,11 @@ export type {
   PluginHealthMessage,
   PluginInfo,
   ProgressMessage,
+  PromptExecuteRequest,
+  PromptExecuteResponse,
+  PromptPreviewRequest,
+  PromptPreviewResponse,
+  PromptSaveRequest,
   ProseEntry,
   PulseExecutionCompletedMessage,
   PulseExecutionFailedMessage,

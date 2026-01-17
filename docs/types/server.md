@@ -276,6 +276,74 @@ type ProgressMessage struct {
 }
 ```
 
+## PromptExecuteRequest {#promptexecuterequest}
+
+**Source**: [`server/prompt_handlers.go:33`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L33)
+
+
+```go
+type PromptExecuteRequest struct {
+	AxQuery string `json:"ax_query"`
+	Template string `json:"template"`
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model string `json:"model,omitempty"`
+}
+```
+
+## PromptExecuteResponse {#promptexecuteresponse}
+
+**Source**: [`server/prompt_handlers.go:42`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L42)
+
+
+```go
+type PromptExecuteResponse struct {
+	Results []prompt.Result `json:"results"`
+	AttestationCount int `json:"attestation_count"`
+	Error string `json:"error,omitempty"`
+}
+```
+
+## PromptPreviewRequest {#promptpreviewrequest}
+
+**Source**: [`server/prompt_handlers.go:21`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L21)
+
+
+```go
+type PromptPreviewRequest struct {
+	AxQuery string `json:"ax_query"`
+}
+```
+
+## PromptPreviewResponse {#promptpreviewresponse}
+
+**Source**: [`server/prompt_handlers.go:26`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L26)
+
+
+```go
+type PromptPreviewResponse struct {
+	AttestationCount int `json:"attestation_count"`
+	Attestations []map[string]interface{} `json:"attestations,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+```
+
+## PromptSaveRequest {#promptsaverequest}
+
+**Source**: [`server/prompt_handlers.go:240`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L240)
+
+
+```go
+type PromptSaveRequest struct {
+	Name string `json:"name"`
+	Template string `json:"template"`
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	AxPattern string `json:"ax_pattern,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model string `json:"model,omitempty"`
+}
+```
+
 ## ProseEntry {#proseentry}
 
 **Source**: [`server/prose_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L16)

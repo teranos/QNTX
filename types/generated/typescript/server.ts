@@ -284,6 +284,42 @@ export interface ProgressMessage {
   message: string;
 }
 
+export interface PromptExecuteRequest {
+  ax_query: string;
+  template: string;
+  system_prompt?: string;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  model?: string;
+}
+
+export interface PromptExecuteResponse {
+  results: Result[];
+  attestation_count: number;
+  error?: string;
+}
+
+export interface PromptPreviewRequest {
+  ax_query: string;
+}
+
+export interface PromptPreviewResponse {
+  attestation_count: number;
+  attestations?: Record<string, unknown>[];
+  error?: string;
+}
+
+export interface PromptSaveRequest {
+  name: string;
+  template: string;
+  system_prompt?: string;
+  ax_pattern?: string;
+  provider?: string;
+  model?: string;
+}
+
 export interface ProseEntry {
   name: string;
   path: string;
