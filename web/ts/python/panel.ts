@@ -584,7 +584,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
                     onClick: async () => {
                         await this.executeCodeDirect();
                     },
-                    variant: 'primary',
+                    variant: 'default',
                     confirmation: {
                         label: 'Confirm Execute',
                         timeout: 5000
