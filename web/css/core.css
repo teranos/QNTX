@@ -1,21 +1,118 @@
 /* Core Styles - Foundation, Layout, Shared Components */
 
-/* CSS Variables - Consolidated for reuse */
+/* =============================================================================
+   Design Tokens - Single source of truth for all CSS variables
+   ============================================================================= */
 :root {
-    /* Font Stacks */
+    /* -------------------------------------------------------------------------
+       Typography
+       ------------------------------------------------------------------------- */
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
+    --font-system: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
-    /* Status Colors */
+    /* -------------------------------------------------------------------------
+       Colors - Light Theme (default)
+       ------------------------------------------------------------------------- */
+    /* Backgrounds */
+    --color-bg: #ffffff;
+    --color-bg-secondary: #f8f8f8;
+    --color-bg-hover: #f0f0f0;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f8f8;
+    --bg-tertiary: #f0f0f0;
+
+    /* Text */
+    --color-text: #000000;
+    --color-text-secondary: #666666;
+    --color-text-tertiary: #999999;
+    --text-primary: #000000;
+    --text-secondary: #666666;
+    --text-tertiary: #999999;
+
+    /* Borders */
+    --color-border: #dddddd;
+    --color-border-hover: #bbbbbb;
+    --border-color: #dddddd;
+
+    /* Primary/Accent */
+    --color-primary: #000000;
+    --color-primary-hover: #333333;
+    --accent-color: #0066cc;
+
+    /* Status Colors - Semantic */
     --color-success: #22c55e;
+    --color-success-dark: #16a34a;
     --color-error: #ef4444;
+    --color-danger: #ef4444;
     --color-warning: #ffaa00;
     --color-info: #3b82f6;
 
-    /* Box Shadows */
+    /* Status Colors - With backgrounds (for badges/alerts) */
+    --status-pending-bg: #fff3e0;
+    --status-pending-text: #e65100;
+    --status-running-bg: #e3f2fd;
+    --status-running-text: #1976d2;
+    --status-completed-bg: #e8f5e9;
+    --status-completed-text: #388e3c;
+    --status-failed-bg: #ffebee;
+    --status-failed-text: #d32f2f;
+
+    /* Accent colors for syntax/highlights */
+    --accent-green: #4ade80;
+    --accent-blue: #60a5fa;
+    --accent-red: #f87171;
+
+    /* -------------------------------------------------------------------------
+       Panel System
+       ------------------------------------------------------------------------- */
+    /* Spacing */
+    --panel-padding-sm: 8px 12px;
+    --panel-padding-md: 12px 16px;
+    --panel-padding-lg: 16px 20px;
+
+    /* Panel colors (light theme) */
+    --panel-bg: #ffffff;
+    --panel-bg-secondary: #f8f8f8;
+    --panel-border: 1px solid #dddddd;
+    --panel-border-color: #dddddd;
+    --panel-border-radius: 4px;
+    --panel-text-primary: #333333;
+    --panel-text-secondary: #666666;
+    --panel-text-tertiary: #999999;
+
+    /* Panel shadows */
+    --panel-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --panel-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --panel-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+
+    /* -------------------------------------------------------------------------
+       Editor System (dark theme for code)
+       ------------------------------------------------------------------------- */
+    --editor-bg: #1e1e1e;
+    --editor-info-bg: #252526;
+    --editor-border: #3e3e42;
+    --editor-text: #cccccc;
+    --editor-text-muted: #858585;
+    --editor-code-bg: #2a2a2a;
+    --status-neutral: #858585;
+    --status-success: #4ec9b0;
+    --status-error: #f48771;
+
+    /* -------------------------------------------------------------------------
+       Shadows - Global scale
+       ------------------------------------------------------------------------- */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
     --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.2);
     --shadow-xl: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+    /* -------------------------------------------------------------------------
+       Transitions
+       ------------------------------------------------------------------------- */
+    --transition-fast: all 0.15s ease;
+    --transition-normal: all 0.2s ease;
+    --panel-transition-fast: all 0.15s ease;
+    --panel-transition-normal: all 0.2s ease;
 }
 
 /* Base */
