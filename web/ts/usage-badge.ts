@@ -27,6 +27,7 @@ import * as d3 from 'd3';
 import { uiState } from './ui-state.ts';
 import { DATA, setVisibility, setExpansion, setLoading } from './css-classes.ts';
 import type { UsageUpdateMessage } from '../types/websocket';
+import { log, SEG } from './logger.ts';
 
 // Internal usage stats derived from WebSocket message
 interface UsageStats {
@@ -127,7 +128,7 @@ async function fetchTimeSeriesData(): Promise<boolean> {
         setLoading(container, DATA.LOADING.ERROR);
         return false;
     } catch (err) {
-        console.warn('Failed to fetch time-series data:', err);
+        log.warn(SEG.UI, 'Failed to fetch time-series data:', err);
         timeSeriesData = [];
         setLoading(container, DATA.LOADING.ERROR);
         return false;

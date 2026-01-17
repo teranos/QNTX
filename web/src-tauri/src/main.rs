@@ -1,7 +1,9 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use qntx_types::sym;
+use log::info;
+use qntx::error::Error;
+use qntx::types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
@@ -19,10 +21,14 @@ use tauri_plugin_deep_link::DeepLinkExt;
 // Import generated types from Go source (single source of truth)
 // These types are kept in sync with the backend via `make types`
 #[allow(unused_imports)]
-use qntx_types::{
+use qntx::types::{
     async_types::{Job, JobStatus},
     server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
 };
+
+// Video processing module (desktop-only)
+// #[cfg(not(any(target_os = "ios", target_os = "android")))]
+// mod vidstream;  // Disabled: blocked by CrabCamera ACL (PR #267)
 
 const SERVER_PORT: &str = "877";
 
@@ -31,34 +37,50 @@ struct ServerState {
     port: String,
 }
 
-/// Helper function to send notifications with consistent error handling and logging
-fn send_notification(app: &tauri::AppHandle, title: &str, body: String, log_message: String) {
-    if let Err(e) = app.notification().builder().title(title).body(body).show() {
-        eprintln!("[notification] Failed to show notification: {}", e);
-    }
-    println!("[notification] {}", log_message);
+/// Helper function to send notifications with proper error propagation
+fn send_notification(
+    app: &tauri::AppHandle,
+    title: &str,
+    body: String,
+    log_message: String,
+) -> Result<(), Error> {
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+        .map_err(|e| Error::context("failed to show notification", e))?;
+    info!("[notification] {}", log_message);
+    Ok(())
 }
 
-/// Helper to show window, focus it, and emit an event
+/// Helper to show window, focus it, and emit an event with proper error propagation
 fn show_window_and_emit<P: serde::Serialize + Clone>(
     app: &tauri::AppHandle,
     event_name: &str,
     payload: P,
-) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        if let Err(e) = window.emit(event_name, payload) {
-            eprintln!("[menu] Failed to emit {} event: {}", event_name, e);
-        }
-    }
+) -> Result<(), Error> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| Error::internal("main window not found"))?;
+
+    window
+        .show()
+        .map_err(|e| Error::context("failed to show window", e))?;
+    window
+        .set_focus()
+        .map_err(|e| Error::context("failed to focus window", e))?;
+    window
+        .emit(event_name, payload)
+        .map_err(|e| Error::context(format!("failed to emit '{}' event", event_name), e))?;
+    Ok(())
 }
 
 /// Handle deep link URLs (qntx://...)
 /// Routes to appropriate panels or resources based on URL path
 #[cfg(not(target_os = "ios"))]
 fn handle_deep_link(app: &tauri::AppHandle, url: &str) {
-    println!("[deep-link] Received: {}", url);
+    info!("[deep-link] Received: {}", url);
 
     // Parse the URL to extract the path
     // Format: qntx://path or qntx://path/id
@@ -67,38 +89,31 @@ fn handle_deep_link(app: &tauri::AppHandle, url: &str) {
         .unwrap_or(url)
         .trim_end_matches('/');
 
-    // Route based on path
-    match path {
-        "pulse" => {
-            show_window_and_emit(app, "show-pulse-panel", ());
-        }
-        "config" | "settings" | "preferences" => {
-            show_window_and_emit(app, "show-config-panel", ());
-        }
-        "docs" | "prose" | "documentation" => {
-            show_window_and_emit(app, "show-prose-panel", ());
-        }
-        "code" | "editor" => {
-            show_window_and_emit(app, "show-code-panel", ());
-        }
-        "hixtory" | "history" => {
-            show_window_and_emit(app, "show-hixtory-panel", ());
-        }
+    // Route based on path - log errors but don't fail the entire handler
+    let result = match path {
+        "pulse" => show_window_and_emit(app, "show-pulse-panel", ()),
+        "config" | "settings" | "preferences" => show_window_and_emit(app, "show-config-panel", ()),
+        "docs" | "prose" | "documentation" => show_window_and_emit(app, "show-prose-panel", ()),
+        "code" | "editor" => show_window_and_emit(app, "show-code-panel", ()),
+        "hixtory" | "history" => show_window_and_emit(app, "show-hixtory-panel", ()),
         _ if path.starts_with("job/") => {
             // qntx://job/<id> - emit event with job ID
             let job_id = path.strip_prefix("job/").unwrap_or("");
             if !job_id.is_empty() {
-                show_window_and_emit(app, "deep-link-job", job_id.to_string());
+                show_window_and_emit(app, "deep-link-job", job_id.to_string())
+            } else {
+                show_window_and_emit(app, "show-hixtory-panel", ())
             }
         }
         _ => {
             // Unknown path - just show window
-            println!("[deep-link] Unknown path: {}", path);
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            info!("[deep-link] Unknown path: {}", path);
+            show_window_and_emit(app, "show-pulse-panel", ())
         }
+    };
+
+    if let Err(e) = result {
+        log::warn!("[deep-link] Failed to handle deep link: {}", e);
     }
 }
 
@@ -134,7 +149,7 @@ fn notify_job_completed(
     handler_name: String,
     job_id: String,
     duration_ms: Option<i64>,
-) {
+) -> Result<(), Error> {
     let duration_text = duration_ms
         .map(|ms| format!(" in {:.1}s", ms as f64 / 1000.0))
         .unwrap_or_default();
@@ -144,7 +159,7 @@ fn notify_job_completed(
         "QNTX: Job Completed",
         format!("{}{}", handler_name, duration_text),
         format!("Job completed: {} ({})", handler_name, job_id),
-    );
+    )
 }
 
 /// Send a native notification for job failure
@@ -154,7 +169,7 @@ fn notify_job_failed(
     handler_name: String,
     job_id: String,
     error: Option<String>,
-) {
+) -> Result<(), Error> {
     let error_text = error.unwrap_or_else(|| "Unknown error".to_string());
 
     send_notification(
@@ -162,25 +177,33 @@ fn notify_job_failed(
         "QNTX: Job Failed",
         format!("{}: {}", handler_name, error_text),
         format!("Job failed: {} ({}) - {}", handler_name, job_id, error_text),
-    );
+    )
 }
 
 /// Send a native notification for storage warnings
 #[tauri::command]
-fn notify_storage_warning(app: tauri::AppHandle, actor: String, fill_percent: f64) {
+fn notify_storage_warning(
+    app: tauri::AppHandle,
+    actor: String,
+    fill_percent: f64,
+) -> Result<(), Error> {
     let percent = fill_percent * 100.0;
     send_notification(
         &app,
         "QNTX: Storage Warning",
         format!("{} is at {:.0}% capacity", actor, percent),
         format!("Storage warning: {} at {:.0}%", actor, percent),
-    );
+    )
 }
 
 /// Send a native notification when server enters draining mode
 /// This happens during graceful shutdown when completing remaining jobs
 #[tauri::command]
-fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: i64) {
+fn notify_server_draining(
+    app: tauri::AppHandle,
+    active_jobs: i64,
+    queued_jobs: i64,
+) -> Result<(), Error> {
     let total = active_jobs + queued_jobs;
     let body = if total > 0 {
         format!("Completing {} remaining job(s) before shutdown", total)
@@ -196,50 +219,64 @@ fn notify_server_draining(app: tauri::AppHandle, active_jobs: i64, queued_jobs: 
             "Server draining: {} active, {} queued",
             active_jobs, queued_jobs
         ),
-    );
+    )
 }
 
 /// Send a native notification when server stops
 #[tauri::command]
-fn notify_server_stopped(app: tauri::AppHandle) {
+fn notify_server_stopped(app: tauri::AppHandle) -> Result<(), Error> {
     send_notification(
         &app,
         "QNTX: Server Stopped",
         "The QNTX server has stopped".to_string(),
         "Server stopped".to_string(),
-    );
+    )
 }
 
 /// Set taskbar progress indicator (Windows feature, works on other platforms too)
 /// - state: "none" | "normal" | "indeterminate" | "paused" | "error"
 /// - progress: Optional percentage (0-100), only used for "normal" state
 #[tauri::command]
-fn set_taskbar_progress(app: tauri::AppHandle, state: String, progress: Option<u64>) {
+fn set_taskbar_progress(
+    app: tauri::AppHandle,
+    state: String,
+    progress: Option<u64>,
+) -> Result<(), Error> {
     use tauri::window::ProgressBarState;
     use tauri::window::ProgressBarStatus;
 
-    if let Some(window) = app.get_webview_window("main") {
-        let status = match state.as_str() {
-            "normal" => ProgressBarStatus::Normal,
-            "indeterminate" => ProgressBarStatus::Indeterminate,
-            "paused" => ProgressBarStatus::Paused,
-            "error" => ProgressBarStatus::Error,
-            _ => ProgressBarStatus::None,
-        };
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| Error::internal("main window not found"))?;
 
-        let progress_state = ProgressBarState {
-            status: Some(status),
-            progress,
-        };
+    let status = match state.as_str() {
+        "normal" => ProgressBarStatus::Normal,
+        "indeterminate" => ProgressBarStatus::Indeterminate,
+        "paused" => ProgressBarStatus::Paused,
+        "error" => ProgressBarStatus::Error,
+        _ => ProgressBarStatus::None,
+    };
 
-        if let Err(e) = window.set_progress_bar(progress_state) {
-            eprintln!("[taskbar] Failed to set progress bar: {}", e);
-        }
-    }
+    let progress_state = ProgressBarState {
+        status: Some(status),
+        progress,
+    };
+
+    window
+        .set_progress_bar(progress_state)
+        .map_err(|e| Error::context("failed to set taskbar progress", e))
 }
 
 fn main() {
     let mut builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -263,12 +300,18 @@ fn main() {
     // Desktop-only plugins
     #[cfg(not(target_os = "ios"))]
     {
-        builder = builder
-            .plugin(tauri_plugin_autostart::init(
-                MacosLauncher::LaunchAgent,
-                Some(vec!["--minimized"]),
-            ))
-            .plugin(tauri_plugin_deep_link::init());
+        info!("Loading desktop plugins...");
+
+        info!("  ✓ autostart");
+        builder = builder.plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ));
+
+        info!("  ✓ deep-link");
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+
+        info!("Desktop plugins loaded");
     }
 
     builder
@@ -344,6 +387,10 @@ fn main() {
                     child: Arc::new(Mutex::new(Some(child))),
                     port: SERVER_PORT.to_string(),
                 });
+
+                // Initialize video processing state (desktop only)
+                // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                // app.manage(vidstream::VideoEngineState::new());  // Disabled: blocked by CrabCamera ACL (PR #267)
 
                 // Set up deep link handler for macOS (events) and check startup URL
                 // On Windows/Linux, deep links come through single-instance CLI args
@@ -555,19 +602,36 @@ fn main() {
                         }
                         // View menu - emit events to show panels
                         "config_panel" | "preferences" => {
-                            show_window_and_emit(app_handle, "show-config-panel", ());
+                            if let Err(e) =
+                                show_window_and_emit(app_handle, "show-config-panel", ())
+                            {
+                                log::warn!("[menu] Failed to show config panel: {}", e);
+                            }
                         }
                         "pulse_panel" => {
-                            show_window_and_emit(app_handle, "show-pulse-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-pulse-panel", ())
+                            {
+                                log::warn!("[menu] Failed to show pulse panel: {}", e);
+                            }
                         }
                         "prose_panel" | "documentation" => {
-                            show_window_and_emit(app_handle, "show-prose-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-prose-panel", ())
+                            {
+                                log::warn!("[menu] Failed to show prose panel: {}", e);
+                            }
                         }
                         "code_panel" => {
-                            show_window_and_emit(app_handle, "show-code-panel", ());
+                            if let Err(e) = show_window_and_emit(app_handle, "show-code-panel", ())
+                            {
+                                log::warn!("[menu] Failed to show code panel: {}", e);
+                            }
                         }
                         "hixtory_panel" => {
-                            show_window_and_emit(app_handle, "show-hixtory-panel", ());
+                            if let Err(e) =
+                                show_window_and_emit(app_handle, "show-hixtory-panel", ())
+                            {
+                                log::warn!("[menu] Failed to show hixtory panel: {}", e);
+                            }
                         }
                         "refresh_graph" => {
                             if let Some(window) = app_handle.get_webview_window("main") {
@@ -654,7 +718,9 @@ fn main() {
                             app.exit(0);
                         } else if event.id == "preferences" {
                             // Open preferences (config panel) - show window and emit event
-                            show_window_and_emit(app, "show-config-panel", ());
+                            if let Err(e) = show_window_and_emit(app, "show-config-panel", ()) {
+                                log::warn!("[tray] Failed to show config panel: {}", e);
+                            }
                         } else if event.id == "toggle_pulse" {
                             // Toggle Pulse daemon (emit event to frontend)
                             if let Some(window) = app.get_webview_window("main") {
@@ -708,7 +774,13 @@ fn main() {
             notify_storage_warning,
             notify_server_draining,
             notify_server_stopped,
-            set_taskbar_progress
+            set_taskbar_progress // Video processing (desktop only) - Disabled: blocked by CrabCamera ACL (PR #267)
+                                 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                                 // vidstream::vidstream_init,
+                                 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                                 // vidstream::vidstream_process_frame,
+                                 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
+                                 // vidstream::vidstream_get_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

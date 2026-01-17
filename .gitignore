@@ -52,3 +52,21 @@ web/src-tauri/gen/
 types/generated/rust/target/
 types/generated/rust/Cargo.lock
 target/
+
+# Nix build outputs
+result
+
+# Generated documentation site (built by GitHub Actions)
+web/site/
+
+# ML models (downloaded separately)
+ats/vidstream/models/
+
+# CTP prototypes (gitignored - for local development)
+web/ctpm1/
+web/css/ctpm1.css
+web/ctp2/
+web/css/ctp2.css
+
+# CTP2 test files (domain-specific, not for open source)
+**/*ctp2*_test.go

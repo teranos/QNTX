@@ -220,7 +220,7 @@ func (p *BookPlugin) Initialize(ctx context.Context, services plugin.ServiceRegi
 	}
 
 	// Create attestations for book collector tracking auction availability (Issue #138 demo)
-	// This demonstrates external plugins using ATSStore and Queue services via gRPC
+	// This demonstrates gRPC plugins using ATSStore and Queue services via gRPC
 	if err := p.setupBookCollector(ctx); err != nil {
 		p.logger.Warnw("Failed to setup book collector attestations", "error", err)
 		// Continue anyway - attestations are optional for plugin functionality
@@ -233,7 +233,7 @@ func (p *BookPlugin) Initialize(ctx context.Context, services plugin.ServiceRegi
 // The collector tracks books they want, auction houses announce availability,
 // and the plugin queries for matches and monitors for new opportunities.
 func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
-	// Get ATSStore - works for both built-in and external plugins via interface
+	// Get ATSStore - works for all plugins via unified interface
 	store := p.services.ATSStore()
 	if store == nil {
 		p.logger.Debug("ATSStore not available, skipping attestation creation")

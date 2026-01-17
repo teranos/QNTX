@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/logger"
+	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/QNTX/server/wslogs"
 )
 
@@ -28,8 +29,12 @@ const (
 	// Send pings to peer with this period (must be less than pongWait)
 	pingPeriod = 54 * time.Second
 
-	// Maximum message size allowed from peer (1MB for graph data)
-	maxMessageSize = 1024 * 1024
+	// Maximum message size allowed from peer
+	// Currently 10MB to support VidStream frames (640x480 RGBA as JSON ≈ 4.4MB)
+	// TODO: Switch to binary WebSocket frames to reduce payload from 4.4MB → 1.2MB
+	//       Binary format: 12-byte header (width:u32, height:u32, format:u32) + raw bytes
+	//       This would allow reducing maxMessageSize back to 2MB
+	maxMessageSize = 10 * 1024 * 1024
 )
 
 // createErrorGraph creates an empty graph with error metadata.
@@ -153,10 +158,18 @@ func (c *Client) readPump() {
 			break
 		}
 
-		if logger.ShouldLogAll(int(c.server.verbosity.Load())) {
+		// Log message size for large messages (helps diagnose WebSocket issues)
+		msgSize := len(messageBytes)
+		if msgSize > 500000 { // Log if > 500KB
+			c.server.logger.Infow("Large WebSocket message received",
+				"client_id", c.id,
+				"size_bytes", msgSize,
+				"size_mb", float64(msgSize)/(1024*1024),
+			)
+		} else if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputDataDump) {
 			c.server.logger.Debugw("Received WebSocket message",
 				"client_id", c.id,
-				"size_bytes", len(messageBytes),
+				"size_bytes", msgSize,
 			)
 		}
 
@@ -165,6 +178,7 @@ func (c *Client) readPump() {
 			c.server.logger.Warnw("JSON unmarshal error",
 				"error", err.Error(),
 				"client_id", c.id,
+				"message_size", msgSize,
 			)
 			continue
 		}
@@ -176,6 +190,15 @@ func (c *Client) readPump() {
 // handleReadError logs unexpected WebSocket read errors.
 // Expected closure codes (going away, abnormal, no status) are silently ignored.
 func (c *Client) handleReadError(err error) {
+	// Always log close errors with full details for debugging
+	if closeErr, ok := err.(*websocket.CloseError); ok {
+		c.server.logger.Infow("WebSocket closed",
+			"client_id", c.id,
+			"code", closeErr.Code,
+			"text", closeErr.Text,
+		)
+	}
+
 	if websocket.IsUnexpectedCloseError(err,
 		websocket.CloseGoingAway,
 		websocket.CloseAbnormalClosure,
@@ -221,6 +244,12 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleJobControl(*msg)
 	case "visibility": // Phase 2: Handle visibility preference updates
 		c.handleVisibility(*msg)
+	case "vidstream_init":
+		c.handleVidStreamInit(*msg)
+	case "vidstream_frame":
+		c.handleVidStreamFrame(*msg)
+	case "get_database_stats":
+		c.handleGetDatabaseStats()
 	case "ping":
 		// Just update deadline, handled by pong handler
 	default:
@@ -267,7 +296,7 @@ func (c *Client) writePump() {
 				return
 			}
 
-			if logger.ShouldLogTrace(int(c.server.verbosity.Load())) {
+			if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputInternalFlow) {
 				c.server.logger.Debugw("Sent graph to client",
 					"client_id", c.id,
 					"nodes", len(g.Nodes),
@@ -346,7 +375,7 @@ func (c *Client) handleQuery(query string) {
 		"query_length", len(query),
 	)
 
-	if logger.ShouldLogTrace(int(c.server.verbosity.Load())) {
+	if logger.ShouldOutput(int(c.server.verbosity.Load()), logger.OutputAxExecution) {
 		c.server.logger.Debugw("Query details",
 			"query_id", queryID,
 			"query", query,
@@ -741,6 +770,51 @@ func (c *Client) handleJobControl(msg QueryMessage) {
 	}
 }
 
+// handleGetDatabaseStats retrieves database statistics and sends them to the client
+func (c *Client) handleGetDatabaseStats() {
+	c.server.logger.Infow("Database stats request",
+		"client_id", c.id,
+	)
+
+	// Get basic storage statistics from database
+	var totalAttestations, uniqueActors, uniqueSubjects, uniqueContexts int
+	err := c.server.db.QueryRow(`
+		SELECT
+			COUNT(*) as total_attestations,
+			COUNT(DISTINCT json_extract(actors, '$[0]')) as unique_actors,
+			COUNT(DISTINCT json_extract(subjects, '$')) as unique_subjects,
+			COUNT(DISTINCT json_extract(contexts, '$')) as unique_contexts
+		FROM attestations
+	`).Scan(&totalAttestations, &uniqueActors, &uniqueSubjects, &uniqueContexts)
+
+	if err != nil {
+		c.server.logger.Errorw("Failed to query database stats",
+			"error", err,
+			"client_id", c.id,
+		)
+		c.sendJSON(map[string]interface{}{
+			"type":  "error",
+			"error": fmt.Sprintf("Failed to retrieve database statistics: %v", err),
+		})
+		return
+	}
+
+	// Send stats to client
+	c.sendJSON(map[string]interface{}{
+		"type":               "database_stats",
+		"path":               c.server.dbPath,
+		"total_attestations": totalAttestations,
+		"unique_actors":      uniqueActors,
+		"unique_subjects":    uniqueSubjects,
+		"unique_contexts":    uniqueContexts,
+	})
+
+	c.server.logger.Infow("Database stats sent",
+		"total_attestations", totalAttestations,
+		"client_id", c.id,
+	)
+}
+
 // handleVisibility updates client visibility preferences and refreshes the graph
 func (c *Client) handleVisibility(msg QueryMessage) {
 	c.server.logger.Infow("Visibility preference update",
@@ -826,7 +900,8 @@ func base64Decode(data string) (string, error) {
 	return string(bytes), nil
 }
 
-// close safely closes the client's channels using sync.Once to prevent double-close panics
+// close safely closes the client's channels using sync.Once to prevent double-close panics.
+// Only called from the broadcast worker goroutine (single-writer model).
 func (c *Client) close() {
 	c.closeOnce.Do(func() {
 		if c.send != nil {
@@ -839,4 +914,36 @@ func (c *Client) close() {
 			close(c.sendMsg)
 		}
 	})
+}
+
+// sendSystemCapabilitiesToClient sends system capability information to a newly connected client.
+// This informs the frontend about available optimizations (e.g., Rust fuzzy matching, ONNX video).
+// Sends are routed through broadcast worker (thread-safe).
+func (s *QNTXServer) sendSystemCapabilitiesToClient(client *Client) {
+	// Get system capabilities from syscap package
+	fuzzyBackend := s.builder.FuzzyBackend()
+	msg := syscap.Get(fuzzyBackend)
+
+	// Send to broadcast worker (thread-safe)
+	req := &broadcastRequest{
+		reqType:  "message",
+		msg:      msg,
+		clientID: client.id, // Send to specific client only
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Queued system capabilities to client",
+			"client_id", client.id,
+			"fuzzy_backend", fuzzyBackend,
+			"fuzzy_optimized", msg.FuzzyOptimized,
+		)
+	case <-s.ctx.Done():
+		return
+	default:
+		// Broadcast queue full (should never happen with proper sizing)
+		s.logger.Warnw("Broadcast request queue full, skipping system capabilities",
+			"client_id", client.id,
+		)
+	}
 }

@@ -15,6 +15,7 @@ import { proseMarkdownParser, proseMarkdownSerializer } from './markdown.ts';
 import { ATSCodeBlockNodeView } from './nodes/ats-code-block.ts';
 import { GoCodeBlockNodeView } from './nodes/go-code-block.ts';
 import { proseInputRules } from './input-rules.ts';
+import { handleError, SEG } from '../error-handler.ts';
 
 export interface ProseEditorCallbacks {
     onDocumentLoad?: (path: string) => void;
@@ -69,7 +70,7 @@ export class ProseEditor {
                 this.callbacks.onDocumentLoad(path);
             }
         } catch (error) {
-            console.error('Failed to load document:', error);
+            handleError(error, `Failed to load document: ${path}`, { context: SEG.ERROR, silent: true });
             this.showError(`Failed to load ${path}`);
         }
     }
@@ -85,7 +86,7 @@ export class ProseEditor {
         try {
             doc = proseMarkdownParser.parse(markdownContent);
         } catch (error) {
-            console.error('Failed to parse markdown:', error);
+            handleError(error, 'Failed to parse markdown', { context: SEG.ERROR, silent: true });
             this.showError('Failed to parse document');
             return;
         }
@@ -165,7 +166,7 @@ export class ProseEditor {
                 this.callbacks.onContentChange(false);
             }
         } catch (error) {
-            console.error('Failed to save content:', error);
+            handleError(error, 'Failed to save content', { context: SEG.ERROR, silent: true });
             this.showError('Failed to save');
         }
     }

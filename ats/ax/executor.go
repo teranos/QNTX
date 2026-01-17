@@ -2,7 +2,6 @@ package ax
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -11,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/ax/classification"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 // AxExecutor executes ask queries against attestation storage
@@ -102,7 +102,7 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	// 1. Resolve aliases for all filter components
 	expandedFilter, err := ae.expandAliasesInFilter(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand aliases in filter: %w", err)
+		return nil, errors.Wrap(err, "failed to expand aliases in filter")
 	}
 
 	// 2. Check if this might be a natural language query
@@ -116,7 +116,7 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 		var err error
 		expandedPredicates, err = ae.expandFuzzyPredicates(ctx, expandedFilter.Predicates)
 		if err != nil {
-			return nil, fmt.Errorf("failed to expand fuzzy predicates: %w", err)
+			return nil, errors.Wrap(err, "failed to expand fuzzy predicates")
 		}
 	}
 
@@ -126,7 +126,7 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 		var err error
 		expandedContexts, err = ae.expandFuzzyContexts(ctx, expandedFilter.Contexts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to expand fuzzy contexts: %w", err)
+			return nil, errors.Wrap(err, "failed to expand fuzzy contexts")
 		}
 	}
 
@@ -140,7 +140,7 @@ func (ae *AxExecutor) ExecuteAsk(ctx context.Context, filter types.AxFilter) (*t
 	// 3. Execute query using query store
 	attestationsPtr, err := ae.queryStore.ExecuteAxQuery(ctx, expandedFilter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, errors.Wrap(err, "failed to execute query")
 	}
 
 	// Convert []*As to []As
@@ -300,7 +300,7 @@ func (ae *AxExecutor) expandFuzzyPredicates(ctx context.Context, queryPredicates
 	// Get all unique predicates from database
 	allPredicates, err := ae.queryStore.GetAllPredicates(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get predicates from database: %w", err)
+		return nil, errors.Wrap(err, "failed to get predicates from database")
 	}
 
 	expanded := []string{}
@@ -323,7 +323,7 @@ func (ae *AxExecutor) expandFuzzyContexts(ctx context.Context, queryContexts []s
 	// Get all unique contexts from database
 	allContexts, err := ae.queryStore.GetAllContexts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get contexts from database: %w", err)
+		return nil, errors.Wrap(err, "failed to get contexts from database")
 	}
 
 	expanded := []string{}
@@ -389,7 +389,7 @@ func (ae *AxExecutor) expandAliasesInFilter(ctx context.Context, filter types.Ax
 			// Get identifiers from both alias system and Contact RLDB alternative IDs
 			allIdentifiers, err := ae.getUnifiedIdentifiers(ctx, subject)
 			if err != nil {
-				return filter, fmt.Errorf("failed to resolve subject identifiers %s: %w", subject, err)
+				return filter, errors.Wrapf(err, "failed to resolve subject identifiers %s", subject)
 			}
 			expandedSubjects = append(expandedSubjects, allIdentifiers...)
 		}
@@ -402,7 +402,7 @@ func (ae *AxExecutor) expandAliasesInFilter(ctx context.Context, filter types.Ax
 		for _, context := range filter.Contexts {
 			resolved, err := ae.aliasResolver.ResolveIdentifier(ctx, context)
 			if err != nil {
-				return filter, fmt.Errorf("failed to resolve context alias %s: %w", context, err)
+				return filter, errors.Wrapf(err, "failed to resolve context alias %s", context)
 			}
 			expandedContexts = append(expandedContexts, resolved...)
 		}
@@ -416,7 +416,7 @@ func (ae *AxExecutor) expandAliasesInFilter(ctx context.Context, filter types.Ax
 			// Get identifiers from both alias system and Contact RLDB alternative IDs
 			allIdentifiers, err := ae.getUnifiedIdentifiers(ctx, actor)
 			if err != nil {
-				return filter, fmt.Errorf("failed to resolve actor identifiers %s: %w", actor, err)
+				return filter, errors.Wrapf(err, "failed to resolve actor identifiers %s", actor)
 			}
 			expandedActors = append(expandedActors, allIdentifiers...)
 		}
@@ -439,7 +439,7 @@ func (ae *AxExecutor) getUnifiedIdentifiers(ctx context.Context, identifier stri
 	// 1. Get identifiers from AS alias system
 	aliasResolved, err := ae.aliasResolver.ResolveIdentifier(ctx, identifier)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve AS aliases for %s: %w", identifier, err)
+		return nil, errors.Wrapf(err, "failed to resolve AS aliases for %s", identifier)
 	}
 	for _, resolved := range aliasResolved {
 		allIdentifiers[resolved] = true
@@ -449,7 +449,7 @@ func (ae *AxExecutor) getUnifiedIdentifiers(ctx context.Context, identifier stri
 	if ae.entityResolver != nil {
 		alternativeIDs, err := ae.entityResolver.GetAlternativeIDs(identifier)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve entity alternatives for %s: %w", identifier, err)
+			return nil, errors.Wrapf(err, "failed to resolve entity alternatives for %s", identifier)
 		}
 		for _, altID := range alternativeIDs {
 			allIdentifiers[altID] = true

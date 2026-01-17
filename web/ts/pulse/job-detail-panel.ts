@@ -7,8 +7,9 @@
  * - Individual execution details and logs
  */
 
-import { debugLog } from '../debug.ts';
 import { CSS } from '../css-classes.ts';
+import { log, SEG } from '../logger';
+import { handleError } from '../error-handler';
 import type { ScheduledJobResponse } from './types.ts';
 import type { Execution, JobStagesResponse, TaskLogsResponse, JobChildrenResponse } from './execution-types.ts';
 import {
@@ -21,7 +22,6 @@ import {
   getStatusColorClass,
 } from './execution-api.ts';
 import { forceTriggerJob } from './api.ts';
-import { toast } from '../toast.ts';
 import {
   onExecutionStarted,
   onExecutionCompleted,
@@ -29,6 +29,7 @@ import {
   onExecutionLog,
   unixToISO,
 } from './events.ts';
+import type { RichError } from '../base-panel-error.ts';
 
 class JobDetailPanel {
   private panel: HTMLElement | null = null;
@@ -136,7 +137,7 @@ class JobDetailPanel {
     this.currentJob = job;
     this.currentPage = 0;
 
-    debugLog('[Job Detail] Showing panel for job:', job.id);
+    log.debug(SEG.PULSE, 'Showing panel for job:', job.id);
 
     // Show panel and overlay
     this.panel.classList.add(CSS.STATE.VISIBLE);
@@ -170,7 +171,7 @@ class JobDetailPanel {
 
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load executions:', error);
+      handleError(error, 'Failed to load execution history', { context: SEG.PULSE, silent: true });
       this.renderError('Failed to load execution history');
     }
   }
@@ -197,7 +198,7 @@ class JobDetailPanel {
           </div>
           <div class="job-info-row">
             <span class="job-info-label">Interval:</span>
-            <span class="job-info-value">${this.formatInterval(this.currentJob.interval_seconds)}</span>
+            <span class="job-info-value">${this.formatInterval(this.currentJob.interval_seconds ?? 0)}</span>
           </div>
           <div class="job-info-row">
             <span class="job-info-label">State:</span>
@@ -269,7 +270,7 @@ class JobDetailPanel {
   }
 
   private async loadExecutionStages(executionId: string, jobId: string): Promise<void> {
-    debugLog('[Job Detail] Loading stages for execution:', executionId, 'job:', jobId);
+    log.debug(SEG.PULSE, 'Loading stages for execution:', executionId, 'job:', jobId);
 
     try {
       const stages = await getJobStages(jobId);
@@ -277,7 +278,7 @@ class JobDetailPanel {
 
       // If no stages, try loading children (job might be an orchestrator)
       if (stages.stages.length === 0) {
-        debugLog('[Job Detail] No stages found, loading children for job:', jobId);
+        log.debug(SEG.PULSE, 'No stages found, loading children for job:', jobId);
         const children = await getJobChildren(jobId);
         this.executionChildren.set(executionId, children);
       }
@@ -285,7 +286,7 @@ class JobDetailPanel {
       // Re-render to show loaded stages or children
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load stages:', error);
+      handleError(error, 'Failed to load execution stages', { context: SEG.PULSE, silent: true });
       // Store empty stages response on error
       this.executionStages.set(executionId, {
         job_id: jobId,
@@ -314,14 +315,14 @@ class JobDetailPanel {
 
   private async loadTaskLogs(jobId: string, taskId: string): Promise<void> {
     const taskKey = `${jobId}:${taskId}`;
-    debugLog('[Job Detail] Loading logs for task:', {jobId, taskId});
+    log.debug(SEG.PULSE, 'Loading logs for task:', {jobId, taskId});
 
     try {
       const logs = await getTaskLogsForJob(jobId, taskId);
       this.taskLogs.set(taskKey, logs);
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load task logs:', error);
+      handleError(error, 'Failed to load task logs', { context: SEG.PULSE, silent: true });
       this.taskLogs.set(taskKey, {
         task_id: taskId,
         logs: []
@@ -411,7 +412,7 @@ class JobDetailPanel {
     `;
   }
 
-  private renderTaskLogsDirectly(task: { task_id: string; log_count: number }, jobId: string): string {
+  private renderTaskLogsDirectly(task: { task_id: string; log_count?: number }, jobId: string): string {
     const taskKey = `${jobId}:${task.task_id}`;
     const logs = this.taskLogs.get(taskKey);
 
@@ -447,7 +448,7 @@ class JobDetailPanel {
                 <span class="child-expand-icon">${isExpanded ? '▼' : '▶'}</span>
                 <span class="child-handler">${this.escapeHtml(child.handler_name)}</span>
                 <span class="child-status child-status-${this.escapeHtml(child.status)}">${this.escapeHtml(child.status)}</span>
-                <span class="child-progress">${Math.round(child.progress_pct)}%</span>
+                <span class="child-progress">${Math.round(child.progress_pct ?? 0)}%</span>
               </div>
               <div class="child-meta">
                 <span class="child-id">${this.escapeHtml(child.id.substring(0, 16))}...</span>
@@ -487,14 +488,14 @@ class JobDetailPanel {
   }
 
   private async loadChildStages(childId: string): Promise<void> {
-    debugLog('[Job Detail] Loading stages for child job:', childId);
+    log.debug(SEG.PULSE, 'Loading stages for child job:', childId);
 
     try {
       const stages = await getJobStages(childId);
       this.childStages.set(childId, stages);
       this.render();
     } catch (error) {
-      console.error('[Job Detail] Failed to load child stages:', error);
+      handleError(error, 'Failed to load child job stages', { context: SEG.PULSE, silent: true });
       this.childStages.set(childId, {
         job_id: childId,
         stages: []
@@ -529,12 +530,9 @@ class JobDetailPanel {
   private formatLogTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
+    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
 
-    // If today, show just time
+    // If today, show just time for logs (more useful than relative time)
     if (diffHours < 24 && date.getDate() === now.getDate()) {
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -544,21 +542,8 @@ class JobDetailPanel {
       });
     }
 
-    // If recent, show relative time
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    } else {
-      // Otherwise show date + time
-      return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-    }
+    // For non-today timestamps, use relative time from html-utils
+    return formatRelativeTime(timestamp);
   }
 
   private getLevelBadge(level: string): string {
@@ -590,8 +575,69 @@ class JobDetailPanel {
     `;
   }
 
+  /**
+   * Build a rich error from a message, with context about the current job
+   */
+  private buildRichError(message: string): RichError {
+    const lowerMessage = message.toLowerCase();
+    const jobContext = this.currentJob ? `ATS Code: ${this.currentJob.ats_code}` : '';
+
+    // Network errors
+    if (lowerMessage.includes('network') || lowerMessage.includes('failed to fetch') || lowerMessage.includes('connection')) {
+      return {
+        title: 'Network Error',
+        message: 'Unable to connect to the server',
+        suggestion: 'Check your network connection and ensure the QNTX server is running',
+        details: jobContext ? `${jobContext}\nError: ${message}` : message
+      };
+    }
+
+    // Timeout errors
+    if (lowerMessage.includes('timeout')) {
+      return {
+        title: 'Request Timeout',
+        message: 'The server took too long to respond',
+        suggestion: 'Try again or check if the server is under heavy load',
+        details: jobContext ? `${jobContext}\nError: ${message}` : message
+      };
+    }
+
+    // HTTP status code errors
+    const httpMatch = message.match(/(\d{3})/);
+    if (httpMatch) {
+      const status = parseInt(httpMatch[1], 10);
+      if (status >= 400 && status < 600) {
+        const statusInfo: Record<number, { title: string; suggestion: string }> = {
+          401: { title: 'Unauthorized', suggestion: 'Your session may have expired. Try refreshing the page.' },
+          403: { title: 'Forbidden', suggestion: 'You may not have permission to view this job.' },
+          404: { title: 'Not Found', suggestion: 'This job may have been deleted.' },
+          500: { title: 'Server Error', suggestion: 'An internal error occurred. Try again later.' },
+          503: { title: 'Service Unavailable', suggestion: 'The Pulse service may be restarting.' }
+        };
+        const info = statusInfo[status] || { title: `HTTP ${status}`, suggestion: 'An unexpected error occurred.' };
+        return {
+          title: info.title,
+          message: message,
+          status,
+          suggestion: info.suggestion,
+          details: jobContext
+        };
+      }
+    }
+
+    // Generic error
+    return {
+      title: 'Error',
+      message: message,
+      suggestion: 'Try again or check the system status.',
+      details: jobContext
+    };
+  }
+
   private renderError(message: string): void {
     if (!this.panel) return;
+
+    const richError = this.buildRichError(message);
 
     // Build error display using DOM API for security
     this.panel.innerHTML = '';
@@ -619,9 +665,54 @@ class JobDetailPanel {
     const content = document.createElement('div');
     content.className = 'job-detail-content';
 
+    // Rich error container
     const errorDiv = document.createElement('div');
-    errorDiv.className = 'job-detail-error';
-    errorDiv.textContent = message;
+    errorDiv.className = 'job-detail-error job-detail-rich-error';
+    errorDiv.setAttribute('role', 'alert');
+
+    // Error title
+    const errorTitle = document.createElement('div');
+    errorTitle.className = 'job-detail-error-title';
+    errorTitle.textContent = richError.title;
+    errorDiv.appendChild(errorTitle);
+
+    // Error message
+    const errorMessage = document.createElement('div');
+    errorMessage.className = 'job-detail-error-message';
+    errorMessage.textContent = richError.message;
+    errorDiv.appendChild(errorMessage);
+
+    // Suggestion
+    if (richError.suggestion) {
+      const errorSuggestion = document.createElement('div');
+      errorSuggestion.className = 'job-detail-error-suggestion';
+      errorSuggestion.textContent = richError.suggestion;
+      errorDiv.appendChild(errorSuggestion);
+    }
+
+    // Expandable details
+    if (richError.details) {
+      const detailsEl = document.createElement('details');
+      detailsEl.className = 'job-detail-error-details';
+
+      const summaryEl = document.createElement('summary');
+      summaryEl.textContent = 'Error Details';
+      detailsEl.appendChild(summaryEl);
+
+      const preEl = document.createElement('pre');
+      preEl.className = 'job-detail-error-details-content';
+      preEl.textContent = richError.details;
+      detailsEl.appendChild(preEl);
+
+      errorDiv.appendChild(detailsEl);
+    }
+
+    // Retry button
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'job-detail-retry-btn';
+    retryBtn.textContent = 'Retry';
+    retryBtn.onclick = () => this.loadExecutions();
+    errorDiv.appendChild(retryBtn);
 
     content.appendChild(errorDiv);
 
@@ -672,7 +763,7 @@ class JobDetailPanel {
     if (!this.currentJob) return;
 
     try {
-      debugLog('[Job Detail] Force triggering job:', this.currentJob.ats_code);
+      log.debug(SEG.PULSE, 'Force triggering job:', this.currentJob.ats_code);
 
       // Call API to create one-time force trigger job
       await forceTriggerJob(this.currentJob.ats_code);
@@ -680,13 +771,9 @@ class JobDetailPanel {
       // Reload executions to show the new forced execution
       await this.loadExecutions();
 
-      debugLog('[Job Detail] Force trigger successful');
+      log.debug(SEG.PULSE, 'Force trigger successful');
     } catch (error) {
-      console.error('[Job Detail] Force trigger failed:', error);
-      toast.error(
-        `Force trigger failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        true
-      );
+      handleError(error, 'Force trigger failed', { context: SEG.PULSE });
     }
   }
 

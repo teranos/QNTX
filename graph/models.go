@@ -14,12 +14,12 @@ type Graph struct {
 // Node represents an entity in the graph
 type Node struct {
 	ID         string                 `json:"id"`
-	Type       string                 `json:"type"`    // Node type from attestations ("artist", "album", "genre") or "untyped"
-	TypeSource string                 `json:"-"`       // Internal only: "attested" or "untyped"
-	Label      string                 `json:"label"`   // Display label
-	Visible    bool                   `json:"visible"` // Backend controls visibility
-	Group      int                    `json:"group"`   // For coloring/clustering (from type definitions)
-	Metadata   map[string]interface{} `json:"metadata"`
+	Type       string                 `json:"type"`            // Node type from attestations ("artist", "album", "genre") or "untyped"
+	TypeSource string                 `json:"-"`               // Internal only: "attested" or "untyped"
+	Label      string                 `json:"label"`           // Display label
+	Visible    bool                   `json:"visible"`         // Backend controls visibility
+	Group      int                    `json:"group,omitempty"` // For coloring/clustering (from type definitions)
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Link represents a relationship between nodes
@@ -42,11 +42,17 @@ type Meta struct {
 }
 
 // NodeTypeInfo describes a node type and its visual configuration
+// Embeds TypeDef to avoid duplication of type metadata
 type NodeTypeInfo struct {
-	Type  string `json:"type"`  // e.g., "artist", "album", "genre"
-	Label string `json:"label"` // Human-readable display name (e.g., "Artist", "Album")
-	Color string `json:"color"` // Hex color code
-	Count int    `json:"count"` // Number of nodes of this type
+	Type  string `json:"type"`            // e.g., "artist", "album", "genre"
+	Label string `json:"label"`           // Human-readable display name (e.g., "Artist", "Album")
+	Color string `json:"color,omitempty"` // Hex color code
+	Count int    `json:"count,omitempty"` // Number of nodes of this type
+	// Fields from TypeDef
+	RichStringFields []string `json:"rich_string_fields,omitempty"` // Metadata fields for semantic search
+	ArrayFields      []string `json:"array_fields,omitempty"`       // Fields flattened into arrays
+	Opacity          *float64 `json:"opacity,omitempty"`            // Visual opacity
+	Deprecated       bool     `json:"deprecated,omitempty"`         // Whether this type is being phased out
 }
 
 // RelationshipTypeInfo describes a relationship type with physics and visual configuration
@@ -56,11 +62,11 @@ type RelationshipTypeInfo struct {
 	Color        string   `json:"color,omitempty"`         // Optional link color override
 	LinkDistance *float64 `json:"link_distance,omitempty"` // D3 force distance override (nil = use default)
 	LinkStrength *float64 `json:"link_strength,omitempty"` // D3 force strength override (nil = use default)
-	Count        int      `json:"count"`                   // Number of links of this type
+	Count        int      `json:"count,omitempty"`         // Number of links of this type
 }
 
 // Stats provides graph statistics
 type Stats struct {
-	TotalNodes int `json:"total_nodes"`
-	TotalEdges int `json:"total_edges"`
+	TotalNodes int `json:"total_nodes,omitempty"`
+	TotalEdges int `json:"total_edges,omitempty"`
 }

@@ -10,6 +10,8 @@ import { EditorView, NodeView } from "prosemirror-view";
 import type { ScheduledJobResponse } from "./types.ts";
 import { createSchedulingControls } from "./scheduling-controls.ts";
 import { subscribeATSBlock, type ATSExecutionState } from "./realtime-handlers.ts";
+import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 
 export interface ATSNodeViewOptions {
   documentId?: string;
@@ -95,7 +97,7 @@ export class ATSNodeView implements NodeView {
         this.renderSchedulingControls();
       }
     } catch (error) {
-      console.error("Failed to load scheduled job:", error);
+      handleError(error, 'Failed to load scheduled job', { context: SEG.PULSE, silent: true });
       this.renderSchedulingControls();
     }
   }
@@ -141,7 +143,7 @@ export class ATSNodeView implements NodeView {
         this.renderSchedulingControls();
       },
       onError: (error, context) => {
-        console.error("Scheduling error:", error, context);
+        log.error(SEG.PULSE, "Scheduling error:", error, context);
         // Show inline error (less intrusive than toast for block-level actions)
         this.showSchedulingError(error.message);
       },
@@ -199,7 +201,7 @@ export class ATSNodeView implements NodeView {
     const newCode = node.textContent;
     if (this.currentJob && this.currentJob.ats_code !== newCode) {
       // ATS code changed - could update the scheduled job or show warning
-      console.warn("ATS code changed but scheduled job exists");
+      log.warn(SEG.PULSE, "ATS code changed but scheduled job exists");
     }
 
     return true;

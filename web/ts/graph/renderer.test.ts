@@ -101,3 +101,71 @@ describe('Link Physics Configuration', () => {
   });
 
 });
+
+// Isolated Node Detection (from renderer.ts lines 78-94)
+import type { GraphData, Node } from '../../types/core';
+
+function detectIsolatedNodes(data: GraphData): Set<string> {
+    const nodeHasLinks = new Set<string>();
+    data.links.forEach(link => {
+        const sourceId = typeof link.source === 'object' ? (link.source as Node).id : link.source as string;
+        const targetId = typeof link.target === 'object' ? (link.target as Node).id : link.target as string;
+        nodeHasLinks.add(sourceId);
+        nodeHasLinks.add(targetId);
+    });
+    return nodeHasLinks;
+}
+
+describe('Isolated Nodes', () => {
+    it('should detect nodes with string IDs', () => {
+        const data: GraphData = {
+            nodes: [
+                { id: 'a', label: 'A', type: 't' },
+                { id: 'b', label: 'B', type: 't' },
+                { id: 'c', label: 'C', type: 't' }
+            ],
+            links: [{ source: 'a', target: 'b', type: 'link' }]
+        };
+
+        const connected = detectIsolatedNodes(data);
+        expect(connected.has('a')).toBe(true);
+        expect(connected.has('b')).toBe(true);
+        expect(connected.has('c')).toBe(false); // isolated
+    });
+
+    it('should detect nodes with object references', () => {
+        const a = { id: 'a', label: 'A', type: 't' };
+        const b = { id: 'b', label: 'B', type: 't' };
+        const c = { id: 'c', label: 'C', type: 't' };
+
+        const data: GraphData = {
+            nodes: [a, b, c],
+            links: [{ source: a, target: b, type: 'link' }]
+        };
+
+        const connected = detectIsolatedNodes(data);
+        expect(connected.has('a')).toBe(true);
+        expect(connected.has('b')).toBe(true);
+        expect(connected.has('c')).toBe(false); // isolated
+    });
+
+    it('should handle empty graph', () => {
+        const data: GraphData = { nodes: [], links: [] };
+        const connected = detectIsolatedNodes(data);
+        expect(connected.size).toBe(0);
+    });
+
+    it('should handle self-loops', () => {
+        const data: GraphData = {
+            nodes: [
+                { id: 'a', label: 'A', type: 't' },
+                { id: 'b', label: 'B', type: 't' }
+            ],
+            links: [{ source: 'a', target: 'a', type: 'self' }]
+        };
+
+        const connected = detectIsolatedNodes(data);
+        expect(connected.has('a')).toBe(true); // self-connected
+        expect(connected.has('b')).toBe(false); // isolated
+    });
+});

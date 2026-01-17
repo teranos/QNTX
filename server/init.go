@@ -23,23 +23,29 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// serverDependencies holds all dependencies created for QNTXServer
+// serverDependencies holds dependencies created for QNTXServer
+// Refactored: Adding a new dependency requires changes in 3-4 places (down from 6):
+// 1. QNTXServer struct (server.go)
+// 2. This struct
+// 3. createServerDependencies() - create and add to return
+// 4. (Optional) Global storage if needed (e.g., SetDefaultPluginManager)
 type serverDependencies struct {
 	builder       *graph.AxGraphBuilder
-	langService   *lsp.Service // Language service for ATS LSP features
+	langService   *lsp.Service
 	usageTracker  *tracker.UsageTracker
 	budgetTracker *budget.Tracker
 	daemon        *async.WorkerPool
-	config        *appcfg.Config // GRACE Phase 2 optimization: reuse for daemon recreation
+	pluginManager *grpcplugin.PluginManager
+	config        *appcfg.Config
 }
 
 // NewQNTXServer creates a new QNTX server
-func NewQNTXServer(db *sql.DB, dbPath string, verbosity int) (*QNTXServer, error) {
-	return NewQNTXServerWithInitialQuery(db, dbPath, verbosity, "")
-}
-
-// NewQNTXServerWithInitialQuery creates a QNTXServer with an optional pre-loaded Ax query
-func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, initialQuery string) (*QNTXServer, error) {
+// Optional initialQuery can be provided to pre-load an Ax query on connection
+func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...string) (*QNTXServer, error) {
+	query := ""
+	if len(initialQuery) > 0 {
+		query = initialQuery[0]
+	}
 	// Defensive: Validate critical inputs
 	if db == nil {
 		return nil, errors.New("database connection cannot be nil")
@@ -81,7 +87,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 	// Create cancellation context for lifecycle management
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// GRACE Phase 2: Recreate daemon with server's context for proper shutdown coordination
+	// Opening/Closing Phase 2: Recreate daemon with server's context for proper shutdown coordination
 	// Reuse config from deps to avoid double-loading (optimization for WS connection speed)
 	poolConfig := async.DefaultWorkerPoolConfig()
 	if deps.config.Pulse.Workers > 0 {
@@ -99,29 +105,38 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 
 	// Create console buffer with callback to print logs to terminal
 	consoleBuffer := NewConsoleBuffer(100)
+	formatter := NewConsoleFormatter(verbosity) // Verbosity-aware formatting
 	consoleBuffer.onNewLog = func(log ConsoleLog) {
-		// Format log level for display
-		levelIcon := map[string]string{
-			"error": "✗",
-			"warn":  "⚠",
-			"info":  "ℹ",
-			"debug": "→",
-		}
-		icon := levelIcon[log.Level]
-		if icon == "" {
-			icon = "·"
-		}
+		// Format message using custom formatter for JSON summarization and coloring
+		formattedMsg := formatter.FormatMessage(log.Message)
 
-		// Print to server terminal
-		serverLogger.Infow(fmt.Sprintf("[Browser %s] %s", icon, log.Message),
-			"level", log.Level,
-			"url", log.URL,
-		)
+		// Prefix with [Browser] to make it obvious where this log came from
+		browserMsg := fmt.Sprintf("[Browser] %s", formattedMsg)
 
-		// Also print stack trace for errors
-		if log.Level == "error" && log.Stack != "" {
-			serverLogger.Debugw("Browser error stack trace",
-				"stack", log.Stack,
+		// Log through zap to match existing log style
+		// Use Infow for consistency with other logs (zap will add its own coloring)
+		switch log.Level {
+		case "error":
+			serverLogger.Errorw(browserMsg,
+				"url", log.URL,
+			)
+			// Also print stack trace for errors at debug level
+			if log.Stack != "" {
+				serverLogger.Debugw("Browser error stack trace",
+					"stack", log.Stack,
+				)
+			}
+		case "warn":
+			serverLogger.Warnw(browserMsg,
+				"url", log.URL,
+			)
+		case "debug":
+			serverLogger.Debugw(browserMsg,
+				"url", log.URL,
+			)
+		default: // info
+			serverLogger.Infow(browserMsg,
+				"url", log.URL,
 			)
 		}
 	}
@@ -134,23 +149,31 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		langService:   deps.langService,
 		usageTracker:  deps.usageTracker,
 		budgetTracker: deps.budgetTracker,
-		daemon:        daemon, // Use daemon with server context
-		ticker:        nil,    // Will be set below after passing server as broadcaster
+		daemon:        daemon,             // Use daemon with server context
+		pluginManager: deps.pluginManager, // May be nil if no plugins enabled
+		ticker:        nil,                // Will be set below after passing server as broadcaster
 		clients:       make(map[*Client]bool),
 		broadcast:     make(chan *graph.Graph, MaxClientMessageQueueSize),
+		broadcastReq:  make(chan *broadcastRequest, MaxClientMessageQueueSize*2), // 2x buffer for multiple message types
 		register:      make(chan *Client),
 		unregister:    make(chan *Client),
 		logger:        serverLogger,
 		logTransport:  wsTransport,
 		wsCore:        wsCore,
 		consoleBuffer: consoleBuffer, // Browser console log buffer with terminal printing
-		initialQuery:  initialQuery,
+		initialQuery:  query,
 		ctx:           ctx,
 		cancel:        cancel,
 	}
 	server.verbosity.Store(int32(verbosity))
 	server.graphLimit.Store(1000)                 // Default graph node limit
-	server.state.Store(int32(ServerStateRunning)) // GRACE Phase 4: Initialize to running
+	server.state.Store(int32(ServerStateRunning)) // Opening/Closing Phase 4: Initialize to running
+
+	// Set as global default server for async plugin initialization
+	SetDefaultServer(server)
+
+	// Configure log transport to route sends through broadcast worker (thread-safe)
+	wsTransport.SetSendFunc(server.sendLogBatch)
 
 	// Initialize domain plugin registry
 	pluginRegistry := plugin.GetDefaultRegistry()
@@ -161,12 +184,12 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 		store := storage.NewSQLStore(db, serverLogger)
 		queue := daemon.GetQueue()
 
-		// Start gRPC services for external plugins (Issue #138)
-		// These services allow external plugins to call back to QNTX core
+		// Start gRPC services for plugins (Issue #138)
+		// These services allow plugins to call back to QNTX core
 		servicesManager := grpcplugin.NewServicesManager(serverLogger)
 		endpoints, err := servicesManager.Start(ctx, store, queue)
 		if err != nil {
-			serverLogger.Warnw("Failed to start plugin services, external plugins will not have service access", "error", err)
+			serverLogger.Warnw("Failed to start plugin services, plugins will not have service access", "error", err)
 			endpoints = nil
 		} else {
 			serverLogger.Infow("Plugin services started",
@@ -175,7 +198,7 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 			)
 		}
 
-		// Wrap config provider to inject service endpoints for external plugins
+		// Wrap config provider to inject service endpoints for plugins
 		configProvider := &pluginConfigProvider{
 			base:      &simpleConfigProvider{},
 			endpoints: endpoints,
@@ -190,8 +213,35 @@ func NewQNTXServerWithInitialQuery(db *sql.DB, dbPath string, verbosity int, ini
 			serverLogger.Infow("Domain plugins initialized", "count", len(pluginRegistry.List()))
 		}
 
-		// Store services manager for shutdown
+		// Store services manager and registry for shutdown and reinitialization
 		server.servicesManager = servicesManager
+		server.services = services
+	}
+
+	// Initialize gRPC plugins (if any are loaded)
+	// IMPORTANT: This must happen during server startup, not lazily on first HTTP request,
+	// so that plugins can register type definitions before graph queries are executed.
+	serverLogger.Infow("Plugin manager check", "plugin_manager_is_nil", server.pluginManager == nil, "services_is_nil", server.services == nil)
+	if server.pluginManager != nil && server.services != nil {
+		plugins := server.pluginManager.GetAllPlugins()
+		serverLogger.Infow("Plugin manager has plugins", "count", len(plugins))
+		if len(plugins) > 0 {
+			serverLogger.Infow("Initializing plugins eagerly", "count", len(plugins))
+
+			// Initialize each plugin with the service registry
+			for _, p := range plugins {
+				meta := p.Metadata()
+				if err := p.Initialize(ctx, server.services); err != nil {
+					serverLogger.Errorw("Failed to initialize plugin",
+						"plugin", meta.Name,
+						"version", meta.Version,
+						"error", err)
+					continue
+				}
+
+				serverLogger.Infow("Initialized plugin", "plugin", meta.Name, "version", meta.Version)
+			}
+		}
 	}
 
 	// Create ticker with server as broadcaster for real-time execution updates
@@ -243,8 +293,8 @@ func createGraphLogger(verbosity int) (*zap.SugaredLogger, *wslogs.WebSocketCore
 	return serverLogger, wsCore, wsTransport, nil
 }
 
-// createServerDependencies creates all dependencies needed by QNTXServer
-func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocketCore, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
+// createServerDependencies creates all components needed for QNTXServer initialization
+func createServerDependencies(db *sql.DB, verbosity int, wsCore zapcore.Core, wsTransport *wslogs.Transport, serverLogger *zap.SugaredLogger) (*serverDependencies, error) {
 	start := time.Now()
 
 	// Create builder with server logger
@@ -290,6 +340,9 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 	daemon := async.NewWorkerPool(db, cfg, async.DefaultWorkerPoolConfig(), serverLogger)
 	serverLogger.Debugw("Daemon created", "duration_ms", time.Since(daemonStart).Milliseconds())
 
+	// Retrieve plugin manager from global storage (set by main.go during plugin initialization)
+	pluginManager := grpcplugin.GetDefaultPluginManager()
+
 	serverLogger.Debugw("All dependencies created", "total_duration_ms", time.Since(start).Milliseconds())
 
 	return &serverDependencies{
@@ -298,7 +351,8 @@ func createServerDependencies(db *sql.DB, verbosity int, wsCore *wslogs.WebSocke
 		usageTracker:  usageTracker,
 		budgetTracker: budgetTracker,
 		daemon:        daemon,
-		config:        cfg, // GRACE Phase 2 optimization: save for reuse
+		pluginManager: pluginManager, // May be nil if no plugins are enabled
+		config:        cfg,           // GRACE Phase 2 optimization: save for reuse
 	}, nil
 }
 
@@ -413,7 +467,7 @@ type pluginConfigWithEndpoints struct {
 }
 
 func (c *pluginConfigWithEndpoints) GetString(key string) string {
-	// Inject service endpoints for external plugins (Issue #138)
+	// Inject service endpoints for plugins (Issue #138)
 	if c.endpoints != nil {
 		switch key {
 		case "_ats_store_endpoint":
@@ -440,7 +494,7 @@ func (c *pluginConfigWithEndpoints) GetStringSlice(key string) []string {
 }
 
 func (c *pluginConfigWithEndpoints) Get(key string) interface{} {
-	// Inject service endpoints for external plugins
+	// Inject service endpoints for plugins
 	if c.endpoints != nil {
 		switch key {
 		case "_ats_store_endpoint":

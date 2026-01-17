@@ -10,6 +10,8 @@ import { GoEditorNavigation } from './navigation.ts';
 import { CodeSuggestions } from './suggestions.ts';
 import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
+import { createRichErrorState, type RichError } from '../base-panel-error.ts';
+import { handleError, SEG } from '../error-handler.ts';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -28,7 +30,7 @@ class GoEditorPanel extends BasePanel {
     private hasUnsavedChanges: boolean = false;
     private isDevMode: boolean = false;
     private workspaceRoot: string = '';
-    private currentTab: 'editor' | 'suggestions' = 'editor';
+    private currentTab: 'editor' | 'suggestions' | null = null;
     private editorContent: string = '';
 
     // Components
@@ -40,8 +42,10 @@ class GoEditorPanel extends BasePanel {
     private saveIndicator: HTMLElement | null = null;
     private statusElement: HTMLElement | null = null;
 
-    // Save keyboard handler
+    // Event handler references for cleanup
     private saveHandler: ((e: KeyboardEvent) => void) | null = null;
+    private closeBtnHandler: (() => void) | null = null;
+    private tabClickHandlers: Map<Element, (e: Event) => void> = new Map();
 
     constructor() {
         super({
@@ -104,16 +108,21 @@ class GoEditorPanel extends BasePanel {
         // Note: Close button (.go-editor-close) needs manual handling since it uses
         // a custom class. BasePanel only auto-handles .panel-close
         const closeBtn = this.$('.go-editor-close');
-        closeBtn?.addEventListener('click', () => this.hide());
+        if (closeBtn) {
+            this.closeBtnHandler = () => this.hide();
+            closeBtn.addEventListener('click', this.closeBtnHandler);
+        }
 
         // Tab switching
         const tabs = this.panel?.querySelectorAll('.go-editor-tab');
         tabs?.forEach(tab => {
-            tab.addEventListener('click', (e) => {
+            const handler = (e: Event) => {
                 const target = e.target as HTMLElement;
                 const tabName = target.dataset.tab as 'editor' | 'suggestions';
                 this.switchTab(tabName);
-            });
+            };
+            this.tabClickHandlers.set(tab, handler);
+            tab.addEventListener('click', handler);
         });
 
         // Save on Cmd/Ctrl+S
@@ -170,10 +179,26 @@ class GoEditorPanel extends BasePanel {
     protected onDestroy(): void {
         this.destroyEditor();
 
+        // Clean up keyboard handler
         if (this.saveHandler) {
             document.removeEventListener('keydown', this.saveHandler);
             this.saveHandler = null;
         }
+
+        // Clean up close button handler
+        if (this.closeBtnHandler) {
+            const closeBtn = this.$('.go-editor-close');
+            if (closeBtn) {
+                closeBtn.removeEventListener('click', this.closeBtnHandler);
+            }
+            this.closeBtnHandler = null;
+        }
+
+        // Clean up tab click handlers
+        this.tabClickHandlers.forEach((handler, element) => {
+            element.removeEventListener('click', handler);
+        });
+        this.tabClickHandlers.clear();
     }
 
     async loadFile(path: string): Promise<void> {
@@ -194,8 +219,8 @@ class GoEditorPanel extends BasePanel {
             // Add to recent files
             this.navigation.addToRecentFiles(path);
         } catch (error) {
-            console.error('Failed to load file:', error);
-            this.showError(`Failed to load ${path}`);
+            handleError(error, `Failed to load file: ${path}`, { context: SEG.ERROR, silent: true });
+            this.showError(`Failed to load ${path}`, path);
         }
     }
 
@@ -219,7 +244,7 @@ class GoEditorPanel extends BasePanel {
 
             this.log('Editor initialized');
         } catch (error) {
-            this.log('Failed to initialize editor: ' + (error instanceof Error ? error.message : String(error)));
+            handleError(error, 'Failed to initialize editor', { context: SEG.ERROR, silent: true });
             this.updateStatus('error');
             this.showError(error instanceof Error ? error.message : String(error));
             this.editor = null;
@@ -240,7 +265,7 @@ class GoEditorPanel extends BasePanel {
             const goModule = await import('@codemirror/lang-go');
             goExtension = goModule.go();
         } catch (err) {
-            this.log('Failed to load Go language support: ' + err);
+            handleError(err, 'Failed to load Go language support', { context: SEG.ERROR, silent: true });
             goExtension = [];
         }
 
@@ -285,7 +310,7 @@ class GoEditorPanel extends BasePanel {
             if (e instanceof Error && e.message.includes('disabled')) {
                 throw e;
             }
-            this.log('Failed to fetch config, using defaults');
+            handleError(e, 'Failed to fetch gopls config', { context: SEG.ERROR, silent: true });
         }
 
         const documentUri = `file://${this.workspaceRoot}/${this.currentPath}`;
@@ -358,7 +383,7 @@ class GoEditorPanel extends BasePanel {
             this.showStatus('Saved');
             console.log('[Go Editor] File saved:', this.currentPath);
         } catch (error) {
-            console.error('Failed to save content:', error);
+            handleError(error, 'Failed to save content', { context: SEG.ERROR, silent: true });
             this.showError('Failed to save');
         }
     }
@@ -402,11 +427,106 @@ class GoEditorPanel extends BasePanel {
         this.log(message);
     }
 
-    showError(message: string): void {
+    /**
+     * Build rich error for Go editor context
+     */
+    private buildEditorError(error: unknown, context?: string): RichError {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        // Check for gopls-specific errors
+        if (errorMessage.includes('gopls') || errorMessage.includes('disabled')) {
+            return {
+                title: 'gopls Unavailable',
+                message: 'The Go language server (gopls) is not available',
+                suggestion: 'Enable gopls in your configuration (code.gopls.enabled = true) or check that gopls is installed.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for WebSocket connection errors
+        if (errorMessage.includes('WebSocket') || errorMessage.includes('ws://') || errorMessage.includes('wss://')) {
+            return {
+                title: 'Connection Error',
+                message: 'Failed to connect to the gopls language server',
+                suggestion: 'Check that the QNTX server is running and the gopls WebSocket endpoint is accessible.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for HTTP errors
+        const httpMatch = errorMessage.match(/HTTP\s*(\d{3})/i);
+        if (httpMatch) {
+            const status = parseInt(httpMatch[1], 10);
+            if (status === 404) {
+                return {
+                    title: 'File Not Found',
+                    message: context ? `Could not find file: ${context}` : 'The requested file was not found',
+                    status: 404,
+                    suggestion: 'Check that the file path is correct and the file exists in the workspace.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status === 403) {
+                return {
+                    title: 'Access Denied',
+                    message: 'You do not have permission to access this file',
+                    status: 403,
+                    suggestion: 'Check file permissions or enable dev mode for write access.',
+                    details: errorStack || errorMessage
+                };
+            }
+            if (status >= 500) {
+                return {
+                    title: 'Server Error',
+                    message: 'The server encountered an error',
+                    status: status,
+                    suggestion: 'Check the server logs for more details.',
+                    details: errorStack || errorMessage
+                };
+            }
+        }
+
+        // Check for file operation errors
+        if (errorMessage.includes('Failed to load') || errorMessage.includes('Failed to save')) {
+            return {
+                title: 'File Operation Failed',
+                message: errorMessage,
+                suggestion: context ? `Check that ${context} exists and is readable.` : 'Check file permissions and try again.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Check for editor initialization errors
+        if (errorMessage.includes('container not found') || errorMessage.includes('CodeMirror')) {
+            return {
+                title: 'Editor Initialization Failed',
+                message: 'Failed to initialize the code editor',
+                suggestion: 'Try refreshing the page or closing and reopening the editor.',
+                details: errorStack || errorMessage
+            };
+        }
+
+        // Generic error
+        return {
+            title: 'Error',
+            message: errorMessage,
+            suggestion: 'Check the error details for more information.',
+            details: errorStack || errorMessage
+        };
+    }
+
+    showError(message: string, context?: string): void {
         const container = this.$('#go-editor-container');
         if (container) {
             container.innerHTML = '';
-            const errorEl = this.createErrorState('Error', message);
+            const richError = this.buildEditorError(new Error(message), context);
+            const errorEl = createRichErrorState(richError, async () => {
+                // Retry loading the file if we have a path
+                if (this.currentPath) {
+                    await this.loadFile(this.currentPath);
+                }
+            });
             errorEl.classList.add('go-editor-error');
             container.appendChild(errorEl);
         }
@@ -417,7 +537,7 @@ class GoEditorPanel extends BasePanel {
             try {
                 this.editor.destroy();
             } catch (err) {
-                console.warn('[Go Editor] Error destroying editor:', err);
+                handleError(err, 'Error destroying editor', { context: SEG.ERROR, silent: true });
             }
             this.editor = null;
         }
@@ -483,8 +603,8 @@ class GoEditorPanel extends BasePanel {
     }
 
     async switchTab(tab: 'editor' | 'suggestions'): Promise<void> {
-        // Don't switch if already on this tab
-        if (tab === this.currentTab) return;
+        // Don't switch if already on this tab (skip null check for initial render)
+        if (this.currentTab !== null && tab === this.currentTab) return;
 
         // Store editor content before switching away from editor tab
         if (this.currentTab === 'editor' && this.editor) {
@@ -550,7 +670,7 @@ class GoEditorPanel extends BasePanel {
                         });
                         this.editor.focus();
                     } catch (err) {
-                        console.warn('[Go Editor] Failed to scroll to line:', err);
+                        handleError(err, 'Failed to scroll to line', { context: SEG.ERROR, silent: true });
                     }
                 }, 100);
             }

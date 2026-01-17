@@ -17,6 +17,7 @@ import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
 import { IX } from '@generated/sym.js';
+import { formatRelativeTime } from './html-utils.ts';
 
 // Extended Job type with frontend-specific fields
 interface Job extends BackendJob {
@@ -292,27 +293,34 @@ class JobListPanel extends BasePanel {
      */
     private renderHistoryItem(job: Job): HTMLElement {
         const statusClass = this.getStatusClass(job.status);
-        const timeAgo = this.formatRelativeTime(job.created_at);
+        const timeAgo = formatRelativeTime(job.created_at);
         const command = this.getJobCommand(job);
+        const absoluteTime = new Date(job.created_at).toLocaleString();
 
         const item = document.createElement('div');
         item.className = 'hixtory-item';
         item.dataset.jobId = job.id;
 
+        // Command with tooltip showing full job details
         const commandDiv = document.createElement('div');
-        commandDiv.className = 'hixtory-command';
+        commandDiv.className = 'hixtory-command has-tooltip';
         commandDiv.textContent = command;
+        commandDiv.dataset.tooltip = this.buildJobTooltip(job);
 
         const metaDiv = document.createElement('div');
         metaDiv.className = 'hixtory-meta';
 
+        // Status badge with tooltip explaining the status
         const statusSpan = document.createElement('span');
-        statusSpan.className = `hixtory-status ${statusClass}`;
+        statusSpan.className = `hixtory-status ${statusClass} has-tooltip`;
         statusSpan.textContent = job.status;
+        statusSpan.dataset.tooltip = this.getStatusTooltip(job);
 
+        // Time with tooltip showing absolute timestamp
         const timeSpan = document.createElement('span');
-        timeSpan.className = 'hixtory-time';
+        timeSpan.className = 'hixtory-time has-tooltip';
         timeSpan.textContent = timeAgo;
+        timeSpan.dataset.tooltip = `Started: ${absoluteTime}`;
 
         metaDiv.appendChild(statusSpan);
         metaDiv.appendChild(timeSpan);
@@ -321,6 +329,63 @@ class JobListPanel extends BasePanel {
         item.appendChild(metaDiv);
 
         return item;
+    }
+
+    /**
+     * Build tooltip content for a job
+     */
+    private buildJobTooltip(job: Job): string {
+        const parts: string[] = [];
+
+        parts.push(`Job ID: ${job.id}`);
+        if (job.handler_name) parts.push(`Handler: ${job.handler_name}`);
+        if (job.source) parts.push(`Source: ${job.source}`);
+
+        if (job.metadata) {
+            if (job.metadata.total_operations !== undefined) {
+                const completed = job.metadata.completed_operations || 0;
+                parts.push(`Progress: ${completed}/${job.metadata.total_operations}`);
+            }
+            if (job.metadata.stage_message) {
+                parts.push(`Stage: ${job.metadata.stage_message}`);
+            }
+        }
+
+        if (job.cost_usd !== undefined) {
+            parts.push(`Cost: $${job.cost_usd.toFixed(4)}`);
+        }
+
+        if (job.error) {
+            parts.push(`---`);
+            parts.push(`Error: ${job.error}`);
+        }
+
+        return parts.join('\n');
+    }
+
+    /**
+     * Get tooltip text for job status
+     */
+    private getStatusTooltip(job: Job): string {
+        switch (job.status) {
+            case 'completed':
+                return 'Job completed successfully';
+            case 'failed':
+                return job.error ? `Failed: ${job.error}` : 'Job failed';
+            case 'running':
+                return 'Job is currently running';
+            case 'queued':
+                return 'Job is queued and waiting to run';
+            case 'paused':
+                const pulseState = (job as any).pulse_state;
+                const reason = pulseState?.pause_reason;
+                if (reason === 'rate_limited') return 'Paused: Rate limit reached';
+                if (reason === 'budget_exceeded') return 'Paused: Budget limit exceeded';
+                if (reason === 'user_requested') return 'Paused by user';
+                return 'Job is paused';
+            default:
+                return `Status: ${job.status}`;
+        }
     }
 
     /**
@@ -345,23 +410,6 @@ class JobListPanel extends BasePanel {
         return '';
     }
 
-    /**
-     * Format ISO 8601 timestamp as relative time (e.g., "5m ago")
-     */
-    private formatRelativeTime(timestamp: string): string {
-        const date = new Date(timestamp);
-        const now = Date.now();
-        const diff = now - date.getTime();
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 0) return `${days}d ago`;
-        if (hours > 0) return `${hours}h ago`;
-        if (minutes > 0) return `${minutes}m ago`;
-        return 'just now';
-    }
 }
 
 // Initialize and export

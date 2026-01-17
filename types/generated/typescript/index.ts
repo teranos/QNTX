@@ -87,6 +87,7 @@ export type {
 export type {
   ChildJobInfo,
   CompleteMessage,
+  ConsoleFormatter,
   ConsoleLog,
   CreateScheduledJobRequest,
   DaemonStatusMessage,
@@ -112,12 +113,16 @@ export type {
   StageInfo,
   StatsMessage,
   StorageWarningMessage,
-  SystemCapabilitiesMessage,
   TaskInfo,
   TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,
 } from './server';
+
+// Types from syscap
+export type {
+  Message,
+} from './syscap';
 
 // Types from types
 export type {

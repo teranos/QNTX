@@ -4,7 +4,8 @@
  * Inline UI controls for ATS code blocks to configure Pulse scheduling
  */
 
-import { debugLog } from "../debug.ts";
+import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 import type { ScheduledJobResponse } from "./types.ts";
 import { INTERVAL_PRESETS, formatInterval } from "./types.ts";
 import {
@@ -99,7 +100,7 @@ function renderExistingJobControls(
 
   const interval = document.createElement('span');
   interval.className = 'pulse-interval';
-  interval.textContent = formatInterval(job.interval_seconds);
+  interval.textContent = formatInterval(job.interval_seconds ?? 0);
 
   const state = document.createElement('span');
   state.className = 'pulse-state';
@@ -163,6 +164,7 @@ function renderExistingJobControls(
         existingJob: updatedJob,
       });
     } catch (error) {
+      handleError(error, `Failed to ${isActive ? 'pause' : 'resume'} job`, { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: isActive ? 'pause' : 'resume',
       });
@@ -174,7 +176,7 @@ function renderExistingJobControls(
     if (value === "custom") {
       const customValue = prompt("Enter interval (e.g., 30m, 2h, 1d):");
       if (!customValue) {
-        intervalSelect.value = job.interval_seconds.toString();
+        intervalSelect.value = (job.interval_seconds ?? 0).toString();
         return;
       }
       // TODO(#30): Parse custom interval
@@ -192,6 +194,7 @@ function renderExistingJobControls(
         existingJob: updatedJob,
       });
     } catch (error) {
+      handleError(error, 'Failed to update job interval', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'change interval',
         intervalSeconds: parseInt(value, 10),
@@ -209,6 +212,7 @@ function renderExistingJobControls(
       container.innerHTML = "";
       renderAddScheduleButton(container, options);
     } catch (error) {
+      handleError(error, 'Failed to delete scheduled job', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'delete',
         atsCode: job.ats_code,
@@ -259,6 +263,15 @@ function renderAddScheduleButton(
   });
 }
 
+// State for two-click confirmation
+interface ConfirmationState {
+  needsConfirmation: boolean;
+  intervalSeconds: number;
+  timeout: number | null;
+}
+
+const confirmationStates = new WeakMap<HTMLElement, ConfirmationState>();
+
 /**
  * Render interval selection UI (expanded from "Add Schedule" button)
  */
@@ -268,6 +281,13 @@ function renderIntervalSelection(
 ): void {
   // Build interval picker using DOM API for security
   container.innerHTML = '';
+
+  // Initialize confirmation state for this container
+  confirmationStates.set(container, {
+    needsConfirmation: false,
+    intervalSeconds: 0,
+    timeout: null
+  });
 
   const picker = document.createElement('div');
   picker.className = 'pulse-interval-picker';
@@ -306,6 +326,18 @@ function renderIntervalSelection(
 
   container.appendChild(picker);
 
+  // Reset confirmation when interval changes
+  intervalSelect.addEventListener("change", () => {
+    const state = confirmationStates.get(container);
+    if (state && state.needsConfirmation) {
+      state.needsConfirmation = false;
+      confirmBtn.textContent = '✓';
+      confirmBtn.classList.remove('pulse-btn-confirm-active');
+      const hint = container.querySelector('.pulse-confirm-hint');
+      hint?.remove();
+    }
+  });
+
   confirmBtn.addEventListener("click", async () => {
     const value = intervalSelect.value;
     if (value === "custom") {
@@ -313,8 +345,52 @@ function renderIntervalSelection(
       return;
     }
 
+    const state = confirmationStates.get(container);
+    if (!state) return;
+
+    const intervalSeconds = parseInt(value, 10);
+
+    // First click: show confirmation state
+    if (!state.needsConfirmation || state.intervalSeconds !== intervalSeconds) {
+      state.needsConfirmation = true;
+      state.intervalSeconds = intervalSeconds;
+
+      // Update button to confirmation state
+      confirmBtn.textContent = 'Confirm';
+      confirmBtn.classList.add('pulse-btn-confirm-active');
+
+      // Add hint
+      const existingHint = container.querySelector('.pulse-confirm-hint');
+      if (!existingHint) {
+        const hint = document.createElement('div');
+        hint.className = 'pulse-confirm-hint panel-confirm-hint';
+        hint.textContent = 'Click again to schedule';
+        picker.appendChild(hint);
+      }
+
+      // Auto-reset after 5 seconds
+      if (state.timeout) {
+        clearTimeout(state.timeout);
+      }
+      state.timeout = window.setTimeout(() => {
+        state.needsConfirmation = false;
+        confirmBtn.textContent = '✓';
+        confirmBtn.classList.remove('pulse-btn-confirm-active');
+        const hint = container.querySelector('.pulse-confirm-hint');
+        hint?.remove();
+      }, 5000);
+
+      return;
+    }
+
+    // Second click: actually create schedule
+    state.needsConfirmation = false;
+    if (state.timeout) {
+      clearTimeout(state.timeout);
+      state.timeout = null;
+    }
+
     try {
-      const intervalSeconds = parseInt(value, 10);
       const atsCode = resolveAtsCode(options.atsCode);
 
       // Validate ATS code before sending
@@ -322,7 +398,7 @@ function renderIntervalSelection(
         throw new Error('ATS code is empty - cannot schedule empty query. Try refreshing the page.');
       }
 
-      debugLog('[Scheduling Controls] Creating job with:', {
+      log.debug(SEG.PULSE, 'Creating job with:', {
         atsCode,
         intervalSeconds,
         documentId: options.documentId,
@@ -335,7 +411,7 @@ function renderIntervalSelection(
         created_from_doc: options.documentId,
       };
 
-      debugLog('[Scheduling Controls] API Request:', request);
+      log.debug(SEG.PULSE, 'API Request:', request);
 
       const job = await createScheduledJob(request);
 
@@ -347,16 +423,21 @@ function renderIntervalSelection(
         existingJob: job,
       });
     } catch (error) {
+      handleError(error, 'Failed to create scheduled job', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'create',
         atsCode: resolveAtsCode(options.atsCode),
-        intervalSeconds: parseInt(value, 10),
+        intervalSeconds: intervalSeconds,
         documentId: options.documentId,
       });
     }
   });
 
   cancelBtn.addEventListener("click", () => {
+    const state = confirmationStates.get(container);
+    if (state?.timeout) {
+      clearTimeout(state.timeout);
+    }
     container.innerHTML = "";
     renderAddScheduleButton(container, options);
   });

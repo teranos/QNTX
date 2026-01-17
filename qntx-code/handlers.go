@@ -77,19 +77,31 @@ func validateCodePath(codePath, workspaceRoot string) (string, error) {
 }
 
 // registerHTTPHandlers registers all HTTP handlers for the code domain
+// NOTE: QNTX strips the /api/code prefix before forwarding requests to the plugin,
+// so routes here should NOT include that prefix.
 func (p *Plugin) registerHTTPHandlers(mux *http.ServeMux) error {
-	// Code file tree and content
-	mux.HandleFunc("/api/code", p.handleCodeTree)
-	mux.HandleFunc("/api/code/", p.handleCodeContent)
+	// Code file tree and content - single handler that dispatches
+	// QNTX forwards /api/code -> / and /api/code/path -> /path
+	// No method restriction to avoid conflicts with other handlers
+	mux.HandleFunc("/", p.handleCode)
 
 	// GitHub PR integration
-	mux.HandleFunc("/api/code/github/pr/", p.handlePRSuggestions)
-	mux.HandleFunc("/api/code/github/pr", p.handlePRList)
+	mux.HandleFunc("GET /github/pr/", p.handlePRSuggestions)
+	mux.HandleFunc("GET /github/pr", p.handlePRList)
 
 	// Git ingestion (⨳ ix segment)
-	mux.HandleFunc("POST /api/code/ixgest/git", p.handleGitIxgest)
+	mux.HandleFunc("POST /ixgest/git", p.handleGitIxgest)
 
 	return nil
+}
+
+// handleCode dispatches between tree and content handlers based on path
+func (p *Plugin) handleCode(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/" {
+		p.handleCodeTree(w, r)
+	} else {
+		p.handleCodeContent(w, r)
+	}
 }
 
 // checkPaused returns true and writes 503 response if plugin is paused
@@ -130,7 +142,8 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 
 	logger := p.services.Logger("code")
 
-	codePath := strings.TrimPrefix(r.URL.Path, "/api/code/")
+	// QNTX already stripped /api/code prefix, path comes as /filename
+	codePath := strings.TrimPrefix(r.URL.Path, "/")
 	if codePath == "" {
 		http.Error(w, "Empty path", http.StatusBadRequest)
 		return
@@ -186,8 +199,9 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract PR number
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/code/github/pr/"), "/")
+	// Extract PR number from path like /github/pr/123/suggestions
+	// QNTX already stripped /api/code prefix
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/github/pr/"), "/")
 	if len(parts) < 2 || parts[1] != "suggestions" {
 		http.Error(w, "Invalid URL format", http.StatusBadRequest)
 		return

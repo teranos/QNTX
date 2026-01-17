@@ -1,10 +1,16 @@
-// Package qntxcode provides the built-in code domain plugin for QNTX.
+// Package qntxcode provides the code domain plugin for QNTX.
 //
 // The code domain includes:
 //   - Ixgest: Git repository and dependency ingestion
 //   - VCS: GitHub PR workflow integration
 //   - Language Server: gopls for Go code intelligence
 //   - UI: Code editor and browser
+//
+// This plugin runs as an external gRPC process. Build with:
+//
+//	go build ./qntx-code/cmd/qntx-code-plugin
+//
+// Then install to ~/.qntx/plugins/ or add to plugin.paths in am.toml.
 package qntxcode
 
 import (
@@ -35,7 +41,7 @@ func NewPlugin() *Plugin {
 func (p *Plugin) Metadata() plugin.Metadata {
 	return plugin.Metadata{
 		Name:        "code",
-		Version:     "0.1.0",
+		Version:     "0.2.1",
 		QNTXVersion: ">= 0.1.0",
 		Description: "Software development domain (git, GitHub, gopls, code editor)",
 		Author:      "QNTX Team",
@@ -134,8 +140,8 @@ func (p *Plugin) Health(ctx context.Context) plugin.HealthStatus {
 	}
 
 	return plugin.HealthStatus{
-		Healthy: true,       // Paused is intentional, not a failure
-		Paused:  p.paused,   // Separate field for pause state
+		Healthy: true,     // Paused is intentional, not a failure
+		Paused:  p.paused, // Separate field for pause state
 		Message: message,
 		Details: details,
 	}
@@ -180,6 +186,43 @@ func (p *Plugin) Resume(ctx context.Context) error {
 func (p *Plugin) IsPaused() bool {
 	return p.paused
 }
+
+// ConfigSchema returns the configuration schema for UI-based configuration.
+// Implements plugin.ConfigurablePlugin.
+func (p *Plugin) ConfigSchema() map[string]plugin.ConfigField {
+	return map[string]plugin.ConfigField{
+		"gopls.workspace_root": {
+			Type:         "string",
+			Description:  "Root directory for gopls workspace. Defaults to current directory.",
+			DefaultValue: ".",
+			Required:     false,
+		},
+		"gopls.enabled": {
+			Type:         "boolean",
+			Description:  "Enable gopls Go language server for code intelligence.",
+			DefaultValue: "true",
+			Required:     false,
+		},
+		"github.token": {
+			Type:        "string",
+			Description: "GitHub personal access token for API operations (PRs, issues).",
+			Required:    false,
+		},
+		"github.default_owner": {
+			Type:        "string",
+			Description: "Default GitHub repository owner/organization.",
+			Required:    false,
+		},
+		"github.default_repo": {
+			Type:        "string",
+			Description: "Default GitHub repository name.",
+			Required:    false,
+		},
+	}
+}
+
+// Verify Plugin implements ConfigurablePlugin at compile time
+var _ plugin.ConfigurablePlugin = (*Plugin)(nil)
 
 // attestGoplsStatus creates an attestation for gopls initialization status
 func (p *Plugin) attestGoplsStatus(status, workspace, errMsg string) {

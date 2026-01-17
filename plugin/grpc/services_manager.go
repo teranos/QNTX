@@ -41,7 +41,7 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate auth token")
+		return nil, errors.Wrap(err, "failed to generate auth token for plugin services")
 	}
 
 	// Start ATSStore service
@@ -66,18 +66,14 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 		AuthToken:       authToken,
 	}
 
-	m.logger.Infow("Plugin services started",
-		"ats_store", atsStoreAddr,
-		"queue", queueAddr,
-	)
-
 	return &m.endpoints, nil
 }
 
 // startATSStoreService starts the ATSStore gRPC service
 func (m *ServicesManager) startATSStoreService(ctx context.Context, store *storage.SQLStore, authToken string) (string, error) {
 	// Listen on dynamic port
-	listener, err := net.Listen("tcp", "localhost:0")
+	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}
@@ -110,7 +106,8 @@ func (m *ServicesManager) startATSStoreService(ctx context.Context, store *stora
 // startQueueService starts the Queue gRPC service
 func (m *ServicesManager) startQueueService(ctx context.Context, queue *async.Queue, authToken string) (string, error) {
 	// Listen on dynamic port
-	listener, err := net.Listen("tcp", "localhost:0")
+	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to listen")
 	}

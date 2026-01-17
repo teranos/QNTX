@@ -90,7 +90,24 @@ class PulsePanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
-        // Event listeners are attached dynamically in renderSchedules()
+        // Attach panel event listeners once using event delegation
+        const ctx = this.getActionContext();
+        const cleanup = attachPanelEventListeners(this.panel!, {
+            onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
+            onForceTrigger: (jobId) => handleForceTrigger(jobId, ctx),
+            onJobAction: (jobId, action) => handleJobAction(jobId, action, ctx),
+            onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
+            onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
+            onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
+            onProseLocation: (docId) => handleProseLocationClick(docId)
+        });
+
+        // Store cleanup function for onDestroy
+        // Note: unsubscribers array is initialized by field initializer after super() returns
+        if (!this.unsubscribers) {
+            this.unsubscribers = [];
+        }
+        this.unsubscribers.push(cleanup);
     }
 
     protected async onShow(): Promise<void> {
@@ -124,6 +141,9 @@ class PulsePanel extends BasePanel {
         await this.renderSystemStatus();
         await this.renderActiveQueue();
         this.renderSchedules();
+
+        // Refresh tooltips after dynamic content updates
+        this.refreshTooltips();
     }
 
     private async renderSystemStatus(): Promise<void> {
@@ -173,16 +193,8 @@ class PulsePanel extends BasePanel {
 
             container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
 
-            const ctx = this.getActionContext();
-            attachPanelEventListeners(this.panel!, {
-                onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
-                onForceTrigger: (jobId) => handleForceTrigger(jobId, ctx),
-                onJobAction: (jobId, action) => handleJobAction(jobId, action, ctx),
-                onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
-                onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
-                onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
-                onProseLocation: (docId) => handleProseLocationClick(docId)
-            });
+            // Event listeners attached once in setupEventListeners() via event delegation
+            // No need to re-attach on every render
         });
     }
 
@@ -208,11 +220,21 @@ class PulsePanel extends BasePanel {
                 await this.handleSystemStatusAction('edit-budget');
             });
         }
+
+        // Listen for confirmation reset events (triggered when 5s timeout expires)
+        container.addEventListener('daemon-confirm-reset', async () => {
+            await this.renderSystemStatus();
+        });
     }
 
     private async handleSystemStatusAction(action: string): Promise<void> {
         const { handleSystemStatusAction } = await import('./pulse/system-status.ts');
-        await handleSystemStatusAction(action);
+        const executed = await handleSystemStatusAction(action);
+
+        // If action wasn't executed (waiting for confirmation), re-render to show confirm state
+        if (!executed) {
+            await this.renderSystemStatus();
+        }
     }
 
     /**

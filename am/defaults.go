@@ -25,6 +25,7 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("local_inference.model", "llama3.2:3b")
 	v.SetDefault("local_inference.context_size", 16384)
 	v.SetDefault("local_inference.timeout_seconds", 3600)
+	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
 
 	// OpenRouter defaults
 	v.SetDefault("openrouter.model", "openai/gpt-4o-mini") // Cost-effective default
@@ -45,7 +46,8 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("pulse.cost_per_score_usd", 0.002)            // Default $0.002 per operation
 
 	// Server configuration defaults
-	v.SetDefault("server.port", DefaultGraphPort)
+	v.SetDefault("server.port", DefaultServerPort)
+	v.SetDefault("server.frontend_port", 8820) // Frontend dev server port
 	v.SetDefault("server.allowed_origins", []string{
 		"http://localhost",
 		"https://localhost",
@@ -81,12 +83,12 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 	v.BindEnv("local_inference.model", "QNTX_LOCAL_INFERENCE_MODEL")
 }
 
-// GetGraphPort returns the configured QNTX server port
-// Returns server.port from config, or DefaultGraphPort (877) if not configured
-func GetGraphPort() int {
+// GetServerPort returns the configured QNTX server port
+// Returns server.port from config, or DefaultServerPort (877) if not configured
+func GetServerPort() int {
 	cfg, err := Load()
 	if err != nil || cfg.Server.Port == 0 {
-		return DefaultGraphPort
+		return DefaultServerPort
 	}
 	return cfg.Server.Port
 }

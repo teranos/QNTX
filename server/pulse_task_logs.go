@@ -2,17 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-)
 
-// TODO: Remove ambiguous endpoint - task_id alone isn't unique across jobs
-// Use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead (handled by HandlePulseJob)
-/*
-func (s *QNTXServer) HandlePulseTask(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusGone, "This endpoint is deprecated. Use /api/pulse/jobs/{job_id}/tasks/{task_id}/logs instead")
-}
-*/
+	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/logger"
+)
 
 // handleGetTaskLogsForJob returns logs for a specific task within a job context
 // NEW: Requires both job_id and task_id to avoid ambiguity
@@ -25,13 +19,16 @@ func (s *QNTXServer) handleGetTaskLogsForJob(w http.ResponseWriter, r *http.Requ
 		ORDER BY timestamp ASC
 	`
 
+	pulseLog := logger.AddPulseSymbol(s.logger)
+
 	rows, err := s.db.Query(query, jobID, taskID, taskID)
 	if err != nil {
-		s.logger.Errorw("Failed to query task logs",
+		wrappedErr := errors.Wrap(err, "failed to query task logs")
+		pulseLog.Errorw("Failed to query task logs",
 			"job_id", jobID,
 			"task_id", taskID,
-			"error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to query logs: %v", err))
+			"error", wrappedErr)
+		writeError(w, http.StatusInternalServerError, wrappedErr.Error())
 		return
 	}
 	defer rows.Close()
@@ -42,23 +39,23 @@ func (s *QNTXServer) handleGetTaskLogsForJob(w http.ResponseWriter, r *http.Requ
 		var metadataJSON *string
 
 		if err := rows.Scan(&timestamp, &level, &message, &metadataJSON); err != nil {
-			s.logger.Errorw("Failed to scan task log row - database type mismatch or corrupt data",
+			wrappedErr := errors.Wrap(err, "failed to scan task log row")
+			pulseLog.Errorw("Failed to scan task log row - database type mismatch or corrupt data",
 				"job_id", jobID,
 				"task_id", taskID,
-				"error", err,
-				"error_detail", err.Error(),
+				"error", wrappedErr,
 				"expected_columns", []string{"timestamp (DATETIME)", "level (TEXT)", "message (TEXT)", "metadata (TEXT/NULL)"})
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to scan logs: %v", err))
+			writeError(w, http.StatusInternalServerError, wrappedErr.Error())
 			return
 		}
 
 		var metadata map[string]interface{}
 		if metadataJSON != nil {
 			if err := json.Unmarshal([]byte(*metadataJSON), &metadata); err != nil {
-				s.logger.Warnw("Failed to unmarshal metadata, using empty object",
+				pulseLog.Warnw("Failed to unmarshal metadata, using empty object",
 					"job_id", jobID,
 					"task_id", taskID,
-					"error", err)
+					"error", errors.Wrap(err, "json unmarshal failed"))
 				metadata = make(map[string]interface{})
 			}
 		}

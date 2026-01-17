@@ -5,6 +5,7 @@ import { connectWebSocket } from './websocket.ts';
 import { handleLogBatch, initSystemDrawer } from './system-drawer.ts';
 import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
+import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
@@ -25,7 +26,7 @@ import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
-import './ai-provider-panel.ts';
+import './ai-provider-window.ts';
 import './command-explorer-panel.ts';
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
 // to avoid unused import warnings. Menu items use "show" events with dynamic imports,
@@ -33,7 +34,7 @@ import './command-explorer-panel.ts';
 import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
-import { initConsoleReporter } from './console-reporter.ts';
+import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -99,10 +100,7 @@ function handleVersion(data: VersionMessage): void {
         // Format build time if available
         let buildTimeText = '';
         if (data.build_time) {
-            const buildDate = new Date(data.build_time);
-            const dateStr = buildDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = buildDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-            buildTimeText = ` · ${dateStr} ${timeStr}`;
+            buildTimeText = ` · ${formatDateTime(data.build_time)}`;
         }
 
         // Build version info using DOM API for security
@@ -127,22 +125,29 @@ function handleVersion(data: VersionMessage): void {
         logVersion.textContent = data.commit.substring(0, 7);
     }
 
+    // Update Self diagnostic window if loaded
+    import('./self-window.js').then(({ selfWindow }) => {
+        selfWindow.updateVersion(data);
+    });
+
     console.log('Server version:', data);
 }
 
 
 // Initialize the application
+// Avoid Sin #4: Callback Hell - Use async/await for sequential async operations
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
     console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
-    // Initialize console reporter (dev mode only)
+    // Initialize debug interceptor (dev mode only)
+    // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
     try {
-        await initConsoleReporter();
+        await initDebugInterceptor();
     } catch (err) {
-        console.error('[Init] Failed to initialize console reporter:', err);
-        // Continue anyway - console reporting is not critical to app function
+        console.error('[Init] Failed to initialize debug interceptor:', err);
+        // Continue anyway - debug interception is not critical to app function
     }
 
     // Restore previous session if exists
@@ -317,6 +322,7 @@ async function init(): Promise<void> {
 }
 
 // Start application when DOM is ready
+// Virtue #8: Progressive Enhancement - Core init works immediately, enhanced features layer on
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         init();

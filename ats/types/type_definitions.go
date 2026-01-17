@@ -1,9 +1,9 @@
 package types
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/vanity-id"
 )
 
@@ -17,11 +17,13 @@ type AttestationStore interface {
 // Types are richer than single predicates - they represent semantic categories with
 // multiple identifying patterns, relationships, and behavioral rules.
 type TypeDef struct {
-	Name       string   // Type identifier (e.g., "commit", "author")
-	Label      string   // Human-readable label for UI (e.g., "Commit", "Author")
-	Color      string   // Hex color code for graph visualization (e.g., "#34495e")
-	Opacity    *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
-	Deprecated bool     // Whether this type is being phased out
+	Name             string   // Type identifier (e.g., "commit", "author")
+	Label            string   // Human-readable label for UI (e.g., "Commit", "Author")
+	Color            string   // Hex color code for graph visualization (e.g., "#34495e")
+	Opacity          *float64 // Visual opacity (0.0-1.0), nil defaults to 1.0
+	Deprecated       bool     // Whether this type is being phased out
+	RichStringFields []string // Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
+	ArrayFields      []string // Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
 }
 
 // RelationshipTypeDef defines a relationship type with physics and display metadata.
@@ -45,9 +47,11 @@ type RelationshipTypeDef struct {
 //
 // Attributes typically include display metadata for graph visualization:
 //   - display_color: Hex color code (e.g., "#3498db")
-//   - display_label: Human-readable label (e.g., "Job Description")
+//   - display_label: Human-readable label (e.g., "Document")
 //   - deprecated: Boolean flag for phasing out types
 //   - opacity: Float for visual emphasis (0.0-1.0)
+//   - rich_string_fields: Array of metadata field names containing rich text (e.g., ["notes", "description"])
+//   - array_fields: Array of field names that should be flattened into arrays (e.g., ["skills", "tags"])
 //
 // But can contain any JSON-serializable data relevant to the type definition.
 //
@@ -55,24 +59,26 @@ type RelationshipTypeDef struct {
 //
 //	attrs := map[string]interface{}{
 //	    "display_color": "#e67e22",
-//	    "display_label": "Job Description",
+//	    "display_label": "Document",
 //	    "deprecated": false,
 //	    "opacity": 1.0,
+//	    "rich_string_fields": []string{"content", "summary"},
+//	    "array_fields": []string{"tags", "categories"},
 //	}
-//	err := types.AttestType(store, "jd", "ix-jd", attrs)
+//	err := types.AttestType(store, "document", "ix-content", attrs)
 func AttestType(store AttestationStore, typeName, source string, attributes map[string]interface{}) error {
 	if typeName == "" {
-		return fmt.Errorf("typeName cannot be empty")
+		return errors.New("typeName cannot be empty")
 	}
 	if source == "" {
-		return fmt.Errorf("source cannot be empty")
+		return errors.New("source cannot be empty")
 	}
 
 	// Generate ASID for the type definition
 	// Empty actor seed creates self-certifying ASID
 	asid, err := id.GenerateASID(typeName, "type", "graph", "")
 	if err != nil {
-		return fmt.Errorf("failed to generate ASID for type %s: %w", typeName, err)
+		return errors.Wrapf(err, "failed to generate ASID for type %s", typeName)
 	}
 
 	// Create attestation with self-certifying actor
@@ -90,7 +96,7 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 
 	// Store the attestation
 	if err := store.CreateAttestation(attestation); err != nil {
-		return fmt.Errorf("failed to create type attestation for %s: %w", typeName, err)
+		return errors.Wrapf(err, "failed to create type attestation for %s", typeName)
 	}
 
 	return nil
@@ -111,7 +117,7 @@ func AttestType(store AttestationStore, typeName, source string, attributes map[
 //	        "impact", "graph visualization may lack custom type metadata")
 //	}
 func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) error {
-	var errors []error
+	var errs []error
 
 	for _, def := range typeDefs {
 		// Default opacity to 1.0 if not explicitly set
@@ -127,18 +133,28 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 			"opacity":       opacity,
 		}
 
+		// Include rich_string_fields if specified
+		if len(def.RichStringFields) > 0 {
+			attrs["rich_string_fields"] = def.RichStringFields
+		}
+
+		// Include array_fields if specified
+		if len(def.ArrayFields) > 0 {
+			attrs["array_fields"] = def.ArrayFields
+		}
+
 		if err := AttestType(store, def.Name, source, attrs); err != nil {
-			errors = append(errors, fmt.Errorf("failed to attest type %s: %w", def.Name, err))
+			errs = append(errs, errors.Wrapf(err, "failed to attest type %s", def.Name))
 		}
 	}
 
 	// Return combined error if any failed, but all were attempted
-	if len(errors) > 0 {
+	if len(errs) > 0 {
 		errMsg := "failed to create some type definitions:"
-		for _, err := range errors {
+		for _, err := range errs {
 			errMsg += "\n  - " + err.Error()
 		}
-		return fmt.Errorf("%s", errMsg)
+		return errors.New(errMsg)
 	}
 
 	return nil
@@ -169,17 +185,17 @@ func EnsureTypes(store AttestationStore, source string, typeDefs ...TypeDef) err
 //	err := types.AttestRelationshipType(store, "is_child_of", "ix-git", attrs)
 func AttestRelationshipType(store AttestationStore, predicateName, source string, attributes map[string]interface{}) error {
 	if predicateName == "" {
-		return fmt.Errorf("predicateName cannot be empty")
+		return errors.New("predicateName cannot be empty")
 	}
 	if source == "" {
-		return fmt.Errorf("source cannot be empty")
+		return errors.New("source cannot be empty")
 	}
 
 	// Generate ASID for the relationship type definition
 	// Using "relationship_type" as predicate to distinguish from node types
 	asid, err := id.GenerateASID(predicateName, "relationship_type", "graph", "")
 	if err != nil {
-		return fmt.Errorf("failed to generate ASID for relationship type %s: %w", predicateName, err)
+		return errors.Wrapf(err, "failed to generate ASID for relationship type %s", predicateName)
 	}
 
 	// Create attestation with self-certifying actor
@@ -196,7 +212,7 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 
 	// Store the attestation
 	if err := store.CreateAttestation(attestation); err != nil {
-		return fmt.Errorf("failed to create relationship type attestation for %s: %w", predicateName, err)
+		return errors.Wrapf(err, "failed to create relationship type attestation for %s", predicateName)
 	}
 
 	return nil
@@ -217,7 +233,7 @@ func AttestRelationshipType(store AttestationStore, predicateName, source string
 //	        "impact", "graph physics will use default values")
 //	}
 func EnsureRelationshipTypes(store AttestationStore, source string, relationshipDefs ...RelationshipTypeDef) error {
-	var errors []error
+	var errs []error
 
 	for _, def := range relationshipDefs {
 		attrs := map[string]interface{}{
@@ -237,17 +253,17 @@ func EnsureRelationshipTypes(store AttestationStore, source string, relationship
 		}
 
 		if err := AttestRelationshipType(store, def.Name, source, attrs); err != nil {
-			errors = append(errors, fmt.Errorf("failed to attest relationship type %s: %w", def.Name, err))
+			errs = append(errs, errors.Wrapf(err, "failed to attest relationship type %s", def.Name))
 		}
 	}
 
 	// Return combined error if any failed, but all were attempted
-	if len(errors) > 0 {
+	if len(errs) > 0 {
 		errMsg := "failed to create some relationship type definitions:"
-		for _, err := range errors {
+		for _, err := range errs {
 			errMsg += "\n  - " + err.Error()
 		}
-		return fmt.Errorf("%s", errMsg)
+		return errors.New(errMsg)
 	}
 
 	return nil

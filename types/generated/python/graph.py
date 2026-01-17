@@ -80,8 +80,8 @@ class Node:
     # Backend controls visibility
     visible: bool
     # For coloring/clustering (from type definitions)
-    group: int
-    metadata: dict[str, Any]
+    group: int | None = None
+    metadata: dict[str, Any] | None = None
 
 # NodeTypeInfo describes a node type and its visual configuration
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/graph.md#nodetypeinfo
@@ -92,9 +92,13 @@ class NodeTypeInfo:
     # Human-readable display name (e.g., "Artist", "Album")
     label: str
     # Hex color code
-    color: str
+    color: str | None = None
     # Number of nodes of this type
-    count: int
+    count: int | None = None
+    # Metadata fields for semantic search (e.g., ["notes", "description"])
+    rich_string_fields: list[str] | None = None
+    # Fields flattened into arrays (e.g., ["skills", "languages"])
+    array_fields: list[str] | None = None
 
 # RelationshipDefinition holds physics and display metadata for a relationship type from attestations.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/graph.md#relationshipdefinition
@@ -121,21 +125,21 @@ class RelationshipTypeInfo:
     type_: str
     # Human-readable display name
     label: str
-    # Number of links of this type
-    count: int
     # Optional link color override
     color: str | None = None
     # D3 force distance override (nil = use default)
     link_distance: float | None = None
     # D3 force strength override (nil = use default)
     link_strength: float | None = None
+    # Number of links of this type
+    count: int | None = None
 
 # Stats provides graph statistics
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/graph.md#stats
 @dataclass
 class Stats:
-    total_nodes: int
-    total_edges: int
+    total_nodes: int | None = None
+    total_edges: int | None = None
 
 # TypeDefinition holds display metadata for a node type from attestations.
 # Documentation: https://github.com/teranos/QNTX/blob/main/docs/types/graph.md#typedefinition
@@ -151,6 +155,10 @@ class TypeDefinition:
     deprecated: bool
     # Optional opacity (default 1.0)
     opacity: float
+    # Metadata fields for semantic search (e.g., ["notes", "description"])
+    rich_string_fields: list[str]
+    # Fields flattened into arrays (e.g., ["skills", "languages"])
+    array_fields: list[str]
 
 __all__ = [
     "AxGraphBuilder",

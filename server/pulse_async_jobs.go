@@ -1,12 +1,10 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
 
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
-	"github.com/teranos/QNTX/sym"
 )
 
 const (
@@ -18,13 +16,12 @@ const (
 // HandlePulseJobs handles requests to /api/pulse/jobs
 // GET: List all async jobs (active, completed, failed)
 func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
-	s.logger.Infow(fmt.Sprintf("%s Pulse list async jobs", sym.Pulse),
+	logger.AddPulseSymbol(s.logger).Infow("Pulse list async jobs",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"remote", r.RemoteAddr)
 
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -36,7 +33,7 @@ func (s *QNTXServer) HandlePulseJobs(w http.ResponseWriter, r *http.Request) {
 // Sub-resources: /api/pulse/jobs/{id}/children, /api/pulse/jobs/{id}/stages, /api/pulse/jobs/{id}/tasks/:task_id/logs
 func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 	// Extract job ID from URL path
-	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/pulse/jobs/"), "/")
+	pathParts := extractPathParts(r.URL.Path, "/api/pulse/jobs/")
 	if len(pathParts) == 0 || pathParts[0] == "" {
 		writeError(w, http.StatusBadRequest, "Missing job ID")
 		return
@@ -45,41 +42,37 @@ func (s *QNTXServer) HandlePulseJob(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this is a request for child jobs
 	if len(pathParts) > 1 && pathParts[1] == "children" {
-		if r.Method == http.MethodGet {
-			s.logger.Infow(fmt.Sprintf("%s Pulse get children | job:%s", sym.Pulse, jobID), "job_id", jobID)
-			s.handleGetJobChildren(w, r, jobID)
-		} else {
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		if !requireMethod(w, r, http.MethodGet) {
+			return
 		}
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get children", "job_id", jobID)
+		s.handleGetJobChildren(w, r, jobID)
 		return
 	}
 
 	// Check if this is a request for stages
 	if len(pathParts) > 1 && pathParts[1] == "stages" {
-		if r.Method == http.MethodGet {
-			s.logger.Infow(fmt.Sprintf("%s Pulse get stages | job:%s", sym.Pulse, jobID), "job_id", jobID)
-			s.handleGetJobStages(w, r, jobID)
-		} else {
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		if !requireMethod(w, r, http.MethodGet) {
+			return
 		}
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get stages", "job_id", jobID)
+		s.handleGetJobStages(w, r, jobID)
 		return
 	}
 
 	// Check if this is a request for task logs: /api/pulse/jobs/:job_id/tasks/:task_id/logs
 	if len(pathParts) >= 4 && pathParts[1] == "tasks" && pathParts[3] == "logs" {
-		if r.Method == http.MethodGet {
-			taskID := pathParts[2]
-			s.logger.Infow(fmt.Sprintf("%s Pulse get task logs | job:%s task:%s", sym.Pulse, jobID, taskID), "job_id", jobID, "task_id", taskID)
-			s.handleGetTaskLogsForJob(w, r, jobID, taskID)
-		} else {
-			writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		if !requireMethod(w, r, http.MethodGet) {
+			return
 		}
+		taskID := pathParts[2]
+		logger.AddPulseSymbol(s.logger).Infow("Pulse get task logs", "job_id", jobID, "task_id", taskID)
+		s.handleGetTaskLogsForJob(w, r, jobID, taskID)
 		return
 	}
 
 	// Handle single async job operations
-	if r.Method != http.MethodGet {
-		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -145,12 +138,7 @@ func (s *QNTXServer) handleGetAsyncJob(w http.ResponseWriter, r *http.Request, j
 	queue := s.daemon.GetQueue()
 	job, err := queue.GetJob(jobID)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("Job not found: %s", jobID))
-			return
-		}
-		s.logger.Errorw("Failed to get async job", "job_id", jobID, "error", err)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get job: %v", err))
+		handleError(w, s.logger, err, "failed to get async job")
 		return
 	}
 

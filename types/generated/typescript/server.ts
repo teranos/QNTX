@@ -11,9 +11,9 @@ export interface ChildJobInfo {
   handler_name: string;
   source: string;
   status: string;
-  progress_pct: number;
-  cost_estimate: number;
-  cost_actual: number;
+  progress_pct?: number;
+  cost_estimate?: number;
+  cost_actual?: number;
   error?: string;
   created_at: string;
   started_at?: string | null;
@@ -29,6 +29,9 @@ export interface CompleteMessage {
    * Completion message
    */
   message: string;
+}
+
+export interface ConsoleFormatter {
 }
 
 export interface ConsoleLog {
@@ -111,7 +114,7 @@ export interface DaemonStatusMessage {
    */
   budget_monthly_limit: number;
   /**
-   * GRACE Phase 4: "running", "draining", "stopped"
+   * Opening/Closing Phase 4: "running", "draining", "stopped"
    */
   server_state: string;
   /**
@@ -196,7 +199,7 @@ export interface ListExecutionsResponse {
 
 export interface ListScheduledJobsResponse {
   jobs: ScheduledJobResponse[];
-  count: number;
+  count?: number;
 }
 
 export interface LogEntry {
@@ -402,7 +405,7 @@ export interface PulseExecutionStartedMessage {
 
 export interface QueryMessage {
   /**
-   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility"
+   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame"
    */
   type: string;
   /**
@@ -465,12 +468,40 @@ export interface QueryMessage {
    * For visibility messages: whether to hide the node type/isolated nodes
    */
   hidden: boolean;
+  /**
+   * VidStream fields (for vidstream_init and vidstream_frame messages)
+   */
+  model_path: string;
+  /**
+   * For vidstream_init: detection confidence threshold
+   */
+  confidence_threshold: number;
+  /**
+   * For vidstream_init: NMS IoU threshold
+   */
+  nms_threshold: number;
+  /**
+   * For vidstream_frame: raw frame bytes (RGBA)
+   */
+  frame_data: number[];
+  /**
+   * For vidstream_frame: frame width
+   */
+  width: number;
+  /**
+   * For vidstream_frame: frame height
+   */
+  height: number;
+  /**
+   * For vidstream_frame: "rgba8", "rgb8", etc.
+   */
+  format: string;
 }
 
 export interface ScheduledJobResponse {
   id: string;
   ats_code: string;
-  interval_seconds: number;
+  interval_seconds?: number;
   /**
    * RFC3339 timestamp
    */
@@ -482,10 +513,10 @@ export interface ScheduledJobResponse {
   /**
    * Last async job ID
    */
-  last_execution_id: string;
+  last_execution_id?: string;
   state: string;
-  created_from_doc: string;
-  metadata: string;
+  created_from_doc?: string;
+  metadata?: string;
   /**
    * RFC3339 timestamp
    */
@@ -555,24 +586,9 @@ export interface StorageWarningMessage {
   timestamp: number;
 }
 
-export interface SystemCapabilitiesMessage {
-  /**
-   * "system_capabilities"
-   */
-  type: string;
-  /**
-   * "rust" or "go" - which fuzzy matching implementation is active
-   */
-  fuzzy_backend: string;
-  /**
-   * true if using Rust (optimized), false if Go fallback
-   */
-  fuzzy_optimized: boolean;
-}
-
 export interface TaskInfo {
   task_id: string;
-  log_count: number;
+  log_count?: number;
 }
 
 export interface TaskLogsResponse {

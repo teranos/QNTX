@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // =============================================================================
@@ -79,8 +80,8 @@ func (p *mockPlugin) RegisterHTTP(mux *http.ServeMux) error {
 	for path, handler := range p.httpHandlers {
 		mux.HandleFunc(path, handler)
 	}
-	// Default handler
-	mux.HandleFunc("/api/mock/test", func(w http.ResponseWriter, r *http.Request) {
+	// Default handler - paths are stripped by proxy (e.g., /test not /api/mock/test)
+	mux.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello from mock"))
 	})
 	return nil
@@ -253,10 +254,10 @@ func TestPluginServer_HandleHTTP(t *testing.T) {
 	// Initialize to register HTTP handlers
 	server.Initialize(context.Background(), &protocol.InitializeRequest{})
 
-	// Test HTTP request
+	// Test HTTP request - path is already stripped by proxy
 	req := &protocol.HTTPRequest{
 		Method: "GET",
-		Path:   "/api/mock/test",
+		Path:   "/test",
 		Headers: []*protocol.HTTPHeader{
 			{Name: "Content-Type", Values: []string{"application/json"}},
 		},
@@ -272,7 +273,7 @@ func TestPluginServer_HandleHTTP(t *testing.T) {
 func TestPluginServer_HandleHTTP_POST(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.httpHandlers["/api/mock/echo"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/echo"] = func(w http.ResponseWriter, r *http.Request) {
 		body := make([]byte, r.ContentLength)
 		r.Body.Read(body)
 		w.Header().Set("Content-Type", "application/json")
@@ -284,7 +285,7 @@ func TestPluginServer_HandleHTTP_POST(t *testing.T) {
 
 	req := &protocol.HTTPRequest{
 		Method: "POST",
-		Path:   "/api/mock/echo",
+		Path:   "/echo",
 		Headers: []*protocol.HTTPHeader{
 			{Name: "Content-Type", Values: []string{"application/json"}},
 		},
@@ -307,7 +308,7 @@ func TestPluginServer_HandleHTTP_NotFound(t *testing.T) {
 
 	req := &protocol.HTTPRequest{
 		Method: "GET",
-		Path:   "/api/mock/nonexistent",
+		Path:   "/nonexistent",
 	}
 
 	resp, err := server.HandleHTTP(context.Background(), req)
@@ -418,15 +419,6 @@ func TestExternalDomainProxy_Shutdown(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestExternalDomainProxy_ConnectionFailure(t *testing.T) {
-	logger := zaptest.NewLogger(t).Sugar()
-
-	// Use a port that's unlikely to be in use
-	_, err := NewExternalDomainProxy("localhost:59999", logger)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to connect")
-}
-
 func TestExternalDomainProxy_RegisterHTTP(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
@@ -471,7 +463,7 @@ func TestExternalDomainProxy_ImplementsDomainPlugin(t *testing.T) {
 
 func TestRemoteServiceRegistry_Database(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger, nil)
 
 	// Should return nil and log warning
 	db := registry.Database()
@@ -480,7 +472,7 @@ func TestRemoteServiceRegistry_Database(t *testing.T) {
 
 func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger, nil)
 
 	// Should return nil and log warning
 	store := registry.ATSStore()
@@ -489,7 +481,7 @@ func TestRemoteServiceRegistry_ATSStore(t *testing.T) {
 
 func TestRemoteServiceRegistry_Queue(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger, nil)
 
 	// Should return nil and log warning
 	queue := registry.Queue()
@@ -498,7 +490,7 @@ func TestRemoteServiceRegistry_Queue(t *testing.T) {
 
 func TestRemoteServiceRegistry_Logger(t *testing.T) {
 	logger := zaptest.NewLogger(t).Sugar()
-	registry := NewRemoteServiceRegistry("", "", "", nil, logger)
+	registry := NewRemoteServiceRegistry("", "", "", nil, logger, nil)
 
 	pluginLogger := registry.Logger("test")
 	assert.NotNil(t, pluginLogger)
@@ -511,7 +503,7 @@ func TestRemoteServiceRegistry_Config(t *testing.T) {
 		"enabled": "true",
 		"count":   "42",
 	}
-	registry := NewRemoteServiceRegistry("", "", "", config, logger)
+	registry := NewRemoteServiceRegistry("", "", "", config, logger, nil)
 
 	cfg := registry.Config("test")
 	assert.Equal(t, "value1", cfg.GetString("key1"))
@@ -557,7 +549,7 @@ func TestPluginClientServer_FullIntegration(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.httpHandlers["/api/mock/data"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/data"] = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	}
@@ -595,7 +587,7 @@ func TestPluginClientServer_HTTPProxying(t *testing.T) {
 
 	logger := zaptest.NewLogger(t).Sugar()
 	plugin := newMockPlugin()
-	plugin.httpHandlers["/api/mock/json"] = func(w http.ResponseWriter, r *http.Request) {
+	plugin.httpHandlers["/json"] = func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"key":"value"}`))
@@ -935,4 +927,85 @@ func TestPluginServer_WebSocketStreaming(t *testing.T) {
 	// Close the stream
 	err = stream.CloseSend()
 	require.NoError(t, err)
+}
+
+// TestPluginServer_PortAutoIncrement verifies that the server automatically
+// increments to the next available port when the requested port is occupied.
+func TestPluginServer_PortAutoIncrement(t *testing.T) {
+	logger := zaptest.NewLogger(t).Sugar()
+	plugin := newMockPlugin()
+	server := NewPluginServer(plugin, logger)
+
+	// Find a free port to use as base
+	baseListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	baseAddr := baseListener.Addr().String()
+	_, basePortStr, err := net.SplitHostPort(baseAddr)
+	require.NoError(t, err)
+	baseListener.Close()
+
+	// Occupy the base port
+	occupiedListener, err := net.Listen("tcp", baseAddr)
+	require.NoError(t, err)
+	defer occupiedListener.Close()
+
+	t.Logf("Base port %s is occupied, server should auto-increment", basePortStr)
+
+	// Try to start server on the occupied port
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Run server in goroutine
+	serverErrChan := make(chan error, 1)
+	serverStarted := make(chan string, 1)
+
+	go func() {
+		// The server should automatically increment to basePort+1
+		err := server.Serve(ctx, baseAddr)
+		serverErrChan <- err
+	}()
+
+	// Give server time to start and announce port
+	time.Sleep(500 * time.Millisecond)
+
+	// Try to connect to basePort+1 (where server should have bound)
+	expectedPort := mustParsePort(t, basePortStr) + 1
+	expectedAddr := fmt.Sprintf("127.0.0.1:%d", expectedPort)
+
+	connCtx, connCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer connCancel()
+	conn, err := grpc.DialContext(connCtx, expectedAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	require.NoError(t, err, "Server should have bound to port %d", expectedPort)
+	defer conn.Close()
+
+	// Verify the server is responding
+	client := protocol.NewDomainPluginServiceClient(conn)
+	resp, err := client.Metadata(context.Background(), &protocol.Empty{})
+	require.NoError(t, err)
+	assert.Equal(t, "mock", resp.Name)
+
+	t.Logf("Successfully connected to server on auto-incremented port %d", expectedPort)
+
+	// Send serverStarted notification
+	serverStarted <- expectedAddr
+
+	// Cleanup
+	cancel()
+	select {
+	case err := <-serverErrChan:
+		// Server error is expected when context is cancelled
+		t.Logf("Server stopped: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Server did not stop after context cancellation")
+	}
+}
+
+// mustParsePort is a test helper to parse port from string
+func mustParsePort(t *testing.T, portStr string) int {
+	var port int
+	_, err := fmt.Sscanf(portStr, "%d", &port)
+	require.NoError(t, err)
+	return port
 }

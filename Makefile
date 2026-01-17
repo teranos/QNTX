@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto plugins rust-fuzzy rust-fuzzy-test rust-fuzzy-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,27 +6,22 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy ## Build QNTX CLI binary (with Rust fuzzy optimization)
-	@echo "Building QNTX CLI with Rust fuzzy optimization..."
-	@go build -tags rustfuzzy -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-fuzzy rust-vidstream ## Build QNTX CLI binary (with Rust fuzzy optimization and ONNX video)
+	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video)..."
+	@go build -tags "rustfuzzy,rustvideo" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
-	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+	@CGO_ENABLED=0 go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
-types: $(if $(findstring ./bin/qntx,$(QNTX)),cli-nocgo,) ## Generate TypeScript, Python, Rust types and markdown docs from Go source
-	@echo "Generating types and documentation..."
-	@$(QNTX) typegen --lang typescript --output types/generated/
-	@$(QNTX) typegen --lang python --output types/generated/
-	@$(QNTX) typegen --lang rust --output types/generated/
-	@$(QNTX) typegen --lang markdown  # Defaults to docs/types/
-	@echo "✓ TypeScript types generated in types/generated/typescript/"
-	@echo "✓ Python types generated in types/generated/python/"
-	@echo "✓ Rust types generated in types/generated/rust/"
-	@echo "✓ Markdown docs generated in docs/types/"
+typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
+	@go build -o bin/typegen ./cmd/typegen
 
-types-check: cli ## Check if generated types are up to date (always builds from source)
-	@./bin/qntx typegen check
+types: ## Generate TypeScript, Python, Rust types and markdown docs from Go source (via Nix)
+	@nix run .#generate-types
+
+types-check: ## Check if generated types are up to date (via Nix)
+	@nix run .#check-types
 
 server: cli ## Start QNTX WebSocket server
 	@echo "Starting QNTX server..."
@@ -34,13 +29,14 @@ server: cli ## Start QNTX WebSocket server
 
 dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
 	@echo "🚀 Starting development environment..."
-	@echo "  Backend:  http://localhost:877"
-	@echo "  Frontend: http://localhost:8820 (with live reload)"
-	@echo "  Database: dev-qntx.db (development)"
+	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
+	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
+	@echo "  Database: Uses am.toml configuration"
+	@echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"
 	@echo ""
 	@# Clean up any lingering processes on dev ports
 	@pkill -f "bun.*dev" 2>/dev/null || true
-	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
 		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
@@ -48,7 +44,7 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
 	set -m; \
-	DB_PATH=dev-qntx.db ./bin/qntx server --dev --no-browser -vvv & \
+	./bin/qntx server --dev --no-browser -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
@@ -58,13 +54,13 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 
 dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	@echo "📱 Starting mobile development environment..."
-	@echo "  Backend:  http://localhost:877"
-	@echo "  Frontend: http://localhost:8820 (with live reload)"
+	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
+	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
 	@echo "  iOS:      Launching simulator..."
 	@echo ""
 	@# Clean up any lingering processes
 	@pkill -f "bun.*dev" 2>/dev/null || true
-	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start servers in background
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
@@ -72,7 +68,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 		pkill -f "bun.*dev" 2>/dev/null || true; \
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
-	DB_PATH=dev-qntx.db ./bin/qntx server --dev --no-browser -vvv & \
+	./bin/qntx server --dev --no-browser -vvv & \
 	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
 	FRONTEND_PID=$$!; \
@@ -142,6 +138,8 @@ install: cli ## Install QNTX binary to ~/.qntx/bin (override with PREFIX=/custom
 	fi
 
 desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
+	# TODO: Add proper Nix package for Tauri desktop app (rustPlatform.buildRustPackage)
+	# This would eliminate build complexity and ensure reproducible builds across environments
 	@echo "Preparing desktop app assets..."
 	@./web/src-tauri/generate-icons.sh
 	@./web/src-tauri/prepare-sidecar.sh
@@ -149,12 +147,12 @@ desktop-prepare: cli web ## Prepare desktop app (icons + sidecar binary)
 
 desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "Starting QNTX Desktop in development mode..."
-	@echo "  Frontend dev server: http://localhost:8820"
-	@echo "  Backend will start as sidecar on port 877"
+	@echo "  Frontend dev server: http://localhost:$${FRONTEND_PORT:-8820}"
+	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-877}"
 	@echo ""
 	@# Clean up any lingering dev server processes
 	@pkill -f "bun.*dev" 2>/dev/null || true
-	@lsof -ti:8820 | xargs kill -9 2>/dev/null || true
+	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start dev server in background, then launch Tauri
 	@trap 'echo "Shutting down dev server..."; \
 		pkill -f "bun.*dev" 2>/dev/null || true; \
@@ -177,35 +175,15 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 		cp web/src-tauri/bin/qntx-$$TARGET target/release/bundle/macos/QNTX.app/Contents/MacOS/
 	@echo "✓ Desktop app built in target/release/bundle/"
 
-proto: ## Generate Go code from protobuf definitions
-	@echo "Generating gRPC code from proto files..."
-	@protoc --go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		plugin/grpc/protocol/domain.proto
-	@echo "✓ Proto files generated in plugin/grpc/protocol/"
+proto: ## Generate Go code from protobuf definitions (via Nix)
+	@nix run .#generate-proto
 
-plugins: ## Build and install all external plugin binaries to ~/.qntx/plugins/
-	@echo "Building external plugins..."
+code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
+	@echo "Building code plugin..."
 	@mkdir -p $(PREFIX)/plugins
-	@# Build code plugin from qntx-code/cmd/qntx-code-plugin
-	@if [ -d "qntx-code/cmd/qntx-code-plugin" ]; then \
-		echo "  Building code (Go) plugin..."; \
-		go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin || exit 1; \
-		chmod +x $(PREFIX)/plugins/qntx-code-plugin; \
-		echo "  ✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"; \
-	fi
-	@# Install Python/script-based plugins (e.g., webscraper)
-	@if [ -d "qntx-webscraper" ]; then \
-		echo "  Installing webscraper (Python) plugin..."; \
-		cp qntx-webscraper/webscraper $(PREFIX)/plugins/webscraper; \
-		chmod +x $(PREFIX)/plugins/webscraper; \
-		cp qntx-webscraper/webscraper.toml $(PREFIX)/plugins/webscraper.toml 2>/dev/null || true; \
-		echo "  ✓ webscraper → $(PREFIX)/plugins/webscraper"; \
-	fi
-	@echo "✓ All plugins installed to $(PREFIX)/plugins/"
-	@echo ""
-	@echo "Installed plugins:"
-	@ls -lh $(PREFIX)/plugins/qntx-*-plugin $(PREFIX)/plugins/webscraper 2>/dev/null || echo "  (none)"
+	@go build -o $(PREFIX)/plugins/qntx-code-plugin ./qntx-code/cmd/qntx-code-plugin
+	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
+	@echo "✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"
 
 # Rust fuzzy matching library (ax segment optimization)
 rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
@@ -214,6 +192,14 @@ rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
 	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
 	@echo "  Static:  libqntx_fuzzy.a"
 	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
+
+rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
+	@echo "Building Rust vidstream library with ONNX..."
+	@cd ats/vidstream && cargo build --release --features onnx --lib
+	@echo "✓ libqntx_vidstream built in ats/vidstream/target/release/"
+	@echo "  Static:  libqntx_vidstream.a"
+	@echo "  Shared:  libqntx_vidstream.so (Linux) / libqntx_vidstream.dylib (macOS)"
+	@echo "  Features: ONNX Runtime (download-binaries enabled)"
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."
@@ -232,3 +218,30 @@ rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rus
 		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
 		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
 	@echo "✓ Integration tests passed"
+
+# Rust Python plugin (PyO3-based Python execution)
+# REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
+rust-python: ## Build Rust Python plugin binary (via Nix)
+	@echo "Building qntx-python-plugin via Nix..."
+	@nix build .#qntx-python
+	@mkdir -p bin
+	@cp -L result/bin/qntx-python-plugin bin/
+	@echo "✓ qntx-python-plugin built in bin/"
+
+rust-python-test: ## Run Rust Python plugin tests (via Nix)
+	@echo "Running Rust Python plugin tests via Nix..."
+	@echo "Note: Use 'nix develop' shell and run 'cd qntx-python && cargo test' for iterative testing"
+	@nix develop --command bash -c "cd qntx-python && cargo test"
+	@echo "✓ All Rust Python tests passed"
+
+rust-python-check: ## Check Rust Python plugin code (fmt + clippy via Nix)
+	@echo "Checking Rust Python plugin code..."
+	@nix develop --command bash -c "cd qntx-python && cargo fmt --check && cargo clippy -- -D warnings"
+	@echo "✓ Rust Python code checks passed"
+
+rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
+	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."
+	@mkdir -p $(PREFIX)/plugins
+	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
+	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
+	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"

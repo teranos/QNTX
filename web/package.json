@@ -49,5 +49,9 @@
     "@codemirror/lint": "6.8.5",
     "@codemirror/language": "6.10.3",
     "@lezer/common": "1.4.0"
+  },
+  "dependencies": {
+    "@codemirror/lang-python": "^6.2.1",
+    "smol-toml": "^1.6.0"
   }
 }

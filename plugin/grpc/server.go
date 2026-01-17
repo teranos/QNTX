@@ -15,6 +15,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/teranos/QNTX/errors"
@@ -25,7 +27,7 @@ import (
 )
 
 // PluginServer wraps a DomainPlugin to expose it via gRPC.
-// This is used by external plugins to serve their implementation.
+// This wraps a DomainPlugin implementation to serve it via gRPC.
 type PluginServer struct {
 	protocol.UnimplementedDomainPluginServiceServer
 
@@ -36,7 +38,7 @@ type PluginServer struct {
 	// HTTP mux for handling HTTP requests via gRPC
 	httpMux *http.ServeMux
 
-	// initOnce ensures Initialize is only executed once
+	// initOnce ensures Initialize is only executed once; concurrent calls block until completion
 	initOnce sync.Once
 	initErr  error
 }
@@ -51,16 +53,76 @@ func NewPluginServer(plugin plugin.DomainPlugin, logger *zap.SugaredLogger) *Plu
 }
 
 // Serve starts the gRPC server on the given address.
+// If the port is already in use, automatically tries the next port (up to 64 attempts).
+// Outputs the actual port to stdout for the PluginManager to discover.
 func (s *PluginServer) Serve(ctx context.Context, addr string) error {
-	listener, err := net.Listen("tcp", addr)
+	// Parse the initial address to extract host and port
+	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
-		return errors.Wrapf(err, "failed to listen on %s", addr)
+		return errors.Wrapf(err, "invalid address format: %s", addr)
 	}
+
+	startPort, err := strconv.Atoi(portStr)
+	if err != nil {
+		return errors.Wrapf(err, "invalid port in address: %s", addr)
+	}
+
+	const maxAttempts = 64
+	var listener net.Listener
+	var actualPort int
+
+	// Try to bind to a port, incrementing on failure
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		tryPort := startPort + attempt
+		tryAddr := net.JoinHostPort(host, strconv.Itoa(tryPort))
+
+		listener, err = net.Listen("tcp", tryAddr)
+		if err == nil {
+			// Successfully bound to port
+			actualPort = tryPort
+			if attempt > 0 {
+				s.logger.Infow("Port conflict resolved",
+					"requested_port", startPort,
+					"attempts", attempt+1,
+					"actual_port", actualPort)
+			}
+			break
+		}
+
+		// Check if error is "address already in use"
+		if isAddressInUse(err) {
+			if attempt == 0 {
+				s.logger.Warnw("Requested port already in use, trying next port",
+					"requested_port", startPort,
+					"trying_port", tryPort+1)
+			} else if (attempt+1) % 10 == 0 {
+				// Log every 10 attempts to avoid spam
+				s.logger.Warnw("Still searching for available port",
+					"requested_port", startPort,
+					"attempts", attempt+1,
+					"trying_port", tryPort+1)
+			}
+			continue
+		}
+
+		// Different error, not port conflict
+		return errors.Wrapf(err, "failed to listen on %s (attempt %d/%d)", tryAddr, attempt+1, maxAttempts)
+	}
+
+	if listener == nil {
+		return errors.Newf("failed to find available port after %d attempts starting from %d", maxAttempts, startPort)
+	}
+
+	actualAddr := net.JoinHostPort(host, strconv.Itoa(actualPort))
+
+	// Output the actual port in a structured format that PluginManager can parse
+	// This goes to stdout and will be captured by pluginLogger
+	fmt.Printf("QNTX_PLUGIN_PORT=%d\n", actualPort)
 
 	grpcServer := grpc.NewServer()
 	protocol.RegisterDomainPluginServiceServer(grpcServer, s)
 
-	s.logger.Infow("Starting gRPC plugin server", "address", addr)
+	s.logger.Infow("Starting gRPC plugin server", "address", actualAddr, "port", actualPort)
 
 	// Handle graceful shutdown
 	go func() {
@@ -74,6 +136,18 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 	}
 
 	return nil
+}
+
+// isAddressInUse checks if the error is due to address already in use.
+func isAddressInUse(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for common "address already in use" errors across platforms
+	errStr := err.Error()
+	return strings.Contains(errStr, "address already in use") ||
+		strings.Contains(errStr, "bind: address already in use") ||
+		strings.Contains(errStr, "Only one usage of each socket address")
 }
 
 // Metadata returns plugin metadata.
@@ -102,6 +176,7 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 			req.AuthToken,
 			req.Config,
 			s.logger,
+			s.plugin, // Pass plugin reference for metadata lookup
 		)
 
 		// Initialize the plugin
@@ -134,6 +209,9 @@ func (s *PluginServer) Shutdown(ctx context.Context, _ *protocol.Empty) (*protoc
 
 // HandleHTTP handles an HTTP request via gRPC.
 func (s *PluginServer) HandleHTTP(ctx context.Context, req *protocol.HTTPRequest) (*protocol.HTTPResponse, error) {
+	// DEBUG: Log incoming request
+	s.logger.Infow("gRPC HandleHTTP received", "method", req.Method, "path", req.Path)
+
 	// Create an HTTP request
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.Path, bytes.NewReader(req.Body))
 	if err != nil {
@@ -266,5 +344,39 @@ func (s *PluginServer) Health(ctx context.Context, _ *protocol.Empty) (*protocol
 		Healthy: status.Healthy,
 		Message: status.Message,
 		Details: details,
+	}, nil
+}
+
+// ConfigSchema returns the plugin's configuration schema for UI-based configuration.
+// If the plugin implements ConfigurablePlugin, returns its schema; otherwise empty.
+func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*protocol.ConfigSchemaResponse, error) {
+	// Check if plugin implements ConfigurablePlugin
+	configurable, ok := s.plugin.(plugin.ConfigurablePlugin)
+	if !ok {
+		// Plugin doesn't support configuration schema - return empty
+		return &protocol.ConfigSchemaResponse{
+			Fields: make(map[string]*protocol.ConfigFieldSchema),
+		}, nil
+	}
+
+	// Get schema from plugin and convert to protocol format
+	schema := configurable.ConfigSchema()
+	fields := make(map[string]*protocol.ConfigFieldSchema, len(schema))
+
+	for name, field := range schema {
+		fields[name] = &protocol.ConfigFieldSchema{
+			Type:         field.Type,
+			Description:  field.Description,
+			DefaultValue: field.DefaultValue,
+			Required:     field.Required,
+			MinValue:     field.MinValue,
+			MaxValue:     field.MaxValue,
+			Pattern:      field.Pattern,
+			ElementType:  field.ElementType,
+		}
+	}
+
+	return &protocol.ConfigSchemaResponse{
+		Fields: fields,
 	}, nil
 }
