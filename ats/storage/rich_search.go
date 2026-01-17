@@ -23,6 +23,7 @@ type RichSearchMatch struct {
 	Strategy     string                 `json:"strategy"`      // The matching strategy used
 	DisplayLabel string                 `json:"display_label"` // Label to display for this entity
 	Attributes   map[string]interface{} `json:"attributes"`    // Full attributes for the entity
+	MatchedWords []string               `json:"matched_words"` // The actual words that were matched (for highlighting)
 }
 
 // SearchRichStringFields searches for matches in RichStringFields across attestations
@@ -565,6 +566,12 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 				strategy = "fuzzy:all-words"
 			}
 
+			// Collect the actual matched words for highlighting
+			matchedWordsList := make([]string, 0, len(queryWordsFound))
+			for word := range queryWordsFound {
+				matchedWordsList = append(matchedWordsList, word)
+			}
+
 			matches = append(matches, RichSearchMatch{
 				NodeID:       nodeID,
 				TypeName:     typeName,
@@ -576,6 +583,7 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 				Strategy:     strategy,
 				DisplayLabel: displayLabel,
 				Attributes:   attributes,
+				MatchedWords: matchedWordsList,
 			})
 
 			processedNodes[nodeID] = true
