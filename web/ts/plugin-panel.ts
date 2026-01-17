@@ -11,7 +11,7 @@
 
 import { BasePanel } from './base-panel.ts';
 import { apiFetch } from './api.ts';
-import { toast } from './toast';
+import { toast } from './components/toast';
 import { escapeHtml } from './html-utils.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';

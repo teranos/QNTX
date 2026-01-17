@@ -15,7 +15,7 @@
 import { BasePanel } from './base-panel.ts';
 import type { JobUpdateData, LLMStreamData } from '../types/websocket';
 import type { Job as BackendJob } from '../../types/generated/typescript';
-import { toast } from './toast';
+import { toast } from './components/toast';
 import { IX } from '@generated/sym.js';
 import { formatRelativeTime } from './html-utils.ts';
 
