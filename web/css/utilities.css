@@ -99,12 +99,12 @@
 }
 
 /* Color utilities - using CSS variables */
-.u-color-success { color: var(--color-success) !important; }
-.u-color-error { color: var(--color-error) !important; }
+.u-color-success { color: var(--success) !important; }
+.u-color-error { color: var(--error) !important; }
 .u-color-warning { color: var(--warning) !important; }
-.u-color-info { color: var(--color-info) !important; }
+.u-color-info { color: var(--info) !important; }
 
-.u-bg-success { background-color: var(--color-success) !important; }
-.u-bg-error { background-color: var(--color-error) !important; }
+.u-bg-success { background-color: var(--success) !important; }
+.u-bg-error { background-color: var(--error) !important; }
 .u-bg-warning { background-color: var(--warning) !important; }
-.u-bg-info { background-color: var(--color-info) !important; }
+.u-bg-info { background-color: var(--info) !important; }
