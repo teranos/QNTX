@@ -573,16 +573,6 @@
     cursor: not-allowed;
 }
 
-.panel-btn-warning {
-    background: #fff3e0;
-    border-color: #ef6c00;
-    color: #e65100;
-}
-
-.panel-btn-warning:hover:not(:disabled) {
-    background: #ffe0b2;
-}
-
 /* Responsive config form */
 @media (max-width: 768px) {
     .plugin-config-values {

@@ -69,9 +69,9 @@ class PythonEditorPanel extends BasePanel {
                 </div>
                 <button class="prose-close python-editor-close" aria-label="Close">✕</button>
             </div>
-            <div class="python-editor-tabs">
-                <button class="python-editor-tab active" data-tab="editor">Editor</button>
-                <button class="python-editor-tab" data-tab="output">Output</button>
+            <div class="panel-tabs">
+                <button class="panel-tab active" data-tab="editor">Editor</button>
+                <button class="panel-tab" data-tab="output">Output</button>
             </div>
             <div class="prose-body">
                 <div class="prose-sidebar" id="tab-sidebar">
@@ -98,7 +98,7 @@ class PythonEditorPanel extends BasePanel {
         }
 
         // Tab switching
-        const tabs = this.panel?.querySelectorAll('.python-editor-tab');
+        const tabs = this.panel?.querySelectorAll('.panel-tab');
         tabs?.forEach(tab => {
             const handler = (e: Event) => {
                 const target = e.target as HTMLElement;
@@ -518,23 +518,23 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     private getEditorSidebarTemplate(): string {
         return `
-            <div class="python-sidebar-content">
-                <div class="python-sidebar-section">
+            <div class="prose-sidebar-content">
+                <div class="prose-sidebar-section">
                     <h4>Quick Actions</h4>
-                    ${buttonPlaceholder('python-execute', 'Run (⌘↵)', 'python-action-btn')}
-                    <button id="python-clear-btn" class="python-action-btn secondary">Clear</button>
+                    ${buttonPlaceholder('python-execute', 'Run (⌘↵)', 'qntx-btn qntx-btn-primary')}
+                    <button id="python-clear-btn" class="qntx-btn">Clear</button>
                 </div>
-                <div class="python-sidebar-section">
+                <div class="prose-sidebar-section">
                     <h4>Status</h4>
-                    <div class="python-status-row">
+                    <div class="panel-info-row">
                         Plugin: <span id="python-status" class="python-status-connecting">connecting...</span>
                     </div>
                 </div>
-                <div class="python-sidebar-section">
+                <div class="prose-sidebar-section">
                     <h4>Examples</h4>
-                    <button class="python-example-btn" data-example="hello">Hello World</button>
-                    <button class="python-example-btn" data-example="math">Math</button>
-                    <button class="python-example-btn" data-example="json">JSON</button>
+                    <button class="qntx-btn" data-example="hello">Hello World</button>
+                    <button class="qntx-btn" data-example="math">Math</button>
+                    <button class="qntx-btn" data-example="json">JSON</button>
                 </div>
             </div>
         `;
@@ -556,11 +556,11 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
 
     private getOutputSidebarTemplate(): string {
         return `
-            <div class="python-sidebar-content">
-                <div class="python-sidebar-section">
+            <div class="prose-sidebar-content">
+                <div class="prose-sidebar-section">
                     <h4>Actions</h4>
-                    <button id="python-back-btn" class="python-action-btn">← Back to Editor</button>
-                    <button id="python-copy-btn" class="python-action-btn secondary">Copy Output</button>
+                    <button id="python-back-btn" class="qntx-btn">← Back to Editor</button>
+                    <button id="python-copy-btn" class="qntx-btn">Copy Output</button>
                 </div>
             </div>
         `;
@@ -569,7 +569,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
     private getOutputContentTemplate(): string {
         return `
             <div id="python-output-content" class="python-output-content">
-                <div class="no-output">No output yet. Run some code!</div>
+                <div class="panel-empty">No output yet. Run some code!</div>
             </div>
         `;
     }
@@ -605,7 +605,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         });
 
         // Example buttons
-        const exampleBtns = this.panel?.querySelectorAll('.python-example-btn');
+        const exampleBtns = this.panel?.querySelectorAll('[data-example]');
         exampleBtns?.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const example = (e.target as HTMLElement).dataset.example;
