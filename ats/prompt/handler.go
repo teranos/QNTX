@@ -43,12 +43,16 @@ type Payload struct {
 	// Model overrides the default model for the provider
 	Model string `json:"model,omitempty"`
 
+	// PromptID is the attestation ID of the stored prompt being executed
+	// Used to construct actor as model@promptID
+	PromptID string `json:"prompt_id,omitempty"`
+
 	// ResultPredicate is the predicate used when creating result attestations
 	// Defaults to "prompt-result"
 	ResultPredicate string `json:"result_predicate,omitempty"`
 
 	// ResultActor is the actor for result attestations
-	// Defaults to the model identifier (e.g., "openai/gpt-4o-mini")
+	// Defaults to model@promptID (or just model if no PromptID)
 	ResultActor string `json:"result_actor,omitempty"`
 }
 
@@ -240,13 +244,22 @@ func (h *Handler) createResultAttestation(
 
 	actor := payload.ResultActor
 	if actor == "" {
-		// Use model as actor
+		// Determine the model being used
+		var model string
 		if payload.Model != "" {
-			actor = payload.Model
+			model = payload.Model
 		} else if h.config.LocalInference.Enabled {
-			actor = h.config.LocalInference.Model
+			model = h.config.LocalInference.Model
 		} else {
-			actor = h.config.OpenRouter.Model
+			model = h.config.OpenRouter.Model
+		}
+
+		// Construct actor as model@promptID if we have a prompt ID
+		// This represents the actual "agent" - the model running with this specific prompt
+		if payload.PromptID != "" {
+			actor = model + "@" + payload.PromptID
+		} else {
+			actor = model
 		}
 	}
 
