@@ -53,71 +53,26 @@
 </head>
 <body class="disconnected">
     <!-- Loading screen - shows immediately before any scripts run -->
-    <div id="loading-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; color: #888; animation: fadeInLoader 300ms ease-out;">
-        <!-- qntx Logo -->
-        <img src="/qntx.jpg" alt="qntx" style="width: 80px; height: 80px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); opacity: 0.6; filter: brightness(0.7);">
-
-        <!-- Status text -->
-        <div style="font-size: 14px; margin-bottom: 12px;">Loading</div>
-
-        <!-- Progress bar -->
-        <div style="width: 200px; height: 2px; background: #333; border-radius: 1px; overflow: hidden; margin-bottom: 12px;">
-            <div id="loading-bar" style="height: 100%; background: #666; width: 0%; transition: width 0.3s;"></div>
+    <!-- Styles defined in /css/loading.css -->
+    <div id="loading-screen">
+        <img class="logo" src="/qntx.jpg" alt="qntx">
+        <div class="status-text">Loading</div>
+        <div class="progress-bar-container">
+            <div id="loading-bar"></div>
         </div>
-
-        <!-- Status details -->
-        <div id="loading-status" style="font-size: 11px; color: #666; margin-bottom: 16px;">Initializing...</div>
-
-        <!-- Log panel - shows initialization steps -->
-        <div id="loader-logs" style="width: 300px; max-height: 120px; overflow-y: auto; background: #0f0f0f; border: 1px solid #2a2a2a; border-radius: 4px; padding: 8px 10px; font-family: 'Monaco', 'Courier New', monospace; font-size: 10px; color: #666; line-height: 1.6; margin-bottom: 16px;">
+        <div id="loading-status">Initializing...</div>
+        <div id="loader-logs">
             <div style="color: #888;">Starting initialization...</div>
         </div>
-
-        <!-- MetaMask warning -->
-        <div id="metamask-warning" style="display: none; padding: 12px 16px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; max-width: 400px; text-align: center;">
-            <div style="font-size: 12px; color: #f59e0b; margin-bottom: 6px;">⚠️ MetaMask detected</div>
-            <div style="font-size: 11px; color: #888; line-height: 1.4;">
+        <div id="metamask-warning">
+            <div class="warning-title">⚠️ MetaMask detected</div>
+            <div class="warning-text">
                 MetaMask's security features can slow page loading by 30+ seconds.
                 <br>
                 For best performance, use a browser profile without MetaMask.
             </div>
         </div>
     </div>
-
-    <!-- CSS animations for loader -->
-    <style>
-        @keyframes fadeInLoader {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes fadeOutLoader {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(0.98); }
-        }
-
-        #loading-screen.fade-out {
-            animation: fadeOutLoader 500ms ease-out forwards;
-        }
-
-        /* Log scrollbar styling */
-        #loader-logs::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        #loader-logs::-webkit-scrollbar-track {
-            background: #1a1a1a;
-        }
-
-        #loader-logs::-webkit-scrollbar-thumb {
-            background: #333;
-            border-radius: 2px;
-        }
-
-        #loader-logs::-webkit-scrollbar-thumb:hover {
-            background: #444;
-        }
-    </style>
 
     <!-- Inline loading progress script - runs immediately, not blocked by extensions -->
     <script>
