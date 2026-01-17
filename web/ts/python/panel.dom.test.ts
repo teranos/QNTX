@@ -124,7 +124,8 @@ describe('PythonEditorPanel', () => {
             expect(sidebar).toBeTruthy();
 
             // Check for key action buttons
-            const runBtn = document.querySelector('#python-execute-btn');
+            // Run button uses Button component with placeholder pattern
+            const runBtn = document.querySelector('[data-button-id="python-execute"]');
             const clearBtn = document.querySelector('#python-clear-btn');
 
             expect(runBtn).toBeTruthy();
