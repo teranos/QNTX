@@ -17,10 +17,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// ExternalDomainProxy implements DomainPlugin by proxying to a remote gRPC process.
-// This is the adapter that allows external plugins to be used identically to built-in plugins.
-// From the Registry's perspective, there is no difference between a built-in plugin
-// and an ExternalDomainProxy - both implement DomainPlugin.
+// ExternalDomainProxy implements DomainPlugin by proxying to a gRPC plugin process.
+// All QNTX plugins run via gRPC - this is the client-side proxy that connects to them.
+// From the Registry's perspective, all plugins implement the same DomainPlugin interface.
 type ExternalDomainProxy struct {
 	conn     *grpc.ClientConn
 	client   protocol.DomainPluginServiceClient
@@ -33,9 +32,8 @@ type ExternalDomainProxy struct {
 	wsConfig        *WebSocketConfig
 }
 
-// NewExternalDomainProxy creates a new proxy to an external plugin running at the given address.
-// The returned proxy implements DomainPlugin and can be registered with the Registry
-// just like any built-in plugin.
+// NewExternalDomainProxy creates a new client proxy to a gRPC plugin at the given address.
+// The returned proxy implements DomainPlugin and can be registered with the Registry.
 func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDomainProxy, error) {
 	// Create gRPC connection with retry and timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -46,7 +44,8 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 		grpc.WithBlock(),
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to plugin at %s", addr)
+		wrappedErr := errors.Wrapf(err, "failed to connect to plugin at %s", addr)
+		return nil, errors.WithHint(wrappedErr, "verify the plugin is running and the address/port is correct")
 	}
 
 	client := protocol.NewDomainPluginServiceClient(conn)
@@ -62,7 +61,8 @@ func NewExternalDomainProxy(addr string, logger *zap.SugaredLogger) (*ExternalDo
 	metaResp, err := client.Metadata(ctx, &protocol.Empty{})
 	if err != nil {
 		conn.Close()
-		return nil, errors.Wrapf(err, "failed to get plugin metadata from %s", addr)
+		wrappedErr := errors.Wrapf(err, "failed to get plugin metadata from %s", addr)
+		return nil, errors.WithHint(wrappedErr, "plugin may not implement the required gRPC interface or is still starting up")
 	}
 
 	proxy.metadata = plugin.Metadata{
@@ -103,44 +103,40 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	config := make(map[string]string)
 	pluginConfig := services.Config(c.metadata.Name)
 
-	// Pass common configuration keys to plugin
-	// Note: Config interface doesn't support enumerating all keys, so we manually
-	// specify known configuration keys. Plugins that need custom config should
-	// document their keys.
-	//
-	// TODO: Add AllSettings() method to Config interface for complete config passing
-
-	// String configuration
-	stringKeys := []string{
-		"workspace_root", "api_token", "base_url", "model",
-		"github.token", "gopls.workspace_root",
-	}
-	for _, key := range stringKeys {
-		if val := pluginConfig.GetString(key); val != "" {
-			config[key] = val
+	// Pass all configuration keys from the plugin's namespace
+	// This includes both built-in keys and custom keys from ~/.qntx/plugins/{name}.toml [config] sections
+	for _, key := range pluginConfig.GetKeys() {
+		// Skip internal keys (prefixed with _)
+		if len(key) > 0 && key[0] == '_' {
+			continue
 		}
-	}
 
-	// Boolean configuration
-	boolKeys := []string{"enabled", "gopls.enabled"}
-	for _, key := range boolKeys {
-		// Always pass boolean values (even false) to avoid ambiguity
-		config[key] = fmt.Sprintf("%v", pluginConfig.GetBool(key))
-	}
-
-	// Integer configuration
-	intKeys := []string{"context_size", "timeout_seconds"}
-	for _, key := range intKeys {
-		if val := pluginConfig.GetInt(key); val != 0 {
-			config[key] = fmt.Sprintf("%d", val)
+		// Get raw value and convert to string for protobuf
+		val := pluginConfig.Get(key)
+		if val == nil {
+			continue
 		}
-	}
 
-	// String slice configuration (JSON-encoded)
-	sliceKeys := []string{"allowed_domains", "blocked_domains"}
-	for _, key := range sliceKeys {
-		if slice := pluginConfig.GetStringSlice(key); len(slice) > 0 {
-			if jsonBytes, err := json.Marshal(slice); err == nil {
+		// Type-based conversion to string
+		switch v := val.(type) {
+		case string:
+			if v != "" {
+				config[key] = v
+			}
+		case int, int8, int16, int32, int64:
+			config[key] = fmt.Sprintf("%d", v)
+		case float32, float64:
+			config[key] = fmt.Sprintf("%f", v)
+		case bool:
+			config[key] = fmt.Sprintf("%v", v)
+		case []interface{}:
+			// Array types - serialize as JSON
+			if jsonBytes, err := json.Marshal(v); err == nil {
+				config[key] = string(jsonBytes)
+			}
+		default:
+			// Try JSON marshaling for complex types
+			if jsonBytes, err := json.Marshal(v); err == nil {
 				config[key] = string(jsonBytes)
 			}
 		}
@@ -172,7 +168,8 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 
 	_, err := c.client.Initialize(ctx, req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to initialize remote plugin %s at %s", c.metadata.Name, c.addr)
+		wrappedErr := errors.Wrapf(err, "failed to initialize remote plugin %s at %s", c.metadata.Name, c.addr)
+		return errors.WithHint(wrappedErr, "check plugin logs for initialization errors or verify required configuration is set")
 	}
 
 	c.logger.Infow("Remote plugin initialized",
@@ -181,6 +178,15 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		"queue", queueEndpoint != "",
 	)
 	return nil
+}
+
+// ConfigSchema returns the configuration schema from the remote plugin.
+func (c *ExternalDomainProxy) ConfigSchema(ctx context.Context) (*protocol.ConfigSchemaResponse, error) {
+	resp, err := c.client.ConfigSchema(ctx, &protocol.Empty{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get config schema from plugin %s at %s", c.metadata.Name, c.addr)
+	}
+	return resp, nil
 }
 
 // Shutdown shuts down the remote plugin.
@@ -193,19 +199,39 @@ func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 }
 
 // RegisterHTTP registers HTTP handlers that proxy to the remote plugin.
+// Uses method-specific wildcards to catch all paths including / (Issue #277).
 func (c *ExternalDomainProxy) RegisterHTTP(mux *http.ServeMux) error {
-	// Register a catch-all handler for the plugin's namespace
-	namespace := fmt.Sprintf("/api/%s/", c.metadata.Name)
-
-	mux.HandleFunc(namespace, func(w http.ResponseWriter, r *http.Request) {
+	// Register method-specific wildcards that match all paths (including /)
+	// The {path...} wildcard matches zero or more segments, so it matches / too
+	mux.HandleFunc("GET /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("POST /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("PUT /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("PATCH /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("DELETE /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("HEAD /{path...}", func(w http.ResponseWriter, r *http.Request) {
+		c.proxyHTTPRequest(w, r)
+	})
+	mux.HandleFunc("OPTIONS /{path...}", func(w http.ResponseWriter, r *http.Request) {
 		c.proxyHTTPRequest(w, r)
 	})
 
-	c.logger.Infow("Registered HTTP proxy handler", "namespace", namespace)
+	c.logger.Infow("Registered HTTP proxy handlers", "plugin", c.metadata.Name)
 	return nil
 }
 
 // proxyHTTPRequest forwards an HTTP request to the remote plugin.
+// Tries stripped path first (without /api/{plugin}), then full path if 404 (Issue #277).
+// This allows plugins to register routes either way without friction.
 func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Request) {
 	// Read request body
 	var body []byte
@@ -219,7 +245,6 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Convert HTTP headers to protocol format
-	// HTTP headers can have multiple values (e.g., Set-Cookie, Accept)
 	headers := make([]*protocol.HTTPHeader, 0, len(r.Header))
 	for name, values := range r.Header {
 		headers = append(headers, &protocol.HTTPHeader{
@@ -228,24 +253,55 @@ func (c *ExternalDomainProxy) proxyHTTPRequest(w http.ResponseWriter, r *http.Re
 		})
 	}
 
-	// Create gRPC request
+	// Calculate both stripped and full paths
+	originalPath := r.URL.Path
+	prefix := "/api/" + c.metadata.Name
+	strippedPath := originalPath
+
+	if originalPath == prefix {
+		// Exact match: /api/code -> /
+		strippedPath = "/"
+	} else if len(originalPath) > len(prefix) && originalPath[:len(prefix)] == prefix {
+		// Has prefix: /api/code/... -> /...
+		strippedPath = originalPath[len(prefix):]
+		// Ensure stripped path starts with /
+		if strippedPath == "" || strippedPath[0] != '/' {
+			strippedPath = "/" + strippedPath
+		}
+	}
+
+	// Add query string
+	queryString := ""
+	if r.URL.RawQuery != "" {
+		queryString = "?" + r.URL.RawQuery
+	}
+
+	// Try stripped path first (modern approach: plugins don't need to know mount point)
 	req := &protocol.HTTPRequest{
 		Method:  r.Method,
-		Path:    r.URL.Path,
+		Path:    strippedPath + queryString,
 		Headers: headers,
 		Body:    body,
 	}
 
-	// Add query string to path
-	if r.URL.RawQuery != "" {
-		req.Path = r.URL.Path + "?" + r.URL.RawQuery
+	c.logger.Debugw("Proxying to plugin (stripped)", "plugin", c.metadata.Name, "original", originalPath, "trying", strippedPath)
+	resp, err := c.client.HandleHTTP(r.Context(), req)
+
+	// If stripped path returns 404, try full path (for LLMs that naturally include prefix)
+	if err == nil && resp.StatusCode == 404 && strippedPath != originalPath {
+		c.logger.Debugw("Stripped path 404, retrying with full path", "plugin", c.metadata.Name, "full_path", originalPath)
+		req.Path = originalPath + queryString
+		resp, err = c.client.HandleHTTP(r.Context(), req)
 	}
 
-	// Call remote plugin
-	resp, err := c.client.HandleHTTP(r.Context(), req)
+	// Handle errors
 	if err != nil {
-		c.logger.Errorw("Remote HTTP request failed", "error", err, "path", r.URL.Path)
-		http.Error(w, "Plugin error", http.StatusBadGateway)
+		c.logger.Errorw("Remote HTTP request failed",
+			"plugin", c.metadata.Name,
+			"method", r.Method,
+			"path", req.Path,
+			"error", err)
+		http.Error(w, fmt.Sprintf("Plugin '%s' error: %v (%s %s)", c.metadata.Name, err, r.Method, req.Path), http.StatusBadGateway)
 		return
 	}
 

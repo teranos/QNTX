@@ -12,14 +12,27 @@
 
 QNTX uses segments across the project:
 
-- **꩜** (Pulse) - Async operations, rate limiting, job processing
-- **⌬** (by) - Actor/catalyst, origin of action
+### Primary SEG Operators (UI/Command Symbols)
+- **⍟** (i) - Self, your vantage point into QNTX
 - **≡** (am) - Configuration and system settings
 - **⨳** (ix) - Data ingestion/import
 - **⋈** (ax) - Expand/query, contextual surfacing
-- **⊔** (db) - Database/storage, material retention substrate
+- **⌬** (by) - Actor/catalyst, origin of action (all forms: creator, source, authenticated user)
+- **✦** (at) - Temporal marker/moment
+- **⟶** (so) - Therefore, consequent action
 
-**Note:** These symbols are defined in the `sym` package for consistent use across QNTX.
+### System Symbols
+- **꩜** (Pulse) - Async operations, rate limiting, job processing (always prefix Pulse-related logs)
+- **✿** (PulseOpen) - Graceful startup
+- **❀** (PulseClose) - Graceful shutdown
+- **⊔** (db) - Database/storage layer
+
+### Attestation Building Blocks
+- **+** (as) - Assert, emit an attestation
+- **=** (is) - Identity/equivalence in attestations
+- **∈** (of) - Membership/belonging in attestations
+
+**Note:** These symbols are defined in the `sym` package for consistent use across QNTX. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
 
 **For Claude**: Use these segments consistently when referencing system components.
 
@@ -33,7 +46,7 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 - **Philosophy**: Sensible defaults for immediate use; configuration optional for customization
 - **Precedence**: System < User < Project < Environment Variables
 - **File naming**: Prefers `am.toml` (new) but supports `config.toml` (backward compat)
-- **Scope**: Core infrastructure only (Pulse, REPL, Server, Code, LocalInference, Ax, Database)
+- **Scope**: Core infrastructure only (Pulse, Server, Code, LocalInference, Ax, Database)
 
 ### Key Design Decisions
 

@@ -4,7 +4,8 @@
  * Provides methods to interact with /api/pulse/schedules endpoints
  */
 
-import { debugLog, debugError } from "../debug.ts";
+import { log, SEG } from "../logger";
+import { handleError } from "../error-handler";
 import type {
   ScheduledJobResponse,
   CreateScheduledJobRequest,
@@ -20,11 +21,11 @@ function getBaseUrl(): string {
     const baseUrl = `${backendUrl}/api/pulse/schedules`;
 
     if (backendUrl) {
-        debugLog('%c[Pulse API] DEV MODE', 'background: #00ff00; color: #000; font-weight: bold; padding: 4px 8px;', `Backend: ${backendUrl}`);
+        log.debug(SEG.PULSE, 'Backend URL configured:', backendUrl);
     } else {
-        debugLog('%c[Pulse API] PRODUCTION', 'background: #0099ff; color: #fff; font-weight: bold; padding: 4px 8px;', 'Using same-origin');
+        log.debug(SEG.PULSE, 'Using same-origin backend');
     }
-    debugLog('[Pulse API] Full URL:', baseUrl);
+    log.debug(SEG.PULSE, 'Full URL:', baseUrl);
 
     return baseUrl;
 }
@@ -59,7 +60,7 @@ export async function createScheduledJob(
   request: CreateScheduledJobRequest
 ): Promise<ScheduledJobResponse> {
   const baseUrl = getBaseUrl();
-  debugLog('[Pulse API] Creating scheduled job:', request);
+  log.debug(SEG.PULSE, 'Creating scheduled job:', request);
 
   const response = await fetch(baseUrl, {
     method: "POST",
@@ -67,7 +68,7 @@ export async function createScheduledJob(
     body: JSON.stringify(request),
   });
 
-  debugLog('[Pulse API] Response:', {
+  log.debug(SEG.PULSE, 'Response:', {
     status: response.status,
     statusText: response.statusText,
     url: response.url,
@@ -76,13 +77,14 @@ export async function createScheduledJob(
 
   if (!response.ok) {
     const responseText = await response.text();
-    debugError('[Pulse API] Error response body:', responseText);
+    log.error(SEG.PULSE, 'Error response body:', responseText);
 
     let errorMessage = response.statusText;
     try {
       const errorJson = JSON.parse(responseText);
       errorMessage = errorJson.error || errorJson.message || response.statusText;
     } catch (e) {
+      handleError(e, 'Failed to parse API error response', { context: SEG.PULSE, silent: true });
       // Response wasn't JSON, use raw text
       errorMessage = responseText || response.statusText;
     }
@@ -91,7 +93,7 @@ export async function createScheduledJob(
   }
 
   const job = await response.json();
-  debugLog('[Pulse API] Created job response:', {
+  log.debug(SEG.PULSE, 'Created job response:', {
     id: job.id,
     created_from_doc: job.created_from_doc,
     hasCreatedFromDoc: !!job.created_from_doc
@@ -110,7 +112,7 @@ export async function updateScheduledJob(
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/${id}`;
 
-  debugLog('[Pulse API] Updating scheduled job:', { id, request, url });
+  log.debug(SEG.PULSE, 'Updating scheduled job:', { id, request, url });
 
   const response = await fetch(url, {
     method: "PATCH",
@@ -118,7 +120,7 @@ export async function updateScheduledJob(
     body: JSON.stringify(request),
   });
 
-  debugLog('[Pulse API] Update response:', {
+  log.debug(SEG.PULSE, 'Update response:', {
     status: response.status,
     statusText: response.statusText,
     url: response.url,
@@ -165,7 +167,7 @@ export async function resumeScheduledJob(id: string): Promise<ScheduledJobRespon
  * Uses interval_seconds: 0 to indicate one-time execution
  */
 export async function forceTriggerJob(atsCode: string): Promise<ScheduledJobResponse> {
-  debugLog('[Pulse API] Force triggering job:', atsCode);
+  log.debug(SEG.PULSE, 'Force triggering job:', atsCode);
 
   return createScheduledJob({
     ats_code: atsCode,

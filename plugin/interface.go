@@ -4,8 +4,7 @@
 // Each domain provides HTTP endpoints, WebSocket handlers, and lifecycle management.
 //
 // Architecture:
-//   - Built-in domains compiled into QNTX binary
-//   - External domains run as separate processes via gRPC
+//   - All domains run as separate processes via gRPC
 //   - All domains implement the same DomainPlugin interface
 //   - Domains are isolated - interact only via shared database (attestations)
 //
@@ -21,7 +20,7 @@ import (
 )
 
 // DomainPlugin defines the interface that all domain plugins must implement.
-// Both built-in and external plugins implement this interface.
+// All plugins implement this interface.
 type DomainPlugin interface {
 	// Metadata returns information about this domain plugin
 	Metadata() Metadata
@@ -83,6 +82,8 @@ type HealthStatus struct {
 type PluginState string
 
 const (
+	// StateLoading indicates the plugin is currently loading/connecting
+	StateLoading PluginState = "loading"
 	// StateRunning indicates the plugin is active and processing requests
 	StateRunning PluginState = "running"
 	// StatePaused indicates the plugin is temporarily suspended
@@ -106,4 +107,33 @@ type PausablePlugin interface {
 
 	// Resume restores the plugin to active operation after a pause.
 	Resume(ctx context.Context) error
+}
+
+// ConfigurablePlugin is an optional interface for plugins that expose configuration
+// schemas for UI-based configuration. Plugins implementing this interface will have
+// their configuration schema exposed via the gRPC ConfigSchema RPC, enabling the
+// web UI to render configuration forms.
+type ConfigurablePlugin interface {
+	DomainPlugin
+
+	// ConfigSchema returns the configuration schema for this plugin.
+	// The returned map keys are configuration field names (e.g., "gopls.workspace_root").
+	// Values describe each field's type, description, default, and validation constraints.
+	//
+	// Field types: "string", "number", "boolean", "array"
+	// See protocol.ConfigFieldSchema for the full schema definition.
+	ConfigSchema() map[string]ConfigField
+}
+
+// ConfigField describes a single configuration field for UI-based configuration.
+// This maps directly to protocol.ConfigFieldSchema for gRPC serialization.
+type ConfigField struct {
+	Type         string // "string", "number", "boolean", "array"
+	Description  string // Human-readable description
+	DefaultValue string // Default value as string
+	Required     bool   // Whether field is required
+	MinValue     string // For numbers: minimum value
+	MaxValue     string // For numbers: maximum value
+	Pattern      string // For strings: regex validation pattern
+	ElementType  string // For arrays: element type
 }

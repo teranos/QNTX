@@ -166,6 +166,72 @@ func TestEnsureTypes_OpacityHandling(t *testing.T) {
 	}
 }
 
+func TestEnsureTypes_RichStringFields(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	typeDefs := []TypeDef{
+		{
+			Name:             "candidate",
+			Label:            "Candidate",
+			Color:            "#e74c3c",
+			RichStringFields: []string{"notes", "description"},
+		},
+		{
+			Name:             "jd",
+			Label:            "Job Description",
+			Color:            "#27ae60",
+			RichStringFields: []string{"description", "requirements"},
+		},
+		{
+			Name:  "simple",
+			Label: "Simple Type",
+			Color: "#3498db",
+			// No RichStringFields
+		},
+	}
+
+	err := EnsureTypes(store, "test-source", typeDefs...)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(store.attestations) != 3 {
+		t.Fatalf("expected 3 attestations, got %d", len(store.attestations))
+	}
+
+	// Test candidate type with rich_string_fields
+	candidateAttestation := store.attestations[0]
+	richFields, ok := candidateAttestation.Attributes["rich_string_fields"].([]string)
+	if !ok {
+		t.Errorf("candidate: expected rich_string_fields to be []string, got %T", candidateAttestation.Attributes["rich_string_fields"])
+	}
+	if len(richFields) != 2 {
+		t.Errorf("candidate: expected 2 rich_string_fields, got %d", len(richFields))
+	}
+	if richFields[0] != "notes" || richFields[1] != "description" {
+		t.Errorf("candidate: expected [notes, description], got %v", richFields)
+	}
+
+	// Test jd type with different rich_string_fields
+	jdAttestation := store.attestations[1]
+	jdRichFields, ok := jdAttestation.Attributes["rich_string_fields"].([]string)
+	if !ok {
+		t.Errorf("jd: expected rich_string_fields to be []string, got %T", jdAttestation.Attributes["rich_string_fields"])
+	}
+	if len(jdRichFields) != 2 {
+		t.Errorf("jd: expected 2 rich_string_fields, got %d", len(jdRichFields))
+	}
+	if jdRichFields[0] != "description" || jdRichFields[1] != "requirements" {
+		t.Errorf("jd: expected [description, requirements], got %v", jdRichFields)
+	}
+
+	// Test simple type with NO rich_string_fields
+	simpleAttestation := store.attestations[2]
+	if _, exists := simpleAttestation.Attributes["rich_string_fields"]; exists {
+		t.Errorf("simple: expected rich_string_fields to be absent, but found: %v", simpleAttestation.Attributes["rich_string_fields"])
+	}
+}
+
 // TestIsExistenceAttestation validates detection of pure existence claims vs relationships
 // Critical for graph building: existence attestations don't create links, relationships do
 func TestIsExistenceAttestation(t *testing.T) {
@@ -227,5 +293,55 @@ func TestIsExistenceAttestation(t *testing.T) {
 	}
 	if multiContext.IsExistenceAttestation() {
 		t.Error("Expected NOT existence attestation with multiple contexts")
+	}
+}
+
+func TestEnsureTypes_ArrayFields(t *testing.T) {
+	store := &MockAttestationStore{}
+
+	typeDefs := []TypeDef{
+		{
+			Name:        "repository",
+			Label:       "Code Repository",
+			Color:       "#6e5494",
+			ArrayFields: []string{"languages", "topics", "contributors"},
+		},
+		{
+			Name:  "commit",
+			Label: "Commit",
+			Color: "#34495e",
+			// No ArrayFields
+		},
+	}
+
+	err := EnsureTypes(store, "test-source", typeDefs...)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(store.attestations) != 2 {
+		t.Fatalf("expected 2 attestations, got %d", len(store.attestations))
+	}
+
+	// Test repository type with array_fields
+	repoAttestation := store.attestations[0]
+	arrayFields, ok := repoAttestation.Attributes["array_fields"].([]string)
+	if !ok {
+		t.Errorf("repository: expected array_fields to be []string, got %T", repoAttestation.Attributes["array_fields"])
+	}
+	if len(arrayFields) != 3 {
+		t.Errorf("repository: expected 3 array_fields, got %d", len(arrayFields))
+	}
+	expected := []string{"languages", "topics", "contributors"}
+	for i, field := range expected {
+		if arrayFields[i] != field {
+			t.Errorf("repository: expected array_fields[%d] = %s, got %s", i, field, arrayFields[i])
+		}
+	}
+
+	// Test commit type with NO array_fields
+	commitAttestation := store.attestations[1]
+	if _, exists := commitAttestation.Attributes["array_fields"]; exists {
+		t.Errorf("commit: expected array_fields to be absent, but found: %v", commitAttestation.Attributes["array_fields"])
 	}
 }

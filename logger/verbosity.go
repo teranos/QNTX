@@ -2,13 +2,26 @@ package logger
 
 import "go.uber.org/zap/zapcore"
 
-// Verbosity level constants for CLI flag counts
+// Verbosity level constants for CLI flag counts.
+//
+// These levels control WHAT categories of output are shown, not just log severity.
+// See output.go for the full category system.
+//
+// Example usage:
+//
+//	if logger.ShouldOutput(verbosity, logger.OutputPluginLogs) {
+//	    fmt.Printf("[plugin] %s\n", line)
+//	}
+//
+//	if logger.ShouldOutput(verbosity, logger.OutputAxQueries) {
+//	    fmt.Printf("Executing query: %s\n", query)
+//	}
 const (
-	VerbosityUser  = 0 // No flags: user-facing output only
-	VerbosityInfo  = 1 // -v: informational messages
-	VerbosityDebug = 2 // -vv: debug messages
-	VerbosityTrace = 3 // -vvv: trace-level debugging
-	VerbosityAll   = 4 // -vvvv: dump full data structures
+	VerbosityUser  = 0 // No flags: results and errors only
+	VerbosityInfo  = 1 // -v: + progress, startup, plugin status
+	VerbosityDebug = 2 // -vv: + queries, timing, config details
+	VerbosityTrace = 3 // -vvv: + plugin logs, SQL, gRPC calls
+	VerbosityAll   = 4 // -vvvv: + full request/response bodies
 )
 
 // VerbosityToLevel maps verbosity flags (-v, -vv, etc.) to zap log levels

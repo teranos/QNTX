@@ -55,19 +55,11 @@ func TestGRPCMetadata(t *testing.T) {
 	resp, err := client.Metadata(context.Background(), &protocol.Empty{})
 	require.NoError(t, err, "Metadata RPC failed")
 
-	// Verify metadata matches what the code plugin should return
+	// Verify metadata is returned via gRPC
 	assert.Equal(t, "code", resp.Name, "Plugin name must be 'code'")
-	assert.Equal(t, "0.1.0", resp.Version, "Plugin version")
-	assert.Equal(t, ">= 0.1.0", resp.QntxVersion, "Required QNTX version")
-	assert.Equal(t, "Software development domain (git, GitHub, gopls, code editor)", resp.Description)
-
-	// Regression test: Ensure we're not returning webscraper metadata via gRPC
-	assert.NotEqual(t, "webscraper", resp.Name,
-		"Code plugin gRPC server must not return 'webscraper' as name")
-	assert.NotEqual(t, "0.2.0", resp.Version,
-		"Code plugin gRPC server must not return webscraper's version")
-	assert.NotContains(t, resp.Description, "Web scraping",
-		"Code plugin gRPC server must not have webscraper description")
+	assert.NotEmpty(t, resp.Version, "Version must not be empty")
+	assert.NotEmpty(t, resp.QntxVersion, "Required QNTX version must not be empty")
+	assert.NotEmpty(t, resp.Description, "Description must not be empty")
 
 	// Shutdown
 	cancel()

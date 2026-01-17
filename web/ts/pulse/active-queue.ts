@@ -3,6 +3,8 @@
  */
 
 import { formatRelativeTime, escapeHtml } from './panel.ts';
+import { log, SEG } from '../logger';
+import { handleError } from '../error-handler';
 
 /**
  * Render Active Queue section
@@ -57,7 +59,7 @@ export async function fetchActiveJobs(): Promise<any[]> {
     try {
         const response = await fetch('/api/pulse/jobs?limit=50');
         if (!response.ok) {
-            console.error('Failed to fetch active jobs:', response.statusText);
+            log.error(SEG.PULSE, 'Failed to fetch active jobs:', response.statusText);
             return [];
         }
 
@@ -71,7 +73,7 @@ export async function fetchActiveJobs(): Promise<any[]> {
             job.status === 'paused'
         );
     } catch (error) {
-        console.error('Error fetching active jobs:', error);
+        handleError(error, 'Error fetching active jobs', { context: SEG.PULSE, silent: true });
         return [];
     }
 }

@@ -30,19 +30,19 @@ PULSE_CLOSE = "❀"
 PULSE_OPEN = "✿"
 SO = "⟶"
 
-PALETTE_ORDER: tuple[str, ...] = (I, AM, IX, AX, AS, IS, OF, BY, AT, SO,)
+PALETTE_ORDER: tuple[str, ...] = (I, AM, IX, AX, BY, AT, SO,)
 
 COMMAND_DESCRIPTIONS: dict[str, str] = {
-    "am": "Structure — QNTX's internal understanding",
+    "am": "Configuration — System settings and state",
     "as": "Assert — Emit an attestation",
-    "at": "Event — Temporal marker/moment",
-    "ax": "Expand — Surface related context",
-    "by": "Actor — Catalyst/origin of action",
+    "at": "Temporal — Time marker/moment",
+    "ax": "Expand — Query and surface related context",
+    "by": "Actor — Origin of action (creator/source/user)",
     "i": "Self — Your vantage point into QNTX",
-    "is": "Identity — Subject/equivalence",
+    "is": "Identity — Subject/equivalence in attestations",
     "ix": "Ingest — Import external data",
-    "of": "Membership — Element-of/belonging",
-    "so": "Therefore — Consequent action",
+    "of": "Membership — Element-of/belonging in attestations",
+    "so": "Therefore — Consequent action/trigger",
 }
 
 COMMAND_TO_SYMBOL: dict[str, str] = {

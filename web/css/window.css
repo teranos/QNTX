@@ -1,0 +1,198 @@
+/**
+ * Draggable Window Component
+ * Used for floating UI elements like VidStream
+ */
+
+.draggable-window {
+    position: fixed;
+    top: 100px;
+    left: 100px;
+    background: var(--panel-bg, #fff);
+    border: var(--panel-border);
+    border-radius: var(--panel-border-radius);
+    box-shadow: var(--panel-shadow-md);
+    z-index: 9999;
+    display: none;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+}
+
+.draggable-window[data-visible="true"] {
+    display: block;
+}
+
+/* Header */
+.draggable-window-header {
+    padding: 8px 12px;
+    border-bottom: var(--panel-border);
+    cursor: move;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    background: var(--panel-bg-secondary, #f8f8f8);
+}
+
+.draggable-window-header:active {
+    cursor: grabbing;
+}
+
+.draggable-window-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--panel-text-primary, #333);
+}
+
+/* Version text next to title */
+.draggable-window-version {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--panel-text-tertiary, #999);
+    margin-left: 6px;
+    cursor: help;
+}
+
+/* Content */
+.draggable-window-content {
+    padding: 12px;
+}
+
+/* Footer - for runtime stats and metrics */
+.draggable-window-footer {
+    padding: 8px 12px;
+    border-top: var(--panel-border);
+    background: var(--panel-bg-secondary, #f8f8f8);
+    font-size: 11px;
+    color: var(--panel-text-secondary, #666);
+    display: none;
+}
+
+.draggable-window-footer:not(:empty) {
+    display: block;
+}
+
+/* Form elements */
+.window-input {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--panel-bg, #fff);
+    border: var(--panel-border);
+    color: var(--panel-text-primary, #333);
+    border-radius: var(--panel-border-radius);
+    font-family: inherit;
+    font-size: 11px;
+    margin-bottom: 8px;
+}
+
+.window-input:focus {
+    outline: 2px solid #0066cc;
+    outline-offset: 1px;
+}
+
+.window-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Unavailable button - diagonal striped pattern */
+.btn-unavailable {
+    position: relative;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-unavailable::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 4px,
+        rgba(0, 0, 0, 0.1) 4px,
+        rgba(0, 0, 0, 0.1) 8px
+    );
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+/* Controls row */
+.window-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.window-status {
+    margin-left: auto;
+    align-self: center;
+    color: var(--panel-text-secondary, #666);
+    font-size: 11px;
+}
+
+/* Video viewport */
+.window-viewport {
+    position: relative;
+    width: 640px;
+    height: 480px;
+    background: #000;
+    margin-bottom: 8px;
+    border: var(--panel-border);
+    overflow: hidden;
+}
+
+.window-video,
+.window-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Error display */
+.window-error {
+    padding: 8px 12px;
+    background: #fee;
+    border: 1px solid #c88;
+    border-radius: var(--panel-border-radius);
+    color: #a00;
+    font-size: 11px;
+    margin-bottom: 8px;
+    font-family: inherit;
+    word-break: break-word;
+    user-select: text;
+    cursor: text;
+}
+
+/* Stats grid */
+.window-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    font-size: 11px;
+    color: var(--panel-text-secondary, #666);
+}
+
+.window-stat-value {
+    font-weight: 600;
+    color: var(--panel-text-primary, #333);
+}
+
+/* Model info */
+.window-model-info {
+    font-size: 10px;
+    color: var(--panel-text-secondary, #666);
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background: var(--panel-bg-secondary, #f8f8f8);
+    border-radius: var(--panel-border-radius);
+}
+
+.window-model-info span {
+    font-family: monospace;
+    color: var(--panel-text-primary, #333);
+}

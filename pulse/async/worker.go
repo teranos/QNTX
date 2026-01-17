@@ -9,8 +9,8 @@ import (
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/budget"
-	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
 )
 
@@ -558,10 +558,11 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 		}
 		// Log rate limit status for visibility
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
-		wp.logger.SugaredLogger.Infow(fmt.Sprintf(sym.Pulse+" Rate limit reached - job paused | calls:%d/%d remaining:%d | job:%s",
-			callsInWindow, callsInWindow+callsRemaining, callsRemaining, job.ID[:12]),
+		logger.AddPulseSymbol(wp.logger.SugaredLogger).Infow("Rate limit reached - job paused",
 			"job_id", job.ID,
+			"job_short", job.ID[:12],
 			"calls_in_window", callsInWindow,
+			"calls_total", callsInWindow+callsRemaining,
 			"calls_remaining", callsRemaining,
 			"reason", "rate_limited")
 		return true, nil
@@ -586,21 +587,19 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 			dailyLimit := status.DailySpend + status.DailyRemaining
 			monthlyLimit := status.MonthlySpend + status.MonthlyRemaining
 
-			wp.logger.SugaredLogger.Infow(fmt.Sprintf(sym.Pulse+" Budget exceeded - job %s | daily:$%.2f/$%.2f monthly:$%.2f/$%.2f | job:%s",
-				func() string {
-					if wp.poolConfig.PauseOnBudget {
-						return "paused"
-					}
-					return "failed"
-				}(),
-				status.DailySpend, dailyLimit,
-				status.MonthlySpend, monthlyLimit,
-				job.ID[:12]),
+			action := "failed"
+			if wp.poolConfig.PauseOnBudget {
+				action = "paused"
+			}
+			logger.AddPulseSymbol(wp.logger.SugaredLogger).Infow("Budget exceeded - job "+action,
 				"job_id", job.ID,
+				"job_short", job.ID[:12],
 				"estimated_cost", estimatedCost,
 				"daily_spend", status.DailySpend,
-				"daily_remaining", status.DailyRemaining,
+				"daily_limit", dailyLimit,
 				"monthly_spend", status.MonthlySpend,
+				"monthly_limit", monthlyLimit,
+				"daily_remaining", status.DailyRemaining,
 				"monthly_remaining", status.MonthlyRemaining,
 				"reason", "budget_exceeded")
 		}

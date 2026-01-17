@@ -12,9 +12,10 @@ func floatPtr(f float64) *float64 {
 // Git entity types
 var (
 	Commit = atstypes.TypeDef{
-		Name:  "commit",
-		Label: "Commit",
-		Color: "#34495e",
+		Name:             "commit",
+		Label:            "Commit",
+		Color:            "#34495e",
+		RichStringFields: []string{"message", "title", "description"},
 	}
 
 	Author = atstypes.TypeDef{

@@ -1,13 +1,17 @@
 package am
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/viper"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 var globalConfig *Config
@@ -23,7 +27,7 @@ func Load() (*Config, error) {
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 
 	globalConfig = &config
@@ -39,7 +43,7 @@ func GetViper() *viper.Viper {
 func LoadWithViper(v *viper.Viper) (*Config, error) {
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal config")
 	}
 	return &config, nil
 }
@@ -54,12 +58,12 @@ func LoadFromFile(configPath string) (*Config, error) {
 	SetDefaults(v)
 
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %w", configPath, err)
+		return nil, errors.Wrapf(err, "failed to read config file %s", configPath)
 	}
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config from %s: %w", configPath, err)
+		return nil, errors.Wrapf(err, "failed to unmarshal config from %s", configPath)
 	}
 
 	return &config, nil
@@ -178,6 +182,114 @@ func mergeConfigFiles(v *viper.Viper) {
 	}
 }
 
+// LoadPluginConfigs loads plugin-specific configuration from ~/.qntx/plugins/{name}.toml files
+// Config values are loaded under the plugin name namespace (e.g., python.python_paths)
+// Returns nil if plugins directory doesn't exist (not an error), or actual errors encountered
+func LoadPluginConfigs(pluginPaths []string) error {
+	v := initViper()
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "failed to get home directory")
+	}
+
+	pluginsDir := filepath.Join(homeDir, ".qntx", "plugins")
+
+	// Check if plugins directory exists
+	if _, err := os.Stat(pluginsDir); os.IsNotExist(err) {
+		// Plugins directory doesn't exist yet - this is fine
+		return nil
+	}
+
+	// Scan for plugin TOML files in the plugins directory
+	entries, err := os.ReadDir(pluginsDir)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to read plugins directory")
+		return errors.WithSafeDetails(err, "path=%s", pluginsDir)
+	}
+
+	var loadErrors []error
+
+	for _, entry := range entries {
+		// Skip directories and non-TOML files
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".toml") {
+			continue
+		}
+
+		pluginConfigPath := filepath.Join(pluginsDir, entry.Name())
+
+		// Load the plugin TOML file
+		tempViper := viper.New()
+		tempViper.SetConfigFile(pluginConfigPath)
+		tempViper.SetConfigType("toml")
+
+		if err := tempViper.ReadInConfig(); err != nil {
+			// Collect error but continue - one bad config shouldn't break all plugins
+			wrappedErr := errors.Wrapf(err, "failed to read plugin config")
+			wrappedErr = errors.WithSafeDetails(wrappedErr, "file=%s", entry.Name())
+			wrappedErr = errors.WithHintf(wrappedErr, "check TOML syntax in %s", pluginConfigPath)
+			loadErrors = append(loadErrors, wrappedErr)
+			continue
+		}
+
+		// Extract plugin name from the TOML or filename
+		pluginName := tempViper.GetString("name")
+		if pluginName == "" {
+			// Use filename without .toml extension as plugin name
+			pluginName = strings.TrimSuffix(entry.Name(), ".toml")
+		}
+
+		// Get the [config] section if it exists
+		configSection := tempViper.GetStringMap("config")
+		if len(configSection) == 0 {
+			// No [config] section - this is fine, plugin uses defaults
+			continue
+		}
+
+		// Merge config values under plugin namespace (e.g., python.key)
+		// Convert all values to strings for consistency with protobuf
+		for key, value := range configSection {
+			fullKey := pluginName + "." + key
+
+			// Type assertion: ensure value can be converted to string
+			var strValue string
+			switch v := value.(type) {
+			case string:
+				strValue = v
+			case int, int8, int16, int32, int64:
+				strValue = fmt.Sprintf("%d", v)
+			case float32, float64:
+				strValue = fmt.Sprintf("%f", v)
+			case bool:
+				strValue = fmt.Sprintf("%t", v)
+			default:
+				// Complex types (arrays, maps) - serialize as JSON string
+				if jsonBytes, err := json.Marshal(v); err == nil {
+					strValue = string(jsonBytes)
+				} else {
+					typeErr := errors.Newf("unsupported config value type")
+					typeErr = errors.WithSafeDetails(typeErr, "file=%s key=%s type=%T", entry.Name(), key, value)
+					typeErr = errors.WithHint(typeErr, "config values must be strings, numbers, booleans, or JSON-serializable types")
+					loadErrors = append(loadErrors, typeErr)
+					continue
+				}
+			}
+
+			v.Set(fullKey, strValue)
+		}
+	}
+
+	// If there were errors, combine them
+	if len(loadErrors) > 0 {
+		baseErr := errors.Newf("%d plugin config(s) failed to load", len(loadErrors))
+		for i, err := range loadErrors {
+			baseErr = errors.Wrapf(err, "%s (error %d/%d)", baseErr.Error(), i+1, len(loadErrors))
+		}
+		return errors.WithHintf(baseErr, "fix plugin configuration files in %s", pluginsDir)
+	}
+
+	return nil
+}
+
 // Get returns a configuration value using dot notation
 func Get(key string) interface{} {
 	v := initViper()
@@ -241,4 +353,141 @@ func GetServerConfig() (*ServerConfig, error) {
 		return nil, err
 	}
 	return &config.Server, nil
+}
+
+// UpdatePluginConfig updates a plugin's runtime configuration.
+// It writes the updated config to ~/.qntx/plugins/{pluginName}.toml and updates viper.
+// If the plugin config file doesn't exist, it creates one with sensible defaults.
+func UpdatePluginConfig(pluginName string, config map[string]string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "failed to get home directory")
+	}
+
+	pluginsDir := filepath.Join(homeDir, ".qntx", "plugins")
+	configPath := filepath.Join(pluginsDir, pluginName+".toml")
+
+	// Ensure plugins directory exists
+	if err := os.MkdirAll(pluginsDir, DefaultDirPermissions); err != nil {
+		err = errors.Wrapf(err, "failed to create plugins directory")
+		return errors.WithSafeDetails(err, "path=%s", pluginsDir)
+	}
+
+	// Load existing config or create new one
+	pluginConfig := make(map[string]interface{})
+	if data, err := os.ReadFile(configPath); err == nil {
+		// Parse existing config
+		if err := toml.Unmarshal(data, &pluginConfig); err != nil {
+			wrappedErr := errors.Wrapf(err, "failed to parse existing plugin config")
+			wrappedErr = errors.WithSafeDetails(wrappedErr, "plugin=%s", pluginName)
+			return errors.WithHintf(wrappedErr, "fix TOML syntax in %s or delete the file to recreate", configPath)
+		}
+	} else if !os.IsNotExist(err) {
+		// Read error other than "not exist"
+		return errors.Wrapf(err, "failed to read plugin config at %s", configPath)
+	}
+
+	// Ensure basic fields are set if creating new config
+	if pluginConfig["name"] == nil {
+		pluginConfig["name"] = pluginName
+	}
+	if pluginConfig["enabled"] == nil {
+		pluginConfig["enabled"] = true
+	}
+	if pluginConfig["auto_start"] == nil {
+		pluginConfig["auto_start"] = true
+	}
+
+	// Update [config] section
+	pluginConfig["config"] = config
+
+	// Write updated config to disk
+	if err := writePluginConfigFile(configPath, pluginConfig); err != nil {
+		return err
+	}
+
+	// Update viper with new values
+	v := initViper()
+	for key, value := range config {
+		fullKey := pluginName + "." + key
+		v.Set(fullKey, value)
+	}
+
+	return nil
+}
+
+// WritePluginConfigToTemp writes plugin config to a temporary file for validation.
+// Returns the temp file path on success.
+func WritePluginConfigToTemp(pluginName string, config map[string]string) (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get home directory")
+	}
+
+	pluginsDir := filepath.Join(homeDir, ".qntx", "plugins")
+	configPath := filepath.Join(pluginsDir, pluginName+".toml")
+
+	// Load existing config or create new one
+	pluginConfig := make(map[string]interface{})
+	if data, err := os.ReadFile(configPath); err == nil {
+		if err := toml.Unmarshal(data, &pluginConfig); err != nil {
+			wrappedErr := errors.Wrapf(err, "failed to parse existing plugin config")
+			wrappedErr = errors.WithSafeDetails(wrappedErr, "plugin=%s", pluginName)
+			return "", errors.WithHintf(wrappedErr, "fix TOML syntax in %s", configPath)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", errors.Wrapf(err, "failed to read plugin config at %s", configPath)
+	}
+
+	// Set defaults if missing
+	if pluginConfig["name"] == nil {
+		pluginConfig["name"] = pluginName
+	}
+	if pluginConfig["enabled"] == nil {
+		pluginConfig["enabled"] = true
+	}
+	if pluginConfig["auto_start"] == nil {
+		pluginConfig["auto_start"] = true
+	}
+
+	// Update [config] section
+	pluginConfig["config"] = config
+
+	// Create temp file
+	tempFile, err := os.CreateTemp("", pluginName+"-*.toml")
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to create temp file for plugin %s", pluginName)
+	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+
+	// Write to temp file
+	if err := writePluginConfigFile(tempPath, pluginConfig); err != nil {
+		os.Remove(tempPath)
+		return "", err
+	}
+
+	return tempPath, nil
+}
+
+// writePluginConfigFile writes plugin configuration to a TOML file.
+// Internal helper used by both UpdatePluginConfig and WritePluginConfigToTemp.
+func writePluginConfigFile(path string, config map[string]interface{}) error {
+	// Create a buffer to write TOML
+	buf := &strings.Builder{}
+
+	// Encode to TOML
+	encoder := toml.NewEncoder(buf)
+	if err := encoder.Encode(config); err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to encode plugin config as TOML")
+		return errors.WithSafeDetails(wrappedErr, "path=%s", path)
+	}
+
+	// Write to file with safe permissions
+	if err := os.WriteFile(path, []byte(buf.String()), DefaultFilePermissions); err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to write plugin config file")
+		return errors.WithSafeDetails(wrappedErr, "path=%s", path)
+	}
+
+	return nil
 }

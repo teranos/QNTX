@@ -304,16 +304,20 @@ func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult
 		sinceCommit, err := repo.CommitObject(plumbing.NewHash(p.sinceHash))
 		if err != nil {
 			// Try as short hash by iterating
-			commitIter, _ := repo.CommitObjects()
-			_ = commitIter.ForEach(func(c *object.Commit) error {
-				if strings.HasPrefix(c.Hash.String(), p.sinceHash) {
-					t := c.Author.When
-					p.sinceTime = &t
-					return fmt.Errorf("found") // Break iteration
-				}
-				return nil
-			})
-			commitIter.Close()
+			commitIter, iterErr := repo.CommitObjects()
+			if iterErr == nil {
+				// ForEach error ignored: uses sentinel error "found" to break iteration
+				_ = commitIter.ForEach(func(c *object.Commit) error {
+					if strings.HasPrefix(c.Hash.String(), p.sinceHash) {
+						t := c.Author.When
+						p.sinceTime = &t
+						return fmt.Errorf("found") // Break iteration
+					}
+					return nil
+				})
+				commitIter.Close()
+			}
+			// If commitIter failed, sinceTime remains nil (will be handled below)
 		} else {
 			t := sinceCommit.Author.When
 			p.sinceTime = &t

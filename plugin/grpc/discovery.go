@@ -2,8 +2,8 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,10 +15,13 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin"
+	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-// PluginConfig represents configuration for an external plugin.
+// PluginConfig represents configuration for a plugin.
 type PluginConfig struct {
 	// Name is the plugin identifier
 	Name string `toml:"name"`
@@ -42,31 +45,66 @@ type PluginConfig struct {
 
 	// AutoStart controls whether to automatically start the plugin
 	AutoStart bool `toml:"auto_start"`
+
+	// Config contains plugin-specific runtime configuration
+	// These key-value pairs are passed to the plugin via InitializeRequest
+	Config map[string]string `toml:"config"`
 }
 
-// PluginManager manages external plugin processes and connections.
+// PluginManager manages plugin processes and connections.
 type PluginManager struct {
-	mu       sync.RWMutex
-	plugins  map[string]*managedPlugin
-	logger   *zap.SugaredLogger
-	basePort int
+	mu           sync.RWMutex
+	plugins      map[string]*managedPlugin
+	logger       *zap.SugaredLogger
+	basePort     int
+	nextPort     int // Track the next port to allocate
+	portMu       sync.Mutex // Separate mutex for port allocation
 }
 
 // managedPlugin tracks a running plugin.
 type managedPlugin struct {
-	config  PluginConfig
-	client  *ExternalDomainProxy
-	process *os.Process
-	port    int
+	config       PluginConfig
+	client       *ExternalDomainProxy
+	process      *os.Process
+	port         int
+	stdoutLogger *pluginLogger
+	stderrLogger *pluginLogger
 }
+
+const (
+	// DefaultPluginBasePort is the starting port for plugin allocation
+	// Uses 38700 to avoid conflicts with common development tools
+	DefaultPluginBasePort = 38700
+)
 
 // NewPluginManager creates a new plugin manager.
 func NewPluginManager(logger *zap.SugaredLogger) *PluginManager {
 	return &PluginManager{
 		plugins:  make(map[string]*managedPlugin),
 		logger:   logger,
-		basePort: 9000, // External plugins start on port 9000+
+		basePort: DefaultPluginBasePort,
+		nextPort: DefaultPluginBasePort,
 	}
+}
+
+// Global plugin manager instance (similar to plugin.Registry pattern)
+var (
+	defaultPluginManager *PluginManager
+	pluginManagerMu      sync.RWMutex
+)
+
+// SetDefaultPluginManager sets the global plugin manager instance
+func SetDefaultPluginManager(manager *PluginManager) {
+	pluginManagerMu.Lock()
+	defer pluginManagerMu.Unlock()
+	defaultPluginManager = manager
+}
+
+// GetDefaultPluginManager returns the global plugin manager instance
+func GetDefaultPluginManager() *PluginManager {
+	pluginManagerMu.RLock()
+	defer pluginManagerMu.RUnlock()
+	return defaultPluginManager
 }
 
 // LoadPlugins loads and connects to plugins from configuration.
@@ -90,6 +128,7 @@ func (m *PluginManager) LoadPlugins(ctx context.Context, configs []PluginConfig)
 
 	if len(failedPlugins) > 0 {
 		m.logger.Warnf("Some plugins failed to load: %v", failedPlugins)
+		// Don't return error - plugin system is resilient, continue with loaded plugins
 	}
 
 	return nil
@@ -102,12 +141,15 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 
 	// Check if already loaded
 	if _, exists := m.plugins[config.Name]; exists {
-		return errors.Newf("plugin already loaded: %s", config.Name)
+		err := errors.Newf("plugin already loaded: %s", config.Name)
+		return errors.WithHint(err, "check for duplicate plugin entries in am.plugins.toml or ~/.qntx/plugins/")
 	}
 
 	var addr string
 	var process *os.Process
 	var port int
+	var stdoutLogger *pluginLogger
+	var stderrLogger *pluginLogger
 
 	if config.Address != "" {
 		// Plugin is already running at the specified address
@@ -116,14 +158,24 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	} else if config.Binary != "" && config.AutoStart {
 		// Launch the plugin binary
 		port = m.allocatePort()
-		addr = fmt.Sprintf("localhost:%d", port)
+		// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
+		addr = fmt.Sprintf("127.0.0.1:%d", port)
 
 		var err error
-		process, err = m.launchPlugin(ctx, config, port)
+		var actualPort int
+		process, actualPort, stdoutLogger, stderrLogger, err = m.launchPlugin(ctx, config, port)
 		if err != nil {
 			return errors.Wrapf(err, "failed to launch plugin %s (binary=%s, port=%d)",
 				config.Name, config.Binary, port)
 		}
+
+		// Use the actual port if plugin reported a different one (due to auto-increment)
+		if actualPort != 0 && actualPort != port {
+			port = actualPort
+			addr = fmt.Sprintf("127.0.0.1:%d", port)
+			m.logger.Infow("Plugin bound to different port", "name", config.Name, "actual_port", actualPort)
+		}
+
 		m.logger.Infof("Started '%s' plugin process (pid=%d, port=%d, addr=%s)",
 			config.Name, process.Pid, port, addr)
 
@@ -141,7 +193,8 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 		)
 		return nil
 	} else {
-		return errors.Newf("plugin %s: either address or binary must be specified", config.Name)
+		err := errors.Newf("plugin %s: either address or binary must be specified", config.Name)
+		return errors.WithHint(err, "set 'address' for remote plugins or 'binary' with 'auto_start=true' in plugin config")
 	}
 
 	// Connect to the plugin
@@ -154,72 +207,86 @@ func (m *PluginManager) loadPlugin(ctx context.Context, config PluginConfig) err
 	}
 
 	// Validate plugin metadata matches config
-	actualName := client.Metadata().Name
+	metadata := client.Metadata()
+	actualName := metadata.Name
 	if actualName != config.Name {
 		if process != nil {
 			process.Kill()
 		}
-		return fmt.Errorf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s' (wrong binary installed?)",
+		err := errors.Newf("plugin metadata mismatch: binary at %s reports name='%s' but config expects '%s'",
 			config.Binary, actualName, config.Name)
+		return errors.WithHint(err, "verify the correct plugin binary is installed or update the plugin name in config")
+	}
+
+	// Update logger names with version information
+	nameWithVersion := fmt.Sprintf("%s v%s", metadata.Name, metadata.Version)
+	if stdoutLogger != nil {
+		stdoutLogger.updateName(nameWithVersion)
+	}
+	if stderrLogger != nil {
+		stderrLogger.updateName(nameWithVersion)
 	}
 
 	m.plugins[config.Name] = &managedPlugin{
-		config:  config,
-		client:  client,
-		process: process,
-		port:    port,
+		config:       config,
+		client:       client,
+		process:      process,
+		port:         port,
+		stdoutLogger: stdoutLogger,
+		stderrLogger: stderrLogger,
 	}
 
 	m.logger.Infof("Plugin '%s' v%s loaded and ready - %s",
-		config.Name, client.Metadata().Version, client.Metadata().Description)
+		config.Name, metadata.Version, metadata.Description)
 
 	return nil
 }
 
 // allocatePort finds the next available port for a plugin.
-// Uses deterministic iteration to ensure consistent port allocation.
+// Uses a simple counter to ensure each plugin gets a unique port.
+// Thread-safe for concurrent plugin loading.
 func (m *PluginManager) allocatePort() int {
-	port := m.basePort
+	m.portMu.Lock()
+	defer m.portMu.Unlock()
 
-	// Collect all allocated ports and find max deterministically
-	// Map iteration is non-deterministic in Go, so we track the max explicitly
-	maxPort := m.basePort - 1
-	for _, p := range m.plugins {
-		if p.port > maxPort {
-			maxPort = p.port
-		}
-	}
+	port := m.nextPort
+	m.nextPort++ // Increment for next allocation
 
-	// Next port is one after the current maximum
-	if maxPort >= m.basePort {
-		port = maxPort + 1
-	}
-
+	m.logger.Debugw("Allocated port for plugin", "port", port, "next_port", m.nextPort)
 	return port
 }
 
-// launchPlugin starts a plugin binary.
-func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*os.Process, error) {
+// launchPlugin starts a plugin binary and returns the process, actual port, and loggers.
+// If the plugin outputs QNTX_PLUGIN_PORT=XXXX, that port is returned instead of the requested port.
+func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, port int) (*os.Process, int, *pluginLogger, *pluginLogger, error) {
 	binary := config.Binary
 
 	// Resolve relative paths
 	if !filepath.IsAbs(binary) {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
+			return nil, 0, nil, nil, errors.Wrapf(err, "failed to get home directory for plugin %s", config.Name)
 		}
 		binary = filepath.Join(home, ".qntx", "plugins", binary)
 	}
 
 	// Check if binary exists
 	if _, err := os.Stat(binary); os.IsNotExist(err) {
-		return nil, errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
+		err := errors.Newf("plugin binary not found for %s: %s", config.Name, binary)
+		return nil, 0, nil, nil, errors.WithHint(err, "install the plugin binary to ~/.qntx/plugins/ or specify the full path in config")
 	}
 
 	// Build command arguments
 	args := append([]string{"--port", strconv.Itoa(port)}, config.Args...)
 
-	cmd := exec.CommandContext(ctx, binary, args...)
+	// NOTE: Using exec.Command instead of exec.CommandContext intentionally.
+	// This prevents plugins from being killed when parent context is cancelled (e.g., during
+	// graceful shutdown), allowing proper plugin shutdown via gRPC Shutdown() call.
+	//
+	// TRADEOFF: If QNTX crashes or is killed (SIGKILL), plugin processes become orphans.
+	// TODO: Consider implementing process group management or pidfile tracking for cleanup
+	// of orphaned plugins on next QNTX startup.
+	cmd := exec.Command(binary, args...)
 
 	// Set environment
 	cmd.Env = os.Environ()
@@ -227,19 +294,55 @@ func (m *PluginManager) launchPlugin(ctx context.Context, config PluginConfig, p
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	// Capture output for debugging
-	cmd.Stdout = &pluginLogger{logger: m.logger, name: config.Name, level: "info"}
-	cmd.Stderr = &pluginLogger{logger: m.logger, name: config.Name, level: "error"}
+	// Create a channel to receive the actual port from plugin output
+	portChan := make(chan int, 1)
+
+	// Capture output for debugging and port discovery
+	stdoutLogger := &pluginLogger{
+		logger:   m.logger,
+		name:     config.Name,
+		level:    "info",
+		portChan: portChan,
+	}
+	stderrLogger := &pluginLogger{
+		logger: m.logger,
+		name:   config.Name,
+		level:  "error",
+		// Don't pass portChan to stderr - port announcement should be on stdout
+	}
+
+	cmd.Stdout = stdoutLogger
+	cmd.Stderr = stderrLogger
 
 	if err := cmd.Start(); err != nil {
-		return nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
+		return nil, 0, nil, nil, errors.Wrapf(err, "failed to start plugin %s (binary=%s, args=%v)",
 			config.Name, binary, args)
 	}
 
-	return cmd.Process, nil
+	// Wait for the port announcement with a short timeout (2 seconds)
+	// The plugin should announce its port almost immediately after binding
+	actualPort := port // Default to requested port
+	select {
+	case discoveredPort := <-portChan:
+		actualPort = discoveredPort
+		m.logger.Infow("Discovered plugin port from stdout",
+			"name", config.Name,
+			"requested_port", port,
+			"actual_port", actualPort)
+	case <-time.After(2 * time.Second):
+		// No port announcement - plugin is using the requested port
+		// This is normal for older plugins that don't support auto-increment
+		m.logger.Debugw("No port announcement from plugin, assuming requested port",
+			"name", config.Name,
+			"port", port)
+	}
+
+	return cmd.Process, actualPort, stdoutLogger, stderrLogger, nil
 }
 
-// waitForPlugin waits for a plugin to become available.
+// waitForPlugin waits for a plugin's gRPC server to become ready.
+// This polls the gRPC metadata endpoint rather than just checking TCP connectivity
+// to ensure the plugin is actually ready to handle requests.
 func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 
@@ -250,21 +353,38 @@ func (m *PluginManager) waitForPlugin(ctx context.Context, addr string, timeout 
 		default:
 		}
 
-		// Try to connect
-		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		// Try gRPC connection with short timeout
+		connCtx, cancel := context.WithTimeout(ctx, time.Second)
+		conn, err := grpc.DialContext(connCtx, addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+		)
+		cancel()
+
 		if err == nil {
+			// Connection succeeded, verify gRPC service is ready by calling metadata
+			client := protocol.NewDomainPluginServiceClient(conn)
+			metaCtx, metaCancel := context.WithTimeout(ctx, time.Second)
+			_, metaErr := client.Metadata(metaCtx, &protocol.Empty{})
+			metaCancel()
 			conn.Close()
-			return nil
+
+			if metaErr == nil {
+				// gRPC service is ready
+				return nil
+			}
+			// gRPC service not ready yet, continue waiting
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return errors.Newf("timeout waiting for plugin at %s", addr)
+	err := errors.Newf("timeout waiting for plugin gRPC service at %s", addr)
+	return errors.WithHint(err, "check plugin logs for startup errors, increase timeout, or verify the plugin binary is compatible")
 }
 
 // GetPlugin returns a connected plugin as a DomainPlugin.
-// The returned plugin can be registered with the Registry like any built-in plugin.
+// The returned plugin can be registered with the Registry like any other plugin.
 func (m *PluginManager) GetPlugin(name string) (plugin.DomainPlugin, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -276,7 +396,7 @@ func (m *PluginManager) GetPlugin(name string) (plugin.DomainPlugin, bool) {
 }
 
 // GetAllPlugins returns all connected plugins as DomainPlugin instances.
-// These can be registered with the Registry alongside built-in plugins.
+// These can be registered with the Registry.
 func (m *PluginManager) GetAllPlugins() []plugin.DomainPlugin {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -302,6 +422,29 @@ func (m *PluginManager) ConfigureWebSocket(keepalive KeepaliveConfig, wsConfig W
 		"ping_interval", keepalive.PingInterval,
 		"allowed_origins_count", len(wsConfig.AllowedOrigins),
 	)
+}
+
+// ReinitializePlugin reinitializes a plugin with updated configuration.
+// This is called after plugin config is updated via the UI.
+// The plugin must already be loaded and running.
+func (m *PluginManager) ReinitializePlugin(ctx context.Context, pluginName string, services plugin.ServiceRegistry) error {
+	m.mu.RLock()
+	p, exists := m.plugins[pluginName]
+	m.mu.RUnlock()
+
+	if !exists {
+		err := errors.Newf("plugin not loaded: %s", pluginName)
+		return errors.WithHintf(err, "ensure plugin '%s' is enabled and running before reinitializing", pluginName)
+	}
+
+	// Call Initialize again with updated config from ServiceRegistry
+	if err := p.client.Initialize(ctx, services); err != nil {
+		wrappedErr := errors.Wrapf(err, "failed to reinitialize plugin %s", pluginName)
+		return errors.WithHintf(wrappedErr, "check plugin logs and verify configuration is valid")
+	}
+
+	m.logger.Infof("Successfully reinitialized plugin '%s' with updated configuration", pluginName)
+	return nil
 }
 
 // Shutdown stops all managed plugins.
@@ -336,12 +479,28 @@ func (m *PluginManager) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// pluginLogger logs plugin output.
+// pluginLogger logs plugin output and captures port announcements.
 type pluginLogger struct {
-	logger *zap.SugaredLogger
-	name   string
-	level  string
-	buf    strings.Builder
+	logger   *zap.SugaredLogger
+	name     string
+	level    string
+	buf      strings.Builder
+	portChan chan int // Optional channel to send discovered port
+	mu       sync.RWMutex // Protects name field for dynamic updates
+}
+
+// updateName safely updates the logger's name with version info
+func (l *pluginLogger) updateName(newName string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.name = newName
+}
+
+// getName safely retrieves the current name
+func (l *pluginLogger) getName() string {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.name
 }
 
 func (l *pluginLogger) Write(p []byte) (n int, err error) {
@@ -355,10 +514,44 @@ func (l *pluginLogger) Write(p []byte) (n int, err error) {
 		l.buf.WriteString(rest)
 
 		if line = strings.TrimSpace(line); line != "" {
-			if l.level == "error" {
-				l.logger.Errorf("[%s stderr] %s", l.name, line)
-			} else {
-				l.logger.Infof("[%s] %s", l.name, line)
+			// Check for port announcement (QNTX_PLUGIN_PORT=9001)
+			if l.portChan != nil && strings.HasPrefix(line, "QNTX_PLUGIN_PORT=") {
+				portStr := strings.TrimPrefix(line, "QNTX_PLUGIN_PORT=")
+				if port, err := strconv.Atoi(portStr); err == nil {
+					select {
+					case l.portChan <- port:
+						// Port sent successfully
+					default:
+						// Channel full or closed, ignore
+					}
+				}
+				// Don't log the raw QNTX_PLUGIN_PORT line - it's internal protocol
+				continue
+			}
+
+			// Try to parse JSON log entry and extract actual level
+			var logEntry struct {
+				Level string `json:"level"`
+			}
+			actualLevel := l.level // Default to configured level (stdout=info, stderr=error)
+			if err := json.Unmarshal([]byte(line), &logEntry); err == nil && logEntry.Level != "" {
+				actualLevel = logEntry.Level
+			}
+
+			// Log at the actual level from JSON, or fallback to configured level for non-JSON
+			name := l.getName()
+			switch actualLevel {
+			case "debug":
+				l.logger.Debugf("[%s] %s", name, line)
+			case "info":
+				l.logger.Infof("[%s] %s", name, line)
+			case "warn":
+				l.logger.Warnf("[%s] %s", name, line)
+			case "error":
+				l.logger.Errorf("[%s stderr] %s", name, line)
+			default:
+				// Unknown level or non-JSON
+				l.logger.Warnf("[%s UNKNOWN] %s", name, line)
 			}
 		}
 	}

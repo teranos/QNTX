@@ -3,15 +3,66 @@
  *
  * Handles all job-related actions: force trigger, pause, resume, delete,
  * expansion toggle, execution loading, and navigation.
+ *
+ * Uses two-click confirmation pattern for destructive actions:
+ * - Force Trigger: Bypasses scheduling, needs confirmation
+ * - Delete: Permanently removes job, needs confirmation
  */
 
-import { debugLog } from '../debug';
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { formatInterval } from './types';
 import { toast } from '../toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
+import { handleError, SEG } from '../error-handler';
+import { log } from '../logger';
+
+/**
+ * Two-click confirmation state for job actions
+ */
+interface ConfirmationState {
+    needsConfirmation: boolean;
+    timeout: number | null;
+}
+
+// Track confirmation state per job per action
+const forceTriggerConfirmation = new Map<string, ConfirmationState>();
+const deleteConfirmation = new Map<string, ConfirmationState>();
+
+/**
+ * Reset confirmation state for a job action
+ */
+function resetConfirmation(
+    confirmMap: Map<string, ConfirmationState>,
+    jobId: string
+): void {
+    const state = confirmMap.get(jobId);
+    if (state?.timeout) {
+        clearTimeout(state.timeout);
+    }
+    confirmMap.delete(jobId);
+}
+
+/**
+ * Update button visual state for confirmation
+ */
+function updateButtonConfirmState(
+    button: HTMLElement,
+    isConfirming: boolean,
+    originalText: string,
+    confirmText: string
+): void {
+    if (isConfirming) {
+        button.classList.add('pulse-btn-confirming');
+        button.textContent = confirmText;
+        button.setAttribute('data-original-text', originalText);
+    } else {
+        button.classList.remove('pulse-btn-confirming');
+        const original = button.getAttribute('data-original-text') || originalText;
+        button.textContent = original;
+        button.removeAttribute('data-original-text');
+    }
+}
 
 /**
  * Context passed to job action handlers
@@ -25,16 +76,51 @@ export interface JobActionContext {
 
 /**
  * Force trigger a job for immediate execution
+ * Uses two-click confirmation pattern
  */
 export async function handleForceTrigger(
     jobId: string,
-    ctx: JobActionContext
+    ctx: JobActionContext,
+    buttonElement?: HTMLElement
 ): Promise<void> {
     const job = ctx.jobs.get(jobId);
     if (!job) return;
 
+    // Get the button element if not passed
+    const button = buttonElement || document.querySelector(
+        `.pulse-job-card[data-job-id="${jobId}"] [data-action="force-trigger"]`
+    ) as HTMLElement | null;
+
+    // Check if we're in confirmation state
+    const state = forceTriggerConfirmation.get(jobId);
+
+    if (!state?.needsConfirmation) {
+        // First click: enter confirmation state
+        forceTriggerConfirmation.set(jobId, {
+            needsConfirmation: true,
+            timeout: window.setTimeout(() => {
+                resetConfirmation(forceTriggerConfirmation, jobId);
+                if (button) {
+                    updateButtonConfirmState(button, false, 'Force Trigger', 'Confirm');
+                }
+            }, 5000)
+        });
+
+        if (button) {
+            updateButtonConfirmState(button, true, 'Force Trigger', 'Confirm Trigger');
+        }
+
+        return;
+    }
+
+    // Second click: execute action
+    resetConfirmation(forceTriggerConfirmation, jobId);
+    if (button) {
+        updateButtonConfirmState(button, false, 'Force Trigger', 'Confirm');
+    }
+
     try {
-        debugLog('[Pulse Panel] Force triggering job:', job.ats_code);
+        log.debug(SEG.PULSE, 'Force triggering job:', job.ats_code);
 
         await forceTriggerJob(job.ats_code);
 
@@ -47,20 +133,53 @@ export async function handleForceTrigger(
 
         toast.success('Force trigger started - check execution history below');
     } catch (error) {
-        console.error('[Pulse Panel] Force trigger failed:', error);
-        toast.error(`Force trigger failed: ${(error as Error).message}`, true);
+        handleError(error, 'Force trigger failed', { context: SEG.PULSE, showBuildInfo: true });
     }
 }
 
 /**
  * Handle job lifecycle actions (pause, resume, delete)
+ * Delete uses two-click confirmation pattern
  */
 export async function handleJobAction(
     jobId: string,
     action: string,
-    ctx: JobActionContext
+    ctx: JobActionContext,
+    buttonElement?: HTMLElement
 ): Promise<void> {
-    const job = ctx.jobs.get(jobId);
+    // Handle delete with two-click confirmation
+    if (action === 'delete') {
+        const button = buttonElement || document.querySelector(
+            `.pulse-job-card[data-job-id="${jobId}"] [data-action="delete"]`
+        ) as HTMLElement | null;
+
+        const state = deleteConfirmation.get(jobId);
+
+        if (!state?.needsConfirmation) {
+            // First click: enter confirmation state
+            deleteConfirmation.set(jobId, {
+                needsConfirmation: true,
+                timeout: window.setTimeout(() => {
+                    resetConfirmation(deleteConfirmation, jobId);
+                    if (button) {
+                        updateButtonConfirmState(button, false, 'Delete', 'Confirm Delete');
+                    }
+                }, 5000)
+            });
+
+            if (button) {
+                updateButtonConfirmState(button, true, 'Delete', 'Confirm Delete');
+            }
+
+            return;
+        }
+
+        // Second click: execute delete
+        resetConfirmation(deleteConfirmation, jobId);
+        if (button) {
+            updateButtonConfirmState(button, false, 'Delete', 'Confirm Delete');
+        }
+    }
 
     try {
         switch (action) {
@@ -71,26 +190,13 @@ export async function handleJobAction(
                 await resumeScheduledJob(jobId);
                 break;
             case 'delete':
-                if (!confirm('Delete this scheduled job?')) return;
                 await deleteScheduledJob(jobId);
                 break;
         }
 
         await ctx.loadJobs();
     } catch (error) {
-        console.error(`[Pulse Panel] Failed to ${action} job:`, error);
-
-        let errorMsg = `Failed to ${action} job: ${(error as Error).message}`;
-
-        if (job) {
-            errorMsg += `\n\nATS Code:\n${job.ats_code}`;
-            errorMsg += `\nInterval: ${formatInterval(job.interval_seconds)}`;
-            if (job.created_from_doc) {
-                errorMsg += `\nDocument: ${job.created_from_doc}`;
-            }
-        }
-
-        toast.error(errorMsg);
+        handleError(error, `Failed to ${action} job`, { context: SEG.PULSE });
     }
 }
 
@@ -132,10 +238,8 @@ export async function loadExecutionsForJob(
         ctx.state.jobExecutions.set(jobId, response.executions);
         ctx.state.executionErrors.delete(jobId);
     } catch (error) {
-        console.error('[Pulse Panel] Failed to load executions:', error);
-        const errorMessage = (error as Error).message || 'Unknown error';
-        ctx.state.executionErrors.set(jobId, errorMessage);
-        toast.error(`Failed to load execution history: ${errorMessage}`);
+        const err = handleError(error, 'Failed to load execution history', { context: SEG.PULSE });
+        ctx.state.executionErrors.set(jobId, err.message);
     } finally {
         ctx.state.loadingExecutions.delete(jobId);
         await ctx.render();
@@ -183,7 +287,7 @@ export async function handleViewDetailed(
  * Open prose document that created this job
  */
 export async function handleProseLocationClick(docId: string): Promise<void> {
-    debugLog('[Pulse Panel] Opening prose document:', docId);
+    log.debug(SEG.PULSE, 'Opening prose document:', docId);
 
     const { showProseDocument } = await import('../prose/panel.js');
     await showProseDocument(docId);

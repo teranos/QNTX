@@ -36,6 +36,8 @@
 import { CSS, DATA, setVisibility } from './css-classes.ts';
 import * as PanelError from './base-panel-error.ts';
 import type { PanelErrorState, ErrorHandlingContext } from './base-panel-error.ts';
+import { tooltip as tooltipManager, type TooltipConfig } from './components/tooltip.ts';
+import { log, SEG } from './logger.ts';
 
 export interface PanelConfig {
     id: string;
@@ -44,13 +46,17 @@ export interface PanelConfig {
     closeOnEscape?: boolean;
     closeOnOverlayClick?: boolean;
     insertAfter?: string;  // Selector, e.g., '#symbolPalette'
+    /** Enable interactive tooltips for elements with data-tooltip attribute */
+    enableTooltips?: boolean;
+    /** Custom tooltip configuration */
+    tooltipConfig?: TooltipConfig;
 }
 
 export abstract class BasePanel {
     protected panel: HTMLElement | null = null;
     protected overlay: HTMLElement | null = null;
     protected isVisible: boolean = false;
-    protected config: Required<PanelConfig>;
+    protected config: Required<Omit<PanelConfig, 'tooltipConfig'>> & { tooltipConfig?: TooltipConfig };
 
     /** Error state management */
     protected errorState: PanelErrorState = {
@@ -60,6 +66,7 @@ export abstract class BasePanel {
 
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private clickOutsideHandler: ((e: Event) => void) | null = null;
+    private tooltipCleanup: (() => void) | null = null;
 
     constructor(config: PanelConfig) {
         this.config = {
@@ -68,6 +75,7 @@ export abstract class BasePanel {
             closeOnEscape: true,
             closeOnOverlayClick: true,
             insertAfter: '',
+            enableTooltips: true, // Enable by default for observability
             ...config
         };
         this.initialize();
@@ -89,13 +97,18 @@ export abstract class BasePanel {
         // Attach common handlers
         this.attachCommonListeners();
 
+        // Setup tooltips if enabled
+        if (this.config.enableTooltips && this.panel) {
+            this.setupTooltips();
+        }
+
         // Error boundary: wrap setupEventListeners() to catch initialization errors
         try {
             // Subclass custom setup
             this.setupEventListeners();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in setupEventListeners():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in setupEventListeners():`, err);
             // Log error but allow panel to be created - it may still be partially functional
         }
     }
@@ -177,7 +190,7 @@ export abstract class BasePanel {
             if (!await this.beforeShow()) return;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in beforeShow():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in beforeShow():`, err);
             this.showErrorState(err);
             return;
         }
@@ -190,7 +203,7 @@ export abstract class BasePanel {
             await this.onShow();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in onShow():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in onShow():`, err);
             this.showErrorState(err);
         }
     }
@@ -204,7 +217,7 @@ export abstract class BasePanel {
             if (!this.beforeHide()) return;
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in beforeHide():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in beforeHide():`, err);
             // Don't show error state during hide, just log and continue
         }
 
@@ -215,7 +228,7 @@ export abstract class BasePanel {
             this.onHide();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            console.error(`[${this.config.id}] Error in onHide():`, err);
+            log.error(SEG.UI, `[${this.config.id}] Error in onHide():`, err);
             // Don't show error state during hide, just log
         }
     }
@@ -248,11 +261,41 @@ export abstract class BasePanel {
         if (this.clickOutsideHandler) {
             document.removeEventListener('click', this.clickOutsideHandler);
         }
+        if (this.tooltipCleanup) {
+            this.tooltipCleanup();
+            this.tooltipCleanup = null;
+        }
 
         this.panel?.remove();
         this.overlay?.remove();
         this.panel = null;
         this.overlay = null;
+    }
+
+    /**
+     * Setup interactive tooltips for elements with data-tooltip attribute
+     * Uses the shared tooltip manager for consistent styling
+     */
+    protected setupTooltips(): void {
+        if (!this.panel) return;
+
+        // Use 'has-tooltip' class by default, can be customized via config
+        const selector = this.config.tooltipConfig?.triggerClass
+            ? `.${this.config.tooltipConfig.triggerClass}`
+            : '.has-tooltip';
+
+        this.tooltipCleanup = tooltipManager.attach(this.panel, selector);
+    }
+
+    /**
+     * Manually refresh tooltip bindings
+     * Useful after dynamic content updates that add new tooltip elements
+     */
+    protected refreshTooltips(): void {
+        if (this.tooltipCleanup) {
+            this.tooltipCleanup();
+        }
+        this.setupTooltips();
     }
 
     // Utility methods

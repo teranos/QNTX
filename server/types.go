@@ -27,7 +27,7 @@ const (
 	DaemonBusy                      // High load (>60%)
 )
 
-// ServerState represents the server lifecycle state for GRACE Phase 4
+// ServerState represents the server lifecycle state for Opening/Closing Phase 4
 type ServerState int
 
 const (
@@ -56,7 +56,7 @@ type cachedUsageStats struct {
 
 // QueryMessage represents a client message
 type QueryMessage struct {
-	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility"
+	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame"
 	Query         string  `json:"query"`          // The Ax query text (can be multi-line)
 	Line          int     `json:"line"`           // Current line number (for multi-line support)
 	Cursor        int     `json:"cursor"`         // Cursor position
@@ -72,6 +72,14 @@ type QueryMessage struct {
 	JobID         string  `json:"job_id"`         // For job_control messages
 	NodeType      string  `json:"node_type"`      // For visibility messages: node type to toggle
 	Hidden        bool    `json:"hidden"`         // For visibility messages: whether to hide the node type/isolated nodes
+	// VidStream fields (for vidstream_init and vidstream_frame messages)
+	ModelPath           string  `json:"model_path"`           // For vidstream_init: path to ONNX model
+	ConfidenceThreshold float32 `json:"confidence_threshold"` // For vidstream_init: detection confidence threshold
+	NMSThreshold        float32 `json:"nms_threshold"`        // For vidstream_init: NMS IoU threshold
+	FrameData           []byte  `json:"frame_data"`           // For vidstream_frame: raw frame bytes (RGBA)
+	Width               int     `json:"width"`                // For vidstream_frame: frame width
+	Height              int     `json:"height"`               // For vidstream_frame: frame height
+	Format              string  `json:"format"`               // For vidstream_frame: "rgba8", "rgb8", etc.
 }
 
 // ProgressMessage represents an import progress message
@@ -128,7 +136,7 @@ type DaemonStatusMessage struct {
 	BudgetDailyLimit   float64 `json:"budget_daily_limit"`   // Daily budget limit (config)
 	BudgetWeeklyLimit  float64 `json:"budget_weekly_limit"`  // Weekly budget limit (config)
 	BudgetMonthlyLimit float64 `json:"budget_monthly_limit"` // Monthly budget limit (config)
-	ServerState        string  `json:"server_state"`         // GRACE Phase 4: "running", "draining", "stopped"
+	ServerState        string  `json:"server_state"`         // Opening/Closing Phase 4: "running", "draining", "stopped"
 	Timestamp          int64   `json:"timestamp"`            // Unix timestamp
 }
 
@@ -200,18 +208,11 @@ type StorageWarningMessage struct {
 // PluginHealthMessage represents a plugin health status update
 // Broadcast when plugin state changes (pause/resume) or health check fails
 type PluginHealthMessage struct {
-	Type      string `json:"type"`       // "plugin_health"
-	Name      string `json:"name"`       // Plugin name
-	Healthy   bool   `json:"healthy"`    // Current health status
-	State     string `json:"state"`      // "running", "paused", "stopped"
-	Message   string `json:"message"`    // Status message
-	Timestamp int64  `json:"timestamp"`  // Unix timestamp
+	Type      string `json:"type"`      // "plugin_health"
+	Name      string `json:"name"`      // Plugin name
+	Healthy   bool   `json:"healthy"`   // Current health status
+	State     string `json:"state"`     // "running", "paused", "stopped"
+	Message   string `json:"message"`   // Status message
+	Timestamp int64  `json:"timestamp"` // Unix timestamp
 }
 
-// SystemCapabilitiesMessage represents system capability information
-// Sent once on WebSocket connection to inform client of available optimizations
-type SystemCapabilitiesMessage struct {
-	Type          string `json:"type"`           // "system_capabilities"
-	FuzzyBackend  string `json:"fuzzy_backend"`  // "rust" or "go" - which fuzzy matching implementation is active
-	FuzzyOptimized bool  `json:"fuzzy_optimized"` // true if using Rust (optimized), false if Go fallback
-}

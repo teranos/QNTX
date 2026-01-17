@@ -597,4 +597,4 @@ func (p *Plugin) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 ## Complete Example
 
-See [`domains/code/plugin.go`](../../domains/code/plugin.go) for full reference implementation.
+The `code` domain plugin provides a full reference implementation demonstrating all API methods and best practices.

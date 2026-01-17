@@ -5,6 +5,7 @@
  */
 
 import type { BuildInfo } from '../types/core';
+import { formatRelativeTime } from './html-utils';
 
 let cachedBuildInfo: BuildInfo | null = null;
 
@@ -73,31 +74,11 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     if (showBuildInfo && cachedBuildInfo) {
         const commitShort = cachedBuildInfo.commit.substring(0, 7);
 
-        // Format build time
+        // Format build time using formatRelativeTime
         let buildTime = 'unknown';
         if (cachedBuildInfo.build_time) {
             try {
-                const buildDate = new Date(cachedBuildInfo.build_time);
-                const now = new Date();
-                const diffMs = now.getTime() - buildDate.getTime();
-                const diffSecs = Math.floor(diffMs / 1000);
-                const diffMins = Math.floor(diffMs / 60000);
-
-                if (diffSecs < 60) {
-                    buildTime = `${diffSecs}s ago`;
-                } else if (diffMins < 60) {
-                    buildTime = `${diffMins}m ago`;
-                } else if (diffMins < 1440) {
-                    buildTime = `${Math.floor(diffMins / 60)}h ago`;
-                } else {
-                    buildTime = buildDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false
-                    });
-                }
+                buildTime = formatRelativeTime(cachedBuildInfo.build_time);
             } catch (e) {
                 buildTime = 'parse error';
             }

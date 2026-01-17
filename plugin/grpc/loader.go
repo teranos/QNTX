@@ -146,7 +146,8 @@ func discoverPlugin(name string, searchPaths []string, logger *zap.SugaredLogger
 		}
 	}
 
-	return PluginConfig{}, errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
+	err := errors.Newf("plugin binary not found in search paths: %s", strings.Join(expandedPaths, ", "))
+	return PluginConfig{}, errors.WithHint(err, "install the plugin using 'qntx plugin install <name>' or add its path to [plugin].paths in config")
 }
 
 // expandAndValidatePath safely expands and validates a path using go-getter.
@@ -199,5 +200,6 @@ func expandAndValidatePath(path string) (string, error) {
 		return abs, nil
 	}
 
-	return "", errors.Newf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
+	err = errors.Newf("unsupported path scheme: %s (expected file:// or local path)", u.Scheme)
+	return "", errors.WithHint(err, "use a local filesystem path like ~/.qntx/plugins/ instead of remote URLs")
 }

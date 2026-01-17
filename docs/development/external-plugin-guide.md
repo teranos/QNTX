@@ -1,6 +1,6 @@
 # External Plugin Development Guide
 
-This guide explains how to develop external QNTX domain plugins that run as separate processes and communicate via gRPC.
+This guide explains how to develop external QNTX domain plugins that run as separate processes and communicate via gRPC. For the complete gRPC API reference, see [Plugin gRPC API](../api/grpc-plugin.md).
 
 ## Table of Contents
 

@@ -29,6 +29,10 @@ import {
   PulseExecutionLogStreamMessage as GeneratedPulseExecutionLogStreamMessage,
 } from '../../types/generated/typescript/server';
 
+import {
+  Message as GeneratedSystemCapabilitiesMessage,
+} from '../../types/generated/typescript/syscap';
+
 // Re-export Job for convenience
 export type { Job, JobStatus };
 
@@ -399,13 +403,11 @@ export interface PluginHealthMessage extends BaseMessage {
 }
 
 /**
- * System capabilities notification
+ * System capabilities notification (from server/syscap/types.go:Message)
  * Sent once on WebSocket connection to inform client of available optimizations
  */
-export interface SystemCapabilitiesMessage extends BaseMessage {
+export interface SystemCapabilitiesMessage extends Omit<GeneratedSystemCapabilitiesMessage, 'type'> {
   type: 'system_capabilities';
-  fuzzy_backend: 'go' | 'rust';
-  fuzzy_optimized: boolean;
 }
 
 /**

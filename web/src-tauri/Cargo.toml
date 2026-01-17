@@ -1,11 +1,11 @@
 [package]
 name = "qntx-app"
-version = "0.1.0"
+version.workspace = true
 description = "QNTX Application (Desktop & Mobile)"
 authors = ["Sebastiaan Brandon van Houten <me@sbvh.nl>"]
-license = "MIT"
-repository = "https://github.com/teranos/QNTX"
-edition = "2021"
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
 
 [lib]
 name = "qntx_lib"
@@ -19,28 +19,24 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# QNTX shared library (types only, no plugin infrastructure)
+qntx = { path = "../../crates/qntx", default-features = true }
+
+serde.workspace = true
+serde_json.workspace = true
+log = "0.4"
 tauri = { version = "2", features = ["tray-icon", "image-ico", "image-png"] }
 tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
-
-# Generated types from QNTX Go source (single source of truth)
-qntx-types = { path = "../../types/generated/rust" }
+tauri-plugin-log = "2"
 
 # Desktop-only plugins (not available on iOS/Android)
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-deep-link = "2"
+# qntx-vidstream = { path = "../../ats/vidstream", features = ["onnx"] }  # Disabled: blocked by CrabCamera ACL (PR #267)
 
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
-
-[profile.release]
-panic = "abort"
-codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true

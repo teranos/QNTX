@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 
 	"github.com/teranos/QNTX/errors"
 )
@@ -74,10 +75,23 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("errors include stack traces from errors package", func(t *testing.T) {
-		// Try to open database at an invalid path that will fail
-		invalidPath := "/proc/invalid/cannot/create/db.sqlite"
+		// Create a scenario where WAL mode enabling will fail
+		// 1. Create a temporary directory with a database
+		tmpDir := t.TempDir()
+		dbPath := filepath.Join(tmpDir, "test.db")
 
-		db, err := Open(invalidPath, nil)
+		// 2. Create the database file first (so sql.Open succeeds)
+		firstDB, err := Open(dbPath, nil)
+		require.NoError(t, err)
+		firstDB.Close()
+
+		// 3. Make directory read-only so WAL files (.db-wal, .db-shm) can't be created
+		err = os.Chmod(tmpDir, 0555) // r-x r-x r-x (no write)
+		require.NoError(t, err)
+		defer os.Chmod(tmpDir, 0755) // Restore for cleanup
+
+		// 4. Try to open again - sql.Open succeeds (file exists) but WAL pragma fails
+		db, err := Open(dbPath, nil)
 		require.Error(t, err)
 		require.Nil(t, db)
 
@@ -91,7 +105,7 @@ func TestOpen(t *testing.T) {
 		assert.Contains(t, detailed, "stack trace:", "detailed format should show stack trace section")
 		assert.Contains(t, detailed, "db.Open", "stack should show db.Open function")
 
-		// Verify we wrapped the error - it fails at WAL mode setup for this path
+		// Verify we wrapped the error - it fails at WAL mode setup
 		assert.Contains(t, detailed, "failed to enable WAL mode", "error should include our wrapped context")
 	})
 
@@ -101,9 +115,9 @@ func TestOpen_WithLogger(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	// TODO: Add logger mock/spy to verify logging calls
-	// For now, just verify it doesn't panic with a logger
-	db, err := Open(dbPath, nil)
+	// Use test logger to verify logging calls
+	logger := zaptest.NewLogger(t).Sugar()
+	db, err := Open(dbPath, logger)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 	defer db.Close()
