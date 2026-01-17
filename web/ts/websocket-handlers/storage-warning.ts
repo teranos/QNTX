@@ -5,7 +5,7 @@
  * when bounded storage limits are approaching.
  */
 
-import { toast } from '../toast';
+import { toast } from '../components/toast';
 import type { StorageWarningMessage } from '../../types/websocket';
 
 /**

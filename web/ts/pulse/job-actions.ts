@@ -11,7 +11,7 @@
 
 import type { ScheduledJobResponse } from './types';
 import { pauseScheduledJob, resumeScheduledJob, deleteScheduledJob, forceTriggerJob } from './api';
-import { toast } from '../toast';
+import { toast } from '../components/toast';
 import { listExecutions } from './execution-api';
 import type { PulsePanelState } from './panel-state';
 import { handleError, SEG } from '../error-handler';

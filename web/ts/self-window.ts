@@ -13,7 +13,7 @@
  */
 
 import { Window } from './components/window';
-import { formatBuildTime, tooltip } from './components/tooltip.ts';
+import { formatBuildTime, tooltip } from './components/tooltip';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 
 interface SelfDiagnosticInfo {

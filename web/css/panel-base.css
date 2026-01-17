@@ -427,33 +427,10 @@
 }
 
 /* === TOOLTIPS === */
-
-/* Terminal-style interactive tooltip */
-.panel-tooltip {
-    position: fixed;
-    background: var(--editor-bg-alt);
-    color: var(--editor-text);
-    padding: 8px 12px;
-    border-radius: 0;
-    font-size: 11px;
-    font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    z-index: 100000; /* Must be above windows (which start at 9999) */
-    pointer-events: none;
-    box-shadow: var(--shadow-lg);
-    max-width: 400px;
-    border: 1px solid var(--editor-border);
-}
-
-/* Mobile/tablet: constrain tooltip to viewport */
-@media (max-width: 768px) {
-    .panel-tooltip {
-        max-width: calc(100vw - 32px);
-    }
-}
+/* Note: Tooltip popup styling is now in ts/components/tooltip/tooltip.module.css */
 
 /* Interactive element styling - indicates hoverable for more info */
+/* Kept as global class for backward compatibility with existing HTML templates */
 .has-tooltip {
     cursor: help;
     border-bottom: 1px dotted var(--text-secondary);
@@ -463,12 +440,4 @@
 .has-tooltip:hover {
     color: var(--text-primary);
     border-bottom-color: var(--text-primary);
-}
-
-/* Tooltip content separator */
-.panel-tooltip-separator {
-    display: block;
-    height: 1px;
-    background: var(--editor-border);
-    margin: 6px 0;
 }

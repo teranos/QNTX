@@ -7,7 +7,7 @@
 import { Window } from './components/window';
 import { sendMessage } from './websocket.ts';
 import { DB } from '@generated/sym.js';
-import { tooltip } from './components/tooltip.ts';
+import { tooltip } from './components/tooltip';
 
 interface DatabaseStats {
     path: string;

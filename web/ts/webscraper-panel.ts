@@ -21,7 +21,7 @@
 
 import { BasePanel } from './base-panel.ts';
 import { escapeHtml } from './html-utils.ts';
-import { toast } from './toast.ts';
+import { toast } from './components/toast';
 import { log, SEG } from './logger';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
 import { handleError } from './error-handler.ts';
