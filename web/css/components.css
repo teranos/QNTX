@@ -139,24 +139,24 @@
 }
 
 .qntx-btn-primary {
-    background: #0066cc;
-    border-color: #0066cc;
+    background: #4a4a4a;
+    border-color: #4a4a4a;
     color: #fff;
 }
 
 .qntx-btn-primary:hover:not(:disabled) {
-    background: #0055aa;
-    border-color: #0055aa;
+    background: #333;
+    border-color: #333;
 }
 
 .qntx-btn-secondary {
     background: transparent;
-    border-color: #0066cc;
-    color: #0066cc;
+    border-color: #999;
+    color: #666;
 }
 
 .qntx-btn-secondary:hover:not(:disabled) {
-    background: rgba(0, 102, 204, 0.08);
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .qntx-btn-danger {
@@ -225,7 +225,7 @@
 
 /* Focus state */
 .qntx-btn:focus-visible {
-    outline: 2px solid #0066cc;
+    outline: 2px solid #666;
     outline-offset: 2px;
 }
 
