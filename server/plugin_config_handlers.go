@@ -12,8 +12,7 @@ import (
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
-	grpcplugin "github.com/teranos/QNTX/plugin/grpc"
-	"github.com/teranos/QNTX/plugin/grpc/protocol"
+	"github.com/teranos/QNTX/plugin"
 )
 
 const (
@@ -80,38 +79,38 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 	var schema map[string]interface{}
 	if s.pluginManager != nil {
 		if pluginClient, ok := s.pluginManager.GetPlugin(pluginName); ok {
-			// Try to get schema from plugin
+			// Try to get schema from plugin via ConfigSchemaProvider interface
 			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 			defer cancel()
 
-			// Type assert to ExternalDomainProxy to access ConfigSchema
-			if proxy, ok := pluginClient.(*grpcplugin.ExternalDomainProxy); ok {
-				if schemaResp, err := proxy.ConfigSchema(ctx); err == nil && schemaResp != nil {
-					// Convert protobuf schema to JSON-friendly map
-					schema = make(map[string]interface{})
-					for fieldName, fieldSchema := range schemaResp.Fields {
-						schema[fieldName] = map[string]interface{}{
-							"type":          fieldSchema.Type,
-							"description":   fieldSchema.Description,
-							"default_value": fieldSchema.DefaultValue,
-							"required":      fieldSchema.Required,
-							"min_value":     fieldSchema.MinValue,
-							"max_value":     fieldSchema.MaxValue,
-							"pattern":       fieldSchema.Pattern,
-							"element_type":  fieldSchema.ElementType,
-						}
-					}
-				} else if err != nil {
-					wrappedErr := errors.Wrap(err, "ConfigSchema RPC failed")
+			// Type assert to ConfigSchemaProvider interface (not concrete type)
+			if provider, ok := pluginClient.(plugin.ConfigSchemaProvider); ok {
+				schemaFields, err := provider.ConfigSchemaFields(ctx)
+				if err != nil {
+					wrappedErr := errors.Wrap(err, "ConfigSchemaFields failed")
 					s.logger.Warnw("Failed to get config schema from plugin", "plugin", pluginName, "error", err)
 					s.writeRichError(w, wrappedErr, http.StatusServiceUnavailable)
 					return
 				}
+				// Convert schema to JSON-friendly map
+				schema = make(map[string]interface{})
+				for fieldName, fieldSchema := range schemaFields {
+					schema[fieldName] = map[string]interface{}{
+						"type":          fieldSchema.Type,
+						"description":   fieldSchema.Description,
+						"default_value": fieldSchema.DefaultValue,
+						"required":      fieldSchema.Required,
+						"min_value":     fieldSchema.MinValue,
+						"max_value":     fieldSchema.MaxValue,
+						"pattern":       fieldSchema.Pattern,
+						"element_type":  fieldSchema.ElementType,
+					}
+				}
 			} else {
-				// Not an external gRPC plugin
+				// Plugin does not implement ConfigSchemaProvider
 				err := errors.WithDetail(
 					errors.Newf("plugin %q does not support configuration", pluginName),
-					"This plugin does not implement the ConfigSchema RPC method. Only external gRPC plugins with configuration support can be configured through this API.",
+					"This plugin does not implement the ConfigSchemaProvider interface. Only plugins with configuration support can be configured through this API.",
 				)
 				s.writeRichError(w, err, http.StatusNotImplemented)
 				return
@@ -171,15 +170,15 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		proxy, ok := s.pluginManager.GetPlugin(pluginName)
+		pluginClient, ok := s.pluginManager.GetPlugin(pluginName)
 		if !ok {
 			s.writeRichError(w, errors.Newf("plugin not found: %s", pluginName), http.StatusNotFound)
 			return
 		}
 
-		// Get schema from plugin via gRPC
-		if extProxy, ok := proxy.(*grpcplugin.ExternalDomainProxy); ok {
-			schema, err := extProxy.ConfigSchema(ctx)
+		// Get schema from plugin via ConfigSchemaProvider interface
+		if provider, ok := pluginClient.(plugin.ConfigSchemaProvider); ok {
+			schemaFields, err := provider.ConfigSchemaFields(ctx)
 			if err != nil {
 				s.logger.Errorw("Failed to get config schema", "error", err, "plugin", pluginName)
 				s.writeRichError(w, errors.Wrap(err, "failed to validate config"), http.StatusInternalServerError)
@@ -187,7 +186,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 			}
 
 			// Validate config against schema
-			if validationErrs := validateConfigAgainstSchema(req.Config, schema.Fields); len(validationErrs) > 0 {
+			if validationErrs := validateConfigAgainstSchema(req.Config, schemaFields); len(validationErrs) > 0 {
 				response := map[string]interface{}{
 					"success": false,
 					"message": "Configuration validation failed",
@@ -271,14 +270,14 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 }
 
 // validateConfigAgainstSchema validates config values against plugin schema constraints
-func validateConfigAgainstSchema(config map[string]string, schema map[string]*protocol.ConfigFieldSchema) map[string]string {
-	errors := make(map[string]string)
+func validateConfigAgainstSchema(config map[string]string, schema map[string]plugin.ConfigField) map[string]string {
+	validationErrors := make(map[string]string)
 
 	// Check all required fields are present
 	for fieldName, fieldSchema := range schema {
 		if fieldSchema.Required {
 			if value, exists := config[fieldName]; !exists || value == "" {
-				errors[fieldName] = "This field is required"
+				validationErrors[fieldName] = "This field is required"
 				continue
 			}
 		}
@@ -288,7 +287,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 	for fieldName, value := range config {
 		fieldSchema, schemaExists := schema[fieldName]
 		if !schemaExists {
-			errors[fieldName] = "Unknown configuration field"
+			validationErrors[fieldName] = "Unknown configuration field"
 			continue
 		}
 
@@ -297,7 +296,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 		case "integer":
 			intVal, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
-				errors[fieldName] = "Must be a valid integer"
+				validationErrors[fieldName] = "Must be a valid integer"
 				continue
 			}
 
@@ -305,7 +304,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 			if fieldSchema.MinValue != "" {
 				minVal, err := strconv.ParseInt(fieldSchema.MinValue, 10, 64)
 				if err == nil && intVal < minVal {
-					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
+					validationErrors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
 					continue
 				}
 			}
@@ -314,7 +313,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 			if fieldSchema.MaxValue != "" {
 				maxVal, err := strconv.ParseInt(fieldSchema.MaxValue, 10, 64)
 				if err == nil && intVal > maxVal {
-					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
+					validationErrors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
 					continue
 				}
 			}
@@ -322,7 +321,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 		case "number":
 			floatVal, err := strconv.ParseFloat(value, 64)
 			if err != nil {
-				errors[fieldName] = "Must be a valid number"
+				validationErrors[fieldName] = "Must be a valid number"
 				continue
 			}
 
@@ -330,7 +329,7 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 			if fieldSchema.MinValue != "" {
 				minVal, err := strconv.ParseFloat(fieldSchema.MinValue, 64)
 				if err == nil && floatVal < minVal {
-					errors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
+					validationErrors[fieldName] = fmt.Sprintf("Must be at least %s", fieldSchema.MinValue)
 					continue
 				}
 			}
@@ -339,14 +338,14 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 			if fieldSchema.MaxValue != "" {
 				maxVal, err := strconv.ParseFloat(fieldSchema.MaxValue, 64)
 				if err == nil && floatVal > maxVal {
-					errors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
+					validationErrors[fieldName] = fmt.Sprintf("Must be at most %s", fieldSchema.MaxValue)
 					continue
 				}
 			}
 
 		case "boolean":
 			if value != "true" && value != "false" {
-				errors[fieldName] = "Must be 'true' or 'false'"
+				validationErrors[fieldName] = "Must be 'true' or 'false'"
 				continue
 			}
 
@@ -356,9 +355,9 @@ func validateConfigAgainstSchema(config map[string]string, schema map[string]*pr
 
 		default:
 			// Unknown type - shouldn't happen if schema is valid
-			errors[fieldName] = fmt.Sprintf("Unknown field type: %s", fieldSchema.Type)
+			validationErrors[fieldName] = fmt.Sprintf("Unknown field type: %s", fieldSchema.Type)
 		}
 	}
 
-	return errors
+	return validationErrors
 }

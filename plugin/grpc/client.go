@@ -189,6 +189,37 @@ func (c *ExternalDomainProxy) ConfigSchema(ctx context.Context) (*protocol.Confi
 	return resp, nil
 }
 
+// ConfigSchemaFields returns the configuration schema as plugin.ConfigField map.
+// This implements plugin.ConfigSchemaProvider interface, decoupling callers from
+// the gRPC protocol types.
+func (c *ExternalDomainProxy) ConfigSchemaFields(ctx context.Context) (map[string]plugin.ConfigField, error) {
+	resp, err := c.ConfigSchema(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil || resp.Fields == nil {
+		return make(map[string]plugin.ConfigField), nil
+	}
+
+	fields := make(map[string]plugin.ConfigField, len(resp.Fields))
+	for name, f := range resp.Fields {
+		fields[name] = plugin.ConfigField{
+			Type:         f.Type,
+			Description:  f.Description,
+			DefaultValue: f.DefaultValue,
+			Required:     f.Required,
+			MinValue:     f.MinValue,
+			MaxValue:     f.MaxValue,
+			Pattern:      f.Pattern,
+			ElementType:  f.ElementType,
+		}
+	}
+	return fields, nil
+}
+
+// Verify ExternalDomainProxy implements ConfigSchemaProvider
+var _ plugin.ConfigSchemaProvider = (*ExternalDomainProxy)(nil)
+
 // Shutdown shuts down the remote plugin.
 func (c *ExternalDomainProxy) Shutdown(ctx context.Context) error {
 	_, err := c.client.Shutdown(ctx, &protocol.Empty{})

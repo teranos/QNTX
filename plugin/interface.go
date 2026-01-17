@@ -137,3 +137,15 @@ type ConfigField struct {
 	Pattern      string // For strings: regex validation pattern
 	ElementType  string // For arrays: element type
 }
+
+// ConfigSchemaProvider is an interface for plugins that provide configuration
+// schemas via a context-aware method. This allows the server to fetch config
+// schemas without knowing the concrete plugin implementation (e.g., gRPC proxy).
+//
+// This interface decouples the server package from plugin/grpc implementation
+// details, enabling cleaner dependency management.
+type ConfigSchemaProvider interface {
+	// ConfigSchemaFields returns the configuration schema for this plugin.
+	// The returned map keys are field names, values describe each field.
+	ConfigSchemaFields(ctx context.Context) (map[string]ConfigField, error)
+}
