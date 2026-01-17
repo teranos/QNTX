@@ -56,6 +56,7 @@ export abstract class BasePanel {
     protected panel: HTMLElement | null = null;
     protected overlay: HTMLElement | null = null;
     protected isVisible: boolean = false;
+    protected isFullscreen: boolean = false;
     protected config: Required<Omit<PanelConfig, 'tooltipConfig'>> & { tooltipConfig?: TooltipConfig };
 
     /** Error state management */
@@ -67,6 +68,7 @@ export abstract class BasePanel {
     private escapeHandler: ((e: KeyboardEvent) => void) | null = null;
     private clickOutsideHandler: ((e: Event) => void) | null = null;
     private tooltipCleanup: (() => void) | null = null;
+    private fullscreenHandler: ((e: KeyboardEvent) => void) | null = null;
 
     constructor(config: PanelConfig) {
         this.config = {
@@ -154,6 +156,10 @@ export abstract class BasePanel {
         const closeBtn = this.panel?.querySelector(`.${CSS.PANEL.CLOSE}`);
         closeBtn?.addEventListener('click', () => this.hide());
 
+        // Fullscreen button
+        const fullscreenBtn = this.panel?.querySelector('.panel-fullscreen-toggle');
+        fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen());
+
         // Escape key
         if (this.config.closeOnEscape) {
             this.escapeHandler = (e: KeyboardEvent) => {
@@ -163,6 +169,15 @@ export abstract class BasePanel {
             };
             document.addEventListener('keydown', this.escapeHandler);
         }
+
+        // F11 key for fullscreen toggle
+        this.fullscreenHandler = (e: KeyboardEvent) => {
+            if (e.key === 'F11' && this.isVisible) {
+                e.preventDefault();
+                this.toggleFullscreen();
+            }
+        };
+        document.addEventListener('keydown', this.fullscreenHandler);
 
         // Click outside (for panels without overlay)
         if (!this.config.useOverlay) {
@@ -252,6 +267,30 @@ export abstract class BasePanel {
         }
     }
 
+    /**
+     * Toggle fullscreen mode for the panel
+     */
+    public toggleFullscreen(): void {
+        if (!this.panel) return;
+
+        this.isFullscreen = !this.isFullscreen;
+        this.panel.setAttribute('data-mode', this.isFullscreen ? 'fullscreen' : 'panel');
+
+        // Update button icon/state
+        const btn = this.panel.querySelector('.panel-fullscreen-toggle');
+        if (btn) {
+            btn.textContent = this.isFullscreen ? '⊗' : '⛶';
+            btn.setAttribute('aria-label', this.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen');
+        }
+
+        // Hide overlay in fullscreen mode for better visibility
+        if (this.overlay && this.config.useOverlay) {
+            setVisibility(this.overlay, this.isFullscreen ? DATA.VISIBILITY.HIDDEN : DATA.VISIBILITY.VISIBLE);
+        }
+
+        log(SEG.UI, `[${this.config.id}] Toggled fullscreen: ${this.isFullscreen}`);
+    }
+
     public destroy(): void {
         this.onDestroy();
 
@@ -260,6 +299,9 @@ export abstract class BasePanel {
         }
         if (this.clickOutsideHandler) {
             document.removeEventListener('click', this.clickOutsideHandler);
+        }
+        if (this.fullscreenHandler) {
+            document.removeEventListener('keydown', this.fullscreenHandler);
         }
         if (this.tooltipCleanup) {
             this.tooltipCleanup();
@@ -362,9 +404,9 @@ export abstract class BasePanel {
      */
     protected createHeader(
         title: string,
-        options: { includeClose?: boolean; className?: string } = {}
+        options: { includeClose?: boolean; includeFullscreen?: boolean; className?: string } = {}
     ): HTMLElement {
-        const { includeClose = true, className = '' } = options;
+        const { includeClose = true, includeFullscreen = true, className = '' } = options;
 
         const header = document.createElement('div');
         header.className = `${CSS.PANEL.HEADER}${className ? ` ${className}` : ''}`;
@@ -374,8 +416,26 @@ export abstract class BasePanel {
         titleEl.textContent = title;
         header.appendChild(titleEl);
 
+        // Create action buttons container
+        const actions = document.createElement('div');
+        actions.className = 'panel-header-actions';
+
+        if (includeFullscreen) {
+            const fullscreenBtn = document.createElement('button');
+            fullscreenBtn.className = 'panel-fullscreen-toggle';
+            fullscreenBtn.setAttribute('aria-label', 'Enter fullscreen');
+            fullscreenBtn.setAttribute('title', 'Toggle fullscreen (F11)');
+            fullscreenBtn.setAttribute('type', 'button');
+            fullscreenBtn.textContent = '⛶';
+            actions.appendChild(fullscreenBtn);
+        }
+
         if (includeClose) {
-            header.appendChild(this.createCloseButton());
+            actions.appendChild(this.createCloseButton());
+        }
+
+        if (actions.children.length > 0) {
+            header.appendChild(actions);
         }
 
         return header;
