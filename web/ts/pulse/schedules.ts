@@ -10,6 +10,7 @@ import { formatRelativeTime, escapeHtml, formatDuration } from './panel.ts';
 import { Pulse } from '@generated/sym.js';
 import type { RichError } from '../base-panel-error.ts';
 import { buildTooltipText } from '../components/tooltip.ts';
+import { buttonPlaceholder } from '../components/button.ts';
 
 /**
  * Build a rich error for execution history failures
@@ -193,21 +194,9 @@ export function renderJobCard(job: ScheduledJobResponse, state: PulsePanelState)
             </div>
 
             <div class="pulse-job-actions">
-                <button class="pulse-btn pulse-btn-force has-tooltip"
-                        data-action="force-trigger"
-                        data-tooltip="Execute immediately\nBypasses scheduling and deduplication\nCreates a one-time execution">
-                    Force Trigger
-                </button>
-                <button class="pulse-btn pulse-btn-${isActive ? 'pause' : 'resume'} has-tooltip"
-                        data-action="${isActive ? 'pause' : 'resume'}"
-                        data-tooltip="${isActive ? 'Pause scheduled executions\nJob will not run until resumed' : 'Resume scheduled executions\nJob will run on next interval'}">
-                    ${isActive ? 'Pause' : 'Resume'}
-                </button>
-                <button class="pulse-btn pulse-btn-delete has-tooltip"
-                        data-action="delete"
-                        data-tooltip="Permanently delete this job\nThis action cannot be undone">
-                    Delete
-                </button>
+                ${buttonPlaceholder(`force-trigger-${job.id}`, 'Force Trigger', 'pulse-btn pulse-btn-force')}
+                ${buttonPlaceholder(`toggle-state-${job.id}`, isActive ? 'Pause' : 'Resume', `pulse-btn pulse-btn-${isActive ? 'pause' : 'resume'}`)}
+                ${buttonPlaceholder(`delete-${job.id}`, 'Delete', 'pulse-btn pulse-btn-delete')}
             </div>
 
             ${executionHistoryHtml}
