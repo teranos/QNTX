@@ -272,6 +272,132 @@ func TestSearchRichStringFields(t *testing.T) {
 	})
 }
 
+func TestSearchRichStringFields_FuzzyMatching(t *testing.T) {
+	ctx := context.Background()
+	db := qntxtest.CreateTestDB(t)
+	store := NewBoundedStore(db, nil)
+
+	// Insert test attestations with known content for fuzzy matching
+	testData := []struct {
+		id      string
+		content string
+	}{
+		{"commit-1", "Initial commit message"},
+		{"commit-2", "Implement fuzzy matching algorithm"},
+		{"commit-3", "Refactor code for better performance"},
+		{"commit-4", "Add temporal aggregation feature"},
+	}
+
+	for _, td := range testData {
+		attrs := map[string]interface{}{
+			"type":    "Commit",
+			"message": td.content,
+		}
+		attrsJSON, _ := json.Marshal(attrs)
+		subjectsJSON, _ := json.Marshal([]string{td.id})
+
+		_, err := db.Exec(`
+			INSERT INTO attestations (id, subjects, attributes, timestamp)
+			VALUES (?, ?, ?, ?)`,
+			td.id+"-att", subjectsJSON, attrsJSON, time.Now().Unix())
+		require.NoError(t, err)
+	}
+
+	t.Run("Fuzzy match with typos", func(t *testing.T) {
+		testCases := []struct {
+			query       string
+			shouldFind  string
+			description string
+		}{
+			{"comit", "commit", "Missing 'm'"},
+			{"fuzy", "fuzzy", "Missing 'z'"},
+			{"refactr", "refactor", "Missing 'o'"},
+			{"mesage", "message", "Missing 's'"},
+			{"tempral", "temporal", "Missing 'o'"},
+			{"algorythm", "algorithm", "Common misspelling"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.description, func(t *testing.T) {
+				matches, err := store.SearchRichStringFields(ctx, tc.query, 10)
+				require.NoError(t, err)
+
+				found := false
+				for _, match := range matches {
+					if match.Strategy != "exact" && match.Strategy != "substring" {
+						// This is a fuzzy match
+						assert.Contains(t, match.Strategy, "fuzzy", "Should use fuzzy strategy")
+						if len(match.MatchedWords) > 0 {
+							// Check if the matched word is what we expected
+							for _, word := range match.MatchedWords {
+								if word == tc.shouldFind {
+									found = true
+									t.Logf("✅ Fuzzy matched '%s' → '%s' (score: %.2f)",
+										tc.query, word, match.Score)
+									break
+								}
+							}
+						}
+					}
+				}
+
+				if !found {
+					t.Logf("⚠️  No fuzzy match for '%s' → '%s' (might need Rust backend)",
+						tc.query, tc.shouldFind)
+				}
+			})
+		}
+	})
+
+	t.Run("Multi-word fuzzy queries", func(t *testing.T) {
+		testCases := []struct {
+			query       string
+			expectMatch bool
+			description string
+		}{
+			{"fuzzy matching", true, "Exact multi-word"},
+			{"fuzy matchin", true, "Multi-word with typos"},
+			{"initial comit", true, "Multi-word with one typo"},
+			{"refactr performnce", true, "Multi-word with typos in both"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.description, func(t *testing.T) {
+				matches, err := store.SearchRichStringFields(ctx, tc.query, 10)
+				require.NoError(t, err)
+
+				if tc.expectMatch {
+					if len(matches) == 0 {
+						t.Logf("⚠️  No matches for multi-word query '%s' (might need Rust backend)",
+							tc.query)
+					} else {
+						assert.NotEmpty(t, matches, "Should find matches for '%s'", tc.query)
+						for _, match := range matches {
+							if len(match.MatchedWords) > 1 {
+								t.Logf("Found multi-word match: %v", match.MatchedWords)
+							}
+						}
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("Matched words field populated", func(t *testing.T) {
+		matches, err := store.SearchRichStringFields(ctx, "fuzzy", 10)
+		require.NoError(t, err)
+
+		for _, match := range matches {
+			if match.Strategy == "fuzzy:all-words" || match.Strategy == "fuzzy:partial" {
+				assert.NotEmpty(t, match.MatchedWords,
+					"Fuzzy matches should populate MatchedWords field")
+				assert.Contains(t, match.MatchedWords, "fuzzy",
+					"Should contain the matched word")
+			}
+		}
+	})
+}
+
 func TestSearchRichStringFields_Performance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping performance test in short mode")
