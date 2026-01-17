@@ -24,6 +24,7 @@ func TestSavePrompt_RecipeGenerator(t *testing.T) {
 	// A prompt that generates recipes from inventory attestations
 	prompt := &StoredPrompt{
 		Name:     "dinner-suggestions",
+		Filename: "dinner-suggestions.md",
 		Template: "Based on {{subject}}'s available ingredients from {{context}}: {{attributes}}, suggest 3 dinner recipes.",
 	}
 
@@ -54,6 +55,7 @@ func TestSavePrompt_VersionIncrementsAsRecipeEvolves(t *testing.T) {
 	// Version 1: Simple recipe suggestion
 	v1 := &StoredPrompt{
 		Name:     "weekly-meal-planner",
+		Filename: "weekly-meal-planner.md",
 		Template: "Suggest meals for {{subject}} using {{attributes}}",
 	}
 	saved1, err := store.SavePrompt(ctx, v1, "meal-planner")
@@ -67,6 +69,7 @@ func TestSavePrompt_VersionIncrementsAsRecipeEvolves(t *testing.T) {
 	// Version 2: Added dietary context
 	v2 := &StoredPrompt{
 		Name:     "weekly-meal-planner",
+		Filename: "weekly-meal-planner.md",
 		Template: "Plan {{subject}}'s weekly meals using {{attributes}} from {{context}}. Consider freshness dates.",
 	}
 	saved2, err := store.SavePrompt(ctx, v2, "meal-planner")
@@ -80,6 +83,7 @@ func TestSavePrompt_VersionIncrementsAsRecipeEvolves(t *testing.T) {
 	// Version 3: Added multi-source awareness
 	v3 := &StoredPrompt{
 		Name:     "weekly-meal-planner",
+		Filename: "weekly-meal-planner.md",
 		Template: "Plan {{subject}}'s meals using inventory from {{contexts}} (sources: {{actors}}). Items: {{attributes}}. Updated: {{temporal}}",
 	}
 	saved3, err := store.SavePrompt(ctx, v3, "meal-planner")
@@ -118,6 +122,7 @@ func TestGetPromptVersions_RecipePromptHistory(t *testing.T) {
 	for _, tmpl := range templates {
 		prompt := &StoredPrompt{
 			Name:     "kitchen-assistant",
+			Filename: "kitchen-assistant.md",
 			Template: tmpl,
 		}
 		_, err := store.SavePrompt(ctx, prompt, "chef-bot")
@@ -126,7 +131,7 @@ func TestGetPromptVersions_RecipePromptHistory(t *testing.T) {
 		}
 	}
 
-	versions, err := store.GetPromptVersions(ctx, "kitchen-assistant", 10)
+	versions, err := store.GetPromptVersions(ctx, "kitchen-assistant.md", 10)
 	if err != nil {
 		t.Fatalf("GetPromptVersions failed: %v", err)
 	}
@@ -162,6 +167,7 @@ func TestListPrompts_MultipleRecipePrompts(t *testing.T) {
 	for _, p := range prompts {
 		prompt := &StoredPrompt{
 			Name:     p.name,
+			Filename: p.name + ".md",
 			Template: p.template,
 		}
 		_, err := store.SavePrompt(ctx, prompt, "recipe-app")
@@ -188,6 +194,7 @@ func TestSavePrompt_FullRecipeConfiguration(t *testing.T) {
 	// Full configuration for a recipe prompt with all options
 	prompt := &StoredPrompt{
 		Name:         "smart-chef",
+		Filename:     "smart-chef.md",
 		Template:     "Based on {{subject}}'s kitchen inventory from {{contexts}}, recorded by {{actors}} at {{temporal}}, suggest healthy dinner recipes using: {{attributes}}. Prioritize items expiring soon.",
 		SystemPrompt: "You are a professional chef and nutritionist. Suggest balanced, healthy meals that minimize food waste. Consider cooking time and difficulty level.",
 		AxPattern:    "* is inventory of fridge,cupboard by *",
@@ -228,6 +235,7 @@ func TestSavePrompt_ValidatesRecipeTemplate(t *testing.T) {
 	// Invalid template with unknown field
 	prompt := &StoredPrompt{
 		Name:     "bad-recipe-prompt",
+		Filename: "bad-recipe-prompt.md",
 		Template: "Use {{ingredients}} to make dinner", // "ingredients" is not a valid field
 	}
 
@@ -244,6 +252,7 @@ func TestSavePrompt_RequiresName(t *testing.T) {
 
 	prompt := &StoredPrompt{
 		Name:     "",
+		Filename: "test.md",
 		Template: "Suggest recipes using {{attributes}}",
 	}
 
@@ -260,6 +269,7 @@ func TestSavePrompt_RequiresTemplate(t *testing.T) {
 
 	prompt := &StoredPrompt{
 		Name:     "empty-recipe",
+		Filename: "empty-recipe.md",
 		Template: "",
 	}
 
