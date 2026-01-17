@@ -4,7 +4,7 @@
  * Displays database statistics similar to `qntx db stats` output
  */
 
-import { Window } from './components/window.ts';
+import { Window } from './components/window';
 import { sendMessage } from './websocket.ts';
 import { DB } from '@generated/sym.js';
 import { tooltip } from './components/tooltip.ts';

@@ -13,7 +13,7 @@
 
 import { debug, info, error, SEG } from './logger.ts';
 import { sendMessage, registerHandler } from './websocket.ts';
-import { Window } from './components/window.ts';
+import { Window } from './components/window';
 import { apiFetch } from './api.ts';
 import { tooltip } from './components/tooltip.ts';
 import type { QueryMessage } from '@generated/server.js';

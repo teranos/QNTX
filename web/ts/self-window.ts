@@ -12,7 +12,7 @@
  * - System capabilities snapshot
  */
 
-import { Window } from './components/window.ts';
+import { Window } from './components/window';
 import { formatBuildTime, tooltip } from './components/tooltip.ts';
 import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 

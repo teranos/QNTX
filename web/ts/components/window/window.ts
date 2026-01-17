@@ -3,6 +3,8 @@
  * Supports multiple windows with z-index stacking
  */
 
+import styles from './window.module.css';
+
 export interface WindowConfig {
     id: string;
     title: string;
@@ -21,6 +23,7 @@ export class Window {
     private contentContainer: HTMLElement;
     private footerContainer: HTMLElement | null = null;
     private config: WindowConfig;
+    private closeBtn: HTMLButtonElement;
 
     // Drag state
     private isDragging: boolean = false;
@@ -35,9 +38,10 @@ export class Window {
     constructor(config: WindowConfig) {
         this.config = config;
         this.element = this.createElement();
-        this.header = this.element.querySelector('.draggable-window-header') as HTMLElement;
-        this.contentContainer = this.element.querySelector('.draggable-window-content') as HTMLElement;
-        this.footerContainer = this.element.querySelector('.draggable-window-footer') as HTMLElement | null;
+        this.header = this.element.querySelector(`.${styles.header}`) as HTMLElement;
+        this.contentContainer = this.element.querySelector(`.${styles.content}`) as HTMLElement;
+        this.footerContainer = this.element.querySelector(`.${styles.footer}`) as HTMLElement | null;
+        this.closeBtn = this.element.querySelector(`.${styles.close}`) as HTMLButtonElement;
 
         document.body.appendChild(this.element);
         this.setupEventListeners();
@@ -47,7 +51,7 @@ export class Window {
     private createElement(): HTMLElement {
         const win = document.createElement('div');
         win.id = this.config.id;
-        win.className = 'draggable-window';
+        win.className = styles.window;
 
         // Set dimensions
         if (this.config.width) win.style.width = this.config.width;
@@ -63,25 +67,40 @@ export class Window {
         // Initial z-index
         win.style.zIndex = String(Window.zIndexCounter++);
 
-        win.innerHTML = `
-            <div class="draggable-window-header">
-                <span class="draggable-window-title">${this.config.title}</span>
-                <button class="panel-close" aria-label="Close">&times;</button>
-            </div>
-            <div class="draggable-window-content"></div>
-            <div class="draggable-window-footer"></div>
-        `;
+        // Build DOM structure
+        const header = document.createElement('div');
+        header.className = styles.header;
+
+        const title = document.createElement('span');
+        title.className = styles.title;
+        title.textContent = this.config.title;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = styles.close;
+        closeBtn.setAttribute('aria-label', 'Close');
+        closeBtn.textContent = '×';
+
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        const content = document.createElement('div');
+        content.className = styles.content;
+
+        const footer = document.createElement('div');
+        footer.className = styles.footer;
+
+        win.appendChild(header);
+        win.appendChild(content);
+        win.appendChild(footer);
 
         return win;
     }
 
     private setupEventListeners(): void {
-        const closeBtn = this.element.querySelector('.panel-close') as HTMLButtonElement;
-
         // Dragging - mousedown on header
         this.header.addEventListener('mousedown', (e) => {
             // Ignore if clicking close button
-            if ((e.target as HTMLElement).closest('.panel-close')) return;
+            if ((e.target as HTMLElement).closest(`.${styles.close}`)) return;
 
             this.isDragging = true;
             const rect = this.element.getBoundingClientRect();
@@ -114,7 +133,7 @@ export class Window {
         });
 
         // Close button
-        closeBtn.addEventListener('click', () => {
+        this.closeBtn.addEventListener('click', () => {
             if (this.config.onClose) {
                 this.config.onClose();
             }
@@ -239,12 +258,12 @@ export class Window {
     }
 
     /**
-     * Update window title (accepts HTML)
+     * Update window title
      */
     public setTitle(title: string): void {
-        const titleEl = this.header.querySelector('.draggable-window-title');
+        const titleEl = this.header.querySelector(`.${styles.title}`);
         if (titleEl) {
-            titleEl.innerHTML = title;
+            titleEl.textContent = title;
         }
     }
 
@@ -260,5 +279,12 @@ export class Window {
      */
     public static closeAll(): void {
         Window.openWindows.forEach(win => win.destroy());
+    }
+
+    /**
+     * Expose styles for consumers that need to add window-specific classes
+     */
+    public static get styles() {
+        return styles;
     }
 }
