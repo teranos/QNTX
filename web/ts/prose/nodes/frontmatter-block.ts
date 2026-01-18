@@ -16,6 +16,7 @@ export class FrontmatterNodeView {
     private updating: boolean = false;
     private editorContainer: HTMLElement;
     private collapseButton: HTMLElement;
+    private isDestroyed: boolean = false;
 
     constructor(
         private node: PMNode,
@@ -88,6 +89,9 @@ export class FrontmatterNodeView {
             console.error('[Frontmatter Block] YAML language support unavailable:', error);
             yamlExtension = [];
         }
+
+        // Check if destroyed during async operation
+        if (this.isDestroyed) return;
 
         const initialContent = this.node.textContent;
 
@@ -198,6 +202,7 @@ export class FrontmatterNodeView {
     }
 
     destroy(): void {
+        this.isDestroyed = true;
         if (this.cmView) {
             this.cmView.destroy();
         }
