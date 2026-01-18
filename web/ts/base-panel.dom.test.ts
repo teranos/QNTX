@@ -3,13 +3,42 @@
  *
  * DOM tests for BasePanel visibility management
  * These tests run only in CI with JSDOM environment
+ *
+ * Strategy:
+ * - CI: USE_JSDOM=1 enables these tests (catches regressions before merge)
+ * - Local: Tests skipped by default (keeps `make test` fast for development)
+ * - Developers can run `USE_JSDOM=1 bun test` to debug panel issues
  */
 
+import { describe, test, expect, beforeEach } from 'bun:test';
 import { CSS } from './css-classes.ts';
 import { BasePanel } from './base-panel.ts';
 import type { PanelConfig } from './base-panel.ts';
 
+// Only run these tests when USE_JSDOM=1 (CI environment)
+const USE_JSDOM = process.env.USE_JSDOM === '1';
+
+// Setup jsdom if enabled
+if (USE_JSDOM) {
+    const { JSDOM } = await import('jsdom');
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+    const { window } = dom;
+
+    // Set up global DOM objects
+    global.window = window as any;
+    global.document = window.document;
+    global.HTMLElement = window.HTMLElement;
+    global.Element = window.Element;
+    global.MouseEvent = window.MouseEvent;
+    global.Event = window.Event;
+    global.getComputedStyle = window.getComputedStyle;
+}
+
 describe('BasePanel Data Attributes', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
     beforeEach(() => {
         // Reset DOM
         document.body.innerHTML = '';
@@ -178,6 +207,10 @@ describe('BasePanel Data Attributes', () => {
 });
 
 describe('BasePanel DOM Helpers', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
     beforeEach(() => {
         document.body.innerHTML = '';
     });
@@ -291,6 +324,10 @@ describe('BasePanel DOM Helpers', () => {
 });
 
 describe('BasePanel Error Boundary', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
     beforeEach(() => {
         document.body.innerHTML = '';
     });
@@ -382,6 +419,10 @@ describe('BasePanel Error Boundary', () => {
 });
 
 describe('BasePanel Expand/Collapse Button', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
     beforeEach(() => {
         document.body.innerHTML = '';
     });
@@ -656,6 +697,10 @@ describe('BasePanel Expand/Collapse Button', () => {
 });
 
 describe('BasePanel Integration - Error Boundaries', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
     beforeEach(() => {
         document.body.innerHTML = '';
     });
@@ -714,7 +759,11 @@ describe('BasePanel Integration - Error Boundaries', () => {
     });
 
     test('Error in setupEventListeners is logged but panel is created', () => {
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: any[] = [];
+        console.error = (...args: any[]) => {
+            consoleErrorCalls.push(args);
+        };
 
         const config: PanelConfig = {
             id: 'test-panel',
@@ -735,17 +784,20 @@ describe('BasePanel Integration - Error Boundaries', () => {
 
         // Panel should still be created despite error
         expect(document.getElementById('test-panel')).toBeTruthy();
-        expect(consoleSpy).toHaveBeenCalledWith(
-            '[▦]',
-            expect.stringContaining('[test-panel] Error in setupEventListeners():'),
-            expect.any(Error)
-        );
+        expect(consoleErrorCalls.length).toBeGreaterThan(0);
+        expect(consoleErrorCalls[0][0]).toBe('[▦]');
+        expect(consoleErrorCalls[0][1]).toContain('[test-panel] Error in setupEventListeners():');
+        expect(consoleErrorCalls[0][2]).toBeInstanceOf(Error);
 
-        consoleSpy.mockRestore();
+        console.error = originalConsoleError;
     });
 
     test('Error in beforeHide is logged but hide continues', () => {
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: any[] = [];
+        console.error = (...args: any[]) => {
+            consoleErrorCalls.push(args);
+        };
 
         const config: PanelConfig = {
             id: 'test-panel',
@@ -766,17 +818,21 @@ describe('BasePanel Integration - Error Boundaries', () => {
         const panel = new TestPanel(config);
         panel.hide();
 
-        expect(consoleSpy).toHaveBeenLastCalledWith(
-            '[▦]',
-            expect.stringContaining('[test-panel] Error in beforeHide():'),
-            expect.any(Error)
-        );
+        expect(consoleErrorCalls.length).toBeGreaterThan(0);
+        const lastCall = consoleErrorCalls[consoleErrorCalls.length - 1];
+        expect(lastCall[0]).toBe('[▦]');
+        expect(lastCall[1]).toContain('[test-panel] Error in beforeHide():');
+        expect(lastCall[2]).toBeInstanceOf(Error);
 
-        consoleSpy.mockRestore();
+        console.error = originalConsoleError;
     });
 
     test('Error in onHide is logged but hide continues', () => {
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: any[] = [];
+        console.error = (...args: any[]) => {
+            consoleErrorCalls.push(args);
+        };
 
         const config: PanelConfig = {
             id: 'test-panel',
@@ -797,12 +853,12 @@ describe('BasePanel Integration - Error Boundaries', () => {
         const panel = new TestPanel(config);
         panel.hide();
 
-        expect(consoleSpy).toHaveBeenLastCalledWith(
-            '[▦]',
-            expect.stringContaining('[test-panel] Error in onHide():'),
-            expect.any(Error)
-        );
+        expect(consoleErrorCalls.length).toBeGreaterThan(0);
+        const lastCall = consoleErrorCalls[consoleErrorCalls.length - 1];
+        expect(lastCall[0]).toBe('[▦]');
+        expect(lastCall[1]).toContain('[test-panel] Error in onHide():');
+        expect(lastCall[2]).toBeInstanceOf(Error);
 
-        consoleSpy.mockRestore();
+        console.error = originalConsoleError;
     });
 });
