@@ -12,7 +12,7 @@
     --panel-border-radius: 4px;
 
     /* Colors */
-    --panel-bg: #fff;
+    --panel-bg: var(--bg-primary);
     --panel-bg-secondary: var(--bg-subtle);
     --panel-text-primary: var(--text-primary);
     --panel-text-secondary: var(--text-secondary);
