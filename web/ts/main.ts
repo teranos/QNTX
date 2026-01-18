@@ -145,8 +145,8 @@ async function init(): Promise<void> {
     // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
     try {
         await initDebugInterceptor();
-    } catch (err) {
-        console.error('[Init] Failed to initialize debug interceptor:', err);
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize debug interceptor:', error);
         // Continue anyway - debug interception is not critical to app function
     }
 

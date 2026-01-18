@@ -354,7 +354,7 @@ export async function retryShow(ctx: ErrorHandlingContext): Promise<void> {
     // Re-run onShow with error boundary
     try {
         await ctx.onShow();
-    } catch (error) {
+    } catch (error: unknown) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error(`[${ctx.panelId}] Error in retryShow():`, err);
         showErrorState(ctx, err);

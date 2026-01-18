@@ -96,7 +96,7 @@ export class ATSNodeView implements NodeView {
         this.currentJob = await response.json();
         this.renderSchedulingControls();
       }
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to load scheduled job', { context: SEG.PULSE, silent: true });
       this.renderSchedulingControls();
     }

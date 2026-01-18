@@ -83,8 +83,8 @@ export async function createScheduledJob(
     try {
       const errorJson = JSON.parse(responseText);
       errorMessage = errorJson.error || errorJson.message || response.statusText;
-    } catch (e) {
-      handleError(e, 'Failed to parse API error response', { context: SEG.PULSE, silent: true });
+    } catch (error: unknown) {
+      handleError(error, 'Failed to parse API error response', { context: SEG.PULSE, silent: true });
       // Response wasn't JSON, use raw text
       errorMessage = responseText || response.statusText;
     }
