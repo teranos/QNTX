@@ -79,7 +79,7 @@
 
 /* Commands - Primary operations (i, am, ix, ax, as) */
 .ats-command {
-    color: #0066cc;
+    color: var(--accent-color);
     font-weight: 600;
 }
 

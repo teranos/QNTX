@@ -118,7 +118,7 @@
 .scraper-status-info {
     background: #f0f8ff;
     border-left-color: #2196F3;
-    color: #0066cc;
+    color: var(--accent-color);
 }
 
 .scraper-status-success {
@@ -191,7 +191,7 @@
 }
 
 .scraper-result-link {
-    color: #0066cc;
+    color: var(--accent-color);
     text-decoration: none;
     font-size: 14px;
 }
