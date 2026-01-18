@@ -25,6 +25,14 @@ type Match struct {
 	Strategy string
 }
 
+// RebuildResult contains stats from rebuilding the index
+type RebuildResult struct {
+	PredicateCount int
+	ContextCount   int
+	BuildTimeMs    uint64
+	IndexHash      string
+}
+
 // FuzzyEngine is a stub implementation that returns no results
 type FuzzyEngine struct{}
 
@@ -34,13 +42,18 @@ func NewFuzzyEngine() (*FuzzyEngine, error) {
 }
 
 // RebuildIndex is a no-op in the stub
-func (e *FuzzyEngine) RebuildIndex(predicates, contexts []string) int {
-	return 0
+func (e *FuzzyEngine) RebuildIndex(predicates, contexts []string) (*RebuildResult, error) {
+	return &RebuildResult{
+		PredicateCount: len(predicates),
+		ContextCount:   len(contexts),
+		BuildTimeMs:    0,
+		IndexHash:      "",
+	}, nil
 }
 
 // FindMatches always returns empty results in the stub
-func (e *FuzzyEngine) FindMatches(query string, vocabType VocabularyType, limit int, minScore float64) []Match {
-	return []Match{}
+func (e *FuzzyEngine) FindMatches(query string, vocabType VocabularyType, limit int, minScore float64) ([]Match, uint64, error) {
+	return []Match{}, 0, nil
 }
 
 // Close is a no-op in the stub
