@@ -70,7 +70,7 @@
 
 /* Prose location link */
 .pulse-prose-link {
-  color: #7b1fa2;
+  color: var(--color-scheduled);
   text-decoration: none;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 11px;
@@ -111,7 +111,7 @@
 .pulse-btn-pause:hover,
 .pulse-btn-resume:hover {
   background: #f3e5f5;
-  border-color: #7b1fa2;
+  border-color: var(--color-scheduled);
 }
 
 .pulse-btn-delete:hover {
@@ -148,7 +148,7 @@
 }
 
 .execution-child.expanded {
-  border-color: #7b1fa2;
+  border-color: var(--color-scheduled);
 }
 
 .child-header {
@@ -606,12 +606,12 @@
 
 /* Focus states for keyboard navigation (WCAG requirement) */
 .pulse-btn:focus-visible {
-    outline: 2px solid #7b1fa2;
+    outline: 2px solid var(--color-scheduled);
     outline-offset: 2px;
 }
 
 .pulse-expand-toggle:focus-visible {
-    outline: 2px solid #7b1fa2;
+    outline: 2px solid var(--color-scheduled);
     outline-offset: 2px;
 }
 
