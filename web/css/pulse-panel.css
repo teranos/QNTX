@@ -267,7 +267,7 @@
 }
 
 .task-log-timestamp {
-  color: #999;
+  color: var(--text-tertiary);
   font-size: 11px;
   margin-right: 12px;
 }
@@ -285,7 +285,7 @@
 .task-logs-loading {
   padding: 12px;
   text-align: center;
-  color: #999;
+  color: var(--text-tertiary);
   font-style: italic;
 }
 
@@ -407,7 +407,7 @@
 .pulse-execution-empty {
     padding: 24px;
     text-align: center;
-    color: #999;
+    color: var(--text-tertiary);
     font-style: italic;
 }
 
@@ -558,7 +558,7 @@
 
 .pulse-exec-duration {
     font-size: 13px;
-    color: #999;
+    color: var(--text-tertiary);
     font-family: 'SF Mono', Monaco, monospace;
 }
 
