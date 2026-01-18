@@ -4,4 +4,13 @@ See [Design Philosophy](../../docs/development/design-philosophy.md) for foundat
 
 Panel styles in `{name}-panel.css`; reusable components (buttons, badges, close icons) in `components.css`.
 
-Variables in `core.css :root`: use `--color-*` for status colors, `--shadow-*` for elevation, `--font-mono` for code.
+## Core Tokens (`core.css`)
+
+```css
+/* Text */        --text-primary, --text-secondary
+/* Backgrounds */ --bg-primary, --bg-subtle, --bg-dark
+/* Borders */     --border-color, --border-light
+/* Accent */      --accent-color
+/* Status */      --color-success, --color-error, --color-warning, --color-info, --color-scheduled
+/* Shadows */     --shadow-sm, --shadow-md, --shadow-lg, --shadow-xl
+```
