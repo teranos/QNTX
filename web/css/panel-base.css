@@ -358,7 +358,7 @@
 .panel-btn-success {
     background: var(--status-completed-bg);
     border-color: #388e3c;
-    color: #2e7d32;
+    color: var(--status-completed-text);
 }
 
 .panel-btn-success:hover:not(:disabled) {

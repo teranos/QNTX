@@ -243,11 +243,11 @@
 
 /* Toast variants */
 .config-toast-success {
-    background: #2e7d32;
+    background: var(--status-completed-text);
 }
 
 .config-toast-error {
-    background: #c62828;
+    background: var(--status-failed-text);
 }
 
 /* Value type styling */
