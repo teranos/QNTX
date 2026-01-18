@@ -28,7 +28,7 @@ type PromptMetadata struct {
 	// Format: "provider/model" (e.g., "anthropic/claude-sonnet-4")
 	Model string `yaml:"model,omitempty"`
 
-	// Temperature controls randomness (0.0-1.0)
+	// Temperature controls randomness (0.0-2.0, provider-dependent)
 	Temperature *float64 `yaml:"temperature,omitempty"`
 
 	// MaxTokens limits response length
@@ -36,9 +36,6 @@ type PromptMetadata struct {
 
 	// Type distinguishes system vs user prompts
 	Type string `yaml:"type,omitempty"`
-
-	// Privacy controls sharing (private/team/public)
-	Privacy string `yaml:"privacy,omitempty"`
 
 	// Variables lists expected template placeholders
 	Variables []string `yaml:"variables,omitempty"`
@@ -109,18 +106,6 @@ func validateMetadata(m *PromptMetadata) error {
 		}
 	}
 
-	// Validate privacy values if provided
-	if m.Privacy != "" {
-		validPrivacy := map[string]bool{
-			"private": true,
-			"team":    true,
-			"public":  true,
-		}
-		if !validPrivacy[m.Privacy] {
-			return errors.Newf("privacy must be 'private', 'team', or 'public', got '%s'", m.Privacy)
-		}
-	}
-
 	return nil
 }
 
@@ -146,12 +131,4 @@ func (p *PromptDocument) GetMaxTokens(fallback int) int {
 		return *p.Metadata.MaxTokens
 	}
 	return fallback
-}
-
-// GetPrivacy returns the privacy setting, defaulting to "private" if not specified
-func (p *PromptDocument) GetPrivacy() string {
-	if p.Metadata.Privacy != "" {
-		return p.Metadata.Privacy
-	}
-	return "private"
 }

@@ -120,6 +120,8 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		logger.AddAxSymbol(logger.Logger).Errorw("Frontmatter parsing failed",
 			"error", err,
 			"template_length", len(payload.Template),
+			"job_id", job.ID,
+			"prompt_id", payload.PromptID,
 		)
 		return errors.Wrap(err, "failed to parse frontmatter")
 	}
@@ -369,8 +371,14 @@ func ExecuteOneShot(
 	template string,
 	systemPrompt string,
 ) ([]Result, error) {
-	// Parse template
-	tmpl, err := Parse(template)
+	// Parse frontmatter from template
+	doc, err := ParseFrontmatter(template)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse frontmatter")
+	}
+
+	// Parse template body (after frontmatter)
+	tmpl, err := Parse(doc.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse prompt template")
 	}
@@ -402,10 +410,21 @@ func ExecuteOneShot(
 			return results, errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
 		}
 
-		// Call LLM
+		// Call LLM with frontmatter metadata applied
 		chatReq := openrouter.ChatRequest{
 			SystemPrompt: systemPrompt,
 			UserPrompt:   prompt,
+		}
+
+		// Apply frontmatter metadata (temperature, max_tokens, model)
+		if doc.Metadata.Temperature != nil {
+			chatReq.Temperature = doc.Metadata.Temperature
+		}
+		if doc.Metadata.MaxTokens != nil {
+			chatReq.MaxTokens = doc.Metadata.MaxTokens
+		}
+		if doc.Metadata.Model != "" {
+			chatReq.Model = &doc.Metadata.Model
 		}
 
 		resp, err := client.Chat(ctx, chatReq)

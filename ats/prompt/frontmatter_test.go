@@ -6,15 +6,14 @@ import (
 
 func TestParseFrontmatter(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		wantName    string
-		wantModel   string
-		wantTemp    *float64
-		wantTokens  *int
-		wantPrivacy string
-		wantBody    string
-		wantErr     bool
+		name       string
+		input      string
+		wantName   string
+		wantModel  string
+		wantTemp   *float64
+		wantTokens *int
+		wantBody   string
+		wantErr    bool
 	}{
 		{
 			name: "full frontmatter",
@@ -25,17 +24,15 @@ version: "2.0"
 model: "anthropic/claude-sonnet-4"
 temperature: 0.7
 max_tokens: 2000
-privacy: "private"
 ---
 Generate a recipe using these ingredients:
 {{attributes.ingredients}}`,
-			wantName:    "recipe-generator",
-			wantModel:   "anthropic/claude-sonnet-4",
-			wantTemp:    floatPtr(0.7),
-			wantTokens:  intPtr(2000),
-			wantPrivacy: "private",
-			wantBody:    "Generate a recipe using these ingredients:\n{{attributes.ingredients}}",
-			wantErr:     false,
+			wantName:   "recipe-generator",
+			wantModel:  "anthropic/claude-sonnet-4",
+			wantTemp:   floatPtr(0.7),
+			wantTokens: intPtr(2000),
+			wantBody:   "Generate a recipe using these ingredients:\n{{attributes.ingredients}}",
+			wantErr:    false,
 		},
 		{
 			name: "minimal frontmatter",
@@ -66,15 +63,6 @@ Body after empty frontmatter`,
 			input: `---
 name: "bad-temp"
 temperature: 3.0
----
-Body`,
-			wantErr: true,
-		},
-		{
-			name: "invalid privacy",
-			input: `---
-name: "bad-privacy"
-privacy: "secret"
 ---
 Body`,
 			wantErr: true,
@@ -113,9 +101,6 @@ Body`,
 			if !intPtrEqual(doc.Metadata.MaxTokens, tt.wantTokens) {
 				t.Errorf("MaxTokens = %v, want %v", doc.Metadata.MaxTokens, tt.wantTokens)
 			}
-			if doc.Metadata.Privacy != tt.wantPrivacy {
-				t.Errorf("Privacy = %q, want %q", doc.Metadata.Privacy, tt.wantPrivacy)
-			}
 			if doc.Body != tt.wantBody {
 				t.Errorf("Body = %q, want %q", doc.Body, tt.wantBody)
 			}
@@ -129,7 +114,6 @@ func TestPromptDocument_GetMethods(t *testing.T) {
 			Model:       "anthropic/claude-sonnet-4",
 			Temperature: floatPtr(0.8),
 			MaxTokens:   intPtr(1500),
-			Privacy:     "team",
 		},
 	}
 
@@ -143,10 +127,6 @@ func TestPromptDocument_GetMethods(t *testing.T) {
 
 	if got := doc.GetMaxTokens(1000); got != 1500 {
 		t.Errorf("GetMaxTokens() = %d, want %d", got, 1500)
-	}
-
-	if got := doc.GetPrivacy(); got != "team" {
-		t.Errorf("GetPrivacy() = %q, want %q", got, "team")
 	}
 }
 
@@ -165,11 +145,6 @@ func TestPromptDocument_GetMethods_UseFallback(t *testing.T) {
 
 	if got := doc.GetMaxTokens(1000); got != 1000 {
 		t.Errorf("GetMaxTokens() = %d, want %d", got, 1000)
-	}
-
-	// Privacy defaults to "private"
-	if got := doc.GetPrivacy(); got != "private" {
-		t.Errorf("GetPrivacy() = %q, want %q", got, "private")
 	}
 }
 
