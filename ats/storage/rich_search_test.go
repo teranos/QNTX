@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -12,12 +13,40 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
+// attestTypeDefinition is a helper to attest type definitions with rich string fields
+func attestTypeDefinition(t *testing.T, db *sql.DB, typeName string, richFields []string) {
+	typeAttrs := map[string]interface{}{
+		"name":               typeName,
+		"label":              typeName,
+		"rich_string_fields": richFields,
+	}
+	typeAttrsJSON, err := json.Marshal(typeAttrs)
+	require.NoError(t, err)
+
+	subjectsJSON, err := json.Marshal([]string{"type:" + typeName})
+	require.NoError(t, err)
+
+	predicatesJSON, err := json.Marshal([]string{"type"})
+	require.NoError(t, err)
+
+	contextsJSON, err := json.Marshal([]string{"graph"})
+	require.NoError(t, err)
+
+	_, err = db.Exec(`
+		INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"type-def-"+typeName, subjectsJSON, predicatesJSON, contextsJSON, `[]`, typeAttrsJSON, time.Now().Unix(), "test")
+	require.NoError(t, err)
+}
+
 func TestSearchRichStringFields(t *testing.T) {
 	ctx := context.Background()
 	db := qntxtest.CreateTestDB(t)
 	store := NewBoundedStore(db, nil)
 
-	// Note: We search directly in attestation attributes, no types table needed
+	// First, attest type definitions for the fields we'll use
+	attestTypeDefinition(t, db, "Commit", []string{"message", "description"})
+	attestTypeDefinition(t, db, "Note", []string{"content", "summary"})
 
 	// Create test attestations with searchable content
 	testCases := []struct {
@@ -270,6 +299,9 @@ func TestSearchRichStringFields_FuzzyMatching(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewBoundedStore(db, nil)
 
+	// First, attest type definition for the 'message' field we'll use
+	attestTypeDefinition(t, db, "Commit", []string{"message"})
+
 	// Insert test attestations with known content for fuzzy matching
 	testData := []struct {
 		id      string
@@ -400,7 +432,8 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := NewBoundedStore(db, nil)
 
-	// No types table needed - we search attestations directly
+	// Attest a type definition with rich fields for Commit type
+	attestTypeDefinition(t, db, "Commit", []string{"message", "description"})
 
 	// Insert many attestations
 	for i := 0; i < 1000; i++ {
@@ -428,4 +461,149 @@ func TestSearchRichStringFields_Performance(t *testing.T) {
 	assert.NotEmpty(t, matches)
 	assert.Less(t, duration, 500*time.Millisecond, "Search should complete within 500ms")
 	t.Logf("Search completed in %v, found %d matches", duration, len(matches))
+}
+
+func TestDynamicFieldDiscovery(t *testing.T) {
+	ctx := context.Background()
+	db := qntxtest.CreateTestDB(t)
+	store := NewBoundedStore(db, nil)
+
+	t.Run("Discovers fields from type definitions", func(t *testing.T) {
+		// Insert a type definition attestation with custom rich fields
+		typeAttrs := map[string]interface{}{
+			"name":               "CustomNote",
+			"rich_string_fields": []string{"notes", "comments", "remarks"},
+		}
+		typeAttrsJSON, _ := json.Marshal(typeAttrs)
+		subjectsJSON, _ := json.Marshal([]string{"CustomNote"})
+		predicatesJSON, _ := json.Marshal([]string{"type"})
+		contextsJSON, _ := json.Marshal([]string{"graph"})
+
+		_, err := db.Exec(`
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"type-custom-note", subjectsJSON, predicatesJSON, contextsJSON, `[]`, typeAttrsJSON, time.Now().Unix(), "test")
+		require.NoError(t, err)
+
+		// Get dynamic fields
+		fields := store.buildDynamicRichStringFields(ctx)
+
+		// Should only include fields from type definition - no hardcoded defaults
+		assert.Contains(t, fields, "notes", "Should discover 'notes' field from type definition")
+		assert.Contains(t, fields, "comments", "Should discover 'comments' field from type definition")
+		assert.Contains(t, fields, "remarks", "Should discover 'remarks' field from type definition")
+
+		// Should ONLY have the fields from type definitions
+		assert.Equal(t, 3, len(fields), "Should have exactly 3 fields from the type definition")
+	})
+
+	t.Run("Returns empty slice when no type definitions", func(t *testing.T) {
+		// Fresh database with no type definitions
+		db2 := qntxtest.CreateTestDB(t)
+		store2 := NewBoundedStore(db2, nil)
+
+		fields := store2.buildDynamicRichStringFields(ctx)
+
+		// Should have no fields - purely attested, no hardcoded defaults
+		assert.Equal(t, 0, len(fields), "Should have no fields when no type definitions exist")
+	})
+
+	t.Run("SearchRichStringFieldsWithResult returns searched fields", func(t *testing.T) {
+		// Create a fresh database and store to avoid cache conflicts
+		freshDB := qntxtest.CreateTestDB(t)
+		freshStore := NewBoundedStore(freshDB, nil)
+
+		// Attest a type definition for SearchTestNote with notes and message fields
+		attestTypeDefinition(t, freshDB, "SearchTestNote", []string{"notes", "message"})
+
+		// Insert some test data with custom fields
+		attrs := map[string]interface{}{
+			"type":    "SearchTestNote",
+			"notes":   "This is a note with fuzzy content",
+			"message": "Regular message field with fuzzy too",
+		}
+		attrsJSON, _ := json.Marshal(attrs)
+		subjectsJSON, _ := json.Marshal([]string{"note-1"})
+
+		_, err := freshDB.Exec(`
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"att-note-1", subjectsJSON, `[]`, `[]`, `[]`, attrsJSON, time.Now().Unix(), "test")
+		require.NoError(t, err)
+
+		// Search and check that searched_fields is populated
+		result, err := freshStore.SearchRichStringFieldsWithResult(ctx, "fuzzy", 10)
+		require.NoError(t, err)
+
+		assert.NotEmpty(t, result.SearchedFields, "Should return list of searched fields")
+		assert.Contains(t, result.SearchedFields, "notes", "Should include custom field from type definition")
+		assert.Contains(t, result.SearchedFields, "message", "Should include message field from type definition")
+		t.Logf("Searched fields: %v", result.SearchedFields)
+	})
+
+	t.Run("Caching works correctly", func(t *testing.T) {
+		// Call getTypeDefinitions twice
+		fields1, err := store.getTypeDefinitions(ctx)
+		require.NoError(t, err)
+
+		// Second call should use cache (we can't directly test this without timing,
+		// but we can verify the results are the same)
+		fields2, err := store.getTypeDefinitions(ctx)
+		require.NoError(t, err)
+
+		assert.Equal(t, len(fields1), len(fields2), "Cached results should match")
+	})
+
+	t.Run("Dynamic SQL generation handles variable field counts", func(t *testing.T) {
+		// Insert type with many custom fields
+		typeAttrs := map[string]interface{}{
+			"name": "RichDocument",
+			"rich_string_fields": []string{
+				"field1", "field2", "field3", "field4", "field5",
+				"field6", "field7", "field8", "field9", "field10",
+			},
+		}
+		typeAttrsJSON, _ := json.Marshal(typeAttrs)
+		subjectsJSON, _ := json.Marshal([]string{"RichDocument"})
+		predicatesJSON, _ := json.Marshal([]string{"type"})
+		contextsJSON, _ := json.Marshal([]string{"graph"})
+
+		_, err := db.Exec(`
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"type-rich-doc", subjectsJSON, predicatesJSON, contextsJSON, `[]`, typeAttrsJSON, time.Now().Unix(), "test")
+		require.NoError(t, err)
+
+		// Clear cache to force re-query
+		store.typeFieldsCache = nil
+
+		// Insert test document
+		docAttrs := map[string]interface{}{
+			"type":   "RichDocument",
+			"field5": "This contains the search term fuzzy",
+		}
+		docAttrsJSON, _ := json.Marshal(docAttrs)
+		docSubjectsJSON, _ := json.Marshal([]string{"doc-1"})
+
+		_, err = db.Exec(`
+			INSERT INTO attestations (id, subjects, predicates, contexts, actors, attributes, timestamp, source)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"att-doc-1", docSubjectsJSON, `[]`, `[]`, `[]`, docAttrsJSON, time.Now().Unix(), "test")
+		require.NoError(t, err)
+
+		// Search should work with dynamically generated SQL
+		matches, err := store.SearchRichStringFields(ctx, "fuzzy", 10)
+		require.NoError(t, err)
+
+		// Should find the document via field5
+		found := false
+		for _, match := range matches {
+			if match.NodeID == "doc-1" {
+				found = true
+				assert.Equal(t, "field5", match.FieldName, "Should match on custom field")
+				break
+			}
+		}
+		assert.True(t, found, "Should find document via custom field")
+	})
 }
