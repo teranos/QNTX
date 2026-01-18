@@ -26,7 +26,7 @@
     font-size: 13px; /* Default size for mobile */
     color: #000;
     background: #f8f8f8;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     cursor: pointer;
     transition: all 0.15s ease;
     position: relative;
@@ -70,7 +70,7 @@
 .palette-cell:focus {
     outline: none;
     background: #e8e8e8;
-    border-color: #999;
+    border-color: var(--text-tertiary);
     transform: scale(1.05);
 }
 

@@ -5,11 +5,23 @@
     /* Font Stacks */
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
 
+    /* Core Colors */
+    --text-primary: #333;
+    --text-secondary: #666;
+    --text-tertiary: #999;
+    --bg-primary: #fff;
+    --bg-subtle: #f8f8f8;
+    --bg-dark: #1e1e1e;
+    --border-color: #ddd;
+    --border-light: #e0e0e0;
+    --accent-color: #0066cc;
+
     /* Status Colors */
     --color-success: #22c55e;
     --color-error: #ef4444;
     --color-warning: #ffaa00;
     --color-info: #3b82f6;
+    --color-scheduled: #7b1fa2;
 
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -30,7 +42,7 @@ body {
 
 /* Accessibility: Focus Styles */
 :focus-visible {
-    outline: 2px solid var(--accent-color, #0066cc);
+    outline: 2px solid var(--accent-color);
     outline-offset: 2px;
 }
 
@@ -168,7 +180,7 @@ body.disconnected #container {
 #left-panel {
     width: 360px;
     background: #f8f8f8;
-    border-right: 1px solid #ddd;
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
 }
@@ -176,7 +188,7 @@ body.disconnected #container {
 /* Header */
 #header {
     padding: 16px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     background: #fff;
 }
 
@@ -190,7 +202,7 @@ body.disconnected #container {
 #header .subtitle {
     margin: 0;
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 /* Stats */
@@ -198,9 +210,9 @@ body.disconnected #container {
     padding: 12px 16px;
     margin-bottom: 32px; /* Space for fixed log panel at bottom */
     background: #fff;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 #stats .stat-item {
@@ -299,7 +311,7 @@ body.disconnected #container {
         right: 0;
         z-index: 1000;
         background: #fff;
-        border-top: 1px solid #ddd;
+        border-top: 1px solid var(--border-color);
         box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
         display: flex;
         flex-direction: column;
