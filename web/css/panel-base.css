@@ -345,9 +345,9 @@
 
 /* Warning button - for two-click confirmation pattern */
 .panel-btn-warning {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
-    color: #e65100;
+    color: var(--status-pending-text);
 }
 
 .panel-btn-warning:hover:not(:disabled) {
@@ -356,7 +356,7 @@
 
 /* Success/confirm button - for validated state in two-click pattern */
 .panel-btn-success {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
     border-color: #388e3c;
     color: #2e7d32;
 }
@@ -369,7 +369,7 @@
 .panel-confirm-hint {
     display: block;
     font-size: 11px;
-    color: #e65100;
+    color: var(--status-pending-text);
     margin-top: 4px;
     font-style: italic;
 }
