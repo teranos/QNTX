@@ -31,7 +31,7 @@
     /* Meta overlay - gray for secondary information */
     --meta-max-width: 300px;
     --meta-font-size: 11px;
-    --meta-color: #666;  /* Mid-gray for de-emphasized text */
+    --meta-color: var(--text-secondary);  /* Mid-gray for de-emphasized text */
 }
 
 /* Graph Container */
