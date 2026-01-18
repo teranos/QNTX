@@ -24,7 +24,8 @@ export const proseInputRules = new Plugin({
                 // 1. We're at the document start (first node)
                 // 2. No frontmatter block already exists
 
-                const isAtDocStart = $from.before() === 1;
+                // Check if current node is the first block in the document
+                const isAtDocStart = $from.index(0) === 0;
                 if (!isAtDocStart) {
                     return false;
                 }
@@ -41,10 +42,10 @@ export const proseInputRules = new Plugin({
                     return false;
                 }
 
-                // Create frontmatter block
+                // Create frontmatter block with a placeholder text
                 const frontmatterNode = proseSchema.nodes.frontmatter_block.create(
                     { params: 'yaml' },
-                    proseSchema.text('')
+                    proseSchema.text('# Add your YAML frontmatter here')
                 );
 
                 const tr = state.tr.replaceRangeWith(
