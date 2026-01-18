@@ -16,7 +16,6 @@ export class FrontmatterNodeView {
     private updating: boolean = false;
     private editorContainer: HTMLElement;
     private collapseButton: HTMLElement;
-    private isCollapsed: boolean = false;
 
     constructor(
         private node: PMNode,
@@ -30,7 +29,6 @@ export class FrontmatterNodeView {
         // Create collapse button
         this.collapseButton = document.createElement('button');
         this.collapseButton.className = 'frontmatter-collapse';
-        this.collapseButton.textContent = '▼';
         this.collapseButton.setAttribute('aria-label', 'Toggle frontmatter');
         this.collapseButton.addEventListener('click', () => this.toggleCollapse());
         this.dom.appendChild(this.collapseButton);
@@ -40,14 +38,44 @@ export class FrontmatterNodeView {
         this.editorContainer.className = 'frontmatter-editor';
         this.dom.appendChild(this.editorContainer);
 
+        // Apply initial collapse state
+        this.updateCollapseState();
+
         // Initialize editor asynchronously to load YAML language support
         this.initializeEditor();
     }
 
-    private toggleCollapse(): void {
-        this.isCollapsed = !this.isCollapsed;
+    private get isCollapsed(): boolean {
+        return this.node.attrs.collapsed ?? false;
+    }
+
+    private updateCollapseState(): void {
         this.editorContainer.style.display = this.isCollapsed ? 'none' : 'block';
         this.collapseButton.textContent = this.isCollapsed ? '▶' : '▼';
+    }
+
+    private toggleCollapse(): void {
+        const pos = this.getPos();
+        if (pos === undefined) return;
+
+        const newCollapsedState = !this.isCollapsed;
+
+        try {
+            this.updating = true;
+
+            const tr = this.view.state.tr.setNodeMarkup(
+                pos,
+                undefined,
+                {
+                    ...this.node.attrs,
+                    collapsed: newCollapsedState
+                }
+            );
+
+            this.view.dispatch(tr);
+        } finally {
+            this.updating = false;
+        }
     }
 
     private async initializeEditor(): Promise<void> {
@@ -141,7 +169,14 @@ export class FrontmatterNodeView {
         if (node.type !== this.node.type) return false;
         if (!this.cmView) return true;
 
+        const wasCollapsed = this.node.attrs.collapsed ?? false;
         this.node = node;
+        const isNowCollapsed = node.attrs.collapsed ?? false;
+
+        // Update collapse state UI if it changed
+        if (wasCollapsed !== isNowCollapsed) {
+            this.updateCollapseState();
+        }
 
         const newContent = node.textContent;
         if (this.cmView.state.doc.toString() !== newContent) {
