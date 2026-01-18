@@ -53,7 +53,7 @@
 
 #loading-status {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
     margin-bottom: 16px;
 }
 
@@ -67,7 +67,7 @@
     padding: 8px 10px;
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 10px;
-    color: #666;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin-bottom: 16px;
 }

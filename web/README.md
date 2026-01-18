@@ -1,18 +1,32 @@
 # QNTX Web UI
 
-This directory contains the web interface for QNTX, including the ATS query editor with real-time graph visualization.
+Web interface for QNTX that enables visual exploration of attestation relationships through real-time graph visualization.
+
+## Why Web UI
+
+The web UI is essential for QNTX's vision of Continuous Intelligence:
+- **Graph visualization** reveals how aggregations and clusters of data relate to meaning - you can immediately see complex relational structures that would be invisible in CLI output
+- **Real-time updates** show intelligence evolving as new attestations arrive
+- **Foundation for future visions** documented in [tile-based semantic UI](../docs/vision/tile-based-semantic-ui.md) and [time-travel](../docs/vision/time-travel.md)
+
+While `ax` queries provide the data, the graph makes the relationships obvious.
 
 ## Architecture
 
+### Configuration
+Ports are configured in `../am.toml` at project root:
+- `[server].port` - Backend API port (default: 877)
+- `[server].frontend_port` - Development server port (default: 8820)
+
 ### Runtime Dependencies
-- **No NPM required at runtime** - All JavaScript is bundled and embedded in the Go binary
+- **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary
 - WebSocket for real-time updates (graph data and LSP)
 - D3.js for graph visualization
 - CodeMirror 6 for the ATS query editor with LSP integration
 
 ### Build System: Bun
 
-This project uses **Bun** as a fast JavaScript bundler and package manager. Bun is chosen because:
+This project uses **Bun** as a fast bundler and package manager. Bun is chosen because:
 - **Fast builds** - 10x faster than npm/webpack
 - **Integrated tooling** - Single tool for dependencies, bundling, and runtime
 - **Reproducible builds** - Lock file ensures exact versions
@@ -34,22 +48,6 @@ bun run build            # Build bundle to internal/server/dist/
 ```
 
 This is automatically called before `make cli` builds the Go binary.
-
-### What Gets Built
-
-**Input:** Everything in `web/` directory
-- `index.html` - Main HTML template
-- `js/` - JavaScript source files (imported from vendor bundles + custom code)
-- `css/` - Stylesheets
-- `fonts/` - Custom fonts
-- `qntx.jpg` - Logo image
-
-**Output:** `internal/server/dist/` (embedded in Go binary)
-- `index.html` - Optimized HTML
-- `js/main.js` - Bundled and minified JavaScript (all dependencies included)
-- `css/` - CSS files
-- `fonts/` - Font files
-- `qntx.jpg` - Image asset
 
 ### Understanding Dependencies
 
@@ -105,7 +103,7 @@ The `package.json` locks **exact versions** (no `^` or `~`):
 
 ```typescript
 // 1. Clean dist/ directory
-// 2. Bundle JavaScript with Bun's bundler
+// 2. Bundle with Bun's bundler
 //    - Resolves all imports
 //    - Includes dependencies from package.json
 //    - Minifies output
@@ -134,32 +132,6 @@ make cli
 # - Search/query works
 ```
 
-## File Structure
-
-```
-web/
-├── package.json          # Exact dependency versions (sacred)
-├── bun.lock              # Lock file (commit this)
-├── build.ts              # Build script
-├── index.html            # Main HTML template
-├── qntx.jpg              # Logo image
-├── css/
-│   ├── core.css          # Core styles
-│   ├── codemirror.css    # Editor styles
-│   ├── graph.css         # Graph visualization styles
-│   └── ...
-├── js/
-│   ├── main.js           # Entry point
-│   ├── codemirror-editor.js       # CodeMirror setup
-│   ├── ats-semantic-tokens-client.js  # Custom parse protocol
-│   ├── websocket.js      # WebSocket manager
-│   ├── graph-renderer.js # D3 graph visualization
-│   └── vendor/           # Pre-built libraries (not bundled)
-│       ├── d3.v7.min.js  # D3 (vendored, not npm)
-│       └── codemirror-bundle.js   # Old - now replaced by bun bundle
-└── README.md             # This file
-```
-
 ## Key Features Enabled
 
 ### CodeMirror 6 with LSP
@@ -172,19 +144,6 @@ web/
 - D3.js force-directed graph
 - Interactive node filtering via legend
 - Real-time updates as queries execute
-
-### WebSocket Protocols
-
-**Two protocols running on different endpoints:**
-
-1. **LSP Protocol** (`/lsp`) - Standard Language Server Protocol
-   - Completions, hover info, diagnostics
-   - Handled by `internal/ats/lsp/`
-
-2. **Custom Protocol** (`/ws`) - Graph updates, logs, custom parse tokens
-   - Query responses (graph data)
-   - Semantic tokens for syntax highlighting
-   - Handled by `internal/server/handlers.go`
 
 ## Troubleshooting
 
@@ -207,11 +166,3 @@ Check `bun.lock` - if versions don't match package.json:
 ```bash
 bun install  # Resync package.json and bun.lock
 ```
-
-## Future Improvements
-
-- [ ] Lazy-load non-critical UI components
-- [ ] Service worker for offline support
-- [ ] Progressive enhancement for slow networks
-- [ ] Internationalization support
-- [ ] Dark mode theme toggle
