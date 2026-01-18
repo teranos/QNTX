@@ -106,7 +106,7 @@ export abstract class BasePanel {
         try {
             // Subclass custom setup
             this.setupEventListeners();
-        } catch (error) {
+        } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             log.error(SEG.UI, `[${this.config.id}] Error in setupEventListeners():`, err);
             // Log error but allow panel to be created - it may still be partially functional
@@ -188,7 +188,7 @@ export abstract class BasePanel {
         try {
             // Allow subclass to prevent show (e.g., unsaved changes check)
             if (!await this.beforeShow()) return;
-        } catch (error) {
+        } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             log.error(SEG.UI, `[${this.config.id}] Error in beforeShow():`, err);
             this.showErrorState(err);
@@ -201,7 +201,7 @@ export abstract class BasePanel {
         try {
             this.clearError();
             await this.onShow();
-        } catch (error) {
+        } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             log.error(SEG.UI, `[${this.config.id}] Error in onShow():`, err);
             this.showErrorState(err);
@@ -215,7 +215,7 @@ export abstract class BasePanel {
         try {
             // Allow subclass to prevent hide (e.g., unsaved changes prompt)
             if (!this.beforeHide()) return;
-        } catch (error) {
+        } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             log.error(SEG.UI, `[${this.config.id}] Error in beforeHide():`, err);
             // Don't show error state during hide, just log and continue
@@ -226,7 +226,7 @@ export abstract class BasePanel {
         // Error boundary: wrap onHide() to catch errors
         try {
             this.onHide();
-        } catch (error) {
+        } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             log.error(SEG.UI, `[${this.config.id}] Error in onHide():`, err);
             // Don't show error state during hide, just log

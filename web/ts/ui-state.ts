@@ -406,16 +406,16 @@ class UIState {
             // Reset failure count on success
             this.subscriberFailures.delete(callback);
             return true;
-        } catch (e) {
+        } catch (error: unknown) {
             const failures = (this.subscriberFailures.get(callback) ?? 0) + 1;
             this.subscriberFailures.set(callback, failures);
 
             if (failures >= MAX_SUBSCRIBER_FAILURES) {
-                log.error(SEG.UI, `Subscriber for ${context} failed ${failures} times, auto-unsubscribing:`, e);
+                log.error(SEG.UI, `Subscriber for ${context} failed ${failures} times, auto-unsubscribing:`, error);
                 return false;
             }
 
-            log.error(SEG.UI, `Subscriber error for ${context} (${failures}/${MAX_SUBSCRIBER_FAILURES}):`, e);
+            log.error(SEG.UI, `Subscriber error for ${context} (${failures}/${MAX_SUBSCRIBER_FAILURES}):`, error);
             return true;
         }
     }
