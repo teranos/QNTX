@@ -3,6 +3,8 @@ package css
 import (
 	"fmt"
 	"go/ast"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -105,4 +107,24 @@ func toKebabCase(s string) string {
 	}
 
 	return result.String()
+}
+
+// GenerateReadme creates a minimal README for the generated CSS directory
+func GenerateReadme(outputDir string) error {
+	content := `# Generated CSS
+
+Auto-generated CSS custom properties from Go source code.
+
+**Do not edit manually.** Regenerate with:
+
+` + "```bash" + `
+make types        # Regenerate all types including CSS
+` + "```" + `
+`
+
+	readmePath := filepath.Join(outputDir, "README.md")
+	if err := os.WriteFile(readmePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write README: %w", err)
+	}
+	return nil
 }
