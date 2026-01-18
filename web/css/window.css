@@ -10,7 +10,7 @@
     background: var(--panel-bg, #fff);
     border: var(--panel-border);
     border-radius: var(--panel-border-radius);
-    box-shadow: var(--panel-shadow-md);
+    box-shadow: var(--shadow-md);
     z-index: 9999;
     display: none;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;

@@ -19,11 +19,6 @@
     --panel-text-secondary: #666;
     --panel-text-tertiary: #999;
 
-    /* Shadows */
-    --panel-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-    --panel-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --panel-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
-
     /* Transitions */
     --panel-transition-fast: all 0.15s ease;
     --panel-transition-normal: all 0.2s ease;
@@ -51,7 +46,7 @@
 }
 
 .panel-card:hover {
-    box-shadow: var(--panel-shadow-md);
+    box-shadow: var(--shadow-md);
 }
 
 /* Card variants */
