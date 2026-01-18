@@ -5,6 +5,10 @@
     /* Font Stacks */
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
 
+    /* Core Colors */
+    --text-primary: #333;
+    --bg-subtle: #f8f8f8;
+
     /* Status Colors */
     --color-success: #22c55e;
     --color-error: #ef4444;
