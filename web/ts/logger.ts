@@ -223,13 +223,7 @@ log.error = logger.error.bind(logger);
 log.getLevel = logger.getLevel.bind(logger);
 log.isDevMode = logger.isDevMode;
 
-// Export standalone functions for ergonomics
-const debug = logger.debug.bind(logger);
-const info = logger.info.bind(logger);
-const warn = logger.warn.bind(logger);
-const error = logger.error.bind(logger);
-
-export { log, debug, info, warn, error };
+export { log };
 
 /**
  * Default export for convenience

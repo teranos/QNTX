@@ -186,7 +186,7 @@ export function withErrorHandling<T extends (...args: unknown[]) => Promise<unkn
     return async (...args: Parameters<T>): Promise<ReturnType<T> | undefined> => {
         try {
             return await fn(...args) as ReturnType<T>;
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, errorMessage, options);
             return undefined;
         }
