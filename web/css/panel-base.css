@@ -8,21 +8,15 @@
     --panel-padding-lg: 16px 20px;
 
     /* Borders */
-    --panel-border: 1px solid #ddd;
+    --panel-border: 1px solid var(--border-color);
     --panel-border-radius: 4px;
 
     /* Colors */
-    --panel-bg: #fff;
-    --panel-bg-secondary: #f8f8f8;
-    --panel-border-color: #ddd;
-    --panel-text-primary: #333;
-    --panel-text-secondary: #666;
-    --panel-text-tertiary: #999;
-
-    /* Shadows */
-    --panel-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-    --panel-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --panel-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --panel-bg: var(--bg-primary);
+    --panel-bg-secondary: var(--bg-subtle);
+    --panel-text-primary: var(--text-primary);
+    --panel-text-secondary: var(--text-secondary);
+    --panel-text-tertiary: var(--text-tertiary);
 
     /* Transitions */
     --panel-transition-fast: all 0.15s ease;
@@ -30,13 +24,13 @@
 
     /* Status colors */
     --status-pending-bg: #fff3e0;
-    --status-pending-text: #e65100;
+    --status-pending-text: var(--color-warning);
     --status-running-bg: #e3f2fd;
-    --status-running-text: #1976d2;
+    --status-running-text: var(--color-info);
     --status-completed-bg: #e8f5e9;
-    --status-completed-text: #388e3c;
+    --status-completed-text: var(--color-success);
     --status-failed-bg: #ffebee;
-    --status-failed-text: #d32f2f;
+    --status-failed-text: var(--color-error);
 }
 
 /* === CARDS === */
@@ -51,7 +45,7 @@
 }
 
 .panel-card:hover {
-    box-shadow: var(--panel-shadow-md);
+    box-shadow: var(--shadow-md);
 }
 
 /* Card variants */
@@ -351,9 +345,9 @@
 
 /* Warning button - for two-click confirmation pattern */
 .panel-btn-warning {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
-    color: #e65100;
+    color: var(--status-pending-text);
 }
 
 .panel-btn-warning:hover:not(:disabled) {
@@ -362,9 +356,9 @@
 
 /* Success/confirm button - for validated state in two-click pattern */
 .panel-btn-success {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
     border-color: #388e3c;
-    color: #2e7d32;
+    color: var(--status-completed-text);
 }
 
 .panel-btn-success:hover:not(:disabled) {
@@ -375,7 +369,7 @@
 .panel-confirm-hint {
     display: block;
     font-size: 11px;
-    color: #e65100;
+    color: var(--status-pending-text);
     margin-top: 4px;
     font-style: italic;
 }

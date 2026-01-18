@@ -26,13 +26,12 @@
 
     /* Controls - subtle grays to minimize UI chrome */
     --control-padding: 8px;
-    --control-bg: #f8f8f8;  /* Near-white to recede visually */
-    --control-border: #ddd;  /* Subtle border for definition */
+    --control-bg: var(--bg-subtle);  /* Near-white to recede visually */
 
     /* Meta overlay - gray for secondary information */
     --meta-max-width: 300px;
     --meta-font-size: 11px;
-    --meta-color: #666;  /* Mid-gray for de-emphasized text */
+    --meta-color: var(--text-secondary);  /* Mid-gray for de-emphasized text */
 }
 
 /* Graph Container */
@@ -198,7 +197,7 @@ body.disconnected #connection-status {
 .legenda-color {
     width: 10px;
     height: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 .reveal-related {

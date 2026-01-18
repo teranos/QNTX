@@ -547,11 +547,13 @@
 
               # Run typegen for each language in parallel
               # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
+              # CSS types output directly to web/css/generated/ (no --output flag)
               echo "Running typegen for all languages in parallel..."
               (
                 ./result/bin/typegen --lang typescript --output types/generated/ &
                 ./result/bin/typegen --lang python --output types/generated/ &
                 ./result/bin/typegen --lang rust &
+                ./result/bin/typegen --lang css &
                 ./result/bin/typegen --lang markdown &
                 wait
               )
@@ -559,6 +561,7 @@
               echo "✓ TypeScript types generated in types/generated/typescript/"
               echo "✓ Python types generated in types/generated/python/"
               echo "✓ Rust types generated in crates/qntx/src/types/"
+              echo "✓ CSS symbols generated in web/css/generated/"
               echo "✓ Markdown docs generated in docs/types/"
             '');
           };
