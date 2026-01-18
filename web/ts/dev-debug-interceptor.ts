@@ -61,8 +61,8 @@ async function sendLog(level: string, args: any[]): Promise<void> {
             // Try to get a stack trace
             try {
                 throw new Error();
-            } catch (e: any) {
-                stack = e.stack;
+            } catch (error: unknown) {
+                stack = (error as any).stack;
             }
         }
     }
@@ -80,15 +80,15 @@ async function sendLog(level: string, args: any[]): Promise<void> {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(log),
-        }).catch(err => {
+        }).catch((error: unknown) => {
             // Silently fail if backend is unavailable
             // Use original console to avoid infinite loop
             // Use original console to avoid infinite loop and logging infrastructure issues
-            originalConsole.debug('[Debug Interceptor] Failed to send log:', err);
+            originalConsole.debug('[Debug Interceptor] Failed to send log:', error);
         });
-    } catch (err) {
+    } catch (error: unknown) {
         // Silently fail - use original console to avoid infinite loop
-        originalConsole.debug('[Debug Interceptor] Failed to send log:', err);
+        originalConsole.debug('[Debug Interceptor] Failed to send log:', error);
     }
 }
 

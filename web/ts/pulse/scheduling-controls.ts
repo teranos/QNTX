@@ -163,7 +163,7 @@ function renderExistingJobControls(
         ...options,
         existingJob: updatedJob,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, `Failed to ${isActive ? 'pause' : 'resume'} job`, { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: isActive ? 'pause' : 'resume',
@@ -193,7 +193,7 @@ function renderExistingJobControls(
         ...options,
         existingJob: updatedJob,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to update job interval', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'change interval',
@@ -211,7 +211,7 @@ function renderExistingJobControls(
       // Re-render to show "Add Schedule" button
       container.innerHTML = "";
       renderAddScheduleButton(container, options);
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to delete scheduled job', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'delete',
@@ -422,7 +422,7 @@ function renderIntervalSelection(
         ...options,
         existingJob: job,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to create scheduled job', { context: SEG.PULSE, silent: true });
       options.onError?.(error as Error, {
         action: 'create',

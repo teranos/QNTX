@@ -34,8 +34,8 @@ export class GoCodeBlockNodeView {
         try {
             const goModule = await import('@codemirror/lang-go');
             goExtension = goModule.go();
-        } catch (err) {
-            console.error('[Go Block] Go language support unavailable:', err);
+        } catch (error: unknown) {
+            console.error('[Go Block] Go language support unavailable:', error);
             goExtension = [];  // Editor works without syntax highlighting
         }
 

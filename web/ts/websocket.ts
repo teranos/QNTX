@@ -150,7 +150,7 @@ export function validateBackendURL(url: string): string | null {
         }
 
         return parsed.origin;
-    } catch (e) {
+    } catch (error: unknown) {
         return null;
     }
 }
