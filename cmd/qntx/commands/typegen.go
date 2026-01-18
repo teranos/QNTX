@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/typegen"
 	"github.com/teranos/QNTX/typegen/api"
+	"github.com/teranos/QNTX/typegen/css"
 	"github.com/teranos/QNTX/typegen/markdown"
 	"github.com/teranos/QNTX/typegen/python"
 	"github.com/teranos/QNTX/typegen/rust"
@@ -43,6 +44,9 @@ var languagePackages = map[string][]string{
 	},
 	"python": {
 		"github.com/teranos/QNTX/graph",
+		"github.com/teranos/QNTX/sym",
+	},
+	"css": {
 		"github.com/teranos/QNTX/sym",
 	},
 	"markdown": {
@@ -147,7 +151,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	defer func() { typegenOutput = originalOutput }()
 
 	// Generate all types to temp directory
-	languages := []string{"typescript", "python", "rust", "markdown"}
+	languages := []string{"typescript", "python", "rust", "css", "markdown"}
 
 	for _, lang := range languages {
 		packages := getDefaultPackages(lang)
@@ -214,7 +218,7 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript", "python", "rust", "markdown"} // All supported languages
+		return []string{"typescript", "python", "rust", "css", "markdown"} // All supported languages
 	case "typescript", "ts":
 		return []string{"typescript"}
 	case "markdown", "md":
@@ -223,6 +227,8 @@ func getLanguages(lang string) []string {
 		return []string{"python"}
 	case "rust", "rs":
 		return []string{"rust"}
+	case "css":
+		return []string{"css"}
 	case "dart":
 		return []string{"dart"}
 	default:
@@ -279,6 +285,8 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		}
 	case "python":
 		gen = python.NewGenerator()
+	case "css":
+		gen = css.NewGenerator()
 	case "dart":
 		fmt.Printf("⚠ %s generator not yet implemented (coming in v1.0.0)\n", lang)
 		return nil
@@ -441,21 +449,25 @@ func isEmbeddedRustLocation(outputDir string) bool {
 // getOutputConfig determines the output directory and file extension for a language
 func getOutputConfig(lang string) (outputDir, fileExt string) {
 	if typegenOutput == "" {
-		// No output specified: markdown defaults to docs/types, rust to embedded crate, others to stdout
+		// No output specified: markdown defaults to docs/types, rust to embedded crate, css to web/css/generated, others to stdout
 		if lang == "markdown" {
 			outputDir = "docs/types"
 		} else if lang == "rust" {
 			outputDir = "crates/qntx/src/types"
+		} else if lang == "css" {
+			outputDir = "web/css/generated"
 		} else {
 			outputDir = "" // stdout mode
 		}
 	} else {
 		// Output specified: use it for all languages
-		// For Rust and markdown, preserve the actual output structure to ensure correct import generation
+		// For Rust, markdown, and CSS, preserve the actual output structure to ensure correct import generation
 		if lang == "rust" {
 			outputDir = filepath.Join(typegenOutput, "crates/qntx/src/types")
 		} else if lang == "markdown" {
 			outputDir = filepath.Join(typegenOutput, "docs/types")
+		} else if lang == "css" {
+			outputDir = filepath.Join(typegenOutput, "web/css/generated")
 		} else {
 			outputDir = filepath.Join(typegenOutput, lang)
 		}
@@ -470,6 +482,8 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 		fileExt = ".py"
 	case "rust":
 		fileExt = ".rs"
+	case "css":
+		fileExt = ".css"
 	case "dart":
 		fileExt = ".dart"
 	}
