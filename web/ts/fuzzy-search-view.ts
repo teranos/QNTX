@@ -45,29 +45,10 @@ export class FuzzySearchView {
         this.container = document.createElement('div');
         this.container.id = 'fuzzy-search-view';
         this.container.className = 'fuzzy-search-view';
-        this.container.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.95);
-            z-index: 100;
-            display: none;
-            overflow: hidden;
-        `;
 
         // Create results container
         this.resultsElement = document.createElement('div');
         this.resultsElement.className = 'fuzzy-results';
-        this.resultsElement.style.cssText = `
-            height: 100%;
-            overflow-y: auto;
-            padding: 20px;
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-        `;
 
         this.container.appendChild(this.resultsElement);
 
@@ -119,13 +100,6 @@ export class FuzzySearchView {
         // Add header with match count
         const header = document.createElement('div');
         header.className = 'fuzzy-header';
-        header.style.cssText = `
-            color: #888;
-            margin-bottom: 8px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid #333;
-            font-size: 12px;
-        `;
         header.textContent = `Found ${message.total} matches for "${message.query}"`;
         this.resultsElement.appendChild(header);
 
@@ -138,11 +112,7 @@ export class FuzzySearchView {
         // If no matches
         if (message.matches.length === 0) {
             const noResults = document.createElement('div');
-            noResults.style.cssText = `
-                color: #666;
-                text-align: center;
-                margin-top: 50px;
-            `;
+            noResults.className = 'fuzzy-no-results';
             noResults.textContent = 'No matches found';
             this.resultsElement.appendChild(noResults);
         }
@@ -154,29 +124,6 @@ export class FuzzySearchView {
     private createResultLine(match: FuzzySearchMatch): HTMLElement {
         const line = document.createElement('div');
         line.className = 'fuzzy-result-line';
-        line.style.cssText = `
-            padding: 4px 8px;
-            margin-bottom: 1px;
-            background: rgba(255, 255, 255, 0.02);
-            border-left: 2px solid transparent;
-            cursor: pointer;
-            transition: all 0.1s ease;
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
-            font-size: 12px;
-            line-height: 1.4;
-        `;
-
-        // Add hover effects
-        line.onmouseenter = () => {
-            line.style.background = 'rgba(255, 255, 255, 0.05)';
-            line.style.borderLeftColor = '#4a9eff';
-        };
-        line.onmouseleave = () => {
-            line.style.background = 'rgba(255, 255, 255, 0.02)';
-            line.style.borderLeftColor = 'transparent';
-        };
 
         // Click handler to focus on node
         line.onclick = () => {
@@ -185,56 +132,28 @@ export class FuzzySearchView {
 
         // Node ID/Label (shortened hash)
         const nodeLabel = document.createElement('span');
-        nodeLabel.style.cssText = `
-            color: #4a9eff;
-            min-width: 80px;
-            flex-shrink: 0;
-            font-family: monospace;
-        `;
+        nodeLabel.className = 'fuzzy-node-id';
         const shortId = (match.node_id || '').substring(0, 7);
         nodeLabel.textContent = shortId;
 
         // Type badge
         const typeBadge = document.createElement('span');
-        typeBadge.style.cssText = `
-            background: rgba(74, 158, 255, 0.15);
-            color: #4a9eff;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 10px;
-            flex-shrink: 0;
-        `;
+        typeBadge.className = 'fuzzy-type-badge';
         typeBadge.textContent = match.type_label || match.type_name;
 
         // Field name
         const fieldName = document.createElement('span');
-        fieldName.style.cssText = `
-            color: #666;
-            font-size: 10px;
-            flex-shrink: 0;
-        `;
+        fieldName.className = 'fuzzy-field-name';
         fieldName.textContent = `[${match.field_name}]`;
 
         // Excerpt with highlighting
         const excerpt = document.createElement('span');
-        excerpt.style.cssText = `
-            color: #ccc;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        `;
+        excerpt.className = 'fuzzy-excerpt';
         excerpt.innerHTML = this.highlightMatch(match.excerpt, this.currentQuery, match.matched_words);
 
         // Score indicator
         const score = document.createElement('span');
-        score.style.cssText = `
-            color: #555;
-            font-size: 10px;
-            flex-shrink: 0;
-            min-width: 30px;
-            text-align: right;
-        `;
+        score.className = 'fuzzy-score';
         score.textContent = `${Math.round(match.score * 100)}%`;
 
         // Assemble the line
@@ -261,14 +180,14 @@ export class FuzzySearchView {
 
             for (const word of sortedWords) {
                 const regex = new RegExp(`\\b(${this.escapeRegex(word)})\\b`, 'gi');
-                highlightedText = highlightedText.replace(regex, '<mark style="background: rgba(255, 200, 0, 0.3); color: #ffc800;">$1</mark>');
+                highlightedText = highlightedText.replace(regex, '<mark class="fuzzy-highlight">$1</mark>');
             }
             return highlightedText;
         }
 
         // Fallback to exact query matching
         const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
-        return text.replace(regex, '<mark style="background: rgba(255, 200, 0, 0.3); color: #ffc800;">$1</mark>');
+        return text.replace(regex, '<mark class="fuzzy-highlight">$1</mark>');
     }
 
     /**
