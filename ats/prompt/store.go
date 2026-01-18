@@ -16,6 +16,7 @@ import (
 type StoredPrompt struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
+	Filename     string    `json:"filename"`        // Source file (used as context)
 	Template     string    `json:"template"`
 	SystemPrompt string    `json:"system_prompt,omitempty"`
 	AxPattern    string    `json:"ax_pattern,omitempty"` // Optional linked ax query
@@ -48,10 +49,13 @@ const (
 )
 
 // SavePrompt stores a prompt as an attestation
-// If a prompt with the same name exists, a new version is created
+// If a prompt with the same name and filename exists, a new version is created
 func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, actor string) (*StoredPrompt, error) {
 	if prompt.Name == "" {
 		return nil, errors.New("prompt name is required")
+	}
+	if prompt.Filename == "" {
+		return nil, errors.New("prompt filename is required")
 	}
 	if prompt.Template == "" {
 		return nil, errors.New("prompt template is required")
@@ -62,15 +66,15 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 		return nil, errors.Wrap(err, "invalid template")
 	}
 
-	// Get current version if exists
-	existing, err := ps.GetPromptByName(ctx, prompt.Name)
+	// Get current version if exists (by filename)
+	existing, err := ps.GetPromptByFilename(ctx, prompt.Filename)
 	version := 1
 	if err == nil && existing != nil {
 		version = existing.Version + 1
 	}
 
-	// Generate ASID for the prompt
-	asid, err := id.GenerateASID(prompt.Name, PredicatePromptTemplate, ContextPromptLibrary, actor)
+	// Generate ASID for the prompt using filename as context
+	asid, err := id.GenerateASID(prompt.Name, PredicatePromptTemplate, prompt.Filename, actor)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate prompt ID")
 	}
@@ -100,7 +104,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 		ID:         asid,
 		Subjects:   []string{prompt.Name},
 		Predicates: []string{PredicatePromptTemplate},
-		Contexts:   []string{ContextPromptLibrary},
+		Contexts:   []string{prompt.Filename},
 		Actors:     []string{actor},
 		Timestamp:  now,
 		Source:     "prompt-editor",
@@ -115,6 +119,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	return &StoredPrompt{
 		ID:           asid,
 		Name:         prompt.Name,
+		Filename:     prompt.Filename,
 		Template:     prompt.Template,
 		SystemPrompt: prompt.SystemPrompt,
 		AxPattern:    prompt.AxPattern,
@@ -126,13 +131,12 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	}, nil
 }
 
-// GetPromptByName returns the latest version of a prompt by name
-func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
+// GetPromptByFilename returns the latest version of a prompt by filename
+func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
 		FROM attestations
-		WHERE EXISTS (SELECT 1 FROM json_each(subjects) WHERE value = ?)
-		  AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
+		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
 		ORDER BY timestamp DESC
 		LIMIT 1
@@ -148,17 +152,52 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 		attributesJSON string
 	)
 
-	err := ps.db.QueryRowContext(ctx, query, name, PredicatePromptTemplate, ContextPromptLibrary).Scan(
+	err := ps.db.QueryRowContext(ctx, query, PredicatePromptTemplate, filename).Scan(
 		&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query prompt")
+		return nil, errors.Wrap(err, "failed to query prompt by filename")
 	}
 
-	return ps.parsePromptFromRow(asID, subjectsJSON, actorsJSON, timestamp, attributesJSON)
+	return ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
+}
+
+// GetPromptByName returns the latest version of a prompt by name
+// Note: Since prompts are now keyed by filename, this searches across all files
+func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
+	query := `
+		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
+		FROM attestations
+		WHERE EXISTS (SELECT 1 FROM json_each(subjects) WHERE value = ?)
+		  AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
+		ORDER BY timestamp DESC
+		LIMIT 1
+	`
+
+	var (
+		asID           string
+		subjectsJSON   string
+		predicatesJSON string
+		contextsJSON   string
+		actorsJSON     string
+		timestamp      time.Time
+		attributesJSON string
+	)
+
+	err := ps.db.QueryRowContext(ctx, query, name, PredicatePromptTemplate).Scan(
+		&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to query prompt by name")
+	}
+
+	return ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
 }
 
 // GetPromptByID returns a specific prompt by ID
@@ -189,7 +228,7 @@ func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*Sto
 		return nil, errors.Wrap(err, "failed to query prompt")
 	}
 
-	return ps.parsePromptFromRow(asID, subjectsJSON, actorsJSON, timestamp, attributesJSON)
+	return ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
 }
 
 // ListPrompts returns all prompts, most recent first
@@ -202,12 +241,11 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
-		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
 		ORDER BY timestamp DESC
 		LIMIT ?
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, ContextPromptLibrary, limit)
+	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list prompts")
 	}
@@ -229,7 +267,7 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 			return nil, errors.Wrap(err, "failed to scan prompt row")
 		}
 
-		prompt, err := ps.parsePromptFromRow(asID, subjectsJSON, actorsJSON, timestamp, attributesJSON)
+		prompt, err := ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
 		if err != nil {
 			continue // Skip malformed entries
 		}
@@ -239,8 +277,8 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 	return prompts, nil
 }
 
-// GetPromptVersions returns all versions of a prompt by name
-func (ps *PromptStore) GetPromptVersions(ctx context.Context, name string, limit int) ([]*StoredPrompt, error) {
+// GetPromptVersions returns all versions of a prompt by filename
+func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, limit int) ([]*StoredPrompt, error) {
 	if limit <= 0 {
 		limit = 16 // Bounded storage default
 	}
@@ -248,14 +286,13 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, name string, limit
 	query := `
 		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
 		FROM attestations
-		WHERE EXISTS (SELECT 1 FROM json_each(subjects) WHERE value = ?)
-		  AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
+		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
 		ORDER BY timestamp DESC
 		LIMIT ?
 	`
 
-	rows, err := ps.db.QueryContext(ctx, query, name, PredicatePromptTemplate, ContextPromptLibrary, limit)
+	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, filename, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list prompt versions")
 	}
@@ -277,7 +314,7 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, name string, limit
 			return nil, errors.Wrap(err, "failed to scan prompt row")
 		}
 
-		prompt, err := ps.parsePromptFromRow(asID, subjectsJSON, actorsJSON, timestamp, attributesJSON)
+		prompt, err := ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
 		if err != nil {
 			continue
 		}
@@ -288,10 +325,15 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, name string, limit
 }
 
 // parsePromptFromRow converts database row data into a StoredPrompt
-func (ps *PromptStore) parsePromptFromRow(asID, subjectsJSON, actorsJSON string, timestamp time.Time, attributesJSON string) (*StoredPrompt, error) {
+func (ps *PromptStore) parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON string, timestamp time.Time, attributesJSON string) (*StoredPrompt, error) {
 	var subjects []string
 	if err := json.Unmarshal([]byte(subjectsJSON), &subjects); err != nil {
 		return nil, errors.Wrap(err, "failed to parse subjects")
+	}
+
+	var contexts []string
+	if err := json.Unmarshal([]byte(contextsJSON), &contexts); err != nil {
+		return nil, errors.Wrap(err, "failed to parse contexts")
 	}
 
 	var actors []string
@@ -309,6 +351,11 @@ func (ps *PromptStore) parsePromptFromRow(asID, subjectsJSON, actorsJSON string,
 		name = subjects[0]
 	}
 
+	filename := ""
+	if len(contexts) > 0 {
+		filename = contexts[0]
+	}
+
 	createdBy := ""
 	if len(actors) > 0 {
 		createdBy = actors[0]
@@ -317,6 +364,7 @@ func (ps *PromptStore) parsePromptFromRow(asID, subjectsJSON, actorsJSON string,
 	prompt := &StoredPrompt{
 		ID:        asID,
 		Name:      name,
+		Filename:  filename,
 		CreatedBy: createdBy,
 		CreatedAt: timestamp,
 	}

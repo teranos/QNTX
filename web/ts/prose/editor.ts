@@ -69,7 +69,7 @@ export class ProseEditor {
             if (this.callbacks.onDocumentLoad) {
                 this.callbacks.onDocumentLoad(path);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, `Failed to load document: ${path}`, { context: SEG.ERROR, silent: true });
             this.showError(`Failed to load ${path}`);
         }
@@ -85,7 +85,7 @@ export class ProseEditor {
         let doc;
         try {
             doc = proseMarkdownParser.parse(markdownContent);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to parse markdown', { context: SEG.ERROR, silent: true });
             this.showError('Failed to parse document');
             return;
@@ -165,7 +165,7 @@ export class ProseEditor {
             if (this.callbacks.onContentChange) {
                 this.callbacks.onContentChange(false);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save content', { context: SEG.ERROR, silent: true });
             this.showError('Failed to save');
         }

@@ -25,7 +25,8 @@ class ProsePanel extends BasePanel {
             id: 'prose-panel',
             classes: ['prose-panel'],
             useOverlay: true,
-            closeOnEscape: true
+            closeOnEscape: true,
+            slideFromRight: true
         });
 
         // Initialize component modules with callbacks
@@ -68,6 +69,7 @@ class ProsePanel extends BasePanel {
             </div>
             <div class="prose-body">
                 <div class="prose-sidebar">
+                    <button class="prose-sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar"></button>
                     <div class="prose-sidebar-header">
                         <input type="text" class="prose-search" placeholder="Search documentation..." />
                     </div>
@@ -85,9 +87,6 @@ class ProsePanel extends BasePanel {
                     <div class="prose-status">
                         <span class="prose-status-text"></span>
                         <span class="prose-save-indicator hidden">●</span>
-                        <button id="theme-toggle" aria-label="Toggle theme">
-                            <span class="theme-icon">☀</span>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -96,6 +95,16 @@ class ProsePanel extends BasePanel {
 
     protected setupEventListeners(): void {
         // Close button is handled automatically by BasePanel
+
+        // Sidebar toggle
+        const sidebarToggle = this.panel?.querySelector('.prose-sidebar-toggle');
+        const sidebar = this.panel?.querySelector('.prose-sidebar');
+        const body = this.panel?.querySelector('.prose-body');
+
+        sidebarToggle?.addEventListener('click', () => {
+            sidebar?.classList.toggle('collapsed');
+            body?.classList.toggle('sidebar-collapsed');
+        });
 
         // Save on Cmd/Ctrl+S
         this.saveKeyHandler = (e: KeyboardEvent) => {

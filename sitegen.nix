@@ -33,7 +33,7 @@ let
       nativeBuildInputs = [ pkgs.curl pkgs.cacert ];
       outputHashMode = "flat";
       outputHashAlgo = "sha256";
-      outputHash = "sha256-GCi4Y56o9KvQYOTW3j17ad055+I67dPNK5h/1sJ/S8E=";
+      outputHash = "sha256-zGd2tzU1n3Y1ih8IeGRL7kJFM8v4MD24ZEmU+imQXQQ=";
     } ''
     curl -s -L -H "Accept: application/vnd.github+json" \
       "https://api.github.com/repos/${githubRepo}/releases" > $out
@@ -958,7 +958,11 @@ let
   mkHtmlDerivation = fileInfo:
     let
       mdContent = builtins.readFile fileInfo.mdPath;
-      rewrittenMd = builtins.replaceStrings [ ".md)" ] [ ".html)" ] mdContent;
+      # Replace both .md) and .md# patterns to handle links with and without anchors
+      rewrittenMd = builtins.replaceStrings
+        [ ".md)" ".md#" ]
+        [ ".html)" ".html#" ]
+        mdContent;
     in
     pkgs.runCommand "qntx-doc-${fileInfo.name}"
       {

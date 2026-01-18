@@ -183,7 +183,7 @@ class PythonEditorPanel extends BasePanel {
             } else {
                 this.updateStatus('unavailable');
             }
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to check Python plugin status', { context: SEG.UI, silent: true });
             this.updateStatus('error');
         }
@@ -212,8 +212,8 @@ class PythonEditorPanel extends BasePanel {
                 const pythonModule = await import('@codemirror/lang-python');
                 pythonExtension = pythonModule.python();
                 log.debug(SEG.UI, 'Python language support loaded');
-            } catch (err) {
-                handleError(err, 'Failed to load Python language support', { context: SEG.UI, silent: true });
+            } catch (error: unknown) {
+                handleError(error, 'Failed to load Python language support', { context: SEG.UI, silent: true });
                 pythonExtension = [];
             }
 
@@ -243,7 +243,7 @@ class PythonEditorPanel extends BasePanel {
             });
 
             log.info(SEG.UI, 'Python Editor initialized successfully');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to initialize Python Editor', { context: SEG.UI, silent: true });
             this.showError(error instanceof Error ? error.message : String(error));
         }
@@ -308,7 +308,7 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
             this.switchTab('output');
 
             log.debug(SEG.UI, 'Python code executed:', result.success ? 'success' : 'error');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Python execution error', { context: SEG.UI, silent: true });
             this.lastOutput = {
                 success: false,
@@ -515,8 +515,8 @@ _result = {"message": "Hello", "numbers": [1, 2, 3]}
         if (this.editor) {
             try {
                 this.editor.destroy();
-            } catch (err) {
-                handleError(err, 'Error destroying Python Editor', { context: SEG.UI, silent: true });
+            } catch (error: unknown) {
+                handleError(error, 'Error destroying Python Editor', { context: SEG.UI, silent: true });
             }
             this.editor = null;
         }

@@ -27,7 +27,7 @@ export async function fetchDevMode(): Promise<boolean> {
         const text = await response.text();
         devMode = text.trim() === 'true';
         return devMode;
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Failed to fetch dev mode:', error);
         devMode = false;
         return devMode;

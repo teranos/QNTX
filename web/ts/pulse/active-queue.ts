@@ -72,7 +72,7 @@ export async function fetchActiveJobs(): Promise<any[]> {
             job.status === 'queued' ||
             job.status === 'paused'
         );
-    } catch (error) {
+    } catch (error: unknown) {
         handleError(error, 'Error fetching active jobs', { context: SEG.PULSE, silent: true });
         return [];
     }

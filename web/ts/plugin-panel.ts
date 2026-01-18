@@ -237,7 +237,7 @@ export class PluginPanel extends BasePanel {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             this.serverHealth = await response.json();
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to fetch server health', { context: SEG.UI, silent: true });
             this.serverHealth = null;
         }
@@ -261,7 +261,7 @@ export class PluginPanel extends BasePanel {
 
             this.plugins = data.plugins;
             log.debug(SEG.UI, 'Successfully loaded', this.plugins.length, 'plugins');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to fetch plugins', { context: SEG.UI, silent: true });
             this.plugins = [];
         }
@@ -512,7 +512,7 @@ export class PluginPanel extends BasePanel {
             await this.fetchPlugins();
             this.render();
             log.debug(SEG.UI, 'Plugin paused:', name);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to pause plugin', { context: SEG.UI });
         }
     }
@@ -533,7 +533,7 @@ export class PluginPanel extends BasePanel {
             await this.fetchPlugins();
             this.render();
             log.debug(SEG.UI, 'Plugin resumed:', name);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to resume plugin', { context: SEG.UI });
         }
     }
@@ -597,7 +597,7 @@ export class PluginPanel extends BasePanel {
                 needsConfirmation: false,
                 editingFields: new Set()
             };
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, `Failed to fetch config for ${pluginName}`, { context: SEG.UI, silent: true });
             this.configState = {
                 pluginName,
@@ -833,7 +833,7 @@ export class PluginPanel extends BasePanel {
             this.configState = null;
             await this.fetchPlugins();
             this.render();
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save config', { context: SEG.UI, silent: true });
 
             // Set error in config state and reset confirmation

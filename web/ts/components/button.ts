@@ -185,7 +185,7 @@ export class Button {
 
         try {
             await this.config.onClick();
-        } catch (error) {
+        } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             this.setError(err);
         } finally {
