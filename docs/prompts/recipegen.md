@@ -1,6 +1,6 @@
 ---
 type: prompt-template
-name: recipegen
+name: recipegen2
 model: anthropic/claude-3-haiku
 ---
 
