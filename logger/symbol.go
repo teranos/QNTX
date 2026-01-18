@@ -167,3 +167,4 @@ func AddAxSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
 func AddIXSymbol(l *zap.SugaredLogger) *zap.SugaredLogger {
 	return l.With(FieldSymbol, sym.IX)
 }
+

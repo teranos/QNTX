@@ -284,6 +284,42 @@ export interface ProgressMessage {
   message: string;
 }
 
+export interface PromptExecuteRequest {
+  ax_query: string;
+  template: string;
+  system_prompt?: string;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  model?: string;
+}
+
+export interface PromptExecuteResponse {
+  results: Result[];
+  attestation_count: number;
+  error?: string;
+}
+
+export interface PromptPreviewRequest {
+  ax_query: string;
+}
+
+export interface PromptPreviewResponse {
+  attestation_count: number;
+  attestations?: Record<string, unknown>[];
+  error?: string;
+}
+
+export interface PromptSaveRequest {
+  name: string;
+  template: string;
+  system_prompt?: string;
+  ax_pattern?: string;
+  provider?: string;
+  model?: string;
+}
+
 export interface ProseEntry {
   name: string;
   path: string;
@@ -496,6 +532,31 @@ export interface QueryMessage {
    * For vidstream_frame: "rgba8", "rgb8", etc.
    */
   format: string;
+}
+
+export interface Result {
+  /**
+   * SourceAttestationID is the ID of the attestation that was processed
+   */
+  source_attestation_id: string;
+  /**
+   * Prompt is the interpolated prompt that was sent to the LLM
+   */
+  prompt: string;
+  /**
+   * Response is the LLM's response
+   */
+  response: string;
+  /**
+   * ResultAttestationID is the ID of the created result attestation
+   */
+  result_attestation_id?: string;
+  /**
+   * Token usage tracking
+   */
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 export interface ScheduledJobResponse {

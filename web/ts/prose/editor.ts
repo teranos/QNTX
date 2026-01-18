@@ -14,6 +14,7 @@ import { apiFetch } from '../api.ts';
 import { proseMarkdownParser, proseMarkdownSerializer } from './markdown.ts';
 import { ATSCodeBlockNodeView } from './nodes/ats-code-block.ts';
 import { GoCodeBlockNodeView } from './nodes/go-code-block.ts';
+import { FrontmatterNodeView } from './nodes/frontmatter-block.ts';
 import { proseInputRules } from './input-rules.ts';
 import { handleError, SEG } from '../error-handler.ts';
 
@@ -111,10 +112,11 @@ export class ProseEditor {
             this.editorView.destroy();
         }
 
-        // Create new editor view with custom NodeViews for ats_code_block and go_code_block
+        // Create new editor view with custom NodeViews for frontmatter, ats_code_block and go_code_block
         this.editorView = new EditorView(this.editorContainer, {
             state,
             nodeViews: {
+                frontmatter_block: (node, view, getPos) => new FrontmatterNodeView(node, view, getPos as () => number),
                 ats_code_block: (node, view, getPos) => new ATSCodeBlockNodeView(node, view, getPos as () => number, this.currentPath),
                 go_code_block: (node, view, getPos) => new GoCodeBlockNodeView(node, view, getPos as () => number)
             },

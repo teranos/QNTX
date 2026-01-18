@@ -84,16 +84,20 @@ func TestExtractTypeDefinitions(t *testing.T) {
 		t.Fatal("artist type definition not found")
 	}
 
-	if artistDef.DisplayColor != "#e74c3c" {
-		t.Errorf("artistDef.DisplayColor = %q, want %q", artistDef.DisplayColor, "#e74c3c")
+	if artistDef.Color != "#e74c3c" {
+		t.Errorf("artistDef.Color = %q, want %q", artistDef.Color, "#e74c3c")
 	}
 
-	if artistDef.DisplayLabel != "Artist" {
-		t.Errorf("artistDef.DisplayLabel = %q, want %q", artistDef.DisplayLabel, "Artist")
+	if artistDef.Label != "Artist" {
+		t.Errorf("artistDef.Label = %q, want %q", artistDef.Label, "Artist")
 	}
 
-	if artistDef.Opacity != 0.9 {
-		t.Errorf("artistDef.Opacity = %f, want 0.9", artistDef.Opacity)
+	if artistDef.Opacity == nil || *artistDef.Opacity != 0.9 {
+		var opacityVal float64
+		if artistDef.Opacity != nil {
+			opacityVal = *artistDef.Opacity
+		}
+		t.Errorf("artistDef.Opacity = %f, want 0.9", opacityVal)
 	}
 
 	// Verify genre type definition (with default opacity)
@@ -102,8 +106,12 @@ func TestExtractTypeDefinitions(t *testing.T) {
 		t.Fatal("genre type definition not found")
 	}
 
-	if genreDef.Opacity != 1.0 {
-		t.Errorf("genreDef.Opacity = %f, want 1.0 (default)", genreDef.Opacity)
+	if genreDef.Opacity == nil || *genreDef.Opacity != 1.0 {
+		var opacityVal float64
+		if genreDef.Opacity != nil {
+			opacityVal = *genreDef.Opacity
+		}
+		t.Errorf("genreDef.Opacity = %f, want 1.0 (default)", opacityVal)
 	}
 
 	if genreDef.Deprecated != false {

@@ -276,6 +276,74 @@ type ProgressMessage struct {
 }
 ```
 
+## PromptExecuteRequest {#promptexecuterequest}
+
+**Source**: [`server/prompt_handlers.go:33`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L33)
+
+
+```go
+type PromptExecuteRequest struct {
+	AxQuery string `json:"ax_query"`
+	Template string `json:"template"`
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model string `json:"model,omitempty"`
+}
+```
+
+## PromptExecuteResponse {#promptexecuteresponse}
+
+**Source**: [`server/prompt_handlers.go:62`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L62)
+
+
+```go
+type PromptExecuteResponse struct {
+	Results []Result `json:"results"`
+	AttestationCount int `json:"attestation_count"`
+	Error string `json:"error,omitempty"`
+}
+```
+
+## PromptPreviewRequest {#promptpreviewrequest}
+
+**Source**: [`server/prompt_handlers.go:21`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L21)
+
+
+```go
+type PromptPreviewRequest struct {
+	AxQuery string `json:"ax_query"`
+}
+```
+
+## PromptPreviewResponse {#promptpreviewresponse}
+
+**Source**: [`server/prompt_handlers.go:26`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L26)
+
+
+```go
+type PromptPreviewResponse struct {
+	AttestationCount int `json:"attestation_count"`
+	Attestations []map[string]interface{} `json:"attestations,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+```
+
+## PromptSaveRequest {#promptsaverequest}
+
+**Source**: [`server/prompt_handlers.go:274`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L274)
+
+
+```go
+type PromptSaveRequest struct {
+	Name string `json:"name"`
+	Template string `json:"template"`
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	AxPattern string `json:"ax_pattern,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model string `json:"model,omitempty"`
+}
+```
+
 ## ProseEntry {#proseentry}
 
 **Source**: [`server/prose_handler.go:16`](https://github.com/teranos/QNTX/blob/main/server/prose_handler.go#L16)
@@ -385,6 +453,23 @@ type QueryMessage struct {
 	Width int `json:"width"`
 	Height int `json:"height"`
 	Format string `json:"format"`
+}
+```
+
+## Result {#result}
+
+**Source**: [`server/prompt_handlers.go:42`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L42)
+
+
+```go
+type Result struct {
+	SourceAttestationID string `json:"source_attestation_id"`
+	Prompt string `json:"prompt"`
+	Response string `json:"response"`
+	ResultAttestationID string `json:"result_attestation_id,omitempty"`
+	PromptTokens int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens int `json:"total_tokens,omitempty"`
 }
 ```
 

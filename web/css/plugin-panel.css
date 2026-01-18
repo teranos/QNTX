@@ -1,7 +1,7 @@
 /**
  * Plugin Panel Styling - Domain plugin list and status display
  * Uses panel-base.css for shared components
- * Uses left-panel.css for base panel structure
+ * Uses components/base-panel.css for base panel structure
  */
 
 /* Note: Tooltip styling is now in panel-base.css (.panel-tooltip) */
