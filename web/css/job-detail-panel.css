@@ -316,7 +316,7 @@
   font-style: italic;
   margin-bottom: 10px;
   padding: 8px 10px;
-  background: #fff3e0;
+  background: var(--status-pending-bg);
   border-radius: 4px;
 }
 

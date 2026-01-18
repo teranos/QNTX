@@ -21,7 +21,7 @@
 
 /* Pulse-specific badge variants */
 .pulse-badge-active {
-  background: #e8f5e9;
+  background: var(--status-completed-bg);
   color: #2e7d32;
 }
 
@@ -115,7 +115,7 @@
 }
 
 .pulse-btn-delete:hover {
-  background: #ffebee;
+  background: var(--status-failed-bg);
   border-color: #c62828;
 }
 
@@ -187,23 +187,23 @@
 }
 
 .child-status-running {
-  background: #e3f2fd;
-  color: #1976d2;
+  background: var(--status-running-bg);
+  color: var(--status-running-text);
 }
 
 .child-status-completed {
-  background: #e8f5e9;
+  background: var(--status-completed-bg);
   color: #388e3c;
 }
 
 .child-status-failed {
-  background: #ffebee;
+  background: var(--status-failed-bg);
   color: #c62828;
 }
 
 .child-status-queued,
 .child-status-paused {
-  background: #fff3e0;
+  background: var(--status-pending-bg);
   color: #f57c00;
 }
 
@@ -235,7 +235,7 @@
 .child-error {
   margin-top: 8px;
   padding: 6px 8px;
-  background: #ffebee;
+  background: var(--status-failed-bg);
   border-left: 3px solid #c62828;
   font-size: 12px;
   color: #c62828;
@@ -329,9 +329,9 @@
 
 /* Two-click confirmation state */
 .pulse-btn-force.pulse-btn-confirming {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
-    color: #e65100;
+    color: var(--status-pending-text);
 }
 
 .pulse-btn-force.pulse-btn-confirming:hover {
@@ -339,7 +339,7 @@
 }
 
 .pulse-btn-delete.pulse-btn-confirming {
-    background: #ffebee;
+    background: var(--status-failed-bg);
     border-color: #c62828;
     color: #c62828;
     font-weight: 600;
@@ -351,7 +351,7 @@
 
 /* Daemon control button confirmation states */
 .pulse-btn-daemon-stop.pulse-btn-confirming {
-    background: #ffebee;
+    background: var(--status-failed-bg);
     border-color: #c62828;
     color: #c62828;
     font-weight: 600;
@@ -362,7 +362,7 @@
 }
 
 .pulse-btn-daemon-start.pulse-btn-confirming {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
     border-color: #388e3c;
     color: #2e7d32;
     font-weight: 600;
@@ -468,7 +468,7 @@
     font-style: italic;
     margin-bottom: 8px;
     padding: 6px 8px;
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-radius: 4px;
 }
 

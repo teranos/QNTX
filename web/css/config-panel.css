@@ -213,9 +213,9 @@
 
 /* Two-click confirmation state */
 .config-save-btn.config-save-confirming {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
-    color: #e65100;
+    color: var(--status-pending-text);
     font-weight: 600;
 }
 
@@ -225,8 +225,8 @@
 
 /* Saving state */
 .config-save-btn.config-save-saving {
-    background: #e3f2fd;
-    border-color: #1976d2;
+    background: var(--status-running-bg);
+    border-color: var(--status-running-text);
     color: #1565c0;
     cursor: wait;
 }
