@@ -17,6 +17,7 @@ export class FrontmatterNodeView {
     private editorContainer: HTMLElement;
     private collapseButton: HTMLElement;
     private isDestroyed: boolean = false;
+    private storageKey: string = '';
 
     constructor(
         private node: PMNode,
@@ -39,6 +40,9 @@ export class FrontmatterNodeView {
         this.editorContainer.className = 'frontmatter-editor';
         this.dom.appendChild(this.editorContainer);
 
+        // Set up storage key for persistence (use current document path if available)
+        this.updateStorageKey();
+
         // Apply initial collapse state
         this.updateCollapseState();
 
@@ -46,7 +50,19 @@ export class FrontmatterNodeView {
         this.initializeEditor();
     }
 
+    private updateStorageKey(): void {
+        // Get document path from editor if available
+        const docPath = (this.view.state as any).docPath || 'default';
+        this.storageKey = `frontmatter-collapsed-${docPath}`;
+    }
+
     private get isCollapsed(): boolean {
+        // Check localStorage first for user preference
+        const stored = localStorage.getItem(this.storageKey);
+        if (stored !== null) {
+            return stored === 'true';
+        }
+        // Fall back to node attrs
         return this.node.attrs.collapsed ?? false;
     }
 
@@ -56,27 +72,13 @@ export class FrontmatterNodeView {
     }
 
     private toggleCollapse(): void {
-        const pos = this.getPos();
-        if (pos === undefined) return;
-
         const newCollapsedState = !this.isCollapsed;
 
-        try {
-            this.updating = true;
+        // Persist to localStorage
+        localStorage.setItem(this.storageKey, newCollapsedState ? 'true' : 'false');
 
-            const tr = this.view.state.tr.setNodeMarkup(
-                pos,
-                undefined,
-                {
-                    ...this.node.attrs,
-                    collapsed: newCollapsedState
-                }
-            );
-
-            this.view.dispatch(tr);
-        } finally {
-            this.updating = false;
-        }
+        // Update UI
+        this.updateCollapseState();
     }
 
     private async initializeEditor(): Promise<void> {

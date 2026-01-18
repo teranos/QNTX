@@ -16,21 +16,18 @@ const schemaSpec = {
             code: true,
             defining: true,
             attrs: {
-                params: { default: 'yaml' },
-                collapsed: { default: false }
+                params: { default: 'yaml' }
             },
             parseDOM: [{
                 tag: 'div[data-type="frontmatter"]',
                 preserveWhitespace: 'full',
                 getAttrs: (node) => ({
-                    params: (node as HTMLElement).getAttribute('data-params') || 'yaml',
-                    collapsed: (node as HTMLElement).getAttribute('data-collapsed') === 'true'
+                    params: (node as HTMLElement).getAttribute('data-params') || 'yaml'
                 })
             }],
             toDOM: (node) => ['div', {
                 'data-type': 'frontmatter',
-                'data-params': node.attrs.params,
-                'data-collapsed': node.attrs.collapsed ? 'true' : 'false'
+                'data-params': node.attrs.params
             }, ['pre', 0]]
         })
         .addBefore('code_block', 'ats_code_block', {
