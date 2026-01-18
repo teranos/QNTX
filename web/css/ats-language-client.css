@@ -251,7 +251,7 @@
 
 .completion-detail {
     font-size: 11px;
-    color: #999;
+    color: var(--text-tertiary);
 }
 
 /* Scrollbar styling for completion menu */

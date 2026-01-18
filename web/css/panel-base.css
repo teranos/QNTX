@@ -16,7 +16,7 @@
     --panel-bg-secondary: var(--bg-subtle);
     --panel-text-primary: var(--text-primary);
     --panel-text-secondary: var(--text-secondary);
-    --panel-text-tertiary: #999;
+    --panel-text-tertiary: var(--text-tertiary);
 
     /* Transitions */
     --panel-transition-fast: all 0.15s ease;
