@@ -139,7 +139,7 @@
 
 .plugin-state-running {
     background: var(--status-completed-bg);
-    color: #2e7d32;
+    color: var(--status-completed-text);
 }
 
 .plugin-state-paused {
@@ -208,8 +208,8 @@
 
 .plugin-resume-btn {
     background: var(--status-completed-bg);
-    border-color: #2e7d32;
-    color: #2e7d32;
+    border-color: var(--status-completed-text);
+    color: var(--status-completed-text);
 }
 
 .plugin-resume-btn:hover {
@@ -510,7 +510,7 @@
 }
 
 .plugin-config-field-cancel:hover {
-    color: #c62828;
+    color: var(--status-failed-text);
 }
 
 /* Legacy - kept for compatibility */

@@ -53,7 +53,7 @@
 
 .pulse-schedule-badge.active {
   background: var(--status-completed-bg);
-  color: #2e7d32;
+  color: var(--status-completed-text);
 }
 
 .pulse-schedule-badge.paused {
