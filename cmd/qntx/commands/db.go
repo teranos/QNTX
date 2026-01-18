@@ -43,7 +43,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 	// Load configuration
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return errors.Wrap(err, "failed to load configuration")
 	}
 
 	// Open and migrate database
@@ -64,7 +64,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 		FROM attestations
 	`).Scan(&totalAttestations, &uniqueActors, &uniqueSubjects, &uniqueContexts)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("failed to query storage stats: %w", err)
+		return errors.Wrap(err, "failed to query storage stats")
 	}
 
 	// Print database info
@@ -92,7 +92,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 		LIMIT ?
 	`, statsLimitFlag)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("failed to query storage events: %w", err)
+		return errors.Wrap(err, "failed to query storage events")
 	}
 	if err == nil {
 		defer rows.Close()
@@ -119,7 +119,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 				timestamp      string
 			)
 			if err := rows.Scan(&eventType, &actor, &context, &entity, &deletionsCount, &timestamp); err != nil {
-				return fmt.Errorf("failed to scan storage event: %w", err)
+				return errors.Wrap(err, "failed to scan storage event")
 			}
 
 			// Count by type
