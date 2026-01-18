@@ -22,7 +22,7 @@
 /* Pulse-specific badge variants */
 .pulse-badge-active {
   background: var(--status-completed-bg);
-  color: #2e7d32;
+  color: var(--status-completed-text);
 }
 
 .pulse-badge-stopping,
@@ -116,7 +116,7 @@
 
 .pulse-btn-delete:hover {
   background: var(--status-failed-bg);
-  border-color: #c62828;
+  border-color: var(--status-failed-text);
 }
 
 /* Dark theme removed - handled by left-panel.css base styles */
@@ -198,7 +198,7 @@
 
 .child-status-failed {
   background: var(--status-failed-bg);
-  color: #c62828;
+  color: var(--status-failed-text);
 }
 
 .child-status-queued,
@@ -236,9 +236,9 @@
   margin-top: 8px;
   padding: 6px 8px;
   background: var(--status-failed-bg);
-  border-left: 3px solid #c62828;
+  border-left: 3px solid var(--status-failed-text);
   font-size: 12px;
-  color: #c62828;
+  color: var(--status-failed-text);
 }
 
 .child-stages-container {
@@ -340,8 +340,8 @@
 
 .pulse-btn-delete.pulse-btn-confirming {
     background: var(--status-failed-bg);
-    border-color: #c62828;
-    color: #c62828;
+    border-color: var(--status-failed-text);
+    color: var(--status-failed-text);
     font-weight: 600;
 }
 
@@ -352,8 +352,8 @@
 /* Daemon control button confirmation states */
 .pulse-btn-daemon-stop.pulse-btn-confirming {
     background: var(--status-failed-bg);
-    border-color: #c62828;
-    color: #c62828;
+    border-color: var(--status-failed-text);
+    color: var(--status-failed-text);
     font-weight: 600;
 }
 
@@ -364,7 +364,7 @@
 .pulse-btn-daemon-start.pulse-btn-confirming {
     background: var(--status-completed-bg);
     border-color: #388e3c;
-    color: #2e7d32;
+    color: var(--status-completed-text);
     font-weight: 600;
 }
 
@@ -452,7 +452,7 @@
 .pulse-error-title {
     font-weight: 600;
     font-size: 14px;
-    color: #c62828;
+    color: var(--status-failed-text);
     margin-bottom: 4px;
 }
 
