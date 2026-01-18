@@ -32,7 +32,7 @@ try {
   console.log(`${darkPeach}Cleaning output directory...${reset}`);
   try {
     await rm(outputDir, { recursive: true, force: true });
-  } catch (e) {
+  } catch (error: unknown) {
     // Directory might not exist yet
   }
 
@@ -93,7 +93,7 @@ try {
   console.log(`${peach}Build complete!${reset}`);
   console.log(`${dim}   Output ready at: ${outputDir}${reset}`);
 
-} catch (error) {
+} catch (error: unknown) {
   console.error(`${darkPeach}Build failed:${reset}`, error);
   process.exit(1);
 }

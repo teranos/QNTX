@@ -27,7 +27,7 @@ function readAmConfig(): AmConfig {
         try {
             const tomlContent = readFileSync(configPath, "utf-8");
             return parseToml(tomlContent) as AmConfig;
-        } catch (error) {
+        } catch (error: unknown) {
             console.error(`Failed to parse am.toml: ${error}`);
         }
     }
@@ -78,7 +78,7 @@ async function build() {
         console.log(`${lightPink}Build complete${reset}`);
         // Notify all connected clients to reload
         broadcastReload();
-    } catch (error) {
+    } catch (error: unknown) {
         console.error(`${darkPink}Build failed:${reset}`, error);
     } finally {
         isBuilding = false;
