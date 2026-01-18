@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ai/tracker"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/internal/httpclient"
 )
 
@@ -144,12 +145,12 @@ type Usage struct {
 func (c *Client) CreateChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, errors.Wrap(err, "failed to marshal request")
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/chat/completions", bytes.NewBuffer(reqBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, errors.Wrap(err, "failed to create request")
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -164,22 +165,22 @@ func (c *Client) CreateChatCompletion(ctx context.Context, req ChatCompletionReq
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+		return nil, errors.Wrap(err, "failed to send request")
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, errors.Wrap(err, "failed to read response")
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(respBody))
+		return nil, errors.Newf("API request failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var chatResp ChatCompletionResponse
 	if err := json.Unmarshal(respBody, &chatResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal response")
 	}
 
 	return &chatResp, nil
@@ -189,7 +190,7 @@ func (c *Client) CreateChatCompletion(ctx context.Context, req ChatCompletionReq
 func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
 	// Handle API key validation
 	if c.config.APIKey == "" {
-		return nil, fmt.Errorf("OpenRouter API key not configured")
+		return nil, errors.New("OpenRouter API key not configured")
 	}
 
 	// Prepare request parameters
@@ -289,17 +290,17 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 
 		// Non-retryable error - provide detailed info
 		c.trackFailedRequest(requestTime, model, temperature, maxTokens, err)
-		return nil, fmt.Errorf("OpenRouter API error: %w", err)
+		return nil, errors.Wrap(err, "OpenRouter API error")
 	}
 
 	if err != nil {
 		c.trackFailedRequest(requestTime, model, temperature, maxTokens, err)
-		return nil, fmt.Errorf("OpenRouter API error after %d retries: %w", maxRetries, err)
+		return nil, errors.Wrapf(err, "OpenRouter API error after %d retries", maxRetries)
 	}
 
 	// Validate response before accessing
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("no response choices from OpenRouter")
+		return nil, errors.New("no response choices from OpenRouter")
 	}
 
 	// Debug response (debug mode shows full details)
