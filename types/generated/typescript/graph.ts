@@ -97,13 +97,21 @@ export interface NodeTypeInfo {
    */
   count?: number;
   /**
-   * Metadata fields for semantic search (e.g., ["notes", "description"])
+   * Fields from TypeDef
    */
   rich_string_fields?: string[];
   /**
-   * Fields flattened into arrays (e.g., ["skills", "languages"])
+   * Fields flattened into arrays
    */
   array_fields?: string[];
+  /**
+   * Visual opacity
+   */
+  opacity?: number | null;
+  /**
+   * Whether this type is being phased out
+   */
+  deprecated?: boolean;
 }
 
 export interface RelationshipDefinition {
@@ -163,36 +171,5 @@ export interface RelationshipTypeInfo {
 export interface Stats {
   total_nodes?: number;
   total_edges?: number;
-}
-
-export interface TypeDefinition {
-  /**
-   * e.g., "artist", "album", "genre"
-   */
-  TypeName: string;
-  /**
-   * Hex color or rgba() string
-   */
-  DisplayColor: string;
-  /**
-   * Human-readable label
-   */
-  DisplayLabel: string;
-  /**
-   * Whether this type is deprecated
-   */
-  Deprecated: boolean;
-  /**
-   * Optional opacity (default 1.0)
-   */
-  Opacity: number;
-  /**
-   * Metadata fields for semantic search (e.g., ["notes", "description"])
-   */
-  RichStringFields: string[];
-  /**
-   * Fields flattened into arrays (e.g., ["skills", "languages"])
-   */
-  ArrayFields: string[];
 }
 
