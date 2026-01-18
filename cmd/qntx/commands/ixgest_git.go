@@ -107,12 +107,12 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 	// Load config and open database
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrap(err, "failed to load config")
 	}
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -123,7 +123,7 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 
 	repoSource, err := git.ResolveRepository(repoInput, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to resolve repository: %w", err)
+		return errors.Wrap(err, "failed to resolve repository")
 	}
 	defer repoSource.Cleanup()
 
@@ -136,7 +136,7 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 	// Handle async mode
 	if asyncMode {
 		if dryRun {
-			return fmt.Errorf("--async and --dry-run cannot be used together")
+			return errors.New("--async and --dry-run cannot be used together")
 		}
 		// For async mode, pass the original input - the worker will clone if needed
 		repoSource.Cleanup() // Clean up any sync clone, worker will handle its own
@@ -159,7 +159,7 @@ func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity 
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return errors.Wrap(err, "failed to marshal payload")
 	}
 
 	// Create job (we don't know total operations yet, will update during execution)
@@ -172,13 +172,13 @@ func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity 
 		actor,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create job: %w", err)
+		return errors.Wrap(err, "failed to create job")
 	}
 
 	// Enqueue job
 	queue := async.NewQueue(database)
 	if err := queue.Enqueue(job); err != nil {
-		return fmt.Errorf("failed to enqueue job: %w", err)
+		return errors.Wrap(err, "failed to enqueue job")
 	}
 
 	if useJSON {

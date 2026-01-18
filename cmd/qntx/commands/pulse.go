@@ -62,7 +62,7 @@ The daemon will:
 		// Load configuration
 		cfg, err := am.Load()
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			return errors.Wrap(err, "failed to load config")
 		}
 
 		// Open and migrate database

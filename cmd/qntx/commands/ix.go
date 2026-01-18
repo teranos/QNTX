@@ -128,7 +128,7 @@ func init() {
 func runIxLs(statusFilter string, limit int) error {
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrap(err, "failed to load config")
 	}
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
@@ -144,7 +144,7 @@ func runIxLs(statusFilter string, limit int) error {
 	if statusFilter != "" {
 		// Validate status using async package
 		if !async.IsValidStatus(statusFilter) {
-			return fmt.Errorf("invalid status '%s': must be one of: queued, running, paused, completed, failed, cancelled", statusFilter)
+			return errors.Newf("invalid status '%s': must be one of: queued, running, paused, completed, failed, cancelled", statusFilter)
 		}
 		s := async.JobStatus(statusFilter)
 		status = &s
@@ -152,7 +152,7 @@ func runIxLs(statusFilter string, limit int) error {
 
 	jobs, err := queue.ListJobs(status, limit)
 	if err != nil {
-		return fmt.Errorf("failed to list jobs: %w", err)
+		return errors.Wrap(err, "failed to list jobs")
 	}
 
 	if len(jobs) == 0 {
@@ -185,7 +185,7 @@ func runIxLs(statusFilter string, limit int) error {
 func runIxStatus(jobID string) error {
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrap(err, "failed to load config")
 	}
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
@@ -197,7 +197,7 @@ func runIxStatus(jobID string) error {
 	queue := async.NewQueue(database)
 	job, err := queue.GetJob(jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get job: %w", err)
+		return errors.Wrap(err, "failed to get job")
 	}
 
 	// Print job details
@@ -237,7 +237,7 @@ func runIxStatus(jobID string) error {
 func runIxPause(jobID string) error {
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrap(err, "failed to load config")
 	}
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
@@ -250,16 +250,16 @@ func runIxPause(jobID string) error {
 
 	job, err := queue.GetJob(jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get job: %w", err)
+		return errors.Wrap(err, "failed to get job")
 	}
 
 	if job.Status != async.JobStatusQueued && job.Status != async.JobStatusRunning {
-		return fmt.Errorf("cannot pause job in status: %s (must be queued or running)", job.Status)
+		return errors.Newf("cannot pause job in status: %s (must be queued or running)", job.Status)
 	}
 
 	job.Status = async.JobStatusPaused
 	if err := queue.UpdateJob(job); err != nil {
-		return fmt.Errorf("failed to pause job: %w", err)
+		return errors.Wrap(err, "failed to pause job")
 	}
 
 	fmt.Printf("%s Job %s paused\n", sym.IX, jobID)
@@ -270,7 +270,7 @@ func runIxPause(jobID string) error {
 func runIxResume(jobID string) error {
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrap(err, "failed to load config")
 	}
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
@@ -283,16 +283,16 @@ func runIxResume(jobID string) error {
 
 	job, err := queue.GetJob(jobID)
 	if err != nil {
-		return fmt.Errorf("failed to get job: %w", err)
+		return errors.Wrap(err, "failed to get job")
 	}
 
 	if job.Status != async.JobStatusPaused {
-		return fmt.Errorf("cannot resume job in status: %s (must be paused)", job.Status)
+		return errors.Newf("cannot resume job in status: %s (must be paused)", job.Status)
 	}
 
 	job.Status = async.JobStatusQueued
 	if err := queue.UpdateJob(job); err != nil {
-		return fmt.Errorf("failed to resume job: %w", err)
+		return errors.Wrap(err, "failed to resume job")
 	}
 
 	fmt.Printf("%s Job %s resumed\n", sym.IX, jobID)

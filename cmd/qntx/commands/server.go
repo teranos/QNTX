@@ -99,7 +99,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Create server
 	srv, err := server.NewQNTXServer(database, dbPath, verbosity, serverAtsQuery)
 	if err != nil {
-		return fmt.Errorf("failed to create server: %w", err)
+		return errors.Wrap(err, "failed to create server")
 	}
 
 	// Start server in goroutine
@@ -138,7 +138,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		case err := <-shutdownDone:
 			// Graceful shutdown completed
 			if err != nil {
-				return fmt.Errorf("shutdown error: %w", err)
+				return errors.Wrap(err, "shutdown error")
 			}
 			pterm.Success.Println("Server stopped cleanly")
 			return nil
