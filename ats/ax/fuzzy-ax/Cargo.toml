@@ -9,6 +9,11 @@ authors = ["QNTX Contributors"]
 [dependencies]
 # String similarity algorithms
 strsim = "0.11"           # Levenshtein, Jaro-Winkler, etc.
+rphonetic = "3.0"         # Phonetic matching (Double Metaphone, Soundex)
+
+# Performance
+memchr = "2.7"            # SIMD-accelerated substring search
+rayon = "1.10"            # Parallel iteration for large vocabularies
 
 # Utilities
 parking_lot = "0.12"      # Fast RwLock for thread safety
