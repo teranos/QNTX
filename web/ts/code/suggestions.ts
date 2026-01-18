@@ -75,7 +75,7 @@ export class CodeSuggestions {
                 }
             };
             prSelect.addEventListener('change', this.prSelectListener);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to load open PRs', { context: SEG.ERROR, silent: true });
             prSelect.innerHTML = '<option value="">Failed to load PRs</option>';
         }
@@ -110,7 +110,7 @@ export class CodeSuggestions {
                 prInfo.classList.remove('hidden');
                 suggestionCount.textContent = `${suggestions.length} suggestion${suggestions.length !== 1 ? 's' : ''}`;
             }
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, `Failed to load PR suggestions for PR #${prNumber}`, { context: SEG.ERROR, silent: true });
             this.showError(`Failed to load suggestions for PR #${prNumber}`);
         }

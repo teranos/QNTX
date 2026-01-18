@@ -79,7 +79,7 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         if (cachedBuildInfo.build_time) {
             try {
                 buildTime = formatRelativeTime(cachedBuildInfo.build_time);
-            } catch (e) {
+            } catch (error: unknown) {
                 buildTime = 'parse error';
             }
         }

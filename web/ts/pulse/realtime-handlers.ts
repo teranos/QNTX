@@ -86,7 +86,7 @@ function notifyATSBlockSubscribers(
         for (const callback of subscribers) {
             try {
                 callback(state, executionId);
-            } catch (error) {
+            } catch (error: unknown) {
                 handleError(error, 'ATS Block subscriber callback error', { context: SEG.PULSE, silent: true });
             }
         }
