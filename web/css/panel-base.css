@@ -24,13 +24,13 @@
 
     /* Status colors */
     --status-pending-bg: #fff3e0;
-    --status-pending-text: #e65100;
+    --status-pending-text: var(--color-warning);
     --status-running-bg: #e3f2fd;
-    --status-running-text: #1976d2;
+    --status-running-text: var(--color-info);
     --status-completed-bg: #e8f5e9;
-    --status-completed-text: #388e3c;
+    --status-completed-text: var(--color-success);
     --status-failed-bg: #ffebee;
-    --status-failed-text: #d32f2f;
+    --status-failed-text: var(--color-error);
 }
 
 /* === CARDS === */
