@@ -6,6 +6,8 @@ Panel styles in `{name}-panel.css`; reusable components (buttons, badges, close 
 
 ## Core Tokens (`core.css`)
 
+`core.css` is the single source of truth for design tokens.
+
 ```css
 /* Text */        --text-primary, --text-secondary
 /* Backgrounds */ --bg-primary, --bg-subtle, --bg-dark
