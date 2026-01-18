@@ -13,6 +13,7 @@
     --bg-dark: #1e1e1e;
     --border-color: #ddd;
     --border-light: #e0e0e0;
+    --accent-color: #0066cc;
 
     /* Status Colors */
     --color-success: #22c55e;
@@ -39,7 +40,7 @@ body {
 
 /* Accessibility: Focus Styles */
 :focus-visible {
-    outline: 2px solid var(--accent-color, #0066cc);
+    outline: 2px solid var(--accent-color);
     outline-offset: 2px;
 }
 
