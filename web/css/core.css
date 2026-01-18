@@ -20,6 +20,7 @@
     --color-error: #ef4444;
     --color-warning: #ffaa00;
     --color-info: #3b82f6;
+    --color-scheduled: #7b1fa2;
 
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
