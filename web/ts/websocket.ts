@@ -123,7 +123,8 @@ const MESSAGE_HANDLERS = {
                 total_attestations: data.total_attestations,
                 unique_actors: data.unique_actors,
                 unique_subjects: data.unique_subjects,
-                unique_contexts: data.unique_contexts
+                unique_contexts: data.unique_contexts,
+                rich_fields: data.rich_fields
             });
         });
 

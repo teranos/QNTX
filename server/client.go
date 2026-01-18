@@ -802,7 +802,29 @@ func (c *Client) handleGetDatabaseStats() {
 		return
 	}
 
-	// Send stats to client
+	// Get discovered rich fields with statistics from a bounded store instance
+	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("db-stats"))
+	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats()
+	if err != nil {
+		c.server.logger.Errorw("Failed to get rich fields with stats",
+			"error", err,
+			"client_id", c.id,
+		)
+		// Fall back to simple field list
+		richFields := boundedStore.GetDiscoveredRichFields()
+		c.sendJSON(map[string]interface{}{
+			"type":               "database_stats",
+			"path":               c.server.dbPath,
+			"total_attestations": totalAttestations,
+			"unique_actors":      uniqueActors,
+			"unique_subjects":    uniqueSubjects,
+			"unique_contexts":    uniqueContexts,
+			"rich_fields":        richFields,
+		})
+		return
+	}
+
+	// Send stats to client with enhanced field information
 	c.sendJSON(map[string]interface{}{
 		"type":               "database_stats",
 		"path":               c.server.dbPath,
@@ -810,6 +832,7 @@ func (c *Client) handleGetDatabaseStats() {
 		"unique_actors":      uniqueActors,
 		"unique_subjects":    uniqueSubjects,
 		"unique_contexts":    uniqueContexts,
+		"rich_fields":        richFieldsWithStats,
 	})
 
 	c.server.logger.Infow("Database stats sent",

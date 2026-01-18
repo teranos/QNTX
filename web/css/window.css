@@ -196,3 +196,82 @@
     font-family: monospace;
     color: var(--panel-text-primary, #333);
 }
+
+/* Database Stats Window Styles */
+.db-stats {
+    padding: 8px;
+}
+
+.db-stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
+}
+
+.db-stat-row:last-child {
+    border-bottom: none;
+}
+
+.db-stat-label {
+    font-weight: 500;
+    color: var(--panel-text-secondary, #666);
+}
+
+.db-stat-value {
+    font-weight: 600;
+    color: var(--panel-text-primary, #333);
+}
+
+.db-path {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+.db-path:hover {
+    color: var(--link-hover, #0066cc);
+}
+
+/* Rich Fields Section */
+.db-stat-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--panel-border-color, #e0e0e0);
+}
+
+.db-stat-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--panel-text-primary, #333);
+    margin: 0 8px 8px 8px;
+}
+
+.rich-fields-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 8px;
+}
+
+.rich-field-item {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--panel-bg-secondary, #f0f0f0);
+    border: 1px solid var(--panel-border-color, #d0d0d0);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--panel-text-primary, #333);
+    transition: background-color 0.2s ease;
+}
+
+.rich-field-item:hover {
+    background: var(--panel-bg-hover, #e8e8e8);
+}
+
+.db-stats-loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--panel-text-secondary, #666);
+}
