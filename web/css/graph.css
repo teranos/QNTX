@@ -26,7 +26,7 @@
 
     /* Controls - subtle grays to minimize UI chrome */
     --control-padding: 8px;
-    --control-bg: #f8f8f8;  /* Near-white to recede visually */
+    --control-bg: var(--bg-subtle);  /* Near-white to recede visually */
 
     /* Meta overlay - gray for secondary information */
     --meta-max-width: 300px;
