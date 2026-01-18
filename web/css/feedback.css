@@ -106,7 +106,7 @@
     font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
-    color: #666;
+    color: var(--text-secondary);
     letter-spacing: 0.5px;
     display: flex;
     align-items: center;
@@ -121,7 +121,7 @@
 .log-column-header .mini-btn {
     background: #2a2a2a;
     border: 1px solid #333;
-    color: #666;
+    color: var(--text-secondary);
     cursor: pointer;
     padding: 1px 6px;
     font-size: 9px;
@@ -180,7 +180,7 @@
 }
 
 .log-timestamp {
-    color: #666;
+    color: var(--text-secondary);
     margin-right: 8px;
 }
 
@@ -211,7 +211,7 @@
 
 #verbosity-select:focus {
     outline: 1px solid #666;
-    border-color: #666;
+    border-color: var(--text-secondary);
 }
 
 /* Progress Events (in log panel) */
@@ -261,7 +261,7 @@
 }
 
 .progress-event-timestamp {
-    color: #666;
+    color: var(--text-secondary);
     font-size: 10px;
     margin-left: auto;
 }
@@ -390,7 +390,7 @@
 
 .hixtory-item:hover {
     background: #252525;
-    border-left-color: #666;
+    border-left-color: var(--text-secondary);
 }
 
 .hixtory-command {
@@ -407,7 +407,7 @@
     display: flex;
     gap: 8px;
     font-size: 10px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .hixtory-status {

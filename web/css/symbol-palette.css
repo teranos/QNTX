@@ -26,7 +26,7 @@
     font-size: 13px; /* Default size for mobile */
     color: #000;
     background: #f8f8f8;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     cursor: pointer;
     transition: all 0.15s ease;
     position: relative;
