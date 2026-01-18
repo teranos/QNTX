@@ -1,8 +1,9 @@
 package grapherror
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // GraphError represents an error in the graph system with structured context
@@ -42,7 +43,7 @@ func New(category Category, err error, userMsg string) *GraphError {
 // Newf creates a new GraphError with a formatted error message
 func Newf(category Category, userMsg, format string, args ...interface{}) *GraphError {
 	return &GraphError{
-		Err:         fmt.Errorf(format, args...),
+		Err:         errors.Newf(format, args...),
 		Category:    category,
 		UserMessage: userMsg,
 		Context:     make(map[string]interface{}),
