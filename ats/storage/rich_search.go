@@ -14,6 +14,14 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
+// Search scoring constants
+const (
+	// Maximum gap in characters between matched words to be considered sequential
+	maxWordGap = 50
+	// Score multiplier for matches with sequential/nearby words
+	sequentialMatchBoost = 1.5
+)
+
 // Note: Rich string fields are discovered dynamically from type definition attestations.
 // There are no hardcoded defaults - all searchable fields must be attested.
 
@@ -628,16 +636,15 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 				// If words are found in sequence/proximity, boost score
 				if len(positions) > 1 {
 					sort.Ints(positions)
-					maxGap := 50 // characters between words
 					sequential := true
 					for i := 1; i < len(positions); i++ {
-						if positions[i] - positions[i-1] > maxGap {
+						if positions[i] - positions[i-1] > maxWordGap {
 							sequential = false
 							break
 						}
 					}
 					if sequential {
-						finalScore *= 1.5 // Boost for sequential/nearby matches
+						finalScore *= sequentialMatchBoost
 						if finalScore > 1.0 {
 							finalScore = 1.0
 						}
