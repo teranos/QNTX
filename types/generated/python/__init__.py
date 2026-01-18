@@ -23,7 +23,6 @@ from .graph import (
     RelationshipDefinition,
     RelationshipTypeInfo,
     Stats,
-    TypeDefinition,
 )
 from .sym import (
     AM,
@@ -58,7 +57,6 @@ __all__ = [
     "RelationshipDefinition",
     "RelationshipTypeInfo",
     "Stats",
-    "TypeDefinition",
     "AM",
     "AS",
     "AT",

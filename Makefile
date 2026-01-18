@@ -17,7 +17,7 @@ cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments wit
 typegen: ## Build standalone typegen binary (pure Go, no plugins/CGO)
 	@go build -o bin/typegen ./cmd/typegen
 
-types: ## Generate TypeScript, Python, Rust types and markdown docs from Go source (via Nix)
+types: ## Generate TypeScript, Python, Rust types, CSS symbols, and markdown docs from Go source (via Nix)
 	@nix run .#generate-types
 
 types-check: ## Check if generated types are up to date (via Nix)
