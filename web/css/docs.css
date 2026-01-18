@@ -266,7 +266,7 @@ nav.doc-nav a {
 }
 
 .search-input::placeholder {
-    color: #999;
+    color: var(--text-tertiary);
 }
 
 .search-results {
@@ -411,7 +411,7 @@ nav.doc-nav a {
 
 .download-section.quick-download .file-size {
     margin-left: 4px;
-    color: #999;
+    color: var(--text-tertiary);
     font-size: 0.85em;
 }
 
@@ -895,7 +895,7 @@ th {
     }
 
     .category-desc {
-        color: #999;
+        color: var(--text-tertiary);
     }
 
     .toc-title {

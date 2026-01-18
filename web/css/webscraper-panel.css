@@ -46,7 +46,7 @@
 }
 
 .scraper-url-input::placeholder {
-    color: #999;
+    color: var(--text-tertiary);
 }
 
 .scraper-submit-btn {
@@ -254,7 +254,7 @@
 
 .scraper-history-empty {
     font-size: 11px;
-    color: #999;
+    color: var(--text-tertiary);
     text-align: center;
     padding: 16px;
 }
@@ -288,6 +288,6 @@
 
 .scraper-history-time {
     font-size: 10px;
-    color: #999;
+    color: var(--text-tertiary);
     margin-left: 8px;
 }

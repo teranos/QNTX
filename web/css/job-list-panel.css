@@ -76,7 +76,7 @@
 }
 
 .job-item:hover {
-    border-color: #999;
+    border-color: var(--text-tertiary);
 }
 
 .job-item.completed {
@@ -180,7 +180,7 @@
 
 .job-action-btn:hover {
     background: var(--bg-subtle);
-    border-color: #999;
+    border-color: var(--text-tertiary);
 }
 
 .job-action-btn.pause-btn {
@@ -253,7 +253,7 @@
 
 .task-list-empty {
     font-size: 11px;
-    color: #999;
+    color: var(--text-tertiary);
     padding: 8px;
     text-align: center;
 }
@@ -491,7 +491,7 @@
 
 .no-metadata {
     font-size: 11px;
-    color: #999;
+    color: var(--text-tertiary);
     text-align: center;
     padding: 8px;
     margin: 0;
