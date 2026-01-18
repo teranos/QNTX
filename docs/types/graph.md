@@ -98,7 +98,7 @@ type Node struct {
 
 ## NodeTypeInfo {#nodetypeinfo}
 
-**Source**: [`graph/models.go:45`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L45)
+**Source**: [`graph/models.go:46`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L46)
 
 
 ```go
@@ -109,6 +109,8 @@ type NodeTypeInfo struct {
 	Count int `json:"count,omitempty"`
 	RichStringFields []string `json:"rich_string_fields,omitempty"`
 	ArrayFields []string `json:"array_fields,omitempty"`
+	Opacity *float64 `json:"opacity,omitempty"`
+	Deprecated bool `json:"deprecated,omitempty"`
 }
 ```
 
@@ -130,7 +132,7 @@ type RelationshipDefinition struct {
 
 ## RelationshipTypeInfo {#relationshiptypeinfo}
 
-**Source**: [`graph/models.go:55`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L55)
+**Source**: [`graph/models.go:59`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L59)
 
 
 ```go
@@ -146,29 +148,12 @@ type RelationshipTypeInfo struct {
 
 ## Stats {#stats}
 
-**Source**: [`graph/models.go:65`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L65)
+**Source**: [`graph/models.go:69`](https://github.com/teranos/QNTX/blob/main/graph/models.go#L69)
 
 
 ```go
 type Stats struct {
 	TotalNodes int `json:"total_nodes,omitempty"`
 	TotalEdges int `json:"total_edges,omitempty"`
-}
-```
-
-## TypeDefinition {#typedefinition}
-
-**Source**: [`graph/node_types.go:11`](https://github.com/teranos/QNTX/blob/main/graph/node_types.go#L11)
-
-
-```go
-type TypeDefinition struct {
-	TypeName string
-	DisplayColor string
-	DisplayLabel string
-	Deprecated bool
-	Opacity float64
-	RichStringFields []string
-	ArrayFields []string
 }
 ```
