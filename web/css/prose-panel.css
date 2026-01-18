@@ -152,12 +152,13 @@
 /* Sidebar */
 .prose-sidebar {
     width: 250px;
+    flex-shrink: 0;  /* Prevent sidebar from shrinking */
     background: #252525;
     border-right: 1px solid #333;
     display: flex;
     flex-direction: column;
     position: relative;
-    transition: margin-left 0.3s ease, width 0.3s ease;
+    transition: width 0.3s ease, border 0.3s ease;
 }
 
 /* Sidebar toggle button - arrow shape */
@@ -188,10 +189,14 @@
 
 /* Collapsed state */
 .prose-sidebar.collapsed {
-    margin-left: -250px;
+    width: 0;
+    overflow: hidden;
+    border-right: none;
 }
 
 .prose-sidebar.collapsed .prose-sidebar-toggle {
+    /* Position toggle button at the edge when collapsed */
+    right: calc(-2 * var(--arrow-size));
     /* Arrow pointing right to expand */
     border-right: none;
     border-left: var(--arrow-size) solid #666;
@@ -203,7 +208,8 @@
 
 /* When sidebar is collapsed, content takes full width */
 .prose-body.sidebar-collapsed .prose-content {
-    margin-left: 12px; /* Small margin for the toggle button */
+    /* Content naturally takes full width when sidebar is collapsed */
+    /* No need for margin since the toggle button is absolutely positioned */
 }
 
 /* Sidebar header with search */
@@ -250,13 +256,17 @@
     display: flex;
     flex-direction: column;
     background: #1e1e1e;
+    overflow: hidden;  /* Contain the content within panel bounds */
+    min-width: 0;  /* Allow flex item to shrink properly */
 }
 
 .prose-editor-container {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;  /* Prevent horizontal overflow */
     padding: 24px 32px;
     min-width: 0;  /* Prevent flex item from overflowing */
+    box-sizing: border-box;  /* Include padding in width calculation */
 }
 
 /* ProseMirror editor styles */
