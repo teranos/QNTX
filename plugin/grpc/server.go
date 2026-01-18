@@ -95,7 +95,7 @@ func (s *PluginServer) Serve(ctx context.Context, addr string) error {
 				s.logger.Warnw("Requested port already in use, trying next port",
 					"requested_port", startPort,
 					"trying_port", tryPort+1)
-			} else if (attempt+1) % 10 == 0 {
+			} else if (attempt+1)%10 == 0 {
 				// Log every 10 attempts to avoid spam
 				s.logger.Warnw("Still searching for available port",
 					"requested_port", startPort,
@@ -270,7 +270,7 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 		}
 		if err != nil {
 			s.logger.Errorw("WebSocket stream receive error", "error", err)
-			return err
+			return errors.Wrap(err, "WebSocket stream receive error")
 		}
 
 		switch msg.Type {
@@ -292,7 +292,7 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 
 			if err := stream.Send(echoMsg); err != nil {
 				s.logger.Errorw("Failed to send WebSocket message", "error", err)
-				return err
+				return errors.Wrap(err, "failed to send WebSocket message")
 			}
 
 		case protocol.WebSocketMessage_PING:
@@ -304,7 +304,7 @@ func (s *PluginServer) HandleWebSocket(stream protocol.DomainPluginService_Handl
 			}
 			if err := stream.Send(pongMsg); err != nil {
 				s.logger.Errorw("Failed to send PONG message", "error", err)
-				return err
+				return errors.Wrap(err, "failed to send PONG message")
 			}
 
 		case protocol.WebSocketMessage_PONG:

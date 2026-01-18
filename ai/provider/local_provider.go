@@ -13,6 +13,7 @@ import (
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 )
 
 // LocalProvider implements Provider interface for local inference servers
@@ -320,7 +321,7 @@ func (lp *LocalProvider) ChatStreaming(ctx context.Context, req openrouter.ChatR
 
 	// Wait for goroutine completion and check for errors
 	if err := <-errChan; err != nil {
-		return err
+		return errors.Wrap(err, "streaming error")
 	}
 
 	return streamErr

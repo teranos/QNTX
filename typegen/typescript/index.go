@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // PackageExport represents a package and its exported types for barrel export
@@ -50,7 +52,7 @@ func GenerateIndexFile(outputDir string, exports []PackageExport) error {
 	// Write index file
 	indexPath := filepath.Join(outputDir, "index.ts")
 	if err := os.WriteFile(indexPath, []byte(sb.String()), 0644); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write index.ts")
 	}
 
 	fmt.Printf("✓ Generated %s (barrel export)\n", indexPath)

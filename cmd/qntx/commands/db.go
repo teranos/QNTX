@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -48,7 +49,7 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 	// Open and migrate database
 	database, err := openDatabase("")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
