@@ -20,7 +20,7 @@ const (
 
 // Match represents a fuzzy match result
 type Match struct {
-	Text     string
+	Value    string
 	Score    float64
 	Strategy string
 }
