@@ -142,11 +142,12 @@ class ConfigPanel extends BasePanel {
             toast.textContent = `Copied to clipboard: ${path}`;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
-        }).catch(err => {
-            console.error('[Config Panel] Failed to copy path:', err);
+        }).catch((error: unknown) => {
+            console.error('[Config Panel] Failed to copy path:', error);
             const toast = document.createElement('div');
             toast.className = 'config-toast config-toast-error';
-            toast.textContent = `Failed to copy: ${err.message || 'Clipboard access denied'}`;
+            const message = error instanceof Error ? error.message : 'Clipboard access denied';
+            toast.textContent = `Failed to copy: ${message}`;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
         });

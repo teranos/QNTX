@@ -135,8 +135,8 @@ function openBudgetConfigPanel(): void {
             weeklyInput.value = (config.weekly_budget_usd ?? 7.0).toString();
             monthlyInput.value = (config.monthly_budget_usd ?? 30.0).toString();
         })
-        .catch(err => {
-            log.error(SEG.PULSE, 'Failed to fetch pulse config:', err);
+        .catch((error: unknown) => {
+            log.error(SEG.PULSE, 'Failed to fetch pulse config:', error);
             // Use defaults
             dailyInput.value = '1.0';
             weeklyInput.value = '7.0';
