@@ -10,8 +10,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: #fafafa;
-  border-bottom: 2px solid #e0e0e0;
+  background: var(--bg-subtle);
+  border-bottom: 2px solid var(--border-light);
   flex-shrink: 0;
 }
 
@@ -25,7 +25,7 @@
 
 .job-detail-back {
   background: none;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-light);
   padding: 6px 12px;
   border-radius: var(--panel-border-radius);
   cursor: pointer;
@@ -46,7 +46,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 20px;
-  background: #f5f5f5;
+  background: var(--bg-subtle);
 }
 
 /* Job info card - uses .panel-card from panel-base.css */
@@ -194,10 +194,10 @@
 .execution-summary {
   margin-top: 8px;
   padding: 8px 10px;
-  background: #f5f5f5;
+  background: var(--bg-subtle);
   border-radius: 3px;
   font-size: 12px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .execution-error {
@@ -225,7 +225,7 @@
 
 .execution-job-id {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  background: #f5f5f5;
+  background: var(--bg-subtle);
   padding: 2px 6px;
   border-radius: 3px;
 }
@@ -233,7 +233,7 @@
 /* Execution logs */
 .execution-logs-container {
   margin-top: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-light);
   padding-top: 12px;
 }
 
@@ -294,7 +294,7 @@
   background: #fff8f8;
   border: 1px solid #ffcdd2;
   border-left: 3px solid #ef5350;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .job-detail-error-title {
@@ -306,13 +306,13 @@
 
 .job-detail-error-message {
   font-size: 13px;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 10px;
 }
 
 .job-detail-error-suggestion {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   font-style: italic;
   margin-bottom: 10px;
   padding: 8px 10px;
@@ -328,18 +328,18 @@
 .job-detail-error-details summary {
   cursor: pointer;
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   user-select: none;
 }
 
 .job-detail-error-details summary:hover {
-  color: #333;
+  color: var(--text-primary);
 }
 
 .job-detail-error-details-content {
   margin-top: 8px;
   padding: 10px;
-  background: #f5f5f5;
+  background: var(--bg-subtle);
   border-radius: 4px;
   font-size: 11px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -373,18 +373,18 @@
   align-items: center;
   margin-top: 16px;
   padding: 12px 0;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-light);
 }
 
 .pagination-btn {
   padding: 8px 14px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-light);
   border-radius: var(--panel-border-radius);
   background: var(--panel-bg);
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .pagination-btn:hover:not([disabled]) {

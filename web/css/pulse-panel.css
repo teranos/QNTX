@@ -34,7 +34,7 @@
 .pulse-job-interval {
   font-size: 13px;
   font-weight: 500;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 /* Pulse-specific code block styling */
@@ -57,7 +57,7 @@
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .pulse-meta-label {
@@ -91,12 +91,12 @@
   gap: 6px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-light);
 }
 
 .pulse-btn {
   padding: 6px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-light);
   border-radius: 4px;
   background: #fff;
   cursor: pointer;
@@ -105,7 +105,7 @@
 }
 
 .pulse-btn:hover {
-  background: #f5f5f5;
+  background: var(--bg-subtle);
 }
 
 .pulse-btn-pause:hover,
@@ -141,7 +141,7 @@
 
 .execution-child {
   background: #fff;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 8px;
   padding: 8px 12px;
@@ -160,13 +160,13 @@
 }
 
 .child-header:hover {
-  background: #f5f5f5;
+  background: var(--bg-subtle);
   border-radius: 2px;
 }
 
 .child-expand-icon {
   font-size: 10px;
-  color: #666;
+  color: var(--text-secondary);
   width: 12px;
   display: inline-block;
 }
@@ -210,7 +210,7 @@
 .child-progress {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .child-meta {
@@ -218,7 +218,7 @@
   gap: 12px;
   margin-top: 6px;
   font-size: 11px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .child-id {
@@ -244,7 +244,7 @@
 .child-stages-container {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-light);
 }
 
 /* Direct log display under stages */
@@ -262,7 +262,7 @@
 
 .task-log-entry {
   padding: 6px 8px;
-  background: #fafafa;
+  background: var(--bg-subtle);
   border-radius: 3px;
 }
 
@@ -279,7 +279,7 @@
 }
 
 .task-log-message {
-  color: #333;
+  color: var(--text-primary);
 }
 
 .task-logs-loading {
@@ -308,12 +308,12 @@
     margin-right: 8px;
     cursor: pointer;
     font-size: 14px;
-    color: #666;
+    color: var(--text-secondary);
     transition: color 0.2s;
 }
 
 .pulse-expand-toggle:hover {
-    color: #333;
+    color: var(--text-primary);
 }
 
 /* Force Trigger button styling */
@@ -390,7 +390,7 @@
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
 }
 
 .pulse-detailed-link {
@@ -458,13 +458,13 @@
 
 .pulse-error-message {
     font-size: 13px;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 8px;
 }
 
 .pulse-error-suggestion {
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
     font-style: italic;
     margin-bottom: 8px;
     padding: 6px 8px;
@@ -480,18 +480,18 @@
 .pulse-error-details summary {
     cursor: pointer;
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
     user-select: none;
 }
 
 .pulse-error-details summary:hover {
-    color: #333;
+    color: var(--text-primary);
 }
 
 .pulse-error-details-content {
     margin-top: 8px;
     padding: 8px;
-    background: #f5f5f5;
+    background: var(--bg-subtle);
     border-radius: 4px;
     font-size: 11px;
     font-family: 'SF Mono', Monaco, 'Courier New', monospace;
@@ -553,7 +553,7 @@
 
 .pulse-exec-time {
     font-size: 13px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .pulse-exec-duration {
@@ -565,7 +565,7 @@
 .pulse-exec-summary {
     grid-column: 1 / -1;
     font-size: 13px;
-    color: #666;
+    color: var(--text-secondary);
     margin-top: 4px;
 }
 
@@ -583,7 +583,7 @@
     width: 100%;
     padding: 10px;
     background: #f0f0f0;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 13px;
     color: #007aff;

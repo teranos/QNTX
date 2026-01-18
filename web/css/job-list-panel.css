@@ -148,13 +148,13 @@
 
 .job-progress-text {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 /* Cost Info */
 .job-cost {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
 
@@ -170,16 +170,16 @@
     padding: 6px 12px;
     font-size: 11px;
     font-weight: 500;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     background: #fff;
-    color: #333;
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .job-action-btn:hover {
-    background: #f5f5f5;
+    background: var(--bg-subtle);
     border-color: #999;
 }
 
@@ -230,7 +230,7 @@
 }
 
 .job-header.clickable:hover {
-    background: #f9f9f9;
+    background: var(--bg-subtle);
     border-radius: 4px;
     margin: -4px;
     padding: 4px;
@@ -238,7 +238,7 @@
 
 .expand-icon {
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
     transition: transform 0.2s ease;
     width: 16px;
     text-align: center;
@@ -248,7 +248,7 @@
 .task-list {
     margin-top: 12px;
     padding-top: 8px;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-light);
 }
 
 .task-list-empty {
@@ -331,7 +331,7 @@
 .job-list-footer {
     padding: 8px 12px;
     background: #f8f8f8;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
 }
 
 .new-ix-btn {
@@ -342,14 +342,14 @@
     border: 1px dashed #999;
     border-radius: 4px;
     background: #fff;
-    color: #333;
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .new-ix-btn:hover {
-    background: #f5f5f5;
-    border-color: #333;
+    background: var(--bg-subtle);
+    border-color: var(--text-primary);
     border-style: solid;
 }
 
@@ -437,18 +437,18 @@
 .job-expanded-details {
     margin-top: 12px;
     padding: 12px;
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-light);
     border-radius: 4px;
 }
 
 .details-header {
     font-size: 12px;
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 8px;
     padding-bottom: 6px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .details-content {
@@ -473,13 +473,13 @@
 
 .metadata-key {
     font-weight: 600;
-    color: #666;
+    color: var(--text-secondary);
     min-width: 100px;
     flex-shrink: 0;
 }
 
 .metadata-value {
-    color: #333;
+    color: var(--text-primary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
     word-break: break-word;
     flex: 1;
