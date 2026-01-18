@@ -74,7 +74,7 @@
     color: #000;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid var(--border-color);
     padding-bottom: 6px;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .config-setting:hover {
-    background: #fafafa;
+    background: var(--bg-subtle);
 }
 
 .config-setting:last-child {
@@ -105,7 +105,7 @@
 }
 
 .config-setting-value {
-    color: #333;
+    color: var(--text-primary);
     word-break: break-word;
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
@@ -203,8 +203,8 @@
 }
 
 .config-save-btn {
-    background: #f5f5f5;
-    color: #333;
+    background: var(--bg-subtle);
+    color: var(--text-primary);
 }
 
 .config-save-btn:hover {
@@ -233,12 +233,12 @@
 
 .config-cancel-btn {
     background: #fff;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .config-cancel-btn:hover {
-    background: #f5f5f5;
-    color: #333;
+    background: var(--bg-subtle);
+    color: var(--text-primary);
 }
 
 /* Toast variants */
@@ -266,7 +266,7 @@
 }
 
 .config-value-string {
-    color: #333;
+    color: var(--text-primary);
 }
 
 .config-value-object {

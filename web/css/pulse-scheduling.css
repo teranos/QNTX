@@ -10,8 +10,8 @@
   flex-direction: column;
   gap: 4px;
   padding: 4px 8px;
-  background: var(--color-bg-secondary, #f5f5f5);
-  border-top: 1px solid var(--color-border, #e0e0e0);
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border-light);
   border-radius: 0 0 4px 4px;
   font-size: 13px;
 }
@@ -57,7 +57,7 @@
 }
 
 .pulse-schedule-badge.paused {
-  background: #f5f5f5;
+  background: var(--bg-subtle);
   color: #757575;
 }
 
@@ -96,7 +96,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border: 1px solid var(--color-border, #e0e0e0);
+  border: 1px solid var(--border-light);
   border-radius: 4px;
   background: white;
   cursor: pointer;
@@ -163,7 +163,7 @@
 /* Interval select dropdown */
 .pulse-interval-select {
   padding: 4px 8px;
-  border: 1px solid var(--color-border, #e0e0e0);
+  border: 1px solid var(--border-light);
   border-radius: 4px;
   background: white;
   font-size: 13px;

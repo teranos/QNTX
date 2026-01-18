@@ -197,7 +197,7 @@ body.disconnected #connection-status {
 .legenda-color {
     width: 10px;
     height: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 .reveal-related {

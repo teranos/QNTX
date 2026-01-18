@@ -19,7 +19,7 @@
     display: block;
     font-size: 11px;
     font-weight: 500;
-    color: #666;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 6px;
@@ -34,7 +34,7 @@
     flex: 1;
     padding: 8px 12px;
     font-size: 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     outline: none;
     font-family: var(--font-mono, monospace);
@@ -74,7 +74,7 @@
 /* Options Section */
 .scraper-options {
     padding: 12px 20px;
-    background: #fafafa;
+    background: var(--bg-subtle);
     border-bottom: 1px solid #eee;
     display: flex;
     flex-wrap: wrap;
@@ -86,7 +86,7 @@
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .scraper-option input[type="checkbox"] {
@@ -96,7 +96,7 @@
 .scraper-option input[type="number"] {
     width: 50px;
     padding: 3px 6px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     font-size: 10px;
     font-family: var(--font-mono, monospace);
@@ -150,7 +150,7 @@
 .scraper-results-title {
     font-size: 11px;
     font-weight: 600;
-    color: #666;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin: 16px 20px 8px;
@@ -167,7 +167,7 @@
 .scraper-result-card {
     padding: 12px;
     margin-bottom: 12px;
-    background: #fafafa;
+    background: var(--bg-subtle);
     border: 1px solid #eee;
     border-radius: 4px;
 }
@@ -202,18 +202,18 @@
 
 .scraper-result-description {
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
     line-height: 1.5;
     margin: 8px 0;
 }
 
 .scraper-result-content {
     font-size: 11px;
-    color: #333;
+    color: var(--text-primary);
     line-height: 1.5;
     padding: 8px;
     background: #fff;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-light);
     border-radius: 3px;
     margin: 8px 0;
     font-family: var(--font-mono, monospace);
@@ -222,7 +222,7 @@
 .scraper-result-links,
 .scraper-result-images {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
     padding: 4px 0;
 }
 
@@ -235,13 +235,13 @@
 .scraper-history {
     border-top: 1px solid #eee;
     padding: 16px 20px;
-    background: #fafafa;
+    background: var(--bg-subtle);
 }
 
 .scraper-history-title {
     font-size: 11px;
     font-weight: 600;
-    color: #666;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin: 0 0 8px 0;
@@ -266,19 +266,19 @@
     padding: 8px;
     margin-bottom: 4px;
     background: #fff;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-light);
     border-radius: 3px;
     cursor: pointer;
     transition: background 0.15s;
 }
 
 .scraper-history-item:hover {
-    background: #f5f5f5;
+    background: var(--bg-subtle);
 }
 
 .scraper-history-url {
     font-size: 11px;
-    color: #333;
+    color: var(--text-primary);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;

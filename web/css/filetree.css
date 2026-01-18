@@ -27,7 +27,7 @@
 }
 
 .prose-search:focus {
-    border-color: #666;
+    border-color: var(--text-secondary);
 }
 
 /* Recent files section */
