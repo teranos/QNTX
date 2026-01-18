@@ -170,7 +170,7 @@ class JobDetailPanel {
       this.totalExecutions = response.total;
 
       this.render();
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to load execution history', { context: SEG.PULSE, silent: true });
       this.renderError('Failed to load execution history');
     }
@@ -285,7 +285,7 @@ class JobDetailPanel {
 
       // Re-render to show loaded stages or children
       this.render();
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to load execution stages', { context: SEG.PULSE, silent: true });
       // Store empty stages response on error
       this.executionStages.set(executionId, {
@@ -321,7 +321,7 @@ class JobDetailPanel {
       const logs = await getTaskLogsForJob(jobId, taskId);
       this.taskLogs.set(taskKey, logs);
       this.render();
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to load task logs', { context: SEG.PULSE, silent: true });
       this.taskLogs.set(taskKey, {
         task_id: taskId,
@@ -494,7 +494,7 @@ class JobDetailPanel {
       const stages = await getJobStages(childId);
       this.childStages.set(childId, stages);
       this.render();
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Failed to load child job stages', { context: SEG.PULSE, silent: true });
       this.childStages.set(childId, {
         job_id: childId,
@@ -772,7 +772,7 @@ class JobDetailPanel {
       await this.loadExecutions();
 
       log.debug(SEG.PULSE, 'Force trigger successful');
-    } catch (error) {
+    } catch (error: unknown) {
       handleError(error, 'Force trigger failed', { context: SEG.PULSE });
     }
   }

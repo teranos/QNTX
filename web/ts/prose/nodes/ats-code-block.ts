@@ -110,8 +110,8 @@ export class ATSCodeBlockNodeView {
                     existingJob = job;
                     this.updateSchedulingControls(existingJob);
                 })
-                .catch(err => {
-                    console.warn('Failed to load scheduled job:', err);
+                .catch((error: unknown) => {
+                    console.warn('Failed to load scheduled job:', error);
                     // Clear invalid job ID from node
                     this.updateNodeAttributes({ scheduledJobId: null });
                 });

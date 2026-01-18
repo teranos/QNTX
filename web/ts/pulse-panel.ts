@@ -130,7 +130,7 @@ class PulsePanel extends BasePanel {
 
             this.hideLoading();
             await this.render();
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('[Pulse Panel] Failed to load jobs:', error);
             const err = error instanceof Error ? error : new Error(String(error));
             this.showErrorState(err);

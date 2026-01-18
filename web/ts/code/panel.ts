@@ -218,7 +218,7 @@ class GoEditorPanel extends BasePanel {
 
             // Add to recent files
             this.navigation.addToRecentFiles(path);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, `Failed to load file: ${path}`, { context: SEG.ERROR, silent: true });
             this.showError(`Failed to load ${path}`, path);
         }
@@ -243,7 +243,7 @@ class GoEditorPanel extends BasePanel {
             this.updateStatus('ready');
 
             this.log('Editor initialized');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to initialize editor', { context: SEG.ERROR, silent: true });
             this.updateStatus('error');
             this.showError(error instanceof Error ? error.message : String(error));
@@ -264,8 +264,8 @@ class GoEditorPanel extends BasePanel {
         try {
             const goModule = await import('@codemirror/lang-go');
             goExtension = goModule.go();
-        } catch (err) {
-            handleError(err, 'Failed to load Go language support', { context: SEG.ERROR, silent: true });
+        } catch (error: unknown) {
+            handleError(error, 'Failed to load Go language support', { context: SEG.ERROR, silent: true });
             goExtension = [];
         }
 
@@ -306,11 +306,11 @@ class GoEditorPanel extends BasePanel {
                     workspaceRoot = `file://${this.workspaceRoot}`;
                 }
             }
-        } catch (e) {
-            if (e instanceof Error && e.message.includes('disabled')) {
-                throw e;
+        } catch (error: unknown) {
+            if (error instanceof Error && error.message.includes('disabled')) {
+                throw error;
             }
-            handleError(e, 'Failed to fetch gopls config', { context: SEG.ERROR, silent: true });
+            handleError(error, 'Failed to fetch gopls config', { context: SEG.ERROR, silent: true });
         }
 
         const documentUri = `file://${this.workspaceRoot}/${this.currentPath}`;
@@ -382,7 +382,7 @@ class GoEditorPanel extends BasePanel {
             this.updateSaveIndicator();
             this.showStatus('Saved');
             console.log('[Go Editor] File saved:', this.currentPath);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save content', { context: SEG.ERROR, silent: true });
             this.showError('Failed to save');
         }
@@ -536,8 +536,8 @@ class GoEditorPanel extends BasePanel {
         if (this.editor) {
             try {
                 this.editor.destroy();
-            } catch (err) {
-                handleError(err, 'Error destroying editor', { context: SEG.ERROR, silent: true });
+            } catch (error: unknown) {
+                handleError(error, 'Error destroying editor', { context: SEG.ERROR, silent: true });
             }
             this.editor = null;
         }
@@ -669,8 +669,8 @@ class GoEditorPanel extends BasePanel {
                             scrollIntoView: true
                         });
                         this.editor.focus();
-                    } catch (err) {
-                        handleError(err, 'Failed to scroll to line', { context: SEG.ERROR, silent: true });
+                    } catch (error: unknown) {
+                        handleError(error, 'Failed to scroll to line', { context: SEG.ERROR, silent: true });
                     }
                 }, 100);
             }

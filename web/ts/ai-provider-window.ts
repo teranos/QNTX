@@ -174,7 +174,7 @@ class AIProviderPanel {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             this.appConfig = await response.json();
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to fetch config', { context: SEG.ACTOR, silent: true });
         }
     }
@@ -212,7 +212,7 @@ class AIProviderPanel {
             });
 
             this.updateStatus('Using OpenRouter (cloud API)', 'success');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to switch to OpenRouter', { context: SEG.ACTOR, silent: true });
             this.updateStatus('Failed to update config', 'error');
         }
@@ -234,7 +234,7 @@ class AIProviderPanel {
             });
 
             this.updateStatus(`Using Ollama (${model})`, 'success');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to switch to Ollama', { context: SEG.ACTOR, silent: true });
             this.updateStatus('Failed to update config - is Ollama running?', 'error');
         }
@@ -249,7 +249,7 @@ class AIProviderPanel {
             });
 
             this.updateStatus(`Using Ollama (${model})`, 'success');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to update Ollama model', { context: SEG.ACTOR, silent: true });
             this.updateStatus('Failed to update model', 'error');
         }
@@ -350,7 +350,7 @@ class AIProviderPanel {
             this.updateStatus('API key saved successfully', 'success');
             keyInput.value = ''; // Clear the input
             keyInput.placeholder = apiKey.substring(0, 10) + '...(configured)';
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save API key', { context: SEG.ACTOR, silent: true });
             this.updateStatus('Failed to save API key', 'error');
         }
@@ -385,7 +385,7 @@ class AIProviderPanel {
             });
 
             this.updateStatus('ONNX model path saved', 'success');
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save ONNX model path', { context: SEG.ACTOR, silent: true });
             // Extract error message from Error object to show server-side error details
             const errorMsg = error instanceof Error ? error.message : 'Failed to save model path';
@@ -418,7 +418,7 @@ class AIProviderPanel {
                     ollamaStatus.textContent = 'Offline';
                 }
             }
-        } catch (error) {
+        } catch (error: unknown) {
             // Ollama is not running or unreachable
             this.ollamaAvailable = false;
 

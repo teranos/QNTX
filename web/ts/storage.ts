@@ -84,8 +84,8 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
         }
 
         return envelope.data;
-    } catch (e) {
-        console.error(`[Storage] Failed to get key "${key}":`, e);
+    } catch (error: unknown) {
+        console.error(`[Storage] Failed to get key "${key}":`, error);
         return null;
     }
 }
@@ -105,8 +105,8 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
             version: options?.version,
         };
         localStorage.setItem(key, JSON.stringify(envelope));
-    } catch (e) {
-        console.error(`[Storage] Failed to set key "${key}":`, e);
+    } catch (error: unknown) {
+        console.error(`[Storage] Failed to set key "${key}":`, error);
     }
 }
 
@@ -118,8 +118,8 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
 export function removeItem(key: string): void {
     try {
         localStorage.removeItem(key);
-    } catch (e) {
-        console.error(`[Storage] Failed to remove key "${key}":`, e);
+    } catch (error: unknown) {
+        console.error(`[Storage] Failed to remove key "${key}":`, error);
     }
 }
 
