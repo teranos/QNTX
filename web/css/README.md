@@ -9,7 +9,7 @@ Panel styles in `{name}-panel.css`; reusable components (buttons, badges, close 
 `core.css` is the single source of truth for design tokens.
 
 ```css
-/* Text */        --text-primary, --text-secondary
+/* Text */        --text-primary, --text-secondary, --text-tertiary
 /* Backgrounds */ --bg-primary, --bg-subtle, --bg-dark
 /* Borders */     --border-color, --border-light
 /* Accent */      --accent-color
