@@ -130,9 +130,9 @@ export class FuzzySearchView {
         this.resultsElement.appendChild(header);
 
         // Add each match as a result line
-        message.matches.forEach((match, index) => {
-            const resultLine = this.createResultLine(match, index);
-            this.resultsElement.appendChild(resultLine);
+        message.matches.forEach((match) => {
+            const resultLine = this.createResultLine(match);
+            this.resultsElement!.appendChild(resultLine);
         });
 
         // If no matches
@@ -151,7 +151,7 @@ export class FuzzySearchView {
     /**
      * Create a single result line
      */
-    private createResultLine(match: FuzzySearchMatch, index: number): HTMLElement {
+    private createResultLine(match: FuzzySearchMatch): HTMLElement {
         const line = document.createElement('div');
         line.className = 'fuzzy-result-line';
         line.style.cssText = `
