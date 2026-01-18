@@ -309,7 +309,6 @@ export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: {
     // Tag styling constants
     const TAG_HEIGHT = 20;
     const TAG_PADDING_X = 8;
-    const TAG_PADDING_Y = 4;
     const TAG_SPACING = 6;
     const TAG_Y_OFFSET = -dimensions.height / 2 + HEADER_HEIGHT + HEADER_PADDING + 10;
 
@@ -322,7 +321,6 @@ export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: {
     // Render tags with dynamic positioning
     let currentX = -dimensions.width / 2 + 10; // Start from left edge with padding
     let currentY = 0;
-    const maxWidth = dimensions.width - 20; // Leave padding on both sides
 
     tags.forEach((tag, index) => {
         // Estimate tag width (rough approximation based on text length)

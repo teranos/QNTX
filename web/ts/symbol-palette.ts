@@ -170,8 +170,8 @@ async function injectCTP2Glyph(): Promise<void> {
         if (cell) {
             cell.innerHTML = generateCTP2Glyph();
         }
-    } catch (err) {
-        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', err);
+    } catch (error: unknown) {
+        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', error);
         // Fallback to text
         const cell = document.getElementById('ctp2-palette-cell');
         if (cell) {
@@ -485,8 +485,8 @@ function showVidStreamWindow(): void {
         }
         log(SEG.VID, 'Calling toggle()');
         vidstreamWindowInstance.toggle();
-    } catch (err) {
-        handleError(err, 'Failed to show VidStream window', { context: SEG.VID });
+    } catch (error: unknown) {
+        handleError(error, 'Failed to show VidStream window', { context: SEG.VID });
     }
 }
 

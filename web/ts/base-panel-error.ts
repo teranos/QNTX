@@ -9,6 +9,7 @@
  */
 
 import { CSS, DATA, setLoading } from './css-classes.ts';
+import { Button } from './components/button.ts';
 
 /**
  * Error state for a panel
@@ -99,15 +100,12 @@ export function createRichErrorState(
 
     // Retry button if callback provided
     if (onRetry) {
-        const retryBtn = document.createElement('button');
-        retryBtn.className = 'panel-error-retry';
-        retryBtn.setAttribute('type', 'button');
-        retryBtn.textContent = 'Retry';
-        retryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            onRetry();
+        const retryBtn = new Button({
+            label: 'Retry',
+            onClick: onRetry,
+            variant: 'default'
         });
-        container.appendChild(retryBtn);
+        container.appendChild(retryBtn.element);
     }
 
     return container;
@@ -136,15 +134,12 @@ export function createErrorState(
     container.appendChild(messageEl);
 
     if (onRetry) {
-        const retryBtn = document.createElement('button');
-        retryBtn.className = 'panel-error-retry';
-        retryBtn.setAttribute('type', 'button');
-        retryBtn.textContent = 'Retry';
-        retryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            onRetry();
+        const retryBtn = new Button({
+            label: 'Retry',
+            onClick: onRetry,
+            variant: 'default'
         });
-        container.appendChild(retryBtn);
+        container.appendChild(retryBtn.element);
     }
 
     return container;
@@ -359,7 +354,7 @@ export async function retryShow(ctx: ErrorHandlingContext): Promise<void> {
     // Re-run onShow with error boundary
     try {
         await ctx.onShow();
-    } catch (error) {
+    } catch (error: unknown) {
         const err = error instanceof Error ? error : new Error(String(error));
         console.error(`[${ctx.panelId}] Error in retryShow():`, err);
         showErrorState(ctx, err);

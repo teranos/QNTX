@@ -118,7 +118,7 @@ class JobListPanel extends BasePanel {
             });
 
             console.log(`Loaded ${jobs.length} async jobs from API`);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Error fetching jobs:', error);
         }
     }
