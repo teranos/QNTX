@@ -75,7 +75,6 @@ export type {
   RelationshipDefinition,
   RelationshipTypeInfo,
   Stats,
-  TypeDefinition,
 } from './graph';
 
 // Types from schedule
