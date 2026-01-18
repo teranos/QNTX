@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
 	qntxdisplay "github.com/teranos/QNTX/display"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/qntx-code/ixgest/git"
@@ -224,7 +225,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 	// Set incremental filter if --since is provided
 	if since != "" {
 		if err := processor.SetSince(since); err != nil {
-			return err
+			return errors.Wrap(err, "failed to set since filter")
 		}
 	}
 
@@ -252,7 +253,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 			return qntxdisplay.OutputJSON(result)
 		}
 		pterm.Error.Printf("Failed to process git repository: %v", err)
-		return err
+		return errors.Wrap(err, "failed to process git repository")
 	}
 
 	// Process dependencies unless --no-deps is specified

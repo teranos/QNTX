@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/sym"
@@ -132,7 +133,7 @@ func runIxLs(statusFilter string, limit int) error {
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -189,7 +190,7 @@ func runIxStatus(jobID string) error {
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -241,7 +242,7 @@ func runIxPause(jobID string) error {
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -274,7 +275,7 @@ func runIxResume(jobID string) error {
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 

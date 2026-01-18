@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/typegen"
 	"github.com/teranos/QNTX/typegen/api"
 	"github.com/teranos/QNTX/typegen/markdown"
@@ -159,7 +160,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	// Compare with existing types using the typegen package
 	result, err := typegen.CompareDirectories(tempDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to compare directories")
 	}
 
 	if result.UpToDate {
@@ -201,7 +202,7 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := generateForLanguage(lang, packages, usingDefaultPackages); err != nil {
-			return err
+			return errors.Wrapf(err, "failed to generate %s types", lang)
 		}
 	}
 
@@ -289,7 +290,7 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 	// Generate types for all packages
 	results, typeToPackage, err := generateTypesForPackages(packages, gen)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to generate types for packages")
 	}
 
 	// Add cross-package imports (TypeScript-specific)
@@ -301,7 +302,7 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 
 	// Write generated files
 	if err := writeGeneratedOutput(results, outputDir, fileExt, lang); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write generated output")
 	}
 
 	// Generate index file for TypeScript (barrel export)
@@ -507,7 +508,7 @@ func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) 
 			// Format Rust files after writing
 			if lang == "rust" {
 				if err := rust.FormatFile(outputPath); err != nil {
-					return err
+					return errors.Wrapf(err, "failed to format rust file %s", outputPath)
 				}
 			}
 

@@ -124,7 +124,7 @@ func saveUIConfig(config map[string]interface{}, configPath string) error {
 func UpdateLocalInferenceEnabled(enabled bool) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load UI config")
 	}
 
 	// Get or create local_inference section
@@ -146,7 +146,7 @@ func UpdateLocalInferenceEnabled(enabled bool) error {
 func UpdateLocalInferenceModel(model string) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load UI config")
 	}
 
 	// Get or create local_inference section
@@ -168,7 +168,7 @@ func UpdateLocalInferenceModel(model string) error {
 func UpdateLocalInferenceONNXModelPath(path string) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load UI config")
 	}
 
 	// Get or create local_inference section
@@ -190,7 +190,7 @@ func UpdateLocalInferenceONNXModelPath(path string) error {
 func UpdatePulseDailyBudget(dailyBudget float64) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load UI config")
 	}
 
 	// Get or create pulse section
@@ -212,7 +212,7 @@ func UpdatePulseDailyBudget(dailyBudget float64) error {
 func UpdatePulseMonthlyBudget(monthlyBudget float64) error {
 	config, configPath, err := loadOrInitializeUIConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load UI config")
 	}
 
 	// Get or create pulse section

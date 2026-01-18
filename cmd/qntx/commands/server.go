@@ -11,6 +11,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/server"
 )
 
@@ -62,7 +63,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Open and migrate database
 	database, err := openDatabase(dbPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -121,7 +122,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	select {
 	case err := <-errChan:
 		// Server failed to start or stopped unexpectedly
-		return err
+		return errors.Wrap(err, "server failed to start")
 	case <-sigChan:
 		// First Ctrl+C - graceful shutdown
 		pterm.Info.Println("\nShutting down gracefully (press Ctrl+C again to force)...")
