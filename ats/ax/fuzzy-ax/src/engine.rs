@@ -37,11 +37,11 @@ impl RankedMatch {
 /// A match result for RichStringFields search
 #[derive(Debug, Clone)]
 pub struct AttributeMatch {
-    pub node_id: String,       // The ID of the attestation/node
+    pub node_id: String,        // The ID of the attestation/node
     pub field_name: String,     // The name of the matched field
     pub field_value: String,    // The full value of the matched field
     pub excerpt: String,        // An excerpt showing the match in context
-    pub score: f64,            // Match score (higher is better)
+    pub score: f64,             // Match score (higher is better)
     pub strategy: &'static str, // The matching strategy used
 }
 
@@ -186,8 +186,10 @@ impl FuzzyEngine {
             return (Vec::new(), start.elapsed().as_micros() as u64);
         }
 
-        debug!("Finding matches for query: '{}' (type: {:?}, limit: {}, min_score: {})",
-               query, vocabulary_type, limit, min_score);
+        debug!(
+            "Finding matches for query: '{}' (type: {:?}, limit: {}, min_score: {})",
+            query, vocabulary_type, limit, min_score
+        );
 
         // Get the appropriate vocabulary
         let (vocabulary, vocabulary_lower) = match vocabulary_type {
@@ -380,7 +382,9 @@ impl FuzzyEngine {
                 }
 
                 // Apply fuzzy matching
-                if let Some(ranked_match) = self.score_match(&query_lower, &str_value.to_lowercase(), &str_value) {
+                if let Some(ranked_match) =
+                    self.score_match(&query_lower, &str_value.to_lowercase(), &str_value)
+                {
                     let excerpt = self.extract_excerpt(&str_value, query, 150);
 
                     matches.push(AttributeMatch::new(
