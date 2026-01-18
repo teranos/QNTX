@@ -81,7 +81,7 @@ export class FileTreeNavigator {
             const response = await apiFetch(this.config.apiEndpoint);
             const data = await response.json();
             this.fileTree = data || [];
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, `Failed to fetch file tree from ${this.config.apiEndpoint}`, { context: SEG.ERROR, silent: true });
             this.fileTree = [];
         }
@@ -242,7 +242,7 @@ export class FileTreeNavigator {
             if (stored) {
                 this.recentFiles = JSON.parse(stored);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to load recent files', { context: SEG.ERROR, silent: true });
             this.recentFiles = [];
         }
@@ -251,7 +251,7 @@ export class FileTreeNavigator {
     saveRecentFiles(): void {
         try {
             localStorage.setItem(this.config.storageKey, JSON.stringify(this.recentFiles));
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Failed to save recent files', { context: SEG.ERROR, silent: true });
         }
     }

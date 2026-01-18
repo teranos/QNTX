@@ -127,8 +127,8 @@ async function fetchTimeSeriesData(): Promise<boolean> {
         }
         setLoading(container, DATA.LOADING.ERROR);
         return false;
-    } catch (err) {
-        log.warn(SEG.UI, 'Failed to fetch time-series data:', err);
+    } catch (error: unknown) {
+        log.warn(SEG.UI, 'Failed to fetch time-series data:', error);
         timeSeriesData = [];
         setLoading(container, DATA.LOADING.ERROR);
         return false;

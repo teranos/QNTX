@@ -335,7 +335,7 @@ class WebscraperPanel extends BasePanel {
 
             const data = await response.json();
             this.handleScraperResponse(data);
-        } catch (error) {
+        } catch (error: unknown) {
             handleError(error, 'Scraping failed', { context: SEG.INGEST, silent: true });
 
             // Build rich error with helpful suggestions
