@@ -177,12 +177,12 @@
 }
 
 .config-toggle-status.status-success {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
     color: #2e7d32;
 }
 
 .config-toggle-status.status-error {
-    background: #ffebee;
+    background: var(--status-failed-bg);
     color: #c62828;
 }
 

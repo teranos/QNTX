@@ -117,7 +117,7 @@
 
 /* Job-specific badge state colors */
 .job-status-badge.paused {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     color: #f57c00;
 }
 
@@ -189,7 +189,7 @@
 }
 
 .job-action-btn.pause-btn:hover {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
 }
 
 .job-action-btn.resume-btn {
@@ -198,16 +198,16 @@
 }
 
 .job-action-btn.resume-btn:hover {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
 }
 
 .job-action-btn.details-btn {
     border-color: #2196f3;
-    color: #1976d2;
+    color: var(--status-running-text);
 }
 
 .job-action-btn.details-btn:hover {
-    background: #e3f2fd;
+    background: var(--status-running-bg);
 }
 
 .job-action-btn.dismiss-btn {
@@ -216,7 +216,7 @@
 }
 
 .job-action-btn.dismiss-btn:hover {
-    background: #ffebee;
+    background: var(--status-failed-bg);
 }
 
 /* Parent Job Hierarchy */
@@ -465,7 +465,7 @@
 }
 
 .metadata-item.error {
-    background: #ffebee;
+    background: var(--status-failed-bg);
     padding: 6px;
     border-radius: 3px;
     border-left: 3px solid #f44336;

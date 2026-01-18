@@ -52,7 +52,7 @@
 }
 
 .pulse-schedule-badge.active {
-  background: #e8f5e9;
+  background: var(--status-completed-bg);
   color: #2e7d32;
 }
 
@@ -138,9 +138,9 @@
 
 /* Two-click confirmation state for confirm button */
 .pulse-btn-confirm-active {
-  background: #fff3e0;
+  background: var(--status-pending-bg);
   border-color: #ef6c00;
-  color: #e65100;
+  color: var(--status-pending-text);
   min-width: 70px;
 }
 
@@ -151,7 +151,7 @@
 /* Confirmation hint (shows below interval picker) */
 .pulse-confirm-hint {
   font-size: 11px;
-  color: #e65100;
+  color: var(--status-pending-text);
   margin-left: auto;
   font-style: italic;
 }

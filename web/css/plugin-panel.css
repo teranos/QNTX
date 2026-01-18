@@ -138,12 +138,12 @@
 }
 
 .plugin-state-running {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
     color: #2e7d32;
 }
 
 .plugin-state-paused {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     color: #ef6c00;
 }
 
@@ -197,7 +197,7 @@
 }
 
 .plugin-pause-btn {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
     color: #ef6c00;
 }
@@ -207,7 +207,7 @@
 }
 
 .plugin-resume-btn {
-    background: #e8f5e9;
+    background: var(--status-completed-bg);
     border-color: #2e7d32;
     color: #2e7d32;
 }
@@ -389,7 +389,7 @@
 }
 
 .plugin-config-row-changed {
-    background: #e3f2fd;
+    background: var(--status-running-bg);
 }
 
 .plugin-config-row-changed:hover {
@@ -397,7 +397,7 @@
 }
 
 .plugin-config-row-error {
-    background: #ffebee;
+    background: var(--status-failed-bg);
 }
 
 .plugin-config-label {
@@ -410,12 +410,12 @@
 
 .plugin-config-row-changed .plugin-config-label,
 .plugin-config-row-changed .plugin-config-value-old {
-    background: #e3f2fd;
+    background: var(--status-running-bg);
 }
 
 .plugin-config-row-error .plugin-config-label,
 .plugin-config-row-error .plugin-config-value-old {
-    background: #ffebee;
+    background: var(--status-failed-bg);
 }
 
 .plugin-config-required {
@@ -450,11 +450,11 @@
 }
 
 .plugin-config-row-changed .plugin-config-value-cell {
-    background: #e3f2fd;
+    background: var(--status-running-bg);
 }
 
 .plugin-config-row-error .plugin-config-value-cell {
-    background: #ffebee;
+    background: var(--status-failed-bg);
 }
 
 .plugin-config-value-display {
@@ -538,11 +538,11 @@
 
 .plugin-config-warning {
     padding: 10px 12px;
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border: 1px solid #ef6c00;
     border-radius: 4px;
     font-size: 11px;
-    color: #e65100;
+    color: var(--status-pending-text);
     line-height: 1.4;
 }
 
@@ -574,9 +574,9 @@
 }
 
 .panel-btn-warning {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
-    color: #e65100;
+    color: var(--status-pending-text);
 }
 
 .panel-btn-warning:hover:not(:disabled) {
