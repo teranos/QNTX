@@ -181,7 +181,7 @@ class WindowTrayImpl {
             const baselineBoost = maxProximityRaw > this.BASELINE_BOOST_TRIGGER ? this.BASELINE_BOOST_AMOUNT : 0;
 
             dots.forEach((dot, index) => {
-                const { distance, distanceX, distanceY, proximityRaw, isVerticalApproach } = this.calculateProximity(dot);
+                const { proximityRaw, isVerticalApproach } = this.calculateProximity(dot);
 
                 // Apply different easing based on approach direction
                 let proximity: number;
