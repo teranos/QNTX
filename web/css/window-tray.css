@@ -1,0 +1,104 @@
+/**
+ * Window Tray - Hidden dock for minimized windows
+ *
+ * Nearly invisible until hover. Dots indicate minimized windows exist.
+ * Slides out to reveal window items on hover.
+ */
+
+.window-tray {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    pointer-events: auto;
+}
+
+/* Hide when empty */
+.window-tray[data-empty="true"] {
+    pointer-events: none;
+}
+
+/* Dot indicators - visible when not revealed */
+.window-tray-indicators {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    opacity: 0.4;
+    transition: opacity 0.15s ease;
+}
+
+.window-tray:hover .window-tray-indicators {
+    opacity: 0.6;
+}
+
+.window-tray[data-revealed="true"] .window-tray-indicators {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.window-tray-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+}
+
+/* Items container - hidden until revealed */
+.window-tray-items {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.window-tray[data-revealed="true"] .window-tray-items {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Individual tray item */
+.window-tray-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--bg-almost-black);
+    border: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
+}
+
+.window-tray-item:hover {
+    background: #2a2a2a;
+}
+
+.window-tray-item:active {
+    background: #333;
+}
+
+.window-tray-item-title {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .window-tray-indicators,
+    .window-tray-items {
+        transition: none;
+    }
+}

@@ -3,6 +3,8 @@
  * Supports multiple windows with z-index stacking
  */
 
+import { windowTray } from './window-tray';
+
 export interface WindowConfig {
     id: string;
     title: string;
@@ -13,6 +15,8 @@ export interface WindowConfig {
     onClose?: () => void;
     onShow?: () => void;
     onHide?: () => void;
+    onMinimize?: () => void;
+    onRestore?: () => void;
 }
 
 export class Window {
@@ -26,6 +30,10 @@ export class Window {
     private isDragging: boolean = false;
     private dragOffsetX: number = 0;
     private dragOffsetY: number = 0;
+
+    // Minimize state
+    private minimized: boolean = false;
+    private savedPosition: { x: number; y: number } | null = null;
 
     // Global window management
     private static zIndexCounter: number = 9999;
@@ -66,7 +74,10 @@ export class Window {
         win.innerHTML = `
             <div class="draggable-window-header">
                 <span class="draggable-window-title">${this.config.title}</span>
-                <button class="panel-close" aria-label="Close">&times;</button>
+                <div class="draggable-window-controls">
+                    <button class="panel-minimize" aria-label="Minimize">&minus;</button>
+                    <button class="panel-close" aria-label="Close">&times;</button>
+                </div>
             </div>
             <div class="draggable-window-content"></div>
             <div class="draggable-window-footer"></div>
@@ -77,11 +88,12 @@ export class Window {
 
     private setupEventListeners(): void {
         const closeBtn = this.element.querySelector('.panel-close') as HTMLButtonElement;
+        const minimizeBtn = this.element.querySelector('.panel-minimize') as HTMLButtonElement;
 
         // Dragging - mousedown on header
         this.header.addEventListener('mousedown', (e) => {
-            // Ignore if clicking close button
-            if ((e.target as HTMLElement).closest('.panel-close')) return;
+            // Ignore if clicking control buttons
+            if ((e.target as HTMLElement).closest('.draggable-window-controls')) return;
 
             this.isDragging = true;
             const rect = this.element.getBoundingClientRect();
@@ -119,6 +131,11 @@ export class Window {
                 this.config.onClose();
             }
             this.hide();
+        });
+
+        // Minimize button
+        minimizeBtn.addEventListener('click', () => {
+            this.minimize();
         });
     }
 
@@ -221,6 +238,110 @@ export class Window {
     }
 
     /**
+     * Check if window is minimized
+     */
+    public isMinimized(): boolean {
+        return this.minimized;
+    }
+
+    /**
+     * Minimize window to tray with animation
+     */
+    public minimize(): void {
+        if (this.minimized) return;
+
+        // Save current position
+        const rect = this.element.getBoundingClientRect();
+        this.savedPosition = { x: rect.left, y: rect.top };
+
+        // Get tray target for animation
+        const trayTarget = windowTray.getTargetPosition();
+
+        // Animate to tray
+        if (trayTarget) {
+            this.element.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+            const dx = trayTarget.x - (rect.left + rect.width / 2);
+            const dy = trayTarget.y - (rect.top + rect.height / 2);
+            this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+            this.element.style.opacity = '0';
+        }
+
+        // After animation, hide and add to tray
+        setTimeout(() => {
+            this.element.style.transition = '';
+            this.element.style.transform = '';
+            this.element.style.opacity = '';
+            this.element.setAttribute('data-visible', 'false');
+
+            this.minimized = true;
+
+            // Add to tray
+            windowTray.add({
+                id: this.config.id,
+                title: this.config.title,
+                onRestore: () => this.restore(),
+                onClose: () => {
+                    if (this.config.onClose) {
+                        this.config.onClose();
+                    }
+                    this.hide();
+                }
+            });
+
+            if (this.config.onMinimize) {
+                this.config.onMinimize();
+            }
+        }, 200);
+    }
+
+    /**
+     * Restore window from tray with animation
+     */
+    public restore(): void {
+        if (!this.minimized) return;
+
+        // Remove from tray
+        windowTray.remove(this.config.id);
+
+        // Restore position
+        if (this.savedPosition) {
+            this.element.style.left = `${this.savedPosition.x}px`;
+            this.element.style.top = `${this.savedPosition.y}px`;
+        }
+
+        // Prepare for animation - start from tray position
+        const trayTarget = windowTray.getTargetPosition();
+        if (trayTarget && this.savedPosition) {
+            const rect = this.element.getBoundingClientRect();
+            const dx = trayTarget.x - (this.savedPosition.x + rect.width / 2);
+            const dy = trayTarget.y - (this.savedPosition.y + rect.height / 2);
+            this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+            this.element.style.opacity = '0';
+        }
+
+        // Show and animate back
+        this.element.setAttribute('data-visible', 'true');
+
+        // Force reflow
+        void this.element.offsetHeight;
+
+        // Animate to original position
+        this.element.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        this.element.style.transform = '';
+        this.element.style.opacity = '';
+
+        setTimeout(() => {
+            this.element.style.transition = '';
+            this.minimized = false;
+            this.bringToFront();
+
+            if (this.config.onRestore) {
+                this.config.onRestore();
+            }
+        }, 200);
+    }
+
+    /**
      * Bring window to front (highest z-index)
      */
     public bringToFront(): void {
@@ -231,6 +352,10 @@ export class Window {
      * Destroy window and remove from DOM
      */
     public destroy(): void {
+        // Remove from tray if minimized
+        if (this.minimized) {
+            windowTray.remove(this.config.id);
+        }
         if (this.config.onClose) {
             this.config.onClose();
         }
