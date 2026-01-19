@@ -842,7 +842,7 @@ th {
     }
 
     .intro-section p:last-child {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     .build-info-section h2 {
@@ -899,7 +899,7 @@ th {
     }
 
     .toc-title {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     th, td {
@@ -929,7 +929,7 @@ th {
     }
 
     .search-result-snippet {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     .search-result-snippet mark {
@@ -947,7 +947,7 @@ th {
     }
 
     .download-card-desc {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     .download-btn {

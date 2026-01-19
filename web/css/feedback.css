@@ -301,7 +301,7 @@
 }
 
 .att-relation {
-    color: #aaa;
+    color: var(--text-on-dark-secondary);
     font-style: italic;
 }
 
