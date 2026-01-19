@@ -645,7 +645,7 @@ nav.doc-nav a {
 }
 
 .doc-list a:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     text-decoration: none;
     border-color: var(--accent-color);
 }
@@ -742,7 +742,7 @@ th {
     .toc,
     .doc-list a,
     th {
-        background: #242424;
+        background: var(--bg-dark);
     }
 
     .toc {
@@ -750,7 +750,7 @@ th {
     }
 
     .doc-list a {
-        background: #242424;
+        background: var(--bg-dark);
         border-color: var(--text-primary);
     }
 
@@ -764,7 +764,7 @@ th {
     }
 
     .intro-section {
-        background: #242424;
+        background: var(--bg-dark);
         border-left-color: #0077cc;
     }
 
@@ -805,7 +805,7 @@ th {
     }
 
     .quick-link {
-        background: #242424;
+        background: var(--bg-dark);
         border-color: var(--text-primary);
     }
 
@@ -834,7 +834,7 @@ th {
     }
 
     .download-card {
-        background: #242424;
+        background: var(--bg-dark);
         border-color: var(--text-primary);
     }
 
@@ -855,7 +855,7 @@ th {
     }
 
     .release-version {
-        background: #242424;
+        background: var(--bg-dark);
         border-color: var(--text-primary);
     }
 
@@ -889,7 +889,7 @@ th {
     }
 
     .nix-table th {
-        background: #242424;
+        background: var(--bg-dark);
     }
 
     .nix-table code,
