@@ -212,7 +212,8 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing graph...');
     initGraphResize();
 
-    // Initialize window tray (minimized windows dock)
+    // Initialize window tray FIRST (before any windows are created)
+    // This ensures the tray is ready to receive minimized windows
     windowTray.init();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
