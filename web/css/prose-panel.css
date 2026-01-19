@@ -54,7 +54,7 @@
     align-items: center;
     padding: 16px 20px;
     border-bottom: 1px solid #333;
-    background: #2a2a2a;
+    background: var(--bg-dark);
 }
 
 .prose-title {
@@ -198,7 +198,7 @@
 }
 
 #prose-editor .ProseMirror code {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     padding: 2px 4px;
     border-radius: 3px;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
@@ -206,7 +206,7 @@
 }
 
 #prose-editor .ProseMirror pre {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     padding: 12px 16px;
     border-radius: 4px;
     overflow-x: auto;
@@ -269,7 +269,7 @@
 }
 
 #prose-editor .ProseMirror th {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     font-weight: 600;
     text-align: left;
 }

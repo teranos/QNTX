@@ -62,7 +62,7 @@
     max-height: 120px;
     overflow-y: auto;
     background: #0f0f0f;
-    border: 1px solid #2a2a2a;
+    border: 1px solid var(--bg-dark);
     border-radius: 4px;
     padding: 8px 10px;
     font-family: 'Monaco', 'Courier New', monospace;
@@ -75,7 +75,7 @@
 #metamask-warning {
     display: none;
     padding: 12px 16px;
-    background: #2a2a2a;
+    background: var(--bg-dark);
     border: 1px solid #444;
     border-radius: 4px;
     max-width: 400px;
