@@ -43,6 +43,9 @@ export class Window {
     // Animation timing - must match CSS transition duration (0.3s)
     private static readonly ANIMATION_DURATION_MS = 300;
 
+    // LocalStorage key for window state persistence
+    private static readonly STORAGE_KEY = 'qntx_window_state';
+
     constructor(config: WindowConfig) {
         this.config = config;
         this.element = this.createElement();
@@ -53,6 +56,9 @@ export class Window {
         document.body.appendChild(this.element);
         this.setupEventListeners();
         Window.openWindows.add(this);
+
+        // Restore previous session state (position, size, visibility, minimized)
+        this.restoreState();
 
         // Check if this window was previously minimized
         // Call immediately so it can be deferred before windowTray.init() runs
@@ -124,6 +130,8 @@ export class Window {
             if (this.isDragging) {
                 this.isDragging = false;
                 this.header.style.cursor = 'move';
+                // Save position after drag completes
+                this.saveState();
             }
         });
 
@@ -210,6 +218,7 @@ export class Window {
     public show(): void {
         this.element.setAttribute('data-visible', 'true');
         this.bringToFront();
+        this.saveState();
         if (this.config.onShow) {
             this.config.onShow();
         }
@@ -220,6 +229,7 @@ export class Window {
      */
     public hide(): void {
         this.element.setAttribute('data-visible', 'false');
+        this.saveState();
         if (this.config.onHide) {
             this.config.onHide();
         }
@@ -264,6 +274,95 @@ export class Window {
     }
 
     /**
+     * Save window state to localStorage
+     */
+    private saveState(): void {
+        try {
+            const allState = this.loadAllWindowState();
+
+            // Get current position
+            let x: number, y: number;
+            if (!this.isVisible() && this.savedPosition) {
+                // Window is hidden - use savedPosition if available (set during minimize)
+                x = this.savedPosition.x;
+                y = this.savedPosition.y;
+            } else {
+                // Window is visible - use actual bounding rect
+                const rect = this.element.getBoundingClientRect();
+                x = rect.left;
+                y = rect.top;
+            }
+
+            allState[this.config.id] = {
+                x,
+                y,
+                width: this.element.style.width || this.config.width || '400px',
+                visible: this.isVisible(),
+                minimized: this.minimized
+            };
+
+            localStorage.setItem(Window.STORAGE_KEY, JSON.stringify(allState));
+        } catch (error) {
+            console.warn('Failed to save window state:', error);
+        }
+    }
+
+    /**
+     * Restore window state from localStorage on construction
+     */
+    private restoreState(): void {
+        try {
+            const allState = this.loadAllWindowState();
+            const state = allState[this.config.id];
+
+            if (!state) return; // No saved state for this window
+
+            // Always restore position and width (needed even for minimized windows)
+            if (state.x !== undefined && state.y !== undefined) {
+                // Clamp to viewport to handle window resize
+                const clampedX = Math.max(0, Math.min(state.x, window.innerWidth - 100));
+                const clampedY = Math.max(0, Math.min(state.y, window.innerHeight - 50));
+                this.element.style.left = `${clampedX}px`;
+                this.element.style.top = `${clampedY}px`;
+            }
+
+            // Restore width (user preference) but not height (should fit content)
+            if (state.width) this.element.style.width = state.width;
+
+            // Skip visibility restoration if window was minimized - restoreMinimizedState() handles it
+            if (state.minimized) return;
+
+            // Don't restore visibility during page load - it will flash above loading screen
+            // Visibility will be restored after hideLoadingScreen() via finishWindowRestore()
+            // Just store that we should restore it later
+            if (state.visible) {
+                this.element.setAttribute('data-should-restore-visibility', 'true');
+            }
+        } catch (error) {
+            console.warn('Failed to restore window state:', error);
+        }
+    }
+
+    /**
+     * Load all window state from localStorage
+     */
+    private loadAllWindowState(): Record<string, {
+        x: number;
+        y: number;
+        width: string;
+        visible: boolean;
+        minimized: boolean;
+    }> {
+        try {
+            const stored = localStorage.getItem(Window.STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        } catch (error) {
+            console.warn('Failed to load window state:', error);
+            return {};
+        }
+    }
+
+    /**
      * Minimize window to tray with animation
      * @param skipAnimation Skip animation for silent minimize (e.g., restoring from localStorage)
      */
@@ -275,8 +374,18 @@ export class Window {
         this.element.style.transition = '';
 
         // Save current position (after clearing transforms)
+        // For hidden windows (display: none), getBoundingClientRect returns incorrect values
+        // so we need to parse from inline styles instead
         const rect = this.element.getBoundingClientRect();
-        this.savedPosition = { x: rect.left, y: rect.top };
+        if (!this.isVisible()) {
+            // Window is hidden - parse position from inline styles
+            const left = parseFloat(this.element.style.left) || 0;
+            const top = parseFloat(this.element.style.top) || 0;
+            this.savedPosition = { x: left, y: top };
+        } else {
+            // Window is visible - use actual bounding rect
+            this.savedPosition = { x: rect.left, y: rect.top };
+        }
 
         // Get tray target for animation
         const trayTarget = windowTray.getTargetPosition();
@@ -299,6 +408,9 @@ export class Window {
             this.element.setAttribute('data-visible', 'false');
 
             this.minimized = true;
+
+            // Save state to persist minimized status
+            this.saveState();
 
             // Add to tray (skipSave during restore to avoid overwriting localStorage prematurely)
             windowTray.add({
@@ -345,6 +457,7 @@ export class Window {
 
         // Show window first so we can get accurate dimensions
         this.element.setAttribute('data-visible', 'true');
+        this.minimized = false; // Mark as not minimized before animation starts
 
         // Prepare for animation - start from source rect (expanded dot) or tray position
         if (this.savedPosition) {
@@ -385,8 +498,10 @@ export class Window {
         setTimeout(() => {
             this.element.style.transition = '';
             this.element.style.transformOrigin = ''; // Clear transform origin
-            this.minimized = false;
             this.bringToFront();
+
+            // Save state after animation completes and transforms are cleared
+            this.saveState();
 
             if (this.config.onRestore) {
                 this.config.onRestore();
@@ -438,5 +553,18 @@ export class Window {
      */
     public static closeAll(): void {
         Window.openWindows.forEach(win => win.destroy());
+    }
+
+    /**
+     * Finish restoring window visibility after loading screen completes
+     * Called once after hideLoadingScreen() to show windows that should be visible
+     */
+    public static finishWindowRestore(): void {
+        Window.openWindows.forEach(win => {
+            if (win.element.getAttribute('data-should-restore-visibility') === 'true') {
+                win.element.removeAttribute('data-should-restore-visibility');
+                win.element.setAttribute('data-visible', 'true');
+            }
+        });
     }
 }
