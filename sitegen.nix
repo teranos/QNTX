@@ -33,7 +33,7 @@ let
       nativeBuildInputs = [ pkgs.curl pkgs.cacert ];
       outputHashMode = "flat";
       outputHashAlgo = "sha256";
-      outputHash = "sha256-GCi4Y56o9KvQYOTW3j17ad055+I67dPNK5h/1sJ/S8E=";
+      outputHash = "sha256-zGd2tzU1n3Y1ih8IeGRL7kJFM8v4MD24ZEmU+imQXQQ=";
     } ''
     curl -s -L -H "Accept: application/vnd.github+json" \
       "https://api.github.com/repos/${githubRepo}/releases" > $out
@@ -989,6 +989,48 @@ let
   htmlDerivations = map mkHtmlDerivation fileInfos;
 
   # ============================================================================
+  # Sitemap Generation
+  # ============================================================================
+
+  baseUrl = "https://qntx.sbvh.nl";
+
+  # Generate sitemap entries for all HTML pages
+  mkSitemapUrl = { loc, lastmod ? buildDate, changefreq ? "weekly", priority ? "0.6" }:
+    ''
+      <url>
+        <loc>${baseUrl}${loc}</loc>
+        ${lib.optionalString (lastmod != null) "<lastmod>${lastmod}</lastmod>"}
+        <changefreq>${changefreq}</changefreq>
+        <priority>${priority}</priority>
+      </url>'';
+
+  sitemapUrls =
+    # Index page (highest priority)
+    [ (mkSitemapUrl { loc = "/"; priority = "1.0"; changefreq = "daily"; }) ]
+
+    # Special pages
+    ++ [
+      (mkSitemapUrl { loc = "/downloads.html"; priority = "0.9"; changefreq = "daily"; })
+      (mkSitemapUrl { loc = "/infrastructure.html"; priority = "0.7"; })
+      (mkSitemapUrl { loc = "/sitegen.html"; priority = "0.7"; })
+    ]
+
+    # All documentation pages
+    ++ map
+      (fileInfo: mkSitemapUrl {
+        loc = "/${fileInfo.htmlPath}";
+        priority = if fileInfo.depth == 0 then "0.8" else "0.6";
+      })
+      fileInfos;
+
+  sitemapContent = ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    ${lib.concatStringsSep "\n" sitemapUrls}
+    </urlset>
+  '';
+
+  # ============================================================================
   # Build Info
   # ============================================================================
 
@@ -1053,6 +1095,23 @@ let
       name = "qntx-docs-cname";
       text = "qntx.sbvh.nl\n";
       destination = "/CNAME";
+    };
+
+    "sitemap.xml" = pkgs.writeTextFile {
+      name = "qntx-docs-sitemap";
+      text = sitemapContent;
+      destination = "/sitemap.xml";
+    };
+
+    "robots.txt" = pkgs.writeTextFile {
+      name = "qntx-docs-robots";
+      text = ''
+        User-agent: *
+        Allow: /
+
+        Sitemap: ${baseUrl}/sitemap.xml
+      '';
+      destination = "/robots.txt";
     };
   };
 
