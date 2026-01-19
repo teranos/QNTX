@@ -7,23 +7,23 @@
 
     /* Core Colors */
     --text-primary: #333433;
-    --text-secondary: #666766;
-    --text-tertiary: #999a99;
-    --bg-primary: #fdffff;
-    --bg-subtle: #f8f9f8;
-    --bg-hover: #f0f1f0;
-    --bg-dark: #242524;
-    --border-color: #dddedd;
-    --border-light: #e0e1e0;
+    --text-secondary: #656766;
+    --text-tertiary: #989a99;
+    --bg-primary: #fcffff;
+    --bg-subtle: #f7f9f8;
+    --bg-hover: #eff1f0;
+    --bg-dark: #202523;
+    --border-color: #dcdedd;
+    --border-light: #dfe1e0;
     --accent-color: #0067cc;
 
     /* Dark mode colors - for dark backgrounds */
     --bg-almost-black: #1a1b1a; /* Like system drawer */
-    --text-on-dark: #e0e1e0; /* Primary text on dark */
-    --text-on-dark-secondary: #aaabaa; /* Secondary text on dark */
-    --text-on-dark-tertiary: #888988; /* Tertiary text on dark */
-    --text-on-dark-emphasis: #fffffe; /* Headings/emphasis on dark */
-    --border-on-dark: #404140; /* Borders on dark backgrounds */
+    --text-on-dark: #dfe1e0; /* Primary text on dark */
+    --text-on-dark-secondary: #a9abaa; /* Secondary text on dark */
+    --text-on-dark-tertiary: #878988; /* Tertiary text on dark */
+    --text-on-dark-emphasis: #fefffe; /* Headings/emphasis on dark */
+    --border-on-dark: #3f4140; /* Borders on dark backgrounds */
 
     /* Status Colors */
     --color-success: #22c65e;
