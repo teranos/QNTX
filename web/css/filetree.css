@@ -21,7 +21,7 @@
     background: #1e1e1e;
     border: 1px solid #444;
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
     font-size: 13px;
     outline: none;
 }
@@ -70,7 +70,7 @@
 
 .prose-recent-label:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 /* File tree */
@@ -117,7 +117,7 @@
 }
 
 .prose-tree-toggle:hover {
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 .prose-tree-label {
