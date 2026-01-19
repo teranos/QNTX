@@ -108,6 +108,32 @@ class WindowTrayImpl {
             const dots = Array.from(this.indicatorContainer.querySelectorAll('.window-tray-dot')) as HTMLElement[];
             const itemsArray = Array.from(this.items.values());
 
+            // First pass: check if any dot is highly proximate (gives baseline boost to all)
+            let maxProximityRaw = 0;
+            dots.forEach((dot) => {
+                const rect = dot.getBoundingClientRect();
+                let distanceX = 0, distanceY = 0;
+
+                if (this.mouseX < rect.left) {
+                    distanceX = rect.left - this.mouseX;
+                } else if (this.mouseX > rect.right) {
+                    distanceX = this.mouseX - rect.right;
+                }
+
+                if (this.mouseY < rect.top) {
+                    distanceY = rect.top - this.mouseY;
+                } else if (this.mouseY > rect.bottom) {
+                    distanceY = this.mouseY - rect.bottom;
+                }
+
+                const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+                const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
+                maxProximityRaw = Math.max(maxProximityRaw, proximityRaw);
+            });
+
+            // Calculate baseline boost (40% when any dot is highly proximate)
+            const baselineBoost = maxProximityRaw > 0.5 ? 0.4 : 0;
+
             dots.forEach((dot, index) => {
                 // Use current bounding rect so hit zone grows with the element
                 const rect = dot.getBoundingClientRect();
@@ -169,6 +195,9 @@ class WindowTrayImpl {
                         }
                     }
                 }
+
+                // Apply baseline boost when any item is being hovered
+                proximity = Math.min(1.0, proximity + baselineBoost);
 
                 // Interpolate dimensions to match actual tray item size
                 // Start: 8px × 8px square
