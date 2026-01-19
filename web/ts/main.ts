@@ -26,6 +26,7 @@ import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
+import { Window } from './components/window.ts';
 import './ai-provider-window.ts';
 import './command-explorer-panel.ts';
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
@@ -333,11 +334,15 @@ if (document.readyState === 'loading') {
         init();
         // Hide loading screen once app is initialized
         if (window.hideLoadingScreen) window.hideLoadingScreen();
+        // Restore window visibility after loading screen completes
+        Window.finishWindowRestore();
     });
 } else {
     init();
     // Hide loading screen once app is initialized
     if (window.hideLoadingScreen) window.hideLoadingScreen();
+    // Restore window visibility after loading screen completes
+    Window.finishWindowRestore();
 }
 
 // Make this a module
