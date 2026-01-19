@@ -13,7 +13,7 @@
 
     /* Colors */
     --panel-bg: var(--bg-primary);
-    --panel-bg-secondary: var(--bg-subtle);
+    --panel-bg-secondary: var(--bg-almost-white);
     --panel-text-primary: var(--text-primary);
     --panel-text-secondary: var(--text-secondary);
     --panel-text-tertiary: var(--text-tertiary);
