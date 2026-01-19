@@ -185,7 +185,7 @@
 }
 
 .log-logger {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     margin-right: 8px;
 }
 
@@ -194,7 +194,7 @@
 }
 
 .log-fields {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-style: italic;
     margin-left: 8px;
 }

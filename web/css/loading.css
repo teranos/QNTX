@@ -16,7 +16,7 @@
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     animation: fadeInLoader 300ms ease-out;
 }
 
@@ -90,7 +90,7 @@
 
 #metamask-warning .warning-text {
     font-size: 11px;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     line-height: 1.4;
 }
 
