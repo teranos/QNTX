@@ -347,7 +347,51 @@ let
   # Page Template System
   # ============================================================================
 
-  mkHead = { title, prefix, description ? defaultDescription, pagePath ? "" }:
+  # Generate BreadcrumbList JSON-LD from fileInfo
+  mkBreadcrumbJsonLd = fileInfo:
+    let
+      category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+      categoryTitle = if category == null then null else toTitleCase category;
+      documentTitle = toTitleCase fileInfo.name;
+      canonicalUrl = "${baseUrl}/${fileInfo.htmlPath}";
+
+      homeItem = ''
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "${baseUrl}/"
+        }'';
+
+      categoryItem = lib.optionalString (category != null) '',
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "${html.escapeJson categoryTitle}",
+          "item": "${baseUrl}/${category}/"
+        }'';
+
+      # Last item doesn't need "item" URL (it's the current page)
+      docPosition = if category == null then 2 else 3;
+      docItem = '',
+        {
+          "@type": "ListItem",
+          "position": ${toString docPosition},
+          "name": "${html.escapeJson documentTitle}"
+        }'';
+    in
+    ''
+      <!-- BreadcrumbList JSON-LD -->
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [${homeItem}${categoryItem}${docItem}
+        ]
+      }
+      </script>'';
+
+  mkHead = { title, prefix, description ? defaultDescription, pagePath ? "", breadcrumbJsonLd ? "", additionalJsonLd ? "" }:
     let
       canonicalUrl = "${baseUrl}${if pagePath == "" then "/" else "/${pagePath}"}";
     in ''
@@ -386,6 +430,8 @@ let
         "description": "${html.escapeJson description}",
         "url": "${canonicalUrl}",
         "image": "${baseUrl}/qntx.jpg",
+        ${lib.optionalString (provenance.date != null) ''"datePublished": "${provenance.date}",
+        "dateModified": "${provenance.date}",''}
         "publisher": {
           "@type": "Organization",
           "name": "QNTX",
@@ -396,6 +442,8 @@ let
         }
       }
       </script>
+      ${breadcrumbJsonLd}
+      ${additionalJsonLd}
     </head>'';
 
   mkNav = { prefix }: ''
@@ -447,6 +495,7 @@ let
     , scripts ? [ ]
     , description ? defaultDescription
     , pagePath ? ""
+    , additionalJsonLd ? ""
     }:
     let
       scriptTags = lib.concatMapStringsSep "\n"
@@ -454,7 +503,7 @@ let
         scripts;
     in
     ''
-      ${mkHead { inherit title prefix description pagePath; }}
+      ${mkHead { inherit title prefix description pagePath additionalJsonLd; }}
       <body>
       ${lib.optionalString nav (mkNav { inherit prefix; })}
       ${content}
@@ -677,12 +726,48 @@ let
           ${html.codeBlock "nix build github:${githubRepo}"}
         '';
       };
+
+      # SoftwareApplication JSON-LD for downloads page
+      softwareAppJsonLd =
+        let
+          version = if latestRelease != null then latestRelease.tag_name else "latest";
+          releaseDate = if latestRelease != null then lib.substring 0 10 latestRelease.published_at else null;
+        in
+        ''
+        <!-- SoftwareApplication JSON-LD -->
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "QNTX",
+          "description": "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.",
+          "applicationCategory": "DeveloperApplication",
+          "operatingSystem": "Linux, macOS, Windows",
+          "softwareVersion": "${html.escapeJson version}",
+          ${lib.optionalString (releaseDate != null) ''"datePublished": "${releaseDate}",''}
+          "downloadUrl": "https://github.com/${githubRepo}/releases",
+          "installUrl": "https://github.com/${githubRepo}#installation",
+          "releaseNotes": "https://github.com/${githubRepo}/releases",
+          "license": "https://github.com/${githubRepo}/blob/main/LICENSE",
+          "author": {
+            "@type": "Organization",
+            "name": "QNTX",
+            "url": "${baseUrl}"
+          },
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          }
+        }
+        </script>'';
     in
     mkPage {
       title = "QNTX Downloads";
       description = "Download QNTX binaries, Docker images, or install via Nix package manager.";
       pagePath = "downloads.html";
       scripts = [ ];
+      additionalJsonLd = softwareAppJsonLd;
       content = ''
         <h1>Download QNTX</h1>
         ${nixInstallSection}
@@ -875,7 +960,7 @@ let
             [ "<strong>RSS Feed</strong>" "Subscribe to documentation updates via <code>/feed.xml</code> with autodiscovery" ]
             [ "<strong>Sitemap with XSLT</strong>" "Human-readable sitemap at <code>/sitemap.xml</code> with browser-viewable styling" ]
             [ "<strong>Canonical URLs</strong>" "Every page has a canonical URL for proper SEO indexing" ]
-            [ "<strong>JSON-LD</strong>" "Structured data for rich search snippets" ]
+            [ "<strong>JSON-LD</strong>" "TechArticle, BreadcrumbList, and SoftwareApplication schemas for rich search snippets" ]
           ];
         };
       };
@@ -1025,6 +1110,7 @@ let
         if catMeta != null && catMeta.desc != ""
         then "QNTX ${toTitleCase category} - ${catMeta.desc}"
         else "QNTX documentation - ${toTitleCase fileInfo.name}";
+      breadcrumbJsonLd = mkBreadcrumbJsonLd fileInfo;
     in
     pkgs.runCommand "qntx-doc-${fileInfo.name}"
       {
@@ -1034,7 +1120,7 @@ let
         mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
         {
           cat <<'EOF'
-        ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; description = docDescription; pagePath = fileInfo.htmlPath; }}
+        ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; description = docDescription; pagePath = fileInfo.htmlPath; inherit breadcrumbJsonLd; }}
         <body>
         ${mkNav { prefix = fileInfo.prefix; }}
         ${mkBreadcrumb fileInfo}
