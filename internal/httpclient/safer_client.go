@@ -2,12 +2,13 @@ package httpclient
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // SaferClient wraps http.Client with SSRF protection
@@ -33,12 +34,12 @@ func NewSaferClient(timeout time.Duration) *SaferClient {
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		// Enforce max redirects
 		if len(via) >= client.maxRedirects {
-			return fmt.Errorf("stopped after %d redirects", client.maxRedirects)
+			return errors.Newf("stopped after %d redirects", client.maxRedirects)
 		}
 
 		// Validate redirect URL
 		if err := client.validateURL(req.URL); err != nil {
-			return fmt.Errorf("redirect blocked: %w", err)
+			return errors.Wrap(err, "redirect blocked")
 		}
 
 		return nil
@@ -56,19 +57,19 @@ func NewSaferClient(timeout time.Duration) *SaferClient {
 				// Extract host from addr
 				host, _, err := net.SplitHostPort(addr)
 				if err != nil {
-					return nil, fmt.Errorf("invalid address: %w", err)
+					return nil, errors.Wrap(err, "invalid address")
 				}
 
 				// Resolve IP address
 				ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
 				if err != nil {
-					return nil, fmt.Errorf("failed to resolve host %q: %w", host, err)
+					return nil, errors.Wrapf(err, "failed to resolve host %q", host)
 				}
 
 				// Check if any resolved IP is private
 				for _, ip := range ips {
 					if isPrivateIP(ip) {
-						return nil, fmt.Errorf("private IP address blocked: %s", ip)
+						return nil, errors.Newf("private IP address blocked: %s", ip)
 					}
 				}
 
@@ -116,12 +117,12 @@ func NewSaferClientWithOptions(timeout time.Duration, opts SaferClientOptions) *
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		// Enforce max redirects
 		if len(via) >= client.maxRedirects {
-			return fmt.Errorf("stopped after %d redirects", client.maxRedirects)
+			return errors.Newf("stopped after %d redirects", client.maxRedirects)
 		}
 
 		// Validate redirect URL
 		if err := client.validateURL(req.URL); err != nil {
-			return fmt.Errorf("redirect blocked: %w", err)
+			return errors.Wrap(err, "redirect blocked")
 		}
 
 		return nil
@@ -139,19 +140,19 @@ func NewSaferClientWithOptions(timeout time.Duration, opts SaferClientOptions) *
 				// Extract host from addr
 				host, _, err := net.SplitHostPort(addr)
 				if err != nil {
-					return nil, fmt.Errorf("invalid address: %w", err)
+					return nil, errors.Wrap(err, "invalid address")
 				}
 
 				// Resolve IP address
 				ips, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
 				if err != nil {
-					return nil, fmt.Errorf("failed to resolve host: %w", err)
+					return nil, errors.Wrap(err, "failed to resolve host")
 				}
 
 				// Check if any resolved IP is private
 				for _, ip := range ips {
 					if isPrivateIP(ip) {
-						return nil, fmt.Errorf("private IP address blocked: %s", ip)
+						return nil, errors.Newf("private IP address blocked: %s", ip)
 					}
 				}
 
@@ -187,30 +188,30 @@ func (c *SaferClient) validateURL(u *url.URL) error {
 		}
 	}
 	if !allowed {
-		return fmt.Errorf("scheme %q not allowed (allowed: %v)", scheme, c.allowedSchemes)
+		return errors.Newf("scheme %q not allowed (allowed: %v)", scheme, c.allowedSchemes)
 	}
 
 	// Check for suspicious patterns in URL
 	if strings.Contains(u.String(), "@") {
 		// Could be credential injection or URL confusion: http://evil.com@localhost/
-		return fmt.Errorf("URL contains @ character (potential SSRF attempt)")
+		return errors.New("URL contains @ character (potential SSRF attempt)")
 	}
 
 	// Parse hostname
 	hostname := u.Hostname()
 	if hostname == "" {
-		return fmt.Errorf("URL missing hostname")
+		return errors.New("URL missing hostname")
 	}
 
 	// Block localhost variants (only if blocking is enabled)
 	if c.blockPrivateIP {
 		if isLocalhost(hostname) {
-			return fmt.Errorf("localhost access blocked")
+			return errors.New("localhost access blocked")
 		}
 
 		// Block private IPs in hostname (DNS rebinding protection handled by DialContext)
 		if ip := net.ParseIP(hostname); ip != nil && isPrivateIP(ip) {
-			return fmt.Errorf("private IP address blocked: %s", hostname)
+			return errors.Newf("private IP address blocked: %s", hostname)
 		}
 	}
 
@@ -221,7 +222,7 @@ func (c *SaferClient) validateURL(u *url.URL) error {
 func (c *SaferClient) ValidateURL(urlStr string) (*url.URL, error) {
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %w", err)
+		return nil, errors.Wrap(err, "invalid URL")
 	}
 
 	if err := c.validateURL(u); err != nil {
@@ -285,7 +286,7 @@ func (c *SaferClient) Get(urlStr string) (*http.Response, error) {
 // For POST requests, use http.NewRequest() then call Do()
 func (c *SaferClient) Do(req *http.Request) (*http.Response, error) {
 	if err := c.validateURL(req.URL); err != nil {
-		return nil, fmt.Errorf("request blocked by SSRF protection: %w", err)
+		return nil, errors.Wrap(err, "request blocked by SSRF protection")
 	}
 	return c.Client.Do(req)
 }

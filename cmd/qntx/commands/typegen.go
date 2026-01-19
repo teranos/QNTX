@@ -183,7 +183,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return errors.New("types are out of date - run 'qntx typegen' or 'make types' to update")
+	return errors.New("types are out of date - run 'make types' to update")
 }
 
 func runTypegen(cmd *cobra.Command, args []string) error {
