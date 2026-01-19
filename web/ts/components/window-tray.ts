@@ -109,11 +109,18 @@ class WindowTrayImpl {
             const itemsArray = Array.from(this.items.values());
 
             dots.forEach((dot, index) => {
-                const rect = dot.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
+                // Cache the initial position (when dot is 8×8) to prevent flickering
+                // as the element grows and its bounds change
+                if (!dot.dataset.initialCenterX) {
+                    const rect = dot.getBoundingClientRect();
+                    dot.dataset.initialCenterX = String(rect.left + rect.width / 2);
+                    dot.dataset.initialCenterY = String(rect.top + rect.height / 2);
+                }
 
-                // Calculate distance from mouse to dot center
+                const centerX = parseFloat(dot.dataset.initialCenterX);
+                const centerY = parseFloat(dot.dataset.initialCenterY);
+
+                // Calculate distance from mouse to initial dot center
                 const dx = this.mouseX - centerX;
                 const dy = this.mouseY - centerY;
                 const distance = Math.sqrt(dx * dx + dy * dy);
@@ -170,10 +177,9 @@ class WindowTrayImpl {
                     if (!dot.dataset.hasText) {
                         dot.style.display = 'flex';
                         dot.style.alignItems = 'center';
-                        dot.style.justifyContent = 'flex-end'; // Right-align text
+                        dot.style.justifyContent = 'flex-start'; // Left-align text (normal)
                         dot.style.padding = '6px 10px';
                         dot.style.whiteSpace = 'nowrap';
-                        dot.style.textAlign = 'right';
                         dot.textContent = title;
                         dot.dataset.hasText = 'true';
                     }
