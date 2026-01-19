@@ -61,6 +61,8 @@
     box-sizing: border-box;
     /* Re-enable pointer events on dots (parent has none) */
     pointer-events: auto;
+    /* Anchor to right edge - growth expands leftward */
+    margin-left: auto;
 }
 
 /* Items container - hidden until revealed */
