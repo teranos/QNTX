@@ -126,7 +126,18 @@ class WindowTrayImpl {
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
-                const proximity = Math.max(0, 1 - (distance / this.proximityThreshold));
+                const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
+
+                // Apply non-linear easing: 0-80% proximity → 40% morph, 80-100% → remaining 60%
+                // This creates gradual growth far away, dramatic transformation when close
+                let proximity: number;
+                if (proximityRaw < 0.8) {
+                    // First 80% of distance: only morph 40% (0.0 → 0.4)
+                    proximity = (proximityRaw / 0.8) * 0.4;
+                } else {
+                    // Last 20% of distance: morph remaining 60% (0.4 → 1.0)
+                    proximity = 0.4 + ((proximityRaw - 0.8) / 0.2) * 0.6;
+                }
 
                 // Interpolate dimensions to match actual tray item size
                 // Start: 8px × 8px square
