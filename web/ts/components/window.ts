@@ -40,6 +40,9 @@ export class Window {
     private static openWindows: Set<Window> = new Set();
     private static readonly CASCADE_OFFSET = 30; // px offset for cascading windows
 
+    // Animation timing - must match CSS transition duration (0.3s)
+    private static readonly ANIMATION_DURATION_MS = 300;
+
     constructor(config: WindowConfig) {
         this.config = config;
         this.element = this.createElement();
@@ -273,7 +276,8 @@ export class Window {
 
         // Animate to tray
         if (trayTarget) {
-            this.element.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+            const duration = Window.ANIMATION_DURATION_MS / 1000; // Convert to seconds for CSS
+            this.element.style.transition = `transform ${duration}s ease, opacity ${duration}s ease`;
             const dx = trayTarget.x - (rect.left + rect.width / 2);
             const dy = trayTarget.y - (rect.top + rect.height / 2);
             this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
@@ -305,7 +309,7 @@ export class Window {
             if (this.config.onMinimize) {
                 this.config.onMinimize();
             }
-        }, 200);
+        }, Window.ANIMATION_DURATION_MS);
     }
 
     /**
@@ -340,7 +344,8 @@ export class Window {
         void this.element.offsetHeight;
 
         // Animate to original position
-        this.element.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+        const duration = Window.ANIMATION_DURATION_MS / 1000; // Convert to seconds for CSS
+        this.element.style.transition = `transform ${duration}s ease, opacity ${duration}s ease`;
         this.element.style.transform = '';
         this.element.style.opacity = '';
 
@@ -352,7 +357,7 @@ export class Window {
             if (this.config.onRestore) {
                 this.config.onRestore();
             }
-        }, 200);
+        }, Window.ANIMATION_DURATION_MS);
     }
 
     /**
