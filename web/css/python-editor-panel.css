@@ -137,7 +137,7 @@
 }
 
 .python-output-content {
-    background: var(--editor-code-bg, #2a2a2a);
+    background: var(--editor-code-bg, var(--bg-dark));
     padding: 10px;
     border-radius: 4px;
     white-space: pre-wrap;
@@ -223,7 +223,7 @@
 }
 
 .python-error-help code {
-    background: var(--editor-code-bg, #2a2a2a);
+    background: var(--editor-code-bg, var(--bg-dark));
     padding: 2px 6px;
     border-radius: 3px;
 }

@@ -133,7 +133,7 @@
 }
 
 .source-undefined {
-    color: #ddd;
+    color: var(--text-on-dark);
     opacity: 0.3;
 }
 
@@ -311,7 +311,7 @@
 }
 
 .config-panel-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb {

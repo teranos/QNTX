@@ -582,7 +582,7 @@
     margin-top: 12px;
     width: 100%;
     padding: 10px;
-    background: #f0f0f0;
+    background: var(--bg-hover);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 13px;
