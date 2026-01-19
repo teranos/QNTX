@@ -59,7 +59,7 @@
     display: block;
     padding: 4px 8px;
     cursor: pointer;
-    color: #aaa;
+    color: var(--text-on-dark-secondary);
     font-size: 12px;
     border-radius: 3px;
     transition: all 0.2s;
