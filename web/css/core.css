@@ -21,7 +21,7 @@
     --text-on-dark: #e0e0e0; /* Primary text on dark */
     --text-on-dark-secondary: #aaa; /* Secondary text on dark */
     --text-on-dark-tertiary: #888; /* Tertiary text on dark */
-    --border-on-dark: rgba(255, 255, 255, 0.1);
+    --border-on-dark: #333;
 
     /* Status Colors */
     --color-success: #22c55e;
