@@ -347,7 +347,10 @@ let
   # Page Template System
   # ============================================================================
 
-  mkHead = { title, prefix, description ? defaultDescription, pagePath ? "" }: ''
+  mkHead = { title, prefix, description ? defaultDescription, pagePath ? "" }:
+    let
+      canonicalUrl = "${baseUrl}${if pagePath == "" then "/" else "/${pagePath}"}";
+    in ''
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -356,6 +359,7 @@ let
       <title>${html.escape title}</title>
       <meta name="description" content="${html.escape description}">
       <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
+      <link rel="canonical" href="${canonicalUrl}">
       <link rel="stylesheet" href="${prefix}/css/core.css">
       <link rel="stylesheet" href="${prefix}/css/docs.css">
       <link rel="stylesheet" href="${prefix}/css/prism.css">
@@ -363,7 +367,7 @@ let
       <meta property="og:title" content="${html.escape title}">
       <meta property="og:description" content="${html.escape description}">
       <meta property="og:image" content="${baseUrl}/qntx.jpg">
-      <meta property="og:url" content="${baseUrl}${if pagePath == "" then "/" else "/${pagePath}"}">
+      <meta property="og:url" content="${canonicalUrl}">
       <meta property="og:type" content="website">
       <meta property="og:site_name" content="QNTX">
       <!-- Twitter Card -->
@@ -373,6 +377,25 @@ let
       <meta name="twitter:image" content="${baseUrl}/qntx.jpg">
       <!-- RSS Feed -->
       <link rel="alternate" type="application/rss+xml" title="QNTX Documentation" href="${baseUrl}/feed.xml">
+      <!-- JSON-LD Structured Data -->
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "${html.escapeJson title}",
+        "description": "${html.escapeJson description}",
+        "url": "${canonicalUrl}",
+        "image": "${baseUrl}/qntx.jpg",
+        "publisher": {
+          "@type": "Organization",
+          "name": "QNTX",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "${baseUrl}/qntx.jpg"
+          }
+        }
+      }
+      </script>
     </head>'';
 
   mkNav = { prefix }: ''
@@ -772,6 +795,8 @@ let
         { path = "sitegen.html"; desc = "This page"; }
         { path = "build-info.json"; desc = "Provenance metadata"; }
         { path = "feed.xml"; desc = "RSS feed"; }
+        { path = "sitemap.xml"; desc = "XML sitemap"; }
+        { path = "sitemap.xsl"; desc = "Sitemap stylesheet"; }
         { path = "qntx.jpg"; desc = "Logo"; }
       ];
 
@@ -848,6 +873,9 @@ let
             [ "<strong>Incremental Builds</strong>" "Each markdown file is a separate derivation for faster rebuilds" ]
             [ "<strong>OpenGraph &amp; Twitter Cards</strong>" "Social media preview cards with per-page titles, descriptions, and images" ]
             [ "<strong>RSS Feed</strong>" "Subscribe to documentation updates via <code>/feed.xml</code> with autodiscovery" ]
+            [ "<strong>Sitemap with XSLT</strong>" "Human-readable sitemap at <code>/sitemap.xml</code> with browser-viewable styling" ]
+            [ "<strong>Canonical URLs</strong>" "Every page has a canonical URL for proper SEO indexing" ]
+            [ "<strong>JSON-LD</strong>" "Structured data for rich search snippets" ]
           ];
         };
       };
@@ -1084,9 +1112,60 @@ let
 
   sitemapContent = ''
     <?xml version="1.0" encoding="UTF-8"?>
+    <?xml-stylesheet type="text/xsl" href="sitemap.xsl"?>
     <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     ${lib.concatStringsSep "\n" sitemapUrls}
     </urlset>
+  '';
+
+  # XSLT stylesheet for human-readable sitemap viewing in browsers
+  sitemapXslContent = ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:sitemap="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <xsl:output method="html" encoding="UTF-8"/>
+      <xsl:template match="/">
+        <html>
+          <head>
+            <title>QNTX Sitemap</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px auto; max-width: 900px; padding: 0 20px; background: #1e1e1e; color: #e0e0e0; }
+              h1 { color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; }
+              p { color: #aaa; margin-bottom: 20px; }
+              table { width: 100%; border-collapse: collapse; }
+              th { text-align: left; padding: 12px; background: #252525; color: #fff; border-bottom: 2px solid #333; }
+              td { padding: 10px 12px; border-bottom: 1px solid #333; }
+              tr:hover td { background: #2a2a2a; }
+              a { color: #66b3ff; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+              .priority { color: #888; }
+              .changefreq { color: #888; }
+              .lastmod { color: #888; }
+            </style>
+          </head>
+          <body>
+            <h1>QNTX Sitemap</h1>
+            <p>This sitemap contains <xsl:value-of select="count(sitemap:urlset/sitemap:url)"/> URLs.</p>
+            <table>
+              <tr>
+                <th>URL</th>
+                <th>Priority</th>
+                <th>Change Freq</th>
+                <th>Last Modified</th>
+              </tr>
+              <xsl:for-each select="sitemap:urlset/sitemap:url">
+                <xsl:sort select="sitemap:priority" order="descending"/>
+                <tr>
+                  <td><a href="{sitemap:loc}"><xsl:value-of select="sitemap:loc"/></a></td>
+                  <td class="priority"><xsl:value-of select="sitemap:priority"/></td>
+                  <td class="changefreq"><xsl:value-of select="sitemap:changefreq"/></td>
+                  <td class="lastmod"><xsl:value-of select="sitemap:lastmod"/></td>
+                </tr>
+              </xsl:for-each>
+            </table>
+          </body>
+        </html>
+      </xsl:template>
+    </xsl:stylesheet>
   '';
 
   # ============================================================================
@@ -1233,6 +1312,12 @@ let
       name = "qntx-docs-sitemap";
       text = sitemapContent;
       destination = "/sitemap.xml";
+    };
+
+    "sitemap.xsl" = pkgs.writeTextFile {
+      name = "qntx-docs-sitemap-xsl";
+      text = sitemapXslContent;
+      destination = "/sitemap.xsl";
     };
 
     "feed.xml" = pkgs.writeTextFile {
