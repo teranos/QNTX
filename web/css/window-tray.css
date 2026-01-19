@@ -51,8 +51,8 @@
     font-family: var(--font-mono);
     font-size: 11px;
     cursor: pointer;
-    /* Smooth transitions handled by JavaScript proximity morphing */
-    transition: none;
+    /* Smooth transition when returning to dot state */
+    transition: all 0.2s ease-out;
     box-sizing: border-box;
     /* Re-enable pointer events on dots (parent has none) */
     pointer-events: auto;
