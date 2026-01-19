@@ -16,6 +16,13 @@
     --border-light: #e0e0e0;
     --accent-color: #0066cc;
 
+    /* Dark mode colors - for dark backgrounds */
+    --bg-almost-black: #1a1a1a; /* Like system drawer */
+    --text-on-dark: #ddd; /* Primary text on dark */
+    --text-on-dark-secondary: #aaa; /* Secondary text on dark */
+    --text-on-dark-tertiary: #888; /* Tertiary text on dark */
+    --border-on-dark: rgba(255, 255, 255, 0.1);
+
     /* Status Colors */
     --color-success: #22c55e;
     --color-error: #ef4444;
