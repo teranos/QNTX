@@ -570,7 +570,7 @@ nav.doc-nav a {
 }
 
 .file-size {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-size: 0.85em;
     margin-left: 4px;
 }
@@ -593,12 +593,12 @@ nav.doc-nav a {
 
 .provenance {
     font-size: 0.8em;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     text-align: center;
 }
 
 .provenance a {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-family: var(--font-mono, monospace);
 }
 
@@ -859,7 +859,7 @@ th {
     }
 
     .download-section.quick-download h2 {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .download-section.quick-download .download-link {
@@ -925,7 +925,7 @@ th {
     }
 
     .search-result-category {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .search-result-snippet {
@@ -938,7 +938,7 @@ th {
     }
 
     .search-no-results {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .download-card {
@@ -972,7 +972,7 @@ th {
     }
 
     .release-date {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .file-size {
@@ -980,7 +980,7 @@ th {
     }
 
     .loading {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .site-footer {
