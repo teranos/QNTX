@@ -89,6 +89,66 @@ nav.doc-nav a {
     margin-right: 8px;
 }
 
+/* Page Header - Breadcrumb + Edit link */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.breadcrumb {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.breadcrumb a {
+    color: var(--text-secondary);
+}
+
+.breadcrumb a:hover {
+    color: var(--accent-color);
+}
+
+.breadcrumb-sep {
+    margin: 0 6px;
+    color: var(--text-tertiary);
+}
+
+.breadcrumb-category {
+    color: var(--text-secondary);
+}
+
+.breadcrumb-current {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.edit-link {
+    font-size: 0.8em;
+    color: var(--text-tertiary);
+    padding: 4px 8px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.edit-link:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    text-decoration: none;
+}
+
+@media (max-width: 640px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
 /* Table of Contents */
 .toc {
     background: var(--bg-subtle);
