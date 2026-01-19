@@ -128,7 +128,7 @@
 
 /* Variants */
 .qntx-btn-default {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-color: #d0d0d0;
     color: var(--text-primary);
 }

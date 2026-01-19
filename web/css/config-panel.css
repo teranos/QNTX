@@ -92,7 +92,7 @@
 }
 
 .config-setting:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
 }
 
 .config-setting:last-child {
@@ -203,7 +203,7 @@
 }
 
 .config-save-btn {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     color: var(--text-primary);
 }
 
@@ -237,7 +237,7 @@
 }
 
 .config-cancel-btn:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     color: var(--text-primary);
 }
 
