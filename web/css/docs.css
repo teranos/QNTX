@@ -74,7 +74,7 @@ a:hover {
 nav.doc-nav {
     margin-bottom: 2em;
     padding: 12px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-radius: 4px;
 }
 
@@ -91,7 +91,7 @@ nav.doc-nav a {
 
 /* Table of Contents */
 .toc {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
     border-radius: 4px;
     padding: 16px 24px;
@@ -164,7 +164,7 @@ nav.doc-nav a {
 .intro-section {
     margin: 1em 0 1.5em 0;
     padding: 12px 16px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-left: 3px solid var(--accent-color);
     border-radius: 3px;
 }
@@ -228,7 +228,7 @@ nav.doc-nav a {
 .quick-link {
     display: inline-block;
     padding: 6px 12px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border: 1px solid var(--border-color);
     border-radius: 3px;
     color: var(--accent-color);
@@ -276,7 +276,7 @@ nav.doc-nav a {
 .search-result {
     padding: 12px 16px;
     margin: 8px 0;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-radius: 4px;
     display: block;
     text-decoration: none;
@@ -332,7 +332,7 @@ nav.doc-nav a {
 .download-section.quick-download {
     margin: 0.75em 0 1.5em 0;
     padding: 10px 12px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-radius: 4px;
     border: 1px solid var(--border-color);
 }
@@ -405,7 +405,7 @@ nav.doc-nav a {
 }
 
 .download-section.quick-download .download-link:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-color: var(--accent-color);
 }
 
@@ -428,7 +428,7 @@ nav.doc-nav a {
 }
 
 .download-card {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
     border-radius: 8px;
     padding: 20px;
@@ -515,7 +515,7 @@ nav.doc-nav a {
 
 /* Release Version Cards - Compact */
 .release-version {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
     border-radius: 4px;
     padding: 12px 16px;
@@ -621,7 +621,7 @@ nav.doc-nav a {
 }
 
 .nix-table th {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     font-weight: 600;
 }
 
@@ -708,7 +708,7 @@ nav.doc-nav a {
 .doc-list a {
     display: block;
     padding: 10px 12px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-radius: 4px;
     border: 1px solid var(--border-light);
     transition: all 0.1s;
@@ -761,7 +761,7 @@ th, td {
 }
 
 th {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     font-weight: 600;
 }
 

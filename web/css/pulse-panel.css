@@ -105,7 +105,7 @@
 }
 
 .pulse-btn:hover {
-  background: var(--bg-subtle);
+  background: var(--bg-almost-white);
 }
 
 .pulse-btn-pause:hover,
@@ -160,7 +160,7 @@
 }
 
 .child-header:hover {
-  background: var(--bg-subtle);
+  background: var(--bg-almost-white);
   border-radius: 2px;
 }
 
@@ -262,7 +262,7 @@
 
 .task-log-entry {
   padding: 6px 8px;
-  background: var(--bg-subtle);
+  background: var(--bg-almost-white);
   border-radius: 3px;
 }
 
@@ -491,7 +491,7 @@
 .pulse-error-details-content {
     margin-top: 8px;
     padding: 8px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-radius: 4px;
     font-size: 11px;
     font-family: 'SF Mono', Monaco, 'Courier New', monospace;

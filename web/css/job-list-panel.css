@@ -179,7 +179,7 @@
 }
 
 .job-action-btn:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-color: var(--text-tertiary);
 }
 
@@ -230,7 +230,7 @@
 }
 
 .job-header.clickable:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-radius: 4px;
     margin: -4px;
     padding: 4px;
@@ -348,7 +348,7 @@
 }
 
 .new-ix-btn:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-color: var(--text-primary);
     border-style: solid;
 }
@@ -437,7 +437,7 @@
 .job-expanded-details {
     margin-top: 12px;
     padding: 12px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
     border-radius: 4px;
 }
