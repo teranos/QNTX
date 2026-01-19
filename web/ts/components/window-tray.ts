@@ -50,6 +50,7 @@ class WindowTrayImpl {
     private mouseX: number = 0;
     private mouseY: number = 0;
     private proximityRAF: number | null = null;
+    private isRestoring: boolean = false; // Disable proximity morphing during restore
 
     /**
      * Initialize the tray and attach to DOM
@@ -107,7 +108,7 @@ class WindowTrayImpl {
         }
 
         this.proximityRAF = requestAnimationFrame(() => {
-            if (!this.indicatorContainer) return;
+            if (!this.indicatorContainer || this.isRestoring) return;
 
             const dots = Array.from(this.indicatorContainer.querySelectorAll('.window-tray-dot')) as HTMLElement[];
             const itemsArray = Array.from(this.items.values());
@@ -228,9 +229,17 @@ class WindowTrayImpl {
                 // End: --bg-almost-black (#1a1a1a = rgb(26,26,26))
                 const startR = 153, startG = 153, startB = 153;
                 const endR = 26, endG = 26, endB = 26;
-                const r = Math.round(startR + (endR - startR) * proximity);
-                const g = Math.round(startG + (endG - startG) * proximity);
-                const b = Math.round(startB + (endB - startB) * proximity);
+                let r = Math.round(startR + (endR - startR) * proximity);
+                let g = Math.round(startG + (endG - startG) * proximity);
+                let b = Math.round(startB + (endB - startB) * proximity);
+
+                // Brighten on hover (10% lighter)
+                const isHovered = dot.matches(':hover');
+                if (isHovered) {
+                    r = Math.min(255, Math.round(r + (255 - r) * 0.1));
+                    g = Math.min(255, Math.round(g + (255 - g) * 0.1));
+                    b = Math.min(255, Math.round(b + (255 - b) * 0.1));
+                }
 
                 // Apply morphing styles
                 dot.style.width = `${width}px`;
@@ -391,7 +400,43 @@ class WindowTrayImpl {
             // Restore window on click
             dot.addEventListener('click', (e) => {
                 e.stopPropagation();
+
+                // Disable proximity morphing - let CSS transition handle the collapse
+                this.isRestoring = true;
+
+                // Start window restore immediately (animates from tray position)
                 item.onRestore();
+
+                // Collapse other dots, but keep clicked dot visible briefly
+                const allDots = this.indicatorContainer!.querySelectorAll('.window-tray-dot');
+                allDots.forEach((d) => {
+                    const htmlDot = d as HTMLElement;
+
+                    if (htmlDot === dot) {
+                        // Clicked dot: fade out as window grows
+                        htmlDot.style.transition = 'opacity 0.15s ease-out';
+                        htmlDot.style.opacity = '0';
+                    } else {
+                        // Other dots: collapse back to square
+                        htmlDot.style.width = '';
+                        htmlDot.style.height = '';
+                        htmlDot.style.borderRadius = '';
+                        htmlDot.style.backgroundColor = '';
+                        htmlDot.style.opacity = '';
+                        htmlDot.style.display = '';
+                        htmlDot.style.alignItems = '';
+                        htmlDot.style.justifyContent = '';
+                        htmlDot.style.padding = '';
+                        htmlDot.style.whiteSpace = '';
+                        htmlDot.textContent = '';
+                        delete htmlDot.dataset.hasText;
+                    }
+                });
+
+                // Re-enable proximity after animation
+                setTimeout(() => {
+                    this.isRestoring = false;
+                }, 300);
             });
 
             this.indicatorContainer!.appendChild(dot);

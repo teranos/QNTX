@@ -60,6 +60,10 @@
     margin-left: auto;
 }
 
+.window-tray-dot:hover {
+    background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
+}
+
 /* Items container - unused (proximity morphing replaced reveal behavior) */
 .window-tray-items {
     display: none;
