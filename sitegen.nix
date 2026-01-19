@@ -3,6 +3,7 @@
 , gitShortRev ? "unknown"
 , gitTag ? null
 , buildDate ? null
+, gitCommitDate ? null
 , ciUser ? null
 , ciPipeline ? null
 , ciRunId ? null
@@ -992,10 +993,31 @@ let
   # Sitemap Generation
   # ============================================================================
 
-  baseUrl = "https://qntx.sbvh.nl";
+  # Derive base URL from CNAME content (single source of truth)
+  cnameContent = "qntx.sbvh.nl";
+  baseUrl = "https://${cnameContent}";
+
+  # Convert Unix timestamp to YYYY-MM-DD
+  timestampToDate = ts:
+    let
+      days = ts / 86400;
+      # Years since 1970 (accounting for leap years approximately)
+      year = 1970 + (days / 365);
+      remainingDays = lib.mod days 365;
+      month = 1 + (remainingDays / 30);
+      day = 1 + (lib.mod remainingDays 30);
+      pad = n: if n < 10 then "0${toString n}" else toString n;
+    in
+    "${toString year}-${pad month}-${pad day}";
+
+  # Fallback lastmod: buildDate (CI) or gitCommitDate converted to YYYY-MM-DD (local builds)
+  sitemapLastmod =
+    if buildDate != null then buildDate
+    else if gitCommitDate != null then timestampToDate gitCommitDate
+    else null;
 
   # Generate sitemap entries for all HTML pages
-  mkSitemapUrl = { loc, lastmod ? buildDate, changefreq ? "weekly", priority ? "0.6" }:
+  mkSitemapUrl = { loc, lastmod ? sitemapLastmod, changefreq ? "weekly", priority ? "0.6" }:
     ''
       <url>
         <loc>${baseUrl}${loc}</loc>
@@ -1093,7 +1115,7 @@ let
 
     "CNAME" = pkgs.writeTextFile {
       name = "qntx-docs-cname";
-      text = "qntx.sbvh.nl\n";
+      text = "${cnameContent}\n";
       destination = "/CNAME";
     };
 
