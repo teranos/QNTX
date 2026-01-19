@@ -9,7 +9,7 @@
     position: absolute;
     bottom: 16px;
     right: 16px;
-    z-index: 100;
+    z-index: 100001; /* Above system drawer (100000) */
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -22,17 +22,16 @@
     pointer-events: none;
 }
 
-/* Dot indicators - visible when not revealed */
+/* Square indicators - visible when not revealed */
 .window-tray-indicators {
     display: flex;
     gap: 4px;
     padding: 4px;
-    opacity: 0.4;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.2s ease;
 }
 
 .window-tray:hover .window-tray-indicators {
-    opacity: 0.6;
+    opacity: 1;
 }
 
 .window-tray[data-revealed="true"] .window-tray-indicators {
@@ -41,10 +40,19 @@
 }
 
 .window-tray-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--text-tertiary);
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-on-dark);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.window-tray:hover .window-tray-dot {
+    width: 12px;
+    height: 12px;
+    background: var(--bg-hover);
+    border-color: var(--border-color);
 }
 
 /* Items container - hidden until revealed */
@@ -82,11 +90,11 @@
 }
 
 .window-tray-item:hover {
-    background: #2a2a2a;
+    background: var(--bg-dark);
 }
 
 .window-tray-item:active {
-    background: #333;
+    background: var(--border-on-dark);
 }
 
 .window-tray-item-title {

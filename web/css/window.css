@@ -69,13 +69,13 @@
 }
 
 .panel-minimize:hover {
-    background: #f0f0f0;
-    color: #000;
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .panel-minimize:active {
-    background: #e0e0e0;
-    color: #000;
+    background: var(--bg-subtle);
+    color: var(--text-primary);
 }
 
 .panel-minimize:focus-visible {
