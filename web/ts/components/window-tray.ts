@@ -139,16 +139,35 @@ class WindowTrayImpl {
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
                 const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
 
-                // Snap to 100% when 90% close to prevent flickering/micro-adjustments
+                // Apply different easing based on approach direction
                 let proximity: number;
+
+                // Snap to 100% when 90% close to prevent flickering
                 if (proximityRaw >= 0.9) {
                     proximity = 1.0;
-                } else if (proximityRaw < 0.8) {
-                    // First 80% of distance: only morph 40% (0.0 → 0.4)
-                    proximity = (proximityRaw / 0.8) * 0.4;
                 } else {
-                    // 80-90% of distance: morph remaining 60% (0.4 → 1.0)
-                    proximity = 0.4 + ((proximityRaw - 0.8) / 0.1) * 0.6;
+                    // Check if vertical or horizontal approach dominates
+                    const isVerticalApproach = distanceY > distanceX;
+
+                    if (isVerticalApproach) {
+                        // VERTICAL: Inverted easing - fast early growth, slow refinement
+                        // 55% proximity → 80% transformed
+                        // Remaining 45% → last 20% transform
+                        if (proximityRaw < 0.55) {
+                            proximity = (proximityRaw / 0.55) * 0.8;
+                        } else {
+                            proximity = 0.8 + ((proximityRaw - 0.55) / 0.35) * 0.2;
+                        }
+                    } else {
+                        // HORIZONTAL: Original easing - gradual growth, dramatic finish
+                        // 80% proximity → 40% transformed
+                        // Last 10% → remaining 60%
+                        if (proximityRaw < 0.8) {
+                            proximity = (proximityRaw / 0.8) * 0.4;
+                        } else {
+                            proximity = 0.4 + ((proximityRaw - 0.8) / 0.1) * 0.6;
+                        }
+                    }
                 }
 
                 // Interpolate dimensions to match actual tray item size
