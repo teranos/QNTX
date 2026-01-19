@@ -39,7 +39,7 @@
 /* Hover state - subtle background change, no scaling */
 .panel-close:hover,
 .toast-close:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     color: #000;
     transform: none; /* Explicitly prevent any scaling */
 }
