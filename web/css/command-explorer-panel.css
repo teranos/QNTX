@@ -47,7 +47,7 @@
     justify-content: space-between;
     padding: var(--panel-padding-md);
     background: #f8f8f8;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .command-explorer-title {
@@ -166,7 +166,7 @@
 /* Item Details */
 .filter-item-label {
     font-size: 12px;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 4px;
     font-weight: 500;
 }
