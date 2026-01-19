@@ -239,7 +239,7 @@
 }
 
 .provider-btn.active .provider-detail {
-    color: #aaa;
+    color: var(--text-on-dark-secondary);
 }
 
 .ollama-model-selector {

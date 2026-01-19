@@ -7,7 +7,7 @@
     --editor-border: #3e3e42;
     --editor-text: #cccccc;
     --editor-text-muted: #858585;
-    --editor-code-bg: #2a2a2a;
+    --editor-code-bg: var(--bg-dark);
 
     /* Status colors */
     --status-neutral: #858585;

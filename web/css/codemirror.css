@@ -11,7 +11,7 @@
 #codemirror-container .cm-editor {
     height: 100%;
     background: transparent;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 #codemirror-container .cm-scroller {
@@ -31,7 +31,7 @@
 /* Line numbers */
 #codemirror-container .cm-gutters {
     background: transparent;
-    border-right: 1px solid #333;
+    border-right: 1px solid var(--border-on-dark);
     color: #555;
     padding-right: 8px;
 }
@@ -57,8 +57,8 @@
 
 /* Completion popup */
 .cm-tooltip-autocomplete {
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }

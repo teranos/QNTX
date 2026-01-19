@@ -203,7 +203,7 @@ body.disconnected #connection-status {
 .reveal-related {
     font-size: 12px;
     cursor: pointer;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     transition: color 0.2s ease;
     padding: 0 2px;
 }
@@ -224,7 +224,7 @@ body.disconnected #connection-status {
 
 .legenda-count {
     font-size: 9px;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     margin-left: auto;
     padding: 1px 4px;
     background: rgba(0, 0, 0, 0.05);

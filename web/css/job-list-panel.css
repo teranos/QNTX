@@ -355,7 +355,7 @@
 
 /* LLM Streaming Output */
 .llm-stream-output {
-    background: #1e1e1e;
+    background: var(--bg-dark);
     border: 1px solid #3d3d3d;
     border-radius: 4px;
     margin-top: 8px;
@@ -421,7 +421,7 @@
 }
 
 .stream-content::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .stream-content::-webkit-scrollbar-thumb {
