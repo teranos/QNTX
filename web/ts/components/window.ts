@@ -50,6 +50,9 @@ export class Window {
         document.body.appendChild(this.element);
         this.setupEventListeners();
         Window.openWindows.add(this);
+
+        // Check if this window was previously minimized
+        this.restoreMinimizedState();
     }
 
     private createElement(): HTMLElement {
@@ -242,6 +245,17 @@ export class Window {
      */
     public isMinimized(): boolean {
         return this.minimized;
+    }
+
+    /**
+     * Restore minimized state from localStorage on window creation
+     */
+    private restoreMinimizedState(): void {
+        const minimizedIds = windowTray.loadState();
+        if (minimizedIds.includes(this.config.id)) {
+            // Window was minimized in previous session - minimize it silently
+            this.minimize();
+        }
     }
 
     /**
