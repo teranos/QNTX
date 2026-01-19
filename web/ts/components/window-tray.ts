@@ -23,7 +23,7 @@ class WindowTrayImpl {
     private mouseX: number = 0;
     private mouseY: number = 0;
     private proximityRAF: number | null = null;
-    private proximityThreshold: number = 150; // Max distance for morphing effect (px)
+    private proximityThreshold: number = 50; // Max distance for morphing effect (px) - reduced for subtlety
 
     /**
      * Initialize the tray and attach to DOM
