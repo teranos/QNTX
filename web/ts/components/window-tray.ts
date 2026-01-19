@@ -121,15 +121,16 @@ class WindowTrayImpl {
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
                 const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
 
-                // Apply non-linear easing: 0-80% proximity → 40% morph, 80-100% → remaining 60%
-                // This creates gradual growth far away, dramatic transformation when close
+                // Snap to 100% when 90% close to prevent flickering/micro-adjustments
                 let proximity: number;
-                if (proximityRaw < 0.8) {
+                if (proximityRaw >= 0.9) {
+                    proximity = 1.0;
+                } else if (proximityRaw < 0.8) {
                     // First 80% of distance: only morph 40% (0.0 → 0.4)
                     proximity = (proximityRaw / 0.8) * 0.4;
                 } else {
-                    // Last 20% of distance: morph remaining 60% (0.4 → 1.0)
-                    proximity = 0.4 + ((proximityRaw - 0.8) / 0.2) * 0.6;
+                    // 80-90% of distance: morph remaining 60% (0.4 → 1.0)
+                    proximity = 0.4 + ((proximityRaw - 0.8) / 0.1) * 0.6;
                 }
 
                 // Interpolate dimensions to match actual tray item size
@@ -169,9 +170,10 @@ class WindowTrayImpl {
                     if (!dot.dataset.hasText) {
                         dot.style.display = 'flex';
                         dot.style.alignItems = 'center';
-                        dot.style.justifyContent = 'center';
+                        dot.style.justifyContent = 'flex-end'; // Right-align text
                         dot.style.padding = '6px 10px';
                         dot.style.whiteSpace = 'nowrap';
+                        dot.style.textAlign = 'right';
                         dot.textContent = title;
                         dot.dataset.hasText = 'true';
                     }
@@ -186,6 +188,7 @@ class WindowTrayImpl {
                         dot.style.justifyContent = '';
                         dot.style.padding = '';
                         dot.style.whiteSpace = '';
+                        dot.style.textAlign = '';
                         delete dot.dataset.hasText;
                     }
                     dot.style.opacity = '1';
