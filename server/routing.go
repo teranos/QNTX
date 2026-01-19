@@ -74,6 +74,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins/{name}/config", s.corsMiddleware(s.HandlePluginConfig)) // Plugin configuration (GET/PUT)
 	http.HandleFunc("/api/plugins/", s.corsMiddleware(s.HandlePluginAction))              // Plugin actions: pause/resume (POST)
 	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                    // List installed plugins (GET)
+	http.HandleFunc("/api/prompt/", s.corsMiddleware(s.HandlePrompt))                     // Prompt editor endpoints (preview/execute)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 

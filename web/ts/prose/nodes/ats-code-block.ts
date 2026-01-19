@@ -10,6 +10,8 @@ import type { EditorView as PMEditorView } from 'prosemirror-view';
 import { createSchedulingControls } from '../../pulse/scheduling-controls';
 import type { ScheduledJobResponse } from '../../pulse/types';
 import { getScheduledJob } from '../../pulse/api';
+import { hasPromptAction, openPromptFromAtsCode } from '../../prompt-editor-window';
+import { SO } from '@generated/sym.js';
 
 export class ATSCodeBlockNodeView {
     dom: HTMLElement;
@@ -17,6 +19,7 @@ export class ATSCodeBlockNodeView {
     private cmView: EditorView;
     private updating: boolean = false;
     private schedulingControls: HTMLElement | null = null;
+    private promptInspectBtn: HTMLElement | null = null;
     private documentPath: string;
 
     constructor(
@@ -79,6 +82,55 @@ export class ATSCodeBlockNodeView {
 
         // Add Pulse scheduling controls below CodeMirror editor
         this.renderSchedulingControls();
+
+        // Add prompt inspect button if code contains "so prompt"
+        this.renderPromptInspectButton();
+    }
+
+    /**
+     * Check if ATS code contains a prompt action and render inspect button
+     */
+    private renderPromptInspectButton(): void {
+        // Remove existing button if present
+        if (this.promptInspectBtn) {
+            this.promptInspectBtn.remove();
+            this.promptInspectBtn = null;
+        }
+
+        const atsCode = this.cmView.state.doc.toString();
+
+        // Only show button if code contains "so prompt"
+        if (!hasPromptAction(atsCode)) {
+            return;
+        }
+
+        // Create inspect button container
+        this.promptInspectBtn = document.createElement('div');
+        this.promptInspectBtn.className = 'ats-prompt-inspect';
+
+        const btn = document.createElement('button');
+        btn.className = 'ats-prompt-inspect-btn';
+        btn.title = 'Open in Prompt Editor';
+
+        const icon = document.createElement('span');
+        icon.className = 'prompt-inspect-icon';
+        icon.textContent = SO;
+
+        const text = document.createElement('span');
+        text.className = 'prompt-inspect-text';
+        text.textContent = 'Inspect Prompt';
+
+        btn.appendChild(icon);
+        btn.appendChild(text);
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentCode = this.cmView.state.doc.toString();
+            openPromptFromAtsCode(currentCode);
+        });
+
+        this.promptInspectBtn.appendChild(btn);
+        this.dom.appendChild(this.promptInspectBtn);
     }
 
     private renderSchedulingControls(): void {
@@ -249,6 +301,9 @@ export class ATSCodeBlockNodeView {
             } finally {
                 this.updating = false;
             }
+
+            // Re-check for prompt actions after content changes
+            this.renderPromptInspectButton();
         }
 
         return true;
