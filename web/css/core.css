@@ -6,30 +6,30 @@
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
 
     /* Core Colors */
-    --text-primary: #333;
-    --text-secondary: #666;
-    --text-tertiary: #999;
+    --text-primary: #333433;
+    --text-secondary: #666766;
+    --text-tertiary: #999a99;
     --bg-primary: #fff;
-    --bg-subtle: #f8f8f8;
-    --bg-hover: #f0f0f0;
-    --bg-dark: #242424;
-    --border-color: #ddd;
-    --border-light: #e0e0e0;
-    --accent-color: #0066cc;
+    --bg-subtle: #f8f9f8;
+    --bg-hover: #f0f1f0;
+    --bg-dark: #242524;
+    --border-color: #dddedd;
+    --border-light: #e0e1e0;
+    --accent-color: #0067cc;
 
     /* Dark mode colors - for dark backgrounds */
-    --bg-almost-black: #1a1a1a; /* Like system drawer */
-    --text-on-dark: #e0e0e0; /* Primary text on dark */
-    --text-on-dark-secondary: #aaa; /* Secondary text on dark */
-    --text-on-dark-tertiary: #888; /* Tertiary text on dark */
-    --border-on-dark: #333;
+    --bg-almost-black: #1a1b1a; /* Like system drawer */
+    --text-on-dark: #e0e1e0; /* Primary text on dark */
+    --text-on-dark-secondary: #aaabaa; /* Secondary text on dark */
+    --text-on-dark-tertiary: #888988; /* Tertiary text on dark */
+    --border-on-dark: #333433;
 
     /* Status Colors */
-    --color-success: #22c55e;
-    --color-error: #ef4444;
-    --color-warning: #ffaa00;
-    --color-info: #3b82f6;
-    --color-scheduled: #7b1fa2;
+    --color-success: #22c65e;
+    --color-error: #ef4544;
+    --color-warning: #ffab00;
+    --color-info: #3b83f6;
+    --color-scheduled: #7b20a2;
 
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
