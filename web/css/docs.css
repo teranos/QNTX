@@ -243,79 +243,6 @@ nav.doc-nav a {
     text-decoration: none;
 }
 
-/* Search */
-.search-container {
-    margin-bottom: 2em;
-}
-
-.search-input {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 1em;
-    border: 1px solid var(--border-light);
-    border-radius: 4px;
-    background: #fff;
-    color: #000;
-    box-sizing: border-box;
-}
-
-.search-input:focus {
-    outline: 2px solid var(--accent-color);
-    outline-offset: -1px;
-    border-color: transparent;
-}
-
-.search-input::placeholder {
-    color: var(--text-tertiary);
-}
-
-.search-results {
-    margin-top: 1em;
-}
-
-.search-result {
-    padding: 12px 16px;
-    margin: 8px 0;
-    background: var(--bg-subtle);
-    border-radius: 4px;
-    display: block;
-    text-decoration: none;
-    color: inherit;
-}
-
-.search-result:hover {
-    background: #f0f0f0;
-    text-decoration: none;
-}
-
-.search-result-title {
-    font-weight: 500;
-    color: var(--accent-color);
-}
-
-.search-result-category {
-    font-size: 0.85em;
-    color: var(--text-secondary);
-    margin-left: 8px;
-}
-
-.search-result-snippet {
-    font-size: 0.9em;
-    color: #555;
-    margin-top: 4px;
-}
-
-.search-result-snippet mark {
-    background: #fff3cd;
-    padding: 0 2px;
-    border-radius: 2px;
-}
-
-.search-no-results {
-    color: var(--text-secondary);
-    padding: 12px 0;
-}
-
 /* Downloads Page - Compact */
 .download-section {
     margin: 1em 0;
@@ -904,41 +831,6 @@ th {
 
     th, td {
         border-color: var(--text-primary);
-    }
-
-    .search-input {
-        background: var(--bg-dark);
-        border-color: var(--text-primary);
-        color: var(--text-on-dark);
-    }
-
-    .search-input::placeholder {
-        color: var(--text-secondary);
-    }
-
-    .search-result {
-        background: #242424;
-    }
-
-    .search-result:hover {
-        background: var(--bg-dark);
-    }
-
-    .search-result-category {
-        color: var(--text-on-dark-tertiary);
-    }
-
-    .search-result-snippet {
-        color: var(--text-on-dark-secondary);
-    }
-
-    .search-result-snippet mark {
-        background: #5c4a00;
-        color: #fff;
-    }
-
-    .search-no-results {
-        color: var(--text-on-dark-tertiary);
     }
 
     .download-card {
