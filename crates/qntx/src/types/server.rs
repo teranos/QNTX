@@ -368,7 +368,7 @@ pub struct PulseExecutionStartedMessage {
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/server.md#querymessage>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueryMessage {
-    /// "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame"
+    /// "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame", "rich_search"
     pub r#type: String,
     /// The Ax query text (can be multi-line)
     pub query: String,

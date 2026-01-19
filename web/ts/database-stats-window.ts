@@ -9,12 +9,19 @@ import { sendMessage } from './websocket.ts';
 import { DB } from '@generated/sym.js';
 import { tooltip } from './components/tooltip.ts';
 
+interface RichFieldInfo {
+    field: string;
+    count: number;
+    source_types: string[];
+}
+
 interface DatabaseStats {
     path: string;
     total_attestations: number;
     unique_actors: number;
     unique_subjects: number;
     unique_contexts: number;
+    rich_fields?: string[] | RichFieldInfo[];
 }
 
 class DatabaseStatsWindow {
@@ -62,7 +69,47 @@ class DatabaseStatsWindow {
             return;
         }
 
-        const { path, total_attestations, unique_actors, unique_subjects, unique_contexts } = this.stats;
+        const { path, total_attestations, unique_actors, unique_subjects, unique_contexts, rich_fields } = this.stats;
+
+        // Format rich fields for display
+        let richFieldsSection = '';
+        if (rich_fields && rich_fields.length > 0) {
+            let fieldsDisplay = '';
+
+            // Check if we have enhanced field information or just strings
+            if (typeof rich_fields[0] === 'object' && 'field' in rich_fields[0]) {
+                // Enhanced field information with counts and source types
+                const enhancedFields = rich_fields as RichFieldInfo[];
+                fieldsDisplay = enhancedFields
+                    .sort((a, b) => b.count - a.count) // Sort by count descending
+                    .map(info => {
+                        const sourcesText = info.source_types.length > 0
+                            ? ` [from: ${info.source_types.join(', ')}]`
+                            : '';
+                        return `<span class="rich-field-item has-tooltip"
+                                      data-tooltip="${info.count.toLocaleString()} attestations${sourcesText}">
+                                    ${info.field} (${info.count.toLocaleString()})${sourcesText}
+                                </span>`;
+                    })
+                    .join('');
+            } else {
+                // Simple string array fallback
+                const simpleFields = rich_fields as string[];
+                fieldsDisplay = simpleFields
+                    .sort()
+                    .map(field => `<span class="rich-field-item">${field}</span>`)
+                    .join('');
+            }
+
+            richFieldsSection = `
+                <div class="db-stat-section">
+                    <h3 class="db-stat-section-title">Searchable Rich Text Fields</h3>
+                    <div class="rich-fields-list">
+                        ${fieldsDisplay}
+                    </div>
+                </div>
+            `;
+        }
 
         content.innerHTML = `
             <div class="db-stats">
@@ -86,6 +133,7 @@ class DatabaseStatsWindow {
                     <span class="db-stat-label">Unique Contexts:</span>
                     <span class="db-stat-value">${unique_contexts.toLocaleString()}</span>
                 </div>
+                ${richFieldsSection}
             </div>
         `;
 

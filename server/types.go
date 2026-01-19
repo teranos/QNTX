@@ -56,7 +56,7 @@ type cachedUsageStats struct {
 
 // QueryMessage represents a client message
 type QueryMessage struct {
-	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame"
+	Type          string  `json:"type"`           // "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame", "rich_search"
 	Query         string  `json:"query"`          // The Ax query text (can be multi-line)
 	Line          int     `json:"line"`           // Current line number (for multi-line support)
 	Cursor        int     `json:"cursor"`         // Cursor position

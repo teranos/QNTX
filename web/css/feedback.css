@@ -6,8 +6,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--bg-secondary, #1a1a1a);
-    border-top: 1px solid var(--border-color, #333);
+    background: var(--bg-almost-black);
+    border-top: 1px solid var(--border-on-dark);
     max-height: 300px;
     z-index: 1000;
     display: flex;
@@ -24,8 +24,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: var(--bg-tertiary, #2a2a2a);
-    border-bottom: 1px solid var(--border-color, #333);
+    background: #252525; /* Slightly lighter than bg-almost-black for header */
+    border-bottom: 1px solid var(--border-on-dark);
     cursor: pointer;
     user-select: none;
     gap: 12px;

@@ -12,6 +12,7 @@ use std::time::Instant;
 
 use ahash::AHasher;
 use parking_lot::RwLock;
+use serde_json::Value;
 use std::hash::{Hash, Hasher};
 use strsim::{jaro_winkler, levenshtein};
 
@@ -27,6 +28,37 @@ impl RankedMatch {
     fn new(value: String, score: f64, strategy: &'static str) -> Self {
         Self {
             value,
+            score,
+            strategy,
+        }
+    }
+}
+
+/// A match result for RichStringFields search
+#[derive(Debug, Clone)]
+pub struct AttributeMatch {
+    pub node_id: String,        // The ID of the attestation/node
+    pub field_name: String,     // The name of the matched field
+    pub field_value: String,    // The full value of the matched field
+    pub excerpt: String,        // An excerpt showing the match in context
+    pub score: f64,             // Match score (higher is better)
+    pub strategy: &'static str, // The matching strategy used
+}
+
+impl AttributeMatch {
+    fn new(
+        node_id: String,
+        field_name: String,
+        field_value: String,
+        excerpt: String,
+        score: f64,
+        strategy: &'static str,
+    ) -> Self {
+        Self {
+            node_id,
+            field_name,
+            field_value,
+            excerpt,
             score,
             strategy,
         }
@@ -153,6 +185,11 @@ impl FuzzyEngine {
         if query_lower.is_empty() {
             return (Vec::new(), start.elapsed().as_micros() as u64);
         }
+
+        debug!(
+            "Finding matches for query: '{}' (type: {:?}, limit: {}, min_score: {})",
+            query, vocabulary_type, limit, min_score
+        );
 
         // Get the appropriate vocabulary
         let (vocabulary, vocabulary_lower) = match vocabulary_type {
@@ -293,6 +330,125 @@ impl FuzzyEngine {
         }
 
         format!("{:016x}", hasher.finish())
+    }
+
+    /// Search for matches in RichStringFields of attestations
+    ///
+    /// Parameters:
+    /// - query: The search query
+    /// - attributes_json: JSON string containing the attributes object
+    /// - rich_string_fields: List of field names to search in
+    /// - node_id: The ID of the attestation/node for tracking
+    ///
+    /// Returns matches with scores and excerpts
+    pub fn find_attribute_matches(
+        &self,
+        query: &str,
+        attributes_json: &str,
+        rich_string_fields: &[String],
+        node_id: &str,
+    ) -> Vec<AttributeMatch> {
+        if query.trim().is_empty() || rich_string_fields.is_empty() {
+            return Vec::new();
+        }
+
+        // Parse JSON attributes
+        let attributes: Value = match serde_json::from_str(attributes_json) {
+            Ok(val) => val,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut matches = Vec::new();
+        let query_lower = query.to_lowercase();
+
+        // Search through each RichStringField
+        for field_name in rich_string_fields {
+            if let Some(value) = attributes.get(field_name) {
+                // Convert value to string
+                let str_value = match value {
+                    Value::String(s) => s.clone(),
+                    Value::Array(arr) => {
+                        // Join array elements with spaces
+                        arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    }
+                    _ => continue,
+                };
+
+                if str_value.is_empty() {
+                    continue;
+                }
+
+                // Apply fuzzy matching
+                if let Some(ranked_match) =
+                    self.score_match(&query_lower, &str_value.to_lowercase(), &str_value)
+                {
+                    let excerpt = self.extract_excerpt(&str_value, query, 150);
+
+                    matches.push(AttributeMatch::new(
+                        node_id.to_string(),
+                        field_name.clone(),
+                        str_value,
+                        excerpt,
+                        ranked_match.score,
+                        ranked_match.strategy,
+                    ));
+                }
+            }
+        }
+
+        // Sort by score descending
+        matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+
+        // Apply limit from config
+        matches.truncate(self.config.max_results);
+
+        matches
+    }
+
+    /// Extract an excerpt from text around the match
+    fn extract_excerpt(&self, text: &str, query: &str, max_length: usize) -> String {
+        let text_lower = text.to_lowercase();
+        let query_lower = query.to_lowercase();
+
+        // Find the match position
+        let idx = text_lower.find(&query_lower).unwrap_or(0);
+
+        // Calculate excerpt bounds
+        let start = if idx > max_length / 2 {
+            // Find word boundary
+            let target_start = idx.saturating_sub(max_length / 2);
+            text[..target_start]
+                .rfind(char::is_whitespace)
+                .map(|i| i + 1)
+                .unwrap_or(target_start)
+        } else {
+            0
+        };
+
+        let end = if idx + query.len() + max_length / 2 < text.len() {
+            let target_end = (idx + query.len() + max_length / 2).min(text.len());
+            text[idx + query.len()..target_end]
+                .find(char::is_whitespace)
+                .map(|i| idx + query.len() + i)
+                .unwrap_or(target_end)
+        } else {
+            text.len()
+        };
+
+        // Build excerpt
+        let mut excerpt = String::new();
+        if start > 0 {
+            excerpt.push_str("...");
+        }
+        excerpt.push_str(&text[start..end]);
+        if end < text.len() {
+            excerpt.push_str("...");
+        }
+
+        excerpt
     }
 }
 
