@@ -27,7 +27,7 @@
     right: 0;
     width: 50%;
     height: 100%;
-    background: #1e1e1e;
+    background: var(--bg-dark);
     border-left: 1px solid var(--border-on-dark);
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
     z-index: 1000;
@@ -92,7 +92,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .prose-editor-container {
@@ -275,7 +275,7 @@
 }
 
 #prose-editor .ProseMirror td {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 #prose-editor .ProseMirror .selectedCell {
@@ -338,7 +338,7 @@
 }
 
 .prose-editor-container::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .prose-editor-container::-webkit-scrollbar-thumb {

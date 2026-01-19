@@ -18,7 +18,7 @@
 .prose-search {
     width: 100%;
     padding: 8px 12px;
-    background: #1e1e1e;
+    background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     color: var(--text-on-dark);
@@ -148,7 +148,7 @@
 }
 
 .prose-tree::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .prose-tree::-webkit-scrollbar-thumb {

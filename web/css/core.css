@@ -237,7 +237,7 @@ body.disconnected #container {
 
 /* LLM Streaming Styles */
 .progress-event.llm-stream {
-    background: #1e1e1e;
+    background: var(--bg-dark);
     border-left: 3px solid #4ade80;
 }
 
