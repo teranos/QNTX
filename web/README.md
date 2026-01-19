@@ -166,3 +166,29 @@ Check `bun.lock` - if versions don't match package.json:
 ```bash
 bun install  # Resync package.json and bun.lock
 ```
+
+## Testing
+
+### Running Tests
+```bash
+bun test              # Fast tests only (~1.5s)
+USE_JSDOM=1 bun test  # All tests including DOM tests (~9s)
+```
+
+### Writing DOM Tests
+DOM tests using JSDOM are slow. Gate them behind `USE_JSDOM=1` so they only run in CI:
+
+```typescript
+// At top of *.dom.test.ts file
+const USE_JSDOM = process.env.USE_JSDOM === '1';
+
+describe('YourComponent', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+    // ... your tests
+});
+```
+
+See `ts/vidstream-window.dom.test.ts` for example.
