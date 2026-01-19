@@ -33,7 +33,7 @@
         top: 0;
         bottom: auto;
         border-top: none;
-        border-bottom: 1px solid #333;
+        border-bottom: 1px solid var(--border-on-dark);
     }
 
     /* Hide build hash on mobile to save space */
