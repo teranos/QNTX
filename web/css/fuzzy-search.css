@@ -1,0 +1,112 @@
+/**
+ * Fuzzy Search View - Compact dark overlay for search results
+ */
+
+/* Main overlay */
+.fuzzy-search-view {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-almost-black);
+    border: 1px solid var(--border-on-dark);
+    box-shadow: var(--shadow-xl);
+    z-index: 100;
+    display: none;
+    overflow: hidden;
+}
+
+/* Results container */
+.fuzzy-results {
+    height: 100%;
+    padding: 20px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-on-dark);
+}
+
+/* Header */
+.fuzzy-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark-secondary);
+    font-weight: 500;
+}
+
+/* Result line */
+.fuzzy-result-line {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 4px 8px;
+    margin-bottom: 1px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid transparent;
+    font-size: 12px;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.fuzzy-result-line:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: var(--accent-color);
+}
+
+/* Result line components */
+.fuzzy-node-id {
+    min-width: 80px;
+    flex-shrink: 0;
+    color: var(--accent-color);
+    font-family: var(--font-mono);
+}
+
+.fuzzy-type-badge {
+    padding: 1px 4px;
+    background: rgba(74, 158, 255, 0.15);
+    color: #4a9eff;
+    border-radius: 2px;
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.fuzzy-field-name,
+.fuzzy-score {
+    flex-shrink: 0;
+    color: var(--text-on-dark-tertiary);
+    font-size: 10px;
+}
+
+.fuzzy-field-name {
+    text-transform: uppercase;
+}
+
+.fuzzy-score {
+    min-width: 30px;
+    text-align: right;
+}
+
+.fuzzy-excerpt {
+    flex: 1;
+    color: var(--text-on-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Highlight matched text */
+.fuzzy-highlight {
+    padding: 0 1px;
+    background-color: rgba(255, 200, 0, 0.3);
+    color: #ffcc00;
+    font-weight: 600;
+}
+
+/* No results */
+.fuzzy-no-results {
+    margin-top: 50px;
+    text-align: center;
+    color: var(--text-on-dark-secondary);
+    font-size: 13px;
+}

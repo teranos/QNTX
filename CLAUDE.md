@@ -56,6 +56,10 @@ The `am` package ("I am" - core being/state) manages all QNTX configuration:
 
 **For Claude**: When adding config options, ensure sensible defaults exist in `am/defaults.go`. Only require configuration when truly necessary.
 
+## Development Workflow
+
+Use `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820).
+
 ## Type Generation
 
 **NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`.
