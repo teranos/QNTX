@@ -76,7 +76,7 @@
     display: none;
     padding: 12px 16px;
     background: var(--bg-dark);
-    border: 1px solid #444;
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     max-width: 400px;
     text-align: center;

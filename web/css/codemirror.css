@@ -58,7 +58,7 @@
 /* Completion popup */
 .cm-tooltip-autocomplete {
     background: var(--bg-dark);
-    border: 1px solid #444;
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }

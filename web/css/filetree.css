@@ -19,7 +19,7 @@
     width: 100%;
     padding: 8px 12px;
     background: #1e1e1e;
-    border: 1px solid #444;
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     color: var(--text-on-dark);
     font-size: 13px;
