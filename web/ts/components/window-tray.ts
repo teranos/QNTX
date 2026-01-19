@@ -38,6 +38,9 @@ class WindowTrayImpl {
     private readonly DOT_MAX_HEIGHT = 32;
     private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
 
+    // LocalStorage key
+    private readonly STORAGE_KEY = 'qntx_window_tray_state';
+
     // Component state
     private element: HTMLElement | null = null;
     private itemsContainer: HTMLElement | null = null;
@@ -283,6 +286,48 @@ class WindowTrayImpl {
     }
 
     /**
+     * Save tray state to localStorage
+     */
+    private saveState(): void {
+        try {
+            const state = {
+                minimizedWindows: Array.from(this.items.keys())
+            };
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+            console.warn('Failed to save window tray state:', err);
+        }
+    }
+
+    /**
+     * Load tray state from localStorage
+     * Returns array of window IDs that were minimized
+     */
+    public loadState(): string[] {
+        try {
+            const stored = localStorage.getItem(this.STORAGE_KEY);
+            if (!stored) return [];
+
+            const state = JSON.parse(stored);
+            return state.minimizedWindows || [];
+        } catch (err) {
+            console.warn('Failed to load window tray state:', err);
+            return [];
+        }
+    }
+
+    /**
+     * Clear tray state from localStorage
+     */
+    private clearState(): void {
+        try {
+            localStorage.removeItem(this.STORAGE_KEY);
+        } catch (err) {
+            console.warn('Failed to clear window tray state:', err);
+        }
+    }
+
+    /**
      * Add a minimized window to the tray
      */
     public add(item: TrayItem): void {
@@ -295,6 +340,7 @@ class WindowTrayImpl {
         this.items.set(item.id, item);
         this.renderItems();
         this.element?.setAttribute('data-empty', 'false');
+        this.saveState(); // Persist to localStorage
     }
 
     /**
@@ -310,6 +356,9 @@ class WindowTrayImpl {
             this.element?.setAttribute('data-empty', 'true');
             this.element?.setAttribute('data-revealed', 'false');
             this.isRevealed = false;
+            this.clearState(); // Clear localStorage when empty
+        } else {
+            this.saveState(); // Update localStorage
         }
     }
 
