@@ -64,41 +64,6 @@
     background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
 }
 
-/* Items container - unused (proximity morphing replaced reveal behavior) */
-.window-tray-items {
-    display: none;
-}
-
-/* Individual tray item */
-.window-tray-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    background: var(--bg-almost-black);
-    border: 1px solid var(--border-on-dark);
-    color: var(--text-on-dark);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background-color 0.15s ease;
-}
-
-.window-tray-item:hover {
-    background: var(--bg-dark);
-}
-
-.window-tray-item:active {
-    background: var(--border-on-dark);
-}
-
-.window-tray-item-title {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
     .window-tray-indicators,
