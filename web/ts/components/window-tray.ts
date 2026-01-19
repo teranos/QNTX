@@ -14,6 +14,31 @@ export interface TrayItem {
 }
 
 class WindowTrayImpl {
+    // Proximity morphing configuration
+    private readonly PROXIMITY_THRESHOLD = 50; // Max distance for morphing effect (px)
+    private readonly SNAP_THRESHOLD = 0.9; // Snap to 100% at this proximity to prevent flickering
+    private readonly BASELINE_BOOST_TRIGGER = 0.85; // Trigger baseline boost when any item this close
+    private readonly BASELINE_BOOST_AMOUNT = 0.2; // Amount to boost all items (0.0-1.0)
+    private readonly TEXT_FADE_THRESHOLD = 0.5; // Show text when proximity exceeds this
+
+    // Horizontal easing: gradual approach, dramatic finish
+    private readonly HORIZONTAL_EASE_BREAKPOINT = 0.8; // 80% proximity
+    private readonly HORIZONTAL_EASE_EARLY = 0.4; // Transform 40% by breakpoint
+    private readonly HORIZONTAL_EASE_LATE = 0.6; // Remaining 60% in final stretch
+
+    // Vertical easing: fast bloom, slow refinement (inverted)
+    private readonly VERTICAL_EASE_BREAKPOINT = 0.55; // 55% proximity
+    private readonly VERTICAL_EASE_EARLY = 0.8; // Transform 80% by breakpoint
+    private readonly VERTICAL_EASE_LATE = 0.2; // Remaining 20% in final stretch
+
+    // Morphing dimensions
+    private readonly DOT_MIN_WIDTH = 8;
+    private readonly DOT_MIN_HEIGHT = 8;
+    private readonly DOT_MAX_WIDTH = 220;
+    private readonly DOT_MAX_HEIGHT = 32;
+    private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
+
+    // Component state
     private element: HTMLElement | null = null;
     private itemsContainer: HTMLElement | null = null;
     private indicatorContainer: HTMLElement | null = null;
@@ -23,7 +48,6 @@ class WindowTrayImpl {
     private mouseX: number = 0;
     private mouseY: number = 0;
     private proximityRAF: number | null = null;
-    private proximityThreshold: number = 50; // Max distance for morphing effect (px) - reduced for subtlety
 
     /**
      * Initialize the tray and attach to DOM
@@ -127,12 +151,12 @@ class WindowTrayImpl {
                 }
 
                 const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-                const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
+                const proximityRaw = Math.max(0, 1 - (distance / this.PROXIMITY_THRESHOLD));
                 maxProximityRaw = Math.max(maxProximityRaw, proximityRaw);
             });
 
-            // Calculate baseline boost (20% when any dot is nearly fully expanded)
-            const baselineBoost = maxProximityRaw > 0.85 ? 0.2 : 0;
+            // Calculate baseline boost when any dot is nearly fully expanded
+            const baselineBoost = maxProximityRaw > this.BASELINE_BOOST_TRIGGER ? this.BASELINE_BOOST_AMOUNT : 0;
 
             dots.forEach((dot, index) => {
                 // Use current bounding rect so hit zone grows with the element
@@ -163,13 +187,13 @@ class WindowTrayImpl {
                 const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
-                const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
+                const proximityRaw = Math.max(0, 1 - (distance / this.PROXIMITY_THRESHOLD));
 
                 // Apply different easing based on approach direction
                 let proximity: number;
 
-                // Snap to 100% when 90% close to prevent flickering
-                if (proximityRaw >= 0.9) {
+                // Snap to 100% when very close to prevent flickering
+                if (proximityRaw >= this.SNAP_THRESHOLD) {
                     proximity = 1.0;
                 } else {
                     // Check if vertical or horizontal approach dominates
@@ -177,21 +201,21 @@ class WindowTrayImpl {
 
                     if (isVerticalApproach) {
                         // VERTICAL: Inverted easing - fast early growth, slow refinement
-                        // 55% proximity → 80% transformed
-                        // Remaining 45% → last 20% transform
-                        if (proximityRaw < 0.55) {
-                            proximity = (proximityRaw / 0.55) * 0.8;
+                        if (proximityRaw < this.VERTICAL_EASE_BREAKPOINT) {
+                            proximity = (proximityRaw / this.VERTICAL_EASE_BREAKPOINT) * this.VERTICAL_EASE_EARLY;
                         } else {
-                            proximity = 0.8 + ((proximityRaw - 0.55) / 0.35) * 0.2;
+                            const remaining = 1.0 - this.VERTICAL_EASE_BREAKPOINT;
+                            proximity = this.VERTICAL_EASE_EARLY +
+                                      ((proximityRaw - this.VERTICAL_EASE_BREAKPOINT) / remaining) * this.VERTICAL_EASE_LATE;
                         }
                     } else {
-                        // HORIZONTAL: Original easing - gradual growth, dramatic finish
-                        // 80% proximity → 40% transformed
-                        // Last 10% → remaining 60%
-                        if (proximityRaw < 0.8) {
-                            proximity = (proximityRaw / 0.8) * 0.4;
+                        // HORIZONTAL: Gradual growth, dramatic finish
+                        if (proximityRaw < this.HORIZONTAL_EASE_BREAKPOINT) {
+                            proximity = (proximityRaw / this.HORIZONTAL_EASE_BREAKPOINT) * this.HORIZONTAL_EASE_EARLY;
                         } else {
-                            proximity = 0.4 + ((proximityRaw - 0.8) / 0.1) * 0.6;
+                            const remaining = this.SNAP_THRESHOLD - this.HORIZONTAL_EASE_BREAKPOINT;
+                            proximity = this.HORIZONTAL_EASE_EARLY +
+                                      ((proximityRaw - this.HORIZONTAL_EASE_BREAKPOINT) / remaining) * this.HORIZONTAL_EASE_LATE;
                         }
                     }
                 }
@@ -200,17 +224,11 @@ class WindowTrayImpl {
                 proximity = Math.min(1.0, proximity + baselineBoost);
 
                 // Interpolate dimensions to match actual tray item size
-                // Start: 8px × 8px square
-                // End: ~220px × 32px (actual tray item dimensions)
-                const minWidth = 8;
-                const maxWidth = 220;
-                const minHeight = 8;
-                const maxHeight = 32;
-                const width = minWidth + (maxWidth - minWidth) * proximity;
-                const height = minHeight + (maxHeight - minHeight) * proximity;
+                const width = this.DOT_MIN_WIDTH + (this.DOT_MAX_WIDTH - this.DOT_MIN_WIDTH) * proximity;
+                const height = this.DOT_MIN_HEIGHT + (this.DOT_MAX_HEIGHT - this.DOT_MIN_HEIGHT) * proximity;
 
-                // Interpolate border radius (2px square -> 0px for full item)
-                const borderRadius = 2 * (1 - proximity);
+                // Interpolate border radius (starts at max, goes to 0 for full item)
+                const borderRadius = this.DOT_BORDER_RADIUS_MAX * (1 - proximity);
 
                 // Interpolate colors using RGB interpolation
                 // Start: --bg-gray (#999 = rgb(153,153,153))
@@ -227,8 +245,8 @@ class WindowTrayImpl {
                 dot.style.borderRadius = `${borderRadius}px`;
                 dot.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
 
-                // Show title text when proximity is high enough
-                if (proximity > 0.5 && index < itemsArray.length) {
+                // Show title text when proximity exceeds threshold
+                if (proximity > this.TEXT_FADE_THRESHOLD && index < itemsArray.length) {
                     const item = itemsArray[index];
                     const title = this.stripHtml(item.title);
 
@@ -242,8 +260,8 @@ class WindowTrayImpl {
                         dot.textContent = title;
                         dot.dataset.hasText = 'true';
                     }
-                    // Fade in text based on proximity
-                    dot.style.opacity = String(0.5 + (proximity - 0.5));
+                    // Fade in text based on proximity (above threshold)
+                    dot.style.opacity = String(this.TEXT_FADE_THRESHOLD + (proximity - this.TEXT_FADE_THRESHOLD));
                 } else {
                     // Hide text when far away
                     if (dot.dataset.hasText) {
