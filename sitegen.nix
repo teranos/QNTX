@@ -310,26 +310,28 @@ let
   # Date Utilities
   # ============================================================================
 
-  # Convert Unix timestamp to RFC 822 format for RSS
+  # Convert Unix timestamp to RFC 822 format for RSS using shell date utility
   # Example: 1737244800 -> "Mon, 19 Jan 2026 00:00:00 +0000"
   timestampToRfc822 = ts:
     let
-      days = ts / 86400;
-      year = 1970 + (days / 365);
-      remainingDays = lib.mod days 365;
-      month = 1 + (remainingDays / 30);
-      day = 1 + (lib.mod remainingDays 30);
-
-      monthNames = [ "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec" ];
-      dayNames = [ "Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat" ];
-
-      # Approximate day of week (simplified)
-      dayOfWeek = lib.elemAt dayNames (lib.mod (days + 4) 7);
-      monthName = lib.elemAt monthNames (month - 1);
-
-      pad = n: if n < 10 then "0${toString n}" else toString n;
+      dateFile = pkgs.runCommand "timestamp-to-rfc822-${toString ts}"
+        { nativeBuildInputs = [ pkgs.coreutils ]; }
+        ''
+          date -u -d @${toString ts} '+%a, %d %b %Y %H:%M:%S +0000' > $out
+        '';
     in
-    "${dayOfWeek}, ${pad day} ${monthName} ${toString year} 00:00:00 +0000";
+    lib.trim (builtins.readFile dateFile);
+
+  # Convert Unix timestamp to YYYY-MM-DD format for sitemaps
+  timestampToDate = ts:
+    let
+      dateFile = pkgs.runCommand "timestamp-to-date-${toString ts}"
+        { nativeBuildInputs = [ pkgs.coreutils ]; }
+        ''
+          date -u -d @${toString ts} '+%Y-%m-%d' > $out
+        '';
+    in
+    lib.trim (builtins.readFile dateFile);
 
   # ============================================================================
   # Markdown Discovery
@@ -1205,19 +1207,6 @@ let
   cnameContent = "qntx.sbvh.nl";
   baseUrl = "https://${cnameContent}";
 
-  # Convert Unix timestamp to YYYY-MM-DD
-  timestampToDate = ts:
-    let
-      days = ts / 86400;
-      # Years since 1970 (accounting for leap years approximately)
-      year = 1970 + (days / 365);
-      remainingDays = lib.mod days 365;
-      month = 1 + (remainingDays / 30);
-      day = 1 + (lib.mod remainingDays 30);
-      pad = n: if n < 10 then "0${toString n}" else toString n;
-    in
-    "${toString year}-${pad month}-${pad day}";
-
   # Fallback lastmod: buildDate (CI) or gitCommitDate converted to YYYY-MM-DD (local builds)
   sitemapLastmod =
     if buildDate != null then buildDate
@@ -1261,26 +1250,38 @@ let
     </urlset>
   '';
 
-  # Extract CSS variable values from core.css for XSLT
-  cssVarExtractor = varName: default:
+  # Extract CSS variable value from core.css
+  extractCssVar = varName:
     let
-      coreCssContent = builtins.readFile cssFiles.core;
-      # Match pattern: --var-name: #value;
-      pattern = "--${varName}:[[:space:]]*([^;]+);";
-      matches = builtins.match ".*${pattern}.*" coreCssContent;
+      coreCss = builtins.readFile cssFiles.core;
+      # Match --var-name: value; (handles spaces, colors, etc)
+      lines = lib.splitString "\n" coreCss;
+      matchingLines = lib.filter (line: lib.hasInfix "--${varName}:" line) lines;
+      extractValue = line:
+        let
+          # Remove everything before the colon
+          afterColon = lib.elemAt (lib.splitString ":" line) 1;
+          # Remove comments (/* ... */)
+          beforeComment = lib.head (lib.splitString "/*" afterColon);
+          # Trim whitespace and remove semicolon
+          trimmed = lib.trim beforeComment;
+        in
+        lib.removeSuffix ";" trimmed;
     in
-    if matches != null then lib.head matches else default;
+    if matchingLines != [ ]
+    then extractValue (lib.head matchingLines)
+    else throw "CSS variable --${varName} not found in core.css";
 
-  # Extract colors from core.css
+  # XSLT colors automatically extracted from core.css (single source of truth!)
   xsltColors = {
-    bgDark = "#202523"; # --bg-dark
-    textOnDark = "#dfe1e0"; # --text-on-dark
-    textOnDarkEmphasis = "#fefffe"; # --text-on-dark-emphasis
-    textOnDarkSecondary = "#a9abaa"; # --text-on-dark-secondary
-    textOnDarkTertiary = "#878988"; # --text-on-dark-tertiary
-    borderOnDark = "#3f4140"; # --border-on-dark
-    bgAlmostBlack = "#1a1b1a"; # --bg-almost-black
-    accentColor = "#0067cc"; # --accent-color
+    bgDark = extractCssVar "bg-dark";
+    textOnDark = extractCssVar "text-on-dark";
+    textOnDarkEmphasis = extractCssVar "text-on-dark-emphasis";
+    textOnDarkSecondary = extractCssVar "text-on-dark-secondary";
+    textOnDarkTertiary = extractCssVar "text-on-dark-tertiary";
+    borderOnDark = extractCssVar "border-on-dark";
+    bgAlmostBlack = extractCssVar "bg-almost-black";
+    accentColor = extractCssVar "accent-color";
   };
 
   # XSLT stylesheet for human-readable sitemap viewing in browsers
