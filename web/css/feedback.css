@@ -119,7 +119,7 @@
 }
 
 .log-column-header .mini-btn {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     border: 1px solid #333;
     color: var(--text-secondary);
     cursor: pointer;
