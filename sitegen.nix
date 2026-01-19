@@ -371,6 +371,8 @@ let
       <meta name="twitter:title" content="${html.escape title}">
       <meta name="twitter:description" content="${html.escape description}">
       <meta name="twitter:image" content="${baseUrl}/qntx.jpg">
+      <!-- RSS Feed -->
+      <link rel="alternate" type="application/rss+xml" title="QNTX Documentation" href="${baseUrl}/feed.xml">
     </head>'';
 
   mkNav = { prefix }: ''
@@ -769,6 +771,7 @@ let
         { path = "infrastructure.html"; desc = "Nix build documentation"; }
         { path = "sitegen.html"; desc = "This page"; }
         { path = "build-info.json"; desc = "Provenance metadata"; }
+        { path = "feed.xml"; desc = "RSS feed"; }
         { path = "qntx.jpg"; desc = "Logo"; }
       ];
 
@@ -844,6 +847,7 @@ let
             [ "<strong>Self-documenting Infra</strong>" "Nix packages, apps, and containers documented from flake metadata" ]
             [ "<strong>Incremental Builds</strong>" "Each markdown file is a separate derivation for faster rebuilds" ]
             [ "<strong>OpenGraph &amp; Twitter Cards</strong>" "Social media preview cards with per-page titles, descriptions, and images" ]
+            [ "<strong>RSS Feed</strong>" "Subscribe to documentation updates via <code>/feed.xml</code> with autodiscovery" ]
           ];
         };
       };
@@ -1086,6 +1090,79 @@ let
   '';
 
   # ============================================================================
+  # RSS Feed Generation
+  # ============================================================================
+
+  # RSS date format: RFC 822 (e.g., "Mon, 15 Jan 2025 00:00:00 GMT")
+  # We approximate since we only have YYYY-MM-DD from sitemapLastmod
+  rssDate =
+    if sitemapLastmod != null
+    then "${sitemapLastmod}T00:00:00Z"
+    else null;
+
+  # Generate RSS item for a documentation page
+  mkRssItem = { title, link, description, category ? null }:
+    ''
+      <item>
+        <title>${html.escape title}</title>
+        <link>${baseUrl}${link}</link>
+        <guid isPermaLink="true">${baseUrl}${link}</guid>
+        <description>${html.escape description}</description>
+        ${lib.optionalString (category != null) "<category>${html.escape category}</category>"}
+        ${lib.optionalString (rssDate != null) "<pubDate>${rssDate}</pubDate>"}
+      </item>'';
+
+  # Generate RSS items for documentation pages
+  rssItems =
+    # Special pages
+    [
+      (mkRssItem {
+        title = "QNTX Downloads";
+        link = "/downloads.html";
+        description = "Download QNTX binaries, Docker images, or install via Nix package manager.";
+      })
+      (mkRssItem {
+        title = "QNTX Infrastructure";
+        link = "/infrastructure.html";
+        description = "QNTX build infrastructure - Nix packages, apps, containers, and reproducible builds.";
+      })
+    ]
+    # All documentation pages
+    ++ map
+      (fileInfo:
+        let
+          category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+          catMeta = if category == null then null else getCategoryMeta category;
+          itemDescription =
+            if catMeta != null && catMeta.desc != ""
+            then "QNTX ${toTitleCase category} - ${catMeta.desc}"
+            else "QNTX documentation - ${toTitleCase fileInfo.name}";
+        in
+        mkRssItem {
+          title = "QNTX - ${toTitleCase fileInfo.name}";
+          link = "/${fileInfo.htmlPath}";
+          description = itemDescription;
+          category = if category != null then toTitleCase category else null;
+        })
+      fileInfos;
+
+  rssFeedContent = ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+      <channel>
+        <title>QNTX Documentation</title>
+        <link>${baseUrl}</link>
+        <description>Continuous Intelligence - documentation and updates for QNTX</description>
+        <language>en-us</language>
+        <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
+        ${lib.optionalString (rssDate != null) "<lastBuildDate>${rssDate}</lastBuildDate>"}
+        <generator>sitegen.nix</generator>
+        ${lib.concatStringsSep "\n    " rssItems}
+      </channel>
+    </rss>
+  '';
+
+  # ============================================================================
   # Build Info
   # ============================================================================
 
@@ -1156,6 +1233,12 @@ let
       name = "qntx-docs-sitemap";
       text = sitemapContent;
       destination = "/sitemap.xml";
+    };
+
+    "feed.xml" = pkgs.writeTextFile {
+      name = "qntx-docs-rss";
+      text = rssFeedContent;
+      destination = "/feed.xml";
     };
 
     "robots.txt" = pkgs.writeTextFile {
