@@ -969,3 +969,24 @@ th {
         padding: 0;
     }
 }
+
+/* 404 Error Page */
+.error-404 {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark);
+    color: var(--text-on-dark);
+    text-align: center;
+    max-width: none;
+}
+
+.quantum-box { border: 2px dashed var(--border-on-dark); padding: 40px; max-width: 500px; }
+.cat-state { font-size: 4em; margin: 20px 0; }
+.error-404 h1 { color: var(--text-on-dark-emphasis); border: none; }
+.error-code { font-size: 0.9em; color: var(--text-on-dark-tertiary); }
+.error-404 .explanation { color: var(--text-on-dark-secondary); line-height: 1.6; margin: 20px 0; }
+.error-404 .attestation { font-family: var(--font-mono); background: var(--bg-almost-black); padding: 15px; margin: 20px 0; border-left: 3px solid var(--accent-color); text-align: left; font-size: 0.85em; white-space: pre-line; }
+.home-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: var(--accent-color); color: #fff; text-decoration: none; border-radius: 4px; }
+.home-link:hover { opacity: 0.9; }
