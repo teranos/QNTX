@@ -128,10 +128,15 @@ class WindowTrayImpl {
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
                 const proximity = Math.max(0, 1 - (distance / this.proximityThreshold));
 
-                // Interpolate size (8px -> 120px as it morphs to full item)
-                const minSize = 8;
-                const maxSize = 120;
-                const size = minSize + (maxSize - minSize) * proximity;
+                // Interpolate dimensions to match actual tray item size
+                // Start: 8px × 8px square
+                // End: ~220px × 32px (actual tray item dimensions)
+                const minWidth = 8;
+                const maxWidth = 220;
+                const minHeight = 8;
+                const maxHeight = 32;
+                const width = minWidth + (maxWidth - minWidth) * proximity;
+                const height = minHeight + (maxHeight - minHeight) * proximity;
 
                 // Interpolate border radius (2px square -> 0px for full item)
                 const borderRadius = 2 * (1 - proximity);
@@ -146,8 +151,8 @@ class WindowTrayImpl {
                 const b = Math.round(startB + (endB - startB) * proximity);
 
                 // Apply morphing styles
-                dot.style.width = `${size}px`;
-                dot.style.height = `${size}px`;
+                dot.style.width = `${width}px`;
+                dot.style.height = `${height}px`;
                 dot.style.borderRadius = `${borderRadius}px`;
                 dot.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
 
