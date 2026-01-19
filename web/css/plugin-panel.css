@@ -273,7 +273,7 @@
 }
 
 .plugin-panel-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .plugin-panel-content::-webkit-scrollbar-thumb {

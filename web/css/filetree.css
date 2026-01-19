@@ -4,7 +4,7 @@
 /* Sidebar container */
 .prose-sidebar {
     width: 250px;
-    border-right: 1px solid #333;
+    border-right: 1px solid var(--border-on-dark);
     background: #252525;
     display: flex;
     flex-direction: column;
@@ -12,16 +12,16 @@
 
 .prose-sidebar-header {
     padding: 12px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
 .prose-search {
     width: 100%;
     padding: 8px 12px;
-    background: #1e1e1e;
-    border: 1px solid #444;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
     font-size: 13px;
     outline: none;
 }
@@ -33,13 +33,13 @@
 /* Recent files section */
 .prose-recent {
     padding: 12px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
 .prose-recent-header {
     font-size: 11px;
     font-weight: 600;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
@@ -59,7 +59,7 @@
     display: block;
     padding: 4px 8px;
     cursor: pointer;
-    color: #aaa;
+    color: var(--text-on-dark-secondary);
     font-size: 12px;
     border-radius: 3px;
     transition: all 0.2s;
@@ -70,7 +70,7 @@
 
 .prose-recent-label:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 /* File tree */
@@ -111,13 +111,13 @@
     display: inline-block;
     width: 16px;
     cursor: pointer;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-size: 12px;
     transition: color 0.2s;
 }
 
 .prose-tree-toggle:hover {
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 .prose-tree-label {
@@ -148,7 +148,7 @@
 }
 
 .prose-tree::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .prose-tree::-webkit-scrollbar-thumb {

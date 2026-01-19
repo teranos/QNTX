@@ -101,7 +101,7 @@
 }
 
 .filter-item:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     border-color: #bbb;
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -211,7 +211,7 @@
 }
 
 .command-explorer-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .command-explorer-content::-webkit-scrollbar-thumb {

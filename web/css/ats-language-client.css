@@ -228,7 +228,7 @@
 
 .completion-item:hover,
 .completion-item.selected {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .completion-label {
