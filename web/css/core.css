@@ -22,7 +22,8 @@
     --text-on-dark: #e0e1e0; /* Primary text on dark */
     --text-on-dark-secondary: #aaabaa; /* Secondary text on dark */
     --text-on-dark-tertiary: #888988; /* Tertiary text on dark */
-    --border-on-dark: #333433;
+    --text-on-dark-emphasis: #fffffe; /* Headings/emphasis on dark */
+    --border-on-dark: #404140; /* Borders on dark backgrounds */
 
     /* Status Colors */
     --color-success: #22c65e;

@@ -791,7 +791,7 @@ th {
 
     .download-section.quick-download .download-link {
         background: var(--bg-dark);
-        border-color: #444;
+        border-color: var(--border-on-dark);
         color: var(--text-on-dark);
     }
 
