@@ -45,14 +45,13 @@
     border-radius: 2px;
     background: var(--bg-gray);
     border: 1px solid var(--border-on-dark);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.window-tray:hover .window-tray-dot {
-    width: 12px;
-    height: 12px;
-    background: var(--bg-hover);
-    border-color: var(--border-color);
+    color: var(--text-on-dark);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    /* Smooth transitions handled by JavaScript proximity morphing */
+    transition: none;
+    box-sizing: border-box;
 }
 
 /* Items container - hidden until revealed */
