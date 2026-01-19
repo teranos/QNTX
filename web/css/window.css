@@ -43,6 +43,46 @@
     color: var(--panel-text-primary, #333);
 }
 
+/* Window control buttons container */
+.draggable-window-controls {
+    display: flex;
+    gap: 2px;
+}
+
+/* Minimize button - reuses panel-close pattern from components.css */
+.panel-minimize {
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 18px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.panel-minimize:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.panel-minimize:active {
+    background: var(--bg-almost-white);
+    color: var(--text-primary);
+}
+
+.panel-minimize:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
 /* Version text next to title */
 .draggable-window-version {
     font-weight: 400;
