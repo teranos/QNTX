@@ -115,7 +115,7 @@
 }
 
 #loader-logs::-webkit-scrollbar-track {
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
 }
 
 #loader-logs::-webkit-scrollbar-thumb {
