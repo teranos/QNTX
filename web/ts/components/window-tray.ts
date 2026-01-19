@@ -47,7 +47,6 @@ class WindowTrayImpl {
 
     // Component state
     private element: HTMLElement | null = null;
-    private itemsContainer: HTMLElement | null = null;
     private indicatorContainer: HTMLElement | null = null;
     private items: Map<string, TrayItem> = new Map();
     private mouseX: number = 0;
@@ -72,15 +71,10 @@ class WindowTrayImpl {
         this.element.className = 'window-tray';
         this.element.setAttribute('data-empty', 'true');
 
-        // Indicator dots (visible when not revealed)
+        // Indicator dots
         this.indicatorContainer = document.createElement('div');
         this.indicatorContainer.className = 'window-tray-indicators';
         this.element.appendChild(this.indicatorContainer);
-
-        // Items container (visible when revealed)
-        this.itemsContainer = document.createElement('div');
-        this.itemsContainer.className = 'window-tray-items';
-        this.element.appendChild(this.itemsContainer);
 
         graphContainer.appendChild(this.element);
 
@@ -118,6 +112,50 @@ class WindowTrayImpl {
     }
 
     /**
+     * Calculate proximity metrics for a dot element
+     */
+    private calculateProximity(dot: HTMLElement): {
+        distance: number;
+        distanceX: number;
+        distanceY: number;
+        proximityRaw: number;
+        isVerticalApproach: boolean;
+    } {
+        const rect = dot.getBoundingClientRect();
+        let distanceX = 0, distanceY = 0;
+
+        // Horizontal distance to nearest edge
+        if (this.mouseX < rect.left) {
+            distanceX = rect.left - this.mouseX;
+        } else if (this.mouseX > rect.right) {
+            distanceX = this.mouseX - rect.right;
+        }
+
+        // Vertical distance to nearest edge
+        if (this.mouseY < rect.top) {
+            distanceY = rect.top - this.mouseY;
+        } else if (this.mouseY > rect.bottom) {
+            distanceY = this.mouseY - rect.bottom;
+        }
+
+        // Euclidean distance to nearest edge (0 if inside)
+        const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+        // Determine approach direction
+        const isVerticalApproach = distanceY > distanceX;
+
+        // Use appropriate threshold based on approach direction
+        const threshold = isVerticalApproach
+            ? this.PROXIMITY_THRESHOLD_VERTICAL
+            : this.PROXIMITY_THRESHOLD_HORIZONTAL;
+
+        // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
+        const proximityRaw = Math.max(0, 1 - (distance / threshold));
+
+        return { distance, distanceX, distanceY, proximityRaw, isVerticalApproach };
+    }
+
+    /**
      * Update proximity-based morphing for each dot
      * Uses requestAnimationFrame for smooth 60fps updates
      */
@@ -135,30 +173,7 @@ class WindowTrayImpl {
             // First pass: check if any dot is highly proximate (gives baseline boost to all)
             let maxProximityRaw = 0;
             dots.forEach((dot) => {
-                const rect = dot.getBoundingClientRect();
-                let distanceX = 0, distanceY = 0;
-
-                if (this.mouseX < rect.left) {
-                    distanceX = rect.left - this.mouseX;
-                } else if (this.mouseX > rect.right) {
-                    distanceX = this.mouseX - rect.right;
-                }
-
-                if (this.mouseY < rect.top) {
-                    distanceY = rect.top - this.mouseY;
-                } else if (this.mouseY > rect.bottom) {
-                    distanceY = this.mouseY - rect.bottom;
-                }
-
-                const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-
-                // Use appropriate threshold based on approach direction
-                const isVerticalApproach = distanceY > distanceX;
-                const threshold = isVerticalApproach
-                    ? this.PROXIMITY_THRESHOLD_VERTICAL
-                    : this.PROXIMITY_THRESHOLD_HORIZONTAL;
-
-                const proximityRaw = Math.max(0, 1 - (distance / threshold));
+                const { proximityRaw } = this.calculateProximity(dot);
                 maxProximityRaw = Math.max(maxProximityRaw, proximityRaw);
             });
 
@@ -166,43 +181,7 @@ class WindowTrayImpl {
             const baselineBoost = maxProximityRaw > this.BASELINE_BOOST_TRIGGER ? this.BASELINE_BOOST_AMOUNT : 0;
 
             dots.forEach((dot, index) => {
-                // Use current bounding rect so hit zone grows with the element
-                const rect = dot.getBoundingClientRect();
-
-                // Calculate distance to nearest edge of the element
-                // If mouse is inside the rect, distance is 0
-                let distanceX: number;
-                let distanceY: number;
-
-                if (this.mouseX < rect.left) {
-                    distanceX = rect.left - this.mouseX; // Left of element
-                } else if (this.mouseX > rect.right) {
-                    distanceX = this.mouseX - rect.right; // Right of element
-                } else {
-                    distanceX = 0; // Inside horizontal bounds
-                }
-
-                if (this.mouseY < rect.top) {
-                    distanceY = rect.top - this.mouseY; // Above element
-                } else if (this.mouseY > rect.bottom) {
-                    distanceY = this.mouseY - rect.bottom; // Below element
-                } else {
-                    distanceY = 0; // Inside vertical bounds
-                }
-
-                // Euclidean distance to nearest edge (0 if inside)
-                const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-
-                // Check if vertical or horizontal approach dominates
-                const isVerticalApproach = distanceY > distanceX;
-
-                // Use appropriate threshold based on approach direction
-                const threshold = isVerticalApproach
-                    ? this.PROXIMITY_THRESHOLD_VERTICAL
-                    : this.PROXIMITY_THRESHOLD_HORIZONTAL;
-
-                // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
-                const proximityRaw = Math.max(0, 1 - (distance / threshold));
+                const { distance, distanceX, distanceY, proximityRaw, isVerticalApproach } = this.calculateProximity(dot);
 
                 // Apply different easing based on approach direction
                 let proximity: number;
@@ -415,10 +394,9 @@ class WindowTrayImpl {
     }
 
     private renderItems(): void {
-        if (!this.itemsContainer || !this.indicatorContainer) return;
+        if (!this.indicatorContainer) return;
 
         // Clear existing
-        this.itemsContainer.innerHTML = '';
         this.indicatorContainer.innerHTML = '';
 
         // Render indicators (dots) with click handlers
@@ -476,30 +454,10 @@ class WindowTrayImpl {
 
             this.indicatorContainer!.appendChild(dot);
         });
-
-        // Render items
-        this.items.forEach((item) => {
-            const itemEl = document.createElement('div');
-            itemEl.className = 'window-tray-item';
-            itemEl.setAttribute('data-window-id', item.id);
-
-            const titleEl = document.createElement('span');
-            titleEl.className = 'window-tray-item-title';
-            titleEl.textContent = this.stripHtml(item.title);
-            itemEl.appendChild(titleEl);
-
-            // Restore on click
-            itemEl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                item.onRestore();
-            });
-
-            this.itemsContainer!.appendChild(itemEl);
-        });
     }
 
     /**
-     * Strip HTML tags from title for plain text display
+     * Strip HTML tags from title for plain text display in expanded dots
      */
     private stripHtml(html: string): string {
         const doc = new DOMParser().parseFromString(html, 'text/html');
