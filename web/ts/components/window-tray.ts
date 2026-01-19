@@ -131,8 +131,8 @@ class WindowTrayImpl {
                 maxProximityRaw = Math.max(maxProximityRaw, proximityRaw);
             });
 
-            // Calculate baseline boost (40% when any dot is highly proximate)
-            const baselineBoost = maxProximityRaw > 0.5 ? 0.4 : 0;
+            // Calculate baseline boost (20% when any dot is nearly fully expanded)
+            const baselineBoost = maxProximityRaw > 0.85 ? 0.2 : 0;
 
             dots.forEach((dot, index) => {
                 // Use current bounding rect so hit zone grows with the element
