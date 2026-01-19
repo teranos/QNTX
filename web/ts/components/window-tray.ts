@@ -67,15 +67,8 @@ class WindowTrayImpl {
             this.updateProximity();
         });
 
-        // Reveal on mouse enter
-        this.element.addEventListener('mouseenter', () => {
-            this.reveal();
-        });
-
-        // Hide on mouse leave (with delay)
-        this.element.addEventListener('mouseleave', () => {
-            this.scheduleHide();
-        });
+        // Note: mouseenter/mouseleave removed - proximity morphing replaces reveal behavior
+        // Container has pointer-events: none, only dots are interactive
     }
 
     private reveal(): void {
