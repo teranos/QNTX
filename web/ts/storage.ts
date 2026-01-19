@@ -9,8 +9,8 @@
  * - Any module needing localStorage with robust handling
  */
 
-import { handleErrorSilent, SEG } from './error-handler.ts';
-import { log } from './logger.ts';
+import { handleErrorSilent } from './error-handler.ts';
+import { log, SEG } from './logger.ts';
 
 // ============================================================================
 // Types
@@ -57,14 +57,14 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
 
         // Validate envelope structure
         if (!isValidEnvelope(envelope)) {
-            log.warn(SEG.DB, `Invalid envelope for key "${key}", removing`);
+            log.warn(SEG.UI, `Invalid envelope for key "${key}", removing`);
             removeItem(key);
             return null;
         }
 
         // Check version mismatch
         if (options?.version !== undefined && envelope.version !== options.version) {
-            log.warn(SEG.DB, `Version mismatch for key "${key}" (stored: ${envelope.version}, expected: ${options.version}), removing`);
+            log.warn(SEG.UI, `Version mismatch for key "${key}" (stored: ${envelope.version}, expected: ${options.version}), removing`);
             removeItem(key);
             return null;
         }
@@ -73,7 +73,7 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
         if (options?.maxAge !== undefined) {
             const age = Date.now() - envelope.timestamp;
             if (age > options.maxAge) {
-                log.debug(SEG.DB, `Key "${key}" expired (age: ${age}ms, maxAge: ${options.maxAge}ms)`);
+                log.debug(SEG.UI, `Key "${key}" expired (age: ${age}ms, maxAge: ${options.maxAge}ms)`);
                 removeItem(key);
                 return null;
             }
@@ -81,14 +81,14 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
 
         // Custom validation
         if (options?.validate && !options.validate(envelope.data)) {
-            log.warn(SEG.DB, `Validation failed for key "${key}", removing`);
+            log.warn(SEG.UI, `Validation failed for key "${key}", removing`);
             removeItem(key);
             return null;
         }
 
         return envelope.data;
     } catch (error: unknown) {
-        handleErrorSilent(error, `Failed to get storage key "${key}"`, SEG.DB);
+        handleErrorSilent(error, `Failed to get storage key "${key}"`, SEG.UI);
         return null;
     }
 }
@@ -109,7 +109,7 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
         };
         localStorage.setItem(key, JSON.stringify(envelope));
     } catch (error: unknown) {
-        handleErrorSilent(error, `Failed to set storage key "${key}"`, SEG.DB);
+        handleErrorSilent(error, `Failed to set storage key "${key}"`, SEG.UI);
     }
 }
 
@@ -122,7 +122,7 @@ export function removeItem(key: string): void {
     try {
         localStorage.removeItem(key);
     } catch (error: unknown) {
-        handleErrorSilent(error, `Failed to remove storage key "${key}"`, SEG.DB);
+        handleErrorSilent(error, `Failed to remove storage key "${key}"`, SEG.UI);
     }
 }
 
