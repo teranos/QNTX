@@ -29,7 +29,7 @@
 .window-tray-indicators {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     padding: 0;
     transition: opacity 0.2s ease;
     /* Tight fit around dots only */
