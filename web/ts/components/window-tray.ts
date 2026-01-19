@@ -15,10 +15,11 @@ export interface TrayItem {
 
 class WindowTrayImpl {
     // Proximity morphing configuration
-    private readonly PROXIMITY_THRESHOLD = 50; // Max distance for morphing effect (px)
+    private readonly PROXIMITY_THRESHOLD_HORIZONTAL = 30; // Max distance for horizontal approach (px)
+    private readonly PROXIMITY_THRESHOLD_VERTICAL = 110; // Max distance for vertical approach (px)
     private readonly SNAP_THRESHOLD = 0.9; // Snap to 100% at this proximity to prevent flickering
-    private readonly BASELINE_BOOST_TRIGGER = 0.85; // Trigger baseline boost when any item this close
-    private readonly BASELINE_BOOST_AMOUNT = 0.2; // Amount to boost all items (0.0-1.0)
+    private readonly BASELINE_BOOST_TRIGGER = 0.80; // Trigger baseline boost when any item this close
+    private readonly BASELINE_BOOST_AMOUNT = 0.3; // Amount to boost all items (0.0-1.0)
     private readonly TEXT_FADE_THRESHOLD = 0.5; // Show text when proximity exceeds this
 
     // Horizontal easing: gradual approach, dramatic finish
@@ -46,8 +47,6 @@ class WindowTrayImpl {
     private itemsContainer: HTMLElement | null = null;
     private indicatorContainer: HTMLElement | null = null;
     private items: Map<string, TrayItem> = new Map();
-    private isRevealed: boolean = false;
-    private hideTimeout: number | null = null;
     private mouseX: number = 0;
     private mouseY: number = 0;
     private proximityRAF: number | null = null;
@@ -98,28 +97,6 @@ class WindowTrayImpl {
         // Container has pointer-events: none, only dots are interactive
     }
 
-    private reveal(): void {
-        if (this.hideTimeout) {
-            clearTimeout(this.hideTimeout);
-            this.hideTimeout = null;
-        }
-        if (!this.isRevealed && this.items.size > 0) {
-            this.isRevealed = true;
-            this.element?.setAttribute('data-revealed', 'true');
-        }
-    }
-
-    private scheduleHide(): void {
-        if (this.hideTimeout) {
-            clearTimeout(this.hideTimeout);
-        }
-        this.hideTimeout = window.setTimeout(() => {
-            this.isRevealed = false;
-            this.element?.setAttribute('data-revealed', 'false');
-            this.hideTimeout = null;
-        }, 300);
-    }
-
     /**
      * Update proximity-based morphing for each dot
      * Uses requestAnimationFrame for smooth 60fps updates
@@ -130,7 +107,7 @@ class WindowTrayImpl {
         }
 
         this.proximityRAF = requestAnimationFrame(() => {
-            if (!this.indicatorContainer || this.isRevealed) return;
+            if (!this.indicatorContainer) return;
 
             const dots = Array.from(this.indicatorContainer.querySelectorAll('.window-tray-dot')) as HTMLElement[];
             const itemsArray = Array.from(this.items.values());
@@ -189,8 +166,16 @@ class WindowTrayImpl {
                 // Euclidean distance to nearest edge (0 if inside)
                 const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
+                // Check if vertical or horizontal approach dominates
+                const isVerticalApproach = distanceY > distanceX;
+
+                // Use appropriate threshold based on approach direction
+                const threshold = isVerticalApproach
+                    ? this.PROXIMITY_THRESHOLD_VERTICAL
+                    : this.PROXIMITY_THRESHOLD_HORIZONTAL;
+
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
-                const proximityRaw = Math.max(0, 1 - (distance / this.PROXIMITY_THRESHOLD));
+                const proximityRaw = Math.max(0, 1 - (distance / threshold));
 
                 // Apply different easing based on approach direction
                 let proximity: number;
@@ -199,8 +184,6 @@ class WindowTrayImpl {
                 if (proximityRaw >= this.SNAP_THRESHOLD) {
                     proximity = 1.0;
                 } else {
-                    // Check if vertical or horizontal approach dominates
-                    const isVerticalApproach = distanceY > distanceX;
 
                     if (isVerticalApproach) {
                         // VERTICAL: Inverted easing - fast early growth, slow refinement
@@ -309,7 +292,13 @@ class WindowTrayImpl {
             if (!stored) return [];
 
             const state = JSON.parse(stored);
-            return state.minimizedWindows || [];
+            const windows = state.minimizedWindows;
+
+            // Validate structure
+            if (!Array.isArray(windows)) return [];
+            if (!windows.every((id: any) => typeof id === 'string')) return [];
+
+            return windows;
         } catch (err) {
             console.warn('Failed to load window tray state:', err);
             return [];
@@ -354,8 +343,6 @@ class WindowTrayImpl {
 
         if (this.items.size === 0) {
             this.element?.setAttribute('data-empty', 'true');
-            this.element?.setAttribute('data-revealed', 'false');
-            this.isRevealed = false;
             this.clearState(); // Clear localStorage when empty
         } else {
             this.saveState(); // Update localStorage
@@ -428,9 +415,8 @@ class WindowTrayImpl {
      * Strip HTML tags from title for plain text display
      */
     private stripHtml(html: string): string {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        return tmp.textContent || tmp.innerText || '';
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return doc.body.textContent || '';
     }
 
     /**
