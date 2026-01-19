@@ -131,7 +131,14 @@ class WindowTrayImpl {
                 }
 
                 const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-                const proximityRaw = Math.max(0, 1 - (distance / this.PROXIMITY_THRESHOLD));
+
+                // Use appropriate threshold based on approach direction
+                const isVerticalApproach = distanceY > distanceX;
+                const threshold = isVerticalApproach
+                    ? this.PROXIMITY_THRESHOLD_VERTICAL
+                    : this.PROXIMITY_THRESHOLD_HORIZONTAL;
+
+                const proximityRaw = Math.max(0, 1 - (distance / threshold));
                 maxProximityRaw = Math.max(maxProximityRaw, proximityRaw);
             });
 
