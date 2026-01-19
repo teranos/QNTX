@@ -6,31 +6,32 @@
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
 
     /* Core Colors */
-    --text-primary: #333;
-    --text-secondary: #666;
-    --text-tertiary: #999;
-    --bg-primary: #fff;
-    --bg-almost-white: #f8f8f8;
-    --bg-hover: #f0f0f0;
+    --text-primary: #333433;
+    --text-secondary: #656766;
+    --text-tertiary: #989a99;
+    --bg-primary: #fcffff;
+    --bg-almost-white: #f7f9f8;
+    --bg-hover: #eff1f0;
     --bg-gray: #999;
-    --bg-dark: #1e1e1e;
-    --border-color: #ddd;
-    --border-light: #e0e0e0;
-    --accent-color: #0066cc;
+    --bg-dark: #202523;
+    --border-color: #dcdedd;
+    --border-light: #dfe1e0;
+    --accent-color: #0067cc;
 
     /* Dark mode colors - for dark backgrounds */
-    --bg-almost-black: #1a1a1a; /* Like system drawer */
-    --text-on-dark: #ddd; /* Primary text on dark */
-    --text-on-dark-secondary: #aaa; /* Secondary text on dark */
-    --text-on-dark-tertiary: #888; /* Tertiary text on dark */
-    --border-on-dark: rgba(255, 255, 255, 0.1);
+    --bg-almost-black: #1a1b1a; /* Like system drawer */
+    --text-on-dark: #dfe1e0; /* Primary text on dark */
+    --text-on-dark-secondary: #a9abaa; /* Secondary text on dark */
+    --text-on-dark-tertiary: #878988; /* Tertiary text on dark */
+    --text-on-dark-emphasis: #fefffe; /* Headings/emphasis on dark */
+    --border-on-dark: #3f4140; /* Borders on dark backgrounds */
 
     /* Status Colors */
-    --color-success: #22c55e;
-    --color-error: #ef4444;
-    --color-warning: #ffaa00;
-    --color-info: #3b82f6;
-    --color-scheduled: #7b1fa2;
+    --color-success: #22c65e;
+    --color-error: #ef4544;
+    --color-warning: #ffab00;
+    --color-info: #3b83f6;
+    --color-scheduled: #7b20a2;
 
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -237,7 +238,7 @@ body.disconnected #container {
 
 /* LLM Streaming Styles */
 .progress-event.llm-stream {
-    background: #1e1e1e;
+    background: var(--bg-dark);
     border-left: 3px solid #4ade80;
 }
 

@@ -238,7 +238,7 @@
 }
 
 .execution-logs {
-  background: #1e1e1e;
+  background: var(--bg-dark);
   color: #d4d4d4;
   padding: 12px;
   border-radius: var(--panel-border-radius);

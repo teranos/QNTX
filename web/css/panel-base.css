@@ -475,7 +475,7 @@
     pointer-events: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     max-width: 400px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-on-dark);
 }
 
 /* Mobile/tablet: constrain tooltip to viewport */
