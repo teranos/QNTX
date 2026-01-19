@@ -109,21 +109,32 @@ class WindowTrayImpl {
             const itemsArray = Array.from(this.items.values());
 
             dots.forEach((dot, index) => {
-                // Cache the initial position (when dot is 8×8) to prevent flickering
-                // as the element grows and its bounds change
-                if (!dot.dataset.initialCenterX) {
-                    const rect = dot.getBoundingClientRect();
-                    dot.dataset.initialCenterX = String(rect.left + rect.width / 2);
-                    dot.dataset.initialCenterY = String(rect.top + rect.height / 2);
+                // Use current bounding rect so hit zone grows with the element
+                const rect = dot.getBoundingClientRect();
+
+                // Calculate distance to nearest edge of the element
+                // If mouse is inside the rect, distance is 0
+                let distanceX: number;
+                let distanceY: number;
+
+                if (this.mouseX < rect.left) {
+                    distanceX = rect.left - this.mouseX; // Left of element
+                } else if (this.mouseX > rect.right) {
+                    distanceX = this.mouseX - rect.right; // Right of element
+                } else {
+                    distanceX = 0; // Inside horizontal bounds
                 }
 
-                const centerX = parseFloat(dot.dataset.initialCenterX);
-                const centerY = parseFloat(dot.dataset.initialCenterY);
+                if (this.mouseY < rect.top) {
+                    distanceY = rect.top - this.mouseY; // Above element
+                } else if (this.mouseY > rect.bottom) {
+                    distanceY = this.mouseY - rect.bottom; // Below element
+                } else {
+                    distanceY = 0; // Inside vertical bounds
+                }
 
-                // Calculate distance from mouse to initial dot center
-                const dx = this.mouseX - centerX;
-                const dy = this.mouseY - centerY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
+                // Euclidean distance to nearest edge (0 if inside)
+                const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
                 // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
                 const proximityRaw = Math.max(0, 1 - (distance / this.proximityThreshold));
