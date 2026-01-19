@@ -9,7 +9,7 @@
 export interface TrayItem {
     id: string;
     title: string;
-    onRestore: () => void;
+    onRestore: (sourceRect?: DOMRect) => void;
     onClose?: () => void;
 }
 
@@ -21,6 +21,9 @@ class WindowTrayImpl {
     private readonly BASELINE_BOOST_TRIGGER = 0.80; // Trigger baseline boost when any item this close
     private readonly BASELINE_BOOST_AMOUNT = 0.3; // Amount to boost all items (0.0-1.0)
     private readonly TEXT_FADE_THRESHOLD = 0.5; // Show text when proximity exceeds this
+
+    // Deferred items to add after init
+    private deferredItems: TrayItem[] = [];
 
     // Horizontal easing: gradual approach, dramatic finish
     private readonly HORIZONTAL_EASE_BREAKPOINT = 0.8; // 80% proximity
@@ -82,6 +85,22 @@ class WindowTrayImpl {
         graphContainer.appendChild(this.element);
 
         this.setupEventListeners();
+
+        // Process any deferred items that tried to add before init
+        if (this.deferredItems.length > 0) {
+            const itemsToAdd = [...this.deferredItems];
+            this.deferredItems = [];
+            itemsToAdd.forEach(item => {
+                if (!this.items.has(item.id)) {
+                    this.items.set(item.id, item);
+                }
+            });
+            this.renderItems();
+            if (this.items.size > 0) {
+                this.element.setAttribute('data-empty', 'false');
+                this.saveState();
+            }
+        }
     }
 
     private setupEventListeners(): void {
@@ -335,8 +354,15 @@ class WindowTrayImpl {
     /**
      * Add a minimized window to the tray
      */
-    public add(item: TrayItem): void {
-        this.init(); // Ensure initialized
+    public add(item: TrayItem, skipSave: boolean = false): void {
+        // Try to initialize, but if it fails, defer the item
+        this.init();
+
+        if (!this.element) {
+            // Tray not ready yet, defer this item
+            this.deferredItems.push(item);
+            return;
+        }
 
         if (this.items.has(item.id)) {
             return; // Already in tray
@@ -344,8 +370,12 @@ class WindowTrayImpl {
 
         this.items.set(item.id, item);
         this.renderItems();
-        this.element?.setAttribute('data-empty', 'false');
-        this.saveState(); // Persist to localStorage
+        this.element.setAttribute('data-empty', 'false');
+
+        // Only save state if not skipping (skip during restore from localStorage)
+        if (!skipSave) {
+            this.saveState(); // Persist to localStorage
+        }
     }
 
     /**
@@ -404,20 +434,19 @@ class WindowTrayImpl {
                 // Disable proximity morphing - let CSS transition handle the collapse
                 this.isRestoring = true;
 
-                // Start window restore immediately (animates from tray position)
-                item.onRestore();
+                // Get dot's current position for spatial continuity
+                const dotRect = dot.getBoundingClientRect();
 
-                // Collapse other dots, but keep clicked dot visible briefly
+                // Start window restore immediately (animates from dot's exact position)
+                item.onRestore(dotRect);
+
+                // Keep clicked dot visible during window animation, collapse others
                 const allDots = this.indicatorContainer!.querySelectorAll('.window-tray-dot');
                 allDots.forEach((d) => {
                     const htmlDot = d as HTMLElement;
 
-                    if (htmlDot === dot) {
-                        // Clicked dot: fade out as window grows
-                        htmlDot.style.transition = 'opacity 0.15s ease-out';
-                        htmlDot.style.opacity = '0';
-                    } else {
-                        // Other dots: collapse back to square
+                    if (htmlDot !== dot) {
+                        // Other dots: collapse back to square immediately
                         htmlDot.style.width = '';
                         htmlDot.style.height = '';
                         htmlDot.style.borderRadius = '';
@@ -432,6 +461,12 @@ class WindowTrayImpl {
                         delete htmlDot.dataset.hasText;
                     }
                 });
+
+                // Fade out clicked dot as window morphs from it
+                setTimeout(() => {
+                    dot.style.transition = 'opacity 0.2s ease-out';
+                    dot.style.opacity = '0';
+                }, 50);
 
                 // Re-enable proximity after animation
                 setTimeout(() => {
