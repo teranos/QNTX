@@ -477,7 +477,7 @@ nav.doc-nav a {
 
 .install-code {
     background: var(--bg-dark);
-    color: #e0e0e0;
+    color: var(--text-on-dark);
     padding: 12px 16px;
     border-radius: 4px;
     font-family: var(--font-mono, monospace);
@@ -788,7 +788,7 @@ th {
 @media (prefers-color-scheme: dark) {
     body {
         background: var(--bg-almost-black);
-        color: #e0e0e0;
+        color: var(--text-on-dark);
     }
 
     h1, h2 {
@@ -865,7 +865,7 @@ th {
     .download-section.quick-download .download-link {
         background: var(--bg-dark);
         border-color: #444;
-        color: #e0e0e0;
+        color: var(--text-on-dark);
     }
 
     .download-section.quick-download .download-link:hover {
@@ -891,7 +891,7 @@ th {
     }
 
     .category-title {
-        color: #e0e0e0;
+        color: var(--text-on-dark);
     }
 
     .category-desc {
@@ -909,7 +909,7 @@ th {
     .search-input {
         background: var(--bg-dark);
         border-color: var(--text-primary);
-        color: #e0e0e0;
+        color: var(--text-on-dark);
     }
 
     .search-input::placeholder {

@@ -11,7 +11,7 @@
 #codemirror-container .cm-editor {
     height: 100%;
     background: transparent;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 #codemirror-container .cm-scroller {

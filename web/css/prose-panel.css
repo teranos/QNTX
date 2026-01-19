@@ -62,7 +62,7 @@
     align-items: center;
     gap: 12px;
     font-size: 16px;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 .prose-icon {
@@ -111,7 +111,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     font-size: 15px;
     line-height: 1.6;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
     outline: none;
     /* Ensure text is properly rendered */
     -webkit-font-smoothing: antialiased;
