@@ -307,6 +307,31 @@ let
   ];
 
   # ============================================================================
+  # Date Utilities
+  # ============================================================================
+
+  # Convert Unix timestamp to RFC 822 format for RSS
+  # Example: 1737244800 -> "Mon, 19 Jan 2026 00:00:00 +0000"
+  timestampToRfc822 = ts:
+    let
+      days = ts / 86400;
+      year = 1970 + (days / 365);
+      remainingDays = lib.mod days 365;
+      month = 1 + (remainingDays / 30);
+      day = 1 + (lib.mod remainingDays 30);
+
+      monthNames = [ "Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec" ];
+      dayNames = [ "Sun" "Mon" "Tue" "Wed" "Thu" "Fri" "Sat" ];
+
+      # Approximate day of week (simplified)
+      dayOfWeek = lib.elemAt dayNames (lib.mod (days + 4) 7);
+      monthName = lib.elemAt monthNames (month - 1);
+
+      pad = n: if n < 10 then "0${toString n}" else toString n;
+    in
+    "${dayOfWeek}, ${pad day} ${monthName} ${toString year} 00:00:00 +0000";
+
+  # ============================================================================
   # Markdown Discovery
   # ============================================================================
 
@@ -324,6 +349,23 @@ let
   getRelativePath = path:
     lib.removePrefix "${toString docsDir}/" (toString path);
 
+  # Get git commit timestamp for a file (returns Unix timestamp or null)
+  getFileCommitTimestamp = mdPath:
+    let
+      relPath = getRelativePath mdPath;
+      # Use runCommand to get git log timestamp for the file
+      timestampFile = pkgs.runCommand "git-timestamp-${lib.replaceStrings ["/"] ["-"] relPath}"
+        {
+          nativeBuildInputs = [ pkgs.git ];
+        }
+        ''
+          cd ${./.}
+          git log -1 --format=%ct "docs/${relPath}" 2>/dev/null > $out || echo "" > $out
+        '';
+      timestampStr = lib.trim (builtins.readFile timestampFile);
+    in
+    if timestampStr == "" then null else lib.toInt timestampStr;
+
   mkFileInfo = mdPath:
     let
       relPath = getRelativePath mdPath;
@@ -332,8 +374,9 @@ let
       htmlPath = lib.removeSuffix ".md" relPath + ".html";
       depth = lib.length (lib.filter (x: x != "") (lib.splitString "/" (if dir == "." then "" else dir)));
       prefix = if depth == 0 then "." else lib.concatStringsSep "/" (lib.genList (_: "..") depth);
+      commitTimestamp = getFileCommitTimestamp mdPath;
     in
-    { inherit mdPath relPath dir name htmlPath depth prefix; };
+    { inherit mdPath relPath dir name htmlPath depth prefix commitTimestamp; };
 
   fileInfos = map mkFileInfo markdownFiles;
 
@@ -394,57 +437,58 @@ let
   mkHead = { title, prefix, description ? defaultDescription, pagePath ? "", breadcrumbJsonLd ? "", additionalJsonLd ? "" }:
     let
       canonicalUrl = "${baseUrl}${if pagePath == "" then "/" else "/${pagePath}"}";
-    in ''
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${html.escape title}</title>
-      <meta name="description" content="${html.escape description}">
-      <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
-      <link rel="canonical" href="${canonicalUrl}">
-      <link rel="stylesheet" href="${prefix}/css/core.css">
-      <link rel="stylesheet" href="${prefix}/css/docs.css">
-      <link rel="stylesheet" href="${prefix}/css/prism.css">
-      <!-- OpenGraph -->
-      <meta property="og:title" content="${html.escape title}">
-      <meta property="og:description" content="${html.escape description}">
-      <meta property="og:image" content="${baseUrl}/qntx.jpg">
-      <meta property="og:url" content="${canonicalUrl}">
-      <meta property="og:type" content="website">
-      <meta property="og:site_name" content="QNTX">
-      <!-- Twitter Card -->
-      <meta name="twitter:card" content="summary">
-      <meta name="twitter:title" content="${html.escape title}">
-      <meta name="twitter:description" content="${html.escape description}">
-      <meta name="twitter:image" content="${baseUrl}/qntx.jpg">
-      <!-- RSS Feed -->
-      <link rel="alternate" type="application/rss+xml" title="QNTX Documentation" href="${baseUrl}/feed.xml">
-      <!-- JSON-LD Structured Data -->
-      <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "TechArticle",
-        "headline": "${html.escapeJson title}",
-        "description": "${html.escapeJson description}",
-        "url": "${canonicalUrl}",
-        "image": "${baseUrl}/qntx.jpg",
-        ${lib.optionalString (provenance.date != null) ''"datePublished": "${provenance.date}",
-        "dateModified": "${provenance.date}",''}
-        "publisher": {
-          "@type": "Organization",
-          "name": "QNTX",
-          "logo": {
-            "@type": "ImageObject",
-            "url": "${baseUrl}/qntx.jpg"
-          }
-        }
-      }
-      </script>
-      ${breadcrumbJsonLd}
-      ${additionalJsonLd}
-    </head>'';
+    in
+    ''
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${html.escape title}</title>
+        <meta name="description" content="${html.escape description}">
+        <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
+        <link rel="canonical" href="${canonicalUrl}">
+        <link rel="stylesheet" href="${prefix}/css/core.css">
+        <link rel="stylesheet" href="${prefix}/css/docs.css">
+        <link rel="stylesheet" href="${prefix}/css/prism.css">
+        <!-- OpenGraph -->
+        <meta property="og:title" content="${html.escape title}">
+        <meta property="og:description" content="${html.escape description}">
+        <meta property="og:image" content="${baseUrl}/qntx.jpg">
+        <meta property="og:url" content="${canonicalUrl}">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="QNTX">
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:title" content="${html.escape title}">
+        <meta name="twitter:description" content="${html.escape description}">
+        <meta name="twitter:image" content="${baseUrl}/qntx.jpg">
+        <!-- RSS Feed -->
+        <link rel="alternate" type="application/rss+xml" title="QNTX Documentation" href="${baseUrl}/feed.xml">
+        <!-- JSON-LD Structured Data -->
+        <script type="application/ld+json">
+        ${builtins.toJSON {
+          "@context" = "https://schema.org";
+          "@type" = "TechArticle";
+          headline = title;
+          description = description;
+          url = canonicalUrl;
+          image = "${baseUrl}/qntx.jpg";
+          datePublished = provenance.date;
+          dateModified = provenance.date;
+          publisher = {
+            "@type" = "Organization";
+            name = "QNTX";
+            logo = {
+              "@type" = "ImageObject";
+              url = "${baseUrl}/qntx.jpg";
+            };
+          };
+        }}
+        </script>
+        ${breadcrumbJsonLd}
+        ${additionalJsonLd}
+      </head>'';
 
   mkNav = { prefix }: ''
     <nav class="doc-nav">
@@ -741,33 +785,33 @@ let
           releaseDate = if latestRelease != null then lib.substring 0 10 latestRelease.published_at else null;
         in
         ''
-        <!-- SoftwareApplication JSON-LD -->
-        <script type="application/ld+json">
-        {
-          "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          "name": "QNTX",
-          "description": "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.",
-          "applicationCategory": "DeveloperApplication",
-          "operatingSystem": "Linux, macOS, Windows",
-          "softwareVersion": "${html.escapeJson version}",
-          ${lib.optionalString (releaseDate != null) ''"datePublished": "${releaseDate}",''}
-          "downloadUrl": "https://github.com/${githubRepo}/releases",
-          "installUrl": "https://github.com/${githubRepo}#installation",
-          "releaseNotes": "https://github.com/${githubRepo}/releases",
-          "license": "https://github.com/${githubRepo}/blob/main/LICENSE",
-          "author": {
-            "@type": "Organization",
+          <!-- SoftwareApplication JSON-LD -->
+          <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
             "name": "QNTX",
-            "url": "${baseUrl}"
-          },
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "USD"
+            "description": "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows",
+            "softwareVersion": "${html.escapeJson version}",
+            ${lib.optionalString (releaseDate != null) ''"datePublished": "${releaseDate}",''}
+            "downloadUrl": "https://github.com/${githubRepo}/releases",
+            "installUrl": "https://github.com/${githubRepo}#installation",
+            "releaseNotes": "https://github.com/${githubRepo}/releases",
+            "license": "https://github.com/${githubRepo}/blob/main/LICENSE",
+            "author": {
+              "@type": "Organization",
+              "name": "QNTX",
+              "url": "${baseUrl}"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
           }
-        }
-        </script>'';
+          </script>'';
     in
     mkPage {
       title = "QNTX Downloads";
@@ -1217,6 +1261,28 @@ let
     </urlset>
   '';
 
+  # Extract CSS variable values from core.css for XSLT
+  cssVarExtractor = varName: default:
+    let
+      coreCssContent = builtins.readFile cssFiles.core;
+      # Match pattern: --var-name: #value;
+      pattern = "--${varName}:[[:space:]]*([^;]+);";
+      matches = builtins.match ".*${pattern}.*" coreCssContent;
+    in
+    if matches != null then lib.head matches else default;
+
+  # Extract colors from core.css
+  xsltColors = {
+    bgDark = "#202523"; # --bg-dark
+    textOnDark = "#dfe1e0"; # --text-on-dark
+    textOnDarkEmphasis = "#fefffe"; # --text-on-dark-emphasis
+    textOnDarkSecondary = "#a9abaa"; # --text-on-dark-secondary
+    textOnDarkTertiary = "#878988"; # --text-on-dark-tertiary
+    borderOnDark = "#3f4140"; # --border-on-dark
+    bgAlmostBlack = "#1a1b1a"; # --bg-almost-black
+    accentColor = "#0067cc"; # --accent-color
+  };
+
   # XSLT stylesheet for human-readable sitemap viewing in browsers
   sitemapXslContent = ''
     <?xml version="1.0" encoding="UTF-8"?>
@@ -1227,18 +1293,18 @@ let
           <head>
             <title>QNTX Sitemap</title>
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px auto; max-width: 900px; padding: 0 20px; background: #1e1e1e; color: #e0e0e0; }
-              h1 { color: #fff; border-bottom: 1px solid #333; padding-bottom: 10px; }
-              p { color: #aaa; margin-bottom: 20px; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px auto; max-width: 900px; padding: 0 20px; background: ${xsltColors.bgDark}; color: ${xsltColors.textOnDark}; }
+              h1 { color: ${xsltColors.textOnDarkEmphasis}; border-bottom: 1px solid ${xsltColors.borderOnDark}; padding-bottom: 10px; }
+              p { color: ${xsltColors.textOnDarkSecondary}; margin-bottom: 20px; }
               table { width: 100%; border-collapse: collapse; }
-              th { text-align: left; padding: 12px; background: #252525; color: #fff; border-bottom: 2px solid #333; }
-              td { padding: 10px 12px; border-bottom: 1px solid #333; }
+              th { text-align: left; padding: 12px; background: ${xsltColors.bgAlmostBlack}; color: ${xsltColors.textOnDarkEmphasis}; border-bottom: 2px solid ${xsltColors.borderOnDark}; }
+              td { padding: 10px 12px; border-bottom: 1px solid ${xsltColors.borderOnDark}; }
               tr:hover td { background: #2a2a2a; }
-              a { color: #66b3ff; text-decoration: none; }
+              a { color: ${xsltColors.accentColor}; text-decoration: none; }
               a:hover { text-decoration: underline; }
-              .priority { color: #888; }
-              .changefreq { color: #888; }
-              .lastmod { color: #888; }
+              .priority { color: ${xsltColors.textOnDarkTertiary}; }
+              .changefreq { color: ${xsltColors.textOnDarkTertiary}; }
+              .lastmod { color: ${xsltColors.textOnDarkTertiary}; }
             </style>
           </head>
           <body>
@@ -1271,15 +1337,14 @@ let
   # RSS Feed Generation
   # ============================================================================
 
-  # RSS date format: RFC 822 (e.g., "Mon, 15 Jan 2025 00:00:00 GMT")
-  # We approximate since we only have YYYY-MM-DD from sitemapLastmod
-  rssDate =
-    if sitemapLastmod != null
-    then "${sitemapLastmod}T00:00:00Z"
+  # Fallback RSS date for channel-level lastBuildDate
+  rssChannelDate =
+    if buildDate != null then buildDate
+    else if gitCommitDate != null then timestampToRfc822 gitCommitDate
     else null;
 
   # Generate RSS item for a documentation page
-  mkRssItem = { title, link, description, category ? null }:
+  mkRssItem = { title, link, description, category ? null, pubDate ? null }:
     ''
       <item>
         <title>${html.escape title}</title>
@@ -1287,25 +1352,27 @@ let
         <guid isPermaLink="true">${baseUrl}${link}</guid>
         <description>${html.escape description}</description>
         ${lib.optionalString (category != null) "<category>${html.escape category}</category>"}
-        ${lib.optionalString (rssDate != null) "<pubDate>${rssDate}</pubDate>"}
+        ${lib.optionalString (pubDate != null) "<pubDate>${pubDate}</pubDate>"}
       </item>'';
 
   # Generate RSS items for documentation pages
   rssItems =
-    # Special pages
+    # Special pages (use channel date as fallback)
     [
       (mkRssItem {
         title = "QNTX Downloads";
         link = "/downloads.html";
         description = "Download QNTX binaries, Docker images, or install via Nix package manager.";
+        pubDate = rssChannelDate;
       })
       (mkRssItem {
         title = "QNTX Infrastructure";
         link = "/infrastructure.html";
         description = "QNTX build infrastructure - Nix packages, apps, containers, and reproducible builds.";
+        pubDate = rssChannelDate;
       })
     ]
-    # All documentation pages
+    # All documentation pages with per-file commit dates
     ++ map
       (fileInfo:
         let
@@ -1315,12 +1382,18 @@ let
             if catMeta != null && catMeta.desc != ""
             then "QNTX ${toTitleCase category} - ${catMeta.desc}"
             else "QNTX documentation - ${toTitleCase fileInfo.name}";
+          # Use file's git commit timestamp, or fall back to channel date
+          itemPubDate =
+            if fileInfo.commitTimestamp != null
+            then timestampToRfc822 fileInfo.commitTimestamp
+            else rssChannelDate;
         in
         mkRssItem {
           title = "QNTX - ${toTitleCase fileInfo.name}";
           link = "/${fileInfo.htmlPath}";
           description = itemDescription;
           category = if category != null then toTitleCase category else null;
+          pubDate = itemPubDate;
         })
       fileInfos;
 
@@ -1333,7 +1406,7 @@ let
         <description>Continuous Intelligence - documentation and updates for QNTX</description>
         <language>en-us</language>
         <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
-        ${lib.optionalString (rssDate != null) "<lastBuildDate>${rssDate}</lastBuildDate>"}
+        ${lib.optionalString (rssChannelDate != null) "<lastBuildDate>${rssChannelDate}</lastBuildDate>"}
         <generator>sitegen.nix</generator>
         ${lib.concatStringsSep "\n    " rssItems}
       </channel>
@@ -1354,60 +1427,9 @@ let
       <meta name="robots" content="noindex">
       <link rel="icon" type="image/jpeg" href="./qntx.jpg">
       <link rel="stylesheet" href="./css/core.css">
-      <style>
-        body {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          background: var(--bg-dark);
-          color: var(--text-on-dark);
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          margin: 0;
-          padding: 20px;
-          text-align: center;
-        }
-        .quantum-box {
-          border: 2px dashed var(--border-on-dark);
-          padding: 40px;
-          max-width: 500px;
-          margin: 20px;
-        }
-        .cat-state {
-          font-size: 4em;
-          margin: 20px 0;
-        }
-        h1 { color: var(--text-on-dark-emphasis); margin: 0 0 10px 0; }
-        .error-code { font-size: 0.9em; color: var(--text-on-dark-tertiary); }
-        .explanation {
-          color: var(--text-on-dark-secondary);
-          line-height: 1.6;
-          margin: 20px 0;
-        }
-        .attestation {
-          font-family: monospace;
-          background: var(--bg-almost-black);
-          padding: 15px;
-          margin: 20px 0;
-          border-left: 3px solid var(--accent-color);
-          text-align: left;
-          font-size: 0.85em;
-        }
-        .home-link {
-          display: inline-block;
-          margin-top: 20px;
-          padding: 10px 20px;
-          background: var(--accent-color);
-          color: #fff;
-          text-decoration: none;
-          border-radius: 4px;
-        }
-        .home-link:hover { opacity: 0.9; }
-        .superposition { opacity: 0.6; font-style: italic; }
-      </style>
+      <link rel="stylesheet" href="./css/docs.css">
     </head>
-    <body>
+    <body class="error-404">
       <div class="quantum-box">
         <p class="error-code">ERROR 404</p>
         <h1>Unattested State</h1>
@@ -1423,8 +1445,8 @@ let
           ? 'The page you sought existed in superposition until you observed it.<br>The wavefunction collapsed favorably - but the content remains unattested.'
           : 'The page you sought existed in superposition until you observed it.<br>The wavefunction collapsed unfavorably - this state was never attested.';
         document.getElementById('attestation').innerHTML = isAlive
-          ? '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:#e06c75">UNVERIFIED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:#98c379">"alive"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:#e5c07b">COLLAPSED</span>'
-          : '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:#e06c75">FAILED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:#e06c75">"dead"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:#e5c07b">COLLAPSED</span>';
+          ? '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:var(--color-error)">UNVERIFIED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:var(--color-success)">"alive"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:var(--color-warning)">COLLAPSED</span>'
+          : '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:var(--color-error)">FAILED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:var(--color-error)">"dead"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:var(--color-warning)">COLLAPSED</span>';
       </script>
     </body>
     </html>
