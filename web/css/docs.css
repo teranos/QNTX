@@ -787,7 +787,7 @@ th {
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
     body {
-        background: #1a1a1a;
+        background: var(--bg-almost-black);
         color: #e0e0e0;
     }
 

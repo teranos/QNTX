@@ -95,7 +95,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     overflow: hidden;
 }
 
@@ -219,7 +219,7 @@
     margin: 3px 0;
     padding: 5px 8px;
     border-radius: 3px;
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     border-left: 3px solid #666;
 }
 
@@ -384,7 +384,7 @@
     margin: 2px 0;
     cursor: pointer;
     border-left: 2px solid #444;
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     transition: background 0.1s ease;
 }
 
