@@ -468,6 +468,13 @@ let
     in
     ''<nav class="breadcrumb">${homeCrumb}${categoryCrumb}${documentCrumb}</nav>'';
 
+  # Edit on GitHub link for documentation pages
+  mkEditLink = fileInfo:
+    let
+      editUrl = "https://github.com/${githubRepo}/edit/main/docs/${fileInfo.relPath}";
+    in
+    ''<a href="${editUrl}" class="edit-link" title="Edit this page on GitHub">Edit on GitHub</a>'';
+
   provenanceFooter =
     let
       commitLink = ''<a href="https://github.com/${githubRepo}/commit/${provenance.fullCommit}">${provenance.commit}</a>'';
@@ -878,6 +885,7 @@ let
         { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
         { path = "infrastructure.html"; desc = "Nix build documentation"; }
         { path = "sitegen.html"; desc = "This page"; }
+        { path = "404.html"; desc = "Quantum 404 page"; }
         { path = "build-info.json"; desc = "Provenance metadata"; }
         { path = "feed.xml"; desc = "RSS feed"; }
         { path = "sitemap.xml"; desc = "XML sitemap"; }
@@ -961,6 +969,8 @@ let
             [ "<strong>Sitemap with XSLT</strong>" "Human-readable sitemap at <code>/sitemap.xml</code> with browser-viewable styling" ]
             [ "<strong>Canonical URLs</strong>" "Every page has a canonical URL for proper SEO indexing" ]
             [ "<strong>JSON-LD</strong>" "TechArticle, BreadcrumbList, and SoftwareApplication schemas for rich search snippets" ]
+            [ "<strong>Edit on GitHub</strong>" "Every documentation page links to its source for easy contributions" ]
+            [ "<strong>Quantum 404</strong>" "Custom error page with Schrödinger's cat - state collapses on observation" ]
           ];
         };
       };
@@ -1123,7 +1133,10 @@ let
         ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; description = docDescription; pagePath = fileInfo.htmlPath; inherit breadcrumbJsonLd; }}
         <body>
         ${mkNav { prefix = fileInfo.prefix; }}
-        ${mkBreadcrumb fileInfo}
+        <div class="page-header">
+          ${mkBreadcrumb fileInfo}
+          ${mkEditLink fileInfo}
+        </div>
         EOF
           cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
         ${rewrittenMd}
@@ -1328,6 +1341,96 @@ let
   '';
 
   # ============================================================================
+  # 404 Page - Quantum State Collapse
+  # ============================================================================
+
+  notFoundContent = ''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>404 - Unattested State | QNTX</title>
+      <meta name="robots" content="noindex">
+      <link rel="icon" type="image/jpeg" href="./qntx.jpg">
+      <link rel="stylesheet" href="./css/core.css">
+      <style>
+        body {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-dark);
+          color: var(--text-on-dark);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          margin: 0;
+          padding: 20px;
+          text-align: center;
+        }
+        .quantum-box {
+          border: 2px dashed var(--border-on-dark);
+          padding: 40px;
+          max-width: 500px;
+          margin: 20px;
+        }
+        .cat-state {
+          font-size: 4em;
+          margin: 20px 0;
+        }
+        h1 { color: var(--text-on-dark-emphasis); margin: 0 0 10px 0; }
+        .error-code { font-size: 0.9em; color: var(--text-on-dark-tertiary); }
+        .explanation {
+          color: var(--text-on-dark-secondary);
+          line-height: 1.6;
+          margin: 20px 0;
+        }
+        .attestation {
+          font-family: monospace;
+          background: var(--bg-almost-black);
+          padding: 15px;
+          margin: 20px 0;
+          border-left: 3px solid var(--accent-color);
+          text-align: left;
+          font-size: 0.85em;
+        }
+        .home-link {
+          display: inline-block;
+          margin-top: 20px;
+          padding: 10px 20px;
+          background: var(--accent-color);
+          color: #fff;
+          text-decoration: none;
+          border-radius: 4px;
+        }
+        .home-link:hover { opacity: 0.9; }
+        .superposition { opacity: 0.6; font-style: italic; }
+      </style>
+    </head>
+    <body>
+      <div class="quantum-box">
+        <p class="error-code">ERROR 404</p>
+        <h1>Unattested State</h1>
+        <div class="cat-state" id="cat"></div>
+        <p class="explanation" id="explanation"></p>
+        <div class="attestation" id="attestation"></div>
+        <a href="./index.html" class="home-link">Return to Attested Reality</a>
+      </div>
+      <script>
+        const isAlive = Math.random() < 0.5;
+        document.getElementById('cat').textContent = isAlive ? '😺' : '😿';
+        document.getElementById('explanation').innerHTML = isAlive
+          ? 'The page you sought existed in superposition until you observed it.<br>The wavefunction collapsed favorably - but the content remains unattested.'
+          : 'The page you sought existed in superposition until you observed it.<br>The wavefunction collapsed unfavorably - this state was never attested.';
+        document.getElementById('attestation').innerHTML = isAlive
+          ? '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:#e06c75">UNVERIFIED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:#98c379">"alive"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:#e5c07b">COLLAPSED</span>'
+          : '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:#e06c75">FAILED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:#e06c75">"dead"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:#e5c07b">COLLAPSED</span>';
+      </script>
+    </body>
+    </html>
+  '';
+
+  # ============================================================================
   # Build Info
   # ============================================================================
 
@@ -1392,6 +1495,12 @@ let
       name = "qntx-docs-cname";
       text = "${cnameContent}\n";
       destination = "/CNAME";
+    };
+
+    "404.html" = pkgs.writeTextFile {
+      name = "qntx-docs-404";
+      text = notFoundContent;
+      destination = "/404.html";
     };
 
     "sitemap.xml" = pkgs.writeTextFile {
