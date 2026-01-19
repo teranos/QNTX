@@ -20,6 +20,10 @@ class WindowTrayImpl {
     private items: Map<string, TrayItem> = new Map();
     private isRevealed: boolean = false;
     private hideTimeout: number | null = null;
+    private mouseX: number = 0;
+    private mouseY: number = 0;
+    private proximityRAF: number | null = null;
+    private proximityThreshold: number = 150; // Max distance for morphing effect (px)
 
     /**
      * Initialize the tray and attach to DOM
@@ -56,6 +60,13 @@ class WindowTrayImpl {
     private setupEventListeners(): void {
         if (!this.element) return;
 
+        // Track mouse position globally for proximity effect
+        document.addEventListener('mousemove', (e) => {
+            this.mouseX = e.clientX;
+            this.mouseY = e.clientY;
+            this.updateProximity();
+        });
+
         // Reveal on mouse enter
         this.element.addEventListener('mouseenter', () => {
             this.reveal();
@@ -87,6 +98,93 @@ class WindowTrayImpl {
             this.element?.setAttribute('data-revealed', 'false');
             this.hideTimeout = null;
         }, 300);
+    }
+
+    /**
+     * Update proximity-based morphing for each dot
+     * Uses requestAnimationFrame for smooth 60fps updates
+     */
+    private updateProximity(): void {
+        if (this.proximityRAF) {
+            cancelAnimationFrame(this.proximityRAF);
+        }
+
+        this.proximityRAF = requestAnimationFrame(() => {
+            if (!this.indicatorContainer || this.isRevealed) return;
+
+            const dots = Array.from(this.indicatorContainer.querySelectorAll('.window-tray-dot')) as HTMLElement[];
+            const itemsArray = Array.from(this.items.values());
+
+            dots.forEach((dot, index) => {
+                const rect = dot.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                // Calculate distance from mouse to dot center
+                const dx = this.mouseX - centerX;
+                const dy = this.mouseY - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Calculate proximity factor (1.0 = at dot, 0.0 = at threshold or beyond)
+                const proximity = Math.max(0, 1 - (distance / this.proximityThreshold));
+
+                // Interpolate size (8px -> 120px as it morphs to full item)
+                const minSize = 8;
+                const maxSize = 120;
+                const size = minSize + (maxSize - minSize) * proximity;
+
+                // Interpolate border radius (2px square -> 0px for full item)
+                const borderRadius = 2 * (1 - proximity);
+
+                // Interpolate colors using RGB interpolation
+                // Start: --bg-gray (#999 = rgb(153,153,153))
+                // End: --bg-almost-black (#1a1a1a = rgb(26,26,26))
+                const startR = 153, startG = 153, startB = 153;
+                const endR = 26, endG = 26, endB = 26;
+                const r = Math.round(startR + (endR - startR) * proximity);
+                const g = Math.round(startG + (endG - startG) * proximity);
+                const b = Math.round(startB + (endB - startB) * proximity);
+
+                // Apply morphing styles
+                dot.style.width = `${size}px`;
+                dot.style.height = `${size}px`;
+                dot.style.borderRadius = `${borderRadius}px`;
+                dot.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+
+                // Show title text when proximity is high enough
+                if (proximity > 0.5 && index < itemsArray.length) {
+                    const item = itemsArray[index];
+                    const title = this.stripHtml(item.title);
+
+                    // Add text content if not already present
+                    if (!dot.dataset.hasText) {
+                        dot.style.display = 'flex';
+                        dot.style.alignItems = 'center';
+                        dot.style.justifyContent = 'center';
+                        dot.style.padding = '6px 10px';
+                        dot.style.whiteSpace = 'nowrap';
+                        dot.textContent = title;
+                        dot.dataset.hasText = 'true';
+                    }
+                    // Fade in text based on proximity
+                    dot.style.opacity = String(0.5 + (proximity - 0.5));
+                } else {
+                    // Hide text when far away
+                    if (dot.dataset.hasText) {
+                        dot.textContent = '';
+                        dot.style.display = '';
+                        dot.style.alignItems = '';
+                        dot.style.justifyContent = '';
+                        dot.style.padding = '';
+                        dot.style.whiteSpace = '';
+                        delete dot.dataset.hasText;
+                    }
+                    dot.style.opacity = '1';
+                }
+            });
+
+            this.proximityRAF = null;
+        });
     }
 
     /**
@@ -146,10 +244,18 @@ class WindowTrayImpl {
         this.itemsContainer.innerHTML = '';
         this.indicatorContainer.innerHTML = '';
 
-        // Render indicators (dots)
-        this.items.forEach(() => {
+        // Render indicators (dots) with click handlers
+        this.items.forEach((item) => {
             const dot = document.createElement('div');
             dot.className = 'window-tray-dot';
+            dot.setAttribute('data-window-id', item.id);
+
+            // Restore window on click
+            dot.addEventListener('click', (e) => {
+                e.stopPropagation();
+                item.onRestore();
+            });
+
             this.indicatorContainer!.appendChild(dot);
         });
 
