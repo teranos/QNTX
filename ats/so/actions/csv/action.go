@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/teranos/QNTX/ats/so"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -60,22 +61,22 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 			// "delimiter" introduces delimiter specification
 			if i+1 < len(tokens) {
 				if state == "filename" && len(filenameParts) > 0 {
-					action.Filename = joinTemplate(filenameParts)
+					action.Filename = so.JoinTemplate(filenameParts)
 					filenameParts = nil
 				}
 				i++
-				action.Delimiter = stripQuotes(tokens[i])
+				action.Delimiter = so.StripQuotes(tokens[i])
 				state = "done"
 			}
 		case "headers":
 			// "headers" introduces header specification
 			if i+1 < len(tokens) {
 				if state == "filename" && len(filenameParts) > 0 {
-					action.Filename = joinTemplate(filenameParts)
+					action.Filename = so.JoinTemplate(filenameParts)
 					filenameParts = nil
 				}
 				i++
-				headerStr := stripQuotes(tokens[i])
+				headerStr := so.StripQuotes(tokens[i])
 				action.Headers = strings.Split(headerStr, ",")
 				// Trim whitespace from each header
 				for j := range action.Headers {
@@ -92,7 +93,7 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 
 	// Finalize filename if not set yet
 	if action.Filename == "" && len(filenameParts) > 0 {
-		action.Filename = joinTemplate(filenameParts)
+		action.Filename = so.JoinTemplate(filenameParts)
 	}
 
 	if action.Filename == "" {
@@ -100,27 +101,6 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 	}
 
 	return action, nil
-}
-
-// stripQuotes removes surrounding quotes from a string
-func stripQuotes(s string) string {
-	if len(s) >= 2 {
-		if (s[0] == '"' && s[len(s)-1] == '"') ||
-			(s[0] == '\'' && s[len(s)-1] == '\'') {
-			return s[1 : len(s)-1]
-		}
-	}
-	return s
-}
-
-// joinTemplate joins tokens and strips surrounding quotes
-func joinTemplate(parts []string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-
-	result := strings.Join(parts, " ")
-	return stripQuotes(result)
 }
 
 // ToPayload converts an Action to a handler Payload
