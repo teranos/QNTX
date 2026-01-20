@@ -201,6 +201,13 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		req.Color = "#666666" // Default color
 	}
 
+	// Check total field count limit
+	totalFields := len(req.RichStringFields) + len(req.ArrayFields)
+	if totalFields > 50 {
+		http.Error(w, fmt.Sprintf("Too many fields: %d. Maximum 50 fields allowed per type", totalFields), http.StatusBadRequest)
+		return
+	}
+
 	// Validate all field names in rich_string_fields
 	for _, fieldName := range req.RichStringFields {
 		if err := validateFieldName(fieldName); err != nil {
