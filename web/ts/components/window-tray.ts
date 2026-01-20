@@ -6,8 +6,8 @@
  * The minimize animation teaches users where windows go.
  */
 
-import { handleErrorSilent } from '../error-handler';
 import { log, SEG } from '../logger';
+import { uiState } from '../state/ui';
 
 export interface TrayItem {
     id: string;
@@ -44,9 +44,6 @@ class WindowTrayImpl {
     private readonly DOT_MAX_WIDTH = 220;
     private readonly DOT_MAX_HEIGHT = 32;
     private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
-
-    // LocalStorage key
-    private readonly STORAGE_KEY = 'qntx_window_tray_state';
 
     // Component state
     private element: HTMLElement | null = null;
@@ -95,7 +92,9 @@ class WindowTrayImpl {
             this.renderItems();
             if (this.items.size > 0) {
                 this.element.setAttribute('data-empty', 'false');
-                this.saveState();
+                // Sync to uiState
+                const ids = Array.from(this.items.keys());
+                ids.forEach(id => uiState.addMinimizedWindow(id));
             }
         }
     }
@@ -286,51 +285,11 @@ class WindowTrayImpl {
     }
 
     /**
-     * Save tray state to localStorage
-     */
-    private saveState(): void {
-        try {
-            const state = {
-                minimizedWindows: Array.from(this.items.keys())
-            };
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
-        } catch (err) {
-            handleErrorSilent(err, 'Failed to save window tray state', SEG.UI);
-        }
-    }
-
-    /**
-     * Load tray state from localStorage
+     * Load tray state from uiState
      * Returns array of window IDs that were minimized
      */
     public loadState(): string[] {
-        try {
-            const stored = localStorage.getItem(this.STORAGE_KEY);
-            if (!stored) return [];
-
-            const state = JSON.parse(stored);
-            const windows = state.minimizedWindows;
-
-            // Validate structure
-            if (!Array.isArray(windows)) return [];
-            if (!windows.every((id: any) => typeof id === 'string')) return [];
-
-            return windows;
-        } catch (err) {
-            handleErrorSilent(err, 'Failed to load window tray state', SEG.UI);
-            return [];
-        }
-    }
-
-    /**
-     * Clear tray state from localStorage
-     */
-    private clearState(): void {
-        try {
-            localStorage.removeItem(this.STORAGE_KEY);
-        } catch (err) {
-            handleErrorSilent(err, 'Failed to clear window tray state', SEG.UI);
-        }
+        return uiState.getMinimizedWindows();
     }
 
     /**
@@ -354,9 +313,9 @@ class WindowTrayImpl {
         this.renderItems();
         this.element.setAttribute('data-empty', 'false');
 
-        // Only save state if not skipping (skip during restore from localStorage)
+        // Only save state if not skipping (skip during restore from uiState)
         if (!skipSave) {
-            this.saveState(); // Persist to localStorage
+            uiState.addMinimizedWindow(item.id);
         }
     }
 
@@ -371,10 +330,10 @@ class WindowTrayImpl {
 
         if (this.items.size === 0) {
             this.element?.setAttribute('data-empty', 'true');
-            this.clearState(); // Clear localStorage when empty
-        } else {
-            this.saveState(); // Update localStorage
         }
+
+        // Remove from uiState
+        uiState.removeMinimizedWindow(id);
     }
 
     /**
