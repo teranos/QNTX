@@ -256,6 +256,33 @@ export class TypeDefinitionWindow {
     }
 
     /**
+     * Validate field name follows identifier rules
+     * Must start with letter, contain only alphanumeric and underscores
+     */
+    private validateFieldName(name: string): { valid: boolean; error?: string } {
+        if (!name) {
+            return { valid: false, error: 'Field name cannot be empty' };
+        }
+
+        // Check first character is letter
+        if (!/^[a-zA-Z]/.test(name)) {
+            return { valid: false, error: 'Field name must start with a letter' };
+        }
+
+        // Check only contains alphanumeric and underscores
+        if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name)) {
+            return { valid: false, error: 'Field name can only contain letters, numbers, and underscores' };
+        }
+
+        // Check length
+        if (name.length > 64) {
+            return { valid: false, error: 'Field name must be 64 characters or less' };
+        }
+
+        return { valid: true };
+    }
+
+    /**
      * Attach event listeners
      */
     private attachEventListeners(): void {
@@ -277,6 +304,23 @@ export class TypeDefinitionWindow {
 
         const addField = () => {
             const fieldName = addInput.value.trim();
+
+            // Validate field name
+            const validation = this.validateFieldName(fieldName);
+            if (!validation.valid) {
+                // Show error message
+                const statusEl = container.querySelector('#save-status') as HTMLElement;
+                if (statusEl) {
+                    statusEl.textContent = validation.error || 'Invalid field name';
+                    statusEl.style.color = '#e74c3c';
+                    setTimeout(() => {
+                        statusEl.textContent = '';
+                    }, 3000);
+                }
+                addInput.focus();
+                return;
+            }
+
             if (fieldName && !this.fields.has(fieldName)) {
                 this.fields.set(fieldName, {
                     name: fieldName,
@@ -436,6 +480,19 @@ export class TypeDefinitionWindow {
     private async persistTypeDefinition(): Promise<void> {
         if (!this.currentType) return;
 
+        // Validate all field names in rich_string_fields and array_fields
+        const allFields = [
+            ...(this.currentType.rich_string_fields || []),
+            ...(this.currentType.array_fields || [])
+        ];
+
+        for (const fieldName of allFields) {
+            const validation = this.validateFieldName(fieldName);
+            if (!validation.valid) {
+                throw new Error(`Invalid field name '${fieldName}': ${validation.error}`);
+            }
+        }
+
         // Create type definition payload
         const typePayload = {
             name: this.currentType.name,
@@ -560,8 +617,25 @@ export class TypeDefinitionWindow {
             const label = labelInput.value.trim() || this.capitalizeFirst(name);
             const color = colorInput.value;
 
-            if (!name) {
+            // Validate type name
+            const validation = this.validateFieldName(name);
+            if (!validation.valid) {
+                // Show error next to the input
+                const errorEl = document.createElement('div');
+                errorEl.className = 'field-error';
+                errorEl.style.cssText = 'color: #e74c3c; font-size: 12px; margin-top: 4px;';
+                errorEl.textContent = validation.error || 'Invalid type name';
+
+                // Remove any existing error
+                const existingError = nameInput.parentElement?.querySelector('.field-error');
+                existingError?.remove();
+
+                // Add new error
+                nameInput.parentElement?.appendChild(errorEl);
                 nameInput.focus();
+
+                // Remove error after 3 seconds
+                setTimeout(() => errorEl.remove(), 3000);
                 return;
             }
 
