@@ -10,7 +10,7 @@ import { updateGraph, initGraphResize } from './graph/index.ts';
 import { initLegendaToggles } from './legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './state/ui.ts';
-import { appState } from './config.ts';
+import { appState } from './state/app.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
