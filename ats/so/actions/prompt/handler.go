@@ -57,6 +57,11 @@ type Payload struct {
 	ResultActor string `json:"result_actor,omitempty"`
 }
 
+// GetAxFilter implements so.Payload interface
+func (p *Payload) GetAxFilter() types.AxFilter {
+	return p.AxFilter
+}
+
 // Result represents the output of a prompt execution
 type Result struct {
 	// SourceAttestationID is the ID of the attestation that was processed
