@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/server"
 )
 
@@ -62,7 +62,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Open and migrate database
 	database, err := openDatabase(dbPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -98,7 +98,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	// Create server
 	srv, err := server.NewQNTXServer(database, dbPath, verbosity, serverAtsQuery)
 	if err != nil {
-		return fmt.Errorf("failed to create server: %w", err)
+		return errors.Wrap(err, "failed to create server")
 	}
 
 	// Start server in goroutine
@@ -121,7 +121,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	select {
 	case err := <-errChan:
 		// Server failed to start or stopped unexpectedly
-		return err
+		return errors.Wrap(err, "server failed to start")
 	case <-sigChan:
 		// First Ctrl+C - graceful shutdown
 		pterm.Info.Println("\nShutting down gracefully (press Ctrl+C again to force)...")
@@ -137,7 +137,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		case err := <-shutdownDone:
 			// Graceful shutdown completed
 			if err != nil {
-				return fmt.Errorf("shutdown error: %w", err)
+				return errors.Wrap(err, "shutdown error")
 			}
 			pterm.Success.Println("Server stopped cleanly")
 			return nil

@@ -3,6 +3,8 @@
  * Supports multiple windows with z-index stacking
  */
 
+import { handleErrorSilent } from '../error-handler';
+import { SEG } from '../logger';
 import { windowTray } from './window-tray';
 
 export interface WindowConfig {
@@ -303,7 +305,7 @@ export class Window {
 
             localStorage.setItem(Window.STORAGE_KEY, JSON.stringify(allState));
         } catch (error) {
-            console.warn('Failed to save window state:', error);
+            handleErrorSilent(error, 'Failed to save window state', SEG.UI);
         }
     }
 
@@ -339,7 +341,7 @@ export class Window {
                 this.element.setAttribute('data-should-restore-visibility', 'true');
             }
         } catch (error) {
-            console.warn('Failed to restore window state:', error);
+            handleErrorSilent(error, 'Failed to restore window state', SEG.UI);
         }
     }
 
@@ -357,7 +359,7 @@ export class Window {
             const stored = localStorage.getItem(Window.STORAGE_KEY);
             return stored ? JSON.parse(stored) : {};
         } catch (error) {
-            console.warn('Failed to load window state:', error);
+            handleErrorSilent(error, 'Failed to load window state', SEG.UI);
             return {};
         }
     }

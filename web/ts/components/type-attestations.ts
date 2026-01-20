@@ -1,6 +1,7 @@
 // Type Attestations - Node type visualization and filtering controls
 
-import { appState, UI_TEXT } from '../config.ts';
+import { appState } from '../state/app.ts';
+import { UI_TEXT } from '../config.ts';
 import type { GraphData, NodeTypeInfo } from '../../types/core';
 import { sendMessage } from '../websocket.ts'; // Phase 2: Send visibility preferences to backend
 import { typeDefinitionWindow } from '../type-definition-window.js';

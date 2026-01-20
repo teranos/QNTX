@@ -1,8 +1,9 @@
 // D3.js graph visualization
 // Main rendering orchestration - delegates to specialized modules
 
-import { appState, GRAPH_PHYSICS } from '../config.ts';
-import { uiState } from '../ui-state.ts';
+import { appState } from '../state/app.ts';
+import { GRAPH_PHYSICS } from '../config.ts';
+import { uiState } from '../state/ui.ts';
 import { hiddenNodeTypes, initTypeAttestations } from '../components/type-attestations.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
