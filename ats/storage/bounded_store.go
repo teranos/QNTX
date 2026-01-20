@@ -7,6 +7,8 @@ package storage
 
 import (
 	"database/sql"
+	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -32,6 +34,11 @@ type BoundedStore struct {
 	store  *SQLStore
 	logger *zap.SugaredLogger
 	config *BoundedStoreConfig
+
+	// Cache for type definitions (used by rich search)
+	typeFieldsCache     map[string][]string
+	typeFieldsCacheLock sync.RWMutex
+	typeFieldsCacheTime time.Time
 }
 
 // NewBoundedStore creates a new bounded storage manager with default limits (16/64/64)
