@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -35,9 +36,10 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 	writer := csv.NewWriter(file)
 	if payload.Delimiter != "" && payload.Delimiter != "," {
 		// Only set delimiter if it's different from default
-		if len(payload.Delimiter) > 0 {
-			writer.Comma = rune(payload.Delimiter[0])
+		if len(payload.Delimiter) > 1 {
+			return errors.New("csv delimiter must be a single character")
 		}
+		writer.Comma = rune(payload.Delimiter[0])
 	}
 	defer writer.Flush()
 
@@ -95,14 +97,28 @@ func getFieldValue(attest *types.As, field string) string {
 	}
 }
 
-// joinSlice joins a slice of strings with semicolon
+// joinSlice joins a slice of strings with semicolon.
+// Per RFC 4180, the encoding/csv writer will automatically quote fields
+// that contain the delimiter character, so this is safe even when delimiter is ";".
+// Example: ["ALICE", "BOB"] with delimiter ";" becomes quoted: "ALICE;BOB"
+//
+// Individual array elements are escaped per CSV spec (quotes doubled) before joining
+// to prevent ambiguity. Example: ["ALICE \"Crypto\"", "BOB"] becomes "ALICE ""Crypto"";BOB"
 func joinSlice(slice []string) string {
 	if len(slice) == 0 {
 		return ""
 	}
-	result := slice[0]
+	// Escape quotes in individual elements per CSV spec
+	result := escapeCSVElement(slice[0])
 	for i := 1; i < len(slice); i++ {
-		result += ";" + slice[i]
+		result += ";" + escapeCSVElement(slice[i])
 	}
 	return result
+}
+
+// escapeCSVElement escapes special characters in a single array element.
+// Per RFC 4180, quotes are escaped by doubling them.
+func escapeCSVElement(s string) string {
+	// Replace " with "" per CSV spec
+	return strings.ReplaceAll(s, `"`, `""`)
 }

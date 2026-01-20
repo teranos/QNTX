@@ -6,6 +6,7 @@ import (
 	"github.com/teranos/QNTX/ats/so"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/logger"
 )
 
 // Action represents a parsed "so csv" action from an ax query
@@ -64,7 +65,11 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 					filenameParts = nil
 				}
 				i++
-				action.Delimiter = so.StripQuotes(tokens[i])
+				delimiter := so.StripQuotes(tokens[i])
+				if len(delimiter) > 1 {
+					return nil, errors.New("csv delimiter must be a single character")
+				}
+				action.Delimiter = delimiter
 				state = "done"
 			}
 		case "headers":
@@ -99,7 +104,36 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 		return nil, errors.New("csv action requires a non-empty filename")
 	}
 
+	// Validate headers if specified
+	if len(action.Headers) > 0 {
+		validateHeaders(action.Headers)
+	}
+
 	return action, nil
+}
+
+// validateHeaders checks headers against known standard fields and logs warnings for unknown ones.
+// Unknown headers are still allowed (they may be custom attribute fields).
+func validateHeaders(headers []string) {
+	for _, header := range headers {
+		if !isKnownField(header) {
+			logger.Logger.Warnw("Unknown CSV header field - may be empty if not a custom attribute",
+				"header", header,
+				"known_fields", "id, subjects, subject, predicates, predicate, contexts, context, actors, actor, timestamp, source",
+			)
+		}
+	}
+}
+
+// isKnownField checks if a field name is a known standard attestation field
+func isKnownField(field string) bool {
+	switch strings.ToLower(field) {
+	case "id", "subjects", "subject", "predicates", "predicate",
+		"contexts", "context", "actors", "actor", "timestamp", "source":
+		return true
+	default:
+		return false
+	}
 }
 
 // Payload represents the data needed to execute a CSV export

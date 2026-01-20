@@ -105,6 +105,13 @@ func TestParseAction(t *testing.T) {
 				Headers:   []string{"id", "subject", "predicate"},
 			},
 		},
+		{
+			name: "multi-character delimiter",
+			filter: &types.AxFilter{
+				SoActions: []string{"csv", "output.csv", "delimiter", "||"},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
