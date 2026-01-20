@@ -17,9 +17,9 @@
  * - Budget warnings (transient)
  */
 
-import type { PanelState, Transform } from '../types/core';
+import type { PanelState, Transform } from '../../types/core';
 import { getItem, setItem, removeItem } from './storage';
-import { log, SEG } from './logger';
+import { log, SEG } from '../logger';
 
 // ============================================================================
 // State Types
