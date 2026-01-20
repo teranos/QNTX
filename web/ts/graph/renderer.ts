@@ -3,7 +3,7 @@
 
 import { appState, GRAPH_PHYSICS } from '../config.ts';
 import { uiState } from '../ui-state.ts';
-import { hiddenNodeTypes, initLegendaToggles } from '../components/legenda.ts';
+import { hiddenNodeTypes, initTypeAttestations } from '../components/type-attestations.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
     getSimulation, getDomCache,
@@ -37,7 +37,7 @@ export function updateGraph(data: GraphData): void {
     appState.currentGraphData = data;
 
     // Rebuild legend with node types from backend and re-attach event listeners
-    initLegendaToggles(renderGraph, data);
+    initTypeAttestations(renderGraph, data);
 
     renderGraph(data);
 
