@@ -6,6 +6,9 @@
  * The minimize animation teaches users where windows go.
  */
 
+import { handleErrorSilent } from '../error-handler';
+import { log, SEG } from '../logger';
+
 export interface TrayItem {
     id: string;
     title: string;
@@ -63,7 +66,7 @@ class WindowTrayImpl {
 
         const graphContainer = document.getElementById('graph-container');
         if (!graphContainer) {
-            console.warn('WindowTray: #graph-container not found, deferring init');
+            log.warn(SEG.UI, 'WindowTray: #graph-container not found, deferring init');
             return;
         }
 
@@ -292,7 +295,7 @@ class WindowTrayImpl {
             };
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
         } catch (err) {
-            console.warn('Failed to save window tray state:', err);
+            handleErrorSilent(err, 'Failed to save window tray state', SEG.UI);
         }
     }
 
@@ -314,7 +317,7 @@ class WindowTrayImpl {
 
             return windows;
         } catch (err) {
-            console.warn('Failed to load window tray state:', err);
+            handleErrorSilent(err, 'Failed to load window tray state', SEG.UI);
             return [];
         }
     }
@@ -326,7 +329,7 @@ class WindowTrayImpl {
         try {
             localStorage.removeItem(this.STORAGE_KEY);
         } catch (err) {
-            console.warn('Failed to clear window tray state:', err);
+            handleErrorSilent(err, 'Failed to clear window tray state', SEG.UI);
         }
     }
 

@@ -60,6 +60,9 @@
  *   - graph/focus/dimensions.ts (1)
  *   - graph/focus/physics.ts (2)
  *   - graph/tile/controls.ts (3)
+ *
+ * Migrated:
+ *   - storage.ts ✓
  */
 
 // Import core QNTX symbols from generated types
