@@ -1,7 +1,6 @@
 package prompt
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/teranos/QNTX/ats/so"
@@ -144,7 +143,7 @@ func appendToken(templateParts, systemParts *[]string, state, token string) {
 }
 
 // ToPayload converts an Action to a handler Payload
-func (a *Action) ToPayload(filter types.AxFilter) (*Payload, error) {
+func (a *Action) ToPayload(filter types.AxFilter) (so.Payload, error) {
 	// Clear SoActions from the filter since we've extracted the prompt action
 	filter.SoActions = nil
 
@@ -160,17 +159,10 @@ func (a *Action) ToPayload(filter types.AxFilter) (*Payload, error) {
 
 // ToPayloadJSON converts an Action to a JSON-encoded payload for job creation
 func (a *Action) ToPayloadJSON(filter types.AxFilter) ([]byte, error) {
-	payload, err := a.ToPayload(filter)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(payload)
+	return so.ToPayloadJSON(a, filter)
 }
 
 // IsPromptAction checks if a filter has a prompt so_action
 func IsPromptAction(filter *types.AxFilter) bool {
-	if filter == nil || len(filter.SoActions) == 0 {
-		return false
-	}
-	return strings.ToLower(filter.SoActions[0]) == "prompt"
+	return so.IsAction(filter, "prompt")
 }
