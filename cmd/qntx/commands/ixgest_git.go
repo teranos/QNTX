@@ -3,7 +3,6 @@ package commands
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/pterm/pterm"
