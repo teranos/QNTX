@@ -3,7 +3,7 @@
 
 import { appState, GRAPH_PHYSICS } from '../config.ts';
 import { uiState } from '../ui-state.ts';
-import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
+import { hiddenNodeTypes, initLegendaToggles } from '../components/legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
     getSimulation, getDomCache,

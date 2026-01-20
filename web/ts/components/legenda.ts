@@ -1,8 +1,9 @@
 // Legenda (Legend) - Node type visualization and filtering controls
 
-import { appState, UI_TEXT } from './config.ts';
-import type { GraphData, NodeTypeInfo } from '../types/core';
-import { sendMessage } from './websocket.ts'; // Phase 2: Send visibility preferences to backend
+import { appState, UI_TEXT } from '../config.ts';
+import type { GraphData, NodeTypeInfo } from '../../types/core';
+import { sendMessage } from '../websocket.ts'; // Phase 2: Send visibility preferences to backend
+import { typeDefinitionWindow } from '../type-definition-window.js';
 
 // Re-export graph visibility state from appState for backward compatibility
 // All visibility state is now centralized in appState.graphVisibility
@@ -136,6 +137,16 @@ export function buildLegenda(graphData: GraphData | null = null): void {
         legendaContainer.appendChild(title);
     }
 
+    // Add right-click handler to legend container for creating new types
+    legendaContainer.addEventListener('contextmenu', (e) => {
+        // Only handle right-click on the legend container itself, not on items
+        if ((e.target as HTMLElement).classList.contains('legenda') ||
+            (e.target as HTMLElement).classList.contains('legenda-title')) {
+            e.preventDefault();
+            typeDefinitionWindow.createNewType();
+        }
+    });
+
     // Require backend data - fail loud if not provided (Phase 1: enforce backend responsibility)
     if (!graphData?.meta?.node_types || graphData.meta.node_types.length === 0) {
         console.warn('No node type metadata from backend - legend cannot be rendered');
@@ -179,6 +190,25 @@ export function buildLegenda(graphData: GraphData | null = null): void {
             countSpan.textContent = String(type.count);
             item.appendChild(countSpan);
         }
+
+        // Add edit icon that appears on hover
+        const editIcon = document.createElement('span');
+        editIcon.className = 'type-edit-icon';
+        editIcon.textContent = '✏';
+        editIcon.title = `Edit ${type.label} type definition`;
+        editIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            typeDefinitionWindow.open(type.type, {
+                name: type.type,
+                label: type.label,
+                color: type.color || '#666666',
+                opacity: type.opacity,
+                deprecated: type.deprecated || false,
+                rich_string_fields: type.rich_string_fields || [],
+                array_fields: type.array_fields || []
+            });
+        });
+        item.appendChild(editIcon);
 
         legendaContainer.appendChild(item);
     });
