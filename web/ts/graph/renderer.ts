@@ -2,7 +2,7 @@
 // Main rendering orchestration - delegates to specialized modules
 
 import { appState, GRAPH_PHYSICS } from '../config.ts';
-import { uiState } from '../ui-state.ts';
+import { uiState } from '../state/ui.ts';
 import { hiddenNodeTypes, initLegendaToggles } from '../legenda.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
 import {
