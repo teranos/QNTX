@@ -2,8 +2,10 @@ package logger
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/teranos/QNTX/sym"
 	"go.uber.org/zap"
@@ -395,7 +397,7 @@ func getFieldValue(field zapcore.Field) string {
 		return field.String
 	}
 
-	// For numeric types
+	// For numeric integer types
 	if field.Type == zapcore.Int64Type || field.Type == zapcore.Int32Type ||
 		field.Type == zapcore.Int16Type || field.Type == zapcore.Int8Type ||
 		field.Type == zapcore.Uint64Type || field.Type == zapcore.Uint32Type ||
@@ -403,12 +405,46 @@ func getFieldValue(field zapcore.Field) string {
 		return fmt.Sprintf("%d", field.Integer)
 	}
 
-	// For other interface types
+	// For float types (CRITICAL: was missing!)
+	if field.Type == zapcore.Float64Type {
+		return fmt.Sprintf("%g", math.Float64frombits(uint64(field.Integer)))
+	}
+	if field.Type == zapcore.Float32Type {
+		return fmt.Sprintf("%g", math.Float32frombits(uint32(field.Integer)))
+	}
+
+	// For boolean types (CRITICAL: was missing!)
+	if field.Type == zapcore.BoolType {
+		if field.Integer == 0 {
+			return "false"
+		}
+		return "true"
+	}
+
+	// For duration types
+	if field.Type == zapcore.DurationType {
+		return time.Duration(field.Integer).String()
+	}
+
+	// For time types
+	if field.Type == zapcore.TimeType {
+		if field.Interface != nil {
+			if t, ok := field.Interface.(time.Time); ok {
+				return t.Format(time.RFC3339)
+			}
+			// Fallback for other time representations
+			return fmt.Sprintf("%v", field.Interface)
+		}
+		return time.Unix(0, field.Integer).Format(time.RFC3339)
+	}
+
+	// For other interface types (arrays, complex objects, etc.)
 	if field.Interface != nil {
 		return fmt.Sprintf("%v", field.Interface)
 	}
 
-	return ""
+	// This should never happen now, but log it if it does
+	return fmt.Sprintf("<unknown type %v>", field.Type)
 }
 
 // extractFieldValues pulls just the values from structured fields with theme-aware colors
@@ -442,6 +478,15 @@ func extractFieldValues(fields []zapcore.Field) string {
 			val := getFieldValue(field)
 			if val != "" {
 				values = append(values, colorNumber()+val+colorReset+"ms")
+			}
+		default:
+			// CRITICAL: Include ALL other fields so we don't lose important debug information
+			val := getFieldValue(field)
+			if val != "" {
+				// Format as key=value with dimmed gray key for "other" fields
+				// This makes them visually distinct but still present
+				dimColor := "\033[38;5;245m" // Dimmed gray for secondary fields
+				values = append(values, dimColor+field.Key+"="+colorReset+val)
 			}
 		}
 	}

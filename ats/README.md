@@ -38,17 +38,11 @@ This pattern captures:
 
 The claim might be wrong. The actor might be unreliable. But the attestation itself is verifiable - someone did say this at this time.
 
-## Why Interfaces?
-
-QNTX is **not tailor-made boutique software**. ATS is a new way of thinking about types and data - it must work for domains we haven't imagined yet.
-
-**Why not configuration?** Can't predict what people need. Your domain's synonym logic, actor detection, entity resolution - these are complex, domain-specific behaviors. Configuration files can't capture that flexibility.
-
-**Interfaces keep ATS truly domain-agnostic**: Core infrastructure stays pure. Your domain knowledge plugs in without forking.
+Types themselves are attestations too - we attest that "restaurant" is a type with certain properties and searchable fields. This makes the type system itself transparent and evolvable. See [docs/attested-types.md](../docs/attested-types.md) for how type attestations work.
 
 ## Extensibility
 
-Customize ATS behavior through interfaces: `QueryExpander` (semantic search), `ActorDetector` (actor identification), `EntityResolver` (entity aliases).
+ATS stays domain-agnostic through interfaces: `QueryExpander` (semantic search), `ActorDetector` (actor identification), `EntityResolver` (entity aliases). Your domain logic plugs in without modifying core.
 
 ### Data Models
 
