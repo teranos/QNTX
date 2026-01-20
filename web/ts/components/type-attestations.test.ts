@@ -1,13 +1,13 @@
 /**
- * Tests for Legenda utilities
+ * Tests for Type Attestation utilities
  *
  * Basic tests for node type state management
  */
 
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { hiddenNodeTypes } from './legenda';
+import { hiddenNodeTypes } from './type-attestations';
 
-describe('Legenda State Management', () => {
+describe('Type Attestation State Management', () => {
   beforeEach(() => {
     hiddenNodeTypes.clear();
   });

@@ -28,7 +28,7 @@ let isFocusAnimating: boolean = false; // Flag to ignore zoom events during prog
 interface DOMCache {
     graphContainer: HTMLElement | null;
     isolatedToggle: HTMLElement | null;
-    legenda: HTMLElement | null;
+    typeAttestations: HTMLElement | null;
     get(key: keyof DOMCache, selector: string): HTMLElement | null;
     clear(): void;
 }
@@ -36,7 +36,7 @@ interface DOMCache {
 const domCache: DOMCache = {
     graphContainer: null,
     isolatedToggle: null,
-    legenda: null,
+    typeAttestations: null,
     get: function(key: keyof DOMCache, selector: string): HTMLElement | null {
         if (!this[key]) {
             const element = document.getElementById(selector) || document.querySelector(selector) as HTMLElement | null;
@@ -47,7 +47,7 @@ const domCache: DOMCache = {
     clear: function(): void {
         this.graphContainer = null;
         this.isolatedToggle = null;
-        this.legenda = null;
+        this.typeAttestations = null;
     }
 };
 
