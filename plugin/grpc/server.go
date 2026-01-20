@@ -170,7 +170,9 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 	// even under concurrent access
 	s.initOnce.Do(func() {
 		// Create a remote service registry with service endpoints
+		// Pass the context for proper cancellation propagation in gRPC calls
 		s.services = NewRemoteServiceRegistry(
+			ctx,
 			req.AtsStoreEndpoint,
 			req.QueueEndpoint,
 			req.AuthToken,
