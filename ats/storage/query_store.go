@@ -8,6 +8,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 // SQLQueryStore implements ats.AttestationQueryStore for SQL databases
@@ -42,7 +43,7 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query predicates: %w", err)
+		return nil, errors.Wrap(err, "failed to query predicates")
 	}
 	defer rows.Close()
 
@@ -52,7 +53,7 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 	for rows.Next() {
 		var predicatesJSON string
 		if err := rows.Scan(&predicatesJSON); err != nil {
-			return nil, fmt.Errorf("failed to scan predicates: %w", err)
+			return nil, errors.Wrap(err, "failed to scan predicates")
 		}
 
 		// Simple JSON parsing - extract predicates from JSON array
@@ -78,7 +79,7 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query contexts: %w", err)
+		return nil, errors.Wrap(err, "failed to query contexts")
 	}
 	defer rows.Close()
 
@@ -88,7 +89,7 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 	for rows.Next() {
 		var contextsJSON string
 		if err := rows.Scan(&contextsJSON); err != nil {
-			return nil, fmt.Errorf("failed to scan contexts: %w", err)
+			return nil, errors.Wrap(err, "failed to scan contexts")
 		}
 
 		// Simple JSON parsing - extract contexts from JSON array
@@ -154,7 +155,7 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	// Execute query
 	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, errors.Wrap(err, "failed to execute query")
 	}
 	defer rows.Close()
 
@@ -163,7 +164,7 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	for rows.Next() {
 		as, err := ScanAttestation(rows)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan attestation: %w", err)
+			return nil, errors.Wrap(err, "failed to scan attestation")
 		}
 		attestations = append(attestations, as)
 	}

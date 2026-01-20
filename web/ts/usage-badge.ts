@@ -24,7 +24,7 @@
 // - Consider: Week-over-week, month-over-month, year-over-year
 
 import * as d3 from 'd3';
-import { uiState } from './ui-state.ts';
+import { uiState } from './state/ui.ts';
 import { DATA, setVisibility, setExpansion, setLoading } from './css-classes.ts';
 import type { UsageUpdateMessage } from '../types/websocket';
 import { log, SEG } from './logger.ts';
