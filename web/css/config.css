@@ -41,7 +41,7 @@
     margin: 0;
     font-size: 11px;
     font-weight: 600;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -60,7 +60,7 @@
     display: block;
     margin-bottom: 4px;
     font-size: 10px;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
 }
 
 .config-field input[type="number"] {
@@ -99,7 +99,7 @@
 
 .config-actions button[type="button"] {
     background: rgba(0, 0, 0, 0.3);
-    color: #888;
+    color: var(--text-on-dark-tertiary);
 }
 
 .config-actions button[type="button"]:hover {

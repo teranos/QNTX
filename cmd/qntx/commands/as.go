@@ -65,7 +65,7 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 	// Open and migrate database
 	database, err := openDatabase("")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 

@@ -403,7 +403,7 @@ func UpdatePluginConfig(pluginName string, config map[string]string) error {
 
 	// Write updated config to disk
 	if err := writePluginConfigFile(configPath, pluginConfig); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write plugin config")
 	}
 
 	// Update viper with new values

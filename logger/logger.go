@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/teranos/QNTX/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -53,7 +54,7 @@ func Initialize(jsonOutput bool) error {
 	}
 
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to build logger")
 	}
 
 	Logger = zapLogger.Sugar()
@@ -98,7 +99,7 @@ func InitializeForLambda() error {
 	}
 
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to build lambda logger")
 	}
 
 	Logger = zapLogger.Sugar()

@@ -1,9 +1,8 @@
 package storage
 
 import (
-	"fmt"
-
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 const (
@@ -88,7 +87,7 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 	var count int
 	err := bs.db.QueryRow(AttestationCountByActorContextQuery, actor, context).Scan(&count)
 	if err != nil {
-		return fmt.Errorf("failed to count attestations: %w", err)
+		return errors.Wrap(err, "failed to count attestations")
 	}
 
 	// If over limit, delete oldest ones
@@ -124,7 +123,7 @@ func (bs *BoundedStore) enforceActorContextLimit(actor, context string) error {
 
 		_, err = bs.db.Exec(AttestationDeleteOldestByActorContextQuery, actor, context, deleteCount)
 		if err != nil {
-			return fmt.Errorf("failed to delete old attestations: %w", err)
+			return errors.Wrap(err, "failed to delete old attestations")
 		}
 
 		// Log enforcement event with details
@@ -141,7 +140,7 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 	// Get all contexts for this actor with usage counts
 	rows, err := bs.db.Query(queryActorContexts, actor)
 	if err != nil {
-		return fmt.Errorf("failed to query actor contexts: %w", err)
+		return errors.Wrap(err, "failed to query actor contexts")
 	}
 	defer rows.Close()
 
@@ -155,13 +154,13 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 		var cu contextUsage
 		err := rows.Scan(&cu.contextArray, &cu.usageCount)
 		if err != nil {
-			return fmt.Errorf("failed to scan context usage: %w", err)
+			return errors.Wrap(err, "failed to scan context usage")
 		}
 		contexts = append(contexts, cu)
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating over contexts: %w", err)
+		return errors.Wrap(err, "error iterating over contexts")
 	}
 
 	// If over limit, delete attestations for least used contexts
@@ -215,7 +214,7 @@ func (bs *BoundedStore) enforceActorContextsLimit(actor string) error {
 				actor, cu.contextArray,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to delete attestations for context %s: %w", cu.contextArray, err)
+				return errors.Wrapf(err, "failed to delete attestations for context %s", cu.contextArray)
 			}
 
 			// Track deletions for telemetry
@@ -240,7 +239,7 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 	// Get all actors for this entity with most recent timestamps
 	rows, err := bs.db.Query(queryEntityActors, entity)
 	if err != nil {
-		return fmt.Errorf("failed to query entity actors: %w", err)
+		return errors.Wrap(err, "failed to query entity actors")
 	}
 	defer rows.Close()
 
@@ -254,13 +253,13 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 		var ai actorInfo
 		err := rows.Scan(&ai.actor, &ai.lastSeen)
 		if err != nil {
-			return fmt.Errorf("failed to scan actor info: %w", err)
+			return errors.Wrap(err, "failed to scan actor info")
 		}
 		actors = append(actors, ai)
 	}
 
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating over actors: %w", err)
+		return errors.Wrap(err, "error iterating over actors")
 	}
 
 	// If over limit, delete attestations for least recent actors
@@ -319,7 +318,7 @@ func (bs *BoundedStore) enforceEntityActorsLimit(entity string) error {
 				ai.actor, entity,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to delete attestations for actor %s: %w", ai.actor, err)
+				return errors.Wrapf(err, "failed to delete attestations for actor %s", ai.actor)
 			}
 
 			// Track deletions for telemetry

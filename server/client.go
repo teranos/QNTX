@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	grapherr "github.com/teranos/QNTX/graph/error"
@@ -244,6 +245,8 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleJobControl(*msg)
 	case "visibility": // Phase 2: Handle visibility preference updates
 		c.handleVisibility(*msg)
+	case "rich_search":
+		c.handleRichSearch(msg.Query)
 	case "vidstream_init":
 		c.handleVidStreamInit(*msg)
 	case "vidstream_frame":
@@ -799,7 +802,29 @@ func (c *Client) handleGetDatabaseStats() {
 		return
 	}
 
-	// Send stats to client
+	// Get discovered rich fields with statistics from a bounded store instance
+	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("db-stats"))
+	richFieldsWithStats, err := boundedStore.GetRichFieldsWithStats()
+	if err != nil {
+		c.server.logger.Errorw("Failed to get rich fields with stats",
+			"error", err,
+			"client_id", c.id,
+		)
+		// Fall back to simple field list
+		richFields := boundedStore.GetDiscoveredRichFields()
+		c.sendJSON(map[string]interface{}{
+			"type":               "database_stats",
+			"path":               c.server.dbPath,
+			"total_attestations": totalAttestations,
+			"unique_actors":      uniqueActors,
+			"unique_subjects":    uniqueSubjects,
+			"unique_contexts":    uniqueContexts,
+			"rich_fields":        richFields,
+		})
+		return
+	}
+
+	// Send stats to client with enhanced field information
 	c.sendJSON(map[string]interface{}{
 		"type":               "database_stats",
 		"path":               c.server.dbPath,
@@ -807,10 +832,65 @@ func (c *Client) handleGetDatabaseStats() {
 		"unique_actors":      uniqueActors,
 		"unique_subjects":    uniqueSubjects,
 		"unique_contexts":    uniqueContexts,
+		"rich_fields":        richFieldsWithStats,
 	})
 
 	c.server.logger.Infow("Database stats sent",
 		"total_attestations", totalAttestations,
+		"client_id", c.id,
+	)
+}
+
+// handleRichSearch performs fuzzy search on RichStringFields
+func (c *Client) handleRichSearch(query string) {
+	// Trim and validate query
+	query = strings.TrimSpace(query)
+	if query == "" {
+		// Send empty result for empty query
+		c.sendJSON(map[string]interface{}{
+			"type":    "rich_search_results",
+			"query":   query,
+			"matches": []interface{}{},
+			"total":   0,
+		})
+		return
+	}
+
+	c.server.logger.Infow("RichStringFields search",
+		"query", query,
+		"client_id", c.id,
+	)
+
+	// Create bounded store to access search functionality
+	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("search"))
+
+	// Just use the working substring search
+	ctx := c.server.ctx
+	matches, err := boundedStore.SearchRichStringFields(ctx, query, 50)
+	if err != nil {
+		c.server.logger.Warnw("RichStringFields search failed",
+			"query", query,
+			"error", err,
+			"client_id", c.id,
+		)
+		c.sendJSON(map[string]interface{}{
+			"type":  "rich_search_error",
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Send results to client
+	c.sendJSON(map[string]interface{}{
+		"type":    "rich_search_results",
+		"query":   query,
+		"matches": matches,
+		"total":   len(matches),
+	})
+
+	c.server.logger.Infow("RichStringFields search results sent",
+		"query", query,
+		"matches", len(matches),
 		"client_id", c.id,
 	)
 }

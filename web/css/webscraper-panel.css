@@ -74,7 +74,7 @@
 /* Options Section */
 .scraper-options {
     padding: 12px 20px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border-bottom: 1px solid #eee;
     display: flex;
     flex-wrap: wrap;
@@ -167,7 +167,7 @@
 .scraper-result-card {
     padding: 12px;
     margin-bottom: 12px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     border: 1px solid #eee;
     border-radius: 4px;
 }
@@ -235,7 +235,7 @@
 .scraper-history {
     border-top: 1px solid #eee;
     padding: 16px 20px;
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
 }
 
 .scraper-history-title {
@@ -273,7 +273,7 @@
 }
 
 .scraper-history-item:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
 }
 
 .scraper-history-url {
