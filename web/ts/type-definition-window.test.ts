@@ -19,8 +19,8 @@ describe('TypeDefinitionWindow', () => {
         });
 
         // Verify the fields are marked searchable
-        expect(window.fields.get('name')?.isRichString).toBe(true);
-        expect(window.fields.get('cuisine_type')?.isRichString).toBe(true);
+        expect(window.getFieldInfo('name')?.isRichString).toBe(true);
+        expect(window.getFieldInfo('cuisine_type')?.isRichString).toBe(true);
     });
 
     test('marks fields from array_fields as arrays', () => {
@@ -34,7 +34,7 @@ describe('TypeDefinitionWindow', () => {
         });
 
         // Verify the field is marked as array
-        expect(window.fields.get('allergens')?.isArray).toBe(true);
+        expect(window.getFieldInfo('allergens')?.isArray).toBe(true);
     });
 
     test('preserves both rich and array field types', () => {
@@ -48,10 +48,10 @@ describe('TypeDefinitionWindow', () => {
         });
 
         // Verify rich fields
-        expect(window.fields.get('review_text')?.isRichString).toBe(true);
-        expect(window.fields.get('reviewer_name')?.isRichString).toBe(true);
+        expect(window.getFieldInfo('review_text')?.isRichString).toBe(true);
+        expect(window.getFieldInfo('reviewer_name')?.isRichString).toBe(true);
 
         // Verify array field
-        expect(window.fields.get('tags')?.isArray).toBe(true);
+        expect(window.getFieldInfo('tags')?.isArray).toBe(true);
     });
 });
