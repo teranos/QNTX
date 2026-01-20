@@ -197,9 +197,14 @@ func TestToPayload(t *testing.T) {
 		SoActions:  []string{"prompt", "{{subject}}"},
 	}
 
-	payload, err := action.ToPayload(filter)
+	soPayload, err := action.ToPayload(filter)
 	if err != nil {
 		t.Fatalf("ToPayload() error: %v", err)
+	}
+
+	payload, ok := soPayload.(*Payload)
+	if !ok {
+		t.Fatalf("ToPayload() returned wrong type: %T", soPayload)
 	}
 
 	if payload.Template != action.Template {
