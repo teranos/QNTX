@@ -10,6 +10,7 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { Window } from './window.ts';
 import { windowTray } from './window-tray.ts';
+import { uiState } from '../state/ui.ts';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -25,6 +26,9 @@ describe('WindowTray - Level 1: DOM State', () => {
             <div id="graph-container"></div>
         `;
         localStorage.clear();
+
+        // Reset uiState
+        uiState.clearMinimizedWindows();
 
         // Force windowTray to reinitialize by clearing its internal state
         // @ts-ignore - accessing private properties for testing
@@ -118,7 +122,7 @@ describe('WindowTray - Level 1: DOM State', () => {
         expect(dot3).toBeTruthy();
     });
 
-    test('localStorage contains correct IDs after minimize', async () => {
+    test('uiState contains correct IDs after minimize', async () => {
         // Create and minimize windows
         const win1 = new Window({ id: 'window-1', title: 'Window 1' });
         const win2 = new Window({ id: 'window-2', title: 'Window 2' });
@@ -131,12 +135,9 @@ describe('WindowTray - Level 1: DOM State', () => {
         // Wait for minimize animations
         await new Promise(resolve => setTimeout(resolve, 350));
 
-        // Check localStorage
-        const stored = localStorage.getItem('qntx_window_tray_state');
-        expect(stored).toBeTruthy();
-
-        const state = JSON.parse(stored!);
-        expect(state.minimizedWindows).toEqual(['window-1', 'window-2']);
+        // Check uiState
+        const minimized = uiState.getMinimizedWindows();
+        expect(minimized).toEqual(['window-1', 'window-2']);
     });
 
     test('tray element has correct data-empty attribute', async () => {
@@ -179,6 +180,9 @@ describe('WindowTray - Level 2: Interactions', () => {
             <div id="graph-container"></div>
         `;
         localStorage.clear();
+
+        // Reset uiState
+        uiState.clearMinimizedWindows();
 
         // Polyfill missing globals for DOM tests
         if (typeof requestAnimationFrame === 'undefined') {
@@ -367,6 +371,9 @@ describe('WindowTray - Level 3: Persistence', () => {
         `;
         localStorage.clear();
 
+        // Reset uiState
+        uiState.clearMinimizedWindows();
+
         // Polyfill missing globals
         if (typeof requestAnimationFrame === 'undefined') {
             // @ts-ignore
@@ -388,7 +395,7 @@ describe('WindowTray - Level 3: Persistence', () => {
         windowTray.items = new Map();
     });
 
-    test('minimized window saves ID to localStorage', async () => {
+    test('minimized window saves ID to uiState', async () => {
         // Initialize tray
         windowTray.init();
 
@@ -400,15 +407,12 @@ describe('WindowTray - Level 3: Persistence', () => {
         // Wait for minimize animation
         await new Promise(resolve => setTimeout(resolve, 350));
 
-        // Check localStorage was updated
-        const stored = localStorage.getItem('qntx_window_tray_state');
-        expect(stored).toBeTruthy();
-
-        const state = JSON.parse(stored!);
-        expect(state.minimizedWindows).toContain('test-window');
+        // Check uiState was updated
+        const minimized = uiState.getMinimizedWindows();
+        expect(minimized).toContain('test-window');
     });
 
-    test('page reload restores minimized dots from localStorage', async () => {
+    test('page reload restores minimized dots from uiState', async () => {
         // First session: minimize windows
         windowTray.init();
         const win1 = new Window({ id: 'window-1', title: 'Window 1' });
@@ -422,10 +426,9 @@ describe('WindowTray - Level 3: Persistence', () => {
         // Wait for minimize animations
         await new Promise(resolve => setTimeout(resolve, 350));
 
-        // Verify localStorage has both IDs
-        const stored = localStorage.getItem('qntx_window_tray_state');
-        const state = JSON.parse(stored!);
-        expect(state.minimizedWindows).toEqual(['window-1', 'window-2']);
+        // Verify uiState has both IDs
+        const minimized = uiState.getMinimizedWindows();
+        expect(minimized).toEqual(['window-1', 'window-2']);
 
         // Simulate page reload: reinitialize tray with fresh state
         // @ts-ignore
@@ -460,7 +463,7 @@ describe('WindowTray - Level 3: Persistence', () => {
         expect(reloadWin2.isMinimized()).toBe(true);
     });
 
-    test('restoring window removes ID from localStorage', async () => {
+    test('restoring window removes ID from uiState', async () => {
         // Initialize and minimize
         windowTray.init();
         const win = new Window({ id: 'test-window', title: 'Test' });
@@ -470,10 +473,9 @@ describe('WindowTray - Level 3: Persistence', () => {
         // Wait for minimize
         await new Promise(resolve => setTimeout(resolve, 350));
 
-        // Verify in localStorage
-        let stored = localStorage.getItem('qntx_window_tray_state');
-        let state = JSON.parse(stored!);
-        expect(state.minimizedWindows).toContain('test-window');
+        // Verify in uiState
+        let minimized = uiState.getMinimizedWindows();
+        expect(minimized).toContain('test-window');
 
         // Restore the window
         win.restore();
@@ -481,20 +483,17 @@ describe('WindowTray - Level 3: Persistence', () => {
         // Wait for restore animation
         await new Promise(resolve => setTimeout(resolve, 350));
 
-        // Verify removed from localStorage
-        // When the last window is restored, clearState() removes the entire localStorage item
-        stored = localStorage.getItem('qntx_window_tray_state');
-        expect(stored).toBeFalsy();
+        // Verify removed from uiState
+        minimized = uiState.getMinimizedWindows();
+        expect(minimized).not.toContain('test-window');
+        expect(minimized.length).toBe(0);
     });
 
-    test('handles corrupted localStorage data gracefully', async () => {
-        // Set invalid JSON in localStorage
-        localStorage.setItem('qntx_window_tray_state', 'not valid json');
-
+    test('tray works correctly when initialized', async () => {
         // Initialize tray - should not throw
         expect(() => windowTray.init()).not.toThrow();
 
-        // Tray should still work
+        // Tray should be created
         const tray = document.querySelector('.window-tray');
         expect(tray).toBeTruthy();
 
@@ -512,11 +511,9 @@ describe('WindowTray - Level 3: Persistence', () => {
         expect(dot).toBeTruthy();
     });
 
-    test('handles missing window ID in localStorage gracefully', async () => {
-        // Set localStorage with window ID that doesn't exist
-        localStorage.setItem('qntx_window_tray_state', JSON.stringify({
-            minimizedWindows: ['non-existent-window']
-        }));
+    test('handles stale window IDs in uiState gracefully', async () => {
+        // Set uiState with window ID that doesn't exist
+        uiState.addMinimizedWindow('non-existent-window');
 
         // Initialize tray
         windowTray.init();
