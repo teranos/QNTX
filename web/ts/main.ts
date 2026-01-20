@@ -7,7 +7,7 @@ import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
 import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
-import { initLegendaToggles } from './components/legenda.ts';
+import { initTypeAttestations } from './components/type-attestations.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './ui-state.ts';
 import { appState } from './config.ts';
@@ -221,7 +221,7 @@ async function init(): Promise<void> {
     initQueryFileDrop();
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
-    initLegendaToggles(updateGraph);  // Pass renderGraph function for legenda callbacks
+    initTypeAttestations(updateGraph);  // Pass renderGraph function for type attestation callbacks
     initUsageBadge();
 
     // Listen for Tauri events (menu actions)

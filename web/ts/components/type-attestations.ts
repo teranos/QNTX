@@ -1,4 +1,4 @@
-// Legenda (Legend) - Node type visualization and filtering controls
+// Type Attestations - Node type visualization and filtering controls
 
 import { appState, UI_TEXT } from '../config.ts';
 import type { GraphData, NodeTypeInfo } from '../../types/core';
@@ -47,8 +47,8 @@ function normalizeNodeType(type: string | null | undefined): string {
     return (type || '').trim().toLowerCase();
 }
 
-// Helper: Update visual state of legenda item
-function updateLegendaItemVisualState(item: HTMLElement, typeNameSpan: HTMLElement, isHidden: boolean): void {
+// Helper: Update visual state of type attestation item
+function updateTypeAttestationItemVisualState(item: HTMLElement, typeNameSpan: HTMLElement, isHidden: boolean): void {
     item.style.opacity = isHidden ? '0.4' : '1';
     typeNameSpan.style.textDecoration = isHidden ? 'line-through' : 'none';
 }
@@ -72,7 +72,7 @@ function setupTypeNameHandler(
             hiddenNodeTypes.add(nodeType);
         }
 
-        updateLegendaItemVisualState(item, typeNameSpan, isHidden);
+        updateTypeAttestationItemVisualState(item, typeNameSpan, isHidden);
 
         // Phase 2: Send visibility preference to backend
         // Backend will apply filter and send back updated graph
@@ -119,33 +119,65 @@ function setupRevealButtonHandler(
 
 // Build legenda HTML from backend node types (backend is single source of truth)
 // Frontend no longer maintains hardcoded node type registry
-export function buildLegenda(graphData: GraphData | null = null): void {
-    const legendaContainer = document.querySelector('.legenda') as HTMLElement | null;
-    if (!legendaContainer) return;
+export function buildTypeAttestations(graphData: GraphData | null = null): void {
+    const typeAttestationsContainer = document.querySelector('.type-attestations') as HTMLElement | null;
+    if (!typeAttestationsContainer) return;
 
     // Clear existing content except title
-    const existingTitle = legendaContainer.querySelector('.legenda-title') as HTMLElement | null;
-    legendaContainer.innerHTML = '';
+    const existingTitle = typeAttestationsContainer.querySelector('.type-attestations-title') as HTMLElement | null;
+    typeAttestationsContainer.innerHTML = '';
+
+    // Create title container with + button
+    const titleContainer = document.createElement('div');
+    titleContainer.style.display = 'flex';
+    titleContainer.style.alignItems = 'center';
+    titleContainer.style.justifyContent = 'space-between';
+    titleContainer.style.marginBottom = '6px';
 
     // Re-add title or create it
     if (existingTitle) {
-        legendaContainer.appendChild(existingTitle);
+        titleContainer.appendChild(existingTitle);
     } else {
         const title = document.createElement('div');
-        title.className = 'legenda-title';
+        title.className = 'type-attestations-title';
         title.innerHTML = UI_TEXT.LEGENDA_TITLE;
-        legendaContainer.appendChild(title);
+        title.style.margin = '0';  // Remove default margin since container handles spacing
+        titleContainer.appendChild(title);
     }
 
-    // Add right-click handler to legend container for creating new types
-    legendaContainer.addEventListener('contextmenu', (e) => {
-        // Only handle right-click on the legend container itself, not on items
-        if ((e.target as HTMLElement).classList.contains('legenda') ||
-            (e.target as HTMLElement).classList.contains('legenda-title')) {
-            e.preventDefault();
-            typeDefinitionWindow.createNewType();
-        }
+    // Add + button for creating new types (using + as the "as" attestation symbol)
+    const addButton = document.createElement('button');
+    addButton.textContent = '+';
+    addButton.title = 'Attest new type';
+    addButton.style.cssText = `
+        background: transparent;
+        border: 1px solid var(--control-border, #ddd);
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 0 6px;
+        line-height: 18px;
+        color: var(--panel-text-secondary, #666);
+        transition: all 0.2s ease;
+    `;
+
+    // Hover effect
+    addButton.addEventListener('mouseenter', () => {
+        addButton.style.background = 'var(--control-bg, #f8f8f8)';
+        addButton.style.color = 'var(--accent-color, #0066cc)';
     });
+    addButton.addEventListener('mouseleave', () => {
+        addButton.style.background = 'transparent';
+        addButton.style.color = 'var(--panel-text-secondary, #666)';
+    });
+
+    addButton.addEventListener('click', () => {
+        typeDefinitionWindow.createNewType();
+    });
+
+    titleContainer.appendChild(addButton);
+    typeAttestationsContainer.appendChild(titleContainer);
 
     // Require backend data - fail loud if not provided (Phase 1: enforce backend responsibility)
     if (!graphData?.meta?.node_types || graphData.meta.node_types.length === 0) {
@@ -159,7 +191,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
     // Build legenda items from backend data using DOM API for security
     typesToRender.forEach((type: NodeTypeInfo) => {
         const item = document.createElement('div');
-        item.className = 'legenda-item';
+        item.className = 'type-attestation-item';
         const countInfo = type.count ? ` (${type.count})` : '';
         item.title = `Click name to show/hide ${type.label} nodes${countInfo}`;
 
@@ -168,7 +200,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
 
         // Build item contents using DOM API for security
         const colorDiv = document.createElement('div');
-        colorDiv.className = 'legenda-color';
+        colorDiv.className = 'type-attestation-color';
         colorDiv.style.background = type.color ?? '#666666';
 
         const revealSpan = document.createElement('span');
@@ -177,7 +209,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
         revealSpan.textContent = '⨁';
 
         const typeNameSpan = document.createElement('span');
-        typeNameSpan.className = 'legenda-type-name';
+        typeNameSpan.className = 'type-attestation-name';
         typeNameSpan.textContent = type.label;
 
         item.appendChild(colorDiv);
@@ -186,7 +218,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
 
         if (type.count) {
             const countSpan = document.createElement('span');
-            countSpan.className = 'legenda-count';
+            countSpan.className = 'type-attestation-count';
             countSpan.textContent = String(type.count);
             item.appendChild(countSpan);
         }
@@ -210,7 +242,7 @@ export function buildLegenda(graphData: GraphData | null = null): void {
         });
         item.appendChild(editIcon);
 
-        legendaContainer.appendChild(item);
+        typeAttestationsContainer.appendChild(item);
     });
 }
 
@@ -235,7 +267,7 @@ export function buildIsolatedToggle(): void {
 // Initialize legenda click handlers for node type visibility toggle
 // renderGraphFn: function to call when graph needs re-rendering
 // graphData: optional graph data with meta.node_types from backend
-export function initLegendaToggles(
+export function initTypeAttestations(
     renderGraphFn: (data: GraphData) => void,
     graphData: GraphData | null = null
 ): void {
@@ -243,16 +275,16 @@ export function initLegendaToggles(
     eventListeners.removeAll();
 
     // Build UI components first (passing graphData for dynamic types)
-    buildLegenda(graphData);
+    buildTypeAttestations(graphData);
     buildIsolatedToggle();
 
-    const legendaItems = document.querySelectorAll('.legenda-item');
+    const legendaItems = document.querySelectorAll('.type-attestation-item');
 
     legendaItems.forEach((item: Element) => {
         const htmlItem = item as HTMLElement;
         htmlItem.style.transition = 'opacity 0.2s ease';
 
-        const typeNameSpan = item.querySelector('.legenda-type-name') as HTMLElement | null;
+        const typeNameSpan = item.querySelector('.type-attestation-name') as HTMLElement | null;
         const revealButton = item.querySelector('.reveal-related') as HTMLElement | null;
 
         if (!typeNameSpan) return;
@@ -284,6 +316,6 @@ export function initLegendaToggles(
 }
 
 // Cleanup function for when legenda is destroyed
-export function cleanupLegenda(): void {
+export function cleanupTypeAttestations(): void {
     eventListeners.removeAll();
 }

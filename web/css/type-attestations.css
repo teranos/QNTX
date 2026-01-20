@@ -1,5 +1,5 @@
 /**
- * Legend (Legenda) styles
+ * Type Attestations styles
  * Node type visibility controls and type editing
  */
 
@@ -36,14 +36,14 @@
     background: #eee;
 }
 
-/* Legenda (Legend) - moved from graph.css */
-.legenda {
+/* Type Attestations - moved from graph.css */
+.type-attestations {
     margin-top: var(--legend-margin-top);
     padding-top: var(--legend-padding-top);
     border-top: 1px solid var(--control-border);
 }
 
-.legenda-title {
+.type-attestations-title {
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
@@ -51,7 +51,7 @@
     color: #000;
 }
 
-.legenda-item {
+.type-attestation-item {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -62,7 +62,7 @@
     padding-right: 32px; /* Make space for edit icon */
 }
 
-.legenda-color {
+.type-attestation-color {
     width: 10px;
     height: 10px;
     border: 1px solid var(--border-color);
@@ -85,12 +85,12 @@
     font-weight: 600;
 }
 
-.legenda-type-name {
+.type-attestation-name {
     cursor: pointer;
     flex: 1;
 }
 
-.legenda-count {
+.type-attestation-count {
     font-size: 9px;
     color: var(--text-on-dark-tertiary);
     margin-left: auto;
@@ -129,7 +129,7 @@
     padding: 4px;
 }
 
-.legenda-item:hover .type-edit-icon {
+.type-attestation-item:hover .type-edit-icon {
     opacity: 0.8;
 }
 
