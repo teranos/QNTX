@@ -1,9 +1,10 @@
 /**
- * Tests for config.ts - app configuration and runtime state
+ * Tests for config.ts constants and state/app.ts runtime state
  */
 
 import { describe, test, expect } from 'bun:test';
-import { appState, GRAPH_PHYSICS, GRAPH_STYLES, UI_TEXT, MAX_LOGS } from './config';
+import { GRAPH_PHYSICS, GRAPH_STYLES, UI_TEXT } from './config';
+import { appState, MAX_LOGS } from './state/app';
 
 describe('appState', () => {
     test('has correct default values', () => {

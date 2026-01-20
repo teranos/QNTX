@@ -2,7 +2,8 @@
 // Header provides command buttons (ax, by, as)
 // Footer displays contextual information (type, connections, metadata)
 
-import { GRAPH_PHYSICS, appState } from '../../config.ts';
+import { appState } from '../../state/app.ts';
+import { GRAPH_PHYSICS } from '../../config.ts';
 import { AX, BY, AS, CommandDescriptions } from '../../../../types/generated/typescript/sym.ts';
 import type { D3Node } from '../../../types/d3-graph';
 import type { Node } from '../../../types/core';

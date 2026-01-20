@@ -1,6 +1,6 @@
 // System drawer for logs, progress, and system output
 
-import { MAX_LOGS, appState } from './config.ts';
+import { appState, MAX_LOGS } from './state/app.ts';
 import { sendMessage } from './websocket.ts';
 import { CSS } from './css-classes.ts';
 import { formatTimestamp } from './html-utils.ts';
