@@ -171,9 +171,14 @@ type StreamingChunk struct {
 
 // GenerateTextStreaming sends a prompt and streams the response token by token
 // Caller is responsible for closing chunkChan
+// Deprecated: Use GenerateTextStreamingWithContext instead for proper cancellation support
 func (lp *LocalProvider) GenerateTextStreaming(systemPrompt, userPrompt string, chunkChan chan<- StreamingChunk) error {
-	// Use background context with client timeout
-	ctx := context.Background()
+	return lp.GenerateTextStreamingWithContext(context.Background(), systemPrompt, userPrompt, chunkChan)
+}
+
+// GenerateTextStreamingWithContext sends a prompt and streams the response with context support
+// Context cancellation will stop the streaming and return early
+func (lp *LocalProvider) GenerateTextStreamingWithContext(ctx context.Context, systemPrompt, userPrompt string, chunkChan chan<- StreamingChunk) error {
 	return lp.generateTextStreamingWithContext(ctx, systemPrompt, userPrompt, chunkChan)
 }
 
