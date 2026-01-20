@@ -51,6 +51,38 @@ export class TypeDefinitionWindow {
             array_fields: []
         };
 
+        // Clear and populate fields from the type definition
+        this.fields.clear();
+
+        // Add fields from rich_string_fields
+        if (this.currentType.rich_string_fields) {
+            for (const fieldName of this.currentType.rich_string_fields) {
+                this.fields.set(fieldName, {
+                    name: fieldName,
+                    value: null,
+                    isRichString: true,
+                    isArray: false
+                });
+            }
+        }
+
+        // Add fields from array_fields (might overlap with rich_string_fields)
+        if (this.currentType.array_fields) {
+            for (const fieldName of this.currentType.array_fields) {
+                const existing = this.fields.get(fieldName);
+                if (existing) {
+                    existing.isArray = true;
+                } else {
+                    this.fields.set(fieldName, {
+                        name: fieldName,
+                        value: null,
+                        isRichString: false,
+                        isArray: true
+                    });
+                }
+            }
+        }
+
         this.discoverFields();
         this.render();
         this.window.show();
@@ -169,6 +201,22 @@ export class TypeDefinitionWindow {
         `;
         content.appendChild(controlsSection);
 
+        // Save button section
+        const saveSection = document.createElement('div');
+        saveSection.className = 'save-section';
+        saveSection.style.cssText = `
+            padding: 12px;
+            border-top: 1px solid var(--panel-border-color, #e0e0e0);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        saveSection.innerHTML = `
+            <button class="btn btn-primary" id="save-type-btn">Attest Type Definition</button>
+            <div class="save-status" id="save-status" style="font-size: 11px; color: var(--panel-text-secondary, #666);"></div>
+        `;
+        content.appendChild(saveSection);
+
         this.window.setContent(content);
         this.attachEventListeners();
     }
@@ -263,6 +311,38 @@ export class TypeDefinitionWindow {
                 this.toggleArrayField(this.selectedField, arrayToggle.checked);
             }
         });
+
+        // Save button handler
+        const saveBtn = container.querySelector('#save-type-btn') as HTMLButtonElement;
+        const saveStatus = container.querySelector('#save-status') as HTMLElement;
+
+        saveBtn?.addEventListener('click', async () => {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Attesting...';
+
+            try {
+                await this.persistTypeDefinition();
+
+                // Show success message
+                if (saveStatus) {
+                    saveStatus.textContent = '✓ Attested';
+                    saveStatus.style.color = 'var(--success-color, #2ecc71)';
+                    setTimeout(() => {
+                        saveStatus.textContent = '';
+                    }, 3000);
+                }
+            } catch (error) {
+                // Show error message
+                if (saveStatus) {
+                    saveStatus.textContent = '✗ Failed to attest';
+                    saveStatus.style.color = 'var(--error-color, #e74c3c)';
+                }
+                console.error('Failed to attest type definition:', error);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Attest Type Definition';
+            }
+        });
     }
 
     /**
@@ -318,10 +398,7 @@ export class TypeDefinitionWindow {
             this.currentType.rich_string_fields = this.currentType.rich_string_fields.filter(f => f !== fieldName);
         }
 
-        // Persist immediately
-        this.persistTypeDefinition();
-
-        // Update UI
+        // Update UI (don't persist - wait for Attest button)
         this.render();
         this.selectField(fieldName);
     }
@@ -348,10 +425,7 @@ export class TypeDefinitionWindow {
             this.currentType.array_fields = this.currentType.array_fields.filter(f => f !== fieldName);
         }
 
-        // Persist immediately
-        this.persistTypeDefinition();
-
-        // Update UI
+        // Update UI (don't persist - wait for Attest button)
         this.render();
         this.selectField(fieldName);
     }
@@ -362,34 +436,25 @@ export class TypeDefinitionWindow {
     private async persistTypeDefinition(): Promise<void> {
         if (!this.currentType) return;
 
-        try {
-            // Create attestation for type definition
-            const attestation = {
-                subjects: [this.currentType.name],
-                predicates: ['type'],
-                contexts: ['graph'],
-                actors: [this.currentType.name], // Self-certifying
-                attributes: {
-                    display_label: this.currentType.label,
-                    display_color: this.currentType.color,
-                    opacity: this.currentType.opacity || 1.0,
-                    deprecated: this.currentType.deprecated || false,
-                    rich_string_fields: this.currentType.rich_string_fields || [],
-                    array_fields: this.currentType.array_fields || []
-                }
-            };
+        // Create type definition payload
+        const typePayload = {
+            name: this.currentType.name,
+            label: this.currentType.label,
+            color: this.currentType.color,
+            opacity: this.currentType.opacity || 1.0,
+            deprecated: this.currentType.deprecated || false,
+            rich_string_fields: this.currentType.rich_string_fields || [],
+            array_fields: this.currentType.array_fields || []
+        };
 
-            const response = await apiFetch('/api/attestations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(attestation)
-            });
+        const response = await apiFetch('/api/types', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(typePayload)
+        });
 
-            if (!response.ok) {
-                console.error('Failed to persist type definition');
-            }
-        } catch (error) {
-            console.error('Error persisting type definition:', error);
+        if (!response.ok) {
+            throw new Error(`Failed to persist type definition: ${response.statusText}`);
         }
     }
 

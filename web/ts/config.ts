@@ -23,7 +23,7 @@ export const UI_TEXT: UIText & {
     CONNECTION_RESTORED: 'Connection restored',
 
     // Extended UI text specific to this app
-    LEGENDA_TITLE: 'Tiles <span style="font-size: 9px; font-weight: normal; color: #666;">(click to toggle)</span>',
+    LEGENDA_TITLE: 'TYPES',
     REVEAL_TOOLTIP: (label: string): string => `⚠️ Experimental: Reveal nodes connected to ${label} (feature in development)`,
     ISOLATED_NODES: '⊖ Hide isolated nodes'  // ⊖ = subtract/hide symbol
 };
