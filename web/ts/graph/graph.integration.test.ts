@@ -50,7 +50,7 @@ describe('Graph Rendering Integration', () => {
                     <svg id="graph"></svg>
                 </div>
                 <div id="controls"></div>
-                <div class="legenda"></div>
+                <div class="type-attestations"></div>
                 <div id="tooltip" class="graph-data-tooltip"></div>
             </body>
             </html>
@@ -82,7 +82,7 @@ describe('Graph Rendering Integration', () => {
         expect(document.getElementById('graph-container')).not.toBeNull();
         expect(document.getElementById('graph')).not.toBeNull();
         expect(document.getElementById('controls')).not.toBeNull();
-        expect(document.querySelector('.legenda')).not.toBeNull();
+        expect(document.querySelector('.type-attestations')).not.toBeNull();
         expect(document.getElementById('tooltip')).not.toBeNull();
     });
 

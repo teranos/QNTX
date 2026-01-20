@@ -84,10 +84,10 @@ export function setFocusUIVisibility(visible: boolean): void {
     const domCache = getDomCache();
 
     // Left side elements (slide left)
-    slideLeft(domCache.get('legenda', '.legenda'));
+    slideLeft(domCache.get('typeAttestations', '.type-attestations'));
     slideLeft(document.getElementById('left-panel'));
-    // TODO: When #controls is renamed to #legenda-container, update this selector
-    slideLeft(document.getElementById('controls')); // Contains legenda
+    // TODO: When #controls is renamed to #type-attestations-container, update this selector
+    slideLeft(document.getElementById('controls')); // Contains type attestations
 
     // Expand graph-container to full width when focused
     // TODO: When #graph-container is renamed to #graph-viewer, update this selector
