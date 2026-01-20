@@ -103,6 +103,15 @@ export class TypeDefinitionWindow {
             }
         } catch (error) {
             console.error('Failed to discover fields:', error);
+            // Show user-friendly message in status area
+            const statusEl = this.window.getContentElement()?.querySelector('#save-status') as HTMLElement;
+            if (statusEl) {
+                statusEl.textContent = 'Could not auto-discover fields - add them manually';
+                statusEl.style.color = '#f39c12'; // Warning color (orange)
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 4000);
+            }
             // Continue with manual field entry
         }
     }
@@ -305,6 +314,19 @@ export class TypeDefinitionWindow {
         const addField = () => {
             const fieldName = addInput.value.trim();
 
+            // Check field count limit
+            if (this.fields.size >= 50) {
+                const statusEl = container.querySelector('#save-status') as HTMLElement;
+                if (statusEl) {
+                    statusEl.textContent = 'Maximum 50 fields allowed per type';
+                    statusEl.style.color = '#e74c3c';
+                    setTimeout(() => {
+                        statusEl.textContent = '';
+                    }, 3000);
+                }
+                return;
+            }
+
             // Validate field name
             const validation = this.validateFieldName(fieldName);
             if (!validation.valid) {
@@ -485,6 +507,11 @@ export class TypeDefinitionWindow {
             ...(this.currentType.rich_string_fields || []),
             ...(this.currentType.array_fields || [])
         ];
+
+        // Check total field count limit
+        if (allFields.length > 50) {
+            throw new Error(`Too many fields: ${allFields.length}. Maximum 50 fields allowed per type.`);
+        }
 
         for (const fieldName of allFields) {
             const validation = this.validateFieldName(fieldName);
