@@ -6,7 +6,7 @@ import { describe, test, expect, beforeEach, mock } from 'bun:test';
 
 // We need to test the class, not the singleton, so we'll import the module fresh
 // For now, test the singleton behavior
-import { uiState, type PanelId, type GraphSessionState } from './state/ui';
+import { uiState, type PanelId, type GraphSessionState } from './ui';
 
 describe('UIState', () => {
     beforeEach(() => {

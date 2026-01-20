@@ -3,7 +3,7 @@
  */
 
 import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
-import { getItem, setItem, removeItem, hasItem, getTimestamp, createStore } from './state/storage';
+import { getItem, setItem, removeItem, hasItem, getTimestamp, createStore } from './storage';
 
 describe('Storage', () => {
     beforeEach(() => {
