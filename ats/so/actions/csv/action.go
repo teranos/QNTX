@@ -1,7 +1,6 @@
 package csv
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/teranos/QNTX/ats/so"
@@ -103,8 +102,21 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 	return action, nil
 }
 
+// Payload represents the data needed to execute a CSV export
+type Payload struct {
+	AxFilter  types.AxFilter `json:"ax_filter"`
+	Filename  string         `json:"filename"`
+	Delimiter string         `json:"delimiter,omitempty"`
+	Headers   []string       `json:"headers,omitempty"`
+}
+
+// GetAxFilter implements so.Payload interface
+func (p *Payload) GetAxFilter() types.AxFilter {
+	return p.AxFilter
+}
+
 // ToPayload converts an Action to a handler Payload
-func (a *Action) ToPayload(filter types.AxFilter) (*Payload, error) {
+func (a *Action) ToPayload(filter types.AxFilter) (so.Payload, error) {
 	// Clear SoActions from the filter since we've extracted the csv action
 	filter.SoActions = nil
 
@@ -118,25 +130,10 @@ func (a *Action) ToPayload(filter types.AxFilter) (*Payload, error) {
 
 // ToPayloadJSON converts an Action to a JSON-encoded payload for job creation
 func (a *Action) ToPayloadJSON(filter types.AxFilter) ([]byte, error) {
-	payload, err := a.ToPayload(filter)
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(payload)
+	return so.ToPayloadJSON(a, filter)
 }
 
 // IsCsvAction checks if a filter has a csv so_action
 func IsCsvAction(filter *types.AxFilter) bool {
-	if filter == nil || len(filter.SoActions) == 0 {
-		return false
-	}
-	return strings.ToLower(filter.SoActions[0]) == "csv"
-}
-
-// Payload represents the data needed to execute a CSV export
-type Payload struct {
-	AxFilter  types.AxFilter `json:"ax_filter"`
-	Filename  string         `json:"filename"`
-	Delimiter string         `json:"delimiter,omitempty"`
-	Headers   []string       `json:"headers,omitempty"`
+	return so.IsAction(filter, "csv")
 }
