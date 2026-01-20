@@ -13,7 +13,7 @@
 
     /* Colors */
     --panel-bg: var(--bg-primary);
-    --panel-bg-secondary: var(--bg-subtle);
+    --panel-bg-secondary: var(--bg-almost-white);
     --panel-text-primary: var(--text-primary);
     --panel-text-secondary: var(--text-secondary);
     --panel-text-tertiary: var(--text-tertiary);
@@ -475,7 +475,7 @@
     pointer-events: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     max-width: 400px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-on-dark);
 }
 
 /* Mobile/tablet: constrain tooltip to viewport */

@@ -379,6 +379,7 @@
           docs-site = pkgs.callPackage ./sitegen.nix {
             gitRevision = self.rev or self.dirtyRev or "unknown";
             gitShortRev = self.shortRev or self.dirtyShortRev or "unknown";
+            gitCommitDate = if self ? lastModified then self.lastModified else null;
 
             # Nix infrastructure metadata for self-documenting builds
             nixPackages = [

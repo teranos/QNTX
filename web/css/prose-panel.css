@@ -27,8 +27,8 @@
     right: 0;
     width: 50%;
     height: 100%;
-    background: #1e1e1e;
-    border-left: 1px solid #333;
+    background: var(--bg-dark);
+    border-left: 1px solid var(--border-on-dark);
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
     z-index: 1000;
     display: flex;
@@ -53,8 +53,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid #333;
-    background: #2a2a2a;
+    border-bottom: 1px solid var(--border-on-dark);
+    background: var(--bg-dark);
 }
 
 .prose-title {
@@ -62,7 +62,7 @@
     align-items: center;
     gap: 12px;
     font-size: 16px;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
 }
 
 .prose-icon {
@@ -74,7 +74,7 @@
 }
 
 .prose-breadcrumb {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-size: 14px;
 }
 
@@ -92,7 +92,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .prose-editor-container {
@@ -111,7 +111,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     font-size: 15px;
     line-height: 1.6;
-    color: #e0e0e0;
+    color: var(--text-on-dark);
     outline: none;
     /* Ensure text is properly rendered */
     -webkit-font-smoothing: antialiased;
@@ -164,8 +164,8 @@
     font-size: 28px;
     font-weight: 600;
     margin: 24px 0 16px;
-    color: #fff;
-    border-bottom: 1px solid #333;
+    color: var(--text-on-dark-emphasis);
+    border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 8px;
 }
 
@@ -173,14 +173,14 @@
     font-size: 22px;
     font-weight: 600;
     margin: 20px 0 12px;
-    color: #fff;
+    color: var(--text-on-dark-emphasis);
 }
 
 #prose-editor .ProseMirror h3 {
     font-size: 18px;
     font-weight: 600;
     margin: 16px 0 8px;
-    color: #fff;
+    color: var(--text-on-dark-emphasis);
 }
 
 #prose-editor .ProseMirror p {
@@ -198,7 +198,7 @@
 }
 
 #prose-editor .ProseMirror code {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     padding: 2px 4px;
     border-radius: 3px;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
@@ -206,7 +206,7 @@
 }
 
 #prose-editor .ProseMirror pre {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     padding: 12px 16px;
     border-radius: 4px;
     overflow-x: auto;
@@ -221,8 +221,8 @@
 #prose-editor .ProseMirror blockquote {
     margin: 12px 0;
     padding-left: 16px;
-    border-left: 3px solid #444;
-    color: #aaa;
+    border-left: 3px solid var(--border-on-dark);
+    color: var(--text-on-dark-secondary);
 }
 
 #prose-editor .ProseMirror a {
@@ -236,7 +236,7 @@
 
 #prose-editor .ProseMirror strong {
     font-weight: 600;
-    color: #fff;
+    color: var(--text-on-dark-emphasis);
 }
 
 #prose-editor .ProseMirror em {
@@ -245,7 +245,7 @@
 
 #prose-editor .ProseMirror hr {
     border: none;
-    border-top: 1px solid #444;
+    border-top: 1px solid var(--border-on-dark);
     margin: 20px 0;
 }
 
@@ -263,19 +263,19 @@
     vertical-align: top;
     box-sizing: border-box;
     position: relative;
-    border: 1px solid #444;
+    border: 1px solid var(--border-on-dark);
     padding: 8px 12px;
     min-width: 100px;
 }
 
 #prose-editor .ProseMirror th {
-    background: #2a2a2a;
+    background: var(--bg-dark);
     font-weight: 600;
     text-align: left;
 }
 
 #prose-editor .ProseMirror td {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 #prose-editor .ProseMirror .selectedCell {
@@ -304,10 +304,10 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 20px;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--border-on-dark);
     background: #252525;
     font-size: 12px;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
 }
 
 .prose-status-text {
@@ -338,7 +338,7 @@
 }
 
 .prose-editor-container::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: var(--bg-dark);
 }
 
 .prose-editor-container::-webkit-scrollbar-thumb {
