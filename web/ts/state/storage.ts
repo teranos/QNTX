@@ -5,12 +5,12 @@
  * for all localStorage operations across the application.
  *
  * Used by:
- * - ui-state.ts (high-level state management)
+ * - state/ui.ts (high-level state management)
  * - Any module needing localStorage with robust handling
  */
 
-import { handleErrorSilent } from './error-handler.ts';
-import { log, SEG } from './logger.ts';
+import { handleErrorSilent } from '../error-handler.ts';
+import { log, SEG } from '../logger.ts';
 
 // ============================================================================
 // Types
