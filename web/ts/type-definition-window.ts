@@ -597,6 +597,13 @@ export class TypeDefinitionWindow {
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
+
+    /**
+     * Public getter for field info (for testing)
+     */
+    public getFieldInfo(name: string): FieldInfo | undefined {
+        return this.fields.get(name);
+    }
 }
 
 // Export singleton instance

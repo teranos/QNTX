@@ -278,5 +278,8 @@ func (s *dbAttestationStore) CreateAttestation(as *types.As) error {
 		time.Now(),
 	)
 
-	return err
+	if err != nil {
+		return errors.Wrap(err, "failed to create attestation")
+	}
+	return nil
 }
