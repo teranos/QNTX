@@ -208,34 +208,34 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to marshal request")
-		chunkChan <- StreamingChunk{Error: wrappedErr}
-		return wrappedErr
+		err = errors.Wrap(err, "failed to marshal request")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	endpoint := lp.baseURL + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to create request")
-		chunkChan <- StreamingChunk{Error: wrappedErr}
-		return wrappedErr
+		err = errors.Wrap(err, "failed to create request")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := lp.httpClient.Do(req)
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "request failed")
-		chunkChan <- StreamingChunk{Error: wrappedErr}
-		return wrappedErr
+		err = errors.Wrap(err, "request failed")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		statusErr := errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
-		chunkChan <- StreamingChunk{Error: statusErr}
-		return statusErr
+		err := errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	// Read SSE stream line by line
@@ -274,9 +274,9 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 		}
 
 		if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
-			decodeErr := errors.Wrap(err, "failed to decode chunk")
-			chunkChan <- StreamingChunk{Error: decodeErr}
-			return decodeErr
+			err = errors.Wrap(err, "failed to decode chunk")
+			chunkChan <- StreamingChunk{Error: err}
+			return err
 		}
 
 		if len(chunk.Choices) > 0 {
@@ -294,9 +294,9 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 	}
 
 	if err := scanner.Err(); err != nil {
-		readErr := errors.Wrap(err, "stream read error")
-		chunkChan <- StreamingChunk{Error: readErr}
-		return readErr
+		err = errors.Wrap(err, "stream read error")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	// Stream ended without explicit completion
@@ -337,7 +337,7 @@ func (lp *LocalProvider) ChatStreaming(ctx context.Context, req openrouter.ChatR
 
 	// Wait for goroutine completion and check for errors
 	if err := <-errChan; err != nil {
-		return errors.Wrap(err, "streaming error")
+		return err
 	}
 
 	return streamErr
