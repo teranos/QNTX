@@ -75,6 +75,9 @@ export interface UIStateData {
     // Graph session (query, verbosity, transform)
     graphSession: GraphSessionState;
 
+    // Minimized window IDs (for window tray)
+    minimizedWindows: string[];
+
     // Timestamp for state versioning
     lastUpdated: number;
 }
@@ -99,6 +102,7 @@ interface PersistedUIState {
     activeModality: string;
     usageView: 'week' | 'month';
     graphSession: GraphSessionState;
+    minimizedWindows: string[];
 }
 
 // ============================================================================
@@ -130,6 +134,7 @@ function createDefaultState(): UIStateData {
         },
         usageView: 'week',
         graphSession: {},
+        minimizedWindows: [],
         lastUpdated: Date.now(),
     };
 }
@@ -326,6 +331,48 @@ class UIState {
     }
 
     // ========================================================================
+    // Minimized Windows Management
+    // ========================================================================
+
+    /**
+     * Get minimized window IDs
+     */
+    getMinimizedWindows(): string[] {
+        return this.state.minimizedWindows;
+    }
+
+    /**
+     * Add a window to the minimized list
+     */
+    addMinimizedWindow(id: string): void {
+        if (this.state.minimizedWindows.includes(id)) return;
+        const updated = [...this.state.minimizedWindows, id];
+        this.update('minimizedWindows', updated);
+    }
+
+    /**
+     * Remove a window from the minimized list
+     */
+    removeMinimizedWindow(id: string): void {
+        const updated = this.state.minimizedWindows.filter(wid => wid !== id);
+        this.update('minimizedWindows', updated);
+    }
+
+    /**
+     * Check if a window is minimized
+     */
+    isWindowMinimized(id: string): boolean {
+        return this.state.minimizedWindows.includes(id);
+    }
+
+    /**
+     * Clear all minimized windows
+     */
+    clearMinimizedWindows(): void {
+        this.update('minimizedWindows', []);
+    }
+
+    // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
 
@@ -432,6 +479,7 @@ class UIState {
             activeModality: this.state.activeModality,
             usageView: this.state.usageView,
             graphSession: this.state.graphSession,
+            minimizedWindows: this.state.minimizedWindows,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
     }
@@ -461,6 +509,7 @@ class UIState {
             activeModality: persisted.activeModality ?? defaultState.activeModality,
             usageView: persisted.usageView ?? defaultState.usageView,
             graphSession: persisted.graphSession ?? defaultState.graphSession,
+            minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
         };
     }
 
