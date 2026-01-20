@@ -141,7 +141,7 @@ export function buildTypeAttestations(graphData: GraphData | null = null): void 
     } else {
         const title = document.createElement('div');
         title.className = 'type-attestations-title';
-        title.innerHTML = UI_TEXT.LEGENDA_TITLE;
+        title.innerHTML = UI_TEXT.TYPE_ATTESTATIONS_TITLE;
         title.style.margin = '0';  // Remove default margin since container handles spacing
         titleContainer.appendChild(title);
     }
@@ -235,7 +235,7 @@ export function buildTypeAttestations(graphData: GraphData | null = null): void 
                 name: type.type,
                 label: type.label,
                 color: type.color || '#666666',
-                opacity: type.opacity,
+                opacity: type.opacity ?? undefined,
                 deprecated: type.deprecated || false,
                 rich_string_fields: type.rich_string_fields || [],
                 array_fields: type.array_fields || []

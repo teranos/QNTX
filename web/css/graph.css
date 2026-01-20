@@ -117,8 +117,6 @@
     font-weight: 600;
 }
 
-/* Controls - moved to legenda.css */
-
 /* Connection Status (in log header) */
 #connection-status {
     padding: 4px 10px;
@@ -139,5 +137,3 @@ body.disconnected #connection-status {
     color: rgba(220, 53, 69, 0.9); /* Subtle red */
     background: rgba(220, 53, 69, 0.15);
 }
-
-/* Legenda (Legend) - moved to legenda.css */

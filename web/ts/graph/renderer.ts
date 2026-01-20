@@ -109,11 +109,11 @@ function renderGraph(data: GraphData): void {
     // Detect which node types are present in the data
     const presentNodeTypes = new Set(data.nodes.map(node => normalizeNodeType(node.type)));
 
-    // Show/hide legenda items based on node type presence (use cached query)
-    const legendaItems = document.querySelectorAll('.legenda-item');
-    legendaItems.forEach((item: Element) => {
+    // Show/hide type attestation items based on node type presence (use cached query)
+    const typeAttestationItems = document.querySelectorAll('.type-attestation-item');
+    typeAttestationItems.forEach((item: Element) => {
         const htmlItem = item as HTMLElement;
-        const typeNameSpan = item.querySelector('.legenda-type-name');
+        const typeNameSpan = item.querySelector('.type-attestation-name');
         if (typeNameSpan) {
             const nodeType = normalizeNodeType(typeNameSpan.textContent);
             if (presentNodeTypes.has(nodeType)) {
@@ -126,15 +126,15 @@ function renderGraph(data: GraphData): void {
         }
     });
 
-    // Show/hide entire legenda container if there are no nodes
-    const legenda = domCache.get('legenda', '.legenda');
-    if (legenda) {
+    // Show/hide entire type attestations container if there are no nodes
+    const typeAttestations = domCache.get('typeAttestations', '.type-attestations');
+    if (typeAttestations) {
         if (data.nodes.length > 0) {
-            legenda.classList.remove('u-hidden');
-            legenda.classList.add('u-block');
+            typeAttestations.classList.remove('u-hidden');
+            typeAttestations.classList.add('u-block');
         } else {
-            legenda.classList.remove('u-block');
-            legenda.classList.add('u-hidden');
+            typeAttestations.classList.remove('u-block');
+            typeAttestations.classList.add('u-hidden');
         }
     }
 

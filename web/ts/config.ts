@@ -6,7 +6,7 @@ import type { GraphPhysics, GraphStyles, UIText } from '../types/core';
 // UI text constants (single source of truth)
 // Virtue #3: Semantic Clarity - Use SEG symbols consistently
 export const UI_TEXT: UIText & {
-    LEGENDA_TITLE: string;
+    TYPE_ATTESTATIONS_TITLE: string;
     REVEAL_TOOLTIP: (label: string) => string;
     ISOLATED_NODES: string;
 } = {
@@ -20,7 +20,7 @@ export const UI_TEXT: UIText & {
     CONNECTION_RESTORED: 'Connection restored',
 
     // Extended UI text specific to this app
-    LEGENDA_TITLE: 'TYPES',
+    TYPE_ATTESTATIONS_TITLE: 'TYPES',
     REVEAL_TOOLTIP: (label: string): string => `⚠️ Experimental: Reveal nodes connected to ${label} (feature in development)`,
     ISOLATED_NODES: '⊖ Hide isolated nodes'  // ⊖ = subtract/hide symbol
 };
