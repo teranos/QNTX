@@ -7,7 +7,7 @@ import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
 import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
-import { initLegendaToggles } from './legenda.ts';
+import { initLegendaToggles } from './components/legenda.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './ui-state.ts';
 import { appState } from './config.ts';
