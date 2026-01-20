@@ -76,7 +76,7 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 // CreateAttestation inserts a new attestation into the database with quota enforcement (implements ats.AttestationStore)
 func (bs *BoundedStore) CreateAttestation(as *types.As) error {
 	if err := bs.store.CreateAttestation(as); err != nil {
-		return err
+		return errors.Wrap(err, "failed to create attestation")
 	}
 
 	// Enforce bounded storage limits after insertion

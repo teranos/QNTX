@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -61,13 +62,13 @@ The daemon will:
 		// Load configuration
 		cfg, err := am.Load()
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			return errors.Wrap(err, "failed to load config")
 		}
 
 		// Open and migrate database
 		database, err := openDatabase("")
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to open database")
 		}
 		defer database.Close()
 

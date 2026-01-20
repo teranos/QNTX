@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // CheckResult holds the result of a types check
@@ -81,8 +83,11 @@ func compareDirectory(tempDir, existingDir string, ignoreMetadata bool) []string
 
 	// Walk through temp directory
 	filepath.Walk(tempDir, func(tempPath string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
+		if err != nil {
+			return errors.Wrapf(err, "failed to access %s", tempPath)
+		}
+		if info.IsDir() {
+			return nil
 		}
 
 		// Skip certain files
@@ -94,7 +99,7 @@ func compareDirectory(tempDir, existingDir string, ignoreMetadata bool) []string
 		// Get relative path
 		relPath, err := filepath.Rel(tempDir, tempPath)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to get relative path for %s", tempPath)
 		}
 
 		// Corresponding existing file

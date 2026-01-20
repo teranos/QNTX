@@ -1,7 +1,5 @@
 package server
 
-import "context"
-
 // refreshGraphFromDatabase refreshes the graph visualization from recent attestations
 // Called after operations that modify the database (e.g., changing graph limit)
 func (s *QNTXServer) refreshGraphFromDatabase() {
@@ -9,7 +7,8 @@ func (s *QNTXServer) refreshGraphFromDatabase() {
 	s.logger.Infow("Refreshing graph from database", "limit", limit)
 
 	// Build graph from recent attestations (limit configurable from frontend)
-	g, err := s.builder.BuildFromRecentAttestations(context.Background(), limit)
+	// Uses server's context for cancellation during shutdown
+	g, err := s.builder.BuildFromRecentAttestations(s.ctx, limit)
 	if err != nil {
 		s.logger.Errorw("Failed to build graph from recent attestations", "error", err)
 		return
