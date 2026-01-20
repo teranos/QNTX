@@ -28,7 +28,7 @@ const (
 type Client struct {
 	apiKey       string
 	baseURL      string
-	httpClient   *http.Client
+	httpClient   *httpclient.SaferClient
 	config       Config
 	usageTracker *tracker.UsageTracker
 }
@@ -77,7 +77,7 @@ func NewClient(config Config) *Client {
 	return &Client{
 		apiKey:       config.APIKey,
 		baseURL:      "https://openrouter.ai/api/v1",
-		httpClient:   saferClient.Client, // Use underlying http.Client
+		httpClient:   saferClient,
 		config:       config,
 		usageTracker: usageTracker,
 	}
@@ -426,5 +426,5 @@ func (c *Client) IsConfigured() bool {
 // SetHTTPClient allows overriding the HTTP client for testing
 // ⚠️ WARNING: Only use this in tests. Production code should use the default SSRF-safer client.
 func (c *Client) SetHTTPClient(client *http.Client) {
-	c.httpClient = client
+	c.httpClient = httpclient.WrapClient(client)
 }

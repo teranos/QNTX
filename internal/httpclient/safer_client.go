@@ -290,3 +290,14 @@ func (c *SaferClient) Do(req *http.Request) (*http.Response, error) {
 	}
 	return c.Client.Do(req)
 }
+
+// WrapClient wraps an existing http.Client in a SaferClient without SSRF protection.
+// ⚠️ WARNING: Only use this in tests where you need to use httptest.NewServer on localhost.
+func WrapClient(client *http.Client) *SaferClient {
+	return &SaferClient{
+		Client:         client,
+		allowedSchemes: []string{"http", "https"},
+		blockPrivateIP: false, // Disabled for test clients
+		maxRedirects:   10,
+	}
+}

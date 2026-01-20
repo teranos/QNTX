@@ -13,6 +13,7 @@ import (
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/internal/httpclient"
 )
 
 // LocalProvider implements Provider interface for local inference servers
@@ -20,18 +21,24 @@ import (
 type LocalProvider struct {
 	baseURL    string
 	model      string
-	httpClient *http.Client
+	httpClient *httpclient.SaferClient
 	config     *am.LocalInferenceConfig
 }
 
 // NewLocalProvider creates a provider for local inference
 func NewLocalProvider(cfg *am.LocalInferenceConfig) *LocalProvider {
+	// Local inference connects to localhost/private IPs intentionally,
+	// so we disable private IP blocking but keep other protections
+	blockPrivateIP := false
 	return &LocalProvider{
 		baseURL: cfg.BaseURL,
 		model:   cfg.Model,
-		httpClient: &http.Client{
-			Timeout: time.Duration(cfg.TimeoutSeconds) * time.Second,
-		},
+		httpClient: httpclient.NewSaferClientWithOptions(
+			time.Duration(cfg.TimeoutSeconds)*time.Second,
+			httpclient.SaferClientOptions{
+				BlockPrivateIP: &blockPrivateIP,
+			},
+		),
 		config: cfg,
 	}
 }
