@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // StdioClient implements Client interface using gopls stdio communication
@@ -400,7 +402,7 @@ func applyTextEdits(uri string, edits []TextEdit) error {
 	// Read current content
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to read file %s", path)
 	}
 
 	// Convert content to lines for easier manipulation
@@ -528,15 +530,15 @@ func (c *StdioClient) notify(method string, params interface{}) error {
 func (c *StdioClient) writeMessage(msg interface{}) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to marshal JSON-RPC message")
 	}
 
 	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
 	if _, err := c.stdin.Write([]byte(header)); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write LSP header")
 	}
 	if _, err := c.stdin.Write(data); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write LSP message")
 	}
 
 	return nil

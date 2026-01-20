@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // PackageExport represents a generated Rust module with its exported types
@@ -111,7 +113,7 @@ func GenerateIndexFile(outputDir string, exports []PackageExport) error {
 
 	// Format the file
 	if err := FormatFile(indexPath); err != nil {
-		return err
+		return errors.Wrap(err, "failed to format mod.rs")
 	}
 
 	return nil
@@ -238,7 +240,7 @@ func GenerateLibRs(outputDir string, exports []PackageExport) error {
 
 	// Format the file
 	if err := FormatFile(libPath); err != nil {
-		return err
+		return errors.Wrap(err, "failed to format lib.rs")
 	}
 
 	return nil

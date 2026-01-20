@@ -3,6 +3,7 @@
 , gitShortRev ? "unknown"
 , gitTag ? null
 , buildDate ? null
+, gitCommitDate ? null
 , ciUser ? null
 , ciPipeline ? null
 , ciRunId ? null
@@ -212,6 +213,9 @@ let
 
   logo = ./web/qntx.jpg;
 
+  # Default OpenGraph description
+  defaultDescription = "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.";
+
   # SEG symbol mappings for semantic navigation
   categoryMeta = {
     getting-started = { symbol = "⍟"; desc = "Entry points"; };
@@ -303,6 +307,33 @@ let
   ];
 
   # ============================================================================
+  # Date Utilities
+  # ============================================================================
+
+  # Convert Unix timestamp to RFC 822 format for RSS using shell date utility
+  # Example: 1737244800 -> "Mon, 19 Jan 2026 00:00:00 +0000"
+  timestampToRfc822 = ts:
+    let
+      dateFile = pkgs.runCommand "timestamp-to-rfc822-${toString ts}"
+        { nativeBuildInputs = [ pkgs.coreutils ]; }
+        ''
+          date -u -d @${toString ts} '+%a, %d %b %Y %H:%M:%S +0000' > $out
+        '';
+    in
+    lib.trim (builtins.readFile dateFile);
+
+  # Convert Unix timestamp to YYYY-MM-DD format for sitemaps
+  timestampToDate = ts:
+    let
+      dateFile = pkgs.runCommand "timestamp-to-date-${toString ts}"
+        { nativeBuildInputs = [ pkgs.coreutils ]; }
+        ''
+          date -u -d @${toString ts} '+%Y-%m-%d' > $out
+        '';
+    in
+    lib.trim (builtins.readFile dateFile);
+
+  # ============================================================================
   # Markdown Discovery
   # ============================================================================
 
@@ -320,6 +351,23 @@ let
   getRelativePath = path:
     lib.removePrefix "${toString docsDir}/" (toString path);
 
+  # Get git commit timestamp for a file (returns Unix timestamp or null)
+  getFileCommitTimestamp = mdPath:
+    let
+      relPath = getRelativePath mdPath;
+      # Use runCommand to get git log timestamp for the file
+      timestampFile = pkgs.runCommand "git-timestamp-${lib.replaceStrings ["/"] ["-"] relPath}"
+        {
+          nativeBuildInputs = [ pkgs.git ];
+        }
+        ''
+          cd ${./.}
+          git log -1 --format=%ct "docs/${relPath}" 2>/dev/null > $out || echo "" > $out
+        '';
+      timestampStr = lib.trim (builtins.readFile timestampFile);
+    in
+    if timestampStr == "" then null else lib.toInt timestampStr;
+
   mkFileInfo = mdPath:
     let
       relPath = getRelativePath mdPath;
@@ -328,8 +376,9 @@ let
       htmlPath = lib.removeSuffix ".md" relPath + ".html";
       depth = lib.length (lib.filter (x: x != "") (lib.splitString "/" (if dir == "." then "" else dir)));
       prefix = if depth == 0 then "." else lib.concatStringsSep "/" (lib.genList (_: "..") depth);
+      commitTimestamp = getFileCommitTimestamp mdPath;
     in
-    { inherit mdPath relPath dir name htmlPath depth prefix; };
+    { inherit mdPath relPath dir name htmlPath depth prefix commitTimestamp; };
 
   fileInfos = map mkFileInfo markdownFiles;
 
@@ -343,18 +392,105 @@ let
   # Page Template System
   # ============================================================================
 
-  mkHead = { title, prefix }: ''
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${html.escape title}</title>
-      <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
-      <link rel="stylesheet" href="${prefix}/css/core.css">
-      <link rel="stylesheet" href="${prefix}/css/docs.css">
-      <link rel="stylesheet" href="${prefix}/css/prism.css">
-    </head>'';
+  # Generate BreadcrumbList JSON-LD from fileInfo
+  mkBreadcrumbJsonLd = fileInfo:
+    let
+      category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+      categoryTitle = if category == null then null else toTitleCase category;
+      documentTitle = toTitleCase fileInfo.name;
+      canonicalUrl = "${baseUrl}/${fileInfo.htmlPath}";
+
+      homeItem = ''
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "${baseUrl}/"
+        }'';
+
+      categoryItem = lib.optionalString (category != null) '',
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "${html.escapeJson categoryTitle}",
+          "item": "${baseUrl}/${category}/"
+        }'';
+
+      # Last item doesn't need "item" URL (it's the current page)
+      docPosition = if category == null then 2 else 3;
+      docItem = '',
+        {
+          "@type": "ListItem",
+          "position": ${toString docPosition},
+          "name": "${html.escapeJson documentTitle}"
+        }'';
+    in
+    ''
+      <!-- BreadcrumbList JSON-LD -->
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [${homeItem}${categoryItem}${docItem}
+        ]
+      }
+      </script>'';
+
+  mkHead = { title, prefix, description ? defaultDescription, pagePath ? "", breadcrumbJsonLd ? "", additionalJsonLd ? "" }:
+    let
+      canonicalUrl = "${baseUrl}${if pagePath == "" then "/" else "/${pagePath}"}";
+    in
+    ''
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${html.escape title}</title>
+        <meta name="description" content="${html.escape description}">
+        <link rel="icon" type="image/jpeg" href="${prefix}/qntx.jpg">
+        <link rel="canonical" href="${canonicalUrl}">
+        <link rel="stylesheet" href="${prefix}/css/core.css">
+        <link rel="stylesheet" href="${prefix}/css/docs.css">
+        <link rel="stylesheet" href="${prefix}/css/prism.css">
+        <!-- OpenGraph -->
+        <meta property="og:title" content="${html.escape title}">
+        <meta property="og:description" content="${html.escape description}">
+        <meta property="og:image" content="${baseUrl}/qntx.jpg">
+        <meta property="og:url" content="${canonicalUrl}">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="QNTX">
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:title" content="${html.escape title}">
+        <meta name="twitter:description" content="${html.escape description}">
+        <meta name="twitter:image" content="${baseUrl}/qntx.jpg">
+        <!-- RSS Feed -->
+        <link rel="alternate" type="application/rss+xml" title="QNTX Documentation" href="${baseUrl}/feed.xml">
+        <!-- JSON-LD Structured Data -->
+        <script type="application/ld+json">
+        ${builtins.toJSON {
+          "@context" = "https://schema.org";
+          "@type" = "TechArticle";
+          headline = title;
+          description = description;
+          url = canonicalUrl;
+          image = "${baseUrl}/qntx.jpg";
+          datePublished = provenance.date;
+          dateModified = provenance.date;
+          publisher = {
+            "@type" = "Organization";
+            name = "QNTX";
+            logo = {
+              "@type" = "ImageObject";
+              url = "${baseUrl}/qntx.jpg";
+            };
+          };
+        }}
+        </script>
+        ${breadcrumbJsonLd}
+        ${additionalJsonLd}
+      </head>'';
 
   mkNav = { prefix }: ''
     <nav class="doc-nav">
@@ -377,6 +513,13 @@ let
       documentCrumb = ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${documentTitle}</span>'';
     in
     ''<nav class="breadcrumb">${homeCrumb}${categoryCrumb}${documentCrumb}</nav>'';
+
+  # Edit on GitHub link for documentation pages
+  mkEditLink = fileInfo:
+    let
+      editUrl = "https://github.com/${githubRepo}/edit/main/docs/${fileInfo.relPath}";
+    in
+    ''<a href="${editUrl}" class="edit-link" title="Edit this page on GitHub">Edit on GitHub</a>'';
 
   provenanceFooter =
     let
@@ -403,6 +546,9 @@ let
     , prefix ? "."
     , nav ? true
     , scripts ? [ ]
+    , description ? defaultDescription
+    , pagePath ? ""
+    , additionalJsonLd ? ""
     }:
     let
       scriptTags = lib.concatMapStringsSep "\n"
@@ -410,7 +556,7 @@ let
         scripts;
     in
     ''
-      ${mkHead { inherit title prefix; }}
+      ${mkHead { inherit title prefix description pagePath additionalJsonLd; }}
       <body>
       ${lib.optionalString nav (mkNav { inherit prefix; })}
       ${content}
@@ -564,6 +710,7 @@ let
       title = "QNTX - Continuous Intelligence";
       nav = false;
       scripts = [ ];
+      pagePath = "index.html";
       content = ''
         <div class="doc-header">
           <img src="./qntx.jpg" alt="QNTX Logo">
@@ -632,10 +779,48 @@ let
           ${html.codeBlock "nix build github:${githubRepo}"}
         '';
       };
+
+      # SoftwareApplication JSON-LD for downloads page
+      softwareAppJsonLd =
+        let
+          version = if latestRelease != null then latestRelease.tag_name else "latest";
+          releaseDate = if latestRelease != null then lib.substring 0 10 latestRelease.published_at else null;
+        in
+        ''
+          <!-- SoftwareApplication JSON-LD -->
+          <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "QNTX",
+            "description": "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows",
+            "softwareVersion": "${html.escapeJson version}",
+            ${lib.optionalString (releaseDate != null) ''"datePublished": "${releaseDate}",''}
+            "downloadUrl": "https://github.com/${githubRepo}/releases",
+            "installUrl": "https://github.com/${githubRepo}#installation",
+            "releaseNotes": "https://github.com/${githubRepo}/releases",
+            "license": "https://github.com/${githubRepo}/blob/main/LICENSE",
+            "author": {
+              "@type": "Organization",
+              "name": "QNTX",
+              "url": "${baseUrl}"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          }
+          </script>'';
     in
     mkPage {
       title = "QNTX Downloads";
+      description = "Download QNTX binaries, Docker images, or install via Nix package manager.";
+      pagePath = "downloads.html";
       scripts = [ ];
+      additionalJsonLd = softwareAppJsonLd;
       content = ''
         <h1>Download QNTX</h1>
         ${nixInstallSection}
@@ -719,6 +904,8 @@ let
     in
     mkPage {
       title = "QNTX Infrastructure";
+      description = "QNTX build infrastructure - Nix packages, apps, containers, and reproducible builds.";
+      pagePath = "infrastructure.html";
       content = ''
         <h1>Build Infrastructure</h1>
         <p>QNTX uses <a href="https://nixos.org/">Nix</a> for reproducible builds.
@@ -744,7 +931,11 @@ let
         { path = "downloads.html"; desc = "Release downloads (GitHub API)"; }
         { path = "infrastructure.html"; desc = "Nix build documentation"; }
         { path = "sitegen.html"; desc = "This page"; }
+        { path = "404.html"; desc = "Quantum 404 page"; }
         { path = "build-info.json"; desc = "Provenance metadata"; }
+        { path = "feed.xml"; desc = "RSS feed"; }
+        { path = "sitemap.xml"; desc = "XML sitemap"; }
+        { path = "sitemap.xsl"; desc = "Sitemap stylesheet"; }
         { path = "qntx.jpg"; desc = "Logo"; }
       ];
 
@@ -819,6 +1010,13 @@ let
             [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
             [ "<strong>Self-documenting Infra</strong>" "Nix packages, apps, and containers documented from flake metadata" ]
             [ "<strong>Incremental Builds</strong>" "Each markdown file is a separate derivation for faster rebuilds" ]
+            [ "<strong>OpenGraph &amp; Twitter Cards</strong>" "Social media preview cards with per-page titles, descriptions, and images" ]
+            [ "<strong>RSS Feed</strong>" "Subscribe to documentation updates via <code>/feed.xml</code> with autodiscovery" ]
+            [ "<strong>Sitemap with XSLT</strong>" "Human-readable sitemap at <code>/sitemap.xml</code> with browser-viewable styling" ]
+            [ "<strong>Canonical URLs</strong>" "Every page has a canonical URL for proper SEO indexing" ]
+            [ "<strong>JSON-LD</strong>" "TechArticle, BreadcrumbList, and SoftwareApplication schemas for rich search snippets" ]
+            [ "<strong>Edit on GitHub</strong>" "Every documentation page links to its source for easy contributions" ]
+            [ "<strong>Quantum 404</strong>" "Custom error page with Schrödinger's cat - state collapses on observation" ]
           ];
         };
       };
@@ -935,6 +1133,8 @@ let
     in
     mkPage {
       title = "QNTX Sitegen";
+      description = "Documentation about the QNTX static site generator written in pure Nix.";
+      pagePath = "sitegen.html";
       content = ''
         <h1>Documentation Generator</h1>
         <p>This documentation site is generated by <code>sitegen.nix</code>, a pure Nix static site generator.
@@ -963,6 +1163,14 @@ let
         [ ".md)" ".md#" ]
         [ ".html)" ".html#" ]
         mdContent;
+      # Generate description from category
+      category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+      catMeta = if category == null then null else getCategoryMeta category;
+      docDescription =
+        if catMeta != null && catMeta.desc != ""
+        then "QNTX ${toTitleCase category} - ${catMeta.desc}"
+        else "QNTX documentation - ${toTitleCase fileInfo.name}";
+      breadcrumbJsonLd = mkBreadcrumbJsonLd fileInfo;
     in
     pkgs.runCommand "qntx-doc-${fileInfo.name}"
       {
@@ -972,10 +1180,13 @@ let
         mkdir -p "$out/$(dirname "${fileInfo.htmlPath}")"
         {
           cat <<'EOF'
-        ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; }}
+        ${mkHead { title = "QNTX - ${fileInfo.name}"; prefix = fileInfo.prefix; description = docDescription; pagePath = fileInfo.htmlPath; inherit breadcrumbJsonLd; }}
         <body>
         ${mkNav { prefix = fileInfo.prefix; }}
-        ${mkBreadcrumb fileInfo}
+        <div class="page-header">
+          ${mkBreadcrumb fileInfo}
+          ${mkEditLink fileInfo}
+        </div>
         EOF
           cat <<'EOF' | ${pkgs.pulldown-cmark}/bin/pulldown-cmark -T -S -F
         ${rewrittenMd}
@@ -991,6 +1202,260 @@ let
       '';
 
   htmlDerivations = map mkHtmlDerivation fileInfos;
+
+  # ============================================================================
+  # Sitemap Generation
+  # ============================================================================
+
+  # Derive base URL from CNAME content (single source of truth)
+  cnameContent = "qntx.sbvh.nl";
+  baseUrl = "https://${cnameContent}";
+
+  # Fallback lastmod: buildDate (CI) or gitCommitDate converted to YYYY-MM-DD (local builds)
+  sitemapLastmod =
+    if buildDate != null then buildDate
+    else if gitCommitDate != null then timestampToDate gitCommitDate
+    else null;
+
+  # Generate sitemap entries for all HTML pages
+  mkSitemapUrl = { loc, lastmod ? sitemapLastmod, changefreq ? "weekly", priority ? "0.6" }:
+    ''
+      <url>
+        <loc>${baseUrl}${loc}</loc>
+        ${lib.optionalString (lastmod != null) "<lastmod>${lastmod}</lastmod>"}
+        <changefreq>${changefreq}</changefreq>
+        <priority>${priority}</priority>
+      </url>'';
+
+  sitemapUrls =
+    # Index page (highest priority)
+    [ (mkSitemapUrl { loc = "/"; priority = "1.0"; changefreq = "daily"; }) ]
+
+    # Special pages
+    ++ [
+      (mkSitemapUrl { loc = "/downloads.html"; priority = "0.9"; changefreq = "daily"; })
+      (mkSitemapUrl { loc = "/infrastructure.html"; priority = "0.7"; })
+      (mkSitemapUrl { loc = "/sitegen.html"; priority = "0.7"; })
+    ]
+
+    # All documentation pages
+    ++ map
+      (fileInfo: mkSitemapUrl {
+        loc = "/${fileInfo.htmlPath}";
+        priority = if fileInfo.depth == 0 then "0.8" else "0.6";
+      })
+      fileInfos;
+
+  sitemapContent = ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <?xml-stylesheet type="text/xsl" href="sitemap.xsl"?>
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    ${lib.concatStringsSep "\n" sitemapUrls}
+    </urlset>
+  '';
+
+  # Extract CSS variable value from core.css
+  extractCssVar = varName:
+    let
+      coreCss = builtins.readFile cssFiles.core;
+      # Match --var-name: value; (handles spaces, colors, etc)
+      lines = lib.splitString "\n" coreCss;
+      matchingLines = lib.filter (line: lib.hasInfix "--${varName}:" line) lines;
+      extractValue = line:
+        let
+          # Remove everything before the colon
+          afterColon = lib.elemAt (lib.splitString ":" line) 1;
+          # Remove comments (/* ... */)
+          beforeComment = lib.head (lib.splitString "/*" afterColon);
+          # Trim whitespace and remove semicolon
+          trimmed = lib.trim beforeComment;
+        in
+        lib.removeSuffix ";" trimmed;
+    in
+    if matchingLines != [ ]
+    then extractValue (lib.head matchingLines)
+    else throw "CSS variable --${varName} not found in core.css";
+
+  # XSLT colors automatically extracted from core.css (single source of truth!)
+  xsltColors = {
+    bgDark = extractCssVar "bg-dark";
+    textOnDark = extractCssVar "text-on-dark";
+    textOnDarkEmphasis = extractCssVar "text-on-dark-emphasis";
+    textOnDarkSecondary = extractCssVar "text-on-dark-secondary";
+    textOnDarkTertiary = extractCssVar "text-on-dark-tertiary";
+    borderOnDark = extractCssVar "border-on-dark";
+    bgAlmostBlack = extractCssVar "bg-almost-black";
+    accentColor = extractCssVar "accent-color";
+  };
+
+  # XSLT stylesheet for human-readable sitemap viewing in browsers
+  sitemapXslContent = ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:sitemap="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <xsl:output method="html" encoding="UTF-8"/>
+      <xsl:template match="/">
+        <html>
+          <head>
+            <title>QNTX Sitemap</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px auto; max-width: 900px; padding: 0 20px; background: ${xsltColors.bgDark}; color: ${xsltColors.textOnDark}; }
+              h1 { color: ${xsltColors.textOnDarkEmphasis}; border-bottom: 1px solid ${xsltColors.borderOnDark}; padding-bottom: 10px; }
+              p { color: ${xsltColors.textOnDarkSecondary}; margin-bottom: 20px; }
+              table { width: 100%; border-collapse: collapse; }
+              th { text-align: left; padding: 12px; background: ${xsltColors.bgAlmostBlack}; color: ${xsltColors.textOnDarkEmphasis}; border-bottom: 2px solid ${xsltColors.borderOnDark}; }
+              td { padding: 10px 12px; border-bottom: 1px solid ${xsltColors.borderOnDark}; }
+              tr:hover td { background: #2a2a2a; }
+              a { color: ${xsltColors.accentColor}; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+              .priority { color: ${xsltColors.textOnDarkTertiary}; }
+              .changefreq { color: ${xsltColors.textOnDarkTertiary}; }
+              .lastmod { color: ${xsltColors.textOnDarkTertiary}; }
+            </style>
+          </head>
+          <body>
+            <h1>QNTX Sitemap</h1>
+            <p>This sitemap contains <xsl:value-of select="count(sitemap:urlset/sitemap:url)"/> URLs.</p>
+            <table>
+              <tr>
+                <th>URL</th>
+                <th>Priority</th>
+                <th>Change Freq</th>
+                <th>Last Modified</th>
+              </tr>
+              <xsl:for-each select="sitemap:urlset/sitemap:url">
+                <xsl:sort select="sitemap:priority" order="descending"/>
+                <tr>
+                  <td><a href="{sitemap:loc}"><xsl:value-of select="sitemap:loc"/></a></td>
+                  <td class="priority"><xsl:value-of select="sitemap:priority"/></td>
+                  <td class="changefreq"><xsl:value-of select="sitemap:changefreq"/></td>
+                  <td class="lastmod"><xsl:value-of select="sitemap:lastmod"/></td>
+                </tr>
+              </xsl:for-each>
+            </table>
+          </body>
+        </html>
+      </xsl:template>
+    </xsl:stylesheet>
+  '';
+
+  # ============================================================================
+  # RSS Feed Generation
+  # ============================================================================
+
+  # Fallback RSS date for channel-level lastBuildDate
+  rssChannelDate =
+    if buildDate != null then buildDate
+    else if gitCommitDate != null then timestampToRfc822 gitCommitDate
+    else null;
+
+  # Generate RSS item for a documentation page
+  mkRssItem = { title, link, description, category ? null, pubDate ? null }:
+    ''
+      <item>
+        <title>${html.escape title}</title>
+        <link>${baseUrl}${link}</link>
+        <guid isPermaLink="true">${baseUrl}${link}</guid>
+        <description>${html.escape description}</description>
+        ${lib.optionalString (category != null) "<category>${html.escape category}</category>"}
+        ${lib.optionalString (pubDate != null) "<pubDate>${pubDate}</pubDate>"}
+      </item>'';
+
+  # Generate RSS items for documentation pages
+  rssItems =
+    # Special pages (use channel date as fallback)
+    [
+      (mkRssItem {
+        title = "QNTX Downloads";
+        link = "/downloads.html";
+        description = "Download QNTX binaries, Docker images, or install via Nix package manager.";
+        pubDate = rssChannelDate;
+      })
+      (mkRssItem {
+        title = "QNTX Infrastructure";
+        link = "/infrastructure.html";
+        description = "QNTX build infrastructure - Nix packages, apps, containers, and reproducible builds.";
+        pubDate = rssChannelDate;
+      })
+    ]
+    # All documentation pages with per-file commit dates
+    ++ map
+      (fileInfo:
+        let
+          category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
+          catMeta = if category == null then null else getCategoryMeta category;
+          itemDescription =
+            if catMeta != null && catMeta.desc != ""
+            then "QNTX ${toTitleCase category} - ${catMeta.desc}"
+            else "QNTX documentation - ${toTitleCase fileInfo.name}";
+          # Use file's git commit timestamp, or fall back to channel date
+          itemPubDate =
+            if fileInfo.commitTimestamp != null
+            then timestampToRfc822 fileInfo.commitTimestamp
+            else rssChannelDate;
+        in
+        mkRssItem {
+          title = "QNTX - ${toTitleCase fileInfo.name}";
+          link = "/${fileInfo.htmlPath}";
+          description = itemDescription;
+          category = if category != null then toTitleCase category else null;
+          pubDate = itemPubDate;
+        })
+      fileInfos;
+
+  rssFeedContent = ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+      <channel>
+        <title>QNTX Documentation</title>
+        <link>${baseUrl}</link>
+        <description>Continuous Intelligence - documentation and updates for QNTX</description>
+        <language>en-us</language>
+        <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
+        ${lib.optionalString (rssChannelDate != null) "<lastBuildDate>${rssChannelDate}</lastBuildDate>"}
+        <generator>sitegen.nix</generator>
+        ${lib.concatStringsSep "\n    " rssItems}
+      </channel>
+    </rss>
+  '';
+
+  # ============================================================================
+  # 404 Page - Quantum State Collapse
+  # ============================================================================
+
+  notFoundContent = ''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>404 - Unattested State | QNTX</title>
+      <meta name="robots" content="noindex">
+      <link rel="icon" type="image/jpeg" href="./qntx.jpg">
+      <link rel="stylesheet" href="./css/core.css">
+      <link rel="stylesheet" href="./css/docs.css">
+    </head>
+    <body class="error-404">
+      <div class="quantum-box">
+        <p class="error-code">ERROR 404</p>
+        <h1>Unattested State</h1>
+        <div class="cat-state" id="cat"></div>
+        <p class="explanation" id="explanation"></p>
+        <div class="attestation" id="attestation"></div>
+        <a href="./index.html" class="home-link">Return to Attested Reality</a>
+      </div>
+      <script>
+        const isAlive = Math.random() < 0.5;
+        document.getElementById('cat').textContent = isAlive ? '😺' : '😿';
+        document.getElementById('explanation').innerHTML = isAlive
+          ? 'The page you sought existed in superposition until you observed it.<br>The wavefunction collapsed favorably - but the content remains unattested.'
+          : 'The page you sought existed in superposition until you observed it.<br>The wavefunction collapsed unfavorably - this state was never attested.';
+        document.getElementById('attestation').innerHTML = isAlive
+          ? '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:var(--color-error)">UNVERIFIED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:var(--color-success)">"alive"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:var(--color-warning)">COLLAPSED</span>'
+          : '<span style="color:var(--text-on-dark-tertiary)">+ page.exists</span> <span style="color:var(--color-error)">FAILED</span>\n<span style="color:var(--text-on-dark-tertiary)">= state</span> <span style="color:var(--color-error)">"dead"</span>\n<span style="color:var(--text-on-dark-tertiary)">∈ superposition</span> <span style="color:var(--color-warning)">COLLAPSED</span>';
+      </script>
+    </body>
+    </html>
+  '';
 
   # ============================================================================
   # Build Info
@@ -1055,8 +1520,43 @@ let
 
     "CNAME" = pkgs.writeTextFile {
       name = "qntx-docs-cname";
-      text = "qntx.sbvh.nl\n";
+      text = "${cnameContent}\n";
       destination = "/CNAME";
+    };
+
+    "404.html" = pkgs.writeTextFile {
+      name = "qntx-docs-404";
+      text = notFoundContent;
+      destination = "/404.html";
+    };
+
+    "sitemap.xml" = pkgs.writeTextFile {
+      name = "qntx-docs-sitemap";
+      text = sitemapContent;
+      destination = "/sitemap.xml";
+    };
+
+    "sitemap.xsl" = pkgs.writeTextFile {
+      name = "qntx-docs-sitemap-xsl";
+      text = sitemapXslContent;
+      destination = "/sitemap.xsl";
+    };
+
+    "feed.xml" = pkgs.writeTextFile {
+      name = "qntx-docs-rss";
+      text = rssFeedContent;
+      destination = "/feed.xml";
+    };
+
+    "robots.txt" = pkgs.writeTextFile {
+      name = "qntx-docs-robots";
+      text = ''
+        User-agent: *
+        Allow: /
+
+        Sitemap: ${baseUrl}/sitemap.xml
+      '';
+      destination = "/robots.txt";
     };
   };
 

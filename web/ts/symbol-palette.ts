@@ -28,7 +28,7 @@ import {
     Pulse, Prose, DB,
     CommandToSymbol,
 } from '@generated/sym.js';
-import { uiState } from './ui-state.ts';
+import { uiState } from './state/ui.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
 import { tooltip } from './components/tooltip.ts';
@@ -436,7 +436,6 @@ function showWebscraperPanel(): void {
 /**
  * Show CTP2 window
  */
-let ctp2WindowInstance: any = null;
 async function showCTP2Window(): Promise<void> {
     // CTP2 is an optional/private module that may not exist in all environments
     // Comment out the import to prevent build failures when the module is missing
