@@ -163,7 +163,7 @@ export class TypeDefinitionWindow {
         fieldList.className = 'field-list';
 
         // Add existing fields
-        this.fields.forEach((field, fieldName) => {
+        this.fields.forEach((field) => {
             const fieldEl = this.createFieldElement(field);
             fieldList.appendChild(fieldEl);
         });
