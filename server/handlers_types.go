@@ -8,12 +8,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
+
+// fieldNameRegex validates field names: must start with letter, contain only alphanumeric and underscores
+var fieldNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 
 // HandleTypes handles type attestation operations:
 // GET /api/types - List all type attestations
@@ -147,6 +151,20 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 	}
 }
 
+// validateFieldName validates that a field name follows identifier rules
+func validateFieldName(name string) error {
+	if name == "" {
+		return errors.New("field name cannot be empty")
+	}
+	if len(name) > 64 {
+		return errors.New("field name must be 64 characters or less")
+	}
+	if !fieldNameRegex.MatchString(name) {
+		return errors.New("field name must start with a letter and contain only letters, numbers, and underscores")
+	}
+	return nil
+}
+
 // handleCreateType creates or updates a type attestation
 func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -169,11 +187,34 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Type name is required", http.StatusBadRequest)
 		return
 	}
+
+	// Validate type name follows same rules as field names
+	if err := validateFieldName(req.Name); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid type name '%s': %v", req.Name, err), http.StatusBadRequest)
+		return
+	}
+
 	if req.Label == "" {
 		req.Label = req.Name // Default label to name if not provided
 	}
 	if req.Color == "" {
 		req.Color = "#666666" // Default color
+	}
+
+	// Validate all field names in rich_string_fields
+	for _, fieldName := range req.RichStringFields {
+		if err := validateFieldName(fieldName); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid rich_string_field '%s': %v", fieldName, err), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Validate all field names in array_fields
+	for _, fieldName := range req.ArrayFields {
+		if err := validateFieldName(fieldName); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid array_field '%s': %v", fieldName, err), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Build attributes map for the attestation
