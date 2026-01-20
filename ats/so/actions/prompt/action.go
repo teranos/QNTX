@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/teranos/QNTX/ats/so"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -65,7 +66,7 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 		case "with":
 			// "with" introduces system prompt
 			if state == "template" && len(templateParts) > 0 {
-				action.Template = joinTemplate(templateParts)
+				action.Template = so.JoinTemplate(templateParts)
 				templateParts = nil
 				state = "system"
 			} else {
@@ -76,9 +77,9 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 			// "model" introduces model specification
 			if i+1 < len(tokens) {
 				if state == "template" && len(templateParts) > 0 {
-					action.Template = joinTemplate(templateParts)
+					action.Template = so.JoinTemplate(templateParts)
 				} else if state == "system" && len(systemParts) > 0 {
-					action.SystemPrompt = joinTemplate(systemParts)
+					action.SystemPrompt = so.JoinTemplate(systemParts)
 				}
 				i++
 				action.Model = tokens[i]
@@ -88,9 +89,9 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 			// "provider" introduces provider specification
 			if i+1 < len(tokens) {
 				if state == "template" && len(templateParts) > 0 {
-					action.Template = joinTemplate(templateParts)
+					action.Template = so.JoinTemplate(templateParts)
 				} else if state == "system" && len(systemParts) > 0 {
-					action.SystemPrompt = joinTemplate(systemParts)
+					action.SystemPrompt = so.JoinTemplate(systemParts)
 				}
 				i++
 				action.Provider = strings.ToLower(tokens[i])
@@ -100,9 +101,9 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 			// "predicate" introduces result predicate
 			if i+1 < len(tokens) {
 				if state == "template" && len(templateParts) > 0 {
-					action.Template = joinTemplate(templateParts)
+					action.Template = so.JoinTemplate(templateParts)
 				} else if state == "system" && len(systemParts) > 0 {
-					action.SystemPrompt = joinTemplate(systemParts)
+					action.SystemPrompt = so.JoinTemplate(systemParts)
 				}
 				i++
 				action.ResultPredicate = tokens[i]
@@ -115,9 +116,9 @@ func ParseAction(filter *types.AxFilter) (*Action, error) {
 
 	// Finalize remaining parts
 	if state == "template" && len(templateParts) > 0 {
-		action.Template = joinTemplate(templateParts)
+		action.Template = so.JoinTemplate(templateParts)
 	} else if state == "system" && len(systemParts) > 0 {
-		action.SystemPrompt = joinTemplate(systemParts)
+		action.SystemPrompt = so.JoinTemplate(systemParts)
 	}
 
 	if action.Template == "" {
@@ -140,25 +141,6 @@ func appendToken(templateParts, systemParts *[]string, state, token string) {
 	case "system":
 		*systemParts = append(*systemParts, token)
 	}
-}
-
-// joinTemplate joins tokens and strips surrounding quotes
-func joinTemplate(parts []string) string {
-	if len(parts) == 0 {
-		return ""
-	}
-
-	result := strings.Join(parts, " ")
-
-	// Strip surrounding quotes if present
-	if len(result) >= 2 {
-		if (result[0] == '"' && result[len(result)-1] == '"') ||
-			(result[0] == '\'' && result[len(result)-1] == '\'') {
-			result = result[1 : len(result)-1]
-		}
-	}
-
-	return result
 }
 
 // ToPayload converts an Action to a handler Payload

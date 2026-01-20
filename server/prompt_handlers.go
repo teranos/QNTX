@@ -11,7 +11,7 @@ import (
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/parser"
-	"github.com/teranos/QNTX/ats/prompt"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/logger"
