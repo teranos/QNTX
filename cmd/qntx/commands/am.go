@@ -220,7 +220,7 @@ func runAmWhere(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		// Sort groups so config.toml appears before am.toml
+		// Sort groups for consistent display order (not precedence!)
 		sort.Slice(groups, func(i, j int) bool {
 			// Special case for default/env (empty paths)
 			if groups[i].path == "" {
