@@ -37,6 +37,7 @@ import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { windowTray } from './components/window-tray.ts';
+import { initializeDock } from './dot-registry.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -216,6 +217,10 @@ async function init(): Promise<void> {
     // Initialize window tray FIRST (before any windows are created)
     // This ensures the tray is ready to receive minimized windows
     windowTray.init();
+
+    // Initialize dock (dot-as-primitive system)
+    // Coexists with windowTray during migration
+    initializeDock();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();
