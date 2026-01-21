@@ -21,6 +21,41 @@
     display: block;
 }
 
+/* Minimized state - window becomes a dot */
+.draggable-window.minimized {
+    width: 8px !important;
+    height: 8px !important;
+    min-width: 8px !important;
+    min-height: 8px !important;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Expand on hover */
+.draggable-window.minimized:hover {
+    width: 220px !important;
+    height: 32px !important;
+    border-radius: 2px;
+}
+
+/* Hide content when minimized (unless hovering) */
+.draggable-window.minimized .draggable-window-content,
+.draggable-window.minimized .draggable-window-footer {
+    display: none;
+}
+
+/* Show title on hover */
+.draggable-window.minimized:hover .draggable-window-header {
+    display: flex;
+}
+
+.draggable-window.minimized .draggable-window-header {
+    display: none;
+}
+
 /* Header */
 .draggable-window-header {
     padding: 8px 12px;
