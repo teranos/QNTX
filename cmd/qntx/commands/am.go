@@ -56,6 +56,16 @@ var amValidateCmd = &cobra.Command{
 	RunE:  runAmValidate,
 }
 
+var amWhereCmd = &cobra.Command{
+	Use:   "where",
+	Short: "Show where configuration is loaded from",
+	Long: `Show the configuration cascade and which files were checked.
+
+Lists all configuration sources in order of precedence, showing
+which files exist and which are missing.`,
+	RunE: runAmWhere,
+}
+
 var configFormat string
 
 func init() {
@@ -66,6 +76,7 @@ func init() {
 	AmCmd.AddCommand(amShowCmd)
 	AmCmd.AddCommand(amGetCmd)
 	AmCmd.AddCommand(amValidateCmd)
+	AmCmd.AddCommand(amWhereCmd)
 }
 
 func runAmShow(cmd *cobra.Command, args []string) error {
@@ -135,5 +146,55 @@ func runAmValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("✓ Configuration is valid")
+	return nil
+}
+
+func runAmWhere(cmd *cobra.Command, args []string) error {
+	// Get the full introspection data
+	intro, err := am.GetConfigIntrospection()
+	if err != nil {
+		return fmt.Errorf("failed to get config introspection: %w", err)
+	}
+
+	// Show config cascade header
+	fmt.Println("Configuration cascade (later overrides earlier):")
+	fmt.Println("  1. [DEFAULT]  Built-in defaults")
+	fmt.Println("  2. [SYSTEM]   /etc/qntx/am.toml")
+	fmt.Println("  3. [USER]     ~/.qntx/am.toml")
+	fmt.Println("  4. [USER_UI]  ~/.qntx/am_from_ui.toml (if exists)")
+	fmt.Println("  5. [PROJECT]  ./am.toml (searches up directories)")
+	fmt.Println("  6. [ENV]      QNTX_* environment variables")
+	fmt.Println()
+
+	// Count sources actually in use
+	sourceCounts := make(map[am.ConfigSource]int)
+	sourceFiles := make(map[am.ConfigSource]string)
+
+	for _, setting := range intro.Settings {
+		sourceCounts[setting.Source]++
+		if setting.SourcePath != "" && setting.Source != am.SourceDefault && setting.Source != am.SourceEnvironment {
+			sourceFiles[setting.Source] = setting.SourcePath
+		}
+	}
+
+	// Show active sources
+	fmt.Println("Active configuration sources:")
+	for source, count := range sourceCounts {
+		if count > 0 {
+			if path, ok := sourceFiles[source]; ok {
+				fmt.Printf("  %s: %d settings from %s\n", source, count, path)
+			} else if source == am.SourceEnvironment {
+				fmt.Printf("  %s: %d settings from environment variables\n", source, count)
+			} else if source == am.SourceDefault {
+				fmt.Printf("  %s: %d settings\n", source, count)
+			}
+		}
+	}
+
+	// Show the primary config file being used
+	if intro.ConfigFile != "" {
+		fmt.Printf("\nPrimary config file: %s\n", intro.ConfigFile)
+	}
+
 	return nil
 }
