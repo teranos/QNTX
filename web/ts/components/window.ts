@@ -336,7 +336,6 @@ export class Window {
                 x,
                 y,
                 width: this.element.style.width || this.config.width || '400px',
-                visible: this.isVisible(),
                 minimized: this.minimized
             });
         } catch (error) {
@@ -370,10 +369,8 @@ export class Window {
 
             // Don't restore visibility during page load - it will flash above loading screen
             // Visibility will be restored after hideLoadingScreen() via finishWindowRestore()
-            // Just store that we should restore it later
-            if (state.visible) {
-                this.element.setAttribute('data-should-restore-visibility', 'true');
-            }
+            // Mark non-minimized windows to be shown after loading completes
+            this.element.setAttribute('data-should-restore-visibility', 'true');
         } catch (error) {
             handleErrorSilent(error, 'Failed to restore window state', SEG.UI);
         }
