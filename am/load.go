@@ -148,9 +148,11 @@ func mergeConfigFiles(v *viper.Viper) {
 	// Build config paths, with project config found via upward search
 	projectConfig := findProjectConfig()
 	configPaths := []string{
-		"/etc/qntx/config.toml",               // System config (lowest precedence)
-		filepath.Join(qntxDir, "am.toml"),     // User am config (new format)
-		filepath.Join(qntxDir, "config.toml"), // User config (backward compat)
+		"/etc/qntx/config.toml",                       // System config (lowest precedence)
+		filepath.Join(qntxDir, "config.toml"),         // User config (backward compat)
+		filepath.Join(qntxDir, "am.toml"),             // User am config (new format - wins if both exist)
+		filepath.Join(qntxDir, "config_from_ui.toml"), // UI config (backward compat)
+		filepath.Join(qntxDir, "am_from_ui.toml"),     // UI am config (new format - wins if both exist)
 	}
 
 	// Add project config if found (highest file precedence, below env vars)

@@ -82,12 +82,12 @@ func buildSourceMap() map[string]SourceInfo {
 		path   string
 		source ConfigSource
 	}{
-		{"/etc/qntx/am.toml", SourceSystem},
-		{"/etc/qntx/config.toml", SourceSystem},
-		{filepath.Join(homeDir, ".qntx", "am.toml"), SourceUser},
-		{filepath.Join(homeDir, ".qntx", "config.toml"), SourceUser},
-		{filepath.Join(homeDir, ".qntx", "am_from_ui.toml"), SourceUserUI},
-		{filepath.Join(homeDir, ".qntx", "config_from_ui.toml"), SourceUserUI},
+		{"/etc/qntx/config.toml", SourceSystem},                                // backward compat
+		{"/etc/qntx/am.toml", SourceSystem},                                    // preferred (wins if both exist)
+		{filepath.Join(homeDir, ".qntx", "config.toml"), SourceUser},           // backward compat
+		{filepath.Join(homeDir, ".qntx", "am.toml"), SourceUser},               // preferred (wins if both exist)
+		{filepath.Join(homeDir, ".qntx", "config_from_ui.toml"), SourceUserUI}, // backward compat
+		{filepath.Join(homeDir, ".qntx", "am_from_ui.toml"), SourceUserUI},     // preferred (wins if both exist)
 		{findProjectConfig(), SourceProject},
 	}
 
