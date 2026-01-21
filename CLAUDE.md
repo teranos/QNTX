@@ -15,7 +15,7 @@
 
 ## Development Workflow
 
-The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). That means the developer always run's the latest version of QNTX, given that they used `make dev`. NEVER have a discussion with the developer about having run the latest version or not, expect that the developer is always running the latest version of whatever and do not discuss or fight the developer on this, if there is an issue it is almost guaranteed the be an issue in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX should work without configuration)
+The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server. That means the developer always run's the latest version of QNTX, given that they used `make dev`. NEVER have a discussion with the developer about having run the latest version or not, expect that the developer is always running the latest version of whatever and do not discuss or fight the developer on this, if there is an issue it is almost guaranteed the be an issue in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX should work without configuration)
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries.
 
