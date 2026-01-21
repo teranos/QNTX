@@ -63,6 +63,7 @@ export interface WindowState {
     x: number;
     y: number;
     width: string;
+    height?: string;  // Optional height (for dot-as-primitive windows)
     visible: boolean;
     minimized: boolean;
 }
@@ -434,6 +435,17 @@ class UIState {
      */
     getAllWindowStates(): Record<string, WindowState> {
         return this.state.windowStates;
+    }
+
+    /**
+     * Get list of expanded window IDs (dot-as-primitive)
+     * Returns IDs of windows that are currently expanded (not minimized)
+     */
+    getExpandedWindows(): string[] {
+        const windows = this.getAllWindowStates();
+        return Object.entries(windows)
+            .filter(([_, state]) => !state.minimized)
+            .map(([id, _]) => id);
     }
 
     // ========================================================================

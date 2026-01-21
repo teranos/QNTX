@@ -12,8 +12,24 @@ import { uiState } from '../state/ui';
 export interface TrayItem {
     id: string;
     title: string;
-    onRestore: (sourceRect?: DOMRect) => void;
+    symbol?: string;  // Symbol to show in collapsed/morphed state
+
+    // Content rendering (new dot-as-primitive)
+    renderContent?: () => HTMLElement;  // Returns the content to display when expanded
+
+    // Window configuration (new dot-as-primitive)
+    initialWidth?: string;
+    initialHeight?: string;
+    defaultX?: number;
+    defaultY?: number;
+
+    // Callbacks
+    onExpand?: () => void;
+    onCollapse?: () => void;
     onClose?: () => void;
+
+    // DEPRECATED (for backward compatibility during migration)
+    onRestore?: (sourceRect?: DOMRect) => void;
 }
 
 class WindowTrayImpl {
@@ -53,6 +69,7 @@ class WindowTrayImpl {
     private mouseY: number = 0;
     private proximityRAF: number | null = null;
     private isRestoring: boolean = false; // Disable proximity morphing during restore
+    private expandedDots: Map<string, HTMLElement> = new Map(); // Track expanded windows (dot-as-primitive)
 
     /**
      * Initialize the tray and attach to DOM
@@ -377,8 +394,20 @@ class WindowTrayImpl {
                 // Get dot's current position for spatial continuity
                 const dotRect = dot.getBoundingClientRect();
 
-                // Start window restore immediately (animates from dot's exact position)
-                item.onRestore(dotRect);
+                // New dot-as-primitive: expand if renderContent exists
+                if (item.renderContent) {
+                    this.expand(item.id);
+                    // Re-enable proximity after animation
+                    setTimeout(() => {
+                        this.isRestoring = false;
+                    }, 300);
+                    return;
+                }
+
+                // Legacy: Start window restore immediately (animates from dot's exact position)
+                if (item.onRestore) {
+                    item.onRestore(dotRect);
+                }
 
                 // Keep clicked dot visible during window animation, collapse others
                 const allDots = this.indicatorContainer!.querySelectorAll('.window-tray-dot');
@@ -416,6 +445,211 @@ class WindowTrayImpl {
 
             this.indicatorContainer!.appendChild(dot);
         });
+    }
+
+    /**
+     * Expand a dot into full window (dot-as-primitive)
+     */
+    public expand(id: string): void {
+        const item = this.items.get(id);
+        if (!item || !item.renderContent || this.expandedDots.has(id)) return;
+
+        log.debug(SEG.UI, `Expanding dot: ${id}`);
+
+        // Create window container
+        const windowEl = document.createElement('div');
+        windowEl.className = 'tray-window';
+        windowEl.setAttribute('data-window-id', id);
+
+        // Create title bar
+        const titleBar = this.createTitleBar(item);
+        windowEl.appendChild(titleBar);
+
+        // Create content area
+        const contentArea = document.createElement('div');
+        contentArea.className = 'tray-window-content';
+        contentArea.appendChild(item.renderContent());
+        windowEl.appendChild(contentArea);
+
+        // Position window (restore from state or use defaults)
+        const state = uiState.getWindowState(id);
+        if (state) {
+            windowEl.style.left = `${state.x}px`;
+            windowEl.style.top = `${state.y}px`;
+            windowEl.style.width = state.width;
+            if (state.height) {
+                windowEl.style.height = state.height;
+            }
+        } else {
+            // Default positioning
+            windowEl.style.left = `${item.defaultX || 100}px`;
+            windowEl.style.top = `${item.defaultY || 100}px`;
+            windowEl.style.width = item.initialWidth || '600px';
+            if (item.initialHeight) {
+                windowEl.style.height = item.initialHeight;
+            }
+        }
+
+        // Add to DOM
+        document.body.appendChild(windowEl);
+
+        // Track expanded state
+        this.expandedDots.set(id, windowEl);
+        uiState.updateWindowState(id, { minimized: false });
+
+        // Make draggable
+        this.makeDraggable(windowEl);
+
+        // Callback
+        item.onExpand?.();
+    }
+
+    /**
+     * Collapse expanded window back to dot (dot-as-primitive)
+     */
+    public collapse(id: string): void {
+        const windowEl = this.expandedDots.get(id);
+        if (!windowEl) return;
+
+        const item = this.items.get(id);
+        log.debug(SEG.UI, `Collapsing dot: ${id}`);
+
+        // Animate collapse back to tray (optional)
+        // windowEl.style.transition = 'all 0.3s ease';
+        // const trayPos = this.getTargetPosition();
+        // windowEl.style.transform = `translate(${trayPos.x}px, ${trayPos.y}px) scale(0)`;
+
+        // Save final state before removing
+        const rect = windowEl.getBoundingClientRect();
+        uiState.updateWindowState(id, {
+            x: rect.left,
+            y: rect.top,
+            width: windowEl.style.width,
+            height: windowEl.style.height || undefined,
+            minimized: true
+        });
+
+        // Remove from DOM
+        windowEl.remove();
+        this.expandedDots.delete(id);
+
+        // Callback
+        item?.onCollapse?.();
+    }
+
+    /**
+     * Create title bar with minimize/close buttons (dot-as-primitive)
+     */
+    private createTitleBar(item: TrayItem): HTMLElement {
+        const titleBar = document.createElement('div');
+        titleBar.className = 'tray-window-title-bar';
+
+        const title = document.createElement('span');
+        title.className = 'tray-window-title';
+        title.textContent = item.title;
+        titleBar.appendChild(title);
+
+        const buttons = document.createElement('div');
+        buttons.className = 'tray-window-buttons';
+
+        // Minimize button
+        const minimizeBtn = document.createElement('button');
+        minimizeBtn.className = 'tray-window-button-minimize';
+        minimizeBtn.textContent = '−';
+        minimizeBtn.setAttribute('aria-label', 'Minimize');
+        minimizeBtn.addEventListener('click', () => this.collapse(item.id));
+        buttons.appendChild(minimizeBtn);
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'tray-window-button-close';
+        closeBtn.textContent = '×';
+        closeBtn.setAttribute('aria-label', 'Close');
+        closeBtn.addEventListener('click', () => {
+            if (item.onClose) {
+                item.onClose();
+            } else {
+                this.collapse(item.id); // Default: just minimize
+            }
+        });
+        buttons.appendChild(closeBtn);
+
+        titleBar.appendChild(buttons);
+
+        return titleBar;
+    }
+
+    /**
+     * Make window draggable (dot-as-primitive)
+     */
+    private makeDraggable(windowEl: HTMLElement): void {
+        const titleBar = windowEl.querySelector('.tray-window-title-bar') as HTMLElement;
+        if (!titleBar) return;
+
+        let isDragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        const onMouseDown = (e: MouseEvent) => {
+            isDragging = true;
+            const rect = windowEl.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            // Prevent text selection during drag
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isDragging) return;
+
+            const x = e.clientX - offsetX;
+            const y = e.clientY - offsetY;
+
+            windowEl.style.left = `${x}px`;
+            windowEl.style.top = `${y}px`;
+        };
+
+        const onMouseUp = () => {
+            if (!isDragging) return;
+            isDragging = false;
+
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+
+            // Save position
+            const id = windowEl.getAttribute('data-window-id');
+            if (id) {
+                const rect = windowEl.getBoundingClientRect();
+                uiState.updateWindowState(id, {
+                    x: rect.left,
+                    y: rect.top
+                });
+            }
+        };
+
+        titleBar.addEventListener('mousedown', onMouseDown);
+    }
+
+    /**
+     * Register a dot (dot-as-primitive)
+     * Used to register dots on startup rather than only when minimizing
+     */
+    public register(item: TrayItem): void {
+        if (this.items.has(item.id)) {
+            log.warn(SEG.UI, `Dot already registered: ${item.id}`);
+            return;
+        }
+
+        this.items.set(item.id, item);
+        this.renderItems();
+        if (this.element) {
+            this.element.setAttribute('data-empty', 'false');
+        }
+        log.debug(SEG.UI, `Dot registered: ${item.id}`);
     }
 
     /**
