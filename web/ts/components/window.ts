@@ -1,6 +1,32 @@
 /**
  * Generic draggable, non-modal window component
  * Supports multiple windows with z-index stacking
+ *
+ * State Machine:
+ * ┌─────────┐  show()   ┌─────────┐  minimize()  ┌───────────┐
+ * │ Hidden  │ ────────> │ Visible │ ───────────> │ Minimized │
+ * │         │ <──────── │         │ <─────────── │ (in tray) │
+ * └─────────┘  hide()   └─────────┘  restore()   └───────────┘
+ *      │                     │                         │
+ *      └─────────────────────┴─────────────────────────┘
+ *                      destroy() - permanent removal
+ *
+ * States:
+ * - Hidden: Window exists in DOM but not visible (visible=false, minimized=false)
+ * - Visible: Window displayed on screen (visible=true, minimized=false)
+ * - Minimized: Hidden with tray dot for quick restore (visible=false, minimized=true)
+ *
+ * Operations:
+ * - show(): Make visible. Auto-restores if minimized.
+ * - hide(): Hide window. No-op if already minimized.
+ * - minimize(): Hide to tray with animation. Adds tray dot.
+ * - restore(): Bring back from tray with animation. Removes tray dot.
+ * - destroy(): Permanent removal from DOM. Not reversible.
+ * - toggle(): show() if hidden, hide() if visible
+ *
+ * Close button behavior:
+ * - Calls destroy() for permanent removal
+ * - Window wrappers (VidStreamWindow, etc.) can recreate via singleton pattern
  */
 
 import { handleErrorSilent } from '../error-handler';
@@ -144,12 +170,9 @@ export class Window {
             this.bringToFront();
         });
 
-        // Close button
+        // Close button - destroys the window permanently
         closeBtn.addEventListener('click', () => {
-            if (this.config.onClose) {
-                this.config.onClose();
-            }
-            this.hide();
+            this.destroy();
         });
 
         // Minimize button
@@ -218,8 +241,15 @@ export class Window {
 
     /**
      * Show the window
+     * If window is minimized, restores it from tray instead
      */
     public show(): void {
+        // Auto-restore if minimized
+        if (this.minimized) {
+            this.restore();
+            return;
+        }
+
         setVisibility(this.element, DATA.VISIBILITY.VISIBLE);
         this.bringToFront();
         this.saveState();
@@ -230,8 +260,14 @@ export class Window {
 
     /**
      * Hide the window
+     * No-op if window is minimized (use restore() to bring back minimized windows)
      */
     public hide(): void {
+        // No-op if already minimized (already hidden via minimize)
+        if (this.minimized) {
+            return;
+        }
+
         setVisibility(this.element, DATA.VISIBILITY.HIDDEN);
         this.saveState();
         if (this.config.onHide) {

@@ -62,17 +62,17 @@ describe('VidStream Critical Paths', () => {
         // Verify default model path is displayed
         expect(modelPathSpan?.textContent).toBe('ats/vidstream/models/yolo11n.onnx');
 
-        // Verify window starts not visible (no data-visible attribute set initially)
-        const initialVisible = windowEl?.getAttribute('data-visible');
-        expect(initialVisible === null || initialVisible === 'false').toBe(true);
+        // Verify window starts not visible (data-visibility should be "hidden")
+        const initialVisible = windowEl?.getAttribute('data-visibility');
+        expect(initialVisible).toBe('hidden');
 
         // Show window
         vidstream.show();
-        expect(windowEl?.getAttribute('data-visible')).toBe('true');
+        expect(windowEl?.getAttribute('data-visibility')).toBe('visible');
 
         // Hide window
         vidstream.hide();
-        expect(windowEl?.getAttribute('data-visible')).toBe('false');
+        expect(windowEl?.getAttribute('data-visibility')).toBe('hidden');
     });
 
     test('Window component creates elements in DOM', () => {
@@ -112,7 +112,7 @@ describe('VidStream Critical Paths', () => {
 
         // Verify we can show the window (handlers are set up)
         vidstream.show();
-        expect(windowEl?.getAttribute('data-visible')).toBe('true');
+        expect(windowEl?.getAttribute('data-visibility')).toBe('visible');
 
         // Cleanup
         vidstream.hide();
