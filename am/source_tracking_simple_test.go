@@ -198,7 +198,7 @@ workers = 2
 	// Verify pulse.workers
 	workerSetting := settings["pulse.workers"]
 	require.NotNil(t, workerSetting)
-	assert.Equal(t, cfg.Pulse.Workers, workerSetting.Value)
+	assert.Equal(t, int64(cfg.Pulse.Workers), workerSetting.Value)
 	assert.Equal(t, SourceUser, workerSetting.Source)
 	assert.Contains(t, workerSetting.SourcePath, "am.toml")
 }
