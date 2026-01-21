@@ -31,6 +31,7 @@
 
 import { handleErrorSilent } from '../error-handler';
 import { SEG } from '../logger';
+import { windowTray } from './window-tray';
 import { setVisibility, getVisibility, DATA } from '../css-classes';
 import { uiState } from '../state/ui';
 
@@ -164,13 +165,9 @@ export class Window {
             }
         });
 
-        // Click anywhere on window to bring to front (or restore if minimized)
+        // Click anywhere on window to bring to front
         this.element.addEventListener('mousedown', () => {
-            if (this.minimized) {
-                this.restore();
-            } else {
-                this.bringToFront();
-            }
+            this.bringToFront();
         });
 
         // Close button - destroys the window permanently
@@ -304,13 +301,14 @@ export class Window {
     }
 
     /**
-     * Restore minimized state from uiState on window creation
+     * Restore minimized state from localStorage on window creation
      */
     private restoreMinimizedState(): void {
-        const state = uiState.getWindowState(this.config.id);
-        if (state?.minimized) {
-            // Window was minimized in previous session - minimize it silently (no animation)
-            this.minimize(true);
+        const minimizedIds = windowTray.loadState();
+        if (minimizedIds.includes(this.config.id)) {
+            // Window was minimized in previous session - minimize it silently (no animation, no save)
+            // skipSave=true prevents overwriting localStorage before all windows have restored
+            this.minimize(true, true);
         }
     }
 
@@ -336,6 +334,7 @@ export class Window {
                 x,
                 y,
                 width: this.element.style.width || this.config.width || '400px',
+                visible: this.isVisible(),
                 minimized: this.minimized
             });
         } catch (error) {
@@ -369,21 +368,29 @@ export class Window {
 
             // Don't restore visibility during page load - it will flash above loading screen
             // Visibility will be restored after hideLoadingScreen() via finishWindowRestore()
-            // Mark non-minimized windows to be shown after loading completes
-            this.element.setAttribute('data-should-restore-visibility', 'true');
+            // Just store that we should restore it later
+            if (state.visible) {
+                this.element.setAttribute('data-should-restore-visibility', 'true');
+            }
         } catch (error) {
             handleErrorSilent(error, 'Failed to restore window state', SEG.UI);
         }
     }
 
     /**
-     * Minimize window - window element becomes the dot
+     * Minimize window to tray with animation
      * @param skipAnimation Skip animation for silent minimize (e.g., restoring from localStorage)
      */
-    public minimize(skipAnimation: boolean = false): void {
+    public minimize(skipAnimation: boolean = false, skipSave: boolean = false): void {
         if (this.minimized) return;
 
-        // Save current position and size
+        // Clear any existing transforms first
+        this.element.style.transform = '';
+        this.element.style.transition = '';
+
+        // Save current position (after clearing transforms)
+        // For hidden windows (display: none), getBoundingClientRect returns incorrect values
+        // so we need to parse from inline styles instead
         const rect = this.element.getBoundingClientRect();
         if (!this.isVisible()) {
             // Window is hidden - parse position from inline styles
@@ -395,39 +402,67 @@ export class Window {
             this.savedPosition = { x: rect.left, y: rect.top };
         }
 
-        // Mark as minimized FIRST so isVisible() returns false
-        this.minimized = true;
+        // Get tray target for animation
+        const trayTarget = windowTray.getTargetPosition();
 
-        // Add minimized class (CSS handles dot styling)
-        this.element.classList.add('minimized');
+        // Animate to tray (unless skipping animation)
+        if (trayTarget && !skipAnimation) {
+            const duration = Window.ANIMATION_DURATION_MS / 1000; // Convert to seconds for CSS
+            this.element.style.transition = `transform ${duration}s ease, opacity ${duration}s ease`;
+            const dx = trayTarget.x - (rect.left + rect.width / 2);
+            const dy = trayTarget.y - (rect.top + rect.height / 2);
+            this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+            this.element.style.opacity = '0';
+        }
 
-        // Calculate tray position (bottom-right corner with spacing)
-        const trayX = window.innerWidth - 100;
-        const trayY = window.innerHeight - 50;
+        // After animation, hide and add to tray
+        const finishMinimize = () => {
+            this.element.style.transition = '';
+            this.element.style.transform = '';
+            this.element.style.opacity = '';
+            setVisibility(this.element, DATA.VISIBILITY.HIDDEN);
 
-        // Reposition to tray
-        this.element.style.left = `${trayX}px`;
-        this.element.style.top = `${trayY}px`;
+            this.minimized = true;
 
-        // Save state to persist minimized status
-        this.saveState();
+            // Save state to persist minimized status
+            this.saveState();
 
-        if (this.config.onMinimize) {
-            this.config.onMinimize();
+            // Add to tray (skipSave during restore to avoid overwriting localStorage prematurely)
+            windowTray.add({
+                id: this.config.id,
+                title: this.config.title,
+                onRestore: (sourceRect?: DOMRect) => this.restore(sourceRect),
+                onClose: () => {
+                    if (this.config.onClose) {
+                        this.config.onClose();
+                    }
+                    this.hide();
+                }
+            }, skipSave);
+
+            if (this.config.onMinimize) {
+                this.config.onMinimize();
+            }
+        };
+
+        if (skipAnimation) {
+            // Execute immediately for silent minimize (no animation)
+            finishMinimize();
+        } else {
+            // Delay for animation
+            setTimeout(finishMinimize, Window.ANIMATION_DURATION_MS);
         }
     }
 
     /**
-     * Restore window from minimized state
+     * Restore window from tray with animation
+     * @param sourceRect Optional rect of the clicked tray item for spatial continuity
      */
-    public restore(): void {
+    public restore(sourceRect?: DOMRect): void {
         if (!this.minimized) return;
 
-        // Mark as not minimized FIRST so isVisible() returns true
-        this.minimized = false;
-
-        // Remove minimized class
-        this.element.classList.remove('minimized');
+        // Remove from tray
+        windowTray.remove(this.config.id);
 
         // Restore position
         if (this.savedPosition) {
@@ -435,14 +470,58 @@ export class Window {
             this.element.style.top = `${this.savedPosition.y}px`;
         }
 
-        this.bringToFront();
+        // Show window first so we can get accurate dimensions
+        setVisibility(this.element, DATA.VISIBILITY.VISIBLE);
+        this.minimized = false; // Mark as not minimized before animation starts
 
-        // Save state
-        this.saveState();
+        // Prepare for animation - start from source rect (expanded dot) or tray position
+        if (this.savedPosition) {
+            const windowRect = this.element.getBoundingClientRect();
+            const finalWidth = windowRect.width;
+            const finalHeight = windowRect.height;
 
-        if (this.config.onRestore) {
-            this.config.onRestore();
+            if (sourceRect) {
+                // Start from expanded dot's exact position and size
+                const dx = sourceRect.left - this.savedPosition.x;
+                const dy = sourceRect.top - this.savedPosition.y;
+                const scaleX = sourceRect.width / finalWidth;
+                const scaleY = sourceRect.height / finalHeight;
+                this.element.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+                this.element.style.transformOrigin = 'top left';
+                this.element.style.opacity = '1'; // Dot is visible, window should be too
+            } else {
+                // Fallback: use tray center position with small scale
+                const trayTarget = windowTray.getTargetPosition();
+                if (trayTarget) {
+                    const dx = trayTarget.x - (this.savedPosition.x + finalWidth / 2);
+                    const dy = trayTarget.y - (this.savedPosition.y + finalHeight / 2);
+                    this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
+                    this.element.style.opacity = '0';
+                }
+            }
         }
+
+        // Force reflow
+        void this.element.offsetHeight;
+
+        // Animate to original position
+        const duration = Window.ANIMATION_DURATION_MS / 1000; // Convert to seconds for CSS
+        this.element.style.transition = `transform ${duration}s ease, opacity ${duration}s ease`;
+        this.element.style.transform = '';
+        this.element.style.opacity = '';
+
+        setTimeout(() => {
+            this.element.style.transition = '';
+            this.element.style.transformOrigin = ''; // Clear transform origin
+            this.bringToFront();
+
+            // Save state after animation completes and transforms are cleared
+            this.saveState();
+
+            if (this.config.onRestore) {
+                this.config.onRestore();
+            }
+        }, Window.ANIMATION_DURATION_MS);
     }
 
     /**

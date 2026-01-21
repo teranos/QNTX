@@ -36,6 +36,7 @@ import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
+import { windowTray } from './components/window-tray.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -211,6 +212,10 @@ async function init(): Promise<void> {
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing graph...');
     initGraphResize();
+
+    // Initialize window tray FIRST (before any windows are created)
+    // This ensures the tray is ready to receive minimized windows
+    windowTray.init();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();
