@@ -178,13 +178,13 @@ workers = 3`),
 
 		// Settings from our file should be there
 		assert.Equal(t, "test.db", settingsMap["database.path"])
-		assert.Equal(t, 3, settingsMap["pulse.workers"])
+		assert.Equal(t, int64(3), settingsMap["pulse.workers"])
 
 		// Default settings should also be there (not just our overrides)
 		assert.NotNil(t, settingsMap["pulse.cost_per_score_usd"], "Defaults should appear in introspection")
 
 		// What we loaded should match what introspection reports
 		assert.Equal(t, cfg.Database.Path, settingsMap["database.path"])
-		assert.Equal(t, cfg.Pulse.Workers, settingsMap["pulse.workers"])
+		assert.Equal(t, int64(cfg.Pulse.Workers), settingsMap["pulse.workers"])
 	})
 }
