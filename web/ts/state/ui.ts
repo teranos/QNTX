@@ -57,6 +57,17 @@ export interface GraphSessionState {
 }
 
 /**
+ * Individual window state
+ */
+export interface WindowState {
+    x: number;
+    y: number;
+    width: string;
+    visible: boolean;
+    minimized: boolean;
+}
+
+/**
  * Consolidated UI state
  */
 export interface UIStateData {
@@ -75,7 +86,10 @@ export interface UIStateData {
     // Graph session (query, verbosity, transform)
     graphSession: GraphSessionState;
 
-    // Minimized window IDs (for window tray)
+    // Window states (position, visibility, minimized)
+    windowStates: Record<string, WindowState>;
+
+    // Minimized window IDs (for window tray) - DEPRECATED: use windowStates[id].minimized
     minimizedWindows: string[];
 
     // Timestamp for state versioning
@@ -102,7 +116,8 @@ interface PersistedUIState {
     activeModality: string;
     usageView: 'week' | 'month';
     graphSession: GraphSessionState;
-    minimizedWindows: string[];
+    windowStates: Record<string, WindowState>;
+    minimizedWindows: string[];  // DEPRECATED: kept for migration compatibility
 }
 
 // ============================================================================
@@ -134,6 +149,7 @@ function createDefaultState(): UIStateData {
         },
         usageView: 'week',
         graphSession: {},
+        windowStates: {},
         minimizedWindows: [],
         lastUpdated: Date.now(),
     };
@@ -144,7 +160,7 @@ function createDefaultState(): UIStateData {
 // ============================================================================
 
 const STORAGE_KEY = 'qntx-ui-state';
-const STORAGE_VERSION = 2; // Bumped for graph session addition
+const STORAGE_VERSION = 3; // Bumped for windowStates addition
 const MAX_SUBSCRIBER_FAILURES = 3;
 const GRAPH_SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -373,6 +389,54 @@ class UIState {
     }
 
     // ========================================================================
+    // Window State Management
+    // ========================================================================
+
+    /**
+     * Get state for a specific window
+     */
+    getWindowState(id: string): WindowState | undefined {
+        return this.state.windowStates[id];
+    }
+
+    /**
+     * Set state for a specific window
+     */
+    setWindowState(id: string, state: WindowState): void {
+        const updated = { ...this.state.windowStates, [id]: state };
+        this.update('windowStates', updated);
+    }
+
+    /**
+     * Update partial state for a specific window
+     */
+    updateWindowState(id: string, partial: Partial<WindowState>): void {
+        const existing = this.state.windowStates[id];
+        if (!existing) {
+            log.warn(SEG.UI, `Attempted to update non-existent window state: ${id}`);
+            return;
+        }
+        const updated = { ...this.state.windowStates, [id]: { ...existing, ...partial } };
+        this.update('windowStates', updated);
+    }
+
+    /**
+     * Remove a window from state
+     */
+    removeWindowState(id: string): void {
+        const updated = { ...this.state.windowStates };
+        delete updated[id];
+        this.update('windowStates', updated);
+    }
+
+    /**
+     * Get all window states
+     */
+    getAllWindowStates(): Record<string, WindowState> {
+        return this.state.windowStates;
+    }
+
+    // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
 
@@ -479,6 +543,7 @@ class UIState {
             activeModality: this.state.activeModality,
             usageView: this.state.usageView,
             graphSession: this.state.graphSession,
+            windowStates: this.state.windowStates,
             minimizedWindows: this.state.minimizedWindows,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
@@ -509,6 +574,7 @@ class UIState {
             activeModality: persisted.activeModality ?? defaultState.activeModality,
             usageView: persisted.usageView ?? defaultState.usageView,
             graphSession: persisted.graphSession ?? defaultState.graphSession,
+            windowStates: persisted.windowStates ?? defaultState.windowStates,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
         };
     }

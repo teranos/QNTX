@@ -6,6 +6,8 @@
 import { handleErrorSilent } from '../error-handler';
 import { SEG } from '../logger';
 import { windowTray } from './window-tray';
+import { setVisibility, getVisibility, DATA } from '../css-classes';
+import { uiState } from '../state/ui';
 
 export interface WindowConfig {
     id: string;
@@ -45,9 +47,6 @@ export class Window {
     // Animation timing - must match CSS transition duration (0.3s)
     private static readonly ANIMATION_DURATION_MS = 300;
 
-    // LocalStorage key for window state persistence
-    private static readonly STORAGE_KEY = 'qntx_window_state';
-
     constructor(config: WindowConfig) {
         this.config = config;
         this.element = this.createElement();
@@ -71,6 +70,9 @@ export class Window {
         const win = document.createElement('div');
         win.id = this.config.id;
         win.className = 'draggable-window';
+
+        // Start hidden by default
+        setVisibility(win, DATA.VISIBILITY.HIDDEN);
 
         // Set dimensions
         if (this.config.width) win.style.width = this.config.width;
@@ -218,7 +220,7 @@ export class Window {
      * Show the window
      */
     public show(): void {
-        this.element.setAttribute('data-visible', 'true');
+        setVisibility(this.element, DATA.VISIBILITY.VISIBLE);
         this.bringToFront();
         this.saveState();
         if (this.config.onShow) {
@@ -230,7 +232,7 @@ export class Window {
      * Hide the window
      */
     public hide(): void {
-        this.element.setAttribute('data-visible', 'false');
+        setVisibility(this.element, DATA.VISIBILITY.HIDDEN);
         this.saveState();
         if (this.config.onHide) {
             this.config.onHide();
@@ -241,8 +243,7 @@ export class Window {
      * Toggle window visibility
      */
     public toggle(): void {
-        const isVisible = this.element.getAttribute('data-visible') === 'true';
-        if (isVisible) {
+        if (this.isVisible()) {
             this.hide();
         } else {
             this.show();
@@ -253,7 +254,7 @@ export class Window {
      * Check if window is visible
      */
     public isVisible(): boolean {
-        return this.element.getAttribute('data-visible') === 'true';
+        return getVisibility(this.element) === DATA.VISIBILITY.VISIBLE;
     }
 
     /**
@@ -276,12 +277,10 @@ export class Window {
     }
 
     /**
-     * Save window state to localStorage
+     * Save window state to uiState
      */
     private saveState(): void {
         try {
-            const allState = this.loadAllWindowState();
-
             // Get current position
             let x: number, y: number;
             if (!this.isVisible() && this.savedPosition) {
@@ -295,27 +294,24 @@ export class Window {
                 y = rect.top;
             }
 
-            allState[this.config.id] = {
+            uiState.setWindowState(this.config.id, {
                 x,
                 y,
                 width: this.element.style.width || this.config.width || '400px',
                 visible: this.isVisible(),
                 minimized: this.minimized
-            };
-
-            localStorage.setItem(Window.STORAGE_KEY, JSON.stringify(allState));
+            });
         } catch (error) {
             handleErrorSilent(error, 'Failed to save window state', SEG.UI);
         }
     }
 
     /**
-     * Restore window state from localStorage on construction
+     * Restore window state from uiState on construction
      */
     private restoreState(): void {
         try {
-            const allState = this.loadAllWindowState();
-            const state = allState[this.config.id];
+            const state = uiState.getWindowState(this.config.id);
 
             if (!state) return; // No saved state for this window
 
@@ -342,25 +338,6 @@ export class Window {
             }
         } catch (error) {
             handleErrorSilent(error, 'Failed to restore window state', SEG.UI);
-        }
-    }
-
-    /**
-     * Load all window state from localStorage
-     */
-    private loadAllWindowState(): Record<string, {
-        x: number;
-        y: number;
-        width: string;
-        visible: boolean;
-        minimized: boolean;
-    }> {
-        try {
-            const stored = localStorage.getItem(Window.STORAGE_KEY);
-            return stored ? JSON.parse(stored) : {};
-        } catch (error) {
-            handleErrorSilent(error, 'Failed to load window state', SEG.UI);
-            return {};
         }
     }
 
@@ -407,7 +384,7 @@ export class Window {
             this.element.style.transition = '';
             this.element.style.transform = '';
             this.element.style.opacity = '';
-            this.element.setAttribute('data-visible', 'false');
+            setVisibility(this.element, DATA.VISIBILITY.HIDDEN);
 
             this.minimized = true;
 
@@ -458,7 +435,7 @@ export class Window {
         }
 
         // Show window first so we can get accurate dimensions
-        this.element.setAttribute('data-visible', 'true');
+        setVisibility(this.element, DATA.VISIBILITY.VISIBLE);
         this.minimized = false; // Mark as not minimized before animation starts
 
         // Prepare for animation - start from source rect (expanded dot) or tray position
@@ -565,7 +542,7 @@ export class Window {
         Window.openWindows.forEach(win => {
             if (win.element.getAttribute('data-should-restore-visibility') === 'true') {
                 win.element.removeAttribute('data-should-restore-visibility');
-                win.element.setAttribute('data-visible', 'true');
+                setVisibility(win.element, DATA.VISIBILITY.VISIBLE);
             }
         });
     }
