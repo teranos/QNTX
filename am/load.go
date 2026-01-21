@@ -17,6 +17,10 @@ import (
 var globalConfig *Config
 var viperInstance *viper.Viper
 
+// ConfigSources tracks where each setting came from during loading
+// Exported for use by introspection
+var ConfigSources = make(map[string]SourceInfo)
+
 // Load reads the QNTX core configuration using Viper
 func Load() (*Config, error) {
 	if globalConfig != nil {
@@ -136,6 +140,33 @@ func findProjectConfig() string {
 	return ""
 }
 
+// trackSource records where a configuration key came from
+func trackSource(key string, source ConfigSource, path string) {
+	ConfigSources[key] = SourceInfo{
+		Source: source,
+		Path:   path,
+	}
+}
+
+// TrackNestedSources recursively tracks sources for nested configuration
+// Exported for testing
+func TrackNestedSources(settings map[string]interface{}, prefix string, source ConfigSource, path string) {
+	for key, value := range settings {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		// Track this key's source
+		trackSource(fullKey, source, path)
+
+		// If nested map, recurse
+		if nestedMap, ok := value.(map[string]interface{}); ok {
+			TrackNestedSources(nestedMap, fullKey, source, path)
+		}
+	}
+}
+
 // mergeConfigFiles manually merges configuration files in the correct precedence order
 // Precedence (lowest to highest): system < user < project < env vars
 func mergeConfigFiles(v *viper.Viper) {
@@ -147,30 +178,51 @@ func mergeConfigFiles(v *viper.Viper) {
 
 	// Build config paths, with project config found via upward search
 	projectConfig := findProjectConfig()
-	configPaths := []string{
-		"/etc/qntx/config.toml",                       // System config (lowest precedence)
-		filepath.Join(qntxDir, "config.toml"),         // User config (backward compat)
-		filepath.Join(qntxDir, "am.toml"),             // User am config (new format - wins if both exist)
-		filepath.Join(qntxDir, "config_from_ui.toml"), // UI config (backward compat)
-		filepath.Join(qntxDir, "am_from_ui.toml"),     // UI am config (new format - wins if both exist)
+
+	// Define config files with their sources
+	type configFile struct {
+		path   string
+		source ConfigSource
+	}
+
+	configFiles := []configFile{
+		{"/etc/qntx/config.toml", SourceSystem},
+		{"/etc/qntx/am.toml", SourceSystem},
+		{filepath.Join(qntxDir, "config.toml"), SourceUser},
+		{filepath.Join(qntxDir, "am.toml"), SourceUser},
+		{filepath.Join(qntxDir, "config_from_ui.toml"), SourceUserUI},
+		{filepath.Join(qntxDir, "am_from_ui.toml"), SourceUserUI},
 	}
 
 	// Add project config if found (highest file precedence, below env vars)
 	if projectConfig != "" {
-		configPaths = append(configPaths, projectConfig)
+		configFiles = append(configFiles, configFile{projectConfig, SourceProject})
 	}
 
-	for _, configPath := range configPaths {
-		if _, err := os.Stat(configPath); err == nil {
+	// Track defaults first
+	for key, value := range v.AllSettings() {
+		trackSource(key, SourceDefault, "")
+		// Track nested defaults
+		if nestedMap, ok := value.(map[string]interface{}); ok {
+			TrackNestedSources(nestedMap, key, SourceDefault, "")
+		}
+	}
+
+	// Process each config file and track sources
+	for _, cf := range configFiles {
+		if _, err := os.Stat(cf.path); err == nil {
 			// Config file exists, merge it
 			tempViper := viper.New()
-			tempViper.SetConfigFile(configPath)
+			tempViper.SetConfigFile(cf.path)
 			tempViper.SetConfigType("toml")
 
 			if err := tempViper.ReadInConfig(); err == nil {
+				// Track sources for all settings in this file
+				allSettings := tempViper.AllSettings()
+				TrackNestedSources(allSettings, "", cf.source, cf.path)
+
 				// Merge this config into the main viper instance
 				// Sort keys for deterministic config loading
-				allSettings := tempViper.AllSettings()
 				keys := make([]string, 0, len(allSettings))
 				for key := range allSettings {
 					keys = append(keys, key)
@@ -180,6 +232,16 @@ func mergeConfigFiles(v *viper.Viper) {
 					v.Set(key, allSettings[key])
 				}
 			}
+		}
+	}
+
+	// Track environment variable overrides
+	// Check each setting to see if it was overridden by an env var
+	for key := range ConfigSources {
+		envKey := "QNTX_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+		if envValue := os.Getenv(envKey); envValue != "" {
+			// This setting was overridden by environment
+			trackSource(key, SourceEnvironment, envKey)
 		}
 	}
 }
