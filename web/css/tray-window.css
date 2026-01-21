@@ -1,0 +1,86 @@
+/**
+ * Tray Window - Expanded dot windows (dot-as-primitive)
+ *
+ * Windows created by expanding dots from the tray zone.
+ * These are NOT the old Window component - these are tray-owned.
+ */
+
+.tray-window {
+    position: fixed;
+    background: var(--bg-primary, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    min-width: 400px;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tray-window-title-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-secondary, #0f0f0f);
+    border-bottom: 1px solid var(--border-color, #333);
+    cursor: move;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.tray-window-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text-primary, #fff);
+}
+
+.tray-window-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.tray-window-buttons button {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary, #999);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tray-window-buttons button:hover {
+    background: var(--bg-hover, #2a2a2a);
+    color: var(--text-primary, #fff);
+}
+
+.tray-window-button-close:hover {
+    background: var(--danger-color, #e74c3c);
+    color: #fff;
+}
+
+.tray-window-content {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+}
+
+/* Disable text selection on title bar buttons */
+.tray-window-buttons button {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Active dragging state */
+.tray-window.dragging {
+    opacity: 0.9;
+}
