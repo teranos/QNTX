@@ -63,9 +63,8 @@ export interface WindowState {
     x: number;
     y: number;
     width: string;
+    visible: boolean;
     minimized: boolean;
-    // Note: visible state is derived from !minimized
-    // Windows are either visible or minimized, no third state needed
 }
 
 /**
