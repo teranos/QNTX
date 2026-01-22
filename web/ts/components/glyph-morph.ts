@@ -21,8 +21,8 @@ export interface Glyph {
 }
 
 // Animation durations in milliseconds - adjust these to slow down/speed up morphing
-export const MAXIMIZE_DURATION_MS = 800;  // Duration for dot → window (e.g., 1000 for 1 second)
-export const MINIMIZE_DURATION_MS = 400;  // Duration for window → dot (e.g., 400 for faster minimize)
+export const MAXIMIZE_DURATION_MS = 200;  // Duration for dot → window (e.g., 1000 for 1 second)
+export const MINIMIZE_DURATION_MS = 200;  // Duration for window → dot (e.g., 400 for faster minimize)
 
 export class GlyphMorph {
 
