@@ -115,6 +115,8 @@ class GlyphRunImpl {
     }
     // Deferred items to add after init
     private deferredItems: Glyph[] = [];
+    private readonly MAX_DEFERRED_ITEMS = 100; // Prevent unbounded growth
+    private deferredItemsTimeout: ReturnType<typeof setTimeout> | null = null;
 
     // Component state
     private element: HTMLElement | null = null;
@@ -150,6 +152,12 @@ class GlyphRunImpl {
 
         // Process any deferred items that tried to add before init
         if (this.deferredItems.length > 0) {
+            // Clear timeout as we're processing items now
+            if (this.deferredItemsTimeout) {
+                clearTimeout(this.deferredItemsTimeout);
+                this.deferredItemsTimeout = null;
+            }
+
             const itemsToAdd = [...this.deferredItems];
             this.deferredItems = [];
             itemsToAdd.forEach(item => {
@@ -202,8 +210,23 @@ class GlyphRunImpl {
         this.init();
 
         if (!this.element) {
-            // Tray not ready yet, defer this item
+            // Tray not ready yet, defer this item (with safeguards)
+            if (this.deferredItems.length >= this.MAX_DEFERRED_ITEMS) {
+                log.warn(SEG.UI, `GlyphRun: Deferred items limit reached (${this.MAX_DEFERRED_ITEMS}), dropping oldest`);
+                this.deferredItems.shift(); // Remove oldest to make room
+            }
+
             this.deferredItems.push(item);
+
+            // Set a timeout to clear deferred items if init never happens
+            if (!this.deferredItemsTimeout) {
+                this.deferredItemsTimeout = setTimeout(() => {
+                    log.warn(SEG.UI, `GlyphRun: Clearing ${this.deferredItems.length} deferred items after 30s timeout`);
+                    this.deferredItems = [];
+                    this.deferredItemsTimeout = null;
+                }, 30000); // Clear after 30 seconds
+            }
+
             return;
         }
 
