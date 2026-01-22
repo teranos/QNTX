@@ -20,7 +20,12 @@ export interface Glyph {
     onClose?: () => void;
 }
 
+// Animation durations in milliseconds - adjust these to slow down/speed up morphing
+export const MAXIMIZE_DURATION_MS = 800;  // Duration for dot → window (e.g., 1000 for 1 second)
+export const MINIMIZE_DURATION_MS = 400;  // Duration for window → dot (e.g., 400 for faster minimize)
+
 export class GlyphMorph {
+
     /**
      * Morph a glyph (dot) into a full window
      * The glyph DOM element itself transforms through animation
@@ -43,8 +48,17 @@ export class GlyphMorph {
             );
         }
 
-        // Get current glyph position and size
+        // Get current glyph position and size (may be proximity-expanded)
         const glyphRect = glyphElement.getBoundingClientRect();
+
+        // Capture current computed styles to preserve proximity-expanded state
+        const computedStyle = window.getComputedStyle(glyphElement);
+        const currentWidth = glyphRect.width;
+        const currentHeight = glyphRect.height;
+        const currentBorderRadius = computedStyle.borderRadius;
+        const currentBackgroundColor = computedStyle.backgroundColor;
+        const currentOpacity = computedStyle.opacity;
+        const currentPadding = computedStyle.padding;
 
         // Calculate window target position (center of screen by default)
         const windowWidth = parseInt(glyph.initialWidth || '800px');
@@ -56,23 +70,33 @@ export class GlyphMorph {
         // Remove from indicator container and reparent to body
         glyphElement.remove(); // Detach from current parent (keeps element alive)
 
-        // Apply initial fixed positioning at current location
-        glyphElement.className = 'glyph-morphing-to-window';
-        glyphElement.style.position = 'fixed';
-        glyphElement.style.left = `${glyphRect.left}px`;
-        glyphElement.style.top = `${glyphRect.top}px`;
-        glyphElement.style.width = `${glyphRect.width}px`;
-        glyphElement.style.height = `${glyphRect.height}px`;
-        glyphElement.style.zIndex = '1000';
-
-        // Clear any proximity text that might be present
+        // Clear any proximity text that might be present AFTER detaching
         if (glyphElement.dataset.hasText) {
             glyphElement.textContent = '';
             delete glyphElement.dataset.hasText;
         }
 
+        // Apply initial fixed positioning at EXACT current state (including proximity expansion)
+        glyphElement.className = 'glyph-morphing-to-window';
+        glyphElement.style.position = 'fixed';
+        glyphElement.style.left = `${glyphRect.left}px`;
+        glyphElement.style.top = `${glyphRect.top}px`;
+        glyphElement.style.width = `${currentWidth}px`;
+        glyphElement.style.height = `${currentHeight}px`;
+        glyphElement.style.borderRadius = currentBorderRadius;
+        glyphElement.style.backgroundColor = currentBackgroundColor;
+        glyphElement.style.opacity = currentOpacity;
+        glyphElement.style.padding = currentPadding;
+        glyphElement.style.zIndex = '1000';
+
         // Reparent to document body for morphing
         document.body.appendChild(glyphElement);
+
+        // Force a reflow to ensure initial styles are applied
+        glyphElement.offsetHeight;
+
+        // NOW set transition after element is positioned
+        glyphElement.style.transition = `all ${MAXIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
         // Mark element as in-window-state (but keep glyph ID)
         glyphElement.dataset.windowState = 'true';
@@ -87,6 +111,7 @@ export class GlyphMorph {
             glyphElement.style.borderRadius = '8px';
             glyphElement.style.backgroundColor = 'var(--bg-primary)';
             glyphElement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+            glyphElement.style.padding = '0'; // Reset padding to allow content to fill
             glyphElement.style.opacity = '1'; // Ensure it's visible
 
             // After animation completes, add window content
@@ -152,7 +177,7 @@ export class GlyphMorph {
 
                 // Make window draggable
                 this.makeWindowDraggable(glyphElement, titleBar);
-            }, 600); // Match animation duration
+            }, MAXIMIZE_DURATION_MS); // Match maximize animation duration
         });
     }
 
@@ -166,41 +191,93 @@ export class GlyphMorph {
         verifyElement: (id: string, element: HTMLElement) => void,
         onMorphComplete: (element: HTMLElement, glyph: Glyph) => void
     ): void {
+        // AXIOM CHECK: Verify this is the correct element
+        verifyElement(glyph.id, windowElement);
+        console.log(`[AXIOM CHECK] Minimizing same element for ${glyph.id}:`, windowElement);
         // Find the position where this glyph should go back to
         const targetRect = this.calculateGlyphTargetPosition(glyph.id);
+
+        console.log(`[Minimize] Starting minimize for ${glyph.id}`);
+        console.log(`[Minimize] Target position: x=${targetRect.x}, y=${targetRect.y}`);
+
+        // Get current window state before clearing anything
+        const currentRect = windowElement.getBoundingClientRect();
+        console.log(`[Minimize] Current window position: x=${currentRect.left}, y=${currentRect.top}, w=${currentRect.width}, h=${currentRect.height}`);
 
         // Clear window state flag
         delete windowElement.dataset.windowState;
 
-        // Add morphing class
-        windowElement.className = 'window-morphing-to-glyph';
-
-        // Clear window content (title bar, content area)
+        // Clear window content but keep a visible background
         windowElement.innerHTML = '';
 
-        // Start morphing back to dot at the target position
-        windowElement.style.left = `${targetRect.x}px`;
-        windowElement.style.top = `${targetRect.y}px`;
-        windowElement.style.width = '8px';
-        windowElement.style.height = '8px';
-        windowElement.style.borderRadius = '2px';
-        windowElement.style.backgroundColor = 'var(--bg-gray)';
-        windowElement.style.boxShadow = 'none';
+        // FORCE class change - remove old class first
+        windowElement.classList.remove('glyph-morphing-to-window');
+        windowElement.className = 'window-morphing-to-glyph';
+        console.log(`[Minimize] Class changed to: ${windowElement.className}`);
+
+        windowElement.style.position = 'fixed';
+        windowElement.style.left = `${currentRect.left}px`;
+        windowElement.style.top = `${currentRect.top}px`;
+        windowElement.style.width = `${currentRect.width}px`;
+        windowElement.style.height = `${currentRect.height}px`;
+        windowElement.style.backgroundColor = 'var(--bg-primary)';  // Keep window background
+        windowElement.style.borderRadius = '8px';
+        windowElement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+        windowElement.style.border = 'none';
         windowElement.style.padding = '0';
-        windowElement.style.border = '1px solid var(--border-on-dark)';
+        windowElement.style.opacity = '1';
+        windowElement.style.zIndex = '10000';
 
-        // After animation completes, move element back to indicator container
-        setTimeout(() => {
-            // Remove from body
-            windowElement.remove();
+        // Force a reflow BEFORE setting transition
+        windowElement.offsetHeight;
 
-            // Reset to glyph class
+        // Apply transition
+        windowElement.style.transition = `all ${MINIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+
+        // Double requestAnimationFrame to ensure styles are committed and transition is ready
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                console.log(`[Minimize] Triggering animation to target position`);
+
+                // Animate to dot appearance and position
+                windowElement.style.left = `${targetRect.x}px`;
+                windowElement.style.top = `${targetRect.y}px`;
+                windowElement.style.width = '8px';
+                windowElement.style.height = '8px';
+                windowElement.style.borderRadius = '2px';
+                windowElement.style.backgroundColor = 'var(--bg-gray)';
+                windowElement.style.boxShadow = 'none';
+                windowElement.style.border = '1px solid var(--border-on-dark)';
+
+                // Force another reflow to ensure styles are applied
+                windowElement.offsetHeight;
+
+                // Verify the styles were actually applied
+                const computedStyle = window.getComputedStyle(windowElement);
+                console.log(`[Minimize] Styles applied - checking computed values:`);
+                console.log(`[Minimize] - width: ${computedStyle.width} (should animate to 8px)`);
+                console.log(`[Minimize] - height: ${computedStyle.height} (should animate to 8px)`);
+                console.log(`[Minimize] - left: ${computedStyle.left} (should animate to ${targetRect.x}px)`);
+                console.log(`[Minimize] - top: ${computedStyle.top} (should animate to ${targetRect.y}px)`);
+                console.log(`[Minimize] - transition: ${computedStyle.transition}`);
+            });
+        });
+
+        // Listen for animation end to ensure it completes
+        const onTransitionEnd = () => {
+            console.log(`[Minimize] Animation completed for ${glyph.id}`);
+            windowElement.removeEventListener('transitionend', onTransitionEnd);
+
+            // Verify element identity is preserved
+            console.log(`[AXIOM CHECK] Same element after animation:`, windowElement);
+
+            // Keep element visible but reset to glyph class
             windowElement.className = 'glyph-run-glyph';
 
-            // Reset inline styles (let CSS take over)
-            windowElement.style.position = '';
-            windowElement.style.left = '';
-            windowElement.style.top = '';
+            // Remove transition so proximity morphing can take over smoothly
+            windowElement.style.transition = '';
+
+            // Reset inline styles BUT keep position for now
             windowElement.style.width = '';
             windowElement.style.height = '';
             windowElement.style.borderRadius = '';
@@ -208,7 +285,6 @@ export class GlyphMorph {
             windowElement.style.boxShadow = '';
             windowElement.style.padding = '';
             windowElement.style.border = '';
-            windowElement.style.zIndex = '';
             windowElement.style.opacity = '';
 
             // Keep the glyph ID
@@ -217,9 +293,29 @@ export class GlyphMorph {
             // CRITICAL: Ensure windowState is cleared after animation
             delete windowElement.dataset.windowState;
 
-            // Re-attach to indicator container (done by caller)
+            // Now remove from body and re-attach to indicator container (SAME ELEMENT)
+            windowElement.remove(); // Detach but element stays alive
+
+            // Clear position styles now that we're re-attaching
+            windowElement.style.position = '';
+            windowElement.style.left = '';
+            windowElement.style.top = '';
+            windowElement.style.zIndex = '';
+
+            // Re-attach THE SAME ELEMENT to indicator container
+            console.log(`[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
             onMorphComplete(windowElement, glyph);
-        }, 600);
+        };
+
+        windowElement.addEventListener('transitionend', onTransitionEnd);
+
+        // Fallback in case transitionend doesn't fire
+        setTimeout(() => {
+            if (windowElement.parentNode === document.body) {
+                console.log(`[Minimize] Fallback triggered - animation may not have played`);
+                onTransitionEnd();
+            }
+        }, MINIMIZE_DURATION_MS + 100);
     }
 
     /**
@@ -227,21 +323,36 @@ export class GlyphMorph {
      */
     private calculateGlyphTargetPosition(glyphId: string): { x: number, y: number } {
         const tray = document.querySelector('.glyph-run');
-        if (!tray) return { x: 0, y: 0 };
+        if (!tray) {
+            console.log(`[Minimize] No tray found, using default position`);
+            return { x: window.innerWidth - 12, y: window.innerHeight / 2 };
+        }
 
-        const trayRect = tray.getBoundingClientRect();
+        const indicatorContainer = tray.querySelector('.glyph-run-indicators');
+        if (!indicatorContainer) {
+            console.log(`[Minimize] No indicator container found`);
+            return { x: window.innerWidth - 12, y: window.innerHeight / 2 };
+        }
+
+        const trayRect = indicatorContainer.getBoundingClientRect();
         const glyphSize = 8;
         const gap = 2;
 
-        // Get index from existing glyphs in tray
-        const glyphsInTray = Array.from(tray.querySelectorAll('.glyph-run-glyph'));
-        const index = glyphsInTray.findIndex(el => el.getAttribute('data-glyph-id') === glyphId);
+        // Count existing glyphs in tray (not including the one being minimized which is on body)
+        const glyphsInTray = Array.from(indicatorContainer.querySelectorAll('.glyph-run-glyph'));
+        console.log(`[Minimize] Found ${glyphsInTray.length} glyphs already in tray`);
 
-        // Stack vertically
-        return {
-            x: trayRect.right - glyphSize - 4, // 4px from right edge
-            y: trayRect.top + (Math.max(0, index) * (glyphSize + gap))
-        };
+        // The minimizing glyph will be added at the end
+        const index = glyphsInTray.length;
+
+        // Stack vertically in the indicator container
+        const x = trayRect.right - glyphSize;
+        const y = trayRect.top + (index * (glyphSize + gap));
+
+        console.log(`[Minimize] Calculated position for index ${index}: x=${x}, y=${y}`);
+        console.log(`[Minimize] Tray rect:`, trayRect);
+
+        return { x, y };
     }
 
     /**
