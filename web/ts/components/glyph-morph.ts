@@ -116,6 +116,10 @@ export class GlyphMorph {
 
             // After animation completes, add window content
             setTimeout(() => {
+                // Set up window as flex container
+                glyphElement.style.display = 'flex';
+                glyphElement.style.flexDirection = 'column';
+
                 // Add window chrome (title bar, controls)
                 const titleBar = document.createElement('div');
                 titleBar.className = 'window-title-bar';
@@ -125,6 +129,7 @@ export class GlyphMorph {
                 titleBar.style.display = 'flex';
                 titleBar.style.alignItems = 'center';
                 titleBar.style.padding = '0 12px';
+                titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
 
                 // Add title
                 const titleText = document.createElement('span');
@@ -171,7 +176,7 @@ export class GlyphMorph {
                 // Add content area
                 const content = glyph.renderContent();
                 content.style.padding = '16px';
-                content.style.height = 'calc(100% - 32px)';
+                content.style.flex = '1'; // Take remaining space in flex container
                 content.style.overflow = 'auto';
                 glyphElement.appendChild(content);
 
