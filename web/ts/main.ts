@@ -36,7 +36,7 @@ import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
-import { glyphRun } from './components/glyph-run.ts';
+import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';

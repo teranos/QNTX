@@ -51,7 +51,7 @@
  * symbols into true glyphs.
  */
 
-import { glyphRun } from './components/glyph-run';
+import { glyphRun } from './components/glyph/run';
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {

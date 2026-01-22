@@ -4,16 +4,18 @@
 
 A single entity that exists in three visual states, morphing between them through smooth animations based on user interaction.
 
-## The Three States
+## The Glyph State Continuum
 
-### 1. Collapsed State (8px glyph) ✓
+### Core States (Implemented)
+
+#### 1. Collapsed State (8px glyph) ✓
 
 - A tiny gray square sitting quietly in the GlyphRun (middle right of screen by default) ✓
 - Minimal visual footprint - just a subtle indicator that something exists ✓
 - No text, no decoration - pure simplicity ✓
 - Multiple glyphs stack vertically in the GlyphRun ✓
 
-### 2. Proximity Expanded State (8px → 220px) ✓
+#### 2. Proximity Expanded State (8px → 220px) ✓
 
 - As the mouse approaches, the glyph smoothly morphs larger ✓
 - The transformation is proximity-based: closer = larger ✓
@@ -22,7 +24,7 @@ A single entity that exists in three visual states, morphing between them throug
 - The existing window-tray.ts already implements this perfectly (lines 164-285) ✓
 - Carefully tuned easing curves, thresholds, and baseline boost logic ✓
 
-### 3. Full Window State ✓
+#### 3. Full Window State ✓
 
 - **THE KEY MOMENT:** When clicked, the expanded glyph doesn't create a window - it BECOMES the window ✓
 - The glyph element itself morphs through animation:
@@ -33,6 +35,47 @@ A single entity that exists in three visual states, morphing between them throug
   - Content appears as the window reaches full size ✓
 - The glyph disappears from the tray because it IS now the window ✓
 - This is a smooth, continuous animation where users can see the glyph becoming the window ✓
+
+### The Universal Manifestation Principle
+
+**THE ULTIMATE VISION:** A glyph can manifest into ANY interactive form the user desires. The glyph is not limited to predefined states but can morph into whatever shape, model, or interface is needed:
+
+#### Potential Manifestations
+
+- **Modal dialogs** - Glyph morphs to center screen with backdrop
+- **Tooltips** - Glyph becomes floating contextual information
+- **Menus** - Glyph expands into dropdown or radial menu
+- **Notifications** - Glyph slides in as toast or banner
+- **Overlays** - Glyph becomes translucent HUD element
+- **Widgets** - Glyph becomes persistent desktop widget
+- **Canvas** - Glyph becomes drawable/editable surface
+- **Graph nodes** - Glyph becomes part of node-based interface
+- **3D objects** - Glyph morphs into spatial/volumetric form
+- **Terminal** - Glyph becomes command interface
+- **Split views** - Glyph divides into multiple synchronized panes
+- **Timelines** - Glyph stretches into temporal visualization
+- **Cards** - Glyph becomes stackable/swipeable card interface
+- **Floating palette** - Glyph becomes tool palette following cursor
+
+#### The Morphing Grammar
+
+Each manifestation is just another state in the glyph's continuous transformation space. The same DOM element, the same identity, infinite forms:
+
+```
+Glyph → [User Intent] → Manifestation
+                     ↓
+              [Interaction]
+                     ↓
+            Another Form or Back
+```
+
+#### Why This Matters
+
+1. **Infinite Flexibility**: No artificial constraints on what UI can be
+2. **Consistent Identity**: The glyph maintains its identity across all forms
+3. **Learnable Patterns**: Users learn the morphing grammar, not specific UIs
+4. **Future-Proof**: New interface paradigms are just new manifestation types
+5. **Conceptual Purity**: ONE primitive, infinite expressions
 
 ## Glyph State Persistence
 
