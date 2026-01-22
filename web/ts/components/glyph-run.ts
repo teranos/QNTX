@@ -41,6 +41,9 @@ class GlyphRunImpl {
     // Track all created glyph elements to enforce single-element axiom
     private glyphElements: Map<string, HTMLElement> = new Map();
 
+    // Track click handlers separately for proper cleanup (prevents memory leaks)
+    private glyphClickHandlers: WeakMap<HTMLElement, (e: MouseEvent) => void> = new WeakMap();
+
     // Proximity morphing handler
     private proximity: GlyphProximity = new GlyphProximity();
 
@@ -103,8 +106,8 @@ class GlyphRunImpl {
             }
         };
 
-        // Store handler reference so we can verify it persists
-        (glyph as any).__glyphClickHandler = clickHandler;
+        // Store handler in WeakMap for proper cleanup
+        this.glyphClickHandlers.set(glyph, clickHandler);
         glyph.addEventListener('click', clickHandler);
 
         return glyph;
@@ -266,6 +269,12 @@ class GlyphRunImpl {
                     `This indicates element recreation.`
                 );
             }
+            // Remove click handler before removing element
+            const handler = this.glyphClickHandlers.get(tracked);
+            if (handler) {
+                tracked.removeEventListener('click', handler);
+                // WeakMap will automatically clean up when element is GC'd
+            }
             tracked.remove();
             this.glyphElements.delete(id);
         }
@@ -326,7 +335,7 @@ class GlyphRunImpl {
         if (!this.indicatorContainer) return;
 
         // Remove any existing handler to avoid duplicates
-        const existingHandler = (glyphElement as any).__glyphClickHandler;
+        const existingHandler = this.glyphClickHandlers.get(glyphElement);
         if (existingHandler) {
             glyphElement.removeEventListener('click', existingHandler);
         }
@@ -352,7 +361,7 @@ class GlyphRunImpl {
             }
         };
 
-        (glyphElement as any).__glyphClickHandler = clickHandler;
+        this.glyphClickHandlers.set(glyphElement, clickHandler);
         glyphElement.addEventListener('click', clickHandler);
 
         // Insert at the correct position in the indicator container
