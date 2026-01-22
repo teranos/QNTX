@@ -368,13 +368,6 @@ class GlyphRunImpl {
         this.isRestoring = false;
     }
 
-    /**
-     * Strip HTML tags from title for plain text display
-     */
-    private stripHtml(html: string): string {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        return doc.body.textContent || '';
-    }
 
     /**
      * Get count of minimized windows

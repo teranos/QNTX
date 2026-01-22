@@ -24,6 +24,23 @@ export interface Glyph {
 export const MAXIMIZE_DURATION_MS = 200;  // Duration for dot → window (e.g., 1000 for 1 second)
 export const MINIMIZE_DURATION_MS = 200;  // Duration for window → dot (e.g., 400 for faster minimize)
 
+// Window dimensions
+const DEFAULT_WINDOW_WIDTH = '800px';
+const DEFAULT_WINDOW_HEIGHT = '600px';
+const WINDOW_BORDER_RADIUS = '8px';
+const WINDOW_BOX_SHADOW = '0 8px 32px rgba(0, 0, 0, 0.3)';
+
+// Window chrome dimensions
+const TITLE_BAR_HEIGHT = '32px';
+const TITLE_BAR_PADDING = '0 12px';
+const WINDOW_BUTTON_SIZE = '24px';
+const CONTENT_PADDING = '16px';
+
+// Dot dimensions
+const DOT_SIZE = '8px';
+const DOT_BORDER_RADIUS = '2px';
+const DOT_BORDER = '1px solid var(--border-on-dark)';
+
 export class GlyphMorph {
 
     /**
@@ -61,8 +78,8 @@ export class GlyphMorph {
         const currentPadding = computedStyle.padding;
 
         // Calculate window target position
-        const windowWidth = parseInt(glyph.initialWidth || '800px');
-        const windowHeight = parseInt(glyph.initialHeight || '600px');
+        const windowWidth = parseInt(glyph.initialWidth || DEFAULT_WINDOW_WIDTH);
+        const windowHeight = parseInt(glyph.initialHeight || DEFAULT_WINDOW_HEIGHT);
 
         // Check if we have a remembered position on the element
         const rememberedX = glyphElement.dataset.lastX;
@@ -116,9 +133,9 @@ export class GlyphMorph {
             glyphElement.style.top = `${targetY}px`;
             glyphElement.style.width = `${windowWidth}px`;
             glyphElement.style.height = `${windowHeight}px`;
-            glyphElement.style.borderRadius = '8px';
+            glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
             glyphElement.style.backgroundColor = 'var(--bg-primary)';
-            glyphElement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+            glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
             glyphElement.style.padding = '0'; // Reset padding to allow content to fill
             glyphElement.style.opacity = '1'; // Ensure it's visible
 
@@ -134,12 +151,12 @@ export class GlyphMorph {
                 // Add window chrome (title bar, controls)
                 const titleBar = document.createElement('div');
                 titleBar.className = 'window-title-bar';
-                titleBar.style.height = '32px';
+                titleBar.style.height = TITLE_BAR_HEIGHT;
                 titleBar.style.backgroundColor = 'var(--bg-secondary)';
                 titleBar.style.borderBottom = '1px solid var(--border-color)';
                 titleBar.style.display = 'flex';
                 titleBar.style.alignItems = 'center';
-                titleBar.style.padding = '0 12px';
+                titleBar.style.padding = TITLE_BAR_PADDING;
                 titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
 
                 // Add title
@@ -151,8 +168,8 @@ export class GlyphMorph {
                 // Add minimize button
                 const minimizeBtn = document.createElement('button');
                 minimizeBtn.textContent = '−';
-                minimizeBtn.style.width = '24px';
-                minimizeBtn.style.height = '24px';
+                minimizeBtn.style.width = WINDOW_BUTTON_SIZE;
+                minimizeBtn.style.height = WINDOW_BUTTON_SIZE;
                 minimizeBtn.style.border = 'none';
                 minimizeBtn.style.background = 'transparent';
                 minimizeBtn.style.cursor = 'pointer';
@@ -168,8 +185,8 @@ export class GlyphMorph {
                 if (glyph.onClose) {
                     const closeBtn = document.createElement('button');
                     closeBtn.textContent = '×';
-                    closeBtn.style.width = '24px';
-                    closeBtn.style.height = '24px';
+                    closeBtn.style.width = WINDOW_BUTTON_SIZE;
+                    closeBtn.style.height = WINDOW_BUTTON_SIZE;
                     closeBtn.style.border = 'none';
                     closeBtn.style.background = 'transparent';
                     closeBtn.style.cursor = 'pointer';
@@ -186,7 +203,7 @@ export class GlyphMorph {
 
                 // Add content area
                 const content = glyph.renderContent();
-                content.style.padding = '16px';
+                content.style.padding = CONTENT_PADDING;
                 content.style.flex = '1'; // Take remaining space in flex container
                 content.style.overflow = 'auto';
                 glyphElement.appendChild(content);
@@ -211,7 +228,7 @@ export class GlyphMorph {
         verifyElement(glyph.id, windowElement);
         console.log(`[AXIOM CHECK] Minimizing same element for ${glyph.id}:`, windowElement);
         // Find the position where this glyph should go back to
-        const targetRect = this.calculateGlyphTargetPosition(glyph.id);
+        const targetRect = this.calculateGlyphTargetPosition();
 
         console.log(`[Minimize] Starting minimize for ${glyph.id}`);
         console.log(`[Minimize] Target position: x=${targetRect.x}, y=${targetRect.y}`);
@@ -245,8 +262,8 @@ export class GlyphMorph {
         windowElement.style.width = `${currentRect.width}px`;
         windowElement.style.height = `${currentRect.height}px`;
         windowElement.style.backgroundColor = 'var(--bg-primary)';  // Keep window background
-        windowElement.style.borderRadius = '8px';
-        windowElement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+        windowElement.style.borderRadius = WINDOW_BORDER_RADIUS;
+        windowElement.style.boxShadow = WINDOW_BOX_SHADOW;
         windowElement.style.border = 'none';
         windowElement.style.padding = '0';
         windowElement.style.opacity = '1';
@@ -270,12 +287,12 @@ export class GlyphMorph {
                 // Animate to dot appearance and position
                 windowElement.style.left = `${targetRect.x}px`;
                 windowElement.style.top = `${targetRect.y}px`;
-                windowElement.style.width = '8px';
-                windowElement.style.height = '8px';
-                windowElement.style.borderRadius = '2px';
+                windowElement.style.width = DOT_SIZE;
+                windowElement.style.height = DOT_SIZE;
+                windowElement.style.borderRadius = DOT_BORDER_RADIUS;
                 windowElement.style.backgroundColor = 'var(--bg-gray)';
                 windowElement.style.boxShadow = 'none';
-                windowElement.style.border = '1px solid var(--border-on-dark)';
+                windowElement.style.border = DOT_BORDER;
 
                 // Listen for the transition to actually complete
                 const onTransitionEnd = (e: TransitionEvent) => {
@@ -343,7 +360,7 @@ export class GlyphMorph {
     /**
      * Calculate where a glyph should be positioned in the tray
      */
-    private calculateGlyphTargetPosition(glyphId: string): { x: number, y: number } {
+    private calculateGlyphTargetPosition(): { x: number, y: number } {
         const tray = document.querySelector('.glyph-run');
         if (!tray) {
             console.log(`[Minimize] No tray found, using default position`);

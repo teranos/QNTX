@@ -6,38 +6,38 @@ A single entity that exists in three visual states, morphing between them throug
 
 ## The Three States
 
-### 1. Collapsed State (8px glyph)
+### 1. Collapsed State (8px glyph) ✓
 
-- A tiny gray square sitting quietly in the GlyphRun (middle right of screen by default)
-- Minimal visual footprint - just a subtle indicator that something exists
-- No text, no decoration - pure simplicity
-- Multiple glyphs stack vertically in the GlyphRun
+- A tiny gray square sitting quietly in the GlyphRun (middle right of screen by default) ✓
+- Minimal visual footprint - just a subtle indicator that something exists ✓
+- No text, no decoration - pure simplicity ✓
+- Multiple glyphs stack vertically in the GlyphRun ✓
 
-### 2. Proximity Expanded State (8px → 220px)
+### 2. Proximity Expanded State (8px → 220px) ✓
 
-- As the mouse approaches, the glyph smoothly morphs larger
-- The transformation is proximity-based: closer = larger
-- Text fades in showing what the glyph represents (e.g., "VidStream", "Database Statistics")
-- Background color transitions from gray to darker as it expands
-- The existing window-tray.ts already implements this perfectly (lines 164-285)
-- Carefully tuned easing curves, thresholds, and baseline boost logic
+- As the mouse approaches, the glyph smoothly morphs larger ✓
+- The transformation is proximity-based: closer = larger ✓
+- Text fades in showing what the glyph represents (e.g., "VidStream", "Database Statistics") ✓
+- Background color transitions from gray to darker as it expands ✓
+- The existing window-tray.ts already implements this perfectly (lines 164-285) ✓
+- Carefully tuned easing curves, thresholds, and baseline boost logic ✓
 
-### 3. Full Window State
+### 3. Full Window State ✓
 
-- **THE KEY MOMENT:** When clicked, the expanded glyph doesn't create a window - it BECOMES the window
+- **THE KEY MOMENT:** When clicked, the expanded glyph doesn't create a window - it BECOMES the window ✓
 - The glyph element itself morphs through animation:
-  - Grows from its current size (likely 220px wide after proximity expansion)
-  - Moves from tray position to window position
-  - Transforms shape from proximate rectangle pill (expanded glyph) to rectangular window
-  - Window chrome (title bar, controls) fades in during transformation
-  - Content appears as the window reaches full size
-- The glyph disappears from the tray because it IS now the window
-- This is a smooth, continuous animation where users can see the glyph becoming the window
+  - Grows from its current size (likely 220px wide after proximity expansion) ✓
+  - Moves from tray position to window position ✓
+  - Transforms shape from proximate rectangle pill (expanded glyph) to rectangular window ✓
+  - Window chrome (title bar, controls) fades in during transformation ✓
+  - Content appears as the window reaches full size ✓
+- The glyph disappears from the tray because it IS now the window ✓
+- This is a smooth, continuous animation where users can see the glyph becoming the window ✓
 
 ## Glyph State Persistence
 
 Glyphs are stateful entities that remember their window configuration:
-- **Window position**: Where the window was last positioned on screen
+- **Window position**: Where the window was last positioned on screen ✓
 - **Window size**: The dimensions the user set by resizing
 - **Content state**: Form inputs, scroll position, expanded/collapsed sections
 - **View state**: Active tabs, selected items, filter settings
