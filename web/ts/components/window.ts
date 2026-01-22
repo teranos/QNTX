@@ -5,7 +5,8 @@
 
 import { handleErrorSilent } from '../error-handler';
 import { SEG } from '../logger';
-import { windowTray } from './window-tray';
+// windowTray integration removed - Window component is deprecated
+// and will be replaced by the Glyph primitive's window state
 
 export interface WindowConfig {
     id: string;
@@ -267,7 +268,9 @@ export class Window {
      * Restore minimized state from localStorage on window creation
      */
     private restoreMinimizedState(): void {
-        const minimizedIds = windowTray.loadState();
+        // DEPRECATED: windowTray integration removed
+        // The Window component will be replaced by Glyph's window state
+        const minimizedIds: string[] = []; // windowTray.loadState();
         if (minimizedIds.includes(this.config.id)) {
             // Window was minimized in previous session - minimize it silently (no animation, no save)
             // skipSave=true prevents overwriting localStorage before all windows have restored
@@ -389,8 +392,8 @@ export class Window {
             this.savedPosition = { x: rect.left, y: rect.top };
         }
 
-        // Get tray target for animation
-        const trayTarget = windowTray.getTargetPosition();
+        // DEPRECATED: windowTray animation removed
+        const trayTarget = null; // windowTray.getTargetPosition();
 
         // Animate to tray (unless skipping animation)
         if (trayTarget && !skipAnimation) {
@@ -414,18 +417,18 @@ export class Window {
             // Save state to persist minimized status
             this.saveState();
 
-            // Add to tray (skipSave during restore to avoid overwriting localStorage prematurely)
-            windowTray.add({
-                id: this.config.id,
-                title: this.config.title,
-                onRestore: (sourceRect?: DOMRect) => this.restore(sourceRect),
-                onClose: () => {
-                    if (this.config.onClose) {
-                        this.config.onClose();
-                    }
-                    this.hide();
-                }
-            }, skipSave);
+            // DEPRECATED: windowTray.add removed - Window will be replaced by Glyph
+            // windowTray.add({
+            //     id: this.config.id,
+            //     title: this.config.title,
+            //     onRestore: (sourceRect?: DOMRect) => this.restore(sourceRect),
+            //     onClose: () => {
+            //         if (this.config.onClose) {
+            //             this.config.onClose();
+            //         }
+            //         this.hide();
+            //     }
+            // }, skipSave);
 
             if (this.config.onMinimize) {
                 this.config.onMinimize();
@@ -449,7 +452,8 @@ export class Window {
         if (!this.minimized) return;
 
         // Remove from tray
-        windowTray.remove(this.config.id);
+        // DEPRECATED: windowTray.remove removed
+        // windowTray.remove(this.config.id);
 
         // Restore position
         if (this.savedPosition) {
@@ -478,7 +482,7 @@ export class Window {
                 this.element.style.opacity = '1'; // Dot is visible, window should be too
             } else {
                 // Fallback: use tray center position with small scale
-                const trayTarget = windowTray.getTargetPosition();
+                const trayTarget = null; // windowTray.getTargetPosition();
                 if (trayTarget) {
                     const dx = trayTarget.x - (this.savedPosition.x + finalWidth / 2);
                     const dy = trayTarget.y - (this.savedPosition.y + finalHeight / 2);
@@ -524,7 +528,8 @@ export class Window {
     public destroy(): void {
         // Remove from tray if minimized
         if (this.minimized) {
-            windowTray.remove(this.config.id);
+            // DEPRECATED: windowTray.remove removed
+        // windowTray.remove(this.config.id);
         }
         if (this.config.onClose) {
             this.config.onClose();
