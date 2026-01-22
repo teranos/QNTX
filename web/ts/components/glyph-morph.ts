@@ -315,12 +315,21 @@ export class GlyphMorph {
                 windowElement.style.boxShadow = 'none';
                 windowElement.style.border = DOT_BORDER;
 
+                // Fallback timeout in case transitionend doesn't fire
+                let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
                 // Listen for the transition to actually complete
-                const onTransitionEnd = (e: TransitionEvent) => {
+                const onTransitionEnd = (e: TransitionEvent | { target: HTMLElement }) => {
                 if (e.target !== windowElement) return;
 
-                console.log(`[Minimize] Animation completed via transitionend for ${glyph.id}`);
-                windowElement.removeEventListener('transitionend', onTransitionEnd);
+                // Clear fallback timeout if transition completed normally
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+
+                console.log(`[Minimize] Animation completed for ${glyph.id}`);
+                windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
 
                 // Verify element identity is preserved
                 console.log(`[AXIOM CHECK] Same element after animation:`, windowElement);
@@ -372,8 +381,17 @@ export class GlyphMorph {
                 onMorphComplete(windowElement, glyph);
             };
 
+                // Set up fallback timeout in case transitionend doesn't fire
+                // (e.g., due to reduced motion preference, CSS interruption, rapid user action)
+                timeoutId = setTimeout(() => {
+                    console.warn(`[Minimize] Timeout reached for ${glyph.id}, forcing completion`);
+                    windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
+                    // Force completion by calling the handler
+                    onTransitionEnd({ target: windowElement });
+                }, MINIMIZE_DURATION_MS + 100); // 100ms grace period
+
                 // Add the event listener
-                windowElement.addEventListener('transitionend', onTransitionEnd);
+                windowElement.addEventListener('transitionend', onTransitionEnd as EventListener);
             });
         }, 0);
     }
