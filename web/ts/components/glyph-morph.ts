@@ -194,19 +194,40 @@ export class GlyphMorph {
                         // Remove from tray data AND remove element
                         onRemove(glyph.id);
                         glyphElement.remove();
-                        glyph.onClose!();
+                        // Call onClose in try-catch (cleanup already done, so safe if it fails)
+                        try {
+                            glyph.onClose!();
+                        } catch (error) {
+                            console.error(`[Glyph ${glyph.id}] Error in onClose callback:`, error);
+                        }
                     };
                     titleBar.appendChild(closeBtn);
                 }
 
                 glyphElement.appendChild(titleBar);
 
-                // Add content area
-                const content = glyph.renderContent();
-                content.style.padding = CONTENT_PADDING;
-                content.style.flex = '1'; // Take remaining space in flex container
-                content.style.overflow = 'auto';
-                glyphElement.appendChild(content);
+                // Add content area with error boundary
+                try {
+                    const content = glyph.renderContent();
+                    content.style.padding = CONTENT_PADDING;
+                    content.style.flex = '1'; // Take remaining space in flex container
+                    content.style.overflow = 'auto';
+                    glyphElement.appendChild(content);
+                } catch (error) {
+                    // Show error UI if renderContent fails
+                    console.error(`[Glyph ${glyph.id}] Error rendering content:`, error);
+                    const errorContent = document.createElement('div');
+                    errorContent.style.padding = CONTENT_PADDING;
+                    errorContent.style.flex = '1';
+                    errorContent.style.overflow = 'auto';
+                    errorContent.style.color = '#ef4444'; // Red error text
+                    errorContent.style.fontFamily = 'var(--font-mono)';
+                    errorContent.innerHTML = `
+                        <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
+                        <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
+                    `;
+                    glyphElement.appendChild(errorContent);
+                }
 
                 // Make window draggable
                 this.makeWindowDraggable(glyphElement, titleBar);
