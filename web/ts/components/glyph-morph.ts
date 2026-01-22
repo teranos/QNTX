@@ -9,6 +9,15 @@
  * We reparent and transform, but NEVER recreate the element.
  */
 
+import {
+    setWindowState,
+    getLastPosition,
+    setLastPosition,
+    hasProximityText,
+    setProximityText,
+    setGlyphId
+} from './glyph-dataset';
+
 export interface Glyph {
     id: string;
     title: string;
@@ -82,13 +91,12 @@ export class GlyphMorph {
         const windowHeight = parseInt(glyph.initialHeight || DEFAULT_WINDOW_HEIGHT);
 
         // Check if we have a remembered position on the element
-        const rememberedX = glyphElement.dataset.lastX;
-        const rememberedY = glyphElement.dataset.lastY;
+        const rememberedPos = getLastPosition(glyphElement);
 
         // Use remembered position, or default position, or center
-        const targetX = rememberedX ? parseFloat(rememberedX) :
+        const targetX = rememberedPos?.x ??
                        (glyph.defaultX ?? (window.innerWidth - windowWidth) / 2);
-        const targetY = rememberedY ? parseFloat(rememberedY) :
+        const targetY = rememberedPos?.y ??
                        (glyph.defaultY ?? (window.innerHeight - windowHeight) / 2);
 
         // THE GLYPH ITSELF BECOMES THE WINDOW - NO CLONING
@@ -96,9 +104,9 @@ export class GlyphMorph {
         glyphElement.remove(); // Detach from current parent (keeps element alive)
 
         // Clear any proximity text that might be present AFTER detaching
-        if (glyphElement.dataset.hasText) {
+        if (hasProximityText(glyphElement)) {
             glyphElement.textContent = '';
-            delete glyphElement.dataset.hasText;
+            setProximityText(glyphElement, false);
         }
 
         // Apply initial fixed positioning at EXACT current state (including proximity expansion)
@@ -124,7 +132,7 @@ export class GlyphMorph {
         glyphElement.style.transition = `all ${MAXIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
         // Mark element as in-window-state (but keep glyph ID)
-        glyphElement.dataset.windowState = 'true';
+        setWindowState(glyphElement, true);
 
         // Trigger morph animation after a frame to ensure initial styles are applied
         requestAnimationFrame(() => {
@@ -259,18 +267,17 @@ export class GlyphMorph {
         console.log(`[Minimize] Current window position: x=${currentRect.left}, y=${currentRect.top}, w=${currentRect.width}, h=${currentRect.height}`);
 
         // Remember window position for next time it opens
-        windowElement.dataset.lastX = String(currentRect.left);
-        windowElement.dataset.lastY = String(currentRect.top);
+        setLastPosition(windowElement, currentRect.left, currentRect.top);
 
         // Clear window state flag
-        delete windowElement.dataset.windowState;
+        setWindowState(windowElement, false);
 
         // Clear window content but keep a visible background
         windowElement.innerHTML = '';
         windowElement.textContent = ''; // Ensure text is also cleared
 
         // Clear any proximity data attributes that might cause text to appear
-        delete windowElement.dataset.hasText;
+        setProximityText(windowElement, false);
 
         // FORCE class change - remove old class first
         windowElement.classList.remove('glyph-morphing-to-window');
@@ -359,13 +366,13 @@ export class GlyphMorph {
                 windowElement.textContent = ''; // Ensure no text remains
 
                 // Keep the glyph ID
-                windowElement.setAttribute('data-glyph-id', glyph.id);
+                setGlyphId(windowElement, glyph.id);
 
                 // CRITICAL: Ensure windowState is cleared after animation
-                delete windowElement.dataset.windowState;
+                setWindowState(windowElement, false);
 
                 // CRITICAL: Clear hasText flag to prevent proximity text appearing
-                delete windowElement.dataset.hasText;
+                setProximityText(windowElement, false);
 
                 // Now remove from body and re-attach to indicator container (SAME ELEMENT)
                 windowElement.remove(); // Detach but element stays alive
@@ -480,8 +487,7 @@ export class GlyphMorph {
 
             // Save final position for next time window opens
             const finalRect = windowElement.getBoundingClientRect();
-            windowElement.dataset.lastX = String(finalRect.left);
-            windowElement.dataset.lastY = String(finalRect.top);
+            setLastPosition(windowElement, finalRect.left, finalRect.top);
 
             // Remove window handlers
             window.removeEventListener('mousemove', drag);
