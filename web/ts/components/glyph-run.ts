@@ -31,17 +31,11 @@
 import { log, SEG } from '../logger';
 import { uiState } from '../state/ui';
 import { GlyphProximity } from './glyph-proximity';
+import { GlyphMorph, type Glyph } from './glyph-morph';
 
-export interface Glyph {
-    id: string;
-    title: string;
-    renderContent: () => HTMLElement;    // Function to render window content
-    initialWidth?: string;                // Window width (e.g., "800px")
-    initialHeight?: string;               // Window height (e.g., "600px")
-    defaultX?: number;                    // Window default X position
-    defaultY?: number;                    // Window default Y position
-    onClose?: () => void;
-}
+// Re-export Glyph interface for external use
+export type { Glyph } from './glyph-morph';
+
 
 class GlyphRunImpl {
     // Track all created glyph elements to enforce single-element axiom
@@ -49,6 +43,9 @@ class GlyphRunImpl {
 
     // Proximity morphing handler
     private proximity: GlyphProximity = new GlyphProximity();
+
+    // Morph transformation handler
+    private morph: GlyphMorph = new GlyphMorph();
 
     /**
      * SINGLE FACTORY for creating glyph DOM elements
@@ -85,15 +82,30 @@ class GlyphRunImpl {
         this.glyphElements.set(item.id, glyph);
 
         // Attach click handler that will persist with the element forever
-        glyph.addEventListener('click', (e) => {
+        const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
+            console.log(`[Glyph ${item.id}] Click detected, windowState:`, glyph.dataset.windowState);
 
             // Only morph if in collapsed state (not already a window)
             if (!glyph.dataset.windowState) {
                 this.isRestoring = true;
-                this.morphToWindow(glyph, item);
+                this.morph.morphToWindow(
+                    glyph,
+                    item,
+                    (id, element) => this.verifyElementTracking(id, element),
+                    (id) => this.remove(id),
+                    (element, g) => this.reattachGlyphToIndicator(element, g)
+                );
+                // Re-enable proximity morphing after animation
+                setTimeout(() => {
+                    this.isRestoring = false;
+                }, 600);
             }
-        });
+        };
+
+        // Store handler reference so we can verify it persists
+        (glyph as any).__glyphClickHandler = clickHandler;
+        glyph.addEventListener('click', clickHandler);
 
         return glyph;
     }
@@ -295,273 +307,73 @@ class GlyphRunImpl {
     }
 
     /**
-     * Morph a glyph (dot) into a full window
-     * The glyph DOM element itself transforms through animation
+     * Verify element tracking for morph operations
      */
-    private morphToWindow(glyphElement: HTMLElement, glyph: Glyph): void {
-        // AXIOM CHECK: Verify this is the correct element
-        const tracked = this.glyphElements.get(glyph.id);
-        if (tracked !== glyphElement) {
+    private verifyElementTracking(glyphId: string, element: HTMLElement): void {
+        const tracked = this.glyphElements.get(glyphId);
+        if (tracked !== element) {
             throw new Error(
-                `AXIOM VIOLATION: morphToWindow called with wrong element for ${glyph.id}. ` +
+                `AXIOM VIOLATION: Element for ${glyphId} doesn't match tracked element. ` +
                 `This indicates element recreation somewhere.`
             );
         }
-
-        // Verify no duplicates exist
-        const elements = document.querySelectorAll(`[data-glyph-id="${glyph.id}"]`);
-        if (elements.length !== 1) {
-            throw new Error(
-                `AXIOM VIOLATION: Expected exactly 1 element for ${glyph.id}, found ${elements.length}`
-            );
-        }
-        // Get current glyph position and size
-        const glyphRect = glyphElement.getBoundingClientRect();
-
-        // Calculate window target position (center of screen by default)
-        const windowWidth = parseInt(glyph.initialWidth || '800px');
-        const windowHeight = parseInt(glyph.initialHeight || '600px');
-        const targetX = glyph.defaultX ?? (window.innerWidth - windowWidth) / 2;
-        const targetY = glyph.defaultY ?? (window.innerHeight - windowHeight) / 2;
-
-        // THE GLYPH ITSELF BECOMES THE WINDOW - NO CLONING
-        // Remove from indicator container and reparent to body
-        glyphElement.remove(); // Detach from current parent (keeps element alive)
-
-        // Apply initial fixed positioning at current location
-        glyphElement.className = 'glyph-morphing-to-window';
-        glyphElement.style.position = 'fixed';
-        glyphElement.style.left = `${glyphRect.left}px`;
-        glyphElement.style.top = `${glyphRect.top}px`;
-        glyphElement.style.width = `${glyphRect.width}px`;
-        glyphElement.style.height = `${glyphRect.height}px`;
-        glyphElement.style.zIndex = '1000';
-
-        // Clear any proximity text that might be present
-        if (glyphElement.dataset.hasText) {
-            glyphElement.textContent = '';
-            delete glyphElement.dataset.hasText;
-        }
-
-        // Reparent to document body for morphing
-        document.body.appendChild(glyphElement);
-
-        // Mark element as in-window-state (but keep glyph ID)
-        glyphElement.dataset.windowState = 'true';
-
-        // Trigger morph animation after a frame to ensure initial styles are applied
-        requestAnimationFrame(() => {
-            // Apply window dimensions and position
-            glyphElement.style.left = `${targetX}px`;
-            glyphElement.style.top = `${targetY}px`;
-            glyphElement.style.width = `${windowWidth}px`;
-            glyphElement.style.height = `${windowHeight}px`;
-            glyphElement.style.borderRadius = '8px';
-            glyphElement.style.backgroundColor = 'var(--bg-primary)';
-            glyphElement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
-            glyphElement.style.opacity = '1'; // Ensure it's visible
-
-            // After animation completes, add window content
-            setTimeout(() => {
-                // Add window chrome (title bar, controls)
-                const titleBar = document.createElement('div');
-                titleBar.className = 'window-title-bar';
-                titleBar.style.height = '32px';
-                titleBar.style.backgroundColor = 'var(--bg-secondary)';
-                titleBar.style.borderBottom = '1px solid var(--border-color)';
-                titleBar.style.display = 'flex';
-                titleBar.style.alignItems = 'center';
-                titleBar.style.padding = '0 12px';
-
-                // Add title
-                const titleText = document.createElement('span');
-                titleText.textContent = this.stripHtml(glyph.title);
-                titleText.style.flex = '1';
-                titleBar.appendChild(titleText);
-
-                // Add minimize button
-                const minimizeBtn = document.createElement('button');
-                minimizeBtn.textContent = '−';
-                minimizeBtn.style.width = '24px';
-                minimizeBtn.style.height = '24px';
-                minimizeBtn.style.border = 'none';
-                minimizeBtn.style.background = 'transparent';
-                minimizeBtn.style.cursor = 'pointer';
-                minimizeBtn.onclick = () => this.morphToGlyph(glyphElement, glyph);
-                titleBar.appendChild(minimizeBtn);
-
-                // Add close button if glyph has onClose
-                if (glyph.onClose) {
-                    const closeBtn = document.createElement('button');
-                    closeBtn.textContent = '×';
-                    closeBtn.style.width = '24px';
-                    closeBtn.style.height = '24px';
-                    closeBtn.style.border = 'none';
-                    closeBtn.style.background = 'transparent';
-                    closeBtn.style.cursor = 'pointer';
-                    closeBtn.onclick = () => {
-                        // Remove from tray data AND remove element
-                        this.remove(glyph.id);
-                        glyphElement.remove();
-                        glyph.onClose!();
-                    };
-                    titleBar.appendChild(closeBtn);
-                }
-
-                glyphElement.appendChild(titleBar);
-
-                // Add content area
-                const content = glyph.renderContent();
-                content.style.padding = '16px';
-                content.style.height = 'calc(100% - 32px)';
-                content.style.overflow = 'auto';
-                glyphElement.appendChild(content);
-
-                // Make window draggable
-                this.makeWindowDraggable(glyphElement, titleBar);
-
-                // Re-enable proximity morphing
-                this.isRestoring = false;
-            }, 600); // Match animation duration
-        });
     }
 
     /**
-     * Morph a window back into a glyph (dot)
-     * THE SAME ELEMENT morphs back - no new elements created
+     * Re-attach a morphed glyph back to the indicator container
      */
-    private morphToGlyph(windowElement: HTMLElement, glyph: Glyph): void {
-        // Ensure glyph is still in our items (may have been removed via close)
-        if (!this.items.has(glyph.id)) {
-            // If it's not in items, the user closed it, so just remove the element
-            windowElement.remove();
-            return;
-        }
-
-        // Get target position in the indicator container
+    private reattachGlyphToIndicator(glyphElement: HTMLElement, glyph: Glyph): void {
         if (!this.indicatorContainer) return;
 
-        // Find the position where this glyph should go back to
-        const glyphIndex = Array.from(this.items.keys()).indexOf(glyph.id);
-        const targetRect = this.calculateGlyphTargetPosition(glyphIndex);
+        // Remove any existing handler to avoid duplicates
+        const existingHandler = (glyphElement as any).__glyphClickHandler;
+        if (existingHandler) {
+            glyphElement.removeEventListener('click', existingHandler);
+        }
 
-        // Clear window state flag
-        delete windowElement.dataset.windowState;
+        // Re-attach the click handler
+        // (Event listeners can be lost during certain DOM manipulations)
+        const clickHandler = (e: MouseEvent) => {
+            e.stopPropagation();
+            console.log(`[Glyph ${glyph.id}] Click detected, windowState:`, glyphElement.dataset.windowState);
 
-        // Add morphing class
-        windowElement.className = 'window-morphing-to-glyph';
-
-        // Clear window content (title bar, content area)
-        windowElement.innerHTML = '';
-
-        // Start morphing back to dot at the target position
-        windowElement.style.left = `${targetRect.x}px`;
-        windowElement.style.top = `${targetRect.y}px`;
-        windowElement.style.width = '8px';
-        windowElement.style.height = '8px';
-        windowElement.style.borderRadius = '2px';
-        windowElement.style.backgroundColor = 'var(--bg-gray)';
-        windowElement.style.boxShadow = 'none';
-        windowElement.style.padding = '0';
-        windowElement.style.border = '1px solid var(--border-on-dark)';
-
-        // After animation completes, move element back to indicator container
-        setTimeout(() => {
-            // Remove from body
-            windowElement.remove();
-
-            // Reset to glyph class
-            windowElement.className = 'glyph-run-glyph';
-
-            // Reset inline styles (let CSS take over)
-            windowElement.style.position = '';
-            windowElement.style.left = '';
-            windowElement.style.top = '';
-            windowElement.style.width = '';
-            windowElement.style.height = '';
-            windowElement.style.borderRadius = '';
-            windowElement.style.backgroundColor = '';
-            windowElement.style.boxShadow = '';
-            windowElement.style.padding = '';
-            windowElement.style.border = '';
-            windowElement.style.zIndex = '';
-            windowElement.style.opacity = '';
-
-            // Keep the glyph ID
-            windowElement.setAttribute('data-glyph-id', glyph.id);
-
-            // Re-attach click handler
-            windowElement.addEventListener('click', (e) => {
-                e.stopPropagation();
+            if (!glyphElement.dataset.windowState) {
                 this.isRestoring = true;
-                this.morphToWindow(windowElement, glyph);
-            });
-
-            // Insert at the correct position in the indicator container
-            const glyphs = Array.from(this.indicatorContainer!.children);
-            if (glyphIndex < glyphs.length) {
-                this.indicatorContainer!.insertBefore(windowElement, glyphs[glyphIndex]);
-            } else {
-                this.indicatorContainer!.appendChild(windowElement);
+                this.morph.morphToWindow(
+                    glyphElement,
+                    glyph,
+                    (id, element) => this.verifyElementTracking(id, element),
+                    (id) => this.remove(id),
+                    (element, g) => this.reattachGlyphToIndicator(element, g)
+                );
+                setTimeout(() => {
+                    this.isRestoring = false;
+                }, 600);
             }
+        };
 
-            // Re-enable proximity morphing
-            this.isRestoring = false;
-        }, 600);
+        (glyphElement as any).__glyphClickHandler = clickHandler;
+        glyphElement.addEventListener('click', clickHandler);
+
+        // Insert at the correct position in the indicator container
+        const glyphIndex = Array.from(this.items.keys()).indexOf(glyph.id);
+        const glyphs = Array.from(this.indicatorContainer.children);
+        if (glyphIndex < glyphs.length) {
+            this.indicatorContainer.insertBefore(glyphElement, glyphs[glyphIndex]);
+        } else {
+            this.indicatorContainer.appendChild(glyphElement);
+        }
+
+        // Re-enable proximity morphing
+        this.isRestoring = false;
     }
 
     /**
-     * Calculate where a glyph should be positioned in the tray
+     * Strip HTML tags from title for plain text display
      */
-    private calculateGlyphTargetPosition(index: number): { x: number, y: number } {
-        if (!this.element) return { x: 0, y: 0 };
-
-        const trayRect = this.element.getBoundingClientRect();
-        const glyphSize = 8;
-        const gap = 2;
-
-        // Stack vertically
-        return {
-            x: trayRect.right - glyphSize - 4, // 4px from right edge
-            y: trayRect.top + (index * (glyphSize + gap))
-        };
-    }
-
-    /**
-     * Make a window draggable by its title bar
-     */
-    private makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): void {
-        let isDragging = false;
-        let startX = 0;
-        let startY = 0;
-        let initialX = 0;
-        let initialY = 0;
-
-        const startDrag = (e: MouseEvent) => {
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            const rect = windowElement.getBoundingClientRect();
-            initialX = rect.left;
-            initialY = rect.top;
-            e.preventDefault();
-        };
-
-        const drag = (e: MouseEvent) => {
-            if (!isDragging) return;
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            windowElement.style.left = `${initialX + deltaX}px`;
-            windowElement.style.top = `${initialY + deltaY}px`;
-        };
-
-        const stopDrag = () => {
-            isDragging = false;
-        };
-
-        handle.addEventListener('mousedown', startDrag);
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', stopDrag);
+    private stripHtml(html: string): string {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        return doc.body.textContent || '';
     }
 
     /**
