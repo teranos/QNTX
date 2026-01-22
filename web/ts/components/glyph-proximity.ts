@@ -8,6 +8,9 @@
  * The element persists through: dot → proximity → window → dot
  */
 
+import type { Glyph } from './glyph-morph';
+import { hasProximityText, setProximityText } from './glyph-dataset';
+
 export class GlyphProximity {
     // Proximity morphing configuration
     private readonly PROXIMITY_THRESHOLD_HORIZONTAL = 30; // Max distance for horizontal approach (px)
@@ -100,7 +103,7 @@ export class GlyphProximity {
      */
     public updateProximity(
         indicatorContainer: HTMLElement | null,
-        items: Map<string, any>,
+        items: Map<string, Glyph>,
         stripHtml: (html: string) => string,
         isRestoring: boolean
     ): void {
@@ -195,20 +198,20 @@ export class GlyphProximity {
                     const title = stripHtml(item.title);
 
                     // Add text content if not already present
-                    if (!glyph.dataset.hasText) {
+                    if (!hasProximityText(glyph)) {
                         glyph.style.display = 'flex';
                         glyph.style.alignItems = 'center';
                         glyph.style.justifyContent = 'flex-start'; // Left-align text (normal)
                         glyph.style.padding = '6px 10px';
                         glyph.style.whiteSpace = 'nowrap';
                         glyph.textContent = title;
-                        glyph.dataset.hasText = 'true';
+                        setProximityText(glyph, true);
                     }
                     // Fade in text based on proximity (above threshold)
                     glyph.style.opacity = String(this.TEXT_FADE_THRESHOLD + (proximity - this.TEXT_FADE_THRESHOLD));
                 } else {
                     // Hide text when far away
-                    if (glyph.dataset.hasText) {
+                    if (hasProximityText(glyph)) {
                         glyph.textContent = '';
                         glyph.style.display = '';
                         glyph.style.alignItems = '';
@@ -216,7 +219,7 @@ export class GlyphProximity {
                         glyph.style.padding = '';
                         glyph.style.whiteSpace = '';
                         glyph.style.textAlign = '';
-                        delete glyph.dataset.hasText;
+                        setProximityText(glyph, false);
                     }
                     glyph.style.opacity = '1';
                 }

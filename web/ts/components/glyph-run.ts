@@ -32,6 +32,7 @@ import { log, SEG } from '../logger';
 import { uiState } from '../state/ui';
 import { GlyphProximity } from './glyph-proximity';
 import { GlyphMorph, type Glyph, MAXIMIZE_DURATION_MS } from './glyph-morph';
+import { isInWindowState, setGlyphId } from './glyph-dataset';
 
 // Re-export Glyph interface for external use
 export type { Glyph } from './glyph-morph';
@@ -79,7 +80,7 @@ class GlyphRunImpl {
         // CREATE THE ELEMENT - ONCE AND ONLY ONCE
         const glyph = document.createElement('div');
         glyph.className = 'glyph-run-glyph';
-        glyph.setAttribute('data-glyph-id', item.id);
+        setGlyphId(glyph, item.id);
 
         // Track this element
         this.glyphElements.set(item.id, glyph);
@@ -87,10 +88,10 @@ class GlyphRunImpl {
         // Attach click handler that will persist with the element forever
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            console.log(`[Glyph ${item.id}] Click detected, windowState:`, glyph.dataset.windowState);
+            console.log(`[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(glyph));
 
             // Only morph if in collapsed state (not already a window)
-            if (!glyph.dataset.windowState) {
+            if (!isInWindowState(glyph)) {
                 this.isRestoring = true;
                 this.morph.morphToWindow(
                     glyph,
@@ -344,9 +345,9 @@ class GlyphRunImpl {
         // (Event listeners can be lost during certain DOM manipulations)
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            console.log(`[Glyph ${glyph.id}] Click detected, windowState:`, glyphElement.dataset.windowState);
+            console.log(`[Glyph ${glyph.id}] Click detected, windowState:`, isInWindowState(glyphElement));
 
-            if (!glyphElement.dataset.windowState) {
+            if (!isInWindowState(glyphElement)) {
                 this.isRestoring = true;
                 this.morph.morphToWindow(
                     glyphElement,
