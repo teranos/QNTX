@@ -29,9 +29,12 @@ export interface Glyph {
     onClose?: () => void;
 }
 
+// Check if user prefers reduced motion
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 // Animation durations in milliseconds - adjust these to slow down/speed up morphing
-export const MAXIMIZE_DURATION_MS = 200;  // Duration for dot → window (e.g., 1000 for 1 second)
-export const MINIMIZE_DURATION_MS = 200;  // Duration for window → dot (e.g., 400 for faster minimize)
+export const MAXIMIZE_DURATION_MS = prefersReducedMotion ? 0 : 200;  // Duration for dot → window
+export const MINIMIZE_DURATION_MS = prefersReducedMotion ? 0 : 200;  // Duration for window → dot
 
 // Window dimensions
 const DEFAULT_WINDOW_WIDTH = '800px';
@@ -448,13 +451,19 @@ export class GlyphMorph {
         let offsetX = 0;
         let offsetY = 0;
 
-        const startDrag = (e: MouseEvent) => {
+        const startDrag = (e: MouseEvent | TouchEvent) => {
+            // Handle both mouse and touch/pen input
+            const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0]?.clientX;
+            const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY;
+
+            if (!clientX || !clientY) return;
+
             isDragging = true;
 
-            // Calculate offset from mouse to window top-left
+            // Calculate offset from pointer to window top-left
             const rect = windowElement.getBoundingClientRect();
-            offsetX = e.clientX - rect.left;
-            offsetY = e.clientY - rect.top;
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
 
             // Prevent text selection while dragging
             e.preventDefault();
@@ -465,14 +474,35 @@ export class GlyphMorph {
             // Move handlers to window for better capture
             window.addEventListener('mousemove', drag);
             window.addEventListener('mouseup', stopDrag);
+            window.addEventListener('touchmove', drag, { passive: false });
+            window.addEventListener('touchend', stopDrag);
+            window.addEventListener('keydown', cancelOnEscape);
         };
 
-        const drag = (e: MouseEvent) => {
+        const drag = (e: MouseEvent | TouchEvent) => {
             if (!isDragging) return;
 
-            // Direct position update - no transforms, no RAF
-            const newX = e.clientX - offsetX;
-            const newY = e.clientY - offsetY;
+            // Handle both mouse and touch input
+            const clientX = e instanceof MouseEvent ? e.clientX : e.touches[0]?.clientX;
+            const clientY = e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY;
+
+            if (!clientX || !clientY) return;
+
+            // Calculate new position
+            let newX = clientX - offsetX;
+            let newY = clientY - offsetY;
+
+            // Clamp to viewport bounds (keep at least 50px visible)
+            const rect = windowElement.getBoundingClientRect();
+            const minVisibleArea = 50;
+
+            // Clamp X position
+            newX = Math.max(-rect.width + minVisibleArea, newX);
+            newX = Math.min(window.innerWidth - minVisibleArea, newX);
+
+            // Clamp Y position (keep title bar visible)
+            newY = Math.max(0, newY);
+            newY = Math.min(window.innerHeight - minVisibleArea, newY);
 
             windowElement.style.left = `${newX}px`;
             windowElement.style.top = `${newY}px`;
@@ -489,12 +519,23 @@ export class GlyphMorph {
             const finalRect = windowElement.getBoundingClientRect();
             setLastPosition(windowElement, finalRect.left, finalRect.top);
 
-            // Remove window handlers
+            // Remove all event handlers
             window.removeEventListener('mousemove', drag);
             window.removeEventListener('mouseup', stopDrag);
+            window.removeEventListener('touchmove', drag);
+            window.removeEventListener('touchend', stopDrag);
+            window.removeEventListener('keydown', cancelOnEscape);
         };
 
+        const cancelOnEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isDragging) {
+                stopDrag();
+            }
+        };
+
+        // Add both mouse and touch/pen event handlers
         handle.addEventListener('mousedown', startDrag);
+        handle.addEventListener('touchstart', startDrag, { passive: false });
     }
 
     /**
