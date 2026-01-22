@@ -29,12 +29,26 @@ export interface Glyph {
     onClose?: () => void;
 }
 
-// Check if user prefers reduced motion
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Function to check if user prefers reduced motion
+function getPrefersReducedMotion(): boolean {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    return false; // Default to animations enabled in test environment
+}
 
 // Animation durations in milliseconds - adjust these to slow down/speed up morphing
-export const MAXIMIZE_DURATION_MS = prefersReducedMotion ? 0 : 200;  // Duration for dot → window
-export const MINIMIZE_DURATION_MS = prefersReducedMotion ? 0 : 200;  // Duration for window → dot
+export const MAXIMIZE_DURATION_MS = 200;  // Base duration for dot → window
+export const MINIMIZE_DURATION_MS = 200;  // Base duration for window → dot
+
+// Get actual durations considering reduced motion preference
+export function getMaximizeDuration(): number {
+    return getPrefersReducedMotion() ? 0 : MAXIMIZE_DURATION_MS;
+}
+
+export function getMinimizeDuration(): number {
+    return getPrefersReducedMotion() ? 0 : MINIMIZE_DURATION_MS;
+}
 
 // Window dimensions
 const DEFAULT_WINDOW_WIDTH = '800px';
@@ -132,7 +146,7 @@ export class GlyphMorph {
         glyphElement.offsetHeight;
 
         // NOW set transition after element is positioned
-        glyphElement.style.transition = `all ${MAXIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        glyphElement.style.transition = `all ${getMaximizeDuration()}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
         // Mark element as in-window-state (but keep glyph ID)
         setWindowState(glyphElement, true);
@@ -242,7 +256,7 @@ export class GlyphMorph {
 
                 // Make window draggable
                 this.makeWindowDraggable(glyphElement, titleBar);
-            }, MAXIMIZE_DURATION_MS); // Match maximize animation duration
+            }, getMaximizeDuration()); // Match maximize animation duration
         });
     }
 
@@ -307,7 +321,7 @@ export class GlyphMorph {
         // Use setTimeout(0) to ensure browser has painted the initial state
         setTimeout(() => {
             // NOW add the transition after initial state is rendered
-            windowElement.style.transition = `all ${MINIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+            windowElement.style.transition = `all ${getMinimizeDuration()}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
             console.log(`[Minimize] Transition applied`);
 
@@ -398,7 +412,7 @@ export class GlyphMorph {
                     windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
                     // Force completion by calling the handler
                     onTransitionEnd({ target: windowElement });
-                }, MINIMIZE_DURATION_MS + 100); // 100ms grace period
+                }, getMinimizeDuration() + 100); // 100ms grace period
 
                 // Add the event listener
                 windowElement.addEventListener('transitionend', onTransitionEnd as EventListener);
