@@ -227,15 +227,19 @@ export class GlyphMorph {
         windowElement.style.padding = '0';
         windowElement.style.opacity = '1';
         windowElement.style.zIndex = '10000';
+        // NO transition yet - we need initial state to be committed first
 
-        // Force a reflow BEFORE setting transition
+        // Force the browser to commit these styles BEFORE adding transition
         windowElement.offsetHeight;
 
-        // Apply transition
-        windowElement.style.transition = `all ${MINIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        // Use setTimeout(0) to ensure browser has painted the initial state
+        setTimeout(() => {
+            // NOW add the transition after initial state is rendered
+            windowElement.style.transition = `all ${MINIMIZE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
-        // Double requestAnimationFrame to ensure styles are committed and transition is ready
-        requestAnimationFrame(() => {
+            console.log(`[Minimize] Transition applied`);
+
+            // Use another frame to trigger animation AFTER transition is registered
             requestAnimationFrame(() => {
                 console.log(`[Minimize] Triggering animation to target position`);
 
@@ -249,73 +253,56 @@ export class GlyphMorph {
                 windowElement.style.boxShadow = 'none';
                 windowElement.style.border = '1px solid var(--border-on-dark)';
 
-                // Force another reflow to ensure styles are applied
-                windowElement.offsetHeight;
+                // Listen for the transition to actually complete
+                const onTransitionEnd = (e: TransitionEvent) => {
+                if (e.target !== windowElement) return;
 
-                // Verify the styles were actually applied
-                const computedStyle = window.getComputedStyle(windowElement);
-                console.log(`[Minimize] Styles applied - checking computed values:`);
-                console.log(`[Minimize] - width: ${computedStyle.width} (should animate to 8px)`);
-                console.log(`[Minimize] - height: ${computedStyle.height} (should animate to 8px)`);
-                console.log(`[Minimize] - left: ${computedStyle.left} (should animate to ${targetRect.x}px)`);
-                console.log(`[Minimize] - top: ${computedStyle.top} (should animate to ${targetRect.y}px)`);
-                console.log(`[Minimize] - transition: ${computedStyle.transition}`);
+                console.log(`[Minimize] Animation completed via transitionend for ${glyph.id}`);
+                windowElement.removeEventListener('transitionend', onTransitionEnd);
+
+                // Verify element identity is preserved
+                console.log(`[AXIOM CHECK] Same element after animation:`, windowElement);
+
+                // Keep element visible but reset to glyph class
+                windowElement.className = 'glyph-run-glyph';
+
+                // Remove transition so proximity morphing can take over smoothly
+                windowElement.style.transition = '';
+
+                // Reset inline styles BUT keep position for now
+                windowElement.style.width = '';
+                windowElement.style.height = '';
+                windowElement.style.borderRadius = '';
+                windowElement.style.backgroundColor = '';
+                windowElement.style.boxShadow = '';
+                windowElement.style.padding = '';
+                windowElement.style.border = '';
+                windowElement.style.opacity = '';
+
+                // Keep the glyph ID
+                windowElement.setAttribute('data-glyph-id', glyph.id);
+
+                // CRITICAL: Ensure windowState is cleared after animation
+                delete windowElement.dataset.windowState;
+
+                // Now remove from body and re-attach to indicator container (SAME ELEMENT)
+                windowElement.remove(); // Detach but element stays alive
+
+                // Clear position styles now that we're re-attaching
+                windowElement.style.position = '';
+                windowElement.style.left = '';
+                windowElement.style.top = '';
+                windowElement.style.zIndex = '';
+
+                // Re-attach THE SAME ELEMENT to indicator container
+                console.log(`[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
+                onMorphComplete(windowElement, glyph);
+            };
+
+                // Add the event listener
+                windowElement.addEventListener('transitionend', onTransitionEnd);
             });
-        });
-
-        // Listen for animation end to ensure it completes
-        const onTransitionEnd = () => {
-            console.log(`[Minimize] Animation completed for ${glyph.id}`);
-            windowElement.removeEventListener('transitionend', onTransitionEnd);
-
-            // Verify element identity is preserved
-            console.log(`[AXIOM CHECK] Same element after animation:`, windowElement);
-
-            // Keep element visible but reset to glyph class
-            windowElement.className = 'glyph-run-glyph';
-
-            // Remove transition so proximity morphing can take over smoothly
-            windowElement.style.transition = '';
-
-            // Reset inline styles BUT keep position for now
-            windowElement.style.width = '';
-            windowElement.style.height = '';
-            windowElement.style.borderRadius = '';
-            windowElement.style.backgroundColor = '';
-            windowElement.style.boxShadow = '';
-            windowElement.style.padding = '';
-            windowElement.style.border = '';
-            windowElement.style.opacity = '';
-
-            // Keep the glyph ID
-            windowElement.setAttribute('data-glyph-id', glyph.id);
-
-            // CRITICAL: Ensure windowState is cleared after animation
-            delete windowElement.dataset.windowState;
-
-            // Now remove from body and re-attach to indicator container (SAME ELEMENT)
-            windowElement.remove(); // Detach but element stays alive
-
-            // Clear position styles now that we're re-attaching
-            windowElement.style.position = '';
-            windowElement.style.left = '';
-            windowElement.style.top = '';
-            windowElement.style.zIndex = '';
-
-            // Re-attach THE SAME ELEMENT to indicator container
-            console.log(`[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
-            onMorphComplete(windowElement, glyph);
-        };
-
-        windowElement.addEventListener('transitionend', onTransitionEnd);
-
-        // Fallback in case transitionend doesn't fire
-        setTimeout(() => {
-            if (windowElement.parentNode === document.body) {
-                console.log(`[Minimize] Fallback triggered - animation may not have played`);
-                onTransitionEnd();
-            }
-        }, MINIMIZE_DURATION_MS + 100);
+        }, 0);
     }
 
     /**
