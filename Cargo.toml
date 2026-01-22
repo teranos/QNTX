@@ -8,6 +8,7 @@ members = [
 exclude = [
     "ats/ax/fuzzy-ax",      # CGO library for Go, not part of Rust ecosystem
     "ats/vidstream",        # CGO library for Go, not part of Rust ecosystem
+    "web/wasm/force-rs",    # Standalone WASM module, no workspace dependencies
 ]
 
 [workspace.package]
