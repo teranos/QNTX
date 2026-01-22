@@ -272,9 +272,8 @@ export class Window {
         // The Window component will be replaced by Glyph's window state
         const minimizedIds: string[] = []; // windowTray.loadState();
         if (minimizedIds.includes(this.config.id)) {
-            // Window was minimized in previous session - minimize it silently (no animation, no save)
-            // skipSave=true prevents overwriting localStorage before all windows have restored
-            this.minimize(true, true);
+            // Window was minimized in previous session - minimize it silently (no animation)
+            this.minimize(true);
         }
     }
 
@@ -371,7 +370,7 @@ export class Window {
      * Minimize window to tray with animation
      * @param skipAnimation Skip animation for silent minimize (e.g., restoring from localStorage)
      */
-    public minimize(skipAnimation: boolean = false, skipSave: boolean = false): void {
+    public minimize(skipAnimation: boolean = false): void {
         if (this.minimized) return;
 
         // Clear any existing transforms first
@@ -392,18 +391,7 @@ export class Window {
             this.savedPosition = { x: rect.left, y: rect.top };
         }
 
-        // DEPRECATED: windowTray animation removed
-        const trayTarget = null; // windowTray.getTargetPosition();
-
-        // Animate to tray (unless skipping animation)
-        if (trayTarget && !skipAnimation) {
-            const duration = Window.ANIMATION_DURATION_MS / 1000; // Convert to seconds for CSS
-            this.element.style.transition = `transform ${duration}s ease, opacity ${duration}s ease`;
-            const dx = trayTarget.x - (rect.left + rect.width / 2);
-            const dy = trayTarget.y - (rect.top + rect.height / 2);
-            this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
-            this.element.style.opacity = '0';
-        }
+        // DEPRECATED: windowTray animation removed - glyphs handle their own morphing
 
         // After animation, hide and add to tray
         const finishMinimize = () => {
@@ -481,14 +469,9 @@ export class Window {
                 this.element.style.transformOrigin = 'top left';
                 this.element.style.opacity = '1'; // Dot is visible, window should be too
             } else {
-                // Fallback: use tray center position with small scale
-                const trayTarget = null; // windowTray.getTargetPosition();
-                if (trayTarget) {
-                    const dx = trayTarget.x - (this.savedPosition.x + finalWidth / 2);
-                    const dy = trayTarget.y - (this.savedPosition.y + finalHeight / 2);
-                    this.element.style.transform = `translate(${dx}px, ${dy}px) scale(0.1)`;
-                    this.element.style.opacity = '0';
-                }
+                // Fallback: no source element (should not happen with glyph system)
+                this.element.style.transform = 'scale(0.1)';
+                this.element.style.opacity = '0';
             }
         }
 
