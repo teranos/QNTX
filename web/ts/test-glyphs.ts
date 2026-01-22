@@ -3,6 +3,52 @@
  *
  * This file registers test glyphs to demonstrate the morphing behavior
  * where glyphs transform into windows and back.
+ *
+ * CURRENT STATE:
+ * These are showcase glyphs demonstrating the core morphing mechanics.
+ * The infrastructure is complete: single DOM element axiom, smooth animations,
+ * proximity morphing, and window transformations all work.
+ *
+ * NEXT STEPS - The Migration Path:
+ *
+ * 1. GlyphSet - The Universal Container
+ *    Instead of separate systems (windows, symbols, segments), we need a
+ *    GlyphSet that holds all available glyphs. This becomes the single
+ *    source of truth for all interactive visual elements in QNTX.
+ *
+ * 2. Symbol Palette → Glyph Migration
+ *    The symbol palette (seg/sym system) should be the FIRST migration target.
+ *    Each symbol becomes a glyph with:
+ *    - Collapsed state: the symbol icon itself
+ *    - Proximity state: symbol with label/description
+ *    - Window state: full symbol details, relationships, attestations
+ *
+ * 3. Existing Windows → Glyph Migration
+ *    Current windows (VidStream, Database, etc.) need to be converted to glyphs:
+ *    - Add glyph registration with renderContent()
+ *    - Remove old window creation code
+ *    - Let the glyph system handle all morphing
+ *
+ * 4. Unified Interaction Model
+ *    Once everything is a glyph:
+ *    - Symbol palette becomes just another GlyphRun view
+ *    - Windows are just expanded glyphs
+ *    - Commands are glyphs that execute on click
+ *    - Everything uses the same proximity/morphing behavior
+ *
+ * 5. Backend Alignment
+ *    The glyph concept should eventually extend to the backend:
+ *    - Attestations about glyphs
+ *    - Glyph state persistence
+ *    - Glyph relationships and dependencies
+ *
+ * The vision: Every visual element in QNTX is a glyph. They all morph
+ * the same way, behave the same way, and are reasoned about the same way.
+ * This creates conceptual clarity throughout the entire system.
+ *
+ * In the next session, we'll begin the real migration from seg/sym to glyphs,
+ * starting with creating the GlyphSet infrastructure and converting the first
+ * symbols into true glyphs.
  */
 
 import { glyphRun } from './components/glyph-run';
