@@ -60,11 +60,19 @@ export class GlyphMorph {
         const currentOpacity = computedStyle.opacity;
         const currentPadding = computedStyle.padding;
 
-        // Calculate window target position (center of screen by default)
+        // Calculate window target position
         const windowWidth = parseInt(glyph.initialWidth || '800px');
         const windowHeight = parseInt(glyph.initialHeight || '600px');
-        const targetX = glyph.defaultX ?? (window.innerWidth - windowWidth) / 2;
-        const targetY = glyph.defaultY ?? (window.innerHeight - windowHeight) / 2;
+
+        // Check if we have a remembered position on the element
+        const rememberedX = glyphElement.dataset.lastX;
+        const rememberedY = glyphElement.dataset.lastY;
+
+        // Use remembered position, or default position, or center
+        const targetX = rememberedX ? parseFloat(rememberedX) :
+                       (glyph.defaultX ?? (window.innerWidth - windowWidth) / 2);
+        const targetY = rememberedY ? parseFloat(rememberedY) :
+                       (glyph.defaultY ?? (window.innerHeight - windowHeight) / 2);
 
         // THE GLYPH ITSELF BECOMES THE WINDOW - NO CLONING
         // Remove from indicator container and reparent to body
@@ -211,6 +219,10 @@ export class GlyphMorph {
         // Get current window state before clearing anything
         const currentRect = windowElement.getBoundingClientRect();
         console.log(`[Minimize] Current window position: x=${currentRect.left}, y=${currentRect.top}, w=${currentRect.width}, h=${currentRect.height}`);
+
+        // Remember window position for next time it opens
+        windowElement.dataset.lastX = String(currentRect.left);
+        windowElement.dataset.lastY = String(currentRect.top);
 
         // Clear window state flag
         delete windowElement.dataset.windowState;
@@ -409,6 +421,11 @@ export class GlyphMorph {
 
             // Reset cursor
             document.body.style.cursor = '';
+
+            // Save final position for next time window opens
+            const finalRect = windowElement.getBoundingClientRect();
+            windowElement.dataset.lastX = String(finalRect.left);
+            windowElement.dataset.lastY = String(finalRect.top);
 
             // Remove window handlers
             window.removeEventListener('mousemove', drag);
