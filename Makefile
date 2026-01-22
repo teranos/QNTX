@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check wasm-force
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check wasm-force wasm-force-rs wasm-force-all
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -247,6 +247,17 @@ rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugin
 	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
 
 wasm-force: ## Build Zig force simulation WASM module
-	@echo "Building WASM force simulation..."
+	@echo "Building WASM force simulation (Zig)..."
 	@cd web/wasm/force && zig build -Doptimize=ReleaseFast
 	@echo "✓ force.wasm built in web/wasm/dist/"
+
+wasm-force-rs: ## Build Rust force simulation WASM module
+	@echo "Building WASM force simulation (Rust)..."
+	@cd web/wasm/force-rs && cargo build --release --target wasm32-unknown-unknown
+	@mkdir -p web/wasm/dist
+	@cp target/wasm32-unknown-unknown/release/force_wasm.wasm web/wasm/dist/force-rs.wasm
+	@echo "✓ force-rs.wasm built in web/wasm/dist/"
+
+wasm-force-all: wasm-force wasm-force-rs ## Build both Zig and Rust WASM modules
+	@echo "✓ Both WASM modules built"
+	@ls -lh web/wasm/dist/*.wasm

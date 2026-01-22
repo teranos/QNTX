@@ -1,16 +1,25 @@
 // WASM Force Simulation Bridge
-// Provides D3-compatible interface backed by Zig WASM module
+// Provides D3-compatible interface backed by Zig or Rust WASM module
 //
 // Usage:
 //   const sim = await ForceSimulation.create(nodes, links);
 //   sim.on('tick', () => updatePositions(sim.nodes()));
 //   sim.alpha(0.3).restart();
+//
+// To use Rust instead of Zig:
+//   const sim = await ForceSimulation.create(nodes, links, { backend: 'rust' });
 
 import type { D3Node, D3Link } from '../../types/d3-graph';
 
-// WASM memory layout matches force.zig structs
+// WASM memory layout (identical for Zig and Rust)
 const NODE_SIZE = 28; // 7 x f32: x, y, vx, vy, fx, fy, radius
 const LINK_SIZE = 16; // 2 x u32 + 2 x f32: source, target, distance, strength
+
+export type WasmBackend = 'zig' | 'rust';
+
+export interface ForceSimulationOptions {
+    backend?: WasmBackend;
+}
 
 interface WasmExports {
     memory: WebAssembly.Memory;
@@ -42,9 +51,11 @@ export class ForceSimulation {
     private tickCallbacks: TickCallback[] = [];
     private running: boolean = false;
     private animationFrame: number | null = null;
+    public readonly backend: WasmBackend;
 
-    private constructor(wasm: WasmExports) {
+    private constructor(wasm: WasmExports, backend: WasmBackend) {
         this.wasm = wasm;
+        this.backend = backend;
         this.nodesPtr = 0;
         this.linksPtr = 0;
         this.nodeMap = new Map();
@@ -54,13 +65,23 @@ export class ForceSimulation {
 
     /**
      * Create a new force simulation with the given nodes and links
+     * @param nodes - Array of nodes
+     * @param links - Array of links
+     * @param options - Configuration options (backend: 'zig' | 'rust')
      */
-    static async create(nodes: D3Node[], links: D3Link[]): Promise<ForceSimulation> {
-        const wasmPath = '/wasm/dist/force.wasm';
+    static async create(
+        nodes: D3Node[],
+        links: D3Link[],
+        options: ForceSimulationOptions = {}
+    ): Promise<ForceSimulation> {
+        const backend = options.backend ?? 'zig';
+        const wasmPath = backend === 'rust'
+            ? '/wasm/dist/force-rs.wasm'
+            : '/wasm/dist/force.wasm';
 
         const response = await fetch(wasmPath);
         if (!response.ok) {
-            throw new Error(`Failed to load WASM: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to load WASM (${backend}): ${response.status} ${response.statusText}`);
         }
 
         const wasmBytes = await response.arrayBuffer();
@@ -71,7 +92,7 @@ export class ForceSimulation {
         });
 
         const wasm = wasmModule.instance.exports as unknown as WasmExports;
-        const sim = new ForceSimulation(wasm);
+        const sim = new ForceSimulation(wasm, backend);
         sim.setData(nodes, links);
         return sim;
     }
@@ -261,12 +282,30 @@ export class ForceSimulation {
 
 /**
  * Check if WASM force simulation is available
+ * @param backend - Which backend to check ('zig' | 'rust')
  */
-export async function isWasmForceAvailable(): Promise<boolean> {
+export async function isWasmForceAvailable(backend: WasmBackend = 'zig'): Promise<boolean> {
+    const wasmPath = backend === 'rust'
+        ? '/wasm/dist/force-rs.wasm'
+        : '/wasm/dist/force.wasm';
     try {
-        const response = await fetch('/wasm/dist/force.wasm', { method: 'HEAD' });
+        const response = await fetch(wasmPath, { method: 'HEAD' });
         return response.ok;
     } catch {
         return false;
     }
+}
+
+/**
+ * Check which WASM backends are available
+ */
+export async function availableBackends(): Promise<WasmBackend[]> {
+    const results = await Promise.all([
+        isWasmForceAvailable('zig'),
+        isWasmForceAvailable('rust'),
+    ]);
+    const available: WasmBackend[] = [];
+    if (results[0]) available.push('zig');
+    if (results[1]) available.push('rust');
+    return available;
 }
