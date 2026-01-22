@@ -51,7 +51,7 @@
     font-family: var(--font-mono);
     font-size: 11px;
     cursor: pointer;
-    /* Smooth transition when returning to dot state */
+    /* Smooth transition for proximity morphing between dot and expanded states */
     transition: all 0.2s ease-out;
     box-sizing: border-box;
     /* Re-enable pointer events on dots (parent has none) */
@@ -64,21 +64,19 @@
     background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
 }
 
-/* Glyph morphing animations */
+/* Glyph morphing animations - transition set dynamically in JavaScript */
 .glyph-morphing-to-window {
     position: fixed !important;
     z-index: 10000 !important;
-    transition: all 600ms cubic-bezier(0.4, 0, 0.2, 1);
-    transition-property: left, top, width, height, border-radius, background-color, box-shadow, opacity;
     pointer-events: auto;
+    /* No transition here - set in JavaScript */
 }
 
 .window-morphing-to-glyph {
     position: fixed !important;
     z-index: 10000 !important;
-    transition: all 600ms cubic-bezier(0.4, 0, 0.2, 1);
-    transition-property: left, top, width, height, border-radius, background-color, box-shadow, opacity;
     pointer-events: auto;
+    /* Transition will be set dynamically in JavaScript for proper timing */
 }
 
 /* Window chrome styles */

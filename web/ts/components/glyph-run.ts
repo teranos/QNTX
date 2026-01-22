@@ -31,7 +31,7 @@
 import { log, SEG } from '../logger';
 import { uiState } from '../state/ui';
 import { GlyphProximity } from './glyph-proximity';
-import { GlyphMorph, type Glyph } from './glyph-morph';
+import { GlyphMorph, type Glyph, MAXIMIZE_DURATION_MS } from './glyph-morph';
 
 // Re-export Glyph interface for external use
 export type { Glyph } from './glyph-morph';
@@ -99,7 +99,7 @@ class GlyphRunImpl {
                 // Re-enable proximity morphing after animation
                 setTimeout(() => {
                     this.isRestoring = false;
-                }, 600);
+                }, MAXIMIZE_DURATION_MS);
             }
         };
 
@@ -348,7 +348,7 @@ class GlyphRunImpl {
                 );
                 setTimeout(() => {
                     this.isRestoring = false;
-                }, 600);
+                }, MAXIMIZE_DURATION_MS);
             }
         };
 
