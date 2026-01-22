@@ -217,6 +217,10 @@ export class GlyphMorph {
 
         // Clear window content but keep a visible background
         windowElement.innerHTML = '';
+        windowElement.textContent = ''; // Ensure text is also cleared
+
+        // Clear any proximity data attributes that might cause text to appear
+        delete windowElement.dataset.hasText;
 
         // FORCE class change - remove old class first
         windowElement.classList.remove('glyph-morphing-to-window');
@@ -287,11 +291,22 @@ export class GlyphMorph {
                 windowElement.style.border = '';
                 windowElement.style.opacity = '';
 
+                // Clear any text-related styles from proximity morphing
+                windowElement.style.display = '';
+                windowElement.style.alignItems = '';
+                windowElement.style.justifyContent = '';
+                windowElement.style.whiteSpace = '';
+                windowElement.style.flexDirection = '';
+                windowElement.textContent = ''; // Ensure no text remains
+
                 // Keep the glyph ID
                 windowElement.setAttribute('data-glyph-id', glyph.id);
 
                 // CRITICAL: Ensure windowState is cleared after animation
                 delete windowElement.dataset.windowState;
+
+                // CRITICAL: Clear hasText flag to prevent proximity text appearing
+                delete windowElement.dataset.hasText;
 
                 // Now remove from body and re-attach to indicator container (SAME ELEMENT)
                 windowElement.remove(); // Detach but element stays alive
