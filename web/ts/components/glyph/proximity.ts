@@ -8,7 +8,7 @@
  * The element persists through: dot → proximity → window → dot
  */
 
-import type { Glyph } from './morph';
+import type { Glyph } from './window';
 import { hasProximityText, setProximityText } from './dataset';
 
 export class GlyphProximity {
