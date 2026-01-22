@@ -31,11 +31,11 @@
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GlyphProximity } from './proximity';
-import { GlyphMorph, type Glyph, getMaximizeDuration } from './morph';
+import { GlyphMorph, type Glyph, getMaximizeDuration } from './window';
 import { isInWindowState, setGlyphId } from './dataset';
 
 // Re-export Glyph interface for external use
-export type { Glyph } from './morph';
+export type { Glyph } from './window';
 
 
 class GlyphRunImpl {
