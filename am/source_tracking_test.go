@@ -109,74 +109,69 @@ enabled = ["python", "code"]
 		assert.Contains(t, pluginEnabled.SourcePath, "am.toml", "plugin.enabled should come from am.toml")
 	})
 
-	// TODO: Fix this test - currently fails because v.Set() gives highest precedence,
-	// breaking environment variable overrides. Need to refactor mergeConfigFiles()
-	// to use Viper's MergeInConfig instead of v.Set().
-	// See: https://github.com/teranos/QNTX/issues/[TODO]
-	/*
-		t.Run("Environment variables override files", func(t *testing.T) {
-			// Reset global state
-			Reset()
-			defer Reset()
+	// Fixed: Using MergeConfigMap instead of v.Set() to preserve proper precedence
+	t.Run("Environment variables override files", func(t *testing.T) {
+		// Reset global state
+		Reset()
+		defer Reset()
 
-			// Create temp directory
-			tempDir := t.TempDir()
-			qntxDir := filepath.Join(tempDir, ".qntx")
-			require.NoError(t, os.MkdirAll(qntxDir, 0755))
+		// Create temp directory
+		tempDir := t.TempDir()
+		qntxDir := filepath.Join(tempDir, ".qntx")
+		require.NoError(t, os.MkdirAll(qntxDir, 0755))
 
-			// Create am.toml with database config
-			amToml := `
+		// Create am.toml with database config
+		amToml := `
 	[database]
 	path = "file.db"
 
 	[server]
 	port = 8080
 	`
-			require.NoError(t, os.WriteFile(
-				filepath.Join(qntxDir, "am.toml"),
-				[]byte(amToml),
-				0644,
-			))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(qntxDir, "am.toml"),
+			[]byte(amToml),
+			0644,
+		))
 
-			// Set environment variable to override database.path
-			os.Setenv("QNTX_DATABASE_PATH", "env.db")
-			defer os.Unsetenv("QNTX_DATABASE_PATH")
+		// Set environment variable to override database.path
+		os.Setenv("QNTX_DATABASE_PATH", "env.db")
+		defer os.Unsetenv("QNTX_DATABASE_PATH")
 
-			// Set environment
-			originalWd, _ := os.Getwd()
-			os.Chdir(tempDir)
-			defer os.Chdir(originalWd)
+		// Set environment
+		originalWd, _ := os.Getwd()
+		os.Chdir(tempDir)
+		defer os.Chdir(originalWd)
 
-			os.Setenv("HOME", tempDir)
-			defer os.Unsetenv("HOME")
+		os.Setenv("HOME", tempDir)
+		defer os.Unsetenv("HOME")
 
-			// Load configuration
-			cfg, err := Load()
-			require.NoError(t, err)
+		// Load configuration
+		cfg, err := Load()
+		require.NoError(t, err)
 
-			// Verify environment variable won
-			assert.Equal(t, "env.db", cfg.Database.Path, "Environment variable should override file")
+		// Verify environment variable won
+		assert.Equal(t, "env.db", cfg.Database.Path, "Environment variable should override file")
 
-			// Get introspection
-			intro, err := GetConfigIntrospection()
-			require.NoError(t, err)
+		// Get introspection
+		intro, err := GetConfigIntrospection()
+		require.NoError(t, err)
 
-			// Find database.path setting
-			var dbPath *SettingInfo
-			for i := range intro.Settings {
-				if intro.Settings[i].Key == "database.path" {
-					dbPath = &intro.Settings[i]
-					break
-				}
+		// Find database.path setting
+		var dbPath *SettingInfo
+		for i := range intro.Settings {
+			if intro.Settings[i].Key == "database.path" {
+				dbPath = &intro.Settings[i]
+				break
 			}
+		}
 
-			// Verify it shows as coming from environment
-			require.NotNil(t, dbPath)
-			assert.Equal(t, SourceEnvironment, dbPath.Source)
-			assert.Equal(t, "QNTX_DATABASE_PATH", dbPath.SourcePath)
-			assert.Equal(t, "env.db", dbPath.Value)
-		})
-	*/
+		// Verify it shows as coming from environment
+		require.NotNil(t, dbPath)
+		assert.Equal(t, SourceEnvironment, dbPath.Source)
+		assert.Equal(t, "QNTX_DATABASE_PATH", dbPath.SourcePath)
+		assert.Equal(t, "env.db", dbPath.Value)
+	})
 
 	t.Run("Project config overrides user config", func(t *testing.T) {
 		// Reset global state
@@ -229,14 +224,14 @@ port = 9090
 
 		// Find settings
 		var serverPort *SettingInfo
-		// var serverLogLevel *SettingInfo // TODO: Not being tracked properly
+		var serverLogLevel *SettingInfo
 		for i := range intro.Settings {
 			setting := &intro.Settings[i]
 			switch setting.Key {
 			case "server.port":
 				serverPort = setting
 			case "server.log_level":
-				// serverLogLevel = setting // TODO: Not being tracked
+				serverLogLevel = setting
 			}
 		}
 
@@ -244,14 +239,13 @@ port = 9090
 		require.NotNil(t, serverPort)
 		assert.Equal(t, SourceProject, serverPort.Source)
 		assert.Contains(t, serverPort.SourcePath, "am.toml")
-		// TODO: Type mismatch - expecting float64 but getting int64
-		// assert.Equal(t, float64(9090), serverPort.Value)
+		// Viper returns integers from TOML as int64
+		assert.Equal(t, int64(9090), serverPort.Value)
 
 		// Verify log_level came from user (not in project)
-		// TODO: serverLogLevel is nil, needs investigation
-		// require.NotNil(t, serverLogLevel)
-		// assert.Equal(t, SourceUser, serverLogLevel.Source)
-		// assert.Equal(t, "info", serverLogLevel.Value)
+		require.NotNil(t, serverLogLevel)
+		assert.Equal(t, SourceUser, serverLogLevel.Source)
+		assert.Equal(t, "info", serverLogLevel.Value)
 	})
 
 	t.Run("UI config files load with correct precedence", func(t *testing.T) {
@@ -316,8 +310,8 @@ monthly_budget_usd = 300.0
 		require.NotNil(t, workers)
 		assert.Equal(t, SourceUser, workers.Source)
 		assert.Contains(t, workers.SourcePath, "am.toml")
-		// TODO: Type mismatch - expecting float64 but getting int
-		// assert.Equal(t, float64(2), workers.Value)
+		// Viper returns integers from TOML as int64
+		assert.Equal(t, int64(2), workers.Value)
 
 		// Verify daily_budget_usd came from UI config (overrode user)
 		dailyBudget := settings["pulse.daily_budget_usd"]
