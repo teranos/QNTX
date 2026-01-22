@@ -28,14 +28,14 @@
  * All Glyph DOM elements MUST be created through createGlyphElement factory.
  */
 
-import { log, SEG } from '../logger';
-import { uiState } from '../state/ui';
-import { GlyphProximity } from './glyph-proximity';
-import { GlyphMorph, type Glyph, getMaximizeDuration } from './glyph-morph';
-import { isInWindowState, setGlyphId } from './glyph-dataset';
+import { log, SEG } from '../../logger';
+import { uiState } from '../../state/ui';
+import { GlyphProximity } from './proximity';
+import { GlyphMorph, type Glyph, getMaximizeDuration } from './morph';
+import { isInWindowState, setGlyphId } from './dataset';
 
 // Re-export Glyph interface for external use
-export type { Glyph } from './glyph-morph';
+export type { Glyph } from './morph';
 
 
 class GlyphRunImpl {

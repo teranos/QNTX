@@ -8,8 +8,8 @@
  * The element persists through: dot → proximity → window → dot
  */
 
-import type { Glyph } from './glyph-morph';
-import { hasProximityText, setProximityText } from './glyph-dataset';
+import type { Glyph } from './morph';
+import { hasProximityText, setProximityText } from './dataset';
 
 export class GlyphProximity {
     // Proximity morphing configuration

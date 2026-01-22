@@ -16,7 +16,7 @@ import {
     hasProximityText,
     setProximityText,
     setGlyphId
-} from './glyph-dataset';
+} from './dataset';
 
 export interface Glyph {
     id: string;
