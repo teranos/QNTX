@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check wasm-force
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -245,3 +245,8 @@ rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugin
 	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
 	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
+
+wasm-force: ## Build Zig force simulation WASM module
+	@echo "Building WASM force simulation..."
+	@cd web/wasm/force && zig build -Doptimize=ReleaseFast
+	@echo "✓ force.wasm built in web/wasm/dist/"
