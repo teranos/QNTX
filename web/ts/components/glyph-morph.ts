@@ -116,6 +116,9 @@ export class GlyphMorph {
 
             // After animation completes, add window content
             setTimeout(() => {
+                // CRITICAL: Remove transition after morphing completes to allow smooth dragging
+                glyphElement.style.transition = '';
+
                 // Set up window as flex container
                 glyphElement.style.display = 'flex';
                 glyphElement.style.flexDirection = 'column';
@@ -352,36 +355,52 @@ export class GlyphMorph {
      */
     private makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): void {
         let isDragging = false;
-        let startX = 0;
-        let startY = 0;
-        let initialX = 0;
-        let initialY = 0;
+        let offsetX = 0;
+        let offsetY = 0;
 
         const startDrag = (e: MouseEvent) => {
             isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
+
+            // Calculate offset from mouse to window top-left
             const rect = windowElement.getBoundingClientRect();
-            initialX = rect.left;
-            initialY = rect.top;
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+
+            // Prevent text selection while dragging
             e.preventDefault();
+
+            // Add cursor style
+            document.body.style.cursor = 'move';
+
+            // Move handlers to window for better capture
+            window.addEventListener('mousemove', drag);
+            window.addEventListener('mouseup', stopDrag);
         };
 
         const drag = (e: MouseEvent) => {
             if (!isDragging) return;
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            windowElement.style.left = `${initialX + deltaX}px`;
-            windowElement.style.top = `${initialY + deltaY}px`;
+
+            // Direct position update - no transforms, no RAF
+            const newX = e.clientX - offsetX;
+            const newY = e.clientY - offsetY;
+
+            windowElement.style.left = `${newX}px`;
+            windowElement.style.top = `${newY}px`;
         };
 
         const stopDrag = () => {
+            if (!isDragging) return;
             isDragging = false;
+
+            // Reset cursor
+            document.body.style.cursor = '';
+
+            // Remove window handlers
+            window.removeEventListener('mousemove', drag);
+            window.removeEventListener('mouseup', stopDrag);
         };
 
         handle.addEventListener('mousedown', startDrag);
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', stopDrag);
     }
 
     /**
