@@ -349,11 +349,15 @@ export class GlyphMorph {
             // Now remove from body and re-attach to indicator container (SAME ELEMENT)
             windowElement.remove(); // Detach but element stays alive
 
-            // Clear position styles now that we're re-attaching
+            // Clear ONLY positioning styles when re-attaching to indicator container
+            // The indicator container handles layout, so we don't need fixed positioning
             windowElement.style.position = '';
             windowElement.style.left = '';
             windowElement.style.top = '';
             windowElement.style.zIndex = '';
+
+            // Visual styles (width, height, colors) are now handled by the .glyph-run-glyph class
+            // We clear them here to let CSS take over rather than inline styles
             windowElement.style.width = '';
             windowElement.style.height = '';
             windowElement.style.borderRadius = '';
