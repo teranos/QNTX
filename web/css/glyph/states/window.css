@@ -1,0 +1,62 @@
+/**
+ * Glyph Window State - Full application window
+ *
+ * When a glyph morphs to window state, it becomes a draggable
+ * application window with title bar and content area.
+ *
+ * This could be triggered by:
+ * - Click on a window-type glyph
+ * - Secondary action on a button-type glyph (hold/right-click)
+ * - Programmatic expansion when results need display
+ */
+
+/* Window chrome styles */
+.window-title-bar {
+    height: 32px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    cursor: move;
+    user-select: none;
+    border-radius: 8px 8px 0 0;
+}
+
+.window-title-bar span {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-on-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.window-title-bar button {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-on-dark);
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    margin-left: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.window-title-bar button:hover {
+    background: var(--bg-hover);
+}
+
+/* Window content area - styled by individual glyphs */
+.glyph-window-content {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+}
