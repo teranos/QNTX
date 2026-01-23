@@ -19,6 +19,12 @@ import {
     setProximityText,
     setGlyphId
 } from './dataset';
+import {
+    animateToWindow,
+    animateToGlyph,
+    cancelAnimation,
+    waitForAnimation
+} from './animation';
 
 export interface Glyph {
     id: string;
@@ -31,26 +37,7 @@ export interface Glyph {
     onClose?: () => void;
 }
 
-// Function to check if user prefers reduced motion
-function getPrefersReducedMotion(): boolean {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    }
-    return false; // Default to animations enabled in test environment
-}
-
-// Animation durations in milliseconds - adjust these to slow down/speed up morphing
-export const MAXIMIZE_DURATION_MS = 200;  // Base duration for dot → window
-export const MINIMIZE_DURATION_MS = 200;  // Base duration for window → dot
-
-// Get actual durations considering reduced motion preference
-export function getMaximizeDuration(): number {
-    return getPrefersReducedMotion() ? 0 : MAXIMIZE_DURATION_MS;
-}
-
-export function getMinimizeDuration(): number {
-    return getPrefersReducedMotion() ? 0 : MINIMIZE_DURATION_MS;
-}
+// Animation durations and reduced motion handling moved to animation.ts
 
 // Window dimensions
 const DEFAULT_WINDOW_WIDTH = '800px';
@@ -64,10 +51,7 @@ const TITLE_BAR_PADDING = '0 12px';
 const WINDOW_BUTTON_SIZE = '24px';
 const CONTENT_PADDING = '16px';
 
-// Dot dimensions
-const DOT_SIZE = '8px';
-const DOT_BORDER_RADIUS = '2px';
-const DOT_BORDER = '1px solid var(--border-on-dark)';
+// Dot dimensions - moved to animation.ts for Web Animations API
 
 export class GlyphMorph {
 
@@ -106,17 +90,19 @@ export class GlyphMorph {
         const currentPadding = computedStyle.padding;
 
         // Calculate window target position
-        const windowWidth = parseInt(glyph.initialWidth || DEFAULT_WINDOW_WIDTH);
-        const windowHeight = parseInt(glyph.initialHeight || DEFAULT_WINDOW_HEIGHT);
+        const windowWidth = glyph.initialWidth || DEFAULT_WINDOW_WIDTH;
+        const windowHeight = glyph.initialHeight || DEFAULT_WINDOW_HEIGHT;
+        const windowWidthPx = parseInt(windowWidth);
+        const windowHeightPx = parseInt(windowHeight);
 
         // Check if we have a remembered position on the element
         const rememberedPos = getLastPosition(glyphElement);
 
         // Use remembered position, or default position, or center
         const targetX = rememberedPos?.x ??
-                       (glyph.defaultX ?? (window.innerWidth - windowWidth) / 2);
+                       (glyph.defaultX ?? (window.innerWidth - windowWidthPx) / 2);
         const targetY = rememberedPos?.y ??
-                       (glyph.defaultY ?? (window.innerHeight - windowHeight) / 2);
+                       (glyph.defaultY ?? (window.innerHeight - windowHeightPx) / 2);
 
         // THE GLYPH ITSELF BECOMES THE WINDOW - NO CLONING
         // Remove from indicator container and reparent to body
@@ -147,29 +133,27 @@ export class GlyphMorph {
         // Force a reflow to ensure initial styles are applied
         glyphElement.offsetHeight;
 
-        // NOW set transition after element is positioned
-        glyphElement.style.transition = `all ${getMaximizeDuration()}ms cubic-bezier(0.4, 0, 0.2, 1)`;
-
         // Mark element as in-window-state (but keep glyph ID)
         setWindowState(glyphElement, true);
 
-        // Trigger morph animation after a frame to ensure initial styles are applied
-        requestAnimationFrame(() => {
-            // Apply window dimensions and position
-            glyphElement.style.left = `${targetX}px`;
-            glyphElement.style.top = `${targetY}px`;
-            glyphElement.style.width = `${windowWidth}px`;
-            glyphElement.style.height = `${windowHeight}px`;
-            glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-            glyphElement.style.backgroundColor = 'var(--bg-primary)';
-            glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
-            glyphElement.style.padding = '0'; // Reset padding to allow content to fill
-            glyphElement.style.opacity = '1'; // Ensure it's visible
+        // Cancel any existing animations
+        cancelAnimation(glyphElement);
 
-            // After animation completes, add window content
-            setTimeout(() => {
-                // CRITICAL: Remove transition after morphing completes to allow smooth dragging
-                glyphElement.style.transition = '';
+        // Use Web Animations API for morphing
+        const currentRect = glyphElement.getBoundingClientRect();
+        const animation = animateToWindow(
+            glyphElement,
+            currentRect,
+            {
+                x: targetX,
+                y: targetY,
+                width: windowWidth,
+                height: windowHeight
+            }
+        );
+
+        // After animation completes, add window content
+        waitForAnimation(animation).then(() => {
 
                 // Set up window as flex container
                 glyphElement.style.display = 'flex';
@@ -258,7 +242,6 @@ export class GlyphMorph {
 
                 // Make window draggable
                 this.makeWindowDraggable(glyphElement, titleBar);
-            }, getMaximizeDuration()); // Match maximize animation duration
         });
     }
 
@@ -317,54 +300,30 @@ export class GlyphMorph {
         windowElement.style.zIndex = '10000';
         // NO transition yet - we need initial state to be committed first
 
-        // Force the browser to commit these styles BEFORE adding transition
+        // Force the browser to commit these styles BEFORE animating
         windowElement.offsetHeight;
 
-        // Use setTimeout(0) to ensure browser has painted the initial state
-        setTimeout(() => {
-            // NOW add the transition after initial state is rendered
-            windowElement.style.transition = `all ${getMinimizeDuration()}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        // Cancel any existing animations
+        cancelAnimation(windowElement);
 
-            log.debug(SEG.UI, `[Minimize] Transition applied`);
+        // Use Web Animations API for minimize animation
+        const animation = animateToGlyph(
+            windowElement,
+            currentRect,
+            { x: targetRect.x, y: targetRect.y }
+        );
 
-            // Use another frame to trigger animation AFTER transition is registered
-            requestAnimationFrame(() => {
-                log.debug(SEG.UI, `[Minimize] Triggering animation to target position`);
+        log.debug(SEG.UI, `[Minimize] Triggering animation to target position`);
 
-                // Animate to dot appearance and position
-                windowElement.style.left = `${targetRect.x}px`;
-                windowElement.style.top = `${targetRect.y}px`;
-                windowElement.style.width = DOT_SIZE;
-                windowElement.style.height = DOT_SIZE;
-                windowElement.style.borderRadius = DOT_BORDER_RADIUS;
-                windowElement.style.backgroundColor = 'var(--bg-gray)';
-                windowElement.style.boxShadow = 'none';
-                windowElement.style.border = DOT_BORDER;
-
-                // Fallback timeout in case transitionend doesn't fire
-                let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-                // Listen for the transition to actually complete
-                const onTransitionEnd = (e: TransitionEvent | { target: HTMLElement }) => {
-                if (e.target !== windowElement) return;
-
-                // Clear fallback timeout if transition completed normally
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                    timeoutId = null;
-                }
-
+        // Wait for animation to complete
+        waitForAnimation(animation).then(() => {
                 log.debug(SEG.UI, `[Minimize] Animation completed for ${glyph.id}`);
-                windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
 
                 // Verify element identity is preserved
                 log.debug(SEG.UI, `[AXIOM CHECK] Same element after animation:`, windowElement);
 
                 // Keep element visible but reset to glyph class
                 windowElement.className = 'glyph-run-glyph';
-
-                // Remove transition so proximity morphing can take over smoothly
-                windowElement.style.transition = '';
 
                 // Reset inline styles BUT keep position for now
                 windowElement.style.width = '';
@@ -405,21 +364,7 @@ export class GlyphMorph {
                 // Re-attach THE SAME ELEMENT to indicator container
                 log.debug(SEG.UI, `[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
                 onMorphComplete(windowElement, glyph);
-            };
-
-                // Set up fallback timeout in case transitionend doesn't fire
-                // (e.g., due to reduced motion preference, CSS interruption, rapid user action)
-                timeoutId = setTimeout(() => {
-                    log.warn(SEG.UI, `[Minimize] Timeout reached for ${glyph.id}, forcing completion`);
-                    windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
-                    // Force completion by calling the handler
-                    onTransitionEnd({ target: windowElement });
-                }, getMinimizeDuration() + 100); // 100ms grace period
-
-                // Add the event listener
-                windowElement.addEventListener('transitionend', onTransitionEnd as EventListener);
-            });
-        }, 0);
+        });
     }
 
     /**

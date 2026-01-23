@@ -10,6 +10,7 @@
 
 import type { Glyph } from './window';
 import { hasProximityText, setProximityText } from './dataset';
+import { animateProximity } from './animation';
 
 export class GlyphProximity {
     // Proximity morphing configuration
@@ -30,12 +31,7 @@ export class GlyphProximity {
     private readonly VERTICAL_EASE_EARLY = 0.8; // Transform 80% by breakpoint
     private readonly VERTICAL_EASE_LATE = 0.2; // Remaining 20% in final stretch
 
-    // Morphing dimensions
-    private readonly DOT_MIN_WIDTH = 8;
-    private readonly DOT_MIN_HEIGHT = 8;
-    private readonly DOT_MAX_WIDTH = 220;
-    private readonly DOT_MAX_HEIGHT = 32;
-    private readonly DOT_BORDER_RADIUS_MAX = 2; // Initial border radius for dots
+    // Morphing dimensions moved to animation.ts for Web Animations API
 
     private mouseX: number = 0;
     private mouseY: number = 0;
@@ -162,35 +158,8 @@ export class GlyphProximity {
                 // Apply baseline boost when any item is being hovered
                 proximity = Math.min(1.0, proximity + baselineBoost);
 
-                // Interpolate dimensions to match actual tray item size
-                const width = this.DOT_MIN_WIDTH + (this.DOT_MAX_WIDTH - this.DOT_MIN_WIDTH) * proximity;
-                const height = this.DOT_MIN_HEIGHT + (this.DOT_MAX_HEIGHT - this.DOT_MIN_HEIGHT) * proximity;
-
-                // Interpolate border radius (starts at max, goes to 0 for full item)
-                const borderRadius = this.DOT_BORDER_RADIUS_MAX * (1 - proximity);
-
-                // Interpolate colors using RGB interpolation
-                // Start: --bg-gray (#999 = rgb(153,153,153))
-                // End: --bg-almost-black (#1a1a1a = rgb(26,26,26))
-                const startR = 153, startG = 153, startB = 153;
-                const endR = 26, endG = 26, endB = 26;
-                let r = Math.round(startR + (endR - startR) * proximity);
-                let g = Math.round(startG + (endG - startG) * proximity);
-                let b = Math.round(startB + (endB - startB) * proximity);
-
-                // Brighten on hover (10% lighter)
-                const isHovered = glyph.matches(':hover');
-                if (isHovered) {
-                    r = Math.min(255, Math.round(r + (255 - r) * 0.1));
-                    g = Math.min(255, Math.round(g + (255 - g) * 0.1));
-                    b = Math.min(255, Math.round(b + (255 - b) * 0.1));
-                }
-
-                // Apply morphing styles
-                glyph.style.width = `${width}px`;
-                glyph.style.height = `${height}px`;
-                glyph.style.borderRadius = `${borderRadius}px`;
-                glyph.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                // Apply morphing using Web Animations API
+                animateProximity(glyph, proximity);
 
                 // Show title text when proximity exceeds threshold
                 if (proximity > this.TEXT_FADE_THRESHOLD && index < itemsArray.length) {

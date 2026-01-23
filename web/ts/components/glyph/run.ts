@@ -32,8 +32,9 @@ import { log, SEG } from '../../logger';
 import { stripHtml } from '../../html-utils';
 import { uiState } from '../../state/ui';
 import { GlyphProximity } from './proximity';
-import { GlyphMorph, type Glyph, getMaximizeDuration } from './window';
+import { GlyphMorph, type Glyph } from './window';
 import { isInWindowState, setGlyphId } from './dataset';
+import { getMaximizeDuration } from './animation';
 
 // Re-export Glyph interface for external use
 export type { Glyph } from './window';
