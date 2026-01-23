@@ -1,0 +1,42 @@
+/**
+ * Glyph Base - Core container and structural styles
+ *
+ * Defines the fundamental container for all glyphs and basic layout.
+ * This is loaded before any state-specific styles.
+ */
+
+.glyph-run {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    z-index: 100001; /* Above system drawer (100000) */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    /* Container itself is non-interactive - only dots respond */
+    pointer-events: none;
+    padding: 0;
+}
+
+/* Hide when empty */
+.glyph-run[data-empty="true"] {
+    pointer-events: none;
+}
+
+/* Container for glyphs in collapsed state */
+.glyph-run-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    transition: opacity 0.2s ease;
+    /* Tight fit around dots only */
+    width: fit-content;
+    height: fit-content;
+}
+
+.glyph-run:hover .glyph-run-indicators {
+    opacity: 1;
+}
