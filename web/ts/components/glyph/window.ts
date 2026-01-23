@@ -154,6 +154,20 @@ export class GlyphMorph {
 
         // After animation completes, add window content
         waitForAnimation(animation).then(() => {
+                // Commit the final animation state to the element
+                // This is critical for dragging to work properly
+                glyphElement.style.position = 'fixed';
+                glyphElement.style.left = `${targetX}px`;
+                glyphElement.style.top = `${targetY}px`;
+                glyphElement.style.width = windowWidth;
+                glyphElement.style.height = windowHeight;
+                glyphElement.style.borderRadius = '8px';
+                glyphElement.style.backgroundColor = 'var(--bg-black)';
+                glyphElement.style.boxShadow = '0 8px 32px rgba(0,0,0,0.6)';
+                glyphElement.style.border = '1px solid var(--border)';
+
+                // Cancel the animation to remove its effects
+                animation.cancel();
 
                 // Set up window as flex container
                 glyphElement.style.display = 'flex';
@@ -318,6 +332,20 @@ export class GlyphMorph {
         // Wait for animation to complete
         waitForAnimation(animation).then(() => {
                 log.debug(SEG.UI, `[Minimize] Animation completed for ${glyph.id}`);
+
+                // Commit the final dot state to the element
+                windowElement.style.position = 'fixed';
+                windowElement.style.left = `${targetRect.x}px`;
+                windowElement.style.top = `${targetRect.y}px`;
+                windowElement.style.width = '8px';
+                windowElement.style.height = '8px';
+                windowElement.style.borderRadius = '2px';
+                windowElement.style.backgroundColor = 'rgb(153, 153, 153)';
+                windowElement.style.boxShadow = 'none';
+                windowElement.style.border = '1px solid rgba(255,255,255,0.1)';
+
+                // Cancel the animation to remove its effects
+                animation.cancel();
 
                 // Verify element identity is preserved
                 log.debug(SEG.UI, `[AXIOM CHECK] Same element after animation:`, windowElement);

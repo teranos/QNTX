@@ -117,6 +117,9 @@ export function animateToGlyph(
     return animation;
 }
 
+// Track active proximity animations to prevent overlap
+const activeProximityAnimations = new WeakMap<HTMLElement, Animation>();
+
 /**
  * Animate proximity-based morphing (dot to expanded text)
  * This replaces the CSS-based proximity morphing
@@ -125,6 +128,12 @@ export function animateProximity(
     element: HTMLElement,
     proximity: number // 0.0 = dot, 1.0 = fully expanded
 ): Animation | null {
+    // Cancel any existing animation for this element
+    const existingAnimation = activeProximityAnimations.get(element);
+    if (existingAnimation && existingAnimation.playState === 'running') {
+        existingAnimation.cancel();
+    }
+
     // Calculate interpolated values based on proximity
     const width = 8 + (220 - 8) * proximity;
     const height = 8 + (32 - 8) * proximity;
@@ -143,41 +152,13 @@ export function animateProximity(
     const finalG = isHovered ? Math.min(255, Math.round(g + (255 - g) * 0.1)) : g;
     const finalB = isHovered ? Math.min(255, Math.round(b + (255 - b) * 0.1)) : b;
 
-    // Get current computed styles to animate from
-    const computedStyle = getComputedStyle(element);
-    const currentWidth = parseFloat(computedStyle.width);
-    const currentHeight = parseFloat(computedStyle.height);
+    // Apply styles directly for immediate response
+    element.style.width = `${width}px`;
+    element.style.height = `${height}px`;
+    element.style.borderRadius = `${borderRadius}px`;
+    element.style.backgroundColor = `rgb(${finalR}, ${finalG}, ${finalB})`;
 
-    // Skip if change is too small (prevents jitter)
-    if (Math.abs(currentWidth - width) < 0.5 && Math.abs(currentHeight - height) < 0.5) {
-        return null;
-    }
-
-    const keyframes: Keyframe[] = [
-        // From: Current state
-        {
-            width: `${currentWidth}px`,
-            height: `${currentHeight}px`,
-            borderRadius: computedStyle.borderRadius,
-            backgroundColor: computedStyle.backgroundColor
-        },
-        // To: Target proximity state
-        {
-            width: `${width}px`,
-            height: `${height}px`,
-            borderRadius: `${borderRadius}px`,
-            backgroundColor: `rgb(${finalR}, ${finalG}, ${finalB})`
-        }
-    ];
-
-    // Create very fast animation for smooth morphing
-    const animation = element.animate(keyframes, {
-        duration: PROXIMITY_DURATION,
-        easing: 'ease-out',
-        fill: 'forwards'
-    });
-
-    return animation;
+    return null; // No animation needed, direct style application is smoother for proximity
 }
 
 /**
