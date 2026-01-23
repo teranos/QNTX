@@ -9,6 +9,8 @@
  * We reparent and transform, but NEVER recreate the element.
  */
 
+import { log, SEG } from '../../logger';
+import { stripHtml } from '../../html-utils';
 import {
     setWindowState,
     getLastPosition,
@@ -186,7 +188,7 @@ export class GlyphMorph {
 
                 // Add title
                 const titleText = document.createElement('span');
-                titleText.textContent = this.stripHtml(glyph.title);
+                titleText.textContent = stripHtml(glyph.title);
                 titleText.style.flex = '1';
                 titleBar.appendChild(titleText);
 
@@ -223,7 +225,7 @@ export class GlyphMorph {
                         try {
                             glyph.onClose!();
                         } catch (error) {
-                            console.error(`[Glyph ${glyph.id}] Error in onClose callback:`, error);
+                            log.error(SEG.UI, `[Glyph ${glyph.id}] Error in onClose callback:`, error);
                         }
                     };
                     titleBar.appendChild(closeBtn);
@@ -240,7 +242,7 @@ export class GlyphMorph {
                     glyphElement.appendChild(content);
                 } catch (error) {
                     // Show error UI if renderContent fails
-                    console.error(`[Glyph ${glyph.id}] Error rendering content:`, error);
+                    log.error(SEG.UI, `[Glyph ${glyph.id}] Error rendering content:`, error);
                     const errorContent = document.createElement('div');
                     errorContent.style.padding = CONTENT_PADDING;
                     errorContent.style.flex = '1';
@@ -272,16 +274,16 @@ export class GlyphMorph {
     ): void {
         // AXIOM CHECK: Verify this is the correct element
         verifyElement(glyph.id, windowElement);
-        console.log(`[AXIOM CHECK] Minimizing same element for ${glyph.id}:`, windowElement);
+        log.debug(SEG.UI, `[AXIOM CHECK] Minimizing same element for ${glyph.id}:`, windowElement);
         // Find the position where this glyph should go back to
         const targetRect = this.calculateGlyphTargetPosition();
 
-        console.log(`[Minimize] Starting minimize for ${glyph.id}`);
-        console.log(`[Minimize] Target position: x=${targetRect.x}, y=${targetRect.y}`);
+        log.debug(SEG.UI, `[Minimize] Starting minimize for ${glyph.id}`);
+        log.debug(SEG.UI, `[Minimize] Target position: x=${targetRect.x}, y=${targetRect.y}`);
 
         // Get current window state before clearing anything
         const currentRect = windowElement.getBoundingClientRect();
-        console.log(`[Minimize] Current window position: x=${currentRect.left}, y=${currentRect.top}, w=${currentRect.width}, h=${currentRect.height}`);
+        log.debug(SEG.UI, `[Minimize] Current window position: x=${currentRect.left}, y=${currentRect.top}, w=${currentRect.width}, h=${currentRect.height}`);
 
         // Remember window position for next time it opens
         setLastPosition(windowElement, currentRect.left, currentRect.top);
@@ -299,7 +301,7 @@ export class GlyphMorph {
         // FORCE class change - remove old class first
         windowElement.classList.remove('glyph-morphing-to-window');
         windowElement.className = 'window-morphing-to-glyph';
-        console.log(`[Minimize] Class changed to: ${windowElement.className}`);
+        log.debug(SEG.UI, `[Minimize] Class changed to: ${windowElement.className}`);
 
         windowElement.style.position = 'fixed';
         windowElement.style.left = `${currentRect.left}px`;
@@ -323,11 +325,11 @@ export class GlyphMorph {
             // NOW add the transition after initial state is rendered
             windowElement.style.transition = `all ${getMinimizeDuration()}ms cubic-bezier(0.4, 0, 0.2, 1)`;
 
-            console.log(`[Minimize] Transition applied`);
+            log.debug(SEG.UI, `[Minimize] Transition applied`);
 
             // Use another frame to trigger animation AFTER transition is registered
             requestAnimationFrame(() => {
-                console.log(`[Minimize] Triggering animation to target position`);
+                log.debug(SEG.UI, `[Minimize] Triggering animation to target position`);
 
                 // Animate to dot appearance and position
                 windowElement.style.left = `${targetRect.x}px`;
@@ -352,11 +354,11 @@ export class GlyphMorph {
                     timeoutId = null;
                 }
 
-                console.log(`[Minimize] Animation completed for ${glyph.id}`);
+                log.debug(SEG.UI, `[Minimize] Animation completed for ${glyph.id}`);
                 windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
 
                 // Verify element identity is preserved
-                console.log(`[AXIOM CHECK] Same element after animation:`, windowElement);
+                log.debug(SEG.UI, `[AXIOM CHECK] Same element after animation:`, windowElement);
 
                 // Keep element visible but reset to glyph class
                 windowElement.className = 'glyph-run-glyph';
@@ -401,14 +403,14 @@ export class GlyphMorph {
                 windowElement.style.zIndex = '';
 
                 // Re-attach THE SAME ELEMENT to indicator container
-                console.log(`[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
+                log.debug(SEG.UI, `[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
                 onMorphComplete(windowElement, glyph);
             };
 
                 // Set up fallback timeout in case transitionend doesn't fire
                 // (e.g., due to reduced motion preference, CSS interruption, rapid user action)
                 timeoutId = setTimeout(() => {
-                    console.warn(`[Minimize] Timeout reached for ${glyph.id}, forcing completion`);
+                    log.warn(SEG.UI, `[Minimize] Timeout reached for ${glyph.id}, forcing completion`);
                     windowElement.removeEventListener('transitionend', onTransitionEnd as EventListener);
                     // Force completion by calling the handler
                     onTransitionEnd({ target: windowElement });
@@ -426,13 +428,13 @@ export class GlyphMorph {
     private calculateGlyphTargetPosition(): { x: number, y: number } {
         const tray = document.querySelector('.glyph-run');
         if (!tray) {
-            console.log(`[Minimize] No tray found, using default position`);
+            log.debug(SEG.UI, `[Minimize] No tray found, using default position`);
             return { x: window.innerWidth - 12, y: window.innerHeight / 2 };
         }
 
         const indicatorContainer = tray.querySelector('.glyph-run-indicators');
         if (!indicatorContainer) {
-            console.log(`[Minimize] No indicator container found`);
+            log.debug(SEG.UI, `[Minimize] No indicator container found`);
             return { x: window.innerWidth - 12, y: window.innerHeight / 2 };
         }
 
@@ -442,7 +444,7 @@ export class GlyphMorph {
 
         // Count existing glyphs in tray (not including the one being minimized which is on body)
         const glyphsInTray = Array.from(indicatorContainer.querySelectorAll('.glyph-run-glyph'));
-        console.log(`[Minimize] Found ${glyphsInTray.length} glyphs already in tray`);
+        log.debug(SEG.UI, `[Minimize] Found ${glyphsInTray.length} glyphs already in tray`);
 
         // The minimizing glyph will be added at the end
         const index = glyphsInTray.length;
@@ -451,8 +453,8 @@ export class GlyphMorph {
         const x = trayRect.right - glyphSize;
         const y = trayRect.top + (index * (glyphSize + gap));
 
-        console.log(`[Minimize] Calculated position for index ${index}: x=${x}, y=${y}`);
-        console.log(`[Minimize] Tray rect:`, trayRect);
+        log.debug(SEG.UI, `[Minimize] Calculated position for index ${index}: x=${x}, y=${y}`);
+        log.debug(SEG.UI, `[Minimize] Tray rect:`, trayRect);
 
         return { x, y };
     }
@@ -552,11 +554,4 @@ export class GlyphMorph {
         handle.addEventListener('touchstart', startDrag, { passive: false });
     }
 
-    /**
-     * Strip HTML tags from title for plain text display
-     */
-    private stripHtml(html: string): string {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        return doc.body.textContent || '';
-    }
 }
