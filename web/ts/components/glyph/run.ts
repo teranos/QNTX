@@ -29,6 +29,7 @@
  */
 
 import { log, SEG } from '../../logger';
+import { stripHtml } from '../../html-utils';
 import { uiState } from '../../state/ui';
 import { GlyphProximity } from './proximity';
 import { GlyphMorph, type Glyph, getMaximizeDuration } from './window';
@@ -88,7 +89,7 @@ class GlyphRunImpl {
         // Attach click handler that will persist with the element forever
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            console.log(`[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(glyph));
+            log.debug(SEG.UI, `[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(glyph));
 
             // Only morph if in collapsed state (not already a window)
             if (!isInWindowState(glyph)) {
@@ -188,7 +189,7 @@ class GlyphRunImpl {
         this.proximity.updateProximity(
             this.indicatorContainer,
             this.items,
-            (html) => this.stripHtml(html),
+            stripHtml,
             this.isRestoring
         );
     }
@@ -331,13 +332,6 @@ class GlyphRunImpl {
     }
 
 
-    /**
-     * Strip HTML tags from title for plain text display in expanded dots
-     */
-    private stripHtml(html: string): string {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        return doc.body.textContent || '';
-    }
 
     /**
      * Verify element tracking for morph operations
@@ -368,7 +362,7 @@ class GlyphRunImpl {
         // (Event listeners can be lost during certain DOM manipulations)
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            console.log(`[Glyph ${glyph.id}] Click detected, windowState:`, isInWindowState(glyphElement));
+            log.debug(SEG.UI, `[Glyph ${glyph.id}] Click detected, windowState:`, isInWindowState(glyphElement));
 
             if (!isInWindowState(glyphElement)) {
                 this.isRestoring = true;
@@ -457,7 +451,7 @@ class GlyphRunImpl {
             }
         });
 
-        console.log(`✓ Invariant verified: ${this.glyphElements.size} glyphs maintain single-element axiom`);
+        log.info(SEG.UI, `✓ Invariant verified: ${this.glyphElements.size} glyphs maintain single-element axiom`);
     }
 }
 
