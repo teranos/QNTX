@@ -67,19 +67,28 @@ export function beginMinimizeMorph(
 
     // Return a promise that represents the transaction
     return new Promise((resolve, reject) => {
-        animation.addEventListener('finish', () => {
+        const handleFinish = () => {
             // COMMIT: Animation completed successfully
             log.debug(SEG.UI, '[MorphTransaction] Minimize committed');
             activeAnimations.delete(element);
+            // Clean up event listeners to prevent memory leaks
+            animation.removeEventListener('finish', handleFinish);
+            animation.removeEventListener('cancel', handleCancel);
             resolve();
-        });
+        };
 
-        animation.addEventListener('cancel', () => {
+        const handleCancel = () => {
             // ROLLBACK: Animation was cancelled
             log.debug(SEG.UI, '[MorphTransaction] Minimize rolled back');
             activeAnimations.delete(element);
+            // Clean up event listeners to prevent memory leaks
+            animation.removeEventListener('finish', handleFinish);
+            animation.removeEventListener('cancel', handleCancel);
             reject(new Error('Animation cancelled'));
-        });
+        };
+
+        animation.addEventListener('finish', handleFinish);
+        animation.addEventListener('cancel', handleCancel);
     });
 }
 
@@ -141,19 +150,28 @@ export function beginMaximizeMorph(
 
     // Return a promise that represents the transaction
     return new Promise((resolve, reject) => {
-        animation.addEventListener('finish', () => {
+        const handleFinish = () => {
             // COMMIT: Animation completed successfully
             log.debug(SEG.UI, '[MorphTransaction] Maximize committed');
             activeAnimations.delete(element);
+            // Clean up event listeners to prevent memory leaks
+            animation.removeEventListener('finish', handleFinish);
+            animation.removeEventListener('cancel', handleCancel);
             resolve();
-        });
+        };
 
-        animation.addEventListener('cancel', () => {
+        const handleCancel = () => {
             // ROLLBACK: Animation was cancelled
             log.debug(SEG.UI, '[MorphTransaction] Maximize rolled back');
             activeAnimations.delete(element);
+            // Clean up event listeners to prevent memory leaks
+            animation.removeEventListener('finish', handleFinish);
+            animation.removeEventListener('cancel', handleCancel);
             reject(new Error('Animation cancelled'));
-        });
+        };
+
+        animation.addEventListener('finish', handleFinish);
+        animation.addEventListener('cancel', handleCancel);
     });
 }
 
