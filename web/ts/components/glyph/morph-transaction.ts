@@ -19,7 +19,8 @@ const activeAnimations = new WeakMap<HTMLElement, Animation>();
 export function beginMinimizeMorph(
     element: HTMLElement,
     fromRect: DOMRect,
-    toPosition: { x: number; y: number }
+    toPosition: { x: number; y: number },
+    duration: number
 ): Promise<void> {
     // Cancel any existing animation for this element (exclusivity)
     const existing = activeAnimations.get(element);
@@ -56,7 +57,7 @@ export function beginMinimizeMorph(
 
     // Begin the transaction
     const animation = element.animate(keyframes, {
-        duration: 200, // Match existing minimize duration
+        duration,
         easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         fill: 'none' // Don't hold final state - we'll commit it manually
     });
@@ -89,7 +90,8 @@ export function beginMinimizeMorph(
 export function beginMaximizeMorph(
     element: HTMLElement,
     fromRect: DOMRect,
-    toPosition: { x: number; y: number; width: number; height: number }
+    toPosition: { x: number; y: number; width: number; height: number },
+    duration: number
 ): Promise<void> {
     // Cancel any existing animation for this element (exclusivity)
     const existing = activeAnimations.get(element);
@@ -129,7 +131,7 @@ export function beginMaximizeMorph(
 
     // Begin the transaction
     const animation = element.animate(keyframes, {
-        duration: 350, // Match existing maximize duration
+        duration,
         easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         fill: 'none' // Don't hold final state - we'll commit it manually
     });
