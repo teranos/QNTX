@@ -220,4 +220,14 @@ export class ProseEditor {
     getHasUnsavedChanges(): boolean {
         return this.hasUnsavedChanges;
     }
+
+    /**
+     * Get the current editor content as markdown
+     */
+    getContent(): string {
+        if (!this.editorView) {
+            return '';
+        }
+        return proseMarkdownSerializer.serialize(this.editorView.state.doc);
+    }
 }
