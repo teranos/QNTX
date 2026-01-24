@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -653,10 +652,4 @@ func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusNotFound, "Unknown prompt endpoint")
 	}
-}
-
-// executePromptAxQuery is a helper that executes an ax query and returns the result
-func (s *QNTXServer) executePromptAxQuery(ctx context.Context, filter types.AxFilter) (*types.AxResult, error) {
-	executor := storage.NewExecutor(s.db)
-	return executor.ExecuteAsk(ctx, filter)
 }
