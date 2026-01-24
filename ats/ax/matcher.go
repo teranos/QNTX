@@ -4,15 +4,11 @@ package ax
 type MatcherBackend string
 
 const (
-	// MatcherBackendGo indicates the built-in Go implementation
-	MatcherBackendGo MatcherBackend = "go"
-	// MatcherBackendRust indicates the CGO-backed Rust implementation
+	// MatcherBackendRust indicates the CGO-backed Rust implementation (qntx-core)
 	MatcherBackendRust MatcherBackend = "rust"
 )
 
 // Matcher defines the interface for fuzzy matching implementations.
-// Both the built-in Go implementation and CGO-backed Rust implementation
-// satisfy this interface.
 type Matcher interface {
 	// FindMatches finds predicates that match the query using fuzzy logic.
 	// Returns matching predicates from the provided vocabulary.
@@ -22,36 +18,24 @@ type Matcher interface {
 	// Returns matching contexts from the provided vocabulary.
 	FindContextMatches(queryContext string, allContexts []string) []string
 
-	// Backend returns which implementation is being used (go or rust)
+	// Backend returns which implementation is being used
 	Backend() MatcherBackend
 
 	// SetLogger sets an optional logger for debug output.
-	// Implementations may ignore this if logging is not supported.
 	SetLogger(logger interface{})
 }
 
-// NewDefaultMatcher creates the best available matcher implementation.
-// Prefers Rust CGO matcher if available (built with -tags rustfuzzy),
-// otherwise falls back to Go implementation.
+// NewDefaultMatcher creates the Rust-backed matcher (qntx-core via CGO).
+// Panics if the Rust library is not available - build with -tags rustfuzzy.
 func NewDefaultMatcher() Matcher {
-	// Try CGO matcher first (only available with -tags rustfuzzy)
-	if matcher, err := NewCGOMatcher(); err == nil {
-		return matcher
+	matcher, err := NewCGOMatcher()
+	if err != nil {
+		panic("qntx-core fuzzy matcher not available: " + err.Error() + " (build with -tags rustfuzzy)")
 	}
-	// Fall back to Go implementation
-	return NewFuzzyMatcher()
+	return matcher
 }
 
-// DetectBackend returns which fuzzy backend is available without
-// creating a matcher instance. This is more efficient than creating
-// a matcher just to check the backend.
+// DetectBackend returns the fuzzy backend (always Rust with qntx-core).
 func DetectBackend() MatcherBackend {
-	// Check if CGO matcher is available (build tag check)
-	if _, err := NewCGOMatcher(); err == nil {
-		return MatcherBackendRust
-	}
-	return MatcherBackendGo
+	return MatcherBackendRust
 }
-
-// Ensure FuzzyMatcher implements Matcher
-var _ Matcher = (*FuzzyMatcher)(nil)
