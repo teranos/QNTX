@@ -104,7 +104,12 @@ impl<'a> Lexer<'a> {
             return Token::new(kind, text, start);
         }
 
-        // Check if it's a natural predicate (contains underscore or specific patterns)
+        // TODO: Natural predicate detection is not very sophisticated. Currently it just
+        // checks for underscores or common prefixes. A more advanced implementation could:
+        // - Use NLP to detect verb phrases vs nouns
+        // - Support camelCase predicates (isAuthorOf)
+        // - Handle multi-word predicates without underscores
+        // - Detect semantic patterns like "X of Y" relationships
         let kind = if text.contains('_') || text.starts_with("is_") || text.starts_with("has_") {
             TokenKind::NaturalPredicate
         } else {
