@@ -369,6 +369,14 @@ export interface PromptPreviewResponse {
    */
   samples: PreviewSample[];
   /**
+   * Number of successful samples
+   */
+  success_count: number;
+  /**
+   * Number of failed samples
+   */
+  failure_count: number;
+  /**
    * Global error if any
    */
   error?: string;

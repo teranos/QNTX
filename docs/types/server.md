@@ -264,7 +264,7 @@ type PluginInfo struct {
 
 ## PreviewSample {#previewsample}
 
-**Source**: [`server/prompt_handlers.go:35`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L35)
+**Source**: [`server/prompt_handlers.go:44`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L44)
 
 
 ```go
@@ -295,7 +295,7 @@ type ProgressMessage struct {
 
 ## PromptExecuteRequest {#promptexecuterequest}
 
-**Source**: [`server/prompt_handlers.go:54`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L54)
+**Source**: [`server/prompt_handlers.go:65`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L65)
 
 
 ```go
@@ -310,7 +310,7 @@ type PromptExecuteRequest struct {
 
 ## PromptExecuteResponse {#promptexecuteresponse}
 
-**Source**: [`server/prompt_handlers.go:83`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L83)
+**Source**: [`server/prompt_handlers.go:94`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L94)
 
 
 ```go
@@ -323,7 +323,7 @@ type PromptExecuteResponse struct {
 
 ## PromptPreviewRequest {#promptpreviewrequest}
 
-**Source**: [`server/prompt_handlers.go:23`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L23)
+**Source**: [`server/prompt_handlers.go:32`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L32)
 
 
 ```go
@@ -341,7 +341,7 @@ type PromptPreviewRequest struct {
 
 ## PromptPreviewResponse {#promptpreviewresponse}
 
-**Source**: [`server/prompt_handlers.go:46`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L46)
+**Source**: [`server/prompt_handlers.go:55`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L55)
 
 
 ```go
@@ -349,13 +349,15 @@ type PromptPreviewResponse struct {
 	TotalAttestations int `json:"total_attestations"`
 	SampleSize int `json:"sample_size"`
 	Samples []PreviewSample `json:"samples"`
+	SuccessCount int `json:"success_count"`
+	FailureCount int `json:"failure_count"`
 	Error string `json:"error,omitempty"`
 }
 ```
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:419`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L419)
+**Source**: [`server/prompt_handlers.go:461`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L461)
 
 
 ```go
@@ -483,7 +485,7 @@ type QueryMessage struct {
 
 ## Result {#result}
 
-**Source**: [`server/prompt_handlers.go:63`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L63)
+**Source**: [`server/prompt_handlers.go:74`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L74)
 
 
 ```go
