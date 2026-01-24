@@ -31,9 +31,11 @@ pub mod attestation;
 pub mod classify;
 pub mod fuzzy;
 pub mod parser;
+pub mod storage;
 
 // Re-export main types at crate root
 pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
 pub use classify::{ActorCredibility, ClassificationResult, ConflictType};
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};
 pub use parser::{AxQuery, ParseError, Parser, TemporalClause};
+pub use storage::{AttestationStore, MemoryStore, QueryStore, StoreError};
