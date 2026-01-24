@@ -13,6 +13,60 @@ import { log, SEG } from '../../logger';
 const activeAnimations = new WeakMap<HTMLElement, Animation>();
 
 /**
+ * Core animation transaction helper
+ * Handles exclusivity, promise wrapping, and event listener cleanup
+ */
+function createMorphAnimation(
+    element: HTMLElement,
+    keyframes: Keyframe[],
+    duration: number,
+    transactionName: string
+): Promise<void> {
+    // Cancel any existing animation for this element (exclusivity)
+    const existing = activeAnimations.get(element);
+    if (existing) {
+        log.debug(SEG.UI, '[MorphTransaction] Cancelling existing animation');
+        existing.cancel();
+    }
+
+    // Create and configure the animation
+    const animation = element.animate(keyframes, {
+        duration,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        fill: 'none' // Don't hold final state - we'll commit it manually
+    });
+
+    // Track this as the exclusive animation for this element
+    activeAnimations.set(element, animation);
+
+    // Return a promise that represents the transaction
+    return new Promise((resolve, reject) => {
+        const handleFinish = () => {
+            // COMMIT: Animation completed successfully
+            log.debug(SEG.UI, `[MorphTransaction] ${transactionName} committed`);
+            activeAnimations.delete(element);
+            // Clean up event listeners to prevent memory leaks
+            animation.removeEventListener('finish', handleFinish);
+            animation.removeEventListener('cancel', handleCancel);
+            resolve();
+        };
+
+        const handleCancel = () => {
+            // ROLLBACK: Animation was cancelled
+            log.debug(SEG.UI, `[MorphTransaction] ${transactionName} rolled back`);
+            activeAnimations.delete(element);
+            // Clean up event listeners to prevent memory leaks
+            animation.removeEventListener('finish', handleFinish);
+            animation.removeEventListener('cancel', handleCancel);
+            reject(new Error('Animation cancelled'));
+        };
+
+        animation.addEventListener('finish', handleFinish);
+        animation.addEventListener('cancel', handleCancel);
+    });
+}
+
+/**
  * Begin a morph transaction for minimize
  * Ensures exclusive animation and provides commit/rollback semantics
  */
@@ -22,13 +76,6 @@ export function beginMinimizeMorph(
     toPosition: { x: number; y: number },
     duration: number
 ): Promise<void> {
-    // Cancel any existing animation for this element (exclusivity)
-    const existing = activeAnimations.get(element);
-    if (existing) {
-        log.debug(SEG.UI, '[MorphTransaction] Cancelling existing animation');
-        existing.cancel();
-    }
-
     // Define the morph keyframes
     const keyframes: Keyframe[] = [
         // From: Window state
@@ -55,41 +102,7 @@ export function beginMinimizeMorph(
         }
     ];
 
-    // Begin the transaction
-    const animation = element.animate(keyframes, {
-        duration,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        fill: 'none' // Don't hold final state - we'll commit it manually
-    });
-
-    // Track this as the exclusive animation for this element
-    activeAnimations.set(element, animation);
-
-    // Return a promise that represents the transaction
-    return new Promise((resolve, reject) => {
-        const handleFinish = () => {
-            // COMMIT: Animation completed successfully
-            log.debug(SEG.UI, '[MorphTransaction] Minimize committed');
-            activeAnimations.delete(element);
-            // Clean up event listeners to prevent memory leaks
-            animation.removeEventListener('finish', handleFinish);
-            animation.removeEventListener('cancel', handleCancel);
-            resolve();
-        };
-
-        const handleCancel = () => {
-            // ROLLBACK: Animation was cancelled
-            log.debug(SEG.UI, '[MorphTransaction] Minimize rolled back');
-            activeAnimations.delete(element);
-            // Clean up event listeners to prevent memory leaks
-            animation.removeEventListener('finish', handleFinish);
-            animation.removeEventListener('cancel', handleCancel);
-            reject(new Error('Animation cancelled'));
-        };
-
-        animation.addEventListener('finish', handleFinish);
-        animation.addEventListener('cancel', handleCancel);
-    });
+    return createMorphAnimation(element, keyframes, duration, 'Minimize');
 }
 
 /**
@@ -102,13 +115,6 @@ export function beginMaximizeMorph(
     toPosition: { x: number; y: number; width: number; height: number },
     duration: number
 ): Promise<void> {
-    // Cancel any existing animation for this element (exclusivity)
-    const existing = activeAnimations.get(element);
-    if (existing) {
-        log.debug(SEG.UI, '[MorphTransaction] Cancelling existing animation');
-        existing.cancel();
-    }
-
     // Capture current computed styles (may be proximity-expanded)
     const computedStyle = window.getComputedStyle(element);
 
@@ -138,41 +144,7 @@ export function beginMaximizeMorph(
         }
     ];
 
-    // Begin the transaction
-    const animation = element.animate(keyframes, {
-        duration,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        fill: 'none' // Don't hold final state - we'll commit it manually
-    });
-
-    // Track this as the exclusive animation for this element
-    activeAnimations.set(element, animation);
-
-    // Return a promise that represents the transaction
-    return new Promise((resolve, reject) => {
-        const handleFinish = () => {
-            // COMMIT: Animation completed successfully
-            log.debug(SEG.UI, '[MorphTransaction] Maximize committed');
-            activeAnimations.delete(element);
-            // Clean up event listeners to prevent memory leaks
-            animation.removeEventListener('finish', handleFinish);
-            animation.removeEventListener('cancel', handleCancel);
-            resolve();
-        };
-
-        const handleCancel = () => {
-            // ROLLBACK: Animation was cancelled
-            log.debug(SEG.UI, '[MorphTransaction] Maximize rolled back');
-            activeAnimations.delete(element);
-            // Clean up event listeners to prevent memory leaks
-            animation.removeEventListener('finish', handleFinish);
-            animation.removeEventListener('cancel', handleCancel);
-            reject(new Error('Animation cancelled'));
-        };
-
-        animation.addEventListener('finish', handleFinish);
-        animation.addEventListener('cancel', handleCancel);
-    });
+    return createMorphAnimation(element, keyframes, duration, 'Maximize');
 }
 
 
