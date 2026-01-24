@@ -19,16 +19,16 @@ import {
     setProximityText,
     setGlyphId
 } from './dataset';
-import { beginMinimizeMorph } from './morph-transaction';
+import { beginMaximizeMorph, beginMinimizeMorph } from './morph-transaction';
 
 export interface Glyph {
     id: string;
     title: string;
     renderContent: () => HTMLElement;    // Function to render window content
-    initialWidth?: string;                // Window width (e.g., "800px")
+    initialWidth?: string;            // Window width (e.g., "800px")
     initialHeight?: string;               // Window height (e.g., "600px")
-    defaultX?: number;                    // Window default X position
-    defaultY?: number;                    // Window default Y position
+    defaultX?: number;                // Window default X position
+    defaultY?: number;                // Window default Y position
     onClose?: () => void;
 }
 
@@ -41,7 +41,7 @@ function getPrefersReducedMotion(): boolean {
 }
 
 // Animation durations in milliseconds - adjust these to slow down/speed up morphing
-export const MAXIMIZE_DURATION_MS = 200;  // Base duration for dot → window
+export const MAXIMIZE_DURATION_MS = 350;  // Base duration for dot → window
 export const MINIMIZE_DURATION_MS = 200;  // Base duration for window → dot
 
 // Get actual durations considering reduced motion preference
@@ -94,15 +94,6 @@ export class GlyphMorph {
         // Get current glyph position and size (may be proximity-expanded)
         const glyphRect = glyphElement.getBoundingClientRect();
 
-        // Capture current computed styles to preserve proximity-expanded state
-        const computedStyle = window.getComputedStyle(glyphElement);
-        const currentWidth = glyphRect.width;
-        const currentHeight = glyphRect.height;
-        const currentBorderRadius = computedStyle.borderRadius;
-        const currentBackgroundColor = computedStyle.backgroundColor;
-        const currentOpacity = computedStyle.opacity;
-        const currentPadding = computedStyle.padding;
-
         // Calculate window target position
         const windowWidth = parseInt(glyph.initialWidth || DEFAULT_WINDOW_WIDTH);
         const windowHeight = parseInt(glyph.initialHeight || DEFAULT_WINDOW_HEIGHT);
@@ -129,31 +120,26 @@ export class GlyphMorph {
         // Apply initial fixed positioning at EXACT current state (including proximity expansion)
         glyphElement.className = 'glyph-morphing-to-window';
         glyphElement.style.position = 'fixed';
-        glyphElement.style.left = `${glyphRect.left}px`;
-        glyphElement.style.top = `${glyphRect.top}px`;
-        glyphElement.style.width = `${currentWidth}px`;
-        glyphElement.style.height = `${currentHeight}px`;
-        glyphElement.style.borderRadius = currentBorderRadius;
-        glyphElement.style.backgroundColor = currentBackgroundColor;
-        glyphElement.style.opacity = currentOpacity;
-        glyphElement.style.padding = currentPadding;
         glyphElement.style.zIndex = '1000';
 
         // Reparent to document body for morphing
         document.body.appendChild(glyphElement);
 
-        // Force a reflow to ensure initial styles are applied
-        glyphElement.offsetHeight;
-
-        // NOW set transition after element is positioned
-        glyphElement.style.transition = `all ${getMaximizeDuration()}ms cubic-bezier(0.4, 0, 0.2, 1)`;
-
         // Mark element as in-window-state (but keep glyph ID)
         setWindowState(glyphElement, true);
 
-        // Trigger morph animation after a frame to ensure initial styles are applied
-        requestAnimationFrame(() => {
-            // Apply window dimensions and position
+        // BEGIN TRANSACTION: Start the morph animation
+        beginMaximizeMorph(
+            glyphElement,
+            glyphRect,
+            { x: targetX, y: targetY, width: windowWidth, height: windowHeight },
+            getMaximizeDuration()
+        ).then(() => {
+            // COMMIT PHASE: Animation completed successfully
+            log.debug(SEG.UI, `[Maximize] Animation committed for ${glyph.id}`);
+
+            // Apply final window state
+            glyphElement.style.position = 'fixed';
             glyphElement.style.left = `${targetX}px`;
             glyphElement.style.top = `${targetY}px`;
             glyphElement.style.width = `${windowWidth}px`;
@@ -161,102 +147,100 @@ export class GlyphMorph {
             glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
             glyphElement.style.backgroundColor = 'var(--bg-primary)';
             glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
-            glyphElement.style.padding = '0'; // Reset padding to allow content to fill
-            glyphElement.style.opacity = '1'; // Ensure it's visible
+            glyphElement.style.padding = '0';
+            glyphElement.style.opacity = '1';
 
-            // After animation completes, add window content
-            setTimeout(() => {
-                // CRITICAL: Remove transition after morphing completes to allow smooth dragging
-                glyphElement.style.transition = '';
+            // Set up window as flex container
+            glyphElement.style.display = 'flex';
+            glyphElement.style.flexDirection = 'column';
 
-                // Set up window as flex container
-                glyphElement.style.display = 'flex';
-                glyphElement.style.flexDirection = 'column';
+            // Add window chrome (title bar, controls)
+            const titleBar = document.createElement('div');
+            titleBar.className = 'window-title-bar';
+            titleBar.style.height = TITLE_BAR_HEIGHT;
+            titleBar.style.backgroundColor = 'var(--bg-secondary)';
+            titleBar.style.borderBottom = '1px solid var(--border-color)';
+            titleBar.style.display = 'flex';
+            titleBar.style.alignItems = 'center';
+            titleBar.style.padding = TITLE_BAR_PADDING;
+            titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
 
-                // Add window chrome (title bar, controls)
-                const titleBar = document.createElement('div');
-                titleBar.className = 'window-title-bar';
-                titleBar.style.height = TITLE_BAR_HEIGHT;
-                titleBar.style.backgroundColor = 'var(--bg-secondary)';
-                titleBar.style.borderBottom = '1px solid var(--border-color)';
-                titleBar.style.display = 'flex';
-                titleBar.style.alignItems = 'center';
-                titleBar.style.padding = TITLE_BAR_PADDING;
-                titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
+            // Add title
+            const titleText = document.createElement('span');
+            titleText.textContent = stripHtml(glyph.title);
+            titleText.style.flex = '1';
+            titleBar.appendChild(titleText);
 
-                // Add title
-                const titleText = document.createElement('span');
-                titleText.textContent = stripHtml(glyph.title);
-                titleText.style.flex = '1';
-                titleBar.appendChild(titleText);
+            // Add minimize button
+            const minimizeBtn = document.createElement('button');
+            minimizeBtn.textContent = '−';
+            minimizeBtn.style.width = WINDOW_BUTTON_SIZE;
+            minimizeBtn.style.height = WINDOW_BUTTON_SIZE;
+            minimizeBtn.style.border = 'none';
+            minimizeBtn.style.background = 'transparent';
+            minimizeBtn.style.cursor = 'pointer';
+            minimizeBtn.onclick = () => this.morphToGlyph(
+                glyphElement,
+                glyph,
+                verifyElement,
+                onMinimize
+            );
+            titleBar.appendChild(minimizeBtn);
 
-                // Add minimize button
-                const minimizeBtn = document.createElement('button');
-                minimizeBtn.textContent = '−';
-                minimizeBtn.style.width = WINDOW_BUTTON_SIZE;
-                minimizeBtn.style.height = WINDOW_BUTTON_SIZE;
-                minimizeBtn.style.border = 'none';
-                minimizeBtn.style.background = 'transparent';
-                minimizeBtn.style.cursor = 'pointer';
-                minimizeBtn.onclick = () => this.morphToGlyph(
-                    glyphElement,
-                    glyph,
-                    verifyElement,
-                    onMinimize
-                );
-                titleBar.appendChild(minimizeBtn);
+            // Add close button if glyph has onClose
+            if (glyph.onClose) {
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '×';
+                closeBtn.style.width = WINDOW_BUTTON_SIZE;
+                closeBtn.style.height = WINDOW_BUTTON_SIZE;
+                closeBtn.style.border = 'none';
+                closeBtn.style.background = 'transparent';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.onclick = () => {
+                    // Remove from tray data AND remove element
+                    onRemove(glyph.id);
+                    glyphElement.remove();
+                    // Call onClose in try-catch (cleanup already done, so safe if it fails)
+                    try {
+                        glyph.onClose!();
+                    } catch (error) {
+                        log.error(SEG.UI, `[Glyph ${glyph.id}] Error in onClose callback:`, error);
+                    }
+                };
+                titleBar.appendChild(closeBtn);
+            }
 
-                // Add close button if glyph has onClose
-                if (glyph.onClose) {
-                    const closeBtn = document.createElement('button');
-                    closeBtn.textContent = '×';
-                    closeBtn.style.width = WINDOW_BUTTON_SIZE;
-                    closeBtn.style.height = WINDOW_BUTTON_SIZE;
-                    closeBtn.style.border = 'none';
-                    closeBtn.style.background = 'transparent';
-                    closeBtn.style.cursor = 'pointer';
-                    closeBtn.onclick = () => {
-                        // Remove from tray data AND remove element
-                        onRemove(glyph.id);
-                        glyphElement.remove();
-                        // Call onClose in try-catch (cleanup already done, so safe if it fails)
-                        try {
-                            glyph.onClose!();
-                        } catch (error) {
-                            log.error(SEG.UI, `[Glyph ${glyph.id}] Error in onClose callback:`, error);
-                        }
-                    };
-                    titleBar.appendChild(closeBtn);
-                }
+            glyphElement.appendChild(titleBar);
 
-                glyphElement.appendChild(titleBar);
-
-                // Add content area with error boundary
-                try {
-                    const content = glyph.renderContent();
-                    content.style.padding = CONTENT_PADDING;
-                    content.style.flex = '1'; // Take remaining space in flex container
-                    content.style.overflow = 'auto';
-                    glyphElement.appendChild(content);
-                } catch (error) {
-                    // Show error UI if renderContent fails
-                    log.error(SEG.UI, `[Glyph ${glyph.id}] Error rendering content:`, error);
-                    const errorContent = document.createElement('div');
-                    errorContent.style.padding = CONTENT_PADDING;
-                    errorContent.style.flex = '1';
-                    errorContent.style.overflow = 'auto';
-                    errorContent.style.color = '#ef4444'; // Red error text
-                    errorContent.style.fontFamily = 'var(--font-mono)';
-                    errorContent.innerHTML = `
+            // Add content area with error boundary
+            try {
+                const content = glyph.renderContent();
+                content.style.padding = CONTENT_PADDING;
+                content.style.flex = '1'; // Take remaining space in flex container
+                content.style.overflow = 'auto';
+                glyphElement.appendChild(content);
+            } catch (error) {
+                // Show error UI if renderContent fails
+                log.error(SEG.UI, `[Glyph ${glyph.id}] Error rendering content:`, error);
+                const errorContent = document.createElement('div');
+                errorContent.style.padding = CONTENT_PADDING;
+                errorContent.style.flex = '1';
+                errorContent.style.overflow = 'auto';
+                errorContent.style.color = '#ef4444'; // Red error text
+                errorContent.style.fontFamily = 'var(--font-mono)';
+                errorContent.innerHTML = `
                         <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>
                         <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
                     `;
-                    glyphElement.appendChild(errorContent);
-                }
+                glyphElement.appendChild(errorContent);
+            }
 
-                // Make window draggable
-                this.makeWindowDraggable(glyphElement, titleBar);
-            }, getMaximizeDuration()); // Match maximize animation duration
+            // Make window draggable
+            this.makeWindowDraggable(glyphElement, titleBar);
+        }).catch(error => {
+            // ROLLBACK: Animation was cancelled or failed
+            log.warn(SEG.UI, `[Maximize] Animation failed for ${glyph.id}:`, error);
+            // Element stays in glyph state, can retry
         });
     }
 
@@ -274,10 +258,7 @@ export class GlyphMorph {
         verifyElement(glyph.id, windowElement);
         log.debug(SEG.UI, `[AXIOM CHECK] Minimizing same element for ${glyph.id}:`, windowElement);
         // Find the position where this glyph should go back to
-        const targetRect = this.calculateGlyphTargetPosition();
-
         log.debug(SEG.UI, `[Minimize] Starting minimize for ${glyph.id}`);
-        log.debug(SEG.UI, `[Minimize] Target position: x=${targetRect.x}, y=${targetRect.y}`);
 
         // Get current window state before clearing anything
         const currentRect = windowElement.getBoundingClientRect();
@@ -286,132 +267,61 @@ export class GlyphMorph {
         // Remember window position for next time it opens
         setLastPosition(windowElement, currentRect.left, currentRect.top);
 
-        // Clear window state flag
-        setWindowState(windowElement, false);
-
-        // Clear window content but keep a visible background
+        // Clear window content immediately for visual feedback
         windowElement.innerHTML = '';
-        windowElement.textContent = ''; // Ensure text is also cleared
+        windowElement.textContent = '';
 
-        // Clear any proximity data attributes that might cause text to appear
-        setProximityText(windowElement, false);
+        // Calculate target position for the dot
+        // The glyph will go to the right side of the tray
+        const trayElement = document.querySelector('.glyph-run');
+        let targetX = window.innerWidth - 50; // Default to right side if no tray
+        let targetY = window.innerHeight / 2;
 
-        // FORCE class change - remove old class first
-        windowElement.classList.remove('glyph-morphing-to-window');
-        windowElement.className = 'window-morphing-to-glyph';
-        log.debug(SEG.UI, `[Minimize] Class changed to: ${windowElement.className}`);
-
-        // Set initial position for animation
-        windowElement.style.position = 'fixed';
-        windowElement.style.zIndex = '10000';
-
-        // BEGIN TRANSACTION: Start the morph animation
-        beginMinimizeMorph(windowElement, currentRect, targetRect).then(() => {
-            // COMMIT PHASE: Animation completed successfully
-            log.debug(SEG.UI, `[Minimize] Animation committed for ${glyph.id}`);
-
-            // Verify element identity is preserved
-            log.debug(SEG.UI, `[AXIOM CHECK] Same element after animation:`, windowElement);
-
-            // Apply final dot state
-            windowElement.style.position = 'fixed';
-            windowElement.style.left = `${targetRect.x}px`;
-            windowElement.style.top = `${targetRect.y}px`;
-            windowElement.style.width = '8px';
-            windowElement.style.height = '8px';
-            windowElement.style.borderRadius = '2px';
-            windowElement.style.backgroundColor = 'var(--bg-gray)';
-            windowElement.style.boxShadow = 'none';
-            windowElement.style.border = '1px solid var(--border-on-dark)';
-
-            // Reset to glyph class
-            windowElement.className = 'glyph-run-glyph';
-
-            // Clear all other inline styles
-            windowElement.style.padding = '';
-            windowElement.style.opacity = '';
-            windowElement.style.display = '';
-            windowElement.style.alignItems = '';
-            windowElement.style.justifyContent = '';
-            windowElement.style.whiteSpace = '';
-            windowElement.style.flexDirection = '';
-            windowElement.textContent = ''; // Ensure no text remains
-
-            // Keep the glyph ID
-            setGlyphId(windowElement, glyph.id);
-
-            // CRITICAL: Ensure windowState is cleared after animation
-            setWindowState(windowElement, false);
-
-            // CRITICAL: Clear hasText flag to prevent proximity text appearing
-            setProximityText(windowElement, false);
-
-            // Now remove from body and re-attach to indicator container (SAME ELEMENT)
-            windowElement.remove(); // Detach but element stays alive
-
-            // Clear ONLY positioning styles when re-attaching to indicator container
-            // The indicator container handles layout, so we don't need fixed positioning
-            windowElement.style.position = '';
-            windowElement.style.left = '';
-            windowElement.style.top = '';
-            windowElement.style.zIndex = '';
-
-            // Visual styles (width, height, colors) are now handled by the .glyph-run-glyph class
-            // We clear them here to let CSS take over rather than inline styles
-            windowElement.style.width = '';
-            windowElement.style.height = '';
-            windowElement.style.borderRadius = '';
-            windowElement.style.backgroundColor = '';
-            windowElement.style.boxShadow = '';
-            windowElement.style.border = '';
-
-            // Re-attach THE SAME ELEMENT to indicator container
-            log.debug(SEG.UI, `[AXIOM CHECK] Re-attaching same element to tray:`, windowElement);
-            onMorphComplete(windowElement, glyph);
-        }).catch(error => {
-            // ROLLBACK: Animation was cancelled or failed
-            log.warn(SEG.UI, `[Minimize] Animation failed for ${glyph.id}:`, error);
-            // Still complete the morph to maintain consistency
-            onMorphComplete(windowElement, glyph);
-        });
-    }
-
-    /**
-     * Calculate where a glyph should be positioned in the tray
-     */
-    private calculateGlyphTargetPosition(): { x: number, y: number } {
-        const tray = document.querySelector('.glyph-run');
-        if (!tray) {
-            log.debug(SEG.UI, `[Minimize] No tray found, using default position`);
-            return { x: window.innerWidth - 12, y: window.innerHeight / 2 };
+        if (trayElement) {
+            const trayRect = trayElement.getBoundingClientRect();
+            // Position at the right edge of the tray, centered vertically
+            targetX = trayRect.right - 20; // A bit inset from the edge
+            targetY = trayRect.top + trayRect.height / 2;
         }
 
-        const indicatorContainer = tray.querySelector('.glyph-run-indicators');
-        if (!indicatorContainer) {
-            log.debug(SEG.UI, `[Minimize] No indicator container found`);
-            return { x: window.innerWidth - 12, y: window.innerHeight / 2 };
-        }
+        log.debug(SEG.UI, `[Minimize] Target position: x=${targetX}, y=${targetY}`);
 
-        const trayRect = indicatorContainer.getBoundingClientRect();
-        const glyphSize = 8;
-        const gap = 2;
+        // Begin the minimize morph animation
+        // Element stays fixed on body during animation
+        beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
+            .then(() => {
+                // Animation completed successfully
+                log.debug(SEG.UI, `[Minimize] Animation complete for ${glyph.id}`);
 
-        // Count existing glyphs in tray (not including the one being minimized which is on body)
-        const glyphsInTray = Array.from(indicatorContainer.querySelectorAll('.glyph-run-glyph'));
-        log.debug(SEG.UI, `[Minimize] Found ${glyphsInTray.length} glyphs already in tray`);
+                // Now reparent the element to the indicator container
+                // Clear state flags
+                setWindowState(windowElement, false);
+                setProximityText(windowElement, false);
 
-        // The minimizing glyph will be added at the end
-        const index = glyphsInTray.length;
+                // Remove from body
+                windowElement.remove();
 
-        // Stack vertically in the indicator container
-        const x = trayRect.right - glyphSize;
-        const y = trayRect.top + (index * (glyphSize + gap));
+                // Clear all inline styles
+                windowElement.style.cssText = '';
 
-        log.debug(SEG.UI, `[Minimize] Calculated position for index ${index}: x=${x}, y=${y}`);
-        log.debug(SEG.UI, `[Minimize] Tray rect:`, trayRect);
+                // Apply glyph class
+                windowElement.className = 'glyph-run-glyph';
 
-        return { x, y };
+                // Keep the glyph ID
+                setGlyphId(windowElement, glyph.id);
+
+                // Re-attach to indicator container
+                log.debug(SEG.UI, `[Minimize] Re-attaching to indicator container`);
+                onMorphComplete(windowElement, glyph);
+            })
+            .catch(error => {
+                // Animation was cancelled or failed
+                log.warn(SEG.UI, `[Minimize] Animation failed for ${glyph.id}:`, error);
+                // Element stays in window state, can retry
+            });
     }
+
+    // calculateGlyphTargetPosition removed - Position calculated directly in minimize logic
 
     /**
      * Make a window draggable by its title bar
