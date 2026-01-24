@@ -18,12 +18,13 @@ func TestMarkSettingsFromSource(t *testing.T) {
 			"ticker_interval_seconds": 1,
 		}
 
-		sourceMap := make(map[string]SourceInfo)
-		markSettingsFromSource(settings, "", SourceUser, "/home/user/.qntx/am.toml", sourceMap)
+		// Test using the new TrackNestedSources function
+		ConfigSources = make(map[string]SourceInfo) // Reset
+		TrackNestedSources(settings, "", SourceUser, "/home/user/.qntx/am.toml")
 
-		assert.Len(t, sourceMap, 3)
-		assert.Equal(t, SourceUser, sourceMap["workers"].Source)
-		assert.Equal(t, "/home/user/.qntx/am.toml", sourceMap["workers"].Path)
+		assert.Len(t, ConfigSources, 3)
+		assert.Equal(t, SourceUser, ConfigSources["workers"].Source)
+		assert.Equal(t, "/home/user/.qntx/am.toml", ConfigSources["workers"].Path)
 	})
 
 	t.Run("Nested settings", func(t *testing.T) {
@@ -37,16 +38,16 @@ func TestMarkSettingsFromSource(t *testing.T) {
 			},
 		}
 
-		sourceMap := make(map[string]SourceInfo)
-		markSettingsFromSource(settings, "", SourceUser, "/test/am.toml", sourceMap)
+		ConfigSources = make(map[string]SourceInfo) // Reset
+		TrackNestedSources(settings, "", SourceUser, "/test/am.toml")
 
 		// Verify dotted keys are created correctly
-		assert.Equal(t, SourceUser, sourceMap["pulse.workers"].Source)
-		assert.Equal(t, SourceUser, sourceMap["pulse.daily_budget_usd"].Source)
-		assert.Equal(t, SourceUser, sourceMap["database.path"].Source)
+		assert.Equal(t, SourceUser, ConfigSources["pulse.workers"].Source)
+		assert.Equal(t, SourceUser, ConfigSources["pulse.daily_budget_usd"].Source)
+		assert.Equal(t, SourceUser, ConfigSources["database.path"].Source)
 
 		// Verify all have correct source path
-		assert.Equal(t, "/test/am.toml", sourceMap["pulse.workers"].Path)
+		assert.Equal(t, "/test/am.toml", ConfigSources["pulse.workers"].Path)
 	})
 
 	t.Run("Deeply nested settings", func(t *testing.T) {
@@ -58,11 +59,11 @@ func TestMarkSettingsFromSource(t *testing.T) {
 			},
 		}
 
-		sourceMap := make(map[string]SourceInfo)
-		markSettingsFromSource(settings, "", SourceProject, "/project/am.toml", sourceMap)
+		ConfigSources = make(map[string]SourceInfo) // Reset
+		TrackNestedSources(settings, "", SourceProject, "/project/am.toml")
 
 		// Verify deep nesting creates correct dotted key
-		info, exists := sourceMap["database.bounded_storage.actor_context_limit"]
+		info, exists := ConfigSources["database.bounded_storage.actor_context_limit"]
 		assert.True(t, exists)
 		assert.Equal(t, SourceProject, info.Source)
 		assert.Equal(t, "/project/am.toml", info.Path)
@@ -185,9 +186,7 @@ workers = 1
 		defer os.Setenv("QNTX_PULSE_DAILY_BUDGET_USD", oldEnv)
 		os.Setenv("QNTX_PULSE_DAILY_BUDGET_USD", "7.0")
 
-		// Simulate what buildSourceMap does
-		sourceMap := make(map[string]SourceInfo)
-
+		// Test environment variable override
 		settings := map[string]interface{}{
 			"pulse": map[string]interface{}{
 				"daily_budget_usd": 3.0,
@@ -195,13 +194,14 @@ workers = 1
 			},
 		}
 
-		markSettingsFromSource(settings, "", SourceUser, configPath, sourceMap)
+		ConfigSources = make(map[string]SourceInfo) // Reset
+		TrackNestedSources(settings, "", SourceUser, configPath)
 
-		// Check for environment variable override
-		for key := range sourceMap {
+		// Check for environment variable override (simulating what happens in load.go)
+		for key := range ConfigSources {
 			envKey := "QNTX_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
 			if os.Getenv(envKey) != "" {
-				sourceMap[key] = SourceInfo{
+				ConfigSources[key] = SourceInfo{
 					Source: SourceEnvironment,
 					Path:   envKey,
 				}
@@ -209,12 +209,12 @@ workers = 1
 		}
 
 		// Verify environment variable overrode file
-		assert.Equal(t, SourceEnvironment, sourceMap["pulse.daily_budget_usd"].Source)
-		assert.Equal(t, "QNTX_PULSE_DAILY_BUDGET_USD", sourceMap["pulse.daily_budget_usd"].Path)
+		assert.Equal(t, SourceEnvironment, ConfigSources["pulse.daily_budget_usd"].Source)
+		assert.Equal(t, "QNTX_PULSE_DAILY_BUDGET_USD", ConfigSources["pulse.daily_budget_usd"].Path)
 
 		// Verify non-env setting still has file source
-		assert.Equal(t, SourceUser, sourceMap["pulse.workers"].Source)
-		assert.Equal(t, configPath, sourceMap["pulse.workers"].Path)
+		assert.Equal(t, SourceUser, ConfigSources["pulse.workers"].Source)
+		assert.Equal(t, configPath, ConfigSources["pulse.workers"].Path)
 	})
 }
 

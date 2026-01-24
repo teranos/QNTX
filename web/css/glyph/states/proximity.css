@@ -1,0 +1,24 @@
+/**
+ * Glyph Proximity State - Expanded with text
+ *
+ * When mouse approaches, glyphs expand to show their title/label.
+ * Width ranges from 8px (dot) to 220px (fully expanded).
+ *
+ * Note: Most proximity styling happens via JavaScript for smooth
+ * continuous morphing based on mouse distance. These classes
+ * define the structural requirements for text display.
+ */
+
+/* Text appearance during proximity expansion */
+.glyph-run-glyph[data-has-text="true"] {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 6px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Proximity-based color shifts are handled in JavaScript */
+/* Background transitions from gray → blue based on distance */

@@ -1,0 +1,29 @@
+/**
+ * Glyph Dot State - Collapsed 8px indicator
+ *
+ * The minimal collapsed state of a glyph when not interacted with.
+ * This is the default resting state in the glyph run.
+ */
+
+.glyph-run-glyph {
+    width: 8px;
+    height: 8px;
+    border-radius: 0;
+    background: var(--bg-gray);
+    border: 1px solid var(--border-on-dark);
+    color: var(--text-on-dark);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    /* Smooth transition for proximity morphing between dot and expanded states */
+    transition: all 0.2s ease-out;
+    box-sizing: border-box;
+    /* Re-enable pointer events on dots (parent has none) */
+    pointer-events: auto;
+    /* Anchor to right edge - growth expands leftward */
+    margin-left: auto;
+}
+
+.glyph-run-glyph:hover {
+    background: color-mix(in srgb, var(--bg-gray) 90%, white 10%);
+}
