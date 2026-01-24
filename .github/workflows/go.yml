@@ -1,96 +1,92 @@
-name: Go
+# DEPRECATED: Pure Go testing disabled.
+# qntx-core (Rust) is now required - no stubs, no fallbacks.
+# See rsgo.yml for the hybrid Rust + Go pipeline.
+#
+# This file is kept for reference. All Go testing now happens
+# in rsgo.yml which builds Rust first and tests Go with it.
+
+name: Go (Deprecated)
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '**/*.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/go.yml'
-  push:
-    branches: [main]
-    paths:
-      - '**/*.go'
-      - 'go.mod'
-      - 'go.sum'
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only, for debugging
 
-jobs:
-  test:
-    name: Go Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run tests
-        run: go test ./...
-
-  integration:
-    name: Go Integration Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run integration tests
-        run: go test -tags=integration ./...
-
-  build:
-    name: Go Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Build
-        run: go build ./...
+# All jobs commented out - use rsgo.yml instead
+#
+# jobs:
+#   test:
+#     name: Go Tests
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#
+#       - name: Set up Go
+#         uses: actions/setup-go@v5
+#         with:
+#           go-version-file: go.mod
+#
+#       - name: Cache Go modules
+#         uses: actions/cache@v4
+#         with:
+#           path: ~/go/pkg/mod
+#           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+#           restore-keys: |
+#             ${{ runner.os }}-go-
+#
+#       - name: Download dependencies
+#         run: go mod download
+#
+#       - name: Run tests
+#         run: go test ./...
+#
+#   integration:
+#     name: Go Integration Tests
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#
+#       - name: Set up Go
+#         uses: actions/setup-go@v5
+#         with:
+#           go-version-file: go.mod
+#
+#       - name: Cache Go modules
+#         uses: actions/cache@v4
+#         with:
+#           path: ~/go/pkg/mod
+#           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+#           restore-keys: |
+#             ${{ runner.os }}-go-
+#
+#       - name: Download dependencies
+#         run: go mod download
+#
+#       - name: Run integration tests
+#         run: go test -tags=integration ./...
+#
+#   build:
+#     name: Go Build
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#
+#       - name: Set up Go
+#         uses: actions/setup-go@v5
+#         with:
+#           go-version-file: go.mod
+#
+#       - name: Cache Go modules
+#         uses: actions/cache@v4
+#         with:
+#           path: ~/go/pkg/mod
+#           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+#           restore-keys: |
+#             ${{ runner.os }}-go-
+#
+#       - name: Download dependencies
+#         run: go mod download
+#
+#       - name: Build
+#         run: go build ./...

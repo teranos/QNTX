@@ -1,0 +1,115 @@
+name: Rust + Go
+
+# Hybrid pipeline: qntx-core is always required.
+# Go code is never tested without Rust - no stubs, no fallbacks.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # Go changes
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      # Rust changes
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/*/Cargo.toml'
+      - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - '.github/workflows/rsgo.yml'
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/*/Cargo.toml'
+      - 'ats/ax/fuzzy-ax/Cargo.toml'
+  workflow_dispatch:
+
+jobs:
+  # Build Rust libraries first, then test Go with them
+  test:
+    name: Rust + Go Tests
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ats/ax/fuzzy-ax
+            crates/qntx-core
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      # --- Rust: qntx-core ---
+      - name: Build qntx-core
+        run: |
+          cd crates/qntx-core
+          cargo build --release --features native
+
+      - name: Test qntx-core
+        run: |
+          cd crates/qntx-core
+          cargo test --features native
+
+      # --- Rust: fuzzy-ax (CGO library) ---
+      - name: Check fuzzy-ax formatting
+        run: cd ats/ax/fuzzy-ax && cargo fmt --check
+
+      - name: Clippy fuzzy-ax
+        run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Build fuzzy-ax release
+        run: cd ats/ax/fuzzy-ax && cargo build --release --lib
+
+      - name: Test fuzzy-ax
+        run: cd ats/ax/fuzzy-ax && cargo test --lib
+
+      # --- Go: Always with Rust ---
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Go build (with Rust)
+        run: go build -tags rustfuzzy ./...
+        env:
+          CGO_ENABLED: "1"
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release
+
+      - name: Go tests (with Rust)
+        run: go test -tags rustfuzzy ./...
+        env:
+          CGO_ENABLED: "1"
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release
+
+      - name: Go integration tests (with Rust)
+        run: go test -tags "rustfuzzy integration" ./...
+        env:
+          CGO_ENABLED: "1"
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release
