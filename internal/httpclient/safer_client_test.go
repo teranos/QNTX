@@ -192,10 +192,10 @@ func TestIsPrivateIP(t *testing.T) {
 		{"93.184.216.34", "93.184.216.34", false}, // example.com
 
 		// IPv6
-		{"::1", "::1", true},                                   // Loopback
-		{"fe80::1", "fe80::1", true},                           // Link-local
-		{"fc00::1", "fc00::1", true},                           // ULA
-		{"2001:4860:4860::8888", "2001:4860:4860::8888", true}, // Public IPv6 (Google DNS) - blocked
+		{"::1", "::1", true},                                    // Loopback
+		{"fe80::1", "fe80::1", true},                            // Link-local
+		{"fc00::1", "fc00::1", true},                            // ULA
+		{"2001:4860:4860::8888", "2001:4860:4860::8888", false}, // Public IPv6 (Google DNS) - allowed
 	}
 
 	for _, tt := range tests {
