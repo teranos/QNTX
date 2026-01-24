@@ -1,0 +1,320 @@
+/**
+ * Type Definition Window Styles
+ * Floating window for configuring type field metadata
+ */
+
+/* Window content container */
+.type-definition-content {
+    min-width: 400px;
+}
+
+/* New type creation form */
+.new-type-form {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--panel-text-secondary, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--panel-bg, #fff);
+    border: 1px solid var(--panel-border-color, #e0e0e0);
+    border-radius: 4px;
+    color: var(--panel-text-primary, #333);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent-color, #0066cc);
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+/* Color input wrapper */
+.color-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.form-color {
+    width: 60px;
+    height: 36px;
+    border: 1px solid var(--panel-border-color, #e0e0e0);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.color-input-wrapper .form-input {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Form actions */
+.form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--panel-border-color, #e0e0e0);
+}
+
+.btn {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-primary {
+    background: var(--accent-color, #0066cc);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover, #0052a3);
+}
+
+.btn-secondary {
+    background: var(--panel-bg-secondary, #f0f0f0);
+    color: var(--panel-text-primary, #333);
+    border: 1px solid var(--panel-border-color, #e0e0e0);
+}
+
+.btn-secondary:hover {
+    background: var(--panel-bg-hover, #e8e8e8);
+}
+
+/* Type header section */
+.type-def-header {
+    padding: 12px;
+    border-bottom: var(--panel-border);
+    background: var(--panel-bg-secondary, #f8f8f8);
+}
+
+.type-def-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.type-def-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--panel-text-primary, #333);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.type-def-label {
+    color: var(--panel-text-secondary, #666);
+    font-size: 12px;
+}
+
+.type-def-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid var(--panel-border-color, #ddd);
+}
+
+/* Fields section */
+.type-def-fields {
+    padding: 12px;
+}
+
+.type-def-fields h3 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--panel-text-primary, #333);
+}
+
+/* Field list */
+.field-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Field item */
+.field-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--panel-bg, #fff);
+    border: 1px solid var(--panel-border-color, #e0e0e0);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.field-item:hover {
+    background: var(--panel-bg-hover, #f8f8f8);
+    border-color: var(--accent-color, #0066cc);
+}
+
+.field-item.selected {
+    background: var(--accent-bg, #e6f2ff);
+    border-color: var(--accent-color, #0066cc);
+    box-shadow: 0 0 0 1px var(--accent-color, #0066cc);
+}
+
+/* Rich string field highlighting - using fuzzy search yellow */
+.field-item.rich-string-field {
+    background: linear-gradient(90deg,
+        rgba(255, 235, 59, 0.1) 0%,
+        rgba(255, 235, 59, 0.05) 100%);
+}
+
+.field-item.rich-string-field .field-name {
+    color: #333;
+    text-shadow: 0 0 8px rgba(255, 235, 59, 0.4);
+}
+
+.field-item.rich-string-field.selected {
+    background: linear-gradient(90deg,
+        rgba(255, 235, 59, 0.2) 0%,
+        rgba(230, 242, 255, 1) 100%);
+}
+
+/* Field name */
+.field-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--panel-text-primary, #333);
+}
+
+/* Field indicators */
+.field-indicators {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.indicator {
+    font-size: 14px;
+    opacity: 0.8;
+    cursor: help;
+}
+
+.fuzzy-indicator {
+    color: #ffeb3b; /* Yellow like fuzzy search */
+    text-shadow: 0 0 4px rgba(255, 235, 59, 0.5);
+}
+
+.array-indicator {
+    color: #3498db;
+}
+
+/* Add field input */
+.add-field {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--panel-border-color, #e0e0e0);
+}
+
+.add-field-input {
+    flex: 1;
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--panel-bg, #fff);
+    border: 1px solid var(--panel-border-color, #e0e0e0);
+    border-radius: 4px;
+    color: var(--panel-text-primary, #333);
+}
+
+.add-field-input:focus {
+    outline: none;
+    border-color: var(--accent-color, #0066cc);
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.add-field-btn {
+    padding: 6px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--accent-color, #0066cc);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.add-field-btn:hover {
+    background: var(--accent-hover, #0052a3);
+}
+
+/* Field controls section */
+.field-controls {
+    padding: 12px;
+    background: var(--panel-bg-secondary, #f8f8f8);
+    border-top: var(--panel-border);
+}
+
+.field-controls h4 {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--panel-text-secondary, #666);
+    letter-spacing: 0.5px;
+}
+
+/* Field control options */
+.field-control-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.field-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.field-option input[type="checkbox"] {
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.field-option span {
+    display: block;
+}
+
+.field-option span:first-of-type {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--panel-text-primary, #333);
+}
+
+.field-option-desc {
+    font-size: 11px;
+    color: var(--panel-text-secondary, #666);
+    margin-top: 2px;
+}

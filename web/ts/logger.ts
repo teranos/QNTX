@@ -23,7 +23,7 @@
  *   - ai-provider-window.ts (9)
  *   - plugin-panel.ts (17)
  *   - debug.ts (5)
- *   - legenda.ts (1)
+ *   - type-attestations.ts (1)
  *   - pulse-panel.ts (1)
  *   - hixtory-panel.ts (4)
  *   - webscraper-panel.ts (1)

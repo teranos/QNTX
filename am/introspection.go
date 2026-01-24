@@ -2,11 +2,10 @@ package am
 
 import (
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/pelletier/go-toml/v2"
+	"github.com/teranos/QNTX/errors"
 )
 
 // ConfigSource represents where a configuration value came from
@@ -36,23 +35,29 @@ type ConfigIntrospection struct {
 }
 
 // GetConfigIntrospection returns detailed information about active configuration
-// with accurate source tracking by reading each config file individually
+// using the sources tracked during actual configuration loading
 func GetConfigIntrospection() (*ConfigIntrospection, error) {
 	v := GetViper()
+
+	// If sources haven't been tracked yet, force a load
+	if len(ConfigSources) == 0 {
+		_, err := Load()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load config for introspection")
+		}
+	}
 
 	introspection := &ConfigIntrospection{
 		ConfigFile: v.ConfigFileUsed(),
 		Settings:   make([]SettingInfo, 0),
 	}
 
-	// Build map of settings to their sources by reading each config file
-	sourceMap := buildSourceMap()
-
 	// Get all effective settings from merged Viper config
 	allSettings := v.AllSettings()
 
-	// Flatten nested settings and assign sources
-	flattenSettingsWithSources(allSettings, "", introspection, sourceMap)
+	// Use the sources we tracked during loading (single source of truth!)
+	// This ensures introspection matches exactly what was loaded
+	flattenSettingsWithSources(allSettings, "", introspection, ConfigSources)
 
 	return introspection, nil
 }
@@ -62,75 +67,6 @@ func GetConfigIntrospection() (*ConfigIntrospection, error) {
 type SourceInfo struct {
 	Source ConfigSource // The type of config source (default, system, user, etc.)
 	Path   string       // File path or environment variable name
-}
-
-// buildSourceMap reads each config file and builds a map of setting -> source info
-// Precedence order (lowest to highest): System < User < User UI < Project < Environment
-func buildSourceMap() map[string]SourceInfo {
-	sourceMap := make(map[string]SourceInfo)
-
-	// Get home directory for user config paths
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// If we can't get home directory, skip user/UI configs and use system/project only
-		homeDir = ""
-	}
-
-	// Define config files in precedence order (lowest to highest)
-	// Supports both am.toml (new) and config.toml (backward compat)
-	configFiles := []struct {
-		path   string
-		source ConfigSource
-	}{
-		{"/etc/qntx/am.toml", SourceSystem},
-		{"/etc/qntx/config.toml", SourceSystem},
-		{filepath.Join(homeDir, ".qntx", "am.toml"), SourceUser},
-		{filepath.Join(homeDir, ".qntx", "config.toml"), SourceUser},
-		{filepath.Join(homeDir, ".qntx", "am_from_ui.toml"), SourceUserUI},
-		{filepath.Join(homeDir, ".qntx", "config_from_ui.toml"), SourceUserUI},
-		{findProjectConfig(), SourceProject},
-	}
-
-	// Read each config file and mark settings with their source
-	for _, cf := range configFiles {
-		if cf.path == "" {
-			continue // Skip if path not found (e.g., no project config or no home dir)
-		}
-
-		if data, err := os.ReadFile(cf.path); err == nil {
-			var settings map[string]interface{}
-			if err := toml.Unmarshal(data, &settings); err == nil {
-				// Flatten and mark all settings from this file
-				markSettingsFromSource(settings, "", cf.source, cf.path, sourceMap)
-			}
-		}
-	}
-
-	// Note: Environment variable checks happen in flattenSettingsWithSources()
-	// to ensure they override all file-based sources
-
-	return sourceMap
-}
-
-// markSettingsFromSource recursively marks all settings from a config file with their source
-func markSettingsFromSource(settings map[string]interface{}, prefix string, source ConfigSource, sourcePath string, sourceMap map[string]SourceInfo) {
-	for key, value := range settings {
-		fullKey := key
-		if prefix != "" {
-			fullKey = prefix + "." + key
-		}
-
-		// If nested map, recurse
-		if nestedMap, ok := value.(map[string]interface{}); ok {
-			markSettingsFromSource(nestedMap, fullKey, source, sourcePath, sourceMap)
-		} else {
-			// Mark this setting with its source (later files override earlier)
-			sourceMap[fullKey] = SourceInfo{
-				Source: source,
-				Path:   sourcePath,
-			}
-		}
-	}
 }
 
 // flattenSettingsWithSources flattens settings and assigns sources from sourceMap
