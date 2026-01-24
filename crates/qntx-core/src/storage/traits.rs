@@ -2,7 +2,6 @@
 
 use crate::attestation::{Attestation, AxFilter, AxResult};
 use crate::storage::error::StoreResult;
-use std::collections::HashMap;
 
 /// Core storage operations for attestations.
 ///
@@ -89,6 +88,7 @@ pub struct StorageStats {
 
 /// Filter for querying attestations (simpler than AxFilter for basic queries)
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct AttestationFilter {
     pub subjects: Option<Vec<String>>,
     pub predicates: Option<Vec<String>>,
@@ -99,6 +99,7 @@ pub struct AttestationFilter {
     pub limit: Option<usize>,
 }
 
+#[allow(dead_code)]
 impl AttestationFilter {
     pub fn new() -> Self {
         Self::default()
