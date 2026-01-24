@@ -33,4 +33,4 @@
 mod engine;
 mod strategies;
 
-pub use engine::{FuzzyEngine, FuzzyMatch, VocabularyType};
+pub use engine::{EngineConfig, FuzzyEngine, FuzzyMatch, VocabularyType};

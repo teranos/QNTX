@@ -1,28 +1,24 @@
 [package]
 name = "qntx-fuzzy"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "High-performance fuzzy matching library for QNTX (CGO)"
 license = "MIT"
 authors = ["QNTX Contributors"]
 
 [dependencies]
-# String similarity algorithms
-strsim = "0.11"           # Levenshtein, Jaro-Winkler, etc.
-rphonetic = "3.0"         # Phonetic matching (Double Metaphone, Soundex)
-
-# Performance
-memchr = "2.7"            # SIMD-accelerated substring search
-rayon = "1.10"            # Parallel iteration for large vocabularies
+# Core engine from qntx-core (with native optimizations)
+qntx-core = { path = "../../../crates/qntx-core", features = ["native"] }
 
 # Logging
 log = "0.4"               # Logging facade
 env_logger = "0.11"       # Environment-based logger configuration
 
-# Utilities
-parking_lot = "0.12"      # Fast RwLock for thread safety
-ahash = "0.8"             # Fast hashing for vocabulary change detection
-serde_json = "1.0"        # For parsing JSON attributes
+# Thread safety for CGO (multiple goroutines)
+parking_lot = "0.12"      # Fast RwLock
+
+# JSON parsing for attribute search (CGO-specific feature)
+serde_json = "1.0"
 
 [profile.release]
 lto = true
