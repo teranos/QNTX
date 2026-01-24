@@ -56,6 +56,8 @@ type PromptPreviewResponse struct {
 	TotalAttestations int             `json:"total_attestations"`   // Total matching attestations from ax query
 	SampleSize        int             `json:"sample_size"`          // X value used for sampling
 	Samples           []PreviewSample `json:"samples"`              // X sample execution results
+	SuccessCount      int             `json:"success_count"`        // Number of successful samples
+	FailureCount      int             `json:"failure_count"`        // Number of failed samples
 	Error             string          `json:"error,omitempty"`      // Global error if any
 }
 
@@ -279,11 +281,28 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// Aggregate error tracking
+	var successCount, failureCount int
+	for _, sample := range samples {
+		if sample.Error != "" {
+			failureCount++
+		} else {
+			successCount++
+		}
+	}
+
 	// Build response
 	response := PromptPreviewResponse{
 		TotalAttestations: totalAttestations,
 		SampleSize:        actualSampleSize,
 		Samples:           samples,
+		SuccessCount:      successCount,
+		FailureCount:      failureCount,
+	}
+
+	// Set global error if all samples failed
+	if failureCount > 0 && successCount == 0 {
+		response.Error = fmt.Sprintf("All %d samples failed. Check individual sample errors for details.", failureCount)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
