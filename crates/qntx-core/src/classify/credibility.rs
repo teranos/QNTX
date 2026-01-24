@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// Higher values indicate more trustworthy sources.
 /// Used for conflict resolution when claims disagree.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
 #[repr(u8)]
 pub enum ActorCredibility {
     /// Unknown external sources (lowest trust)
+    #[default]
     External = 0,
     /// Automated systems
     System = 1,
@@ -64,12 +65,6 @@ impl ActorCredibility {
             Self::Llm => 0.75,
             Self::Human => 1.0,
         }
-    }
-}
-
-impl Default for ActorCredibility {
-    fn default() -> Self {
-        Self::External
     }
 }
 
