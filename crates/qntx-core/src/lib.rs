@@ -27,11 +27,13 @@
 //! let matches = engine.search_predicates("author", 10, 0.6);
 //! ```
 
+pub mod attestation;
 pub mod classify;
 pub mod fuzzy;
 pub mod parser;
 
 // Re-export main types at crate root
+pub use attestation::{Attestation, AttestationBuilder, AxFilter, AxResult, Conflict};
 pub use classify::{ActorCredibility, ClassificationResult, ConflictType};
 pub use fuzzy::{FuzzyEngine, FuzzyMatch};
 pub use parser::{AxQuery, ParseError, Parser, TemporalClause};
