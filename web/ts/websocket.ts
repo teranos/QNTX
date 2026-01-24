@@ -123,13 +123,23 @@ const MESSAGE_HANDLERS = {
                 total_attestations: data.total_attestations,
                 unique_actors: data.unique_actors,
                 unique_subjects: data.unique_subjects,
-                unique_contexts: data.unique_contexts
+                unique_contexts: data.unique_contexts,
+                rich_fields: data.rich_fields
             });
         });
 
         // Update status indicator with total count
         import('./status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
+        });
+    },
+
+    rich_search_results: (data: any) => {
+        log.info(SEG.QUERY, 'Rich search results:', data.total, 'matches');
+
+        // Pass results to the CodeMirror editor's fuzzy search view
+        import('./codemirror-editor.js').then(({ handleFuzzySearchResults }) => {
+            handleFuzzySearchResults(data);
         });
     }
 } as const;
@@ -150,7 +160,7 @@ export function validateBackendURL(url: string): string | null {
         }
 
         return parsed.origin;
-    } catch (e) {
+    } catch (error: unknown) {
         return null;
     }
 }

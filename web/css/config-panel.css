@@ -74,7 +74,7 @@
     color: #000;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid var(--border-color);
     padding-bottom: 6px;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .config-setting:hover {
-    background: #fafafa;
+    background: var(--bg-almost-white);
 }
 
 .config-setting:last-child {
@@ -105,7 +105,7 @@
 }
 
 .config-setting-value {
-    color: #333;
+    color: var(--text-primary);
     word-break: break-word;
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
@@ -133,7 +133,7 @@
 }
 
 .source-undefined {
-    color: #ddd;
+    color: var(--text-on-dark);
     opacity: 0.3;
 }
 
@@ -203,8 +203,8 @@
 }
 
 .config-save-btn {
-    background: #f5f5f5;
-    color: #333;
+    background: var(--bg-almost-white);
+    color: var(--text-primary);
 }
 
 .config-save-btn:hover {
@@ -213,9 +213,9 @@
 
 /* Two-click confirmation state */
 .config-save-btn.config-save-confirming {
-    background: #fff3e0;
+    background: var(--status-pending-bg);
     border-color: #ef6c00;
-    color: #e65100;
+    color: var(--status-pending-text);
     font-weight: 600;
 }
 
@@ -225,29 +225,29 @@
 
 /* Saving state */
 .config-save-btn.config-save-saving {
-    background: #e3f2fd;
-    border-color: #1976d2;
+    background: var(--status-running-bg);
+    border-color: var(--status-running-text);
     color: #1565c0;
     cursor: wait;
 }
 
 .config-cancel-btn {
     background: #fff;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .config-cancel-btn:hover {
-    background: #f5f5f5;
-    color: #333;
+    background: var(--bg-almost-white);
+    color: var(--text-primary);
 }
 
 /* Toast variants */
 .config-toast-success {
-    background: #2e7d32;
+    background: var(--status-completed-text);
 }
 
 .config-toast-error {
-    background: #c62828;
+    background: var(--status-failed-text);
 }
 
 /* Value type styling */
@@ -266,7 +266,7 @@
 }
 
 .config-value-string {
-    color: #333;
+    color: var(--text-primary);
 }
 
 .config-value-object {
@@ -311,7 +311,7 @@
 }
 
 .config-panel-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb {

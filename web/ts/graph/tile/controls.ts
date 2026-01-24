@@ -2,7 +2,8 @@
 // Header provides command buttons (ax, by, as)
 // Footer displays contextual information (type, connections, metadata)
 
-import { GRAPH_PHYSICS, appState } from '../../config.ts';
+import { appState } from '../../state/app.ts';
+import { GRAPH_PHYSICS } from '../../config.ts';
 import { AX, BY, AS, CommandDescriptions } from '../../../../types/generated/typescript/sym.ts';
 import type { D3Node } from '../../../types/d3-graph';
 import type { Node } from '../../../types/core';
@@ -309,7 +310,6 @@ export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: {
     // Tag styling constants
     const TAG_HEIGHT = 20;
     const TAG_PADDING_X = 8;
-    const TAG_PADDING_Y = 4;
     const TAG_SPACING = 6;
     const TAG_Y_OFFSET = -dimensions.height / 2 + HEADER_HEIGHT + HEADER_PADDING + 10;
 
@@ -322,7 +322,6 @@ export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: {
     // Render tags with dynamic positioning
     let currentX = -dimensions.width / 2 + 10; // Start from left edge with padding
     let currentY = 0;
-    const maxWidth = dimensions.width - 20; // Leave padding on both sides
 
     tags.forEach((tag, index) => {
         // Estimate tag width (rough approximation based on text length)

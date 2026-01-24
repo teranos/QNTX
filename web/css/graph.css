@@ -26,13 +26,12 @@
 
     /* Controls - subtle grays to minimize UI chrome */
     --control-padding: 8px;
-    --control-bg: #f8f8f8;  /* Near-white to recede visually */
-    --control-border: #ddd;  /* Subtle border for definition */
+    --control-bg: var(--bg-almost-white);  /* Near-white to recede visually */
 
     /* Meta overlay - gray for secondary information */
     --meta-max-width: 300px;
     --meta-font-size: 11px;
-    --meta-color: #666;  /* Mid-gray for de-emphasized text */
+    --meta-color: var(--text-secondary);  /* Mid-gray for de-emphasized text */
 }
 
 /* Graph Container */
@@ -118,38 +117,6 @@
     font-weight: 600;
 }
 
-/* Controls */
-#controls {
-    position: absolute;
-    top: var(--control-offset);
-    left: var(--control-offset);
-    background: rgba(248, 248, 248, 0.85);  /* Semi-transparent background */
-    padding: var(--control-padding);
-    border: 1px solid rgba(221, 221, 221, 0.8);
-    backdrop-filter: blur(8px);  /* Blur background for better readability */
-}
-
-#controls button {
-    display: block;
-    width: 100%;
-    margin: 0 0 4px 0;
-    padding: 6px 12px;
-    border: 1px solid var(--control-border);
-    background: #fff;
-    color: #000;
-    cursor: pointer;
-    font-size: var(--meta-font-size);
-    font-weight: 500;
-}
-
-#controls button:hover {
-    background: var(--control-bg);
-}
-
-#controls button:active {
-    background: #eee;
-}
-
 /* Connection Status (in log header) */
 #connection-status {
     padding: 4px 10px;
@@ -169,81 +136,4 @@ body.disconnected #connection-status {
     border-color: rgba(220, 53, 69, 0.4);
     color: rgba(220, 53, 69, 0.9); /* Subtle red */
     background: rgba(220, 53, 69, 0.15);
-}
-
-/* Legenda (Legend) */
-.legenda {
-    margin-top: var(--legend-margin-top);
-    padding-top: var(--legend-padding-top);
-    border-top: 1px solid var(--control-border);
-}
-
-.legenda-title {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-    color: #000;
-}
-
-.legenda-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 4px 0;
-    font-size: 10px;
-    user-select: none; /* Prevent text selection on clickable items */
-}
-
-.legenda-color {
-    width: 10px;
-    height: 10px;
-    border: 1px solid #ddd;
-}
-
-.reveal-related {
-    font-size: 12px;
-    cursor: pointer;
-    color: #888;
-    transition: color 0.2s ease;
-    padding: 0 2px;
-}
-
-.reveal-related:hover {
-    color: #000;
-}
-
-.reveal-related.active {
-    color: #000;
-    font-weight: 600;
-}
-
-.legenda-type-name {
-    cursor: pointer;
-    flex: 1;
-}
-
-.legenda-count {
-    font-size: 9px;
-    color: #888;
-    margin-left: auto;
-    padding: 1px 4px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 3px;
-}
-
-#isolated-toggle {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    margin-top: 12px;
-    padding: 8px;
-    cursor: pointer;
-    background: rgba(0,0,0,0.3);
-    border-radius: 3px;
-    font-size: 11px;
-}
-
-#isolated-toggle input {
-    cursor: pointer;
 }

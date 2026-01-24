@@ -23,7 +23,7 @@ pre {
     padding: 12px 16px;
     overflow-x: auto;
     border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-light);
 }
 
 code {
@@ -42,7 +42,7 @@ pre code {
 
 /* Headings - Compact */
 h1 {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 8px;
     font-size: 1.8em;
     margin: 0.5em 0;
@@ -62,7 +62,7 @@ h3 {
 
 /* Links */
 a {
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color);
     text-decoration: none;
 }
 
@@ -74,7 +74,7 @@ a:hover {
 nav.doc-nav {
     margin-bottom: 2em;
     padding: 12px;
-    background: #f9f9f9;
+    background: var(--bg-almost-white);
     border-radius: 4px;
 }
 
@@ -89,10 +89,70 @@ nav.doc-nav a {
     margin-right: 8px;
 }
 
+/* Page Header - Breadcrumb + Edit link */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.breadcrumb {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.breadcrumb a {
+    color: var(--text-secondary);
+}
+
+.breadcrumb a:hover {
+    color: var(--accent-color);
+}
+
+.breadcrumb-sep {
+    margin: 0 6px;
+    color: var(--text-tertiary);
+}
+
+.breadcrumb-category {
+    color: var(--text-secondary);
+}
+
+.breadcrumb-current {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.edit-link {
+    font-size: 0.8em;
+    color: var(--text-tertiary);
+    padding: 4px 8px;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.edit-link:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    text-decoration: none;
+}
+
+@media (max-width: 640px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
 /* Table of Contents */
 .toc {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-almost-white);
+    border: 1px solid var(--border-light);
     border-radius: 4px;
     padding: 16px 24px;
     margin-bottom: 2em;
@@ -124,7 +184,7 @@ nav.doc-nav a {
     display: flex;
     align-items: center;
     margin-bottom: 1.25em;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 10px;
 }
 
@@ -164,8 +224,8 @@ nav.doc-nav a {
 .intro-section {
     margin: 1em 0 1.5em 0;
     padding: 12px 16px;
-    background: #f9f9f9;
-    border-left: 3px solid #0066cc;
+    background: var(--bg-almost-white);
+    border-left: 3px solid var(--accent-color);
     border-radius: 3px;
 }
 
@@ -194,7 +254,7 @@ nav.doc-nav a {
 .build-info-section h2 {
     font-size: 1.1em;
     margin: 0 0 0.5em 0;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 4px;
 }
 
@@ -212,7 +272,7 @@ nav.doc-nav a {
 
 .build-info-list li {
     padding: 4px 0;
-    border-left: 2px solid #e0e0e0;
+    border-left: 2px solid var(--border-light);
     padding-left: 12px;
     margin: 4px 0;
 }
@@ -228,10 +288,10 @@ nav.doc-nav a {
 .quick-link {
     display: inline-block;
     padding: 6px 12px;
-    background: #f9f9f9;
-    border: 1px solid #ddd;
+    background: var(--bg-almost-white);
+    border: 1px solid var(--border-color);
     border-radius: 3px;
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color);
     font-weight: 500;
     font-size: 0.9em;
     text-decoration: none;
@@ -243,86 +303,13 @@ nav.doc-nav a {
     text-decoration: none;
 }
 
-/* Search */
-.search-container {
-    margin-bottom: 2em;
-}
-
-.search-input {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 1em;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    background: #fff;
-    color: #000;
-    box-sizing: border-box;
-}
-
-.search-input:focus {
-    outline: 2px solid var(--accent-color, #0066cc);
-    outline-offset: -1px;
-    border-color: transparent;
-}
-
-.search-input::placeholder {
-    color: #999;
-}
-
-.search-results {
-    margin-top: 1em;
-}
-
-.search-result {
-    padding: 12px 16px;
-    margin: 8px 0;
-    background: #f9f9f9;
-    border-radius: 4px;
-    display: block;
-    text-decoration: none;
-    color: inherit;
-}
-
-.search-result:hover {
-    background: #f0f0f0;
-    text-decoration: none;
-}
-
-.search-result-title {
-    font-weight: 500;
-    color: var(--accent-color, #0066cc);
-}
-
-.search-result-category {
-    font-size: 0.85em;
-    color: #666;
-    margin-left: 8px;
-}
-
-.search-result-snippet {
-    font-size: 0.9em;
-    color: #555;
-    margin-top: 4px;
-}
-
-.search-result-snippet mark {
-    background: #fff3cd;
-    padding: 0 2px;
-    border-radius: 2px;
-}
-
-.search-no-results {
-    color: #666;
-    padding: 12px 0;
-}
-
 /* Downloads Page - Compact */
 .download-section {
     margin: 1em 0;
 }
 
 .download-section h2 {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 4px;
     font-size: 1.1em;
     margin-bottom: 0.75em;
@@ -332,9 +319,9 @@ nav.doc-nav a {
 .download-section.quick-download {
     margin: 0.75em 0 1.5em 0;
     padding: 10px 12px;
-    background: #f5f5f5;
+    background: var(--bg-almost-white);
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
 }
 
 .download-section.quick-download h2 {
@@ -344,7 +331,7 @@ nav.doc-nav a {
     border: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #666;
+    color: var(--text-secondary);
     font-weight: 600;
 }
 
@@ -398,20 +385,20 @@ nav.doc-nav a {
     display: inline-block;
     padding: 6px 12px;
     background: #fff;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 3px;
     font-size: 0.85em;
     transition: all 0.1s;
 }
 
 .download-section.quick-download .download-link:hover {
-    background: #f9f9f9;
-    border-color: #0066cc;
+    background: var(--bg-almost-white);
+    border-color: var(--accent-color);
 }
 
 .download-section.quick-download .file-size {
     margin-left: 4px;
-    color: #999;
+    color: var(--text-tertiary);
     font-size: 0.85em;
 }
 
@@ -428,8 +415,8 @@ nav.doc-nav a {
 }
 
 .download-card {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-almost-white);
+    border: 1px solid var(--border-light);
     border-radius: 8px;
     padding: 20px;
     display: flex;
@@ -461,7 +448,7 @@ nav.doc-nav a {
 
 .download-btn {
     display: inline-block;
-    background: var(--accent-color, #0066cc);
+    background: var(--accent-color);
     color: #fff;
     padding: 10px 20px;
     border-radius: 4px;
@@ -476,8 +463,8 @@ nav.doc-nav a {
 }
 
 .install-code {
-    background: #2a2a2a;
-    color: #e0e0e0;
+    background: var(--bg-dark);
+    color: var(--text-on-dark);
     padding: 12px 16px;
     border-radius: 4px;
     font-family: var(--font-mono, monospace);
@@ -494,7 +481,7 @@ nav.doc-nav a {
 
 .platform-list li {
     padding: 6px 0;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-light);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -515,15 +502,15 @@ nav.doc-nav a {
 
 /* Release Version Cards - Compact */
 .release-version {
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
+    background: var(--bg-almost-white);
+    border: 1px solid var(--border-light);
     border-radius: 4px;
     padding: 12px 16px;
     margin-bottom: 12px;
 }
 
 .release-version.latest {
-    border-color: var(--accent-color, #0066cc);
+    border-color: var(--accent-color);
 }
 
 .release-header {
@@ -544,7 +531,7 @@ nav.doc-nav a {
 }
 
 .latest-badge {
-    background: var(--accent-color, #0066cc);
+    background: var(--accent-color);
     color: #fff;
     padding: 2px 8px;
     border-radius: 4px;
@@ -570,13 +557,13 @@ nav.doc-nav a {
 }
 
 .file-size {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-size: 0.85em;
     margin-left: 4px;
 }
 
 .loading {
-    color: #666;
+    color: var(--text-secondary);
     font-style: italic;
 }
 
@@ -588,22 +575,22 @@ nav.doc-nav a {
 .site-footer {
     margin-top: 4em;
     padding-top: 1em;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--border-light);
 }
 
 .provenance {
     font-size: 0.8em;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     text-align: center;
 }
 
 .provenance a {
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     font-family: var(--font-mono, monospace);
 }
 
 .provenance a:hover {
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color);
 }
 
 /* Nix Infrastructure Tables */
@@ -617,11 +604,11 @@ nav.doc-nav a {
 .nix-table td {
     text-align: left;
     padding: 10px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-light);
 }
 
 .nix-table th {
-    background: #f9f9f9;
+    background: var(--bg-almost-white);
     font-weight: 600;
 }
 
@@ -658,14 +645,14 @@ nav.doc-nav a {
     align-items: baseline;
     margin-bottom: 0.75em;
     padding-bottom: 6px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     gap: 10px;
 }
 
 .category-title {
     margin: 0;
     font-size: 1.1em;
-    color: #333;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
@@ -708,9 +695,9 @@ nav.doc-nav a {
 .doc-list a {
     display: block;
     padding: 10px 12px;
-    background: #f9f9f9;
+    background: var(--bg-almost-white);
     border-radius: 4px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-light);
     transition: all 0.1s;
     height: 100%;
     box-sizing: border-box;
@@ -718,9 +705,9 @@ nav.doc-nav a {
 }
 
 .doc-list a:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     text-decoration: none;
-    border-color: #0066cc;
+    border-color: var(--accent-color);
 }
 
 .doc-list .doc-name {
@@ -757,11 +744,11 @@ table {
 th, td {
     text-align: left;
     padding: 8px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-light);
 }
 
 th {
-    background: #f9f9f9;
+    background: var(--bg-almost-white);
     font-weight: 600;
 }
 
@@ -787,24 +774,24 @@ th {
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
     body {
-        background: #1a1a1a;
-        color: #e0e0e0;
+        background: var(--bg-almost-black);
+        color: var(--text-on-dark);
     }
 
     h1, h2 {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     h2 {
-        border-color: #2a2a2a;
+        border-color: var(--bg-dark);
     }
 
     pre, code {
-        background: #2a2a2a;
+        background: var(--bg-dark);
     }
 
     pre {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     a {
@@ -815,57 +802,57 @@ th {
     .toc,
     .doc-list a,
     th {
-        background: #242424;
+        background: var(--bg-dark);
     }
 
     .toc {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .doc-list a {
-        background: #242424;
-        border-color: #333;
+        background: var(--bg-dark);
+        border-color: var(--text-primary);
     }
 
     .doc-list a:hover {
-        background: #2a2a2a;
+        background: var(--bg-dark);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .doc-header {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .intro-section {
-        background: #242424;
+        background: var(--bg-dark);
         border-left-color: #0077cc;
     }
 
     .intro-section p:last-child {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     .build-info-section h2 {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .build-info-list li {
-        border-left-color: #333;
+        border-left-color: var(--text-primary);
     }
 
     .download-section.quick-download {
         background: #222;
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .download-section.quick-download h2 {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .download-section.quick-download .download-link {
-        background: #2a2a2a;
-        border-color: #444;
-        color: #e0e0e0;
+        background: var(--bg-dark);
+        border-color: var(--border-on-dark);
+        color: var(--text-on-dark);
     }
 
     .download-section.quick-download .download-link:hover {
@@ -878,76 +865,41 @@ th {
     }
 
     .quick-link {
-        background: #242424;
-        border-color: #333;
+        background: var(--bg-dark);
+        border-color: var(--text-primary);
     }
 
     .quick-link:hover {
-        background: #2a2a2a;
+        background: var(--bg-dark);
     }
 
     .category-header {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .category-title {
-        color: #e0e0e0;
+        color: var(--text-on-dark);
     }
 
     .category-desc {
-        color: #999;
+        color: var(--text-tertiary);
     }
 
     .toc-title {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     th, td {
-        border-color: #333;
-    }
-
-    .search-input {
-        background: #2a2a2a;
-        border-color: #333;
-        color: #e0e0e0;
-    }
-
-    .search-input::placeholder {
-        color: #666;
-    }
-
-    .search-result {
-        background: #242424;
-    }
-
-    .search-result:hover {
-        background: #2a2a2a;
-    }
-
-    .search-result-category {
-        color: #888;
-    }
-
-    .search-result-snippet {
-        color: #aaa;
-    }
-
-    .search-result-snippet mark {
-        background: #5c4a00;
-        color: #fff;
-    }
-
-    .search-no-results {
-        color: #888;
+        border-color: var(--text-primary);
     }
 
     .download-card {
-        background: #242424;
-        border-color: #333;
+        background: var(--bg-dark);
+        border-color: var(--text-primary);
     }
 
     .download-card-desc {
-        color: #aaa;
+        color: var(--text-on-dark-secondary);
     }
 
     .download-btn {
@@ -959,12 +911,12 @@ th {
     }
 
     .platform-list li {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .release-version {
-        background: #242424;
-        border-color: #333;
+        background: var(--bg-dark);
+        border-color: var(--text-primary);
     }
 
     .release-version.latest {
@@ -972,19 +924,19 @@ th {
     }
 
     .release-date {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .file-size {
-        color: #666;
+        color: var(--text-secondary);
     }
 
     .loading {
-        color: #888;
+        color: var(--text-on-dark-tertiary);
     }
 
     .site-footer {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .provenance a:hover {
@@ -993,16 +945,16 @@ th {
 
     .nix-table th,
     .nix-table td {
-        border-color: #333;
+        border-color: var(--text-primary);
     }
 
     .nix-table th {
-        background: #242424;
+        background: var(--bg-dark);
     }
 
     .nix-table code,
     .container-details code {
-        background: #2a2a2a;
+        background: var(--bg-dark);
     }
 }
 
@@ -1017,3 +969,24 @@ th {
         padding: 0;
     }
 }
+
+/* 404 Error Page */
+.error-404 {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark);
+    color: var(--text-on-dark);
+    text-align: center;
+    max-width: none;
+}
+
+.quantum-box { border: 2px dashed var(--border-on-dark); padding: 40px; max-width: 500px; }
+.cat-state { font-size: 4em; margin: 20px 0; }
+.error-404 h1 { color: var(--text-on-dark-emphasis); border: none; }
+.error-code { font-size: 0.9em; color: var(--text-on-dark-tertiary); }
+.error-404 .explanation { color: var(--text-on-dark-secondary); line-height: 1.6; margin: 20px 0; }
+.error-404 .attestation { font-family: var(--font-mono); background: var(--bg-almost-black); padding: 15px; margin: 20px 0; border-left: 3px solid var(--accent-color); text-align: left; font-size: 0.85em; white-space: pre-line; }
+.home-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: var(--accent-color); color: #fff; text-decoration: none; border-radius: 4px; }
+.home-link:hover { opacity: 0.9; }

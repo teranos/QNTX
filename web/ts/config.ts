@@ -1,15 +1,12 @@
-// Shared configuration and state for the graph viewer
+// Configuration constants for the graph viewer
+// For runtime state, see state/app.ts
 
-import type { AppState, GraphPhysics, GraphStyles, UIText } from '../types/core';
-
-// Buffer limits
-export const MAX_LOGS: number = 1000;
-export const MAX_PROGRESS: number = 100;
+import type { GraphPhysics, GraphStyles, UIText } from '../types/core';
 
 // UI text constants (single source of truth)
 // Virtue #3: Semantic Clarity - Use SEG symbols consistently
 export const UI_TEXT: UIText & {
-    LEGENDA_TITLE: string;
+    TYPE_ATTESTATIONS_TITLE: string;
     REVEAL_TOOLTIP: (label: string) => string;
     ISOLATED_NODES: string;
 } = {
@@ -23,7 +20,7 @@ export const UI_TEXT: UIText & {
     CONNECTION_RESTORED: 'Connection restored',
 
     // Extended UI text specific to this app
-    LEGENDA_TITLE: 'Tiles <span style="font-size: 9px; font-weight: normal; color: #666;">(click to toggle)</span>',
+    TYPE_ATTESTATIONS_TITLE: 'TYPES',
     REVEAL_TOOLTIP: (label: string): string => `⚠️ Experimental: Reveal nodes connected to ${label} (feature in development)`,
     ISOLATED_NODES: '⊖ Hide isolated nodes'  // ⊖ = subtract/hide symbol
 };
@@ -145,20 +142,4 @@ export const GRAPH_STYLES: GraphStyles & {
     META_MAX_WIDTH: 300,
     META_FONT_SIZE: 11,
     META_COLOR: '#666'
-};
-
-// Shared runtime state (in-memory, not persisted)
-// For persisted state, see ui-state.ts
-export const appState: AppState = {
-    currentVerbosity: 2,  // Default: Debug (-vv)
-    logBuffer: [],
-    progressBuffer: [],
-    currentQuery: '',
-    currentGraphData: null,
-    currentTransform: null,
-    graphVisibility: {
-        hiddenNodeTypes: new Set<string>(),
-        hideIsolated: false,
-        revealRelatedActive: new Set<string>()
-    }
 };

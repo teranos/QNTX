@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/internal/httpclient"
 )
 
 // LocalProvider implements Provider interface for local inference servers
@@ -20,18 +21,24 @@ import (
 type LocalProvider struct {
 	baseURL    string
 	model      string
-	httpClient *http.Client
+	httpClient *httpclient.SaferClient
 	config     *am.LocalInferenceConfig
 }
 
 // NewLocalProvider creates a provider for local inference
 func NewLocalProvider(cfg *am.LocalInferenceConfig) *LocalProvider {
+	// Local inference connects to localhost/private IPs intentionally,
+	// so we disable private IP blocking but keep other protections
+	blockPrivateIP := false
 	return &LocalProvider{
 		baseURL: cfg.BaseURL,
 		model:   cfg.Model,
-		httpClient: &http.Client{
-			Timeout: time.Duration(cfg.TimeoutSeconds) * time.Second,
-		},
+		httpClient: httpclient.NewSaferClientWithOptions(
+			time.Duration(cfg.TimeoutSeconds)*time.Second,
+			httpclient.SaferClientOptions{
+				BlockPrivateIP: &blockPrivateIP,
+			},
+		),
 		config: cfg,
 	}
 }
@@ -106,36 +113,36 @@ func (lp *LocalProvider) generateTextWithContext(ctx context.Context, systemProm
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", errors.Wrap(err, "failed to marshal request")
 	}
 
 	// Use OpenAI-compatible endpoint (works for Ollama, LocalAI, etc.)
 	endpoint := lp.baseURL + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", errors.Wrap(err, "failed to create request")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := lp.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
+		return "", errors.Wrap(err, "request failed")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("local inference returned status %d: %s", resp.StatusCode, string(body))
+		return "", errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var completion ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+		return "", errors.Wrap(err, "failed to decode response")
 	}
 
 	if len(completion.Choices) == 0 {
-		return "", fmt.Errorf("no completion choices returned")
+		return "", errors.New("no completion choices returned")
 	}
 
 	return completion.Choices[0].Message.Content, nil
@@ -164,9 +171,14 @@ type StreamingChunk struct {
 
 // GenerateTextStreaming sends a prompt and streams the response token by token
 // Caller is responsible for closing chunkChan
+// Deprecated: Use GenerateTextStreamingWithContext instead for proper cancellation support
 func (lp *LocalProvider) GenerateTextStreaming(systemPrompt, userPrompt string, chunkChan chan<- StreamingChunk) error {
-	// Use background context with client timeout
-	ctx := context.Background()
+	return lp.GenerateTextStreamingWithContext(context.Background(), systemPrompt, userPrompt, chunkChan)
+}
+
+// GenerateTextStreamingWithContext sends a prompt and streams the response with context support
+// Context cancellation will stop the streaming and return early
+func (lp *LocalProvider) GenerateTextStreamingWithContext(ctx context.Context, systemPrompt, userPrompt string, chunkChan chan<- StreamingChunk) error {
 	return lp.generateTextStreamingWithContext(ctx, systemPrompt, userPrompt, chunkChan)
 }
 
@@ -196,29 +208,32 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		chunkChan <- StreamingChunk{Error: fmt.Errorf("failed to marshal request: %w", err)}
-		return fmt.Errorf("failed to marshal request: %w", err)
+		err = errors.Wrap(err, "failed to marshal request")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	endpoint := lp.baseURL + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		chunkChan <- StreamingChunk{Error: fmt.Errorf("failed to create request: %w", err)}
-		return fmt.Errorf("failed to create request: %w", err)
+		err = errors.Wrap(err, "failed to create request")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := lp.httpClient.Do(req)
 	if err != nil {
-		chunkChan <- StreamingChunk{Error: fmt.Errorf("request failed: %w", err)}
-		return fmt.Errorf("request failed: %w", err)
+		err = errors.Wrap(err, "request failed")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		err := fmt.Errorf("local inference returned status %d: %s", resp.StatusCode, string(body))
+		err := errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
 		chunkChan <- StreamingChunk{Error: err}
 		return err
 	}
@@ -259,8 +274,9 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 		}
 
 		if err := json.Unmarshal([]byte(jsonData), &chunk); err != nil {
-			chunkChan <- StreamingChunk{Error: fmt.Errorf("failed to decode chunk: %w", err)}
-			return fmt.Errorf("failed to decode chunk: %w", err)
+			err = errors.Wrap(err, "failed to decode chunk")
+			chunkChan <- StreamingChunk{Error: err}
+			return err
 		}
 
 		if len(chunk.Choices) > 0 {
@@ -278,8 +294,9 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 	}
 
 	if err := scanner.Err(); err != nil {
-		chunkChan <- StreamingChunk{Error: fmt.Errorf("stream read error: %w", err)}
-		return fmt.Errorf("stream read error: %w", err)
+		err = errors.Wrap(err, "stream read error")
+		chunkChan <- StreamingChunk{Error: err}
+		return err
 	}
 
 	// Stream ended without explicit completion

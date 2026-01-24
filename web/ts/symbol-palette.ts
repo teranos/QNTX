@@ -28,7 +28,7 @@ import {
     Pulse, Prose, DB,
     CommandToSymbol,
 } from '@generated/sym.js';
-import { uiState } from './ui-state.ts';
+import { uiState } from './state/ui.ts';
 import { log, SEG } from './logger';
 import { handleError } from './error-handler.ts';
 import { tooltip } from './components/tooltip.ts';
@@ -170,8 +170,8 @@ async function injectCTP2Glyph(): Promise<void> {
         if (cell) {
             cell.innerHTML = generateCTP2Glyph();
         }
-    } catch (err) {
-        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', err);
+    } catch (error: unknown) {
+        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', error);
         // Fallback to text
         const cell = document.getElementById('ctp2-palette-cell');
         if (cell) {
@@ -436,13 +436,22 @@ function showWebscraperPanel(): void {
 /**
  * Show CTP2 window
  */
-let ctp2WindowInstance: any = null;
 async function showCTP2Window(): Promise<void> {
-    if (!ctp2WindowInstance) {
-        const module = await import('../ctp2/window.js');
-        ctp2WindowInstance = new module.CTP2Window();
+    // CTP2 is an optional/private module that may not exist in all environments
+    // Comment out the import to prevent build failures when the module is missing
+    console.log('CTP2 module not available in this environment (optional/private feature)');
+    const statusEl = document.getElementById('status-message');
+    if (statusEl) {
+        statusEl.textContent = 'CTP2 module not available';
+        setTimeout(() => statusEl.textContent = '', 3000);
     }
-    ctp2WindowInstance.toggle();
+
+    // Original implementation for when CTP2 is available:
+    // if (!ctp2WindowInstance) {
+    //     const module = await import('../ctp2/window.js');
+    //     ctp2WindowInstance = new module.CTP2Window();
+    // }
+    // ctp2WindowInstance.toggle();
 }
 
 /**
@@ -485,8 +494,8 @@ function showVidStreamWindow(): void {
         }
         log(SEG.VID, 'Calling toggle()');
         vidstreamWindowInstance.toggle();
-    } catch (err) {
-        handleError(err, 'Failed to show VidStream window', { context: SEG.VID });
+    } catch (error: unknown) {
+        handleError(error, 'Failed to show VidStream window', { context: SEG.VID });
     }
 }
 

@@ -35,7 +35,7 @@ async function safeFetch(url: string, options?: RequestInit): Promise<Response> 
   try {
     const response = await fetch(url, options);
     return response;
-  } catch (error) {
+  } catch (error: unknown) {
     // Network error (connection refused, DNS failure, etc.)
     handleError(error, 'Network error: Unable to connect to server', { context: SEG.PULSE, silent: true });
     throw new Error('Network error: Unable to connect to server. Please check your connection.');

@@ -1,72 +1,37 @@
 # QNTX Development Guide
 
-## Working with this Project
-
 **Read, don't infer:**
+
 - Stick to what's explicitly stated in code and documentation
 - Don't add features, explanations, or context that weren't requested
 - If something is unclear, ask - don't assume or fill in gaps
 - State only what you can directly verify
 
-## Segments
-
-QNTX uses segments across the project:
-
-### Primary SEG Operators (UI/Command Symbols)
-- **⍟** (i) - Self, your vantage point into QNTX
-- **≡** (am) - Configuration and system settings
-- **⨳** (ix) - Data ingestion/import
-- **⋈** (ax) - Expand/query, contextual surfacing
-- **⌬** (by) - Actor/catalyst, origin of action (all forms: creator, source, authenticated user)
-- **✦** (at) - Temporal marker/moment
-- **⟶** (so) - Therefore, consequent action
-
-### System Symbols
-- **꩜** (Pulse) - Async operations, rate limiting, job processing (always prefix Pulse-related logs)
-- **✿** (PulseOpen) - Graceful startup
-- **❀** (PulseClose) - Graceful shutdown
-- **⊔** (db) - Database/storage layer
-
-### Attestation Building Blocks
-- **+** (as) - Assert, emit an attestation
-- **=** (is) - Identity/equivalence in attestations
-- **∈** (of) - Membership/belonging in attestations
-
-**Note:** These symbols are defined in the `sym` package for consistent use across QNTX. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
-
-**For Claude**: Use these segments consistently when referencing system components.
-
 ## Configuration (am package)
 
-**Core Principle: QNTX works out of the box without configuration.**
+**Zero values are real values:** `0` means zero, not disabled. `0` workers means zero workers, `0` rate limit means no rate limiting. To disable a feature, comment it out or omit it entirely. Don't abuse zero values as disable flags.
 
-The `am` package ("I am" - core being/state) manages all QNTX configuration:
+**For Claude**: Ensure sensible defaults in `am/defaults.go`. Zero values must have actual semantic meaning.
 
-- **Location**: `github.com/teranos/QNTX/am`
-- **Philosophy**: Sensible defaults for immediate use; configuration optional for customization
-- **Precedence**: System < User < Project < Environment Variables
-- **File naming**: Prefers `am.toml` (new) but supports `config.toml` (backward compat)
-- **Scope**: Core infrastructure only (Pulse, Server, Code, LocalInference, Ax, Database)
+## Development Workflow
 
-### Key Design Decisions
+The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server. That means the developer always run's the latest version of QNTX, given that they used `make dev`. NEVER have a discussion with the developer about having run the latest version or not, expect that the developer is always running the latest version of whatever and do not discuss or fight the developer on this, if there is an issue it is almost guaranteed the be an issue in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX should work without configuration)
 
-- **Zero values have meaning**: `0` workers = disabled, `0` rate limit = unlimited
-- **Empty is valid**: Empty database path defaults to `qntx.db`
-- **Multi-source merge**: All config files merge; later sources override earlier ones
-
-**For Claude**: When adding config options, ensure sensible defaults exist in `am/defaults.go`. Only require configuration when truly necessary.
+**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries.
 
 ## Type Generation
 
 **NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`.
+
+## Segments
+
+**Note:** These symbols are defined in the `sym` package for consistent use across QNTX. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
 
 ## Go Development Standards
 
 ### Code Quality
 
 - **Deterministic operations**: Use sorted map keys, consistent error patterns, predictable behavior
-
-### Error Handling
 
 Use `github.com/teranos/QNTX/errors` (wraps cockroachdb/errors). Always wrap with context:
 
@@ -85,6 +50,7 @@ See `errors/README.md` for full documentation.
 NEVER create database schemas inline in tests. ALWAYS use the migration-based test helper.
 
 **Correct Pattern:**
+
 ```go
 import qntxtest "github.com/teranos/QNTX/internal/testing"
 
@@ -95,12 +61,14 @@ func TestSomething(t *testing.T) {
 ```
 
 **Why:**
+
 - `qntxtest.CreateTestDB(t)` runs actual migration files from `db/sqlite/migrations/`
 - Ensures tests use identical schema to production
 - Migrations are the single source of truth
 - Auto-cleanup via `t.Cleanup()`
 
 **NEVER do this:**
+
 ```go
 // ❌ WRONG - Brittle, duplicates schema logic
 db.Exec("CREATE TABLE attestations ...")
@@ -108,5 +76,6 @@ db.Exec("CREATE INDEX ...")
 ```
 
 **Pattern used throughout:**
+
 - `ats/storage/*_test.go` - All tests use `qntxtest.CreateTestDB(t)`
 - `internal/testing/database.go` - Implementation using `db.Migrate()`

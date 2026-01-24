@@ -3,9 +3,10 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // AliasStore handles simple alias mappings
@@ -25,20 +26,20 @@ func NewAliasStore(db *sql.DB) *AliasStore {
 func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 	// Validate inputs to prevent empty or meaningless aliases
 	if alias == "" {
-		return fmt.Errorf("alias cannot be empty")
+		return errors.New("alias cannot be empty")
 	}
 	if target == "" {
-		return fmt.Errorf("target cannot be empty")
+		return errors.New("target cannot be empty")
 	}
 	if strings.EqualFold(alias, target) {
-		return fmt.Errorf("alias and target cannot be identical")
+		return errors.New("alias and target cannot be identical")
 	}
 
 	// Use transaction to ensure atomicity of bidirectional alias creation
 	ctx := context.Background()
 	tx, err := as.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return errors.Wrap(err, "failed to begin transaction")
 	}
 	defer tx.Rollback() // Rollback if not committed
 
@@ -51,7 +52,7 @@ func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 		VALUES (?, ?, ?, ?)`,
 		alias, target, createdBy, now)
 	if err != nil {
-		return fmt.Errorf("failed to create alias %s -> %s: %w", alias, target, err)
+		return errors.Wrapf(err, "failed to create alias %s -> %s", alias, target)
 	}
 
 	// Create reverse mapping
@@ -60,12 +61,12 @@ func (as *AliasStore) CreateAlias(alias, target, createdBy string) error {
 		VALUES (?, ?, ?, ?)`,
 		target, alias, createdBy, now)
 	if err != nil {
-		return fmt.Errorf("failed to create reverse alias %s -> %s: %w", target, alias, err)
+		return errors.Wrapf(err, "failed to create reverse alias %s -> %s", target, alias)
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		return errors.Wrap(err, "failed to commit transaction")
 	}
 
 	return nil
@@ -85,7 +86,7 @@ func (as *AliasStore) ResolveAlias(identifier string) ([]string, error) {
 
 	rows, err := as.db.QueryContext(ctx, query, identifier, identifier)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve alias for %s: %w", identifier, err)
+		return nil, errors.Wrapf(err, "failed to resolve alias for %s", identifier)
 	}
 	defer rows.Close()
 
@@ -93,7 +94,7 @@ func (as *AliasStore) ResolveAlias(identifier string) ([]string, error) {
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed to scan identifier: %w", err)
+			return nil, errors.Wrap(err, "failed to scan identifier")
 		}
 		identifiers = append(identifiers, id)
 	}
@@ -109,7 +110,7 @@ func (as *AliasStore) GetAllAliases() (map[string][]string, error) {
 	ctx := context.Background()
 	rows, err := as.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all aliases: %w", err)
+		return nil, errors.Wrap(err, "failed to get all aliases")
 	}
 	defer rows.Close()
 
@@ -117,7 +118,7 @@ func (as *AliasStore) GetAllAliases() (map[string][]string, error) {
 	for rows.Next() {
 		var alias, target string
 		if err := rows.Scan(&alias, &target); err != nil {
-			return nil, fmt.Errorf("failed to scan alias: %w", err)
+			return nil, errors.Wrap(err, "failed to scan alias")
 		}
 		aliases[alias] = append(aliases[alias], target)
 	}
@@ -130,10 +131,10 @@ func (as *AliasStore) GetAllAliases() (map[string][]string, error) {
 func (as *AliasStore) RemoveAlias(alias, target string) error {
 	// Validate inputs
 	if alias == "" {
-		return fmt.Errorf("alias cannot be empty")
+		return errors.New("alias cannot be empty")
 	}
 	if target == "" {
-		return fmt.Errorf("target cannot be empty")
+		return errors.New("target cannot be empty")
 	}
 
 	// Remove both directions with case-insensitive matching
@@ -144,7 +145,7 @@ func (as *AliasStore) RemoveAlias(alias, target string) error {
 		   OR (alias = ? COLLATE NOCASE AND target = ? COLLATE NOCASE)`,
 		alias, target, target, alias)
 	if err != nil {
-		return fmt.Errorf("failed to remove alias between %s and %s: %w", alias, target, err)
+		return errors.Wrapf(err, "failed to remove alias between %s and %s", alias, target)
 	}
 	return nil
 }

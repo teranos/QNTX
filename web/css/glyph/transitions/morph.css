@@ -1,0 +1,35 @@
+/**
+ * Glyph Morph Transitions - Animation between states
+ *
+ * Handles the smooth morphing animations between glyph states:
+ * - Dot → Window (maximize)
+ * - Window → Dot (minimize)
+ * - Proximity morphing (continuous, handled via inline styles)
+ */
+
+/* Morphing from dot/proximity to window */
+.glyph-morphing-to-window {
+    position: fixed !important;
+    z-index: 10000 !important;
+    pointer-events: auto;
+    /* Transition timing set dynamically in JavaScript for reduced motion support */
+}
+
+/* Morphing from window back to dot */
+.window-morphing-to-glyph {
+    position: fixed !important;
+    z-index: 10000 !important;
+    pointer-events: auto;
+    /* Transition timing set dynamically in JavaScript for proper sequencing */
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .glyph-run-indicators,
+    .glyph-morphing-to-window,
+    .window-morphing-to-glyph,
+    .glyph-run-glyph {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
+    }
+}

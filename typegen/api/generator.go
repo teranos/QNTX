@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/typegen"
 )
 
@@ -84,7 +85,6 @@ func NewGenerator(serverDir, protoDir string) *Generator {
 		wsMessageTypes: make([]WebSocketMessageType, 0),
 	}
 }
-
 
 // parseRouting extracts endpoint patterns from routing.go
 func (g *Generator) parseRouting() error {
@@ -202,7 +202,7 @@ func (g *Generator) parseHandlers() error {
 	// Parse all Go files in server directory
 	err := filepath.Walk(g.serverDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to access path %s", path)
 		}
 
 		// Skip non-Go files and test files
@@ -246,7 +246,10 @@ func (g *Generator) parseHandlers() error {
 		return nil
 	})
 
-	return err
+	if err != nil {
+		return errors.Wrap(err, "failed to parse handlers")
+	}
+	return nil
 }
 
 // extractTypes attempts to extract request/response type names from handler function
@@ -749,7 +752,7 @@ func categorizeEndpoint(ep Endpoint) string {
 		return "Prose (Documents)"
 	}
 	if strings.Contains(handler, "debug") || strings.Contains(handler, "dev") ||
-	   strings.Contains(handler, "usage") || strings.Contains(handler, "log") {
+		strings.Contains(handler, "usage") || strings.Contains(handler, "log") {
 		return "Health & Status"
 	}
 

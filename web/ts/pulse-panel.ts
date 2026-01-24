@@ -35,6 +35,7 @@ import {
     toggleJobExpansion,
     type JobActionContext,
 } from './pulse/job-actions';
+import { hydrateButtons, registerButton, type HydrateConfig } from './components/button';
 import type { DaemonStatusMessage } from '../types/websocket';
 
 // Global daemon status (updated via WebSocket)
@@ -91,11 +92,10 @@ class PulsePanel extends BasePanel {
 
     protected setupEventListeners(): void {
         // Attach panel event listeners once using event delegation
+        // Note: Job action buttons are now hydrated Button components
         const ctx = this.getActionContext();
         const cleanup = attachPanelEventListeners(this.panel!, {
             onToggleExpansion: (jobId) => toggleJobExpansion(jobId, ctx),
-            onForceTrigger: (jobId) => handleForceTrigger(jobId, ctx),
-            onJobAction: (jobId, action) => handleJobAction(jobId, action, ctx),
             onLoadMore: (jobId) => handleLoadMore(jobId, ctx),
             onRetryExecutions: (jobId) => handleRetryExecutions(jobId, ctx),
             onViewDetailed: (jobId) => handleViewDetailed(jobId, ctx),
@@ -130,7 +130,7 @@ class PulsePanel extends BasePanel {
 
             this.hideLoading();
             await this.render();
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('[Pulse Panel] Failed to load jobs:', error);
             const err = error instanceof Error ? error : new Error(String(error));
             this.showErrorState(err);
@@ -193,9 +193,70 @@ class PulsePanel extends BasePanel {
 
             container.innerHTML = `<div class="panel-list pulse-jobs-list">${jobsHtml}</div>`;
 
-            // Event listeners attached once in setupEventListeners() via event delegation
-            // No need to re-attach on every render
+            // Hydrate buttons for each job
+            this.hydrateJobButtons(container as HTMLElement);
         });
+    }
+
+    /**
+     * Hydrate button placeholders with Button component instances
+     * Registers buttons for WebSocket-driven state updates
+     */
+    private hydrateJobButtons(container: HTMLElement): void {
+        const ctx = this.getActionContext();
+
+        // Build hydration config for all jobs
+        const config: HydrateConfig = {};
+
+        for (const job of this.jobs.values()) {
+            const isActive = job.state === 'active';
+
+            // Force Trigger button with confirmation
+            config[`force-trigger-${job.id}`] = {
+                label: 'Force Trigger',
+                onClick: async () => {
+                    await handleForceTrigger(job.id, ctx);
+                },
+                variant: 'warning',
+                size: 'small',
+                confirmation: {
+                    label: 'Confirm Trigger',
+                    timeout: 5000
+                }
+            };
+
+            // Pause/Resume toggle button
+            config[`toggle-state-${job.id}`] = {
+                label: isActive ? 'Pause' : 'Resume',
+                onClick: async () => {
+                    await handleJobAction(job.id, isActive ? 'pause' : 'resume', ctx);
+                },
+                variant: isActive ? 'secondary' : 'primary',
+                size: 'small'
+            };
+
+            // Delete button with confirmation
+            config[`delete-${job.id}`] = {
+                label: 'Delete',
+                onClick: async () => {
+                    await handleJobAction(job.id, 'delete', ctx);
+                },
+                variant: 'danger',
+                size: 'small',
+                confirmation: {
+                    label: 'Confirm Delete',
+                    timeout: 5000
+                }
+            };
+        }
+
+        // Hydrate all buttons
+        const buttons = hydrateButtons(container, config);
+
+        // Register buttons for WebSocket-driven state updates
+        for (const [buttonId, button] of Object.entries(buttons)) {
+            registerButton(buttonId, button);
+        }
     }
 
     private attachSystemStatusHandlers(): void {

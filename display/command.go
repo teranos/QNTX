@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ai/llm"
+	"github.com/teranos/QNTX/errors"
 )
 
 // ShouldOutputJSON determines if a command should output JSON based on flags and LLM detection
@@ -36,7 +37,7 @@ func ShouldOutputJSON(cmd *cobra.Command) bool {
 func OutputJSON(v interface{}) error {
 	data, err := MarshalJSON(v)
 	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
+		return errors.Wrap(err, "failed to marshal JSON")
 	}
 	fmt.Println(string(data))
 	return nil

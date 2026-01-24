@@ -7,10 +7,10 @@ import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
 import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
-import { initLegendaToggles } from './legenda.ts';
+import { initTypeAttestations } from './components/type-attestations.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
-import { uiState } from './ui-state.ts';
-import { appState } from './config.ts';
+import { uiState } from './state/ui.ts';
+import { appState } from './state/app.ts';
 import { initUsageBadge, handleUsageUpdate } from './usage-badge.ts';
 import { handleParseResponse } from './ats-semantic-tokens-client.ts';
 import { handleJobUpdate } from './hixtory-panel.ts';
@@ -26,6 +26,7 @@ import { handleStorageWarning } from './websocket-handlers/storage-warning.ts';
 import { handleStorageEviction } from './websocket-handlers/storage-eviction.ts';
 import './symbol-palette.ts';
 import { toggleConfig } from './config-panel.ts';
+import { Window } from './components/window.ts';
 import './ai-provider-window.ts';
 import './command-explorer-panel.ts';
 // Note: Panel toggle functions are dynamically imported in Tauri event listeners below
@@ -35,6 +36,8 @@ import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
+import { glyphRun } from './components/glyph/run.ts';
+import { registerTestGlyphs } from './test-glyphs.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -145,8 +148,8 @@ async function init(): Promise<void> {
     // Avoid Sin #7: Silent Failures - Log errors even for non-critical components
     try {
         await initDebugInterceptor();
-    } catch (err) {
-        console.error('[Init] Failed to initialize debug interceptor:', err);
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize debug interceptor:', error);
         // Continue anyway - debug interception is not critical to app function
     }
 
@@ -211,11 +214,18 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing graph...');
     initGraphResize();
 
+    // Initialize glyph run FIRST (before any glyphs are created)
+    // This ensures the run is ready to receive glyphs
+    glyphRun.init();
+
+    // Register test glyphs to demonstrate the morphing behavior
+    registerTestGlyphs();
+
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
-    initLegendaToggles(updateGraph);  // Pass renderGraph function for legenda callbacks
+    initTypeAttestations(updateGraph);  // Pass renderGraph function for type attestation callbacks
     initUsageBadge();
 
     // Listen for Tauri events (menu actions)
@@ -328,11 +338,15 @@ if (document.readyState === 'loading') {
         init();
         // Hide loading screen once app is initialized
         if (window.hideLoadingScreen) window.hideLoadingScreen();
+        // Restore window visibility after loading screen completes
+        Window.finishWindowRestore();
     });
 } else {
     init();
     // Hide loading screen once app is initialized
     if (window.hideLoadingScreen) window.hideLoadingScreen();
+    // Restore window visibility after loading screen completes
+    Window.finishWindowRestore();
 }
 
 // Make this a module

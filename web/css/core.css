@@ -5,11 +5,33 @@
     /* Font Stacks */
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Monaco', 'Fira Code', 'Consolas', monospace;
 
+    /* Core Colors */
+    --text-primary: #333433;
+    --text-secondary: #656766;
+    --text-tertiary: #989a99;
+    --bg-primary: #fcffff;
+    --bg-almost-white: #f7f9f8;
+    --bg-hover: #eff1f0;
+    --bg-gray: #999;
+    --bg-dark: #202523;
+    --border-color: #dcdedd;
+    --border-light: #dfe1e0;
+    --accent-color: #0067cc;
+
+    /* Dark mode colors - for dark backgrounds */
+    --bg-almost-black: #1a1b1a; /* Like system drawer */
+    --text-on-dark: #dfe1e0; /* Primary text on dark */
+    --text-on-dark-secondary: #a9abaa; /* Secondary text on dark */
+    --text-on-dark-tertiary: #878988; /* Tertiary text on dark */
+    --text-on-dark-emphasis: #fefffe; /* Headings/emphasis on dark */
+    --border-on-dark: #3f4140; /* Borders on dark backgrounds */
+
     /* Status Colors */
-    --color-success: #22c55e;
-    --color-error: #ef4444;
-    --color-warning: #ffaa00;
-    --color-info: #3b82f6;
+    --color-success: #22c65e;
+    --color-error: #ef4544;
+    --color-warning: #ffab00;
+    --color-info: #3b83f6;
+    --color-scheduled: #7b20a2;
 
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -30,7 +52,7 @@ body {
 
 /* Accessibility: Focus Styles */
 :focus-visible {
-    outline: 2px solid var(--accent-color, #0066cc);
+    outline: 2px solid var(--accent-color);
     outline-offset: 2px;
 }
 
@@ -168,7 +190,7 @@ body.disconnected #container {
 #left-panel {
     width: 360px;
     background: #f8f8f8;
-    border-right: 1px solid #ddd;
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
 }
@@ -176,7 +198,7 @@ body.disconnected #container {
 /* Header */
 #header {
     padding: 16px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
     background: #fff;
 }
 
@@ -190,7 +212,7 @@ body.disconnected #container {
 #header .subtitle {
     margin: 0;
     font-size: 12px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 /* Stats */
@@ -198,9 +220,9 @@ body.disconnected #container {
     padding: 12px 16px;
     margin-bottom: 32px; /* Space for fixed log panel at bottom */
     background: #fff;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 #stats .stat-item {
@@ -216,7 +238,7 @@ body.disconnected #container {
 
 /* LLM Streaming Styles */
 .progress-event.llm-stream {
-    background: #1e1e1e;
+    background: var(--bg-dark);
     border-left: 3px solid #4ade80;
 }
 
@@ -299,7 +321,7 @@ body.disconnected #container {
         right: 0;
         z-index: 1000;
         background: #fff;
-        border-top: 1px solid #ddd;
+        border-top: 1px solid var(--border-color);
         box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
         display: flex;
         flex-direction: column;

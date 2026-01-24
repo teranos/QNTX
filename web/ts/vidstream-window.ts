@@ -11,7 +11,7 @@
  * TODO: Remove bypass once CrabCamera implements ACL (watch releases)
  */
 
-import { debug, info, error, SEG } from './logger.ts';
+import { log, SEG } from './logger.ts';
 import { sendMessage, registerHandler } from './websocket.ts';
 import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
@@ -138,11 +138,11 @@ export class VidStreamWindow {
         // Handle engine initialization response
         registerHandler('vidstream_init_success', (data: any) => {
             this.engineReady = true;
-            debug(SEG.VID, 'Engine ready:', data);
+            log.debug(SEG.VID, 'Engine ready:', data);
         });
 
         registerHandler('vidstream_init_error', (data: any) => {
-            error(SEG.VID, 'Engine init error:', data.error);
+            log.error(SEG.VID, 'Engine init error:', data.error);
             this.showError(data.error);
         });
 
@@ -155,7 +155,7 @@ export class VidStreamWindow {
         });
 
         registerHandler('vidstream_frame_error', (data: any) => {
-            error(SEG.VID, 'Frame processing error:', data.error);
+            log.error(SEG.VID, 'Frame processing error:', data.error);
         });
     }
 
@@ -189,15 +189,15 @@ export class VidStreamWindow {
                     status.textContent = '✓ Inference ready';
                     status.style.color = '#0a0';
                 }
-                info(SEG.VID, 'VidStream ONNX engine initialized');
-            } catch (err) {
+                log.info(SEG.VID, 'VidStream ONNX engine initialized');
+            } catch (error: unknown) {
                 const status = windowEl.querySelector('#vs-status') as HTMLElement;
                 if (status) {
                     status.textContent = `✗ Engine init failed`;
                     status.style.color = '#a00';
                 }
-                error(SEG.VID, 'ONNX engine initialization failed', err);
-                this.showError(err instanceof Error ? err.message : String(err));
+                log.error(SEG.VID, 'ONNX engine initialization failed', error);
+                this.showError(error instanceof Error ? error.message : String(error));
             } finally {
                 initBtn.disabled = false;
                 initBtn.textContent = 'Initialize ONNX';
@@ -232,11 +232,11 @@ export class VidStreamWindow {
             throw new Error('WebSocket not connected');
         }
 
-        debug(SEG.VID, 'Sent vidstream_init message');
+        log.debug(SEG.VID, 'Sent vidstream_init message');
     }
 
     private async startCamera(): Promise<void> {
-        debug(SEG.VID, 'startCamera() called');
+        log.debug(SEG.VID, 'startCamera() called');
 
         const windowEl = this.window.getElement();
         this.canvas = windowEl.querySelector('#vs-canvas') as HTMLCanvasElement;
@@ -244,7 +244,7 @@ export class VidStreamWindow {
 
         try {
             // Browser mode: Use MediaDevices API
-            debug(SEG.VID, 'Using browser MediaDevices API');
+            log.debug(SEG.VID, 'Using browser MediaDevices API');
 
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 640, height: 480 },
@@ -261,10 +261,10 @@ export class VidStreamWindow {
             }
 
             const mode = this.engineReady ? 'with inference' : 'preview only';
-            info(SEG.VID, `Camera started (${mode})`);
-        } catch (err) {
-            error(SEG.VID, 'Failed to start camera', err);
-            this.showError(err instanceof Error ? err.message : String(err));
+            log.info(SEG.VID, `Camera started (${mode})`);
+        } catch (error: unknown) {
+            log.error(SEG.VID, 'Failed to start camera', error);
+            this.showError(error instanceof Error ? error.message : String(error));
         }
     }
 
@@ -286,7 +286,7 @@ export class VidStreamWindow {
             this.video.srcObject = null;
         }
 
-        info(SEG.VID, 'Camera stopped');
+        log.info(SEG.VID, 'Camera stopped');
     }
 
     private startProcessing(): void {
@@ -314,8 +314,8 @@ export class VidStreamWindow {
             }
 
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
-        } catch (err) {
-            error(SEG.VID, 'Frame processing error', err);
+        } catch (error: unknown) {
+            log.error(SEG.VID, 'Frame processing error', error);
             this.animationFrameId = requestAnimationFrame(() => this.processFrame());
         }
     }
@@ -346,15 +346,15 @@ export class VidStreamWindow {
             // Log payload size (JSON encoding inflates size significantly)
             const payloadJSON = JSON.stringify(payload);
             const payloadSizeMB = payloadJSON.length / (1024 * 1024);
-            debug(SEG.VID, `Frame payload: ${payloadSizeMB.toFixed(2)} MB (${payloadJSON.length} bytes)`);
+            log.debug(SEG.VID, `Frame payload: ${payloadSizeMB.toFixed(2)} MB (${payloadJSON.length} bytes)`);
 
             const sent = sendMessage(payload);
 
             if (!sent) {
-                error(SEG.VID, 'Failed to send frame: WebSocket not connected');
+                log.error(SEG.VID, 'Failed to send frame: WebSocket not connected');
             }
-        } catch (err) {
-            error(SEG.VID, 'Inference error', err);
+        } catch (error: unknown) {
+            log.error(SEG.VID, 'Inference error', error);
         }
     }
 
@@ -422,7 +422,7 @@ export class VidStreamWindow {
     }
 
     public show(): void {
-        debug(SEG.VID, 'show() called');
+        log.debug(SEG.VID, 'show() called');
         this.window.show();
     }
 
@@ -432,7 +432,7 @@ export class VidStreamWindow {
     }
 
     public toggle(): void {
-        debug(SEG.VID, `toggle() called, currently visible: ${this.window.isVisible()}`);
+        log.debug(SEG.VID, `toggle() called, currently visible: ${this.window.isVisible()}`);
         this.window.toggle();
     }
 
@@ -462,9 +462,9 @@ export class VidStreamWindow {
                     modelPathSpan.textContent = pathSetting.value as string;
                 }
             }
-        } catch (err) {
+        } catch (error: unknown) {
             // Silent failure - default path already set in HTML
-            debug(SEG.VID, 'Failed to load model path from config:', err);
+            log.debug(SEG.VID, 'Failed to load model path from config:', error);
         }
     }
 
@@ -474,7 +474,7 @@ export class VidStreamWindow {
     public updateVersion(version: string): void {
         this.version = version;
         this.updateTitle();
-        debug(SEG.VID, `VidStream version updated: ${version}`);
+        log.debug(SEG.VID, `VidStream version updated: ${version}`);
     }
 
     /**

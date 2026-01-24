@@ -3,13 +3,14 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"errors"
+	stderrors "errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 const (
@@ -45,11 +46,11 @@ func NewSymbolIndex(db *sql.DB) (*SymbolIndex, error) {
 		WHERE type='table' AND name='attestations'
 	`).Scan(&tableName)
 
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("attestations table not found - database may not be initialized")
+	if stderrors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("attestations table not found - database may not be initialized")
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate schema: %w", err)
+		return nil, errors.Wrap(err, "failed to validate schema")
 	}
 
 	idx := &SymbolIndex{
@@ -62,7 +63,7 @@ func NewSymbolIndex(db *sql.DB) (*SymbolIndex, error) {
 
 	// Attempt to refresh - will fail gracefully if schema is incompatible
 	if err := idx.Refresh(); err != nil {
-		return nil, fmt.Errorf("failed to build symbol index (check that subjects/predicates/contexts/actors are JSON arrays): %w", err)
+		return nil, errors.Wrap(err, "failed to build symbol index (check that subjects/predicates/contexts/actors are JSON arrays)")
 	}
 
 	return idx, nil
@@ -79,28 +80,28 @@ func (idx *SymbolIndex) Refresh() error {
 	// Query subjects
 	subjects, err := idx.querySymbols(ctx, "subjects")
 	if err != nil {
-		return fmt.Errorf("failed to query subjects: %w", err)
+		return errors.Wrap(err, "failed to query subjects")
 	}
 	idx.subjects = subjects
 
 	// Query predicates
 	predicates, err := idx.querySymbols(ctx, "predicates")
 	if err != nil {
-		return fmt.Errorf("failed to query predicates: %w", err)
+		return errors.Wrap(err, "failed to query predicates")
 	}
 	idx.predicates = predicates
 
 	// Query contexts
 	contexts, err := idx.querySymbols(ctx, "contexts")
 	if err != nil {
-		return fmt.Errorf("failed to query contexts: %w", err)
+		return errors.Wrap(err, "failed to query contexts")
 	}
 	idx.contexts = contexts
 
 	// Query actors
 	actors, err := idx.queryActors(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to query actors: %w", err)
+		return errors.Wrap(err, "failed to query actors")
 	}
 	idx.actors = actors
 

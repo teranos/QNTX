@@ -84,7 +84,7 @@ func handleError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, co
 func readJSON(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
-		return err
+		return errors.Wrap(err, "failed to decode JSON request body")
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 )
 
 // Query constants for querying attestations
@@ -57,7 +58,7 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 
 	rows, err := db.Query(query, qb.args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query attestations: %w", err)
+		return nil, errors.Wrap(err, "failed to query attestations")
 	}
 	defer rows.Close()
 
@@ -65,13 +66,13 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	for rows.Next() {
 		as, err := ScanAttestation(rows)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan attestation: %w", err)
+			return nil, errors.Wrap(err, "failed to scan attestation")
 		}
 		attestations = append(attestations, as)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating over attestations: %w", err)
+		return nil, errors.Wrap(err, "error iterating over attestations")
 	}
 
 	return attestations, nil
@@ -100,25 +101,25 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 
 	// Unmarshal JSON fields
 	if err := json.Unmarshal([]byte(subjectsJSON), &as.Subjects); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal subjects: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal subjects")
 	}
 
 	if err := json.Unmarshal([]byte(predicatesJSON), &as.Predicates); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal predicates: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal predicates")
 	}
 
 	if err := json.Unmarshal([]byte(contextsJSON), &as.Contexts); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal contexts: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal contexts")
 	}
 
 	if err := json.Unmarshal([]byte(actorsJSON), &as.Actors); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal actors: %w", err)
+		return nil, errors.Wrap(err, "failed to unmarshal actors")
 	}
 
 	// Handle nullable attributes field
 	if attributesJSON.Valid && attributesJSON.String != "null" && attributesJSON.String != "" {
 		if err := json.Unmarshal([]byte(attributesJSON.String), &as.Attributes); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal attributes: %w", err)
+			return nil, errors.Wrap(err, "failed to unmarshal attributes")
 		}
 	}
 

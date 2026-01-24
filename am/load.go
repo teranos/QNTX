@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -17,13 +16,20 @@ import (
 var globalConfig *Config
 var viperInstance *viper.Viper
 
+// ConfigSources tracks where each setting came from during loading
+// Exported for use by introspection
+var ConfigSources = make(map[string]SourceInfo)
+
 // Load reads the QNTX core configuration using Viper
 func Load() (*Config, error) {
 	if globalConfig != nil {
 		return globalConfig, nil
 	}
 
-	v := initViper()
+	v, err := initViper()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize viper")
+	}
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
@@ -36,7 +42,10 @@ func Load() (*Config, error) {
 
 // GetViper returns the Viper instance for advanced configuration access
 func GetViper() *viper.Viper {
-	return initViper()
+	v, _ := initViper()
+	// Note: Error is ignored here to maintain backward compatibility.
+	// If initialization fails, v will be nil which may cause issues downstream.
+	return v
 }
 
 // LoadWithViper loads configuration using a provided Viper instance
@@ -76,9 +85,9 @@ func Reset() {
 }
 
 // initViper initializes Viper with configuration sources and defaults
-func initViper() *viper.Viper {
+func initViper() (*viper.Viper, error) {
 	if viperInstance != nil {
-		return viperInstance
+		return viperInstance, nil
 	}
 
 	v := viper.New()
@@ -95,10 +104,12 @@ func initViper() *viper.Viper {
 	SetDefaults(v)
 
 	// Manually merge configs in precedence order: system -> user -> project -> env vars
-	mergeConfigFiles(v)
+	if err := mergeConfigFiles(v); err != nil {
+		return nil, err
+	}
 
 	viperInstance = v
-	return v
+	return v, nil
 }
 
 // findProjectConfig searches for config.toml or am.toml by walking up the directory tree
@@ -136,9 +147,36 @@ func findProjectConfig() string {
 	return ""
 }
 
+// trackSource records where a configuration key came from
+func trackSource(key string, source ConfigSource, path string) {
+	ConfigSources[key] = SourceInfo{
+		Source: source,
+		Path:   path,
+	}
+}
+
+// TrackNestedSources recursively tracks sources for nested configuration
+// Exported for testing
+func TrackNestedSources(settings map[string]interface{}, prefix string, source ConfigSource, path string) {
+	for key, value := range settings {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		// Track this key's source
+		trackSource(fullKey, source, path)
+
+		// If nested map, recurse
+		if nestedMap, ok := value.(map[string]interface{}); ok {
+			TrackNestedSources(nestedMap, fullKey, source, path)
+		}
+	}
+}
+
 // mergeConfigFiles manually merges configuration files in the correct precedence order
 // Precedence (lowest to highest): system < user < project < env vars
-func mergeConfigFiles(v *viper.Viper) {
+func mergeConfigFiles(v *viper.Viper) error {
 	homeDir, _ := os.UserHomeDir()
 
 	// Ensure ~/.qntx directory exists
@@ -147,46 +185,80 @@ func mergeConfigFiles(v *viper.Viper) {
 
 	// Build config paths, with project config found via upward search
 	projectConfig := findProjectConfig()
-	configPaths := []string{
-		"/etc/qntx/config.toml",               // System config (lowest precedence)
-		filepath.Join(qntxDir, "am.toml"),     // User am config (new format)
-		filepath.Join(qntxDir, "config.toml"), // User config (backward compat)
+
+	// Define config files with their sources
+	type configFile struct {
+		path   string
+		source ConfigSource
+	}
+
+	configFiles := []configFile{
+		{"/etc/qntx/config.toml", SourceSystem},
+		{"/etc/qntx/am.toml", SourceSystem},
+		{filepath.Join(qntxDir, "config.toml"), SourceUser},
+		{filepath.Join(qntxDir, "am.toml"), SourceUser},
+		{filepath.Join(qntxDir, "config_from_ui.toml"), SourceUserUI},
+		{filepath.Join(qntxDir, "am_from_ui.toml"), SourceUserUI},
 	}
 
 	// Add project config if found (highest file precedence, below env vars)
 	if projectConfig != "" {
-		configPaths = append(configPaths, projectConfig)
+		configFiles = append(configFiles, configFile{projectConfig, SourceProject})
 	}
 
-	for _, configPath := range configPaths {
-		if _, err := os.Stat(configPath); err == nil {
+	// Track defaults first
+	for key, value := range v.AllSettings() {
+		trackSource(key, SourceDefault, "")
+		// Track nested defaults
+		if nestedMap, ok := value.(map[string]interface{}); ok {
+			TrackNestedSources(nestedMap, key, SourceDefault, "")
+		}
+	}
+
+	// Process each config file and track sources
+	for _, cf := range configFiles {
+		if _, err := os.Stat(cf.path); err == nil {
 			// Config file exists, merge it
 			tempViper := viper.New()
-			tempViper.SetConfigFile(configPath)
+			tempViper.SetConfigFile(cf.path)
 			tempViper.SetConfigType("toml")
 
 			if err := tempViper.ReadInConfig(); err == nil {
-				// Merge this config into the main viper instance
-				// Sort keys for deterministic config loading
+				// Track sources for all settings in this file
 				allSettings := tempViper.AllSettings()
-				keys := make([]string, 0, len(allSettings))
-				for key := range allSettings {
-					keys = append(keys, key)
-				}
-				sort.Strings(keys)
-				for _, key := range keys {
-					v.Set(key, allSettings[key])
+				TrackNestedSources(allSettings, "", cf.source, cf.path)
+
+				// Merge this config into the main viper instance
+				// Using MergeConfigMap preserves Viper's natural precedence order,
+				// allowing environment variables to override config files properly
+				if err := v.MergeConfigMap(allSettings); err != nil {
+					return errors.Wrapf(err, "failed to merge config from %s", cf.path)
 				}
 			}
 		}
 	}
+
+	// Track environment variable overrides
+	// Check each setting to see if it was overridden by an env var
+	for key := range ConfigSources {
+		envKey := "QNTX_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+		if envValue := os.Getenv(envKey); envValue != "" {
+			// This setting was overridden by environment
+			trackSource(key, SourceEnvironment, envKey)
+		}
+	}
+
+	return nil
 }
 
 // LoadPluginConfigs loads plugin-specific configuration from ~/.qntx/plugins/{name}.toml files
 // Config values are loaded under the plugin name namespace (e.g., python.python_paths)
 // Returns nil if plugins directory doesn't exist (not an error), or actual errors encountered
 func LoadPluginConfigs(pluginPaths []string) error {
-	v := initViper()
+	v, err := initViper()
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize viper")
+	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return errors.Wrap(err, "failed to get home directory")
@@ -292,44 +364,64 @@ func LoadPluginConfigs(pluginPaths []string) error {
 
 // Get returns a configuration value using dot notation
 func Get(key string) interface{} {
-	v := initViper()
+	v, _ := initViper()
+	if v == nil {
+		return nil
+	}
 	return v.Get(key)
 }
 
 // GetString returns a configuration value as string using dot notation
 func GetString(key string) string {
-	v := initViper()
+	v, _ := initViper()
+	if v == nil {
+		return ""
+	}
 	return v.GetString(key)
 }
 
 // GetBool returns a configuration value as bool using dot notation
 func GetBool(key string) bool {
-	v := initViper()
+	v, _ := initViper()
+	if v == nil {
+		return false
+	}
 	return v.GetBool(key)
 }
 
 // GetInt returns a configuration value as int using dot notation
 func GetInt(key string) int {
-	v := initViper()
+	v, _ := initViper()
+	if v == nil {
+		return 0
+	}
 	return v.GetInt(key)
 }
 
 // GetFloat64 returns a configuration value as float64 using dot notation
 func GetFloat64(key string) float64 {
-	v := initViper()
+	v, _ := initViper()
+	if v == nil {
+		return 0
+	}
 	return v.GetFloat64(key)
 }
 
 // GetStringSlice returns a configuration value as string slice using dot notation
 func GetStringSlice(key string) []string {
-	v := initViper()
+	v, _ := initViper()
+	if v == nil {
+		return nil
+	}
 	return v.GetStringSlice(key)
 }
 
 // Set sets a configuration value using dot notation (runtime override)
 func Set(key string, value interface{}) {
-	v := initViper()
-	v.Set(key, value)
+	v, _ := initViper()
+	if v != nil {
+		v.Set(key, value)
+	}
 }
 
 // GetDatabasePath returns the configured database path
@@ -403,11 +495,14 @@ func UpdatePluginConfig(pluginName string, config map[string]string) error {
 
 	// Write updated config to disk
 	if err := writePluginConfigFile(configPath, pluginConfig); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write plugin config")
 	}
 
 	// Update viper with new values
-	v := initViper()
+	v, err := initViper()
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize viper")
+	}
 	for key, value := range config {
 		fullKey := pluginName + "." + key
 		v.Set(fullKey, value)

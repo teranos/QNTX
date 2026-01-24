@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/typegen"
 	"github.com/teranos/QNTX/typegen/api"
+	"github.com/teranos/QNTX/typegen/css"
 	"github.com/teranos/QNTX/typegen/markdown"
 	"github.com/teranos/QNTX/typegen/python"
 	"github.com/teranos/QNTX/typegen/rust"
@@ -43,6 +45,9 @@ var languagePackages = map[string][]string{
 	},
 	"python": {
 		"github.com/teranos/QNTX/graph",
+		"github.com/teranos/QNTX/sym",
+	},
+	"css": {
 		"github.com/teranos/QNTX/sym",
 	},
 	"markdown": {
@@ -93,12 +98,12 @@ It handles:
   - API endpoint documentation (generated with markdown to docs/api/)
 
 Examples:
-  qntx typegen                                    # Generate TypeScript to stdout
-  qntx typegen --lang typescript                  # Explicit language
-  qntx typegen --lang markdown                    # Generate docs/types/ and docs/api/
-  qntx typegen --lang all                         # All languages
-  qntx typegen --output types/generated/          # Write to directory (creates typescript/ subdir)
-  qntx typegen --packages pulse/async             # Specific package only`,
+  typegen                                    # Generate TypeScript to stdout
+  typegen --lang typescript                  # Explicit language
+  typegen --lang markdown                    # Generate docs/types/ and docs/api/
+  typegen --lang all                         # All languages
+  typegen --output types/generated/          # Write to directory (creates typescript/ subdir)
+  typegen --packages pulse/async             # Specific package only`,
 	RunE: runTypegen,
 }
 
@@ -126,8 +131,8 @@ Exit codes:
   2 - Error during check
 
 Examples:
-  qntx typegen check                      # Check all generated types
-  make types-check                        # Same, via Makefile`,
+  typegen check                      # Check all generated types
+  make types-check                   # Same, via Makefile`,
 	RunE: runTypegenCheck,
 }
 
@@ -137,7 +142,7 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	// Create temp directory for generated types
 	tempDir, err := os.MkdirTemp("", "qntx-types-check-*")
 	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
+		return errors.Wrap(err, "failed to create temp directory")
 	}
 	defer os.RemoveAll(tempDir)
 
@@ -147,19 +152,19 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 	defer func() { typegenOutput = originalOutput }()
 
 	// Generate all types to temp directory
-	languages := []string{"typescript", "python", "rust", "markdown"}
+	languages := []string{"typescript", "python", "rust", "css", "markdown"}
 
 	for _, lang := range languages {
 		packages := getDefaultPackages(lang)
 		if err := generateForLanguage(lang, packages, true); err != nil {
-			return fmt.Errorf("failed to generate %s types: %w", lang, err)
+			return errors.Wrapf(err, "failed to generate %s types", lang)
 		}
 	}
 
 	// Compare with existing types using the typegen package
 	result, err := typegen.CompareDirectories(tempDir)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to compare directories")
 	}
 
 	if result.UpToDate {
@@ -178,14 +183,14 @@ func runTypegenCheck(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return fmt.Errorf("types are out of date - run 'qntx typegen' or 'make types' to update")
+	return errors.New("types are out of date - run 'make types' to update")
 }
 
 func runTypegen(cmd *cobra.Command, args []string) error {
 	// Validate and determine languages to generate
 	languages := getLanguages(typegenLang)
 	if len(languages) == 0 {
-		return fmt.Errorf("invalid language: %s (supported: typescript, python, rust, dart, all)", typegenLang)
+		return errors.Newf("invalid language: %s (supported: typescript, python, rust, dart, all)", typegenLang)
 	}
 
 	// Generate for each language
@@ -201,7 +206,7 @@ func runTypegen(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := generateForLanguage(lang, packages, usingDefaultPackages); err != nil {
-			return err
+			return errors.Wrapf(err, "failed to generate %s types", lang)
 		}
 	}
 
@@ -214,7 +219,7 @@ func getLanguages(lang string) []string {
 
 	switch lang {
 	case "all":
-		return []string{"typescript", "python", "rust", "markdown"} // All supported languages
+		return []string{"typescript", "python", "rust", "css", "markdown"} // All supported languages
 	case "typescript", "ts":
 		return []string{"typescript"}
 	case "markdown", "md":
@@ -223,6 +228,8 @@ func getLanguages(lang string) []string {
 		return []string{"python"}
 	case "rust", "rs":
 		return []string{"rust"}
+	case "css":
+		return []string{"css"}
 	case "dart":
 		return []string{"dart"}
 	default:
@@ -279,17 +286,19 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		}
 	case "python":
 		gen = python.NewGenerator()
+	case "css":
+		gen = css.NewGenerator()
 	case "dart":
 		fmt.Printf("⚠ %s generator not yet implemented (coming in v1.0.0)\n", lang)
 		return nil
 	default:
-		return fmt.Errorf("unknown language: %s", lang)
+		return errors.Newf("unknown language: %s", lang)
 	}
 
 	// Generate types for all packages
 	results, typeToPackage, err := generateTypesForPackages(packages, gen)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to generate types for packages")
 	}
 
 	// Add cross-package imports (TypeScript-specific)
@@ -301,7 +310,7 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 
 	// Write generated files
 	if err := writeGeneratedOutput(results, outputDir, fileExt, lang); err != nil {
-		return err
+		return errors.Wrap(err, "failed to write generated output")
 	}
 
 	// Generate index file for TypeScript (barrel export)
@@ -309,7 +318,7 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 	if outputDir != "" && lang == "typescript" && generateIndex {
 		exports := convertToPackageExports(results)
 		if err := typescript.GenerateIndexFile(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate index file: %w", err)
+			return errors.Wrap(err, "failed to generate index file")
 		}
 	}
 
@@ -323,16 +332,16 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		if !isEmbedded {
 			// Standalone crate: generate all scaffolding
 			if err := rust.GenerateIndexFile(outputDir, exports); err != nil {
-				return fmt.Errorf("failed to generate mod.rs: %w", err)
+				return errors.Wrap(err, "failed to generate mod.rs")
 			}
 			if err := rust.GenerateLibRs(outputDir, exports); err != nil {
-				return fmt.Errorf("failed to generate lib.rs: %w", err)
+				return errors.Wrap(err, "failed to generate lib.rs")
 			}
 			if err := rust.GenerateCargoToml(outputDir); err != nil {
-				return fmt.Errorf("failed to generate Cargo.toml: %w", err)
+				return errors.Wrap(err, "failed to generate Cargo.toml")
 			}
 			if err := rust.GenerateReadme(outputDir, exports); err != nil {
-				return fmt.Errorf("failed to generate README.md: %w", err)
+				return errors.Wrap(err, "failed to generate README.md")
 			}
 		}
 		// Embedded location: skip scaffolding (custom mod.rs exists in parent crate)
@@ -343,14 +352,23 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 	if outputDir != "" && lang == "python" && generateIndex {
 		exports := convertToPythonPackageExports(results)
 		if err := python.GenerateInitFile(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate __init__.py: %w", err)
+			return errors.Wrap(err, "failed to generate __init__.py")
 		}
 		if err := python.GeneratePyProjectToml(outputDir); err != nil {
-			return fmt.Errorf("failed to generate pyproject.toml: %w", err)
+			return errors.Wrap(err, "failed to generate pyproject.toml")
 		}
 		if err := python.GenerateReadme(outputDir, exports); err != nil {
-			return fmt.Errorf("failed to generate README.md: %w", err)
+			return errors.Wrap(err, "failed to generate README.md")
 		}
+	}
+
+	// Generate README.md for CSS
+	// Only generate when processing all default packages to avoid partial indices
+	if outputDir != "" && lang == "css" && generateIndex {
+		if err := css.GenerateReadme(outputDir); err != nil {
+			return fmt.Errorf("failed to generate CSS README: %w", err)
+		}
+		fmt.Printf("✓ Generated %s (index)\n", filepath.Join(outputDir, "README.md"))
 	}
 
 	// Generate README.md index for markdown documentation
@@ -359,14 +377,14 @@ func generateForLanguage(lang string, packages []string, generateIndex bool) err
 		readme := generateMarkdownIndex(results)
 		readmePath := filepath.Join(outputDir, "README.md")
 		if err := os.WriteFile(readmePath, []byte(readme), 0644); err != nil {
-			return fmt.Errorf("failed to write README: %w", err)
+			return errors.Wrap(err, "failed to write README")
 		}
 		fmt.Printf("✓ Generated %s (index)\n", readmePath)
 
 		// Also generate API documentation (part of markdown output)
 		apiOutputDir := "docs/api"
 		if err := api.GenerateAPIDoc("server", apiOutputDir); err != nil {
-			return fmt.Errorf("failed to generate API docs: %w", err)
+			return errors.Wrap(err, "failed to generate API docs")
 		}
 	}
 
@@ -381,7 +399,7 @@ func generateTypesForPackages(packages []string, gen typegen.Generator) ([]genRe
 	for _, pkg := range packages {
 		result, err := typegen.GenerateFromPackage(pkg, gen)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to generate types for %s: %w", pkg, err)
+			return nil, nil, errors.Wrapf(err, "failed to generate types for %s", pkg)
 		}
 
 		// Generate output file
@@ -441,21 +459,25 @@ func isEmbeddedRustLocation(outputDir string) bool {
 // getOutputConfig determines the output directory and file extension for a language
 func getOutputConfig(lang string) (outputDir, fileExt string) {
 	if typegenOutput == "" {
-		// No output specified: markdown defaults to docs/types, rust to embedded crate, others to stdout
+		// No output specified: markdown defaults to docs/types, rust to embedded crate, css to web/css/generated, others to stdout
 		if lang == "markdown" {
 			outputDir = "docs/types"
 		} else if lang == "rust" {
 			outputDir = "crates/qntx/src/types"
+		} else if lang == "css" {
+			outputDir = "web/css/generated"
 		} else {
 			outputDir = "" // stdout mode
 		}
 	} else {
 		// Output specified: use it for all languages
-		// For Rust and markdown, preserve the actual output structure to ensure correct import generation
+		// For Rust, markdown, and CSS, preserve the actual output structure to ensure correct import generation
 		if lang == "rust" {
 			outputDir = filepath.Join(typegenOutput, "crates/qntx/src/types")
 		} else if lang == "markdown" {
 			outputDir = filepath.Join(typegenOutput, "docs/types")
+		} else if lang == "css" {
+			outputDir = filepath.Join(typegenOutput, "web/css/generated")
 		} else {
 			outputDir = filepath.Join(typegenOutput, lang)
 		}
@@ -470,6 +492,8 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 		fileExt = ".py"
 	case "rust":
 		fileExt = ".rs"
+	case "css":
+		fileExt = ".css"
 	case "dart":
 		fileExt = ".dart"
 	}
@@ -497,17 +521,17 @@ func writeGeneratedOutput(results []genResult, outputDir, fileExt, lang string) 
 
 			// Create directory if needed
 			if err := os.MkdirAll(outputDir, 0755); err != nil {
-				return fmt.Errorf("failed to create output directory: %w", err)
+				return errors.Wrap(err, "failed to create output directory")
 			}
 
 			if err := os.WriteFile(outputPath, []byte(res.output), 0644); err != nil {
-				return fmt.Errorf("failed to write %s: %w", outputPath, err)
+				return errors.Wrapf(err, "failed to write %s", outputPath)
 			}
 
 			// Format Rust files after writing
 			if lang == "rust" {
 				if err := rust.FormatFile(outputPath); err != nil {
-					return err
+					return errors.Wrapf(err, "failed to format rust file %s", outputPath)
 				}
 			}
 
@@ -647,7 +671,7 @@ func generateMarkdownIndex(results []genResult) string {
 	sb.WriteString("- Cross-reference between languages\n\n")
 
 	sb.WriteString("---\n\n")
-	sb.WriteString("*Generated by `qntx typegen`*\n")
+	sb.WriteString("*Generated by `typegen`*\n")
 
 	return sb.String()
 }
