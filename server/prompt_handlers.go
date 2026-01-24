@@ -575,7 +575,45 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// sampleAttestations randomly samples n attestations from the provided list
+// sampleAttestations randomly samples n attestations from the provided list using Fisher-Yates shuffle.
+//
+// TODO(non-deterministic-sampling): This function uses unseeded math/rand, violating QNTX's
+// deterministic operations standard (CLAUDE.md). However, this is a deliberate tradeoff worth
+// discussing:
+//
+// THE PARADOX: LLMs are inherently non-deterministic. This X-sampling feature exists precisely
+// BECAUSE of that non-determinism - we're trying to work WITH it, not against it. The entire
+// point of preview sampling is to test prompt behavior across diverse inputs to build confidence
+// before production deployment. Higher X = more samples = higher confidence that the prompt
+// behaves correctly across the attestation space.
+//
+// THE TRADEOFF:
+//   - Reproducibility: Unseeded random means identical API calls produce different samples
+//   - Purpose: Random sampling is the FEATURE - we want diverse coverage, not the same N every time
+//   - Debugging: Non-reproducible results make it harder to debug specific failures
+//
+// POTENTIAL SOLUTIONS (choose based on use case priority):
+//   1. Add optional 'seed' parameter to API request
+//      - Pros: Reproducible when needed, random by default
+//      - Cons: Additional API complexity, users must understand seeding
+//
+//   2. Use deterministic sampling (first N, evenly spaced, hash-based)
+//      - Pros: Fully reproducible, simpler
+//      - Cons: Loses randomness benefit, may miss edge cases clustered in unsampled regions
+//
+//   3. Use crypto/rand for cryptographically secure randomness
+//      - Pros: More secure random
+//      - Cons: Still non-reproducible, overkill for this use case
+//
+//   4. Accept non-determinism as a feature
+//      - Pros: Embraces the purpose of X-sampling
+//      - Cons: Violates QNTX standards, harder debugging
+//
+// RECOMMENDATION: Add optional 'seed' parameter (solution 1) to balance reproducibility needs
+// with the feature's purpose. Default to time-seeded random, allow explicit seed for debugging.
+//
+// SECURITY NOTE: math/rand is sufficient here - we're sampling attestations, not generating
+// cryptographic material. Predictability is not a security concern in this context.
 func sampleAttestations(attestations []types.As, n int) []types.As {
 	if n >= len(attestations) {
 		// Return all attestations if sample size >= total
