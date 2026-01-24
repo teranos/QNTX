@@ -16,6 +16,7 @@ import (
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 )
 
@@ -98,7 +99,8 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 
 	var req PromptPreviewRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
+			"Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -162,22 +164,26 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 	// Parse frontmatter and template
 	doc, err := prompt.ParseFrontmatter(req.Template)
 	if err != nil {
+		wrappedErr := errors.Wrap(err, "failed to parse frontmatter")
 		logger.AddAxSymbol(s.logger).Errorw("Frontmatter parsing failed",
-			"error", err,
+			"error", wrappedErr,
 			"template_length", len(req.Template),
 		)
-		writeError(w, http.StatusBadRequest, "Failed to parse frontmatter: "+err.Error())
+		writeWrappedError(w, s.logger, wrappedErr,
+			"Failed to parse frontmatter", http.StatusBadRequest)
 		return
 	}
 
 	// Parse template body (after frontmatter)
 	tmpl, err := prompt.Parse(doc.Body)
 	if err != nil {
+		wrappedErr := errors.Wrap(err, "failed to parse prompt template")
 		logger.AddAxSymbol(s.logger).Errorw("Template parsing failed",
-			"error", err,
+			"error", wrappedErr,
 			"template_length", len(doc.Body),
 		)
-		writeError(w, http.StatusBadRequest, "Failed to parse prompt template: "+err.Error())
+		writeWrappedError(w, s.logger, wrappedErr,
+			"Failed to parse prompt template", http.StatusBadRequest)
 		return
 	}
 
@@ -286,7 +292,8 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 
 	var req PromptExecuteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
+			"Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -302,7 +309,8 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 
 	// Validate template syntax
 	if err := prompt.ValidateTemplate(req.Template); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid template: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "template validation failed"),
+			"Invalid template", http.StatusBadRequest)
 		return
 	}
 
@@ -311,7 +319,8 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	filter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
 	if err != nil {
 		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
-			writeError(w, http.StatusBadRequest, "Invalid ax query: "+err.Error())
+			writeWrappedError(w, s.logger, errors.Wrap(err, "failed to parse ax query"),
+				"Invalid ax query", http.StatusBadRequest)
 			return
 		}
 	}
@@ -506,7 +515,8 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 
 	var req PromptSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
+			"Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
