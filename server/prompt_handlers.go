@@ -117,15 +117,25 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		req.SampleSize = 1
 	}
 
-	// Parse the ax query
+	// Parse the ax query - support both natural language and simple "TEST-TASK-1" format
+	var filter *types.AxFilter
 	args := strings.Fields(req.AxQuery)
-	filter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
+
+	// Try parsing as natural language ax command
+	parsedFilter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
 	if err != nil {
 		// Check if it's just a warning (best-effort parsing)
 		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
-			writeError(w, http.StatusBadRequest, "Invalid ax query: "+err.Error())
-			return
+			// If it fails, try treating it as a simple subject query
+			filter = &types.AxFilter{
+				Subjects: []string{req.AxQuery},
+				Limit:    100,
+			}
+		} else {
+			filter = parsedFilter
 		}
+	} else {
+		filter = parsedFilter
 	}
 
 	// Execute the query using storage executor
