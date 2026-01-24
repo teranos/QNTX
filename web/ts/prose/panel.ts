@@ -10,12 +10,14 @@
 import { BasePanel } from '../base-panel.ts';
 import { ProseEditor } from './editor.ts';
 import { ProseNavigation } from './navigation.ts';
+import { PromptPreviewPanel } from './prompt-preview-panel.ts';
 import { fetchDevMode } from '../dev-mode.ts';
 
 class ProsePanel extends BasePanel {
     // Component modules
     private editor: ProseEditor;
     private navigation: ProseNavigation;
+    private promptPreview: PromptPreviewPanel;
 
     // Save keyboard handler (separate from escape, which BasePanel handles)
     private saveKeyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -33,6 +35,7 @@ class ProsePanel extends BasePanel {
         this.editor = new ProseEditor({
             onDocumentLoad: (path: string) => {
                 this.navigation.addToRecentDocs(path);
+                this.checkPromptFile(path);
             }
         });
 
@@ -40,6 +43,15 @@ class ProsePanel extends BasePanel {
             onDocumentSelect: (path: string) => {
                 this.editor.loadDocument(path);
             }
+        });
+
+        // Initialize prompt preview panel
+        this.promptPreview = new PromptPreviewPanel({
+            onClose: () => {
+                // Adjust Prose panel width when preview closes
+                this.adjustPanelWidth(false);
+            },
+            getEditorContent: () => this.editor.getContent()
         });
 
         // TODO(issue #11): Implement Layout rendering modes for DocBlock views
@@ -157,6 +169,43 @@ class ProsePanel extends BasePanel {
 
         // Clean up component modules
         this.editor.destroy();
+        this.promptPreview.destroy();
+    }
+
+    /**
+     * Check if the loaded document is a prompt file and update preview panel
+     */
+    private checkPromptFile(path: string): void {
+        // Check if file has prompt indicators:
+        // 1. Contains .prompt in filename (e.g., recipe.prompt.md)
+        // 2. Has frontmatter with type: prompt-template
+        // 3. Is in a prompts/ directory
+        const isPromptFile =
+            path.includes('.prompt.') ||
+            path.includes('/prompts/') ||
+            path.startsWith('prompts/');
+
+        this.promptPreview.setPromptFileActive(isPromptFile);
+
+        // Auto-show preview panel for prompt files
+        if (isPromptFile) {
+            this.promptPreview.show();
+            this.adjustPanelWidth(true);
+        }
+    }
+
+    /**
+     * Adjust the Prose panel width when preview panel is shown/hidden
+     */
+    private adjustPanelWidth(hasPreview: boolean): void {
+        if (!this.panel) return;
+
+        // When preview is shown, reduce Prose panel width to make room
+        if (hasPreview) {
+            this.panel.style.width = '40%';
+        } else {
+            this.panel.style.width = ''; // Reset to CSS default
+        }
     }
 }
 
