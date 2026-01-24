@@ -183,7 +183,8 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let tokens = collect_tokens("is are of from by via since until on between over and so therefore");
+        let tokens =
+            collect_tokens("is are of from by via since until on between over and so therefore");
         let kinds: Vec<_> = tokens.iter().map(|t| t.kind).collect();
         assert_eq!(
             kinds,

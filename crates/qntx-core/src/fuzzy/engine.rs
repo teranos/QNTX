@@ -18,7 +18,11 @@ pub struct FuzzyMatch {
 
 impl FuzzyMatch {
     fn new(value: String, score: f64, strategy: &'static str) -> Self {
-        Self { value, score, strategy }
+        Self {
+            value,
+            score,
+            strategy,
+        }
     }
 }
 
@@ -157,7 +161,8 @@ impl FuzzyEngine {
         };
 
         // Platform-specific matching
-        let mut matches = self.match_vocabulary(&query_lower, vocabulary, vocabulary_lower, min_score);
+        let mut matches =
+            self.match_vocabulary(&query_lower, vocabulary, vocabulary_lower, min_score);
 
         // Sort by score descending, then by value for stability
         matches.sort_by(|a, b| {

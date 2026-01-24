@@ -80,8 +80,15 @@ enum OwnedTemporalClause {
     Since(String),
     Until(String),
     On(String),
-    Between { start: String, end: String },
-    Over { raw: String, value: Option<f64>, unit: Option<String> },
+    Between {
+        start: String,
+        end: String,
+    },
+    Over {
+        raw: String,
+        value: Option<f64>,
+        unit: Option<String>,
+    },
 }
 
 impl OwnedAxQuery {
@@ -91,7 +98,10 @@ impl OwnedAxQuery {
             predicates: query.predicates.iter().map(|s| s.to_string()).collect(),
             contexts: query.contexts.iter().map(|s| s.to_string()).collect(),
             actors: query.actors.iter().map(|s| s.to_string()).collect(),
-            temporal: query.temporal.as_ref().map(OwnedTemporalClause::from_borrowed),
+            temporal: query
+                .temporal
+                .as_ref()
+                .map(OwnedTemporalClause::from_borrowed),
             actions: query.actions.iter().map(|s| s.to_string()).collect(),
         }
     }
@@ -262,9 +272,9 @@ pub fn console_log(msg: &str) {
 // Native tests (test underlying logic without JsValue)
 #[cfg(test)]
 mod tests {
-    use qntx_core::parser::Parser;
-    use qntx_core::fuzzy::FuzzyEngine;
     use qntx_core::classify::ActorCredibility;
+    use qntx_core::fuzzy::FuzzyEngine;
+    use qntx_core::parser::Parser;
 
     #[test]
     fn test_parser_integration() {
@@ -284,10 +294,7 @@ mod tests {
     #[test]
     fn test_fuzzy_engine() {
         let mut engine = FuzzyEngine::new();
-        engine.rebuild_index(
-            vec!["is_author_of".to_string()],
-            vec!["GitHub".to_string()],
-        );
+        engine.rebuild_index(vec!["is_author_of".to_string()], vec!["GitHub".to_string()]);
         assert!(engine.is_ready());
 
         let matches = engine.search_predicates("author", 10, 0.6);
@@ -319,10 +326,7 @@ mod wasm_tests {
     #[wasm_bindgen_test]
     fn test_engine_wasm() {
         let mut engine = QntxEngine::new();
-        engine.rebuild_index(
-            vec!["is_author_of".to_string()],
-            vec!["GitHub".to_string()],
-        );
+        engine.rebuild_index(vec!["is_author_of".to_string()], vec!["GitHub".to_string()]);
         assert!(engine.is_ready());
     }
 }

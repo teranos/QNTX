@@ -190,7 +190,11 @@ pub fn jaro_winkler_match(query: &str, item: &str) -> Option<StrategyMatch> {
 
 /// Try Levenshtein edit distance (score: 0.6-0.8)
 #[inline]
-pub fn levenshtein_match(query: &str, item: &str, max_edit_distance: usize) -> Option<StrategyMatch> {
+pub fn levenshtein_match(
+    query: &str,
+    item: &str,
+    max_edit_distance: usize,
+) -> Option<StrategyMatch> {
     let edit_dist = levenshtein(query, item);
     if edit_dist <= max_edit_distance {
         let max_len = query.len().max(item.len());
