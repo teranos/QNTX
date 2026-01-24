@@ -41,7 +41,7 @@ function getPrefersReducedMotion(): boolean {
 }
 
 // Animation durations in milliseconds - adjust these to slow down/speed up morphing
-export const MAXIMIZE_DURATION_MS = 200;  // Base duration for dot → window
+export const MAXIMIZE_DURATION_MS = 350;  // Base duration for dot → window
 export const MINIMIZE_DURATION_MS = 200;  // Base duration for window → dot
 
 // Get actual durations considering reduced motion preference
@@ -132,7 +132,8 @@ export class GlyphMorph {
         beginMaximizeMorph(
             glyphElement,
             glyphRect,
-            { x: targetX, y: targetY, width: windowWidth, height: windowHeight }
+            { x: targetX, y: targetY, width: windowWidth, height: windowHeight },
+            getMaximizeDuration()
         ).then(() => {
             // COMMIT PHASE: Animation completed successfully
             log.debug(SEG.UI, `[Maximize] Animation committed for ${glyph.id}`);
@@ -287,7 +288,7 @@ export class GlyphMorph {
 
         // Begin the minimize morph animation
         // Element stays fixed on body during animation
-        beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY })
+        beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
             .then(() => {
                 // Animation completed successfully
                 log.debug(SEG.UI, `[Minimize] Animation complete for ${glyph.id}`);
