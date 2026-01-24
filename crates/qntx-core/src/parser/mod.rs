@@ -155,9 +155,11 @@ impl<'a> Parser<'a> {
             TokenKind::Is | TokenKind::Are => self.state = ParserState::Predicates,
             TokenKind::Of | TokenKind::From => self.state = ParserState::Contexts,
             TokenKind::By | TokenKind::Via => self.state = ParserState::Actors,
-            TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
-                self.state = ParserState::Temporal
-            }
+            TokenKind::Since
+            | TokenKind::Until
+            | TokenKind::On
+            | TokenKind::Between
+            | TokenKind::Over => self.state = ParserState::Temporal,
             TokenKind::So | TokenKind::Therefore => self.state = ParserState::Actions,
             TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                 self.state = ParserState::Subjects
@@ -201,7 +203,11 @@ impl<'a> Parser<'a> {
                     self.state = ParserState::Actors;
                     return Ok(());
                 }
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -261,7 +267,11 @@ impl<'a> Parser<'a> {
                     self.state = ParserState::Actors;
                     return Ok(());
                 }
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -321,7 +331,11 @@ impl<'a> Parser<'a> {
                     self.state = ParserState::Actors;
                     return Ok(());
                 }
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -380,7 +394,11 @@ impl<'a> Parser<'a> {
                     self.query.actors.push(t.text);
                     found = true;
                 }
-                TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
+                TokenKind::Since
+                | TokenKind::Until
+                | TokenKind::On
+                | TokenKind::Between
+                | TokenKind::Over => {
                     self.state = ParserState::Temporal;
                     return Ok(());
                 }
@@ -463,7 +481,9 @@ impl<'a> Parser<'a> {
 
     fn collect_between_end(&mut self, keyword_pos: usize) -> Result<&'a str, ParseError> {
         if self.at_eof() {
-            return Err(ParseError::MissingAnd { position: keyword_pos });
+            return Err(ParseError::MissingAnd {
+                position: keyword_pos,
+            });
         }
 
         let and_token = self.peek();
@@ -494,9 +514,11 @@ impl<'a> Parser<'a> {
         match token.kind {
             TokenKind::So | TokenKind::Therefore => self.state = ParserState::Actions,
             TokenKind::Eof => self.state = ParserState::Done,
-            TokenKind::Since | TokenKind::Until | TokenKind::On | TokenKind::Between | TokenKind::Over => {
-                self.state = ParserState::Temporal
-            }
+            TokenKind::Since
+            | TokenKind::Until
+            | TokenKind::On
+            | TokenKind::Between
+            | TokenKind::Over => self.state = ParserState::Temporal,
             _ => self.state = ParserState::Done,
         }
 
@@ -577,7 +599,10 @@ mod tests {
 
     #[test]
     fn test_full_query() {
-        let query = Parser::parse("ALICE BOB is author_of of GitHub Linux by CHARLIE since 2024-01-01 so notify").unwrap();
+        let query = Parser::parse(
+            "ALICE BOB is author_of of GitHub Linux by CHARLIE since 2024-01-01 so notify",
+        )
+        .unwrap();
         assert_eq!(query.subjects, vec!["ALICE", "BOB"]);
         assert_eq!(query.predicates, vec!["author_of"]);
         assert_eq!(query.contexts, vec!["GitHub", "Linux"]);
@@ -589,7 +614,10 @@ mod tests {
     #[test]
     fn test_temporal_between() {
         let query = Parser::parse("ALICE is author between 2024-01-01 and 2024-12-31").unwrap();
-        assert_eq!(query.temporal, Some(TemporalClause::Between("2024-01-01", "2024-12-31")));
+        assert_eq!(
+            query.temporal,
+            Some(TemporalClause::Between("2024-01-01", "2024-12-31"))
+        );
     }
 
     #[test]

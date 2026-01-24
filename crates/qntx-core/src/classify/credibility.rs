@@ -90,27 +90,54 @@ mod tests {
 
     #[test]
     fn test_human_patterns() {
-        assert_eq!(ActorCredibility::from_actor("human:alice"), ActorCredibility::Human);
-        assert_eq!(ActorCredibility::from_actor("alice@verified"), ActorCredibility::Human);
+        assert_eq!(
+            ActorCredibility::from_actor("human:alice"),
+            ActorCredibility::Human
+        );
+        assert_eq!(
+            ActorCredibility::from_actor("alice@verified"),
+            ActorCredibility::Human
+        );
     }
 
     #[test]
     fn test_llm_patterns() {
-        assert_eq!(ActorCredibility::from_actor("llm:gpt-4"), ActorCredibility::Llm);
-        assert_eq!(ActorCredibility::from_actor("claude-3-opus"), ActorCredibility::Llm);
-        assert_eq!(ActorCredibility::from_actor("openai-assistant"), ActorCredibility::Llm);
+        assert_eq!(
+            ActorCredibility::from_actor("llm:gpt-4"),
+            ActorCredibility::Llm
+        );
+        assert_eq!(
+            ActorCredibility::from_actor("claude-3-opus"),
+            ActorCredibility::Llm
+        );
+        assert_eq!(
+            ActorCredibility::from_actor("openai-assistant"),
+            ActorCredibility::Llm
+        );
     }
 
     #[test]
     fn test_system_patterns() {
-        assert_eq!(ActorCredibility::from_actor("system:hr"), ActorCredibility::System);
-        assert_eq!(ActorCredibility::from_actor("qntx:pulse"), ActorCredibility::System);
+        assert_eq!(
+            ActorCredibility::from_actor("system:hr"),
+            ActorCredibility::System
+        );
+        assert_eq!(
+            ActorCredibility::from_actor("qntx:pulse"),
+            ActorCredibility::System
+        );
     }
 
     #[test]
     fn test_external_default() {
-        assert_eq!(ActorCredibility::from_actor("unknown-source"), ActorCredibility::External);
-        assert_eq!(ActorCredibility::from_actor("api.example.com"), ActorCredibility::External);
+        assert_eq!(
+            ActorCredibility::from_actor("unknown-source"),
+            ActorCredibility::External
+        );
+        assert_eq!(
+            ActorCredibility::from_actor("api.example.com"),
+            ActorCredibility::External
+        );
     }
 
     #[test]

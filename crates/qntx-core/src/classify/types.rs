@@ -73,7 +73,11 @@ pub struct ActorRanking {
 
 impl ClassificationResult {
     /// Create a new classification result
-    pub fn new(conflict_type: ConflictType, confidence: f64, actor_rankings: Vec<ActorRanking>) -> Self {
+    pub fn new(
+        conflict_type: ConflictType,
+        confidence: f64,
+        actor_rankings: Vec<ActorRanking>,
+    ) -> Self {
         Self {
             auto_resolved: conflict_type.is_auto_resolvable(),
             strategy: conflict_type.resolution_strategy(),
