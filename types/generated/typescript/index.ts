@@ -101,6 +101,7 @@ export type {
   ParsedATSCode,
   PluginHealthMessage,
   PluginInfo,
+  PreviewSample,
   ProgressMessage,
   PromptExecuteRequest,
   PromptExecuteResponse,

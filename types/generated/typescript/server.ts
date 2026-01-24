@@ -265,6 +265,28 @@ export interface PluginInfo {
   pausable: boolean;
 }
 
+export interface PreviewSample {
+  /**
+   * The sampled attestation
+   */
+  attestation: Record<string, unknown>;
+  /**
+   * Prompt after template interpolation
+   */
+  interpolated_prompt: string;
+  /**
+   * LLM response
+   */
+  response: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  /**
+   * Per-sample error if any
+   */
+  error?: string;
+}
+
 export interface ProgressMessage {
   /**
    * "import_progress"
@@ -303,11 +325,52 @@ export interface PromptExecuteResponse {
 
 export interface PromptPreviewRequest {
   ax_query: string;
+  /**
+   * Prompt template with {{field}} placeholders
+   */
+  template: string;
+  /**
+   * Optional system instruction for the LLM
+   */
+  system_prompt?: string;
+  /**
+   * X value: number of samples to test (default: 1)
+   */
+  sample_size?: number;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  /**
+   * Model override
+   */
+  model?: string;
+  /**
+   * Optional prompt ID for tracking
+   */
+  prompt_id?: string;
+  /**
+   * Optional prompt version for comparison
+   */
+  prompt_version?: number;
 }
 
 export interface PromptPreviewResponse {
-  attestation_count: number;
-  attestations?: Record<string, unknown>[];
+  /**
+   * Total matching attestations from ax query
+   */
+  total_attestations: number;
+  /**
+   * X value used for sampling
+   */
+  sample_size: number;
+  /**
+   * X sample execution results
+   */
+  samples: PreviewSample[];
+  /**
+   * Global error if any
+   */
   error?: string;
 }
 

@@ -37,7 +37,7 @@ Returns all stored prompts
 ### `POST` /api/prompt/preview
 
 HandlePromptPreview handles POST /api/prompt/preview
-Returns attestations matching the ax query for preview
+Samples X attestations, executes prompt against them, and returns results for comparison
 
 **Handler**: `HandlePromptPreview`
 
