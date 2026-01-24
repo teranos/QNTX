@@ -321,7 +321,7 @@ export class GlyphMorph {
             });
     }
 
-    // calculateGlyphTargetPosition removed - FLIP handles positioning automatically
+    // calculateGlyphTargetPosition removed - Position calculated directly in minimize logic
 
     /**
      * Make a window draggable by its title bar
