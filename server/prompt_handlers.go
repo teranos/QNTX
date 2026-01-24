@@ -19,6 +19,15 @@ import (
 	"github.com/teranos/QNTX/logger"
 )
 
+const (
+	// Default query limit when parsing ax queries without explicit limit
+	defaultAxQueryLimit = 100
+	// Default model for local inference when not configured
+	defaultLocalModel = "llama3.2:3b"
+	// Default model for OpenRouter when not configured
+	defaultOpenRouterModel = "openai/gpt-4o-mini"
+)
+
 // PromptPreviewRequest represents a request to preview prompt execution with X-sampling
 type PromptPreviewRequest struct {
 	AxQuery      string `json:"ax_query"`
@@ -130,7 +139,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 			// If it fails, try treating it as a simple subject query
 			filter = &types.AxFilter{
 				Subjects: []string{req.AxQuery},
-				Limit:    100,
+				Limit:    defaultAxQueryLimit,
 			}
 		} else {
 			filter = parsedFilter
@@ -156,7 +165,9 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 			Samples:           []PreviewSample{},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+		}
 		return
 	}
 
@@ -276,7 +287,9 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptExecute handles POST /api/prompt/execute
@@ -367,7 +380,9 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // createPromptAIClient creates an AI client for prompt execution
@@ -394,7 +409,7 @@ func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.A
 			effectiveModel = localModel
 		}
 		if effectiveModel == "" {
-			effectiveModel = "llama3.2:3b"
+			effectiveModel = defaultLocalModel
 		}
 
 		return provider.NewLocalClient(provider.LocalClientConfig{
@@ -412,7 +427,7 @@ func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.A
 		effectiveModel = openrouterModel
 	}
 	if effectiveModel == "" {
-		effectiveModel = "openai/gpt-4o-mini"
+		effectiveModel = defaultOpenRouterModel
 	}
 
 	return openrouter.NewClient(openrouter.Config{
@@ -451,10 +466,12 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"prompts": prompts,
 		"count":   len(prompts),
-	})
+	}); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptGet handles GET /api/prompt/{id}
@@ -477,7 +494,9 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(p)
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptVersions handles GET /api/prompt/{name}/versions
@@ -496,10 +515,12 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"versions": versions,
 		"count":    len(versions),
-	})
+	}); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptSave handles POST /api/prompt/save
@@ -549,7 +570,9 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(saved)
+	if err := json.NewEncoder(w).Encode(saved); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // sampleAttestations randomly samples n attestations from the provided list
