@@ -10,7 +10,7 @@
     background: var(--panel-bg, #fff);
     border: var(--panel-border);
     border-radius: var(--panel-border-radius);
-    box-shadow: var(--panel-shadow-md);
+    box-shadow: var(--shadow-md);
     z-index: 9999;
     display: none;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
@@ -41,6 +41,46 @@
     font-weight: 600;
     font-size: 13px;
     color: var(--panel-text-primary, #333);
+}
+
+/* Window control buttons container */
+.draggable-window-controls {
+    display: flex;
+    gap: 2px;
+}
+
+/* Minimize button - reuses panel-close pattern from components.css */
+.panel-minimize {
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 18px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.panel-minimize:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.panel-minimize:active {
+    background: var(--bg-almost-white);
+    color: var(--text-primary);
+}
+
+.panel-minimize:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
 }
 
 /* Version text next to title */
@@ -85,7 +125,7 @@
 }
 
 .window-input:focus {
-    outline: 2px solid #0066cc;
+    outline: 2px solid var(--accent-color);
     outline-offset: 1px;
 }
 
@@ -195,4 +235,83 @@
 .window-model-info span {
     font-family: monospace;
     color: var(--panel-text-primary, #333);
+}
+
+/* Database Stats Window Styles */
+.db-stats {
+    padding: 8px;
+}
+
+.db-stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
+}
+
+.db-stat-row:last-child {
+    border-bottom: none;
+}
+
+.db-stat-label {
+    font-weight: 500;
+    color: var(--panel-text-secondary, #666);
+}
+
+.db-stat-value {
+    font-weight: 600;
+    color: var(--panel-text-primary, #333);
+}
+
+.db-path {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+.db-path:hover {
+    color: var(--link-hover, #0066cc);
+}
+
+/* Rich Fields Section */
+.db-stat-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--panel-border-color, #e0e0e0);
+}
+
+.db-stat-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--panel-text-primary, #333);
+    margin: 0 8px 8px 8px;
+}
+
+.rich-fields-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 8px;
+}
+
+.rich-field-item {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--panel-bg-secondary, #f0f0f0);
+    border: 1px solid var(--panel-border-color, #d0d0d0);
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--panel-text-primary, #333);
+    transition: background-color 0.2s ease;
+}
+
+.rich-field-item:hover {
+    background: var(--panel-bg-hover, #e8e8e8);
+}
+
+.db-stats-loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--panel-text-secondary, #666);
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"sync"
 
@@ -234,7 +233,8 @@ func (h *GLSPHandler) TextDocumentCompletion(ctx *glsp.Context, params *protocol
 	}
 
 	// Get completions from language service
-	items, err := h.service.GetCompletions(context.Background(), req)
+	// Use server's context for cancellation on shutdown
+	items, err := h.service.GetCompletions(h.server.ctx, req)
 	if err != nil {
 		h.server.logger.Errorw("Completion error", "error", err)
 		return nil, err
@@ -295,7 +295,8 @@ func (h *GLSPHandler) TextDocumentHover(ctx *glsp.Context, params *protocol.Hove
 	)
 
 	// Parse to get tokens at cursor position
-	resp, err := h.service.Parse(context.Background(), query, 0)
+	// Use server's context for cancellation on shutdown
+	resp, err := h.service.Parse(h.server.ctx, query, 0)
 	if err != nil {
 		return nil, nil // Silently fail for hover
 	}
@@ -359,7 +360,8 @@ func (h *GLSPHandler) TextDocumentSemanticTokensFull(ctx *glsp.Context, params *
 	h.server.logger.Debugw("LSP semantic tokens details", "uri", uri, "query_length", len(query))
 
 	// Parse to get semantic tokens
-	resp, err := h.service.Parse(context.Background(), query, 0)
+	// Use server's context for cancellation on shutdown
+	resp, err := h.service.Parse(h.server.ctx, query, 0)
 	if err != nil {
 		h.server.logger.Warnw("Failed to parse for semantic tokens", "error", err)
 		return &protocol.SemanticTokens{Data: []uint32{}}, nil

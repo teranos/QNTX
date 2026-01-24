@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -239,6 +240,7 @@ func TestRemoteServiceRegistryConfig(t *testing.T) {
 		}
 
 		registry := NewRemoteServiceRegistry(
+			context.Background(),
 			"localhost:50051",
 			"localhost:50052",
 			"test-token",

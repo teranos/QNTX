@@ -5,9 +5,12 @@
  * for all localStorage operations across the application.
  *
  * Used by:
- * - ui-state.ts (high-level state management)
+ * - state/ui.ts (high-level state management)
  * - Any module needing localStorage with robust handling
  */
+
+import { handleErrorSilent } from '../error-handler.ts';
+import { log, SEG } from '../logger.ts';
 
 // ============================================================================
 // Types
@@ -54,14 +57,14 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
 
         // Validate envelope structure
         if (!isValidEnvelope(envelope)) {
-            console.warn(`[Storage] Invalid envelope for key "${key}", removing`);
+            log.warn(SEG.UI, `Invalid envelope for key "${key}", removing`);
             removeItem(key);
             return null;
         }
 
         // Check version mismatch
         if (options?.version !== undefined && envelope.version !== options.version) {
-            console.warn(`[Storage] Version mismatch for key "${key}" (stored: ${envelope.version}, expected: ${options.version}), removing`);
+            log.warn(SEG.UI, `Version mismatch for key "${key}" (stored: ${envelope.version}, expected: ${options.version}), removing`);
             removeItem(key);
             return null;
         }
@@ -70,7 +73,7 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
         if (options?.maxAge !== undefined) {
             const age = Date.now() - envelope.timestamp;
             if (age > options.maxAge) {
-                console.debug(`[Storage] Key "${key}" expired (age: ${age}ms, maxAge: ${options.maxAge}ms)`);
+                log.debug(SEG.UI, `Key "${key}" expired (age: ${age}ms, maxAge: ${options.maxAge}ms)`);
                 removeItem(key);
                 return null;
             }
@@ -78,14 +81,14 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
 
         // Custom validation
         if (options?.validate && !options.validate(envelope.data)) {
-            console.warn(`[Storage] Validation failed for key "${key}", removing`);
+            log.warn(SEG.UI, `Validation failed for key "${key}", removing`);
             removeItem(key);
             return null;
         }
 
         return envelope.data;
-    } catch (e) {
-        console.error(`[Storage] Failed to get key "${key}":`, e);
+    } catch (error: unknown) {
+        handleErrorSilent(error, `Failed to get storage key "${key}"`, SEG.UI);
         return null;
     }
 }
@@ -105,8 +108,8 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
             version: options?.version,
         };
         localStorage.setItem(key, JSON.stringify(envelope));
-    } catch (e) {
-        console.error(`[Storage] Failed to set key "${key}":`, e);
+    } catch (error: unknown) {
+        handleErrorSilent(error, `Failed to set storage key "${key}"`, SEG.UI);
     }
 }
 
@@ -118,8 +121,8 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
 export function removeItem(key: string): void {
     try {
         localStorage.removeItem(key);
-    } catch (e) {
-        console.error(`[Storage] Failed to remove key "${key}":`, e);
+    } catch (error: unknown) {
+        handleErrorSilent(error, `Failed to remove storage key "${key}"`, SEG.UI);
     }
 }
 

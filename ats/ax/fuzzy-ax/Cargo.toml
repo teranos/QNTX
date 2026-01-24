@@ -1,6 +1,6 @@
 [package]
 name = "qntx-fuzzy"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "High-performance fuzzy matching library for QNTX (CGO)"
 license = "MIT"
@@ -15,9 +15,14 @@ rphonetic = "3.0"         # Phonetic matching (Double Metaphone, Soundex)
 memchr = "2.7"            # SIMD-accelerated substring search
 rayon = "1.10"            # Parallel iteration for large vocabularies
 
+# Logging
+log = "0.4"               # Logging facade
+env_logger = "0.11"       # Environment-based logger configuration
+
 # Utilities
 parking_lot = "0.12"      # Fast RwLock for thread safety
 ahash = "0.8"             # Fast hashing for vocabulary change detection
+serde_json = "1.0"        # For parsing JSON attributes
 
 [profile.release]
 lto = true

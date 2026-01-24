@@ -24,10 +24,10 @@ Execute an ATS query
 
 | Field | Description |
 |-------|-------------|
+| filename | Source file name |
 | query | ATS query string |
 | line | Cursor line position |
 | cursor | Cursor column position |
-| filename | Source file name |
 
 ### Server → Client
 
@@ -37,8 +37,8 @@ Async job status update
 
 | Field | Description |
 |-------|-------------|
-| metadata | Additional metadata about the update |
 | job | Job object with status, progress, etc. |
+| metadata | Additional metadata about the update |
 
 #### `daemon_status`
 
@@ -46,9 +46,9 @@ Pulse daemon status broadcast
 
 | Field | Description |
 |-------|-------------|
-| running | Whether daemon is running |
 | active_jobs | Number of active jobs |
 | load_percent | Current load percentage |
+| running | Whether daemon is running |
 
 #### `usage_update`
 
@@ -56,9 +56,9 @@ AI usage statistics update
 
 | Field | Description |
 |-------|-------------|
+| tokens | Total tokens used |
 | total_cost | Total cost in USD |
 | requests | Number of requests |
-| tokens | Total tokens used |
 
 #### `llm_stream`
 
@@ -76,9 +76,9 @@ Plugin health status update
 
 | Field | Description |
 |-------|-------------|
-| name | Plugin name |
 | healthy | Health status |
 | state | Plugin state (running/paused) |
+| name | Plugin name |
 
 ## Type References
 

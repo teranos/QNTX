@@ -23,7 +23,7 @@
  *   - ai-provider-window.ts (9)
  *   - plugin-panel.ts (17)
  *   - debug.ts (5)
- *   - legenda.ts (1)
+ *   - type-attestations.ts (1)
  *   - pulse-panel.ts (1)
  *   - hixtory-panel.ts (4)
  *   - webscraper-panel.ts (1)
@@ -60,6 +60,9 @@
  *   - graph/focus/dimensions.ts (1)
  *   - graph/focus/physics.ts (2)
  *   - graph/tile/controls.ts (3)
+ *
+ * Migrated:
+ *   - storage.ts ✓
  */
 
 // Import core QNTX symbols from generated types
@@ -223,13 +226,7 @@ log.error = logger.error.bind(logger);
 log.getLevel = logger.getLevel.bind(logger);
 log.isDevMode = logger.isDevMode;
 
-// Export standalone functions for ergonomics
-const debug = logger.debug.bind(logger);
-const info = logger.info.bind(logger);
-const warn = logger.warn.bind(logger);
-const error = logger.error.bind(logger);
-
-export { log, debug, info, warn, error };
+export { log };
 
 /**
  * Default export for convenience

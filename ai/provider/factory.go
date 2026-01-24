@@ -136,8 +136,7 @@ func (lca *LocalClientAdapter) ChatStreaming(ctx context.Context, req openrouter
 		case chunk, ok := <-providerChan:
 			if !ok {
 				// Channel closed, streaming complete
-				err := <-errChan
-				return err
+				return <-errChan
 			}
 			// Convert provider chunk to AI client chunk
 			streamChan <- StreamChunk{

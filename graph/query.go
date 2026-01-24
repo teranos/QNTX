@@ -9,6 +9,7 @@ import (
 	"github.com/kballard/go-shellquote"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	grapherr "github.com/teranos/QNTX/graph/error"
 	"github.com/teranos/QNTX/logger"
 )
@@ -21,7 +22,7 @@ func (b *AxGraphBuilder) BuildFromRecentAttestations(ctx context.Context, limit 
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to query attestations: %w", err)
+		return nil, errors.Wrap(err, "failed to query attestations")
 	}
 
 	b.logger.Infof("Building graph from %d recent attestations", len(result.Attestations))

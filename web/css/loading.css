@@ -16,7 +16,7 @@
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     animation: fadeInLoader 300ms ease-out;
 }
 
@@ -53,7 +53,7 @@
 
 #loading-status {
     font-size: 11px;
-    color: #666;
+    color: var(--text-secondary);
     margin-bottom: 16px;
 }
 
@@ -62,12 +62,12 @@
     max-height: 120px;
     overflow-y: auto;
     background: #0f0f0f;
-    border: 1px solid #2a2a2a;
+    border: 1px solid var(--bg-dark);
     border-radius: 4px;
     padding: 8px 10px;
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 10px;
-    color: #666;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin-bottom: 16px;
 }
@@ -75,8 +75,8 @@
 #metamask-warning {
     display: none;
     padding: 12px 16px;
-    background: #2a2a2a;
-    border: 1px solid #444;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     max-width: 400px;
     text-align: center;
@@ -90,7 +90,7 @@
 
 #metamask-warning .warning-text {
     font-size: 11px;
-    color: #888;
+    color: var(--text-on-dark-tertiary);
     line-height: 1.4;
 }
 
@@ -115,7 +115,7 @@
 }
 
 #loader-logs::-webkit-scrollbar-track {
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
 }
 
 #loader-logs::-webkit-scrollbar-thumb {

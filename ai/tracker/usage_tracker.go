@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
 )
 
 // ModelUsage represents a record of AI model usage
@@ -75,7 +77,10 @@ func (t *UsageTracker) TrackUsage(usage *ModelUsage) error {
 		usage.Cost, usage.Success, usage.ErrorMessage, usage.Metadata,
 	)
 
-	return err
+	if err != nil {
+		return errors.Wrap(err, "failed to track usage")
+	}
+	return nil
 }
 
 // GetUsageStats returns usage statistics for a given time period

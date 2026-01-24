@@ -81,7 +81,7 @@
 }
 
 .api-key-hint a {
-    color: var(--link-color);
+    color: var(--color-info);
     text-decoration: none;
 }
 
@@ -136,7 +136,7 @@
     justify-content: space-between;
     padding: var(--panel-padding-md);
     background: #f8f8f8;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .ai-provider-title {
@@ -177,13 +177,13 @@
 }
 
 .config-toggle-status.status-success {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: var(--status-completed-bg);
+    color: var(--status-completed-text);
 }
 
 .config-toggle-status.status-error {
-    background: #ffebee;
-    color: #c62828;
+    background: var(--status-failed-bg);
+    color: var(--status-failed-text);
 }
 
 .config-toggle-status.status-warning {
@@ -205,7 +205,7 @@
     gap: 6px;
     padding: 16px 12px;
     background: var(--panel-bg);
-    border: 2px solid #ddd;
+    border: 2px solid var(--border-color);
     border-radius: 8px;
     cursor: pointer;
     transition: var(--panel-transition-normal);
@@ -239,7 +239,7 @@
 }
 
 .provider-btn.active .provider-detail {
-    color: #aaa;
+    color: var(--text-on-dark-secondary);
 }
 
 .ollama-model-selector {
@@ -259,7 +259,7 @@
 
 .ollama-model-selector label {
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
 }
 
 #ollama-model-select {

@@ -47,7 +47,7 @@
     justify-content: space-between;
     padding: var(--panel-padding-md);
     background: #f8f8f8;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .command-explorer-title {
@@ -101,7 +101,7 @@
 }
 
 .filter-item:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
     border-color: #bbb;
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -166,7 +166,7 @@
 /* Item Details */
 .filter-item-label {
     font-size: 12px;
-    color: #333;
+    color: var(--text-primary);
     margin-bottom: 4px;
     font-weight: 500;
 }
@@ -211,7 +211,7 @@
 }
 
 .command-explorer-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .command-explorer-content::-webkit-scrollbar-thumb {

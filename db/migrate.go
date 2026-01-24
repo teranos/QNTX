@@ -3,13 +3,13 @@ package db
 import (
 	"database/sql"
 	"embed"
-	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"go.uber.org/zap"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -22,7 +22,7 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 	// Read migration files
 	entries, err := migrations.ReadDir("sqlite/migrations")
 	if err != nil {
-		return fmt.Errorf("read migrations: %w", err)
+		return errors.Wrap(err, "read migrations")
 	}
 
 	// Sort migrations (000_create_schema_migrations.sql runs first)
@@ -44,7 +44,7 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 		if err != nil {
 			// Table doesn't exist yet - this must be migration 000
 			if version != "000" {
-				return fmt.Errorf("schema_migrations table missing, but migration is not 000: %s", filename)
+				return errors.Newf("schema_migrations table missing, but migration is not 000: %s", filename)
 			}
 		} else if exists {
 			if logger != nil {
@@ -59,7 +59,7 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 		// Read and execute migration
 		sqlBytes, err := migrations.ReadFile(filepath.Join("sqlite/migrations", filename))
 		if err != nil {
-			return fmt.Errorf("read %s: %w", filename, err)
+			return errors.Wrapf(err, "read %s", filename)
 		}
 
 		if logger != nil {
@@ -71,22 +71,22 @@ func Migrate(db *sql.DB, logger *zap.SugaredLogger) error {
 
 		tx, err := db.Begin()
 		if err != nil {
-			return fmt.Errorf("begin tx for %s: %w", filename, err)
+			return errors.Wrapf(err, "begin tx for %s", filename)
 		}
 
 		if _, err := tx.Exec(string(sqlBytes)); err != nil {
 			tx.Rollback()
-			return fmt.Errorf("execute %s: %w", filename, err)
+			return errors.Wrapf(err, "execute %s", filename)
 		}
 
 		// Record migration (000 creates the table, then records itself)
 		if _, err := tx.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
 			tx.Rollback()
-			return fmt.Errorf("record %s: %w", filename, err)
+			return errors.Wrapf(err, "record %s", filename)
 		}
 
 		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit %s: %w", filename, err)
+			return errors.Wrapf(err, "commit %s", filename)
 		}
 	}
 

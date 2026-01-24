@@ -12,8 +12,12 @@ Data flows in constantly from plugins, APIs, user actions. Everything becomes an
 ### Always Processing (꩜)
 Pulse orchestrates background jobs that enrich and connect knowledge while you work or sleep.
 
+Scheduled tasks appear as colored dots in the window tray - their state visible at a glance without opening panels or interrupting your work.
+
 ### Always Available (⋈)
 Query across all time. Yesterday's data, last month's insights, this second's updates - all equally accessible.
+
+Each background task or system component can open its own dedicated window for inspection - spatial isolation means observing one process doesn't interfere with others.
 
 ## Scale Without Configuration
 
