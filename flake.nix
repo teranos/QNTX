@@ -454,6 +454,9 @@
             pkgs.pkg-config
             pkgs.protobuf
             pkgs.onnxruntime
+            # WASM tooling
+            pkgs.wasm-pack
+            pkgs.wasm-bindgen-cli
           ] ++ pre-commit-check.enabledPackages;
 
           # Make Python available to PyO3 builds in dev shell
@@ -465,6 +468,12 @@
             export DYLD_LIBRARY_PATH="${pkgs.onnxruntime}/lib:''${DYLD_LIBRARY_PATH:-}"
             export ORT_DYLIB_PATH="${pkgs.onnxruntime}/lib"
             export ORT_LIB_LOCATION="${pkgs.onnxruntime}/lib"
+
+            # Ensure WASM target is available
+            if ! rustup target list --installed | grep -q wasm32-unknown-unknown; then
+              echo "Installing wasm32-unknown-unknown target..."
+              rustup target add wasm32-unknown-unknown 2>/dev/null || true
+            fi
           '';
         };
 
