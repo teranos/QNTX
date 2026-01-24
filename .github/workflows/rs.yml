@@ -1,13 +1,15 @@
+# Rust-only components (not part of Go server stack)
+# For fuzzy-ax, qntx-core, and Go integration, see rsgo.yml
+
 name: Rust
 
 on:
   pull_request:
     branches: [main]
     paths:
-      - '**/*.rs'
+      - 'web/src-tauri/**/*.rs'
       - 'web/src-tauri/Cargo.toml'
-      - 'crates/qntx/Cargo.toml'
-      - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - 'qntx-python/**/*.rs'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
   push:
@@ -15,56 +17,15 @@ on:
       - main
       - 'claude/**'
     paths:
-      - '**/*.rs'
+      - 'web/src-tauri/**/*.rs'
       - 'web/src-tauri/Cargo.toml'
-      - 'crates/qntx/Cargo.toml'
-      - 'ats/ax/fuzzy-ax/Cargo.toml'
+      - 'qntx-python/**/*.rs'
       - 'qntx-python/Cargo.toml'
   workflow_dispatch:
 
+# fuzzy-ax and qntx-core moved to rsgo.yml (requires Go integration)
+
 jobs:
-  fuzzy-ax:
-    name: Fuzzy Ax
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/teranos/qntx:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure git safe directory
-        run: git config --global --add safe.directory /__w/QNTX/QNTX
-
-      - name: Cache Rust dependencies
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ats/ax/fuzzy-ax
-
-      - name: Check formatting
-        run: cd ats/ax/fuzzy-ax && cargo fmt --check
-
-      - name: Clippy
-        run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
-        env:
-          RUSTFLAGS: "-Dwarnings"
-
-      - name: Test
-        run: cd ats/ax/fuzzy-ax && cargo test --lib
-
-      - name: Build release
-        run: cd ats/ax/fuzzy-ax && cargo build --release --lib
-
-      - name: Test CGO integration
-        run: |
-          cd ats/ax/fuzzy-ax && cargo build --release --lib
-          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
-          cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
-
   qntx-python:
     name: Python Plugin
     runs-on: ubuntu-latest
