@@ -198,10 +198,14 @@ pub extern "C" fn fuzzy_engine_rebuild_index(
 #[no_mangle]
 pub extern "C" fn fuzzy_rebuild_result_free(result: RustRebuildResultC) {
     if !result.error_msg.is_null() {
-        unsafe { let _ = CString::from_raw(result.error_msg); }
+        unsafe {
+            let _ = CString::from_raw(result.error_msg);
+        }
     }
     if !result.index_hash.is_null() {
-        unsafe { let _ = CString::from_raw(result.index_hash); }
+        unsafe {
+            let _ = CString::from_raw(result.index_hash);
+        }
     }
 }
 
@@ -243,7 +247,11 @@ pub extern "C" fn fuzzy_engine_find_matches(
     };
 
     let limit = if limit > 0 { Some(limit) } else { None };
-    let min_score = if min_score > 0.0 { Some(min_score) } else { None };
+    let min_score = if min_score > 0.0 {
+        Some(min_score)
+    } else {
+        None
+    };
 
     let (matches, search_time_us) = engine.find_matches(query_str, vocab_type, limit, min_score);
 
@@ -289,17 +297,24 @@ pub extern "C" fn fuzzy_engine_find_matches(
 #[no_mangle]
 pub extern "C" fn fuzzy_match_result_free(result: RustMatchResultC) {
     if !result.error_msg.is_null() {
-        unsafe { let _ = CString::from_raw(result.error_msg); }
+        unsafe {
+            let _ = CString::from_raw(result.error_msg);
+        }
     }
 
     if !result.matches.is_null() && result.matches_len > 0 {
-        let matches_slice = unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
+        let matches_slice =
+            unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
         for m in matches_slice.iter() {
             if !m.value.is_null() {
-                unsafe { let _ = CString::from_raw(m.value); }
+                unsafe {
+                    let _ = CString::from_raw(m.value);
+                }
             }
             if !m.strategy.is_null() {
-                unsafe { let _ = CString::from_raw(m.strategy); }
+                unsafe {
+                    let _ = CString::from_raw(m.strategy);
+                }
             }
         }
         unsafe {
@@ -408,17 +423,40 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
 #[no_mangle]
 pub extern "C" fn fuzzy_attribute_result_free(result: RustAttributeMatchResultC) {
     if !result.error_msg.is_null() {
-        unsafe { let _ = CString::from_raw(result.error_msg); }
+        unsafe {
+            let _ = CString::from_raw(result.error_msg);
+        }
     }
 
     if !result.matches.is_null() && result.matches_len > 0 {
-        let matches_slice = unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
+        let matches_slice =
+            unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
         for m in matches_slice.iter() {
-            if !m.node_id.is_null() { unsafe { let _ = CString::from_raw(m.node_id); } }
-            if !m.field_name.is_null() { unsafe { let _ = CString::from_raw(m.field_name); } }
-            if !m.field_value.is_null() { unsafe { let _ = CString::from_raw(m.field_value); } }
-            if !m.excerpt.is_null() { unsafe { let _ = CString::from_raw(m.excerpt); } }
-            if !m.strategy.is_null() { unsafe { let _ = CString::from_raw(m.strategy); } }
+            if !m.node_id.is_null() {
+                unsafe {
+                    let _ = CString::from_raw(m.node_id);
+                }
+            }
+            if !m.field_name.is_null() {
+                unsafe {
+                    let _ = CString::from_raw(m.field_name);
+                }
+            }
+            if !m.field_value.is_null() {
+                unsafe {
+                    let _ = CString::from_raw(m.field_value);
+                }
+            }
+            if !m.excerpt.is_null() {
+                unsafe {
+                    let _ = CString::from_raw(m.excerpt);
+                }
+            }
+            if !m.strategy.is_null() {
+                unsafe {
+                    let _ = CString::from_raw(m.strategy);
+                }
+            }
         }
         unsafe {
             let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
@@ -440,7 +478,9 @@ pub extern "C" fn fuzzy_engine_get_hash(engine: *const ThreadSafeFuzzyEngine) ->
         return ptr::null_mut();
     }
     let engine = unsafe { &*engine };
-    CString::new(engine.get_index_hash()).unwrap_or_default().into_raw()
+    CString::new(engine.get_index_hash())
+        .unwrap_or_default()
+        .into_raw()
 }
 
 #[no_mangle]
@@ -457,7 +497,9 @@ pub extern "C" fn fuzzy_engine_is_ready(engine: *const ThreadSafeFuzzyEngine) ->
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn fuzzy_string_free(s: *mut c_char) {
     if !s.is_null() {
-        unsafe { let _ = CString::from_raw(s); }
+        unsafe {
+            let _ = CString::from_raw(s);
+        }
     }
 }
 
