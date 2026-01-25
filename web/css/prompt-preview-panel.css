@@ -1,0 +1,374 @@
+/* Prompt Preview Panel - Side-by-side comparison styles */
+
+/* Vertical indicator on right edge */
+.prompt-indicator-vertical {
+    position: fixed;
+    right: 0;
+    top: 33%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 120px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 998;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+}
+
+.prompt-indicator-vertical span {
+    color: #999;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.prompt-indicator-vertical:hover {
+    background: #333;
+    transform: translateY(-50%) translateX(-2px);
+}
+
+.prompt-indicator-vertical.active {
+    background: #3a3a3a;
+    border-color: #666;
+}
+
+.prompt-indicator-vertical.active span {
+    color: #ccc;
+}
+
+/* Main preview panel */
+.prompt-preview-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 45%; /* Slightly narrower than Prose panel */
+    height: 100%;
+    background: #1a1a1a;
+    border-left: 1px solid #444;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+    z-index: 1001; /* Above Prose panel */
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease, width 0.3s ease;
+}
+
+.prompt-preview-panel[data-visibility="hidden"] {
+    pointer-events: none;
+    transform: translateX(100%);
+}
+
+.prompt-preview-panel[data-visibility="visible"] {
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* Fullscreen mode */
+.prompt-preview-panel[data-mode="fullscreen"] {
+    width: 100% !important;
+    left: 0 !important;
+}
+
+/* Header */
+.prompt-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #222;
+    border-bottom: 1px solid #444;
+}
+
+.prompt-preview-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.prompt-preview-icon {
+    color: #ffd700;
+    font-size: 16px;
+}
+
+.prompt-preview-name {
+    color: #ccc;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.prompt-preview-status {
+    color: #888;
+    font-size: 12px;
+    margin-left: 12px;
+}
+
+.prompt-preview-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.prompt-preview-controls button {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    transition: color 0.2s ease;
+}
+
+.prompt-preview-controls button:hover {
+    color: #ccc;
+}
+
+.prompt-preview-refresh {
+    font-size: 16px !important;
+}
+
+/* Body */
+.prompt-preview-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Settings section */
+.prompt-preview-settings {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #333;
+}
+
+.prompt-preview-sample-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.prompt-preview-sample-control label {
+    color: #999;
+    font-size: 13px;
+}
+
+.prompt-preview-sample-control input[type="number"] {
+    width: 60px;
+    padding: 4px 8px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #ccc;
+    font-size: 13px;
+}
+
+.prompt-preview-run {
+    padding: 6px 16px;
+    background: #3a5a3a;
+    border: 1px solid #4a6a4a;
+    border-radius: 4px;
+    color: #9fc99f;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.prompt-preview-run:hover {
+    background: #4a6a4a;
+    color: #afd9af;
+}
+
+.prompt-preview-filter input {
+    width: 100%;
+    padding: 6px 10px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #ccc;
+    font-size: 13px;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* Results section */
+.prompt-preview-results {
+    min-height: 200px;
+}
+
+.prompt-preview-empty {
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+}
+
+.prompt-preview-empty p {
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+/* Comparison cards */
+.prompt-preview-comparisons {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.prompt-preview-comparison {
+    background: #222;
+    border: 1px solid #333;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.comparison-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #333;
+}
+
+.comparison-number {
+    color: #666;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.comparison-id {
+    color: #888;
+    font-size: 12px;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.comparison-tokens {
+    margin-left: auto;
+    color: #666;
+    font-size: 11px;
+}
+
+.comparison-prompt {
+    padding: 10px 14px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+}
+
+.comparison-prompt code {
+    color: #7a9a7a;
+    font-size: 12px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    word-break: break-word;
+}
+
+.comparison-outputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100px;
+}
+
+.comparison-old,
+.comparison-new {
+    padding: 12px 14px;
+    position: relative;
+}
+
+.comparison-old {
+    border-right: 1px solid #333;
+}
+
+.comparison-label {
+    color: #666;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.comparison-old .comparison-label {
+    color: #966;
+}
+
+.comparison-new .comparison-label {
+    color: #696;
+}
+
+.comparison-content {
+    color: #aaa;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.comparison-old.empty .comparison-content {
+    color: #555;
+    font-style: italic;
+}
+
+.comparison-content em {
+    color: #555;
+    font-style: italic;
+}
+
+/* Footer */
+.prompt-preview-footer {
+    padding: 10px 16px;
+    background: #222;
+    border-top: 1px solid #444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.prompt-preview-token-count,
+.prompt-preview-cost-estimate {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Scrollbar styling */
+.prompt-preview-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.prompt-preview-body::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.prompt-preview-body::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.prompt-preview-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1400px) {
+    .prompt-preview-panel {
+        width: 55%;
+    }
+}
+
+@media (max-width: 1200px) {
+    .prompt-preview-panel {
+        width: 65%;
+    }
+
+    .comparison-outputs {
+        grid-template-columns: 1fr;
+    }
+
+    .comparison-old {
+        border-right: none;
+        border-bottom: 1px solid #333;
+    }
+}
