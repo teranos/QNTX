@@ -21,11 +21,11 @@ func TestClient_Configuration(t *testing.T) {
 		if client.config.Model != "openai/gpt-4o-mini" {
 			t.Errorf("expected default model 'openai/gpt-4o-mini', got %s", client.config.Model)
 		}
-		if client.config.Temperature != 0.2 {
-			t.Errorf("expected default temperature 0.2, got %f", client.config.Temperature)
+		if client.config.Temperature == nil || *client.config.Temperature != 0.2 {
+			t.Errorf("expected default temperature 0.2, got %v", client.config.Temperature)
 		}
-		if client.config.MaxTokens != 1000 {
-			t.Errorf("expected default max tokens 1000, got %d", client.config.MaxTokens)
+		if client.config.MaxTokens == nil || *client.config.MaxTokens != 1000 {
+			t.Errorf("expected default max tokens 1000, got %v", client.config.MaxTokens)
 		}
 	})
 
