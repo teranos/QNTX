@@ -253,10 +253,13 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		job.UpdateProgress(i + 1)
 	}
 
-	// Store results in job (as JSON in Source field for now - could add a Results field)
-	// The caller can retrieve execution history to see results
+	// Store results in job (as JSON in Source field for now)
+	// TODO(issue #345): Consider adding dedicated Results field instead of using Source
 	if len(results) > 0 {
-		resultsJSON, _ := json.Marshal(results)
+		resultsJSON, err := json.Marshal(results)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal execution results")
+		}
 		job.Source = string(resultsJSON)
 	}
 
