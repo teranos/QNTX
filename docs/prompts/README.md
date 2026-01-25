@@ -48,6 +48,7 @@ Show how {{subject}} demonstrates these concepts, referencing its implementation
 - [#342](https://github.com/teranos/QNTX/issues/342) - Add deterministic sampling option to prompt preview API
 - [#344](https://github.com/teranos/QNTX/issues/344) - Make filename optional for attestation-only prompts
 - [#345](https://github.com/teranos/QNTX/issues/345) - Clarify prompt execution result storage pattern
+- [#346](https://github.com/teranos/QNTX/issues/346) - Add context propagation to storage layer
 
 ---
 

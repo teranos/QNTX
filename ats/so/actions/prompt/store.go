@@ -113,6 +113,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 		CreatedAt:  now,
 	}
 
+	// TODO(issue #346): Pass ctx to CreateAttestation once storage layer supports context
 	if err := ps.store.CreateAttestation(as); err != nil {
 		return nil, errors.Wrap(err, "failed to store prompt")
 	}
