@@ -27,7 +27,7 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           int      `mapstructure:"port"`            // Server port (default: 877)
+	Port           *int     `mapstructure:"port"`            // Server port (nil = default 877, 0 = OS-assigned)
 	FrontendPort   int      `mapstructure:"frontend_port"`   // Frontend dev server port (default: 8820)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest

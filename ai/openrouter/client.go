@@ -37,8 +37,8 @@ type Client struct {
 type Config struct {
 	APIKey        string
 	Model         string
-	Temperature   float64
-	MaxTokens     int
+	Temperature   *float64 // nil = use default (0.2)
+	MaxTokens     *int     // nil = use default (1000)
 	Debug         bool
 	DB            *sql.DB // Database for automatic cost/usage tracking (strongly recommended)
 	Verbosity     int     // Verbosity level for usage tracking output
@@ -52,11 +52,13 @@ func NewClient(config Config) *Client {
 	if config.Model == "" {
 		config.Model = DefaultModel
 	}
-	if config.Temperature == 0 {
-		config.Temperature = 0.2 // Default to deterministic
+	if config.Temperature == nil {
+		defaultTemp := 0.2
+		config.Temperature = &defaultTemp
 	}
-	if config.MaxTokens == 0 {
-		config.MaxTokens = 1000 // Default token limit
+	if config.MaxTokens == nil {
+		defaultTokens := 1000
+		config.MaxTokens = &defaultTokens
 	}
 
 	// Initialize usage tracker if database is provided
@@ -193,13 +195,13 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return nil, errors.New("OpenRouter API key not configured")
 	}
 
-	// Prepare request parameters
-	temperature := c.config.Temperature
+	// Prepare request parameters (dereference config defaults, allow per-request overrides)
+	temperature := *c.config.Temperature
 	if req.Temperature != nil {
 		temperature = *req.Temperature
 	}
 
-	maxTokens := c.config.MaxTokens
+	maxTokens := *c.config.MaxTokens
 	if req.MaxTokens != nil {
 		maxTokens = *req.MaxTokens
 	}

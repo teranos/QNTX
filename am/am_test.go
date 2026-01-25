@@ -25,8 +25,8 @@ func TestLoad_Defaults(t *testing.T) {
 		t.Errorf("expected default database path 'qntx.db', got %q", cfg.Database.Path)
 	}
 
-	if cfg.Server.Port != DefaultServerPort {
-		t.Errorf("expected default port %d, got %d", DefaultServerPort, cfg.Server.Port)
+	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
+		t.Errorf("expected default port %d, got %v", DefaultServerPort, cfg.Server.Port)
 	}
 
 	if cfg.Pulse.Workers != 1 {
@@ -199,8 +199,8 @@ func TestGetServerPort(t *testing.T) {
 	}
 
 	// Test that default port is set correctly
-	if cfg.Server.Port != DefaultServerPort {
-		t.Errorf("expected default port %d, got %d", DefaultServerPort, cfg.Server.Port)
+	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
+		t.Errorf("expected default port %d, got %v", DefaultServerPort, cfg.Server.Port)
 	}
 }
 
