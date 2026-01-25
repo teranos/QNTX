@@ -138,8 +138,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 
 		emitter := NewJobProgressEmitter(job, queue, nil, logger)
 
-		// Mission Control: "Candidate AST-042 scored 0.95, qualified"
-		emitter.EmitCandidateMatch("AST-042", 0.95, true, "Excellent physical fitness")
+		emitter.EmitCandidateMatch("AST-042")
 
 		// Verify progress increased by 1
 		if job.Progress.Current != 1 {
