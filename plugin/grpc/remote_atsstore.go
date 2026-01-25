@@ -225,14 +225,3 @@ func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 	r.logger.Infow("Attestation created via gRPC", "id", a.ID)
 	return nil
 }
-
-// GetAttestation is not implemented for remote plugins.
-// Requires proto extension with ID filter support.
-func (r *RemoteATSStore) GetAttestation(asid string) (*types.As, error) {
-	return nil, errors.New("getAttestation not supported for remote plugins (requires proto extension)")
-}
-
-// DeleteAttestation is not applicable - QNTX uses bounded storage eviction, not deletion.
-func (r *RemoteATSStore) DeleteAttestation(asid string) error {
-	return errors.New("deleteAttestation not applicable - attestations are evicted by bounded storage, not deleted")
-}
