@@ -18,10 +18,12 @@ type RemoteQueue struct {
 	conn      *grpc.ClientConn
 	authToken string
 	logger    *zap.SugaredLogger
+	ctx       context.Context // Parent context for cancellation
 }
 
 // NewRemoteQueue creates a gRPC client connection to the Queue service.
-func NewRemoteQueue(endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteQueue, error) {
+// The provided context is used for all gRPC operations and enables cancellation.
+func NewRemoteQueue(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteQueue, error) {
 	conn, err := grpc.Dial(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -36,6 +38,7 @@ func NewRemoteQueue(endpoint string, authToken string, logger *zap.SugaredLogger
 		conn:      conn,
 		authToken: authToken,
 		logger:    logger,
+		ctx:       ctx,
 	}, nil
 }
 
@@ -56,7 +59,7 @@ func (r *RemoteQueue) Enqueue(job *async.Job) error {
 		Job:       protoJob,
 	}
 
-	resp, err := r.client.Enqueue(context.Background(), req)
+	resp, err := r.client.Enqueue(r.ctx, req)
 	if err != nil {
 		return errors.Wrap(err, "failed to enqueue job")
 	}
@@ -80,7 +83,7 @@ func (r *RemoteQueue) GetJob(id string) (*async.Job, error) {
 		JobId:     id,
 	}
 
-	resp, err := r.client.GetJob(context.Background(), req)
+	resp, err := r.client.GetJob(r.ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get job")
 	}
@@ -112,7 +115,7 @@ func (r *RemoteQueue) UpdateJob(job *async.Job) error {
 		Job:       protoJob,
 	}
 
-	resp, err := r.client.UpdateJob(context.Background(), req)
+	resp, err := r.client.UpdateJob(r.ctx, req)
 	if err != nil {
 		return errors.Wrap(err, "failed to update job")
 	}
@@ -136,7 +139,7 @@ func (r *RemoteQueue) ListJobs(status *async.JobStatus, limit int) ([]*async.Job
 		req.Status = string(*status)
 	}
 
-	resp, err := r.client.ListJobs(context.Background(), req)
+	resp, err := r.client.ListJobs(r.ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list jobs")
 	}

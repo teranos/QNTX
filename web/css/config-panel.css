@@ -92,7 +92,7 @@
 }
 
 .config-setting:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
 }
 
 .config-setting:last-child {
@@ -133,7 +133,7 @@
 }
 
 .source-undefined {
-    color: #ddd;
+    color: var(--text-on-dark);
     opacity: 0.3;
 }
 
@@ -203,7 +203,7 @@
 }
 
 .config-save-btn {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     color: var(--text-primary);
 }
 
@@ -237,7 +237,7 @@
 }
 
 .config-cancel-btn:hover {
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     color: var(--text-primary);
 }
 
@@ -311,7 +311,7 @@
 }
 
 .config-panel-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb {

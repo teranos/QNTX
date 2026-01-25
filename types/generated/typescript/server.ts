@@ -441,7 +441,7 @@ export interface PulseExecutionStartedMessage {
 
 export interface QueryMessage {
   /**
-   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame"
+   * "query", "clear", "ping", "set_verbosity", "set_graph_limit", "upload", "daemon_control", "pulse_config_update", "job_control", "visibility", "vidstream_init", "vidstream_frame", "rich_search"
    */
   type: string;
   /**

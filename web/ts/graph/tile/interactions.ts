@@ -1,7 +1,7 @@
 // Tile interactions - User interaction handlers for tiles
 // Click to focus, hover for tooltip, context menu to hide
 
-import { appState } from '../../config.ts';
+import { appState } from '../../state/app.ts';
 import { getHiddenNodes } from '../state.ts';
 import { focusOnTile } from '../focus.ts';
 import type { D3Node } from '../../../types/d3-graph';

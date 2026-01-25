@@ -20,10 +20,12 @@ type RemoteATSStore struct {
 	conn      *grpc.ClientConn
 	authToken string
 	logger    *zap.SugaredLogger
+	ctx       context.Context // Parent context for cancellation
 }
 
 // NewRemoteATSStore creates a gRPC client connection to the ATSStore service.
-func NewRemoteATSStore(endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteATSStore, error) {
+// The provided context is used for all gRPC operations and enables cancellation.
+func NewRemoteATSStore(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteATSStore, error) {
 	conn, err := grpc.Dial(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -38,6 +40,7 @@ func NewRemoteATSStore(endpoint string, authToken string, logger *zap.SugaredLog
 		conn:      conn,
 		authToken: authToken,
 		logger:    logger,
+		ctx:       ctx,
 	}, nil
 }
 
@@ -73,7 +76,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 		Command:   protoCmd,
 	}
 
-	resp, err := r.client.GenerateAndCreateAttestation(context.Background(), req)
+	resp, err := r.client.GenerateAndCreateAttestation(r.ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +119,7 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 		Id:        asid,
 	}
 
-	resp, err := r.client.AttestationExists(context.Background(), req)
+	resp, err := r.client.AttestationExists(r.ctx, req)
 	if err != nil {
 		r.logger.Warnw("Failed to check attestation existence", "error", err)
 		return false
@@ -146,7 +149,7 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 		Filter:    protoFilter,
 	}
 
-	resp, err := r.client.GetAttestations(context.Background(), req)
+	resp, err := r.client.GetAttestations(r.ctx, req)
 	if err != nil {
 		return nil, err
 	}

@@ -24,10 +24,10 @@ Execute an ATS query
 
 | Field | Description |
 |-------|-------------|
-| cursor | Cursor column position |
 | filename | Source file name |
-| line | Cursor line position |
 | query | ATS query string |
+| line | Cursor line position |
+| cursor | Cursor column position |
 
 ### Server → Client
 
@@ -56,9 +56,9 @@ AI usage statistics update
 
 | Field | Description |
 |-------|-------------|
-| requests | Number of requests |
 | tokens | Total tokens used |
 | total_cost | Total cost in USD |
+| requests | Number of requests |
 
 #### `llm_stream`
 
@@ -66,9 +66,9 @@ Streaming LLM response chunks
 
 | Field | Description |
 |-------|-------------|
+| job_id | Associated job ID |
 | content | Text content chunk |
 | done | Whether streaming is complete |
-| job_id | Associated job ID |
 
 #### `plugin_health`
 
@@ -77,8 +77,8 @@ Plugin health status update
 | Field | Description |
 |-------|-------------|
 | healthy | Health status |
-| name | Plugin name |
 | state | Plugin state (running/paused) |
+| name | Plugin name |
 
 ## Type References
 
