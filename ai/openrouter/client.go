@@ -69,8 +69,6 @@ func NewClient(config Config) *Client {
 
 	// Create SSRF-safer HTTP client with redirect protection
 	// Blocks private IPs, localhost, AWS metadata endpoint, dangerous schemes
-	// Note: Tests use httptest.NewServer which binds to 127.0.0.1, so tests
-	// will need to either mock the HTTP client or use a public test endpoint
 	blockPrivateIP := true
 	saferClient := httpclient.NewSaferClientWithOptions(120*time.Second, httpclient.SaferClientOptions{
 		BlockPrivateIP: &blockPrivateIP,
