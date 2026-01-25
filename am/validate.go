@@ -17,9 +17,10 @@ func (c *Config) Validate() error {
 		return errors.Newf("pulse.ticker_interval_seconds must be >= 0, got %d", c.Pulse.TickerIntervalSeconds)
 	}
 
-	// HTTP rate limiting: 0 = unlimited, negative = invalid
-	if c.Pulse.HTTPMaxRequestsPerMinute < 0 {
-		return errors.Newf("pulse.http_max_requests_per_minute must be >= 0 (0 = unlimited), got %d", c.Pulse.HTTPMaxRequestsPerMinute)
+	// HTTP rate limiting: must be positive, negative = invalid
+	// Use a high value (e.g. 10000) for effectively unlimited
+	if c.Pulse.HTTPMaxRequestsPerMinute <= 0 {
+		return errors.Newf("pulse.http_max_requests_per_minute must be > 0, got %d", c.Pulse.HTTPMaxRequestsPerMinute)
 	}
 	if c.Pulse.HTTPDelayBetweenRequestsMS < 0 {
 		return errors.Newf("pulse.http_delay_between_requests_ms must be >= 0, got %d", c.Pulse.HTTPDelayBetweenRequestsMS)
