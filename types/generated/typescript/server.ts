@@ -265,6 +265,28 @@ export interface PluginInfo {
   pausable: boolean;
 }
 
+export interface PreviewSample {
+  /**
+   * The sampled attestation
+   */
+  attestation: Record<string, unknown>;
+  /**
+   * Prompt after template interpolation
+   */
+  interpolated_prompt: string;
+  /**
+   * LLM response
+   */
+  response: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  /**
+   * Per-sample error if any
+   */
+  error?: string;
+}
+
 export interface ProgressMessage {
   /**
    * "import_progress"
@@ -282,6 +304,91 @@ export interface ProgressMessage {
    * Status message
    */
   message: string;
+}
+
+export interface PromptExecuteRequest {
+  ax_query: string;
+  template: string;
+  system_prompt?: string;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  model?: string;
+}
+
+export interface PromptExecuteResponse {
+  results: Result[];
+  attestation_count: number;
+  error?: string;
+}
+
+export interface PromptPreviewRequest {
+  ax_query: string;
+  /**
+   * Prompt template with {{field}} placeholders
+   */
+  template: string;
+  /**
+   * Optional system instruction for the LLM
+   */
+  system_prompt?: string;
+  /**
+   * X value: number of samples to test (default: 1)
+   */
+  sample_size?: number;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  /**
+   * Model override
+   */
+  model?: string;
+  /**
+   * Optional prompt ID for tracking
+   */
+  prompt_id?: string;
+  /**
+   * Optional prompt version for comparison
+   */
+  prompt_version?: number;
+}
+
+export interface PromptPreviewResponse {
+  /**
+   * Total matching attestations from ax query
+   */
+  total_attestations: number;
+  /**
+   * X value used for sampling
+   */
+  sample_size: number;
+  /**
+   * X sample execution results
+   */
+  samples: PreviewSample[];
+  /**
+   * Number of successful samples
+   */
+  success_count: number;
+  /**
+   * Number of failed samples
+   */
+  failure_count: number;
+  /**
+   * Global error if any
+   */
+  error?: string;
+}
+
+export interface PromptSaveRequest {
+  name: string;
+  template: string;
+  system_prompt?: string;
+  ax_pattern?: string;
+  provider?: string;
+  model?: string;
 }
 
 export interface ProseEntry {
@@ -496,6 +603,31 @@ export interface QueryMessage {
    * For vidstream_frame: "rgba8", "rgb8", etc.
    */
   format: string;
+}
+
+export interface Result {
+  /**
+   * SourceAttestationID is the ID of the attestation that was processed
+   */
+  source_attestation_id: string;
+  /**
+   * Prompt is the interpolated prompt that was sent to the LLM
+   */
+  prompt: string;
+  /**
+   * Response is the LLM's response
+   */
+  response: string;
+  /**
+   * ResultAttestationID is the ID of the created result attestation
+   */
+  result_attestation_id?: string;
+  /**
+   * Token usage tracking
+   */
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 export interface ScheduledJobResponse {
