@@ -1,0 +1,3 @@
+# Attested Types
+
+Types exist through attestation - 'restaurant' is real because someone attested it, not because a schema declares it. That attestation carries everything: what fields matter, which ones are searchable, how it appears visually, and crucially, who made these decisions and when. Types can contradict, overlap, and evolve because they're attestations - the mess is the message. Multiple actors might attest different meanings for 'restaurant' - a health inspector sees safety fields, a food critic sees ambiance, a delivery app sees logistics. This multiplicity isn't a problem to solve - it's the actual shape of knowledge in contested domains. Types become part of the conversation, not the rules that govern it.

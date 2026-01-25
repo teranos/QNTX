@@ -7,7 +7,7 @@ import { initCodeMirrorEditor } from './codemirror-editor.ts';
 import { CSS } from './css-classes.ts';
 import { formatDateTime } from './html-utils.ts';
 import { updateGraph, initGraphResize } from './graph/index.ts';
-import { initLegendaToggles } from './legenda.ts';
+import { initTypeAttestations } from './components/type-attestations.ts';
 import { handleImportProgress, handleImportStats, handleImportComplete, initQueryFileDrop } from './file-upload.ts';
 import { uiState } from './state/ui.ts';
 import { appState } from './state/app.ts';
@@ -36,7 +36,8 @@ import './prose/panel.ts';
 import './plugin-panel.ts';
 import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
-import { windowTray } from './components/window-tray.ts';
+import { glyphRun } from './components/glyph/run.ts';
+import { registerTestGlyphs } from './test-glyphs.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -213,15 +214,18 @@ async function init(): Promise<void> {
     if (window.logLoaderStep) window.logLoaderStep('Initializing graph...');
     initGraphResize();
 
-    // Initialize window tray FIRST (before any windows are created)
-    // This ensures the tray is ready to receive minimized windows
-    windowTray.init();
+    // Initialize glyph run FIRST (before any glyphs are created)
+    // This ensures the run is ready to receive glyphs
+    glyphRun.init();
+
+    // Register test glyphs to demonstrate the morphing behavior
+    registerTestGlyphs();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();
 
     if (window.logLoaderStep) window.logLoaderStep('Initializing UI controls...');
-    initLegendaToggles(updateGraph);  // Pass renderGraph function for legenda callbacks
+    initTypeAttestations(updateGraph);  // Pass renderGraph function for type attestation callbacks
     initUsageBadge();
 
     // Listen for Tauri events (menu actions)
