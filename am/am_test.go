@@ -45,7 +45,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "zero workers is valid (disabled)",
+			name: "zero workers is valid (no background workers)",
 			config: Config{
 				Pulse: PulseConfig{Workers: 0},
 			},
@@ -59,7 +59,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero ticker interval is valid (disabled)",
+			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
 				Pulse: PulseConfig{TickerIntervalSeconds: 0},
 			},

@@ -16,8 +16,7 @@ type ExecutionHelper struct {
 }
 
 // NewExecutionHelper creates a new execution helper
-// Note: actor parameter is deprecated - attestations now use self-certifying ASIDs
-func NewExecutionHelper(dryRun bool, actor string) *ExecutionHelper {
+func NewExecutionHelper(dryRun bool) *ExecutionHelper {
 	return &ExecutionHelper{
 		dryRun: dryRun,
 	}
