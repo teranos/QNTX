@@ -9,9 +9,9 @@
 
 ## Configuration (am package)
 
-**Zero is a value, not a flag:** `0` means the literal quantity zero. `0` workers = no background workers. `0` ticker interval = no periodic ticking. `0` rate limit = unlimited. Never use 0 as a "disabled" flag - the value should have direct semantic meaning.
+**Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` rate limit = zero requests allowed (not unlimited). For "unlimited", use a high value. For "use default", omit the field.
 
-**For Claude**: Ensure sensible defaults in `am/defaults.go`. Zero values must have actual semantic meaning, not act as disable flags.
+**For Claude**: Ensure sensible positive defaults in `am/defaults.go`. Validation rejects negative values and zero where it has no meaning.
 
 ## Development Workflow
 

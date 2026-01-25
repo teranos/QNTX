@@ -47,37 +47,37 @@ func TestValidate_ZeroValues(t *testing.T) {
 		{
 			name: "zero workers is valid (no background workers)",
 			config: Config{
-				Pulse: PulseConfig{Workers: 0},
+				Pulse: PulseConfig{Workers: 0, HTTPMaxRequestsPerMinute: 10},
 			},
 			wantErr: false,
 		},
 		{
 			name: "negative workers is invalid",
 			config: Config{
-				Pulse: PulseConfig{Workers: -1},
+				Pulse: PulseConfig{Workers: -1, HTTPMaxRequestsPerMinute: 10},
 			},
 			wantErr: true,
 		},
 		{
 			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
-				Pulse: PulseConfig{TickerIntervalSeconds: 0},
+				Pulse: PulseConfig{TickerIntervalSeconds: 0, HTTPMaxRequestsPerMinute: 10},
 			},
 			wantErr: false,
 		},
 		{
 			name: "negative ticker interval is invalid",
 			config: Config{
-				Pulse: PulseConfig{TickerIntervalSeconds: -1},
+				Pulse: PulseConfig{TickerIntervalSeconds: -1, HTTPMaxRequestsPerMinute: 10},
 			},
 			wantErr: true,
 		},
 		{
-			name: "zero rate limit is valid (unlimited)",
+			name: "zero rate limit is invalid (use high value for unlimited)",
 			config: Config{
 				Pulse: PulseConfig{HTTPMaxRequestsPerMinute: 0},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "negative rate limit is invalid",
@@ -90,6 +90,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "empty database path is valid",
 			config: Config{
 				Database: DatabaseConfig{Path: ""},
+				Pulse:    PulseConfig{HTTPMaxRequestsPerMinute: 10},
 			},
 			wantErr: false,
 		},
