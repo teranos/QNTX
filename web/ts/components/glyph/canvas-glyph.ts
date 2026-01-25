@@ -11,6 +11,7 @@ import type { Glyph } from './glyph';
 import { Pulse, IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
+import { createIxGlyph } from './ix-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
@@ -208,18 +209,7 @@ function spawnIxGlyph(
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): void {
-    const ixGlyph: Glyph = {
-        id: `ix-${crypto.randomUUID()}`,
-        title: 'Ingest',
-        symbol: IX,
-        gridX,
-        gridY,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'IX glyph content (TBD)';
-            return content;
-        }
-    };
+    const ixGlyph = createIxGlyph(gridX, gridY);
 
     // Add to glyphs array
     glyphs.push(ixGlyph);
