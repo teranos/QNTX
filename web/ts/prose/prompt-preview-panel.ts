@@ -29,7 +29,6 @@ interface ComparisonResult {
 export class PromptPreviewPanel extends BasePanel {
     private options: PromptPreviewOptions;
     private currentResults: ComparisonResult[] = [];
-    private verticalIndicator: HTMLElement | null = null;
 
     constructor(options: PromptPreviewOptions = {}) {
         super({
@@ -41,29 +40,15 @@ export class PromptPreviewPanel extends BasePanel {
         });
 
         this.options = options;
-        this.createVerticalIndicator();
     }
 
+    // TODO(issue #339): Add vertical "PROMPT" indicator on right edge for manual toggle
+    // Should show when editing prompt files, click to open/close preview panel
+    // Position at ~33% from top to avoid window tray, z-index above tray (10000+)
     /**
-     * Create the vertical PROMPT indicator on the right edge
-     */
-    private createVerticalIndicator(): void {
-        this.verticalIndicator = document.createElement('div');
-        this.verticalIndicator.className = 'prompt-indicator-vertical';
-        this.verticalIndicator.innerHTML = '<span>PROMPT</span>';
-        this.verticalIndicator.style.display = 'none';
-        this.verticalIndicator.addEventListener('click', () => this.toggle());
-        document.body.appendChild(this.verticalIndicator);
-    }
-
-    /**
-     * Show/hide the vertical indicator based on whether we're editing a prompt file
+     * Show/hide the prompt preview based on whether we're editing a prompt file
      */
     public setPromptFileActive(isPromptFile: boolean): void {
-        if (this.verticalIndicator) {
-            this.verticalIndicator.style.display = isPromptFile ? 'flex' : 'none';
-        }
-
         // Auto-hide panel if not a prompt file
         if (!isPromptFile) {
             this.hide();
@@ -307,17 +292,9 @@ export class PromptPreviewPanel extends BasePanel {
 
     protected async onShow(): Promise<void> {
         // Panel is showing
-        if (this.verticalIndicator) {
-            this.verticalIndicator.classList.add('active');
-        }
     }
 
     protected onHide(): void {
-        // Panel is hiding
-        if (this.verticalIndicator) {
-            this.verticalIndicator.classList.remove('active');
-        }
-
         // Clear results
         this.currentResults = [];
 
@@ -326,11 +303,7 @@ export class PromptPreviewPanel extends BasePanel {
     }
 
     protected onDestroy(): void {
-        // Clean up vertical indicator
-        if (this.verticalIndicator) {
-            this.verticalIndicator.remove();
-            this.verticalIndicator = null;
-        }
+        // Cleanup
     }
 
     /**

@@ -4,7 +4,7 @@
 .prompt-indicator-vertical {
     position: fixed;
     right: 0;
-    top: 50%;
+    top: 33%;
     transform: translateY(-50%);
     width: 24px;
     height: 120px;
