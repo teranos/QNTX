@@ -200,6 +200,8 @@ class ProsePanel extends BasePanel {
     private adjustPanelWidth(hasPreview: boolean): void {
         if (!this.panel) return;
 
+        // TODO: Use CSS classes instead of inline styles to avoid layout thrashing
+        // Consider: this.panel.classList.toggle('has-prompt-preview', hasPreview)
         // When preview is shown, reduce Prose panel width to make room
         if (hasPreview) {
             this.panel.style.width = '40%';
