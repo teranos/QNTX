@@ -1,9 +1,10 @@
 //! SQLite storage backend implementing AttestationStore trait
 
 use rusqlite::{Connection, OptionalExtension};
+use std::collections::HashMap;
 use qntx_core::{
-    attestation::Attestation,
-    storage::{AttestationStore, StoreError},
+    attestation::{Attestation, AxFilter, AxResult, AxSummary},
+    storage::{AttestationStore, QueryStore, StoreError, StorageStats},
 };
 
 type StoreResult<T> = Result<T, StoreError>;
@@ -227,4 +228,231 @@ impl AttestationStore for SqliteStore {
 
         Ok(())
     }
+}
+
+impl QueryStore for SqliteStore {
+    fn query(&self, filter: &AxFilter) -> StoreResult<AxResult> {
+        // Build dynamic SQL query based on filter
+        let mut sql = String::from(
+            "SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at \
+             FROM attestations WHERE 1=1"
+        );
+        let mut params: Vec<String> = Vec::new();
+
+        // Filter by subjects (JSON array contains check)
+        if !filter.subjects.is_empty() {
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM json_each(subjects) WHERE value IN ({}))",
+                filter.subjects.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            ));
+            params.extend(filter.subjects.iter().cloned());
+        }
+
+        // Filter by predicates
+        if !filter.predicates.is_empty() {
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value IN ({}))",
+                filter.predicates.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            ));
+            params.extend(filter.predicates.iter().cloned());
+        }
+
+        // Filter by contexts
+        if !filter.contexts.is_empty() {
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value IN ({}))",
+                filter.contexts.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            ));
+            params.extend(filter.contexts.iter().cloned());
+        }
+
+        // Filter by actors
+        if !filter.actors.is_empty() {
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM json_each(actors) WHERE value IN ({}))",
+                filter.actors.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+            ));
+            params.extend(filter.actors.iter().cloned());
+        }
+
+        // Filter by time range
+        if let Some(start) = filter.time_start {
+            sql.push_str(" AND timestamp >= ?");
+            params.push(crate::json::timestamp_to_sql(start));
+        }
+        if let Some(end) = filter.time_end {
+            sql.push_str(" AND timestamp <= ?");
+            params.push(crate::json::timestamp_to_sql(end));
+        }
+
+        // Apply ordering and limit
+        sql.push_str(" ORDER BY created_at DESC");
+        if let Some(limit) = filter.limit {
+            sql.push_str(&format!(" LIMIT {}", limit));
+        }
+
+        // Execute query
+        let mut stmt = self.conn.prepare(&sql)
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter()
+            .map(|p| p as &dyn rusqlite::ToSql)
+            .collect();
+
+        let rows = stmt.query_map(&param_refs[..], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, String>(8)?,
+            ))
+        })
+        .map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        let mut attestations = Vec::new();
+        for row_result in rows {
+            let row_data = row_result.map_err(|e| StoreError::Backend(e.to_string()))?;
+
+            // Deserialize JSON fields
+            let subjects = crate::json::deserialize_string_vec(&row_data.1)
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            let predicates = crate::json::deserialize_string_vec(&row_data.2)
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            let contexts = crate::json::deserialize_string_vec(&row_data.3)
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            let actors = crate::json::deserialize_string_vec(&row_data.4)
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            let attributes = crate::json::deserialize_attributes(row_data.7.clone())
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+
+            // Convert timestamps
+            let timestamp = crate::json::sql_to_timestamp(&row_data.5)
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            let created_at = crate::json::sql_to_timestamp(&row_data.8)
+                .map_err(|e| StoreError::Serialization(e.to_string()))?;
+
+            attestations.push(Attestation {
+                id: row_data.0,
+                subjects,
+                predicates,
+                contexts,
+                actors,
+                timestamp,
+                source: row_data.6,
+                attributes,
+                created_at,
+            });
+        }
+
+        // Build summary
+        let summary = build_summary(&attestations);
+
+        Ok(AxResult {
+            attestations,
+            conflicts: Vec::new(), // TODO: implement conflict detection
+            summary,
+        })
+    }
+
+    fn predicates(&self) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT value FROM attestations, json_each(predicates) ORDER BY value"
+        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        let predicates = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| StoreError::Backend(e.to_string()))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        Ok(predicates)
+    }
+
+    fn contexts(&self) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT value FROM attestations, json_each(contexts) ORDER BY value"
+        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        let contexts = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| StoreError::Backend(e.to_string()))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        Ok(contexts)
+    }
+
+    fn subjects(&self) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT value FROM attestations, json_each(subjects) ORDER BY value"
+        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        let subjects = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| StoreError::Backend(e.to_string()))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        Ok(subjects)
+    }
+
+    fn actors(&self) -> StoreResult<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT value FROM attestations, json_each(actors) ORDER BY value"
+        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        let actors = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| StoreError::Backend(e.to_string()))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
+
+        Ok(actors)
+    }
+
+    fn stats(&self) -> StoreResult<StorageStats> {
+        Ok(StorageStats {
+            total_attestations: self.count()?,
+            unique_subjects: self.subjects()?.len(),
+            unique_predicates: self.predicates()?.len(),
+            unique_contexts: self.contexts()?.len(),
+            unique_actors: self.actors()?.len(),
+        })
+    }
+}
+
+/// Build a summary from a list of attestations.
+fn build_summary(attestations: &[Attestation]) -> AxSummary {
+    let mut summary = AxSummary {
+        total_attestations: attestations.len(),
+        unique_subjects: HashMap::new(),
+        unique_predicates: HashMap::new(),
+        unique_contexts: HashMap::new(),
+        unique_actors: HashMap::new(),
+    };
+
+    for attestation in attestations {
+        for subject in &attestation.subjects {
+            *summary.unique_subjects.entry(subject.clone()).or_insert(0) += 1;
+        }
+        for predicate in &attestation.predicates {
+            *summary
+                .unique_predicates
+                .entry(predicate.clone())
+                .or_insert(0) += 1;
+        }
+        for context in &attestation.contexts {
+            *summary.unique_contexts.entry(context.clone()).or_insert(0) += 1;
+        }
+        for actor in &attestation.actors {
+            *summary.unique_actors.entry(actor.clone()).or_insert(0) += 1;
+        }
+    }
+
+    summary
 }
