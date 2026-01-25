@@ -7,14 +7,14 @@ func (c *Config) Validate() error {
 	// Database path is optional - empty defaults to "qntx.db" per defaults.go:11
 	// No validation needed here
 
-	// Pulse workers: 0 = disabled, negative = invalid
+	// Pulse workers: 0 = no background workers, negative = invalid
 	if c.Pulse.Workers < 0 {
-		return errors.Newf("pulse.workers must be >= 0 (0 = disabled), got %d", c.Pulse.Workers)
+		return errors.Newf("pulse.workers must be >= 0, got %d", c.Pulse.Workers)
 	}
 
-	// Pulse ticker interval: 0 = disabled, negative = invalid
+	// Pulse ticker interval: 0 = no periodic ticking, negative = invalid
 	if c.Pulse.TickerIntervalSeconds < 0 {
-		return errors.Newf("pulse.ticker_interval_seconds must be >= 0 (0 = disabled), got %d", c.Pulse.TickerIntervalSeconds)
+		return errors.Newf("pulse.ticker_interval_seconds must be >= 0, got %d", c.Pulse.TickerIntervalSeconds)
 	}
 
 	// HTTP rate limiting: 0 = unlimited, negative = invalid
