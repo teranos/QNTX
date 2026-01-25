@@ -129,6 +129,14 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		req.SampleSize = 1
 	}
 
+	// Limit sample size to prevent excessive LLM costs
+	// For very large X-sampling (>20), we would want a different UI/comparison approach
+	const maxSampleSize = 20
+	if req.SampleSize > maxSampleSize {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("sample_size cannot exceed %d", maxSampleSize))
+		return
+	}
+
 	// Parse the ax query - support both natural language and simple "TEST-TASK-1" format
 	var filter *types.AxFilter
 	args := strings.Fields(req.AxQuery)

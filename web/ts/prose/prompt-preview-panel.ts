@@ -74,7 +74,7 @@ export class PromptPreviewPanel extends BasePanel {
                 <div class="prompt-preview-settings">
                     <div class="prompt-preview-sample-control">
                         <label for="sample-count">Sample Size:</label>
-                        <input type="number" id="sample-count" min="1" max="100" value="5" />
+                        <input type="number" id="sample-count" min="1" max="20" value="3" />
                         <button class="prompt-preview-run">Run Preview</button>
                     </div>
                     <div class="prompt-preview-filter">
