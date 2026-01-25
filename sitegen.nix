@@ -1158,7 +1158,11 @@ let
   mkHtmlDerivation = fileInfo:
     let
       mdContent = builtins.readFile fileInfo.mdPath;
-      rewrittenMd = builtins.replaceStrings [ ".md)" ] [ ".html)" ] mdContent;
+      # Replace both .md) and .md# patterns to handle links with and without anchors
+      rewrittenMd = builtins.replaceStrings
+        [ ".md)" ".md#" ]
+        [ ".html)" ".html#" ]
+        mdContent;
       # Generate description from category
       category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
       catMeta = if category == null then null else getCategoryMeta category;

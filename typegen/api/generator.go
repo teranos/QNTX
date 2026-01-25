@@ -109,12 +109,50 @@ func (g *Generator) parseRouting() error {
 			continue
 		}
 
-		endpoint := Endpoint{
-			Pattern: pattern,
-			Handler: handler,
-			Methods: inferMethods(handler, pattern),
+		// Special handling for HandlePrompt router that contains multiple sub-endpoints
+		if handler == "HandlePrompt" {
+			// Add the individual prompt endpoints instead of the router endpoint
+			promptEndpoints := []Endpoint{
+				{
+					Pattern: "/api/prompt/preview",
+					Handler: "HandlePromptPreview",
+					Methods: []string{"POST"},
+				},
+				{
+					Pattern: "/api/prompt/execute",
+					Handler: "HandlePromptExecute",
+					Methods: []string{"POST"},
+				},
+				{
+					Pattern: "/api/prompt/list",
+					Handler: "HandlePromptList",
+					Methods: []string{"GET"},
+				},
+				{
+					Pattern: "/api/prompt/save",
+					Handler: "HandlePromptSave",
+					Methods: []string{"POST"},
+				},
+				{
+					Pattern: "/api/prompt/{id}",
+					Handler: "HandlePromptGet",
+					Methods: []string{"GET"},
+				},
+				{
+					Pattern: "/api/prompt/{name}/versions",
+					Handler: "HandlePromptVersions",
+					Methods: []string{"GET"},
+				},
+			}
+			g.endpoints = append(g.endpoints, promptEndpoints...)
+		} else {
+			endpoint := Endpoint{
+				Pattern: pattern,
+				Handler: handler,
+				Methods: inferMethods(handler, pattern),
+			}
+			g.endpoints = append(g.endpoints, endpoint)
 		}
-		g.endpoints = append(g.endpoints, endpoint)
 	}
 
 	return nil
@@ -699,6 +737,7 @@ func (g *Generator) groupByCategory() []Category {
 	order := []string{
 		"Health & Status",
 		"Configuration",
+		"Prompt",
 		"Pulse Schedules",
 		"Pulse Jobs",
 		"Pulse Executions",
@@ -729,6 +768,9 @@ func categorizeEndpoint(ep Endpoint) string {
 
 	if strings.Contains(handler, "websocket") || strings.Contains(handler, "glsp") {
 		return "WebSocket"
+	}
+	if strings.Contains(pattern, "/prompt") || strings.Contains(handler, "prompt") {
+		return "Prompt"
 	}
 	if strings.Contains(pattern, "/pulse/schedules") {
 		return "Pulse Schedules"
