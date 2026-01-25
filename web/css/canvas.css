@@ -12,6 +12,7 @@
 }
 
 /* Subtle grid overlay */
+/* TODO: Document grid overlay math (39px + 1px = 40px GRID_SIZE) */
 .canvas-grid-overlay {
     position: absolute;
     top: 0;

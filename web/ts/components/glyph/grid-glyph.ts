@@ -7,9 +7,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-
-// Grid configuration (must match canvas-glyph.ts)
-const GRID_SIZE = 40; // pixels per grid cell
+import { GRID_SIZE } from './grid-constants';
 
 /**
  * Create a grid-positioned glyph element
@@ -61,9 +59,11 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         const newX = elementStartX + deltaX;
         const newY = elementStartY + deltaY;
 
-        // Snap to grid
-        const snappedGridX = Math.round(newX / GRID_SIZE);
-        const snappedGridY = Math.round(newY / GRID_SIZE);
+        // Snap to grid with bounds checking
+        const maxGridX = Math.floor(window.innerWidth / GRID_SIZE) - 1;
+        const maxGridY = Math.floor(window.innerHeight / GRID_SIZE) - 1;
+        const snappedGridX = Math.max(0, Math.min(maxGridX, Math.round(newX / GRID_SIZE)));
+        const snappedGridY = Math.max(0, Math.min(maxGridY, Math.round(newY / GRID_SIZE)));
 
         // Update position
         updatePosition(element, snappedGridX, snappedGridY);
@@ -86,6 +86,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         glyph.gridY = currentGridY;
 
         // Persist to uiState
+        // TODO: Add error handling for state persistence failures
         if (glyph.symbol) {
             uiState.addCanvasGlyph({
                 id: glyph.id,

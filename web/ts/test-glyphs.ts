@@ -141,6 +141,7 @@ export function registerTestGlyphs(): void {
         initialHeight: '320px'
     });
 
+    // TODO: Replace console.log with proper logger (log.debug)
     console.log('Test glyphs registered:', {
         vidstream: 'VidStream monitoring',
         database: 'Database Statistics',
