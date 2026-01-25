@@ -464,3 +464,18 @@ func (ae *AxExecutor) getUnifiedIdentifiers(ctx context.Context, identifier stri
 
 	return result, nil
 }
+
+// removeDuplicates removes duplicate strings from a slice while preserving order
+func removeDuplicates(slice []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, item := range slice {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
