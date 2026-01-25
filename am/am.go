@@ -61,7 +61,6 @@ type PulseConfig struct {
 	WeeklyBudgetUSD       float64 `mapstructure:"weekly_budget_usd"`        // Weekly spending limit in USD
 	MonthlyBudgetUSD      float64 `mapstructure:"monthly_budget_usd"`       // Monthly spending limit in USD
 	CostPerScoreUSD       float64 `mapstructure:"cost_per_score_usd"`       // Estimated cost per operation
-	MaxCallsPerMinute     int     `mapstructure:"max_calls_per_minute"`     // Rate limit for API calls
 	PauseOnBudgetExceeded bool    `mapstructure:"pause_on_budget_exceeded"` // Pause jobs when budget exceeded (vs fail them)
 }
 
