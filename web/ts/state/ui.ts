@@ -57,6 +57,16 @@ export interface GraphSessionState {
 }
 
 /**
+ * Canvas glyph state (for persistence)
+ */
+export interface CanvasGlyphState {
+    id: string;
+    symbol: string;
+    gridX: number;
+    gridY: number;
+}
+
+/**
  * Consolidated UI state
  */
 export interface UIStateData {
@@ -77,6 +87,9 @@ export interface UIStateData {
 
     // Minimized window IDs (for window tray)
     minimizedWindows: string[];
+
+    // Canvas workspace glyphs (for canvas glyph)
+    canvasGlyphs: CanvasGlyphState[];
 
     // Timestamp for state versioning
     lastUpdated: number;
@@ -103,6 +116,7 @@ interface PersistedUIState {
     usageView: 'week' | 'month';
     graphSession: GraphSessionState;
     minimizedWindows: string[];
+    canvasGlyphs: CanvasGlyphState[];
 }
 
 // ============================================================================
@@ -135,6 +149,7 @@ function createDefaultState(): UIStateData {
         usageView: 'week',
         graphSession: {},
         minimizedWindows: [],
+        canvasGlyphs: [],
         lastUpdated: Date.now(),
     };
 }
@@ -373,6 +388,57 @@ class UIState {
     }
 
     // ========================================================================
+    // Canvas Glyphs Management
+    // ========================================================================
+
+    /**
+     * Get canvas glyphs
+     */
+    getCanvasGlyphs(): CanvasGlyphState[] {
+        return this.state.canvasGlyphs;
+    }
+
+    /**
+     * Set canvas glyphs (full replace)
+     */
+    setCanvasGlyphs(glyphs: CanvasGlyphState[]): void {
+        this.update('canvasGlyphs', glyphs);
+    }
+
+    /**
+     * Add a glyph to canvas
+     */
+    addCanvasGlyph(glyph: CanvasGlyphState): void {
+        const existing = this.state.canvasGlyphs.find(g => g.id === glyph.id);
+        if (existing) {
+            // Update existing glyph
+            const updated = this.state.canvasGlyphs.map(g =>
+                g.id === glyph.id ? glyph : g
+            );
+            this.update('canvasGlyphs', updated);
+        } else {
+            // Add new glyph
+            const updated = [...this.state.canvasGlyphs, glyph];
+            this.update('canvasGlyphs', updated);
+        }
+    }
+
+    /**
+     * Remove a glyph from canvas
+     */
+    removeCanvasGlyph(id: string): void {
+        const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
+        this.update('canvasGlyphs', updated);
+    }
+
+    /**
+     * Clear all canvas glyphs
+     */
+    clearCanvasGlyphs(): void {
+        this.update('canvasGlyphs', []);
+    }
+
+    // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
 
@@ -480,6 +546,7 @@ class UIState {
             usageView: this.state.usageView,
             graphSession: this.state.graphSession,
             minimizedWindows: this.state.minimizedWindows,
+            canvasGlyphs: this.state.canvasGlyphs,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
     }
@@ -510,6 +577,7 @@ class UIState {
             usageView: persisted.usageView ?? defaultState.usageView,
             graphSession: persisted.graphSession ?? defaultState.graphSession,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
+            canvasGlyphs: persisted.canvasGlyphs ?? defaultState.canvasGlyphs,
         };
     }
 

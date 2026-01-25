@@ -52,9 +52,13 @@
  */
 
 import { glyphRun } from './components/glyph/run';
+import { createCanvasGlyph } from './components/glyph/canvas-glyph';
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {
+    // Canvas Glyph - Fractal container with spatial grid
+    glyphRun.add(createCanvasGlyph());
+
     // VidStream Glyph
     glyphRun.add({
         id: 'vidstream-glyph',
@@ -137,6 +141,7 @@ export function registerTestGlyphs(): void {
         initialHeight: '320px'
     });
 
+    // TODO: Replace console.log with proper logger (log.debug)
     console.log('Test glyphs registered:', {
         vidstream: 'VidStream monitoring',
         database: 'Database Statistics',
