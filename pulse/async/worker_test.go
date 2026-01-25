@@ -26,10 +26,9 @@ import (
 func createTestConfig() *am.Config {
 	return &am.Config{
 		Pulse: am.PulseConfig{
-			DailyBudgetUSD:    10.0,
-			MonthlyBudgetUSD:  100.0,
-			CostPerScoreUSD:   0.01,
-			MaxCallsPerMinute: 60,
+			DailyBudgetUSD:   10.0,
+			MonthlyBudgetUSD: 100.0,
+			CostPerScoreUSD:  0.01,
 		},
 	}
 }
@@ -361,8 +360,6 @@ func TestCronosRateLimitingEnforcement(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	// Cronos sets a very low rate limit to make test deterministic
-	cfg.Pulse.MaxCallsPerMinute = 3 // Only 3 calls per minute
 	cfg.Pulse.PauseOnBudgetExceeded = true
 
 	poolCfg := WorkerPoolConfig{Workers: 1}

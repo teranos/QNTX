@@ -9,7 +9,7 @@
 
 ## Configuration (am package)
 
-**Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` rate limit = zero requests allowed (not unlimited). For "unlimited", use a high value. For "use default", omit the field.
+**Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
 **For Claude**: Ensure sensible positive defaults in `am/defaults.go`. Validation rejects negative values and zero where it has no meaning.
 
