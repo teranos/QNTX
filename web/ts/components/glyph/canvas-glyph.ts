@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse } from '@generated/sym.js';
+import { Pulse, IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { uiState } from '../../state/ui';
@@ -40,7 +40,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [Pulse], // Symbols that can be spawned
+        onSpawnMenu: () => [Pulse, IX], // Symbols that can be spawned
 
         renderContent: () => {
             const container = document.createElement('div');
@@ -124,6 +124,20 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pulseBtn);
+
+    // Add IX symbol
+    const ixBtn = document.createElement('button');
+    ixBtn.className = 'canvas-spawn-button';
+    ixBtn.textContent = IX;
+    ixBtn.title = 'Spawn IX glyph';
+
+    ixBtn.addEventListener('click', () => {
+        spawnIxGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(ixBtn);
+
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -183,6 +197,46 @@ function spawnPulseGlyph(
     canvas.appendChild(glyphElement);
 
     log.debug(SEG.UI, `[Canvas] Spawned Pulse glyph at grid (${gridX}, ${gridY})`);
+}
+
+/**
+ * Spawn a new IX glyph at grid position
+ */
+function spawnIxGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): void {
+    const ixGlyph: Glyph = {
+        id: `ix-${crypto.randomUUID()}`,
+        title: 'Ingest',
+        symbol: IX,
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'IX glyph content (TBD)';
+            return content;
+        }
+    };
+
+    // Add to glyphs array
+    glyphs.push(ixGlyph);
+
+    // Persist to uiState
+    uiState.addCanvasGlyph({
+        id: ixGlyph.id,
+        symbol: IX,
+        gridX,
+        gridY
+    });
+
+    // Render glyph on canvas
+    const glyphElement = createGridGlyph(ixGlyph);
+    canvas.appendChild(glyphElement);
+
+    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at grid (${gridX}, ${gridY})`);
 }
 
 /**
