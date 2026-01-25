@@ -10,7 +10,7 @@
 import type { Glyph } from './glyph';
 import { Pulse } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { createGridChildGlyph } from './grid-child-glyph';
+import { createGridGlyph } from './grid-glyph';
 import { uiState } from '../../state/ui';
 
 // Grid configuration
@@ -67,7 +67,7 @@ export function createCanvasGlyph(): Glyph {
 
             // Render existing glyphs
             glyphs.forEach(glyph => {
-                const glyphElement = renderGlyph(glyph, container, glyphs);
+                const glyphElement = renderGlyph(glyph);
                 container.appendChild(glyphElement);
             });
 
@@ -165,7 +165,7 @@ function spawnPulseGlyph(
     });
 
     // Render glyph on canvas
-    const glyphElement = createGridChildGlyph(pulseGlyph, canvas, glyphs);
+    const glyphElement = createGridGlyph(pulseGlyph);
     canvas.appendChild(glyphElement);
 
     log.debug(SEG.UI, `[Canvas] Spawned Pulse glyph at grid (${gridX}, ${gridY})`);
@@ -174,11 +174,7 @@ function spawnPulseGlyph(
 /**
  * Render a glyph on the canvas
  */
-function renderGlyph(
-    glyph: Glyph,
-    canvas: HTMLElement,
-    glyphs: Glyph[]
-): HTMLElement {
+function renderGlyph(glyph: Glyph): HTMLElement {
     // Render at saved position (or default if not set)
-    return createGridChildGlyph(glyph, canvas, glyphs);
+    return createGridGlyph(glyph);
 }
