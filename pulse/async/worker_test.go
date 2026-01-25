@@ -360,8 +360,6 @@ func TestCronosRateLimitingEnforcement(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	cfg := createTestConfig()
 
-	cfg.Pulse.PauseOnBudgetExceeded = true
-
 	poolCfg := WorkerPoolConfig{Workers: 1}
 	pool := NewWorkerPool(db, cfg, poolCfg, createTestLogger())
 

@@ -48,26 +48,11 @@ type PulseConfig struct {
 	// Ticker configuration for scheduled job execution
 	TickerIntervalSeconds int `mapstructure:"ticker_interval_seconds"` // How often to check for scheduled jobs (default: 1)
 
-	// HTTP rate limiting (prevents bot detection like LinkedIn HTTP 999)
-	// Default settings for sites without specific config
-	HTTPMaxRequestsPerMinute   int `mapstructure:"http_max_requests_per_minute"`
-	HTTPDelayBetweenRequestsMS int `mapstructure:"http_delay_between_requests_ms"`
-
-	// Per-domain rate limit overrides (key = domain like "linkedin.com")
-	HTTPDomainLimits map[string]HTTPDomainLimit `mapstructure:"http_domain_limits"`
-
-	// Budget tracking and rate limiting (core Pulse features)
+	// Budget tracking
 	DailyBudgetUSD        float64 `mapstructure:"daily_budget_usd"`         // Daily spending limit in USD
 	WeeklyBudgetUSD       float64 `mapstructure:"weekly_budget_usd"`        // Weekly spending limit in USD
 	MonthlyBudgetUSD      float64 `mapstructure:"monthly_budget_usd"`       // Monthly spending limit in USD
-	CostPerScoreUSD       float64 `mapstructure:"cost_per_score_usd"`       // Estimated cost per operation
-	PauseOnBudgetExceeded bool    `mapstructure:"pause_on_budget_exceeded"` // Pause jobs when budget exceeded (vs fail them)
-}
-
-// HTTPDomainLimit configures per-domain HTTP rate limiting
-type HTTPDomainLimit struct {
-	MaxRequestsPerMinute   int `mapstructure:"max_requests_per_minute"`
-	DelayBetweenRequestsMS int `mapstructure:"delay_between_requests_ms"`
+	CostPerScoreUSD float64 `mapstructure:"cost_per_score_usd"` // Estimated cost per operation
 }
 
 // CodeConfig configures the code review system
@@ -92,7 +77,7 @@ type LocalInferenceConfig struct {
 	Enabled        bool   `mapstructure:"enabled"`         // Enable local inference instead of cloud APIs
 	BaseURL        string `mapstructure:"base_url"`        // e.g., "http://localhost:11434" for Ollama
 	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
-	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout (default: 120)
+	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
 	ContextSize    int    `mapstructure:"context_size"`    // Context window size (0 = model default, e.g., 16384, 32768)
 }
 
