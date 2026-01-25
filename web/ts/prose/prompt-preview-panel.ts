@@ -56,6 +56,7 @@ export class PromptPreviewPanel extends BasePanel {
     }
 
     protected getTemplate(): string {
+        // TODO: Add ARIA attributes (role="region", aria-live, aria-busy) for accessibility
         return `
             <div class="prompt-preview-header">
                 <div class="prompt-preview-title">
@@ -98,6 +99,8 @@ export class PromptPreviewPanel extends BasePanel {
     }
 
     protected setupEventListeners(): void {
+        // TODO: Add keyboard shortcuts (Cmd/Ctrl+R for refresh, Cmd/Ctrl+Enter for run)
+
         // Refresh button
         const refreshBtn = this.panel?.querySelector('.prompt-preview-refresh');
         refreshBtn?.addEventListener('click', () => this.refreshPreview());
@@ -118,6 +121,7 @@ export class PromptPreviewPanel extends BasePanel {
      * Run preview with current settings
      */
     private async runPreview(): Promise<void> {
+        // TODO(issue #340): Add loading state UI (disable button, show spinner)
         const sampleCount = parseInt((this.panel?.querySelector('#sample-count') as HTMLInputElement)?.value || '5', 10);
         const axFilter = (this.panel?.querySelector('.prompt-preview-ax-filter') as HTMLInputElement)?.value || 'find all';
 
@@ -132,17 +136,18 @@ export class PromptPreviewPanel extends BasePanel {
             }
 
             const template = this.options.getEditorContent();
-            if (!template.trim()) {
+            if (!template || !template.trim()) {
                 this.updateStatus('Error: Empty template');
                 return;
             }
 
             // Build request to backend API
+            // TODO(issue #341): Read provider from frontmatter or add UI control
             const request = {
                 ax_query: axFilter,
                 template: template,
                 sample_size: sampleCount,
-                provider: 'openrouter' // Default provider
+                provider: 'openrouter' // Hardcoded for now
             };
 
             // Call the preview API
@@ -207,6 +212,7 @@ export class PromptPreviewPanel extends BasePanel {
      * Render comparison results
      */
     private renderComparisons(): void {
+        // TODO: Add diff highlighting to show what changed between old and new outputs
         const emptyState = this.panel?.querySelector('.prompt-preview-empty') as HTMLElement;
         const comparisons = this.panel?.querySelector('.prompt-preview-comparisons') as HTMLElement;
 
