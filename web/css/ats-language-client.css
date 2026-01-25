@@ -228,7 +228,7 @@
 
 .completion-item:hover,
 .completion-item.selected {
-    background: #f0f0f0;
+    background: var(--bg-hover);
 }
 
 .completion-label {
@@ -241,7 +241,7 @@
 .completion-kind {
     font-size: 10px;
     color: var(--text-secondary);
-    background: var(--bg-subtle);
+    background: var(--bg-almost-white);
     padding: 2px 6px;
     border-radius: 3px;
     text-transform: uppercase;

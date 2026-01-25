@@ -92,7 +92,7 @@ func ScanJobFromRow(row *sql.Row, job *Job) error {
 	targets := GetJobScanTargets(job, args)
 
 	if err := row.Scan(targets...); err != nil {
-		return err
+		return errors.Wrap(err, "failed to scan job from row")
 	}
 
 	return ProcessJobScanArgs(job, args)
@@ -104,7 +104,7 @@ func ScanJobFromRows(rows *sql.Rows, job *Job) error {
 	targets := GetJobScanTargets(job, args)
 
 	if err := rows.Scan(targets...); err != nil {
-		return err
+		return errors.Wrap(err, "failed to scan job from rows")
 	}
 
 	return ProcessJobScanArgs(job, args)

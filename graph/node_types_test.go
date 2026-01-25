@@ -93,11 +93,11 @@ func TestExtractTypeDefinitions(t *testing.T) {
 	}
 
 	if artistDef.Opacity == nil || *artistDef.Opacity != 0.9 {
-		var opacityVal float64
+		var opacity float64 = -1
 		if artistDef.Opacity != nil {
-			opacityVal = *artistDef.Opacity
+			opacity = *artistDef.Opacity
 		}
-		t.Errorf("artistDef.Opacity = %f, want 0.9", opacityVal)
+		t.Errorf("artistDef.Opacity = %f, want 0.9", opacity)
 	}
 
 	// Verify genre type definition (with default opacity)
@@ -106,12 +106,13 @@ func TestExtractTypeDefinitions(t *testing.T) {
 		t.Fatal("genre type definition not found")
 	}
 
+	// Default opacity should be 1.0 when not specified
 	if genreDef.Opacity == nil || *genreDef.Opacity != 1.0 {
-		var opacityVal float64
+		var opacity float64 = -1
 		if genreDef.Opacity != nil {
-			opacityVal = *genreDef.Opacity
+			opacity = *genreDef.Opacity
 		}
-		t.Errorf("genreDef.Opacity = %f, want 1.0 (default)", opacityVal)
+		t.Errorf("genreDef.Opacity = %f, want 1.0 (default)", opacity)
 	}
 
 	if genreDef.Deprecated != false {

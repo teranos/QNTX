@@ -70,3 +70,4 @@ web/css/ctp2.css
 
 # CTP2 test files (domain-specific, not for open source)
 **/*ctp2*_test.go
+test_fuzzy

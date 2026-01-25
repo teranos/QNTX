@@ -7,6 +7,8 @@ package storage
 
 import (
 	"database/sql"
+	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -32,6 +34,11 @@ type BoundedStore struct {
 	store  *SQLStore
 	logger *zap.SugaredLogger
 	config *BoundedStoreConfig
+
+	// Cache for type definitions (used by rich search)
+	typeFieldsCache     map[string][]string
+	typeFieldsCacheLock sync.RWMutex
+	typeFieldsCacheTime time.Time
 }
 
 // NewBoundedStore creates a new bounded storage manager with default limits (16/64/64)
@@ -69,7 +76,7 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 // CreateAttestation inserts a new attestation into the database with quota enforcement (implements ats.AttestationStore)
 func (bs *BoundedStore) CreateAttestation(as *types.As) error {
 	if err := bs.store.CreateAttestation(as); err != nil {
-		return err
+		return errors.Wrap(err, "failed to create attestation")
 	}
 
 	// Enforce bounded storage limits after insertion

@@ -3,7 +3,6 @@ package commands
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -11,6 +10,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/db"
 	qntxdisplay "github.com/teranos/QNTX/display"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/qntx-code/ixgest/git"
@@ -106,12 +106,12 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 	// Load config and open database
 	cfg, err := am.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return errors.Wrap(err, "failed to load config")
 	}
 
 	database, err := db.OpenWithMigrations(cfg.Database.Path, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return errors.Wrap(err, "failed to open database")
 	}
 	defer database.Close()
 
@@ -122,7 +122,7 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 
 	repoSource, err := git.ResolveRepository(repoInput, logger.Logger)
 	if err != nil {
-		return fmt.Errorf("failed to resolve repository: %w", err)
+		return errors.Wrap(err, "failed to resolve repository")
 	}
 	defer repoSource.Cleanup()
 
@@ -135,7 +135,7 @@ func runIxGit(cmd *cobra.Command, repoInput string, dryRun bool, actor string, v
 	// Handle async mode
 	if asyncMode {
 		if dryRun {
-			return fmt.Errorf("--async and --dry-run cannot be used together")
+			return errors.New("--async and --dry-run cannot be used together")
 		}
 		// For async mode, pass the original input - the worker will clone if needed
 		repoSource.Cleanup() // Clean up any sync clone, worker will handle its own
@@ -158,7 +158,7 @@ func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity 
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return errors.Wrap(err, "failed to marshal payload")
 	}
 
 	// Create job (we don't know total operations yet, will update during execution)
@@ -171,13 +171,13 @@ func runIxGitAsync(database *sql.DB, repoSource string, actor string, verbosity 
 		actor,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create job: %w", err)
+		return errors.Wrap(err, "failed to create job")
 	}
 
 	// Enqueue job
 	queue := async.NewQueue(database)
 	if err := queue.Enqueue(job); err != nil {
-		return fmt.Errorf("failed to enqueue job: %w", err)
+		return errors.Wrap(err, "failed to enqueue job")
 	}
 
 	if useJSON {
@@ -224,7 +224,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 	// Set incremental filter if --since is provided
 	if since != "" {
 		if err := processor.SetSince(since); err != nil {
-			return err
+			return errors.Wrap(err, "failed to set since filter")
 		}
 	}
 
@@ -252,7 +252,7 @@ func runIxGitSync(cmd *cobra.Command, database *sql.DB, repoPath string, origina
 			return qntxdisplay.OutputJSON(result)
 		}
 		pterm.Error.Printf("Failed to process git repository: %v", err)
-		return err
+		return errors.Wrap(err, "failed to process git repository")
 	}
 
 	// Process dependencies unless --no-deps is specified
