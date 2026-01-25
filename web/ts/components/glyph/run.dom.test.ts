@@ -9,7 +9,7 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { glyphRun } from './run.ts';
-import type { Glyph } from './window.ts';
+import type { Glyph } from './glyph.ts';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';

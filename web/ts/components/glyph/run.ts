@@ -32,11 +32,13 @@ import { log, SEG } from '../../logger';
 import { stripHtml } from '../../html-utils';
 import { uiState } from '../../state/ui';
 import { GlyphProximity } from './proximity';
-import { GlyphMorph, type Glyph, getMaximizeDuration } from './window';
+import { type Glyph, getMaximizeDuration } from './glyph';
 import { isInWindowState, setGlyphId } from './dataset';
+import { morphToWindow } from './manifestations/window';
+import { morphToCanvas } from './manifestations/canvas';
 
 // Re-export Glyph interface for external use
-export type { Glyph } from './window';
+export type { Glyph } from './glyph';
 
 
 class GlyphRunImpl {
@@ -48,9 +50,6 @@ class GlyphRunImpl {
 
     // Proximity morphing handler
     private proximity: GlyphProximity = new GlyphProximity();
-
-    // Morph transformation handler
-    private morph: GlyphMorph = new GlyphMorph();
 
     /**
      * SINGLE FACTORY for creating glyph DOM elements
@@ -94,13 +93,26 @@ class GlyphRunImpl {
             // Only morph if in collapsed state (not already a window)
             if (!isInWindowState(glyph)) {
                 this.isRestoring = true;
-                this.morph.morphToWindow(
-                    glyph,
-                    item,
-                    (id, element) => this.verifyElementTracking(id, element),
-                    (id) => this.remove(id),
-                    (element, g) => this.reattachGlyphToIndicator(element, g)
-                );
+
+                // Route to correct manifestation based on type
+                const manifestationType = item.manifestationType || 'window';
+                if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
+                    morphToCanvas(
+                        glyph,
+                        item,
+                        (id, element) => this.verifyElementTracking(id, element),
+                        (element, g) => this.reattachGlyphToIndicator(element, g)
+                    );
+                } else {
+                    morphToWindow(
+                        glyph,
+                        item,
+                        (id, element) => this.verifyElementTracking(id, element),
+                        (id) => this.remove(id),
+                        (element, g) => this.reattachGlyphToIndicator(element, g)
+                    );
+                }
+
                 // Re-enable proximity morphing after animation
                 setTimeout(() => {
                     this.isRestoring = false;
@@ -366,13 +378,26 @@ class GlyphRunImpl {
 
             if (!isInWindowState(glyphElement)) {
                 this.isRestoring = true;
-                this.morph.morphToWindow(
-                    glyphElement,
-                    glyph,
-                    (id, element) => this.verifyElementTracking(id, element),
-                    (id) => this.remove(id),
-                    (element, g) => this.reattachGlyphToIndicator(element, g)
-                );
+
+                // Route to correct manifestation based on type
+                const manifestationType = glyph.manifestationType || 'window';
+                if (manifestationType === 'fullscreen' || manifestationType === 'canvas') {
+                    morphToCanvas(
+                        glyphElement,
+                        glyph,
+                        (id, element) => this.verifyElementTracking(id, element),
+                        (element, g) => this.reattachGlyphToIndicator(element, g)
+                    );
+                } else {
+                    morphToWindow(
+                        glyphElement,
+                        glyph,
+                        (id, element) => this.verifyElementTracking(id, element),
+                        (id) => this.remove(id),
+                        (element, g) => this.reattachGlyphToIndicator(element, g)
+                    );
+                }
+
                 setTimeout(() => {
                     this.isRestoring = false;
                 }, getMaximizeDuration());
