@@ -1,8 +1,9 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 
@@ -11,22 +12,53 @@ import (
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/parser"
-	"github.com/teranos/QNTX/ats/prompt"
+	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 )
 
-// PromptPreviewRequest represents a request to preview ax query results
+const (
+	// Default query limit when parsing ax queries without explicit limit
+	defaultAxQueryLimit = 100
+	// Default model for local inference when not configured
+	defaultLocalModel = "llama3.2:3b"
+	// Default model for OpenRouter when not configured
+	defaultOpenRouterModel = "openai/gpt-4o-mini"
+)
+
+// PromptPreviewRequest represents a request to preview prompt execution with X-sampling
 type PromptPreviewRequest struct {
-	AxQuery string `json:"ax_query"`
+	AxQuery      string `json:"ax_query"`
+	Template     string `json:"template"`                    // Prompt template with {{field}} placeholders
+	SystemPrompt string `json:"system_prompt,omitempty"`      // Optional system instruction for the LLM
+	SampleSize   int    `json:"sample_size,omitempty"`        // X value: number of samples to test (default: 1)
+	Provider     string `json:"provider,omitempty"`           // "openrouter" or "local"
+	Model        string `json:"model,omitempty"`               // Model override
+	PromptID     string `json:"prompt_id,omitempty"`          // Optional prompt ID for tracking
+	PromptVersion int   `json:"prompt_version,omitempty"`     // Optional prompt version for comparison
 }
 
-// PromptPreviewResponse represents the preview response
+// PreviewSample represents a single sample execution result
+type PreviewSample struct {
+	Attestation      map[string]interface{} `json:"attestation"`       // The sampled attestation
+	InterpolatedPrompt string               `json:"interpolated_prompt"` // Prompt after template interpolation
+	Response         string                 `json:"response"`           // LLM response
+	PromptTokens     int                    `json:"prompt_tokens,omitempty"`
+	CompletionTokens int                    `json:"completion_tokens,omitempty"`
+	TotalTokens      int                    `json:"total_tokens,omitempty"`
+	Error            string                 `json:"error,omitempty"`    // Per-sample error if any
+}
+
+// PromptPreviewResponse represents the preview response with X samples
 type PromptPreviewResponse struct {
-	AttestationCount int                      `json:"attestation_count"`
-	Attestations     []map[string]interface{} `json:"attestations,omitempty"`
-	Error            string                   `json:"error,omitempty"`
+	TotalAttestations int             `json:"total_attestations"`   // Total matching attestations from ax query
+	SampleSize        int             `json:"sample_size"`          // X value used for sampling
+	Samples           []PreviewSample `json:"samples"`              // X sample execution results
+	SuccessCount      int             `json:"success_count"`        // Number of successful samples
+	FailureCount      int             `json:"failure_count"`        // Number of failed samples
+	Error             string          `json:"error,omitempty"`      // Global error if any
 }
 
 // PromptExecuteRequest represents a request to execute a prompt
@@ -66,35 +98,56 @@ type PromptExecuteResponse struct {
 }
 
 // HandlePromptPreview handles POST /api/prompt/preview
-// Returns attestations matching the ax query for preview
+// Samples X attestations, executes prompt against them, and returns results for comparison
 func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	logger.AddAxSymbol(s.logger).Infow("Prompt preview request")
+	logger.AddAxSymbol(s.logger).Infow("Prompt preview request with X-sampling")
 
 	var req PromptPreviewRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
+			"Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
+	// Validate required fields
 	if strings.TrimSpace(req.AxQuery) == "" {
 		writeError(w, http.StatusBadRequest, "ax_query is required")
 		return
 	}
+	if strings.TrimSpace(req.Template) == "" {
+		writeError(w, http.StatusBadRequest, "template is required")
+		return
+	}
 
-	// Parse the ax query
+	// Default sample size to 1 if not specified
+	if req.SampleSize <= 0 {
+		req.SampleSize = 1
+	}
+
+	// Parse the ax query - support both natural language and simple "TEST-TASK-1" format
+	var filter *types.AxFilter
 	args := strings.Fields(req.AxQuery)
-	filter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
+
+	// Try parsing as natural language ax command
+	parsedFilter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
 	if err != nil {
 		// Check if it's just a warning (best-effort parsing)
 		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
-			writeError(w, http.StatusBadRequest, "Invalid ax query: "+err.Error())
-			return
+			// If it fails, try treating it as a simple subject query
+			filter = &types.AxFilter{
+				Subjects: []string{req.AxQuery},
+				Limit:    defaultAxQueryLimit,
+			}
+		} else {
+			filter = parsedFilter
 		}
+	} else {
+		filter = parsedFilter
 	}
 
 	// Execute the query using storage executor
@@ -105,10 +158,63 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Convert attestations to map format for JSON response
-	attestations := make([]map[string]interface{}, len(result.Attestations))
-	for i, as := range result.Attestations {
-		attestations[i] = map[string]interface{}{
+	totalAttestations := len(result.Attestations)
+	if totalAttestations == 0 {
+		// No attestations to preview
+		resp := PromptPreviewResponse{
+			TotalAttestations: 0,
+			SampleSize:        req.SampleSize,
+			Samples:           []PreviewSample{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+		}
+		return
+	}
+
+	// Parse frontmatter and template
+	doc, err := prompt.ParseFrontmatter(req.Template)
+	if err != nil {
+		wrappedErr := errors.Wrap(err, "failed to parse frontmatter")
+		logger.AddAxSymbol(s.logger).Errorw("Frontmatter parsing failed",
+			"error", wrappedErr,
+			"template_length", len(req.Template),
+		)
+		writeWrappedError(w, s.logger, wrappedErr,
+			"Failed to parse frontmatter", http.StatusBadRequest)
+		return
+	}
+
+	// Parse template body (after frontmatter)
+	tmpl, err := prompt.Parse(doc.Body)
+	if err != nil {
+		wrappedErr := errors.Wrap(err, "failed to parse prompt template")
+		logger.AddAxSymbol(s.logger).Errorw("Template parsing failed",
+			"error", wrappedErr,
+			"template_length", len(doc.Body),
+		)
+		writeWrappedError(w, s.logger, wrappedErr,
+			"Failed to parse prompt template", http.StatusBadRequest)
+		return
+	}
+
+	// X-sampling: randomly sample attestations
+	actualSampleSize := req.SampleSize
+	if actualSampleSize > totalAttestations {
+		actualSampleSize = totalAttestations
+	}
+
+	sampledAttestations := sampleAttestations(result.Attestations, actualSampleSize)
+
+	// Create AI client
+	client := s.createPromptAIClientForPreview(req, doc)
+
+	// Process each sampled attestation
+	samples := make([]PreviewSample, len(sampledAttestations))
+	for i, as := range sampledAttestations {
+		// Convert attestation to map for response
+		attestationMap := map[string]interface{}{
 			"id":         as.ID,
 			"subjects":   as.Subjects,
 			"predicates": as.Predicates,
@@ -118,15 +224,91 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 			"source":     as.Source,
 			"attributes": as.Attributes,
 		}
+
+		// Interpolate template
+		interpolatedPrompt, err := tmpl.Execute(&as)
+		if err != nil {
+			samples[i] = PreviewSample{
+				Attestation:        attestationMap,
+				InterpolatedPrompt: "",
+				Error:              fmt.Sprintf("Failed to interpolate template: %v", err),
+			}
+			continue
+		}
+
+		// Call LLM
+		chatReq := openrouter.ChatRequest{
+			SystemPrompt: req.SystemPrompt,
+			UserPrompt:   interpolatedPrompt,
+		}
+
+		// Set model if specified
+		if req.Model != "" {
+			chatReq.Model = &req.Model
+		} else if doc.Metadata.Model != "" {
+			chatReq.Model = &doc.Metadata.Model
+		}
+
+		// Set temperature if specified in frontmatter
+		if doc.Metadata.Temperature != nil {
+			chatReq.Temperature = doc.Metadata.Temperature
+		}
+
+		// Set max tokens if specified in frontmatter
+		if doc.Metadata.MaxTokens != nil {
+			chatReq.MaxTokens = doc.Metadata.MaxTokens
+		}
+
+		// Execute prompt
+		resp, err := client.Chat(r.Context(), chatReq)
+		if err != nil {
+			samples[i] = PreviewSample{
+				Attestation:        attestationMap,
+				InterpolatedPrompt: interpolatedPrompt,
+				Error:              fmt.Sprintf("LLM call failed: %v", err),
+			}
+			continue
+		}
+
+		// Successful sample
+		samples[i] = PreviewSample{
+			Attestation:        attestationMap,
+			InterpolatedPrompt: interpolatedPrompt,
+			Response:           resp.Content,
+			PromptTokens:       resp.Usage.PromptTokens,
+			CompletionTokens:   resp.Usage.CompletionTokens,
+			TotalTokens:        resp.Usage.TotalTokens,
+		}
 	}
 
-	resp := PromptPreviewResponse{
-		AttestationCount: len(result.Attestations),
-		Attestations:     attestations,
+	// Aggregate error tracking
+	var successCount, failureCount int
+	for _, sample := range samples {
+		if sample.Error != "" {
+			failureCount++
+		} else {
+			successCount++
+		}
+	}
+
+	// Build response
+	response := PromptPreviewResponse{
+		TotalAttestations: totalAttestations,
+		SampleSize:        actualSampleSize,
+		Samples:           samples,
+		SuccessCount:      successCount,
+		FailureCount:      failureCount,
+	}
+
+	// Set global error if all samples failed
+	if failureCount > 0 && successCount == 0 {
+		response.Error = fmt.Sprintf("All %d samples failed. Check individual sample errors for details.", failureCount)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptExecute handles POST /api/prompt/execute
@@ -141,7 +323,8 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 
 	var req PromptExecuteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
+			"Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -157,7 +340,8 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 
 	// Validate template syntax
 	if err := prompt.ValidateTemplate(req.Template); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid template: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "template validation failed"),
+			"Invalid template", http.StatusBadRequest)
 		return
 	}
 
@@ -166,7 +350,8 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	filter, err := parser.ParseAxCommandWithContext(args, 0, parser.ErrorContextPlain)
 	if err != nil {
 		if _, isWarning := err.(*parser.ParseWarning); !isWarning {
-			writeError(w, http.StatusBadRequest, "Invalid ax query: "+err.Error())
+			writeWrappedError(w, s.logger, errors.Wrap(err, "failed to parse ax query"),
+				"Invalid ax query", http.StatusBadRequest)
 			return
 		}
 	}
@@ -214,7 +399,9 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // createPromptAIClient creates an AI client for prompt execution
@@ -241,7 +428,7 @@ func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.A
 			effectiveModel = localModel
 		}
 		if effectiveModel == "" {
-			effectiveModel = "llama3.2:3b"
+			effectiveModel = defaultLocalModel
 		}
 
 		return provider.NewLocalClient(provider.LocalClientConfig{
@@ -259,7 +446,7 @@ func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.A
 		effectiveModel = openrouterModel
 	}
 	if effectiveModel == "" {
-		effectiveModel = "openai/gpt-4o-mini"
+		effectiveModel = defaultOpenRouterModel
 	}
 
 	return openrouter.NewClient(openrouter.Config{
@@ -298,10 +485,12 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"prompts": prompts,
 		"count":   len(prompts),
-	})
+	}); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptGet handles GET /api/prompt/{id}
@@ -324,7 +513,9 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(p)
+	if err := json.NewEncoder(w).Encode(p); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptVersions handles GET /api/prompt/{name}/versions
@@ -343,10 +534,12 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"versions": versions,
 		"count":    len(versions),
-	})
+	}); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
 }
 
 // HandlePromptSave handles POST /api/prompt/save
@@ -361,7 +554,8 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 
 	var req PromptSaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
+			"Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -395,7 +589,119 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(saved)
+	if err := json.NewEncoder(w).Encode(saved); err != nil {
+		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
+	}
+}
+
+// sampleAttestations randomly samples n attestations from the provided list using Fisher-Yates shuffle.
+//
+// TODO(non-deterministic-sampling): This function uses unseeded math/rand, violating QNTX's
+// deterministic operations standard (CLAUDE.md). However, this is a deliberate tradeoff worth
+// discussing:
+//
+// THE PARADOX: LLMs are inherently non-deterministic. This X-sampling feature exists precisely
+// BECAUSE of that non-determinism - we're trying to work WITH it, not against it. The entire
+// point of preview sampling is to test prompt behavior across diverse inputs to build confidence
+// before production deployment. Higher X = more samples = higher confidence that the prompt
+// behaves correctly across the attestation space.
+//
+// THE TRADEOFF:
+//   - Reproducibility: Unseeded random means identical API calls produce different samples
+//   - Purpose: Random sampling is the FEATURE - we want diverse coverage, not the same N every time
+//   - Debugging: Non-reproducible results make it harder to debug specific failures
+//
+// POTENTIAL SOLUTIONS (choose based on use case priority):
+//   1. Add optional 'seed' parameter to API request
+//      - Pros: Reproducible when needed, random by default
+//      - Cons: Additional API complexity, users must understand seeding
+//
+//   2. Use deterministic sampling (first N, evenly spaced, hash-based)
+//      - Pros: Fully reproducible, simpler
+//      - Cons: Loses randomness benefit, may miss edge cases clustered in unsampled regions
+//
+//   3. Use crypto/rand for cryptographically secure randomness
+//      - Pros: More secure random
+//      - Cons: Still non-reproducible, overkill for this use case
+//
+//   4. Accept non-determinism as a feature
+//      - Pros: Embraces the purpose of X-sampling
+//      - Cons: Violates QNTX standards, harder debugging
+//
+// RECOMMENDATION: Add optional 'seed' parameter (solution 1) to balance reproducibility needs
+// with the feature's purpose. Default to time-seeded random, allow explicit seed for debugging.
+//
+// SECURITY NOTE: math/rand is sufficient here - we're sampling attestations, not generating
+// cryptographic material. Predictability is not a security concern in this context.
+func sampleAttestations(attestations []types.As, n int) []types.As {
+	if n >= len(attestations) {
+		// Return all attestations if sample size >= total
+		return attestations
+	}
+
+	// Create a copy and shuffle using Fisher-Yates
+	sampled := make([]types.As, len(attestations))
+	copy(sampled, attestations)
+
+	// Shuffle the first n elements
+	for i := 0; i < n; i++ {
+		j := i + rand.Intn(len(sampled)-i)
+		sampled[i], sampled[j] = sampled[j], sampled[i]
+	}
+
+	// Return only the first n elements
+	return sampled[:n]
+}
+
+// createPromptAIClientForPreview creates an AI client based on the request and frontmatter configuration
+func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, doc *prompt.PromptDocument) provider.AIClient {
+	// Read config values using am package
+	localEnabled := appcfg.GetBool("local_inference.enabled")
+	localBaseURL := appcfg.GetString("local_inference.base_url")
+	localModel := appcfg.GetString("local_inference.model")
+	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")
+	openRouterAPIKey := appcfg.GetString("openrouter.api_key")
+	openRouterModel := appcfg.GetString("openrouter.model")
+
+	// Determine provider (request > config default)
+	providerName := req.Provider
+
+	// Determine model (request > frontmatter > config default)
+	model := req.Model
+	if model == "" && doc.Metadata.Model != "" {
+		model = doc.Metadata.Model
+	}
+
+	// Use provider factory to create the appropriate client
+	if providerName == "local" || (providerName == "" && localEnabled) {
+		if model == "" {
+			model = localModel
+		}
+		if model == "" {
+			model = "llama3.2:3b" // default fallback
+		}
+		return provider.NewLocalClient(provider.LocalClientConfig{
+			BaseURL:        localBaseURL,
+			Model:          model,
+			TimeoutSeconds: localTimeout,
+			DB:             s.db,
+			OperationType:  "prompt-preview",
+		})
+	}
+
+	// Default to OpenRouter
+	if model == "" {
+		model = openRouterModel
+	}
+	if model == "" {
+		model = "openai/gpt-4o-mini" // default fallback
+	}
+	return openrouter.NewClient(openrouter.Config{
+		APIKey:        openRouterAPIKey,
+		Model:         model,
+		DB:            s.db,
+		OperationType: "prompt-preview",
+	})
 }
 
 // HandlePrompt routes prompt-related requests
@@ -426,10 +732,4 @@ func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusNotFound, "Unknown prompt endpoint")
 	}
-}
-
-// executePromptAxQuery is a helper that executes an ax query and returns the result
-func (s *QNTXServer) executePromptAxQuery(ctx context.Context, filter types.AxFilter) (*types.AxResult, error) {
-	executor := storage.NewExecutor(s.db)
-	return executor.ExecuteAsk(ctx, filter)
 }

@@ -181,3 +181,18 @@ export function formatDateTime(timestamp: string | Date): string {
     });
     return `${dateStr} ${timeStr}`;
 }
+
+/**
+ * Strip HTML tags from a string and return plain text
+ *
+ * @param html - HTML string to strip
+ * @returns Plain text without HTML tags
+ *
+ * @example
+ * stripHtml("<b>Hello</b> world") // "Hello world"
+ * stripHtml("<div>Test</div>") // "Test"
+ */
+export function stripHtml(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+}
