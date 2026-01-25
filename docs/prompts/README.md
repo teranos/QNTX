@@ -29,12 +29,11 @@ Show how {{subject}} demonstrates these concepts, referencing its implementation
 - [#304](https://github.com/teranos/QNTX/pull/304) - Add frontmatter UI support to Prose editor
 - [#305](https://github.com/teranos/QNTX/pull/305) - Implement CSV export action (⟶)
 - [#330](https://github.com/teranos/QNTX/pull/330) - Add prompt preview API endpoint with X-sampling (closes [#314](https://github.com/teranos/QNTX/issues/314))
-- [#338](https://github.com/teranos/QNTX/pull/338) - Prompt UI (frontend preview panel)
+- [#338](https://github.com/teranos/QNTX/pull/338) - Prompt UI (frontend preview panel, closes [#316](https://github.com/teranos/QNTX/issues/316))
 
 ### 🔥 Critical Issues (Next PRs)
 
 - [#315](https://github.com/teranos/QNTX/issues/315) - Implement prompt version comparison logic using attestations
-- [#316](https://github.com/teranos/QNTX/issues/316) - Build side-by-side prompt preview UI panel in Prose editor
 
 ### 📋 Non-Critical Issues (Future)
 
@@ -44,6 +43,9 @@ Show how {{subject}} demonstrates these concepts, referencing its implementation
 - [#320](https://github.com/teranos/QNTX/issues/320) - Add prompt action to command palette SO integration
 - [#321](https://github.com/teranos/QNTX/issues/321) - Enable scheduled prompt execution via Pulse
 - [#339](https://github.com/teranos/QNTX/issues/339) - Add vertical PROMPT indicator for manual toggle
+- [#340](https://github.com/teranos/QNTX/issues/340) - Add loading state UI to prompt preview panel
+- [#341](https://github.com/teranos/QNTX/issues/341) - Make prompt preview provider configurable
+- [#342](https://github.com/teranos/QNTX/issues/342) - Add deterministic sampling option to prompt preview API
 
 ---
 
