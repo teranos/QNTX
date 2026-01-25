@@ -188,17 +188,17 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 // Use GenerateAndCreateAttestation instead.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 	r.logger.Warn("CreateAttestation not supported for remote plugins - use GenerateAndCreateAttestation")
-	return errors.New("CreateAttestation not supported for remote plugins")
+	return errors.New("createAttestation not supported for remote plugins")
 }
 
 // GetAttestation is not implemented for remote plugins.
 func (r *RemoteATSStore) GetAttestation(asid string) (*types.As, error) {
-	r.logger.Warn("GetAttestation not supported for remote plugins yet")
-	return nil, errors.New("GetAttestation not supported for remote plugins yet")
+	r.logger.Warn("GetAttestation not supported for remote plugins")
+	return nil, errors.New("getAttestation not supported for remote plugins")
 }
 
 // DeleteAttestation is not implemented for remote plugins.
 func (r *RemoteATSStore) DeleteAttestation(asid string) error {
 	r.logger.Warn("DeleteAttestation not supported for remote plugins")
-	return errors.New("DeleteAttestation not supported for remote plugins")
+	return errors.New("deleteAttestation not supported for remote plugins")
 }
