@@ -5,16 +5,17 @@
 //!
 //! # Features
 //!
-//! - Implements `AttestationStore` trait for basic CRUD operations
+//! - Implements `AttestationStore` and `QueryStore` traits
 //! - Uses the same SQLite schema as the Go implementation for compatibility
 //! - Supports in-memory databases for testing
 //! - Thread-safe with proper connection handling
+//! - Optional quota enforcement via `BoundedStore`
 //!
-//! # Example
+//! # Example: Basic Usage
 //!
 //! ```rust,no_run
 //! use qntx_sqlite::SqliteStore;
-//! use qntx_core::{AttestationBuilder, storage::AttestationStore};
+//! use qntx_core::{AttestationBuilder, storage::{AttestationStore, QueryStore}, AxFilter};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create an in-memory store
@@ -34,15 +35,40 @@
 //! // Retrieve it
 //! let retrieved = store.get("AS-test-1")?;
 //! assert!(retrieved.is_some());
+//!
+//! // Query with filters
+//! let filter = AxFilter {
+//!     subjects: vec!["ALICE".to_string()],
+//!     ..Default::default()
+//! };
+//! let results = store.query(&filter)?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Example: Bounded Storage with Quotas
+//!
+//! ```rust,no_run
+//! use qntx_sqlite::{BoundedStore, StorageQuotas};
+//! use qntx_core::{AttestationBuilder, storage::AttestationStore};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create store with custom quotas
+//! let quotas = StorageQuotas::new(100, 256, 256); // 100 attestations, 256 predicates, 256 contexts
+//! let mut store = BoundedStore::in_memory_with_quotas(quotas)?;
+//!
+//! // Attempts to exceed quotas will fail with QuotaExceeded error
 //! # Ok(())
 //! # }
 //! ```
 
+pub mod bounded;
 pub mod error;
 pub mod json;
 pub mod migrate;
 pub mod store;
 
 // Re-export main types
+pub use bounded::{BoundedStore, StorageQuotas};
 pub use error::{Result, SqliteError};
 pub use store::SqliteStore;
