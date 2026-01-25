@@ -46,6 +46,7 @@ Show how {{subject}} demonstrates these concepts, referencing its implementation
 - [#340](https://github.com/teranos/QNTX/issues/340) - Add loading state UI to prompt preview panel
 - [#341](https://github.com/teranos/QNTX/issues/341) - Make prompt preview provider configurable
 - [#342](https://github.com/teranos/QNTX/issues/342) - Add deterministic sampling option to prompt preview API
+- [#344](https://github.com/teranos/QNTX/issues/344) - Make filename optional for attestation-only prompts
 
 ---
 

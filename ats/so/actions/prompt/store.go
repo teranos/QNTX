@@ -54,6 +54,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 	if prompt.Name == "" {
 		return nil, errors.New("prompt name is required")
 	}
+	// TODO(issue #344): Make filename optional for attestation-only prompts
 	if prompt.Filename == "" {
 		return nil, errors.New("prompt filename is required")
 	}
