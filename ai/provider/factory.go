@@ -104,13 +104,12 @@ func (lca *LocalClientAdapter) Chat(ctx context.Context, req openrouter.ChatRequ
 	}
 
 	// Return response in openrouter.ChatResponse format
-	// Note: Local inference doesn't provide token usage stats by default
-	// Future: Parse from Ollama /api/generate response or estimate tokens
+	// Note: Local inference (Ollama) doesn't return token counts in responses
 	return &openrouter.ChatResponse{
 		Content: content,
 		Usage: openrouter.Usage{
-			PromptTokens:     0, // TODO(QNTX #68): Estimate or get from provider
-			CompletionTokens: 0, // TODO(QNTX #68): Estimate or get from provider
+			PromptTokens:     0, // Ollama doesn't provide token stats
+			CompletionTokens: 0,
 			TotalTokens:      0,
 		},
 	}, nil
