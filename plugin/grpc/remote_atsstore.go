@@ -184,75 +184,21 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 	return attestations, nil
 }
 
-// CreateAttestation creates an attestation with a pre-generated ID via gRPC.
+// CreateAttestation is not implemented for remote plugins.
+// Use GenerateAndCreateAttestation instead.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
-	// Marshal attributes to JSON string
-	attributesJSON := ""
-	if a.Attributes != nil {
-		json, err := attributesToJSON(a.Attributes)
-		if err != nil {
-			return errors.Wrap(err, "failed to marshal attributes")
-		}
-		attributesJSON = json
-	}
-
-	protoAtt := &protocol.Attestation{
-		Id:             a.ID,
-		Subjects:       a.Subjects,
-		Predicates:     a.Predicates,
-		Contexts:       a.Contexts,
-		Actors:         a.Actors,
-		Timestamp:      a.Timestamp.Unix(),
-		Source:         a.Source,
-		AttributesJson: attributesJSON,
-		CreatedAt:      a.CreatedAt.Unix(),
-	}
-
-	req := &protocol.CreateAttestationRequest{
-		AuthToken:   r.authToken,
-		Attestation: protoAtt,
-	}
-
-	resp, err := r.client.CreateAttestation(r.ctx, req)
-	if err != nil {
-		return errors.Wrap(err, "gRPC CreateAttestation failed")
-	}
-
-	if !resp.Success {
-		return errors.Newf("failed to create attestation: %s", resp.Error)
-	}
-
-	r.logger.Infow("Attestation created via gRPC", "id", a.ID)
-	return nil
+	r.logger.Warn("CreateAttestation not supported for remote plugins - use GenerateAndCreateAttestation")
+	return errors.New("createAttestation not supported for remote plugins")
 }
 
-// GetAttestation retrieves a single attestation by ID via gRPC.
-// Uses GetAttestations with filtering and scans for the matching ID.
+// GetAttestation is not implemented for remote plugins.
 func (r *RemoteATSStore) GetAttestation(asid string) (*types.As, error) {
-	// First check if it exists
-	if !r.AttestationExists(asid) {
-		return nil, errors.Newf("attestation not found: %s", asid)
-	}
-
-	// Query with a reasonable limit and search for the ID
-	// Note: This is a workaround since the proto filter doesn't support ID filtering.
-	// For better performance, the proto should be extended with an ID field.
-	attestations, err := r.GetAttestations(ats.AttestationFilter{Limit: 1000})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query attestations")
-	}
-
-	for _, att := range attestations {
-		if att.ID == asid {
-			return att, nil
-		}
-	}
-
-	return nil, errors.Newf("attestation not found: %s", asid)
+	r.logger.Warn("GetAttestation not supported for remote plugins")
+	return nil, errors.New("getAttestation not supported for remote plugins")
 }
 
-// DeleteAttestation removes an attestation by ID.
-// TODO(QNTX): Implement DeleteAttestation RPC - requires proto regeneration.
+// DeleteAttestation is not implemented for remote plugins.
 func (r *RemoteATSStore) DeleteAttestation(asid string) error {
-	return errors.New("deleteAttestation not yet implemented for remote plugins (requires proto extension)")
+	r.logger.Warn("DeleteAttestation not supported for remote plugins")
+	return errors.New("deleteAttestation not supported for remote plugins")
 }
