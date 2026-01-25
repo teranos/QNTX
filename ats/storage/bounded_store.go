@@ -53,8 +53,7 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 		config = DefaultBoundedStoreConfig()
 	}
 
-	// Validate config: zero or negative limits are invalid for bounded storage
-	// Unlike am package where 0 can mean "disabled", bounded storage requires positive limits
+	// Validate config: zero or negative limits are invalid (use positive limits)
 	if config.ActorContextLimit <= 0 {
 		config.ActorContextLimit = DefaultActorContextLimit
 	}

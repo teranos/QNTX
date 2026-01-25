@@ -30,22 +30,24 @@ func TestClient_Configuration(t *testing.T) {
 	})
 
 	t.Run("preserves custom values", func(t *testing.T) {
+		temp := 0.8
+		tokens := 2000
 		client := NewClient(Config{
 			APIKey:      "test-key",
 			Model:       "custom/model",
-			Temperature: 0.8,
-			MaxTokens:   2000,
+			Temperature: &temp,
+			MaxTokens:   &tokens,
 			Debug:       true,
 		})
 
 		if client.config.Model != "custom/model" {
 			t.Errorf("expected custom model, got %s", client.config.Model)
 		}
-		if client.config.Temperature != 0.8 {
-			t.Errorf("expected custom temperature, got %f", client.config.Temperature)
+		if *client.config.Temperature != 0.8 {
+			t.Errorf("expected custom temperature, got %f", *client.config.Temperature)
 		}
-		if client.config.MaxTokens != 2000 {
-			t.Errorf("expected custom max tokens, got %d", client.config.MaxTokens)
+		if *client.config.MaxTokens != 2000 {
+			t.Errorf("expected custom max tokens, got %d", *client.config.MaxTokens)
 		}
 		if !client.config.Debug {
 			t.Error("expected debug to be true")

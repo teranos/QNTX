@@ -85,10 +85,10 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 // Returns server.port from config, or DefaultServerPort (877) if not configured
 func GetServerPort() int {
 	cfg, err := Load()
-	if err != nil || cfg.Server.Port == 0 {
+	if err != nil || cfg.Server.Port == nil {
 		return DefaultServerPort
 	}
-	return cfg.Server.Port
+	return *cfg.Server.Port
 }
 
 // GetGraphEventPort returns the event viewer port
