@@ -1,5 +1,5 @@
 /**
- * Grid Child Glyph - Visual representation of a glyph on canvas grid
+ * Grid Glyph - Visual representation of a glyph on canvas grid
  *
  * Renders a symbol at a grid position, draggable with grid snapping.
  */
@@ -14,13 +14,9 @@ const GRID_SIZE = 40; // pixels per grid cell
 /**
  * Create a grid-positioned glyph element
  */
-export function createGridChildGlyph(
-    glyph: Glyph,
-    canvas: HTMLElement,
-    glyphs: Glyph[]
-): HTMLElement {
+export function createGridGlyph(glyph: Glyph): HTMLElement {
     const element = document.createElement('div');
-    element.className = 'canvas-child-glyph';
+    element.className = 'canvas-grid-glyph';
     element.dataset.glyphId = glyph.id;
 
     // Get position and symbol from glyph metadata
@@ -99,7 +95,7 @@ export function createGridChildGlyph(
             });
         }
 
-        log.debug(SEG.UI, `[GridChild] Finished dragging ${glyph.id} to grid (${currentGridX}, ${currentGridY})`);
+        log.debug(SEG.UI, `[GridGlyph] Finished dragging ${glyph.id} to grid (${currentGridX}, ${currentGridY})`);
 
         // Clean up temporary drag listeners
         document.removeEventListener('mousemove', handleMouseMove);
@@ -125,7 +121,7 @@ export function createGridChildGlyph(
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
 
-        log.debug(SEG.UI, `[GridChild] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
+        log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
     });
 
     return element;

@@ -75,8 +75,8 @@
     transform: scale(0.95);
 }
 
-/* Child glyphs on canvas grid */
-.canvas-child-glyph {
+/* Grid glyphs on canvas */
+.canvas-grid-glyph {
     position: absolute;
     width: 40px;
     height: 40px;
@@ -93,11 +93,11 @@
     z-index: 1;
 }
 
-.canvas-child-glyph:hover {
+.canvas-grid-glyph:hover {
     background-color: var(--bg-hover);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.canvas-child-glyph:active {
+.canvas-grid-glyph:active {
     cursor: grabbing;
 }
