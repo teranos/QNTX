@@ -256,11 +256,53 @@ func isPrivateIP(ip net.IP) bool {
 		return false
 	}
 
-	// Reject all IPv6 addresses until properly tested
-	// IPv6 has edge cases (IPv4-mapped, zone IDs, etc.) that aren't comprehensively tested
-	// See docs/security/ssrf-protection.md for rationale
+	// Check IPv6 private/special addresses
 	if len(ip) == net.IPv6len {
-		return true
+		// IPv6 loopback (::1)
+		if ip.IsLoopback() {
+			return true
+		}
+
+		// IPv6 link-local (fe80::/10)
+		if ip.IsLinkLocalUnicast() {
+			return true
+		}
+
+		// IPv6 multicast (ff00::/8)
+		if ip.IsMulticast() {
+			return true
+		}
+
+		// IPv6 unspecified (::)
+		if ip.IsUnspecified() {
+			return true
+		}
+
+		// IPv6 unique local addresses (fc00::/7 - covers both fc00::/8 and fd00::/8)
+		// These are the IPv6 equivalent of RFC 1918 private addresses
+		if len(ip) >= 1 && (ip[0]&0xfe) == 0xfc {
+			return true
+		}
+
+		// IPv6 site-local (fec0::/10) - deprecated but should still block
+		if len(ip) >= 2 && ip[0] == 0xfe && (ip[1]&0xc0) == 0xc0 {
+			return true
+		}
+
+		// IPv4-mapped IPv6 addresses (::ffff:0:0/96)
+		// Check if it's an IPv4-mapped address and if so, check the IPv4 part
+		if ip.To4() != nil {
+			// This is handled by the IPv4 check above via To4()
+			return false
+		}
+
+		// Documentation prefix (2001:db8::/32) - used for examples/documentation
+		if len(ip) >= 4 && ip[0] == 0x20 && ip[1] == 0x01 && ip[2] == 0x0d && ip[3] == 0xb8 {
+			return true
+		}
+
+		// If none of the above, it's a public IPv6 address
+		return false
 	}
 
 	return false
