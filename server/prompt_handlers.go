@@ -631,6 +631,8 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 // RECOMMENDATION: Add optional 'seed' parameter (solution 1) to balance reproducibility needs
 // with the feature's purpose. Default to time-seeded random, allow explicit seed for debugging.
 //
+// TODO(issue #342): Implement deterministic sampling option
+//
 // SECURITY NOTE: math/rand is sufficient here - we're sampling attestations, not generating
 // cryptographic material. Predictability is not a security concern in this context.
 func sampleAttestations(attestations []types.As, n int) []types.As {
