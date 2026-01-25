@@ -184,21 +184,55 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 	return attestations, nil
 }
 
-// CreateAttestation is not implemented for remote plugins.
-// Use GenerateAndCreateAttestation instead.
+// CreateAttestation creates an attestation with a pre-generated ID via gRPC.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
-	r.logger.Warn("CreateAttestation not supported for remote plugins - use GenerateAndCreateAttestation")
-	return errors.New("createAttestation not supported for remote plugins")
+	// Marshal attributes to JSON string
+	attributesJSON := ""
+	if a.Attributes != nil {
+		json, err := attributesToJSON(a.Attributes)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal attributes")
+		}
+		attributesJSON = json
+	}
+
+	protoAtt := &protocol.Attestation{
+		Id:             a.ID,
+		Subjects:       a.Subjects,
+		Predicates:     a.Predicates,
+		Contexts:       a.Contexts,
+		Actors:         a.Actors,
+		Timestamp:      a.Timestamp.Unix(),
+		Source:         a.Source,
+		AttributesJson: attributesJSON,
+		CreatedAt:      a.CreatedAt.Unix(),
+	}
+
+	req := &protocol.CreateAttestationRequest{
+		AuthToken:   r.authToken,
+		Attestation: protoAtt,
+	}
+
+	resp, err := r.client.CreateAttestation(r.ctx, req)
+	if err != nil {
+		return errors.Wrap(err, "gRPC CreateAttestation failed")
+	}
+
+	if !resp.Success {
+		return errors.Newf("failed to create attestation: %s", resp.Error)
+	}
+
+	r.logger.Infow("Attestation created via gRPC", "id", a.ID)
+	return nil
 }
 
 // GetAttestation is not implemented for remote plugins.
+// Requires proto extension with ID filter support.
 func (r *RemoteATSStore) GetAttestation(asid string) (*types.As, error) {
-	r.logger.Warn("GetAttestation not supported for remote plugins")
-	return nil, errors.New("getAttestation not supported for remote plugins")
+	return nil, errors.New("getAttestation not supported for remote plugins (requires proto extension)")
 }
 
-// DeleteAttestation is not implemented for remote plugins.
+// DeleteAttestation is not applicable - QNTX uses bounded storage eviction, not deletion.
 func (r *RemoteATSStore) DeleteAttestation(asid string) error {
-	r.logger.Warn("DeleteAttestation not supported for remote plugins")
-	return errors.New("deleteAttestation not supported for remote plugins")
+	return errors.New("deleteAttestation not applicable - attestations are evicted by bounded storage, not deleted")
 }
