@@ -12,9 +12,7 @@ import { Pulse } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { uiState } from '../../state/ui';
-
-// Grid configuration
-const GRID_SIZE = 40; // pixels per grid cell
+import { GRID_SIZE } from './grid-constants';
 
 /**
  * Factory function to create a Canvas glyph
@@ -28,6 +26,7 @@ export function createCanvasGlyph(): Glyph {
         symbol: saved.symbol,
         gridX: saved.gridX,
         gridY: saved.gridY,
+        // TODO: Clarify if grid glyphs should display content
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = 'Pulse glyph content (TBD)';
@@ -78,6 +77,7 @@ export function createCanvasGlyph(): Glyph {
 
 /**
  * Show right-click spawn menu with available symbols
+ * TODO: Spawn menu as container glyph, menu items as glyphs
  */
 function showSpawnMenu(
     mouseX: number,
@@ -91,9 +91,11 @@ function showSpawnMenu(
         existingMenu.remove();
     }
 
-    // Snap menu position to grid
-    const gridX = Math.round(mouseX / GRID_SIZE);
-    const gridY = Math.round(mouseY / GRID_SIZE);
+    // Snap menu position to grid with bounds checking
+    const maxGridX = Math.floor(window.innerWidth / GRID_SIZE) - 1;
+    const maxGridY = Math.floor(window.innerHeight / GRID_SIZE) - 1;
+    const gridX = Math.max(0, Math.min(maxGridX, Math.round(mouseX / GRID_SIZE)));
+    const gridY = Math.max(0, Math.min(maxGridY, Math.round(mouseY / GRID_SIZE)));
 
     // Create spawn menu
     const menu = document.createElement('div');
@@ -103,6 +105,13 @@ function showSpawnMenu(
     menu.style.top = `${mouseY}px`;
     menu.style.zIndex = '10000';
 
+    // Close menu on click outside (with cleanup flag to prevent memory leak)
+    let menuRemoved = false;
+    const removeMenu = () => {
+        menu.remove();
+        menuRemoved = true;
+    };
+
     // Add Pulse symbol
     const pulseBtn = document.createElement('button');
     pulseBtn.className = 'canvas-spawn-button';
@@ -111,7 +120,7 @@ function showSpawnMenu(
 
     pulseBtn.addEventListener('click', () => {
         spawnPulseGlyph(gridX, gridY, canvas, glyphs);
-        menu.remove();
+        removeMenu();
     });
 
     menu.appendChild(pulseBtn);
@@ -120,12 +129,15 @@ function showSpawnMenu(
     // Close menu on click outside
     const closeMenu = (e: MouseEvent) => {
         if (!menu.contains(e.target as Node)) {
-            menu.remove();
+            removeMenu();
             document.removeEventListener('click', closeMenu);
         }
     };
     setTimeout(() => {
-        document.addEventListener('click', closeMenu);
+        // Only attach listener if menu hasn't been removed synchronously
+        if (!menuRemoved) {
+            document.addEventListener('click', closeMenu);
+        }
     }, 0);
 
     log.debug(SEG.UI, `[Canvas] Spawn menu opened at grid (${gridX}, ${gridY})`);
@@ -140,8 +152,10 @@ function spawnPulseGlyph(
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): void {
+    // NOTE: Using crypto.randomUUID() for now to ensure uniqueness.
+    // Future: integrate vanity-id generator as Glyph vision expands.
     const pulseGlyph: Glyph = {
-        id: `pulse-${Date.now()}`,
+        id: `pulse-${crypto.randomUUID()}`,
         title: 'Pulse Schedule',
         symbol: Pulse,
         gridX,
