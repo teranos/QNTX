@@ -10,12 +10,14 @@
 import { BasePanel } from '../base-panel.ts';
 import { ProseEditor } from './editor.ts';
 import { ProseNavigation } from './navigation.ts';
+import { PromptPreviewPanel } from './prompt-preview-panel.ts';
 import { fetchDevMode } from '../dev-mode.ts';
 
 class ProsePanel extends BasePanel {
     // Component modules
     private editor: ProseEditor;
     private navigation: ProseNavigation;
+    private promptPreview: PromptPreviewPanel;
 
     // Save keyboard handler (separate from escape, which BasePanel handles)
     private saveKeyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -25,13 +27,15 @@ class ProsePanel extends BasePanel {
             id: 'prose-panel',
             classes: ['prose-panel'],
             useOverlay: true,
-            closeOnEscape: true
+            closeOnEscape: true,
+            slideFromRight: true
         });
 
         // Initialize component modules with callbacks
         this.editor = new ProseEditor({
             onDocumentLoad: (path: string) => {
                 this.navigation.addToRecentDocs(path);
+                this.checkPromptFile(path);
             }
         });
 
@@ -39,6 +43,15 @@ class ProsePanel extends BasePanel {
             onDocumentSelect: (path: string) => {
                 this.editor.loadDocument(path);
             }
+        });
+
+        // Initialize prompt preview panel
+        this.promptPreview = new PromptPreviewPanel({
+            onClose: () => {
+                // Adjust Prose panel width when preview closes
+                this.adjustPanelWidth(false);
+            },
+            getEditorContent: () => this.editor.getContent()
         });
 
         // TODO(issue #11): Implement Layout rendering modes for DocBlock views
@@ -68,6 +81,7 @@ class ProsePanel extends BasePanel {
             </div>
             <div class="prose-body">
                 <div class="prose-sidebar">
+                    <button class="prose-sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar"></button>
                     <div class="prose-sidebar-header">
                         <input type="text" class="prose-search" placeholder="Search documentation..." />
                     </div>
@@ -85,9 +99,6 @@ class ProsePanel extends BasePanel {
                     <div class="prose-status">
                         <span class="prose-status-text"></span>
                         <span class="prose-save-indicator hidden">●</span>
-                        <button id="theme-toggle" aria-label="Toggle theme">
-                            <span class="theme-icon">☀</span>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -96,6 +107,16 @@ class ProsePanel extends BasePanel {
 
     protected setupEventListeners(): void {
         // Close button is handled automatically by BasePanel
+
+        // Sidebar toggle
+        const sidebarToggle = this.panel?.querySelector('.prose-sidebar-toggle');
+        const sidebar = this.panel?.querySelector('.prose-sidebar');
+        const body = this.panel?.querySelector('.prose-body');
+
+        sidebarToggle?.addEventListener('click', () => {
+            sidebar?.classList.toggle('collapsed');
+            body?.classList.toggle('sidebar-collapsed');
+        });
 
         // Save on Cmd/Ctrl+S
         this.saveKeyHandler = (e: KeyboardEvent) => {
@@ -148,6 +169,45 @@ class ProsePanel extends BasePanel {
 
         // Clean up component modules
         this.editor.destroy();
+        this.promptPreview.destroy();
+    }
+
+    /**
+     * Check if the loaded document is a prompt file and update preview panel
+     */
+    private checkPromptFile(path: string): void {
+        // Check if file has prompt indicators:
+        // 1. Contains .prompt in filename (e.g., recipe.prompt.md)
+        // 2. Has frontmatter with type: prompt-template
+        // 3. Is in a prompts/ directory
+        const isPromptFile =
+            path.includes('.prompt.') ||
+            path.includes('/prompts/') ||
+            path.startsWith('prompts/');
+
+        this.promptPreview.setPromptFileActive(isPromptFile);
+
+        // Auto-show preview panel for prompt files
+        if (isPromptFile) {
+            this.promptPreview.show();
+            this.adjustPanelWidth(true);
+        }
+    }
+
+    /**
+     * Adjust the Prose panel width when preview panel is shown/hidden
+     */
+    private adjustPanelWidth(hasPreview: boolean): void {
+        if (!this.panel) return;
+
+        // TODO: Use CSS classes instead of inline styles to avoid layout thrashing
+        // Consider: this.panel.classList.toggle('has-prompt-preview', hasPreview)
+        // When preview is shown, reduce Prose panel width to make room
+        if (hasPreview) {
+            this.panel.style.width = '40%';
+        } else {
+            this.panel.style.width = ''; // Reset to CSS default
+        }
     }
 }
 
