@@ -52,9 +52,13 @@
  */
 
 import { glyphRun } from './components/glyph/run';
+import { createCanvasGlyph } from './components/glyph/canvas-glyph';
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {
+    // Canvas Glyph - Fractal container with spatial grid
+    glyphRun.add(createCanvasGlyph());
+
     // VidStream Glyph
     glyphRun.add({
         id: 'vidstream-glyph',
