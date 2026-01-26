@@ -67,6 +67,9 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         const newX = elementStartX + deltaX;
         const newY = elementStartY + deltaY;
 
+        // Track drag distance to distinguish clicks from drags
+        dragDistance = Math.abs(deltaX) + Math.abs(deltaY);
+
         // Snap to grid with bounds checking
         const maxGridX = Math.floor(window.innerWidth / GRID_SIZE) - 1;
         const maxGridY = Math.floor(window.innerHeight / GRID_SIZE) - 1;
@@ -111,10 +114,13 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         document.removeEventListener('mouseup', handleMouseUp);
     };
 
+    let dragDistance = 0;
+
     element.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation(); // Prevent canvas context menu
         isDragging = true;
+        dragDistance = 0;
 
         // Record start positions
         dragStartX = e.clientX;
@@ -131,6 +137,23 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         document.addEventListener('mouseup', handleMouseUp);
 
         log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
+    });
+
+    // Detect clicks vs drags - if mouse hasn't moved much, it's a click
+    element.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        // Only trigger click if this wasn't a drag
+        if (dragDistance < 5) {
+            log.debug(SEG.UI, `[GridGlyph] Clicked ${glyph.id}, triggering manifestation`);
+
+            // Dispatch custom event that canvas can listen for
+            const clickEvent = new CustomEvent('glyph-click', {
+                detail: { glyph },
+                bubbles: true
+            });
+            element.dispatchEvent(clickEvent);
+        }
     });
 
     return element;
