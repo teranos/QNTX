@@ -68,6 +68,10 @@ pub mod json;
 pub mod migrate;
 pub mod store;
 
+// FFI module for CGO integration
+#[cfg(feature = "ffi")]
+pub mod ffi;
+
 // Re-export main types
 pub use bounded::{BoundedStore, StorageQuotas};
 pub use error::{Result, SqliteError};
