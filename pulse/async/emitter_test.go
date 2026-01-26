@@ -5,7 +5,6 @@ import (
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"testing"
 
-	"github.com/teranos/QNTX/ats/ix"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -77,7 +76,7 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 		}
 	})
 
-	t.Run("mission control reports attestation creation", func(t *testing.T) {
+	t.Run("mission control reports batch progress", func(t *testing.T) {
 		// Create a mission
 		job := &Job{
 			ID:          "mission-003",
@@ -93,19 +92,12 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 		emitter := NewJobProgressEmitter(job, queue, nil, logger)
 
 		// Mission Control: "10 satellites deployed successfully"
-		satellites := []ix.AttestationEntity{
-			{Entity: "sat-001"},
-			{Entity: "sat-002"},
-			{Entity: "sat-003"},
-			{Entity: "sat-004"},
-			{Entity: "sat-005"},
-			{Entity: "sat-006"},
-			{Entity: "sat-007"},
-			{Entity: "sat-008"},
-			{Entity: "sat-009"},
-			{Entity: "sat-010"},
+		// Using generic EmitProgress with metadata (domain-agnostic)
+		metadata := map[string]interface{}{
+			"type": "satellites",
+			"ids":  []string{"sat-001", "sat-002", "sat-003", "sat-004", "sat-005", "sat-006", "sat-007", "sat-008", "sat-009", "sat-010"},
 		}
-		emitter.EmitAttestations(10, satellites)
+		emitter.EmitProgress(10, metadata)
 
 		// Verify progress increased
 		if job.Progress.Current != 10 {
@@ -122,15 +114,14 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 		}
 	})
 
-	t.Run("mission control reports candidate scoring", func(t *testing.T) {
+	t.Run("mission control reports single item progress", func(t *testing.T) {
 		// Create a mission
 		job := &Job{
 			ID:          "mission-004",
-			HandlerName: "test.candidate-evaluation",
-			Source:      "astronaut-applications",
+			HandlerName: "test.item-evaluation",
+			Source:      "applications",
 			Status:      JobStatusRunning,
 			Progress:    Progress{Current: 0, Total: 50},
-			CostActual:  0.0,
 		}
 		if err := queue.store.CreateJob(job); err != nil {
 			t.Fatalf("Failed to save job: %v", err)
@@ -138,17 +129,17 @@ func TestEmitter_CoreFunctionality(t *testing.T) {
 
 		emitter := NewJobProgressEmitter(job, queue, nil, logger)
 
-		// Mission Control: "Candidate AST-042 scored 0.95, qualified"
-		emitter.EmitCandidateMatch("AST-042", 0.95, true, "Excellent physical fitness")
+		// Mission Control: "Item processed" - using generic EmitProgress
+		// Domain-specific details (like scoring) go in metadata
+		metadata := map[string]interface{}{
+			"item_id": "ITEM-042",
+			"result":  "processed",
+		}
+		emitter.EmitProgress(1, metadata)
 
 		// Verify progress increased by 1
 		if job.Progress.Current != 1 {
 			t.Errorf("Expected progress 1, got %d", job.Progress.Current)
-		}
-
-		// Verify cost was recorded
-		if job.CostActual != 0.002 {
-			t.Errorf("Expected cost 0.002, got %f", job.CostActual)
 		}
 
 		// Verify job was updated in database
