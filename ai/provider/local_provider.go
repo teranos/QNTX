@@ -84,11 +84,28 @@ type ChatCompletionResponse struct {
 
 // GenerateText sends a prompt to local inference server with context support
 func (lp *LocalProvider) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	result, err := lp.GenerateTextWithUsage(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return "", err
+	}
+	return result.Content, nil
+}
+
+// GenerateTextResult contains the response content and token usage statistics
+type GenerateTextResult struct {
+	Content          string
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+}
+
+// GenerateTextWithUsage sends a prompt and returns both content and token usage
+func (lp *LocalProvider) GenerateTextWithUsage(ctx context.Context, systemPrompt, userPrompt string) (*GenerateTextResult, error) {
 	return lp.generateTextWithContext(ctx, systemPrompt, userPrompt)
 }
 
 // generateTextWithContext sends a prompt with context support for cancellation
-func (lp *LocalProvider) generateTextWithContext(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+func (lp *LocalProvider) generateTextWithContext(ctx context.Context, systemPrompt, userPrompt string) (*GenerateTextResult, error) {
 	messages := []ChatMessage{
 		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: userPrompt},
@@ -113,39 +130,50 @@ func (lp *LocalProvider) generateTextWithContext(ctx context.Context, systemProm
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal request")
+		return nil, errors.Wrap(err, "failed to marshal request")
 	}
 
 	// Use OpenAI-compatible endpoint (works for Ollama, LocalAI, etc.)
 	endpoint := lp.baseURL + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create request")
+		return nil, errors.Wrap(err, "failed to create request")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := lp.httpClient.Do(req)
 	if err != nil {
-		return "", errors.Wrap(err, "request failed")
+		return nil, errors.Wrap(err, "request failed")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
+		return nil, errors.Newf("local inference returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var completion ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
-		return "", errors.Wrap(err, "failed to decode response")
+		return nil, errors.Wrap(err, "failed to decode response")
 	}
 
 	if len(completion.Choices) == 0 {
-		return "", errors.New("no completion choices returned")
+		return nil, errors.New("no completion choices returned")
 	}
 
-	return completion.Choices[0].Message.Content, nil
+	result := &GenerateTextResult{
+		Content: completion.Choices[0].Message.Content,
+	}
+
+	// Extract token usage if provided by the server
+	if completion.Usage != nil {
+		result.PromptTokens = completion.Usage.PromptTokens
+		result.CompletionTokens = completion.Usage.CompletionTokens
+		result.TotalTokens = completion.Usage.TotalTokens
+	}
+
+	return result, nil
 }
 
 // EstimateCost returns zero cost for local inference
