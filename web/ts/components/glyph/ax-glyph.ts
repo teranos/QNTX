@@ -1,7 +1,7 @@
 /**
  * Ax Glyph - Ax query editor on canvas grid
  *
- * Text editor for writing ax queries like "is git", "find all", etc.
+ * Text editor for writing ax queries like "is git", "has certification", etc.
  * Similar to ATS editor or prompt editor - just the query text itself.
  *
  * ARCHITECTURE:
@@ -26,9 +26,9 @@ import { GRID_SIZE } from './grid-constants';
  * Factory function to create an Ax query editor glyph
  *
  * @param id Optional glyph ID
- * @param initialQuery Optional initial query text (defaults to "find all")
+ * @param initialQuery Optional initial query text
  */
-export function createAxGlyph(id?: string, initialQuery: string = 'find all'): Glyph {
+export function createAxGlyph(id?: string, initialQuery: string = ''): Glyph {
     const glyphId = id || `ax-${crypto.randomUUID()}`;
     let currentQuery = initialQuery;
 
@@ -36,7 +36,7 @@ export function createAxGlyph(id?: string, initialQuery: string = 'find all'): G
         id: glyphId,
         title: 'Ax Query',
         symbol: AX,
-        manifestationType: 'ax' as any, // Ax manifestation - inline grid editor
+        manifestationType: 'ax', // Ax manifestation - inline grid editor
         renderContent: () => {
             const container = document.createElement('div');
             container.className = 'ax-query-editor';
@@ -53,7 +53,7 @@ export function createAxGlyph(id?: string, initialQuery: string = 'find all'): G
             const editor = document.createElement('textarea');
             editor.className = 'ax-query-textarea';
             editor.value = currentQuery;
-            editor.placeholder = 'Enter ax query (e.g., is git, find all, has certification)';
+            editor.placeholder = 'Enter ax query (e.g., is git, has certification)';
             editor.style.flex = '1';
             editor.style.width = '100%';
             editor.style.padding = '8px';
