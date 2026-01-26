@@ -18,6 +18,7 @@ export interface Glyph {
 
     // Manifestation configuration
     manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'ax';  // Default: 'window'
+    // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;
     defaultX?: number;                   // Default position
@@ -35,6 +36,10 @@ export interface Glyph {
     gridX?: number;                      // Grid cell X position
     gridY?: number;                      // Grid cell Y position
     symbol?: string;                     // Symbol to display (for grid children)
+
+    // Size metadata (for resizable glyphs)
+    width?: number;                      // Custom width in pixels
+    height?: number;                     // Custom height in pixels
 }
 
 // Function to check if user prefers reduced motion
