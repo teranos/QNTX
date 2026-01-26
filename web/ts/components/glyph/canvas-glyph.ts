@@ -12,6 +12,7 @@ import { Pulse, IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
+import { morphToIx } from './manifestations/ix';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
@@ -64,6 +65,42 @@ export function createCanvasGlyph(): Glyph {
                 e.preventDefault();
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
+
+            // Click handler for grid glyphs - trigger manifestation
+            container.addEventListener('glyph-click', ((e: CustomEvent) => {
+                const glyph = e.detail.glyph as Glyph;
+                const glyphElement = e.target as HTMLElement;
+
+                log.debug(SEG.UI, `[Canvas] Glyph clicked: ${glyph.id}, manifestationType: ${glyph.manifestationType}`);
+
+                // Route to correct manifestation
+                if (glyph.manifestationType === 'ix') {
+                    morphToIx(
+                        glyphElement,
+                        glyph,
+                        (id, element) => {
+                            // Verify element (simplified - canvas glyphs aren't tracked)
+                            if (element.dataset.glyphId !== id) {
+                                throw new Error(`Element mismatch: expected ${id}, got ${element.dataset.glyphId}`);
+                            }
+                        },
+                        (id) => {
+                            // Remove glyph (simplified - just remove from array)
+                            const index = glyphs.findIndex(g => g.id === id);
+                            if (index !== -1) {
+                                glyphs.splice(index, 1);
+                            }
+                            uiState.removeCanvasGlyph(id);
+                        },
+                        (_element, g) => {
+                            // Reattach to canvas (simplified - not implemented for canvas glyphs yet)
+                            // TODO: When minimizing from IX manifestation, should it go to tray or back to canvas?
+                            log.debug(SEG.UI, `[Canvas] IX glyph ${g.id} minimized - not re-adding to canvas`);
+                        }
+                    );
+                }
+                // TODO: Handle other manifestation types (Pulse, etc.) when implemented
+            }) as EventListener);
 
             // Render existing glyphs
             glyphs.forEach(glyph => {
