@@ -1,7 +1,13 @@
 /**
  * Python Glyph - CodeMirror-based Python editor on canvas
  *
- * Programmature glyph for editing Python code transparently.
+ * These are resizable code preview glyphs that live on the canvas workspace.
+ * They show a small amount of actual code and are spatially positioned.
+ *
+ * Future vision:
+ * - Clicking a py glyph will spawn a full 'programmature' manifestation
+ * - That manifestation can minimize to tray like windows
+ * - The canvas py glyph remains as a spatial reference/preview
  */
 
 import type { Glyph } from './glyph';
