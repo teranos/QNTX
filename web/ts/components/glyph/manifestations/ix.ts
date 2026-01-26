@@ -4,6 +4,30 @@
  * The IX manifestation is a window-like editor for configuring ingestion.
  * Opens when you click an IX glyph on the canvas.
  * Shows input form with preview of what would be ingested.
+ *
+ * VISION & FUTURE INTEGRATION:
+ *
+ * 1. Preview Panel:
+ *    - Show preview of attestations that would be created
+ *    - Live preview as user types URL/path
+ *    - Sample attestations before committing to full ingest
+ *    - Similar to prompt preview (#338) but for ix operations
+ *
+ * 2. Backend Integration:
+ *    - Wire Execute button to actual ix backend
+ *    - Support all ix-compatible sources (URLs, files, APIs)
+ *    - Stream progress during ingestion
+ *    - Show created attestation count
+ *
+ * 3. Canvas Integration:
+ *    - Update canvas IX glyph status (active/inactive)
+ *    - Show incoming attestation count on canvas glyph
+ *    - Visual feedback when ix operation completes
+ *
+ * 4. State Management:
+ *    - Persist IX configurations per glyph
+ *    - Remember last used source per canvas IX glyph
+ *    - Enable/disable IX operations from canvas
  */
 
 import { log, SEG } from '../../../logger';
@@ -290,8 +314,16 @@ function renderIxForm(): HTMLElement {
         }
 
         log.debug(SEG.UI, `[IX] Executing: ${input}`);
+
         // TODO: Wire up to ix backend execution
-        // For now, just log
+        // Implementation should:
+        // 1. Call backend API endpoint (e.g., POST /api/ix/execute)
+        // 2. Stream progress updates via WebSocket
+        // 3. Show preview of attestations before committing
+        // 4. Display created attestation count on completion
+        // 5. Update canvas glyph status to show active/complete state
+        // 6. Handle errors gracefully with user feedback
+
         alert(`IX execution not yet wired up.\n\nInput: ${input}\n\nThis will be sent to the ix backend.`);
     });
 

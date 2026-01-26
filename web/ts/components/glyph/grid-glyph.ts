@@ -13,6 +13,12 @@ import { GRID_SIZE } from './grid-constants';
  * Create a grid-positioned glyph element
  * Canvas glyphs are lightweight references (symbols only)
  * Clicking them morphs to their full manifestation
+ *
+ * TODO: Future enhancements for canvas glyphs:
+ * - Status indicators (active/inactive, running, error states)
+ * - Badge overlays (e.g., count of incoming attestations for IX)
+ * - Visual feedback on state changes
+ * - Context menu on right-click (edit, delete, duplicate)
  */
 export function createGridGlyph(glyph: Glyph): HTMLElement {
     const element = document.createElement('div');
