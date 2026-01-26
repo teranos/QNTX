@@ -113,7 +113,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { python } = await import('@codemirror/lang-python');
 
-        const editor = new EditorView({
+        // Create editor (prefixed with _ since not used yet - will be needed for run button)
+        const _editor = new EditorView({
             state: EditorState.create({
                 doc: defaultCode,
                 extensions: [
@@ -126,8 +127,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             parent: editorContainer
         });
 
-        // TODO: Store editor reference on element for later access
-        // (element as any).editor = editor;
+        // TODO: Store editor reference on element for later access (needed for run button)
+        // (element as any).editor = _editor;
 
         log.debug(SEG.UI, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
     } catch (error) {
