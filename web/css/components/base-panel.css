@@ -1,0 +1,202 @@
+/**
+ * Base Panel Styles
+ * Core styles for all panels that extend BasePanel class
+ * Provides consistent slide-in UX, fullscreen mode, and common components
+ */
+
+/* Base panel structure - slide in from left */
+.panel-slide-left {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 66.66%;
+  height: 100%;
+  background: #fff;
+  border-right: 1px solid #ddd;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease, opacity 0.3s ease, width 0.3s ease;
+  overflow: hidden;
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.panel-slide-left.visible,
+.panel-slide-left[data-visibility="visible"] {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Fullscreen mode for panels */
+.panel-slide-left[data-mode="fullscreen"] {
+  width: 100%;
+  left: 0;
+  right: 0;
+  z-index: 2000; /* Higher than normal panels */
+  border-right: none;
+  box-shadow: none;
+}
+
+/* Expand button - arrow shape on the edge of the panel */
+/* For left-sliding panels */
+.panel-slide-left .panel-expand-btn {
+  --arrow-size: 14px;
+  position: absolute;
+  right: calc(-1 * var(--arrow-size)); /* Position based on actual arrow size */
+  top: 10%; /* 90% up from bottom */
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1001;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  /* Create arrow pointing right (to expand rightward) */
+  border-top: var(--arrow-size) solid transparent;
+  border-bottom: var(--arrow-size) solid transparent;
+  border-left: var(--arrow-size) solid #ccc;
+  /* Hide when panel is not visible */
+  display: none;
+}
+
+/* Only show expand button when panel is visible */
+.panel-slide-left[data-visibility="visible"] .panel-expand-btn {
+  display: block;
+}
+
+.panel-expand-btn:hover {
+  opacity: 1;
+}
+
+.panel-slide-left .panel-expand-btn:hover {
+  border-left-color: #999;
+}
+
+/* In fullscreen mode, arrow points left to collapse */
+.panel-slide-left[data-mode="fullscreen"] .panel-expand-btn {
+  right: auto;
+  left: 0;
+  transform: translateX(-50%) translateY(-50%);
+  /* Arrow pointing left (to collapse leftward) */
+  border-left: none;
+  border-right: var(--arrow-size) solid #ccc;
+}
+
+.panel-slide-left[data-mode="fullscreen"] .panel-expand-btn:hover {
+  border-right-color: #999;
+}
+
+/* Overlay - darken right side when panel is open */
+.panel-overlay {
+  position: fixed;
+  left: 66.66%;
+  top: 0;
+  width: 33.33%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Visibility state - supports both class (legacy) and data-attribute (issue #114) */
+.panel-overlay.visible,
+.panel-overlay[data-visibility="visible"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Panel header */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fafafa;
+  border-bottom: 2px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #000;
+  letter-spacing: 0.3px;
+}
+
+/* Panel header actions (close, fullscreen, etc) */
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Fullscreen toggle button */
+.panel-fullscreen-toggle {
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  color: #666;
+  font-size: 18px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.panel-fullscreen-toggle:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.panel-fullscreen-toggle:active {
+  background: #e0e0e0;
+}
+
+.panel-fullscreen-toggle:focus-visible {
+  outline: 2px solid #0066cc;
+  outline-offset: -1px;
+}
+
+/* Close button styles moved to components.css for unified styling */
+
+/* Panel content */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 20px;
+  background: #f5f5f5;
+}
+
+/* Loading and empty states */
+.panel-loading,
+.panel-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* Error display */
+.panel-error {
+  padding: 16px;
+  background: rgba(255, 0, 51, 0.1);
+  border-left: 3px solid #ff0033;
+  border-radius: 4px;
+  color: #ff0033;
+  font-size: 12px;
+  margin-bottom: 12px;
+}

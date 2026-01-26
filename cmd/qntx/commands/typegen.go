@@ -39,7 +39,7 @@ var languagePackages = map[string][]string{
 		"github.com/teranos/QNTX/pulse/async",
 		"github.com/teranos/QNTX/pulse/budget",
 		"github.com/teranos/QNTX/pulse/schedule",
-		"github.com/teranos/QNTX/server",
+		// server package excluded - server-side HTTP handler types
 		"github.com/teranos/QNTX/server/syscap", // System capabilities types
 		"github.com/teranos/QNTX/sym",
 	},
