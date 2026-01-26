@@ -77,17 +77,20 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         updatePosition(element, snappedGridX, snappedGridY);
     };
 
+    let abortController: AbortController | null = null;
+
     const handleMouseUp = () => {
         if (!isDragging) return;
         isDragging = false;
 
-        element.style.opacity = '1';
-        element.style.zIndex = '';
+        element.classList.remove('is-dragging');
 
-        // Get final grid position
-        const rect = element.getBoundingClientRect();
-        currentGridX = Math.round(rect.left / GRID_SIZE);
-        currentGridY = Math.round(rect.top / GRID_SIZE);
+        // Get final grid position (calculate relative to canvas parent)
+        const canvas = element.parentElement;
+        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const elementRect = element.getBoundingClientRect();
+        currentGridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
+        currentGridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
 
         // Save position to glyph metadata
         glyph.gridX = currentGridX;
@@ -106,9 +109,8 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
 
         log.debug(SEG.UI, `[GridGlyph] Finished dragging ${glyph.id} to grid (${currentGridX}, ${currentGridY})`);
 
-        // Clean up temporary drag listeners
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        abortController?.abort();
+        abortController = null;
     };
 
     element.addEventListener('mousedown', (e) => {
@@ -123,12 +125,11 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         elementStartX = rect.left;
         elementStartY = rect.top;
 
-        element.style.opacity = '0.7';
-        element.style.zIndex = '1000';
+        element.classList.add('is-dragging');
 
-        // Add document listeners only during drag
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        abortController = new AbortController();
+        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
+        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
         log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
     });
