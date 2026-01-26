@@ -4,8 +4,7 @@
 //! called from PyO3 functions during Python execution.
 
 use crate::proto::{
-    ats_store_service_client::AtsStoreServiceClient, AttestationCommand,
-    GenerateAttestationRequest,
+    ats_store_service_client::AtsStoreServiceClient, AttestationCommand, GenerateAttestationRequest,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
