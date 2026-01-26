@@ -144,6 +144,20 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                 throw new Error(`Execution failed: ${response.statusText}`);
             }
 
+            // TODO: Create attestation for script execution (success or failure)
+            // Call attest() with:
+            //   subjects: [`script:${glyph.id}`]
+            //   predicates: [result.success ? "executed" : "failed"]
+            //   contexts: ["canvas", "python"]
+            //   attributes: {
+            //     code: currentCode,
+            //     stdout: result.stdout,
+            //     stderr: result.stderr,
+            //     error: result.error,
+            //     duration_ms: result.duration_ms
+            //   }
+            // This creates audit trail of all Python executions on canvas.
+
             // Calculate position for result glyph (directly below this py glyph)
             const pyRect = element.getBoundingClientRect();
             const canvas = element.parentElement;

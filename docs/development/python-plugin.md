@@ -89,12 +89,12 @@ Returns:
 }
 ```
 
-## Package Management
+## Package Management (Planned)
 
-Install packages via pip:
+Future package management will use `uv` for fast, deterministic Python dependencies:
 
 ```json
-POST /api/python/pip/install
+POST /api/python/uv/install
 {
   "package": "requests"
 }
@@ -103,5 +103,7 @@ POST /api/python/pip/install
 Check module availability:
 
 ```json
-GET /api/python/pip/check?module=numpy
+GET /api/python/uv/check?module=numpy
 ```
+
+**Note:** These endpoints are not yet implemented. Current builds include only bundled packages.
