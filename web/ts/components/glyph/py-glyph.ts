@@ -24,6 +24,8 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 import { getScriptStorage } from '../../storage/script-storage';
+import { apiFetch } from '../../api';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
 
 /**
  * Create a Python editor glyph with CodeMirror
@@ -76,13 +78,107 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Title bar for dragging
     const titleBar = document.createElement('div');
     titleBar.className = 'py-glyph-title-bar';
-    titleBar.textContent = 'py';
     titleBar.style.padding = '8px';
     titleBar.style.backgroundColor = 'var(--bg-tertiary)';
     titleBar.style.cursor = 'move';
     titleBar.style.userSelect = 'none';
     titleBar.style.fontWeight = 'bold';
     titleBar.style.fontSize = '14px';
+    titleBar.style.display = 'flex';
+    titleBar.style.alignItems = 'center';
+    titleBar.style.justifyContent = 'space-between';
+
+    // Label
+    const label = document.createElement('span');
+    label.textContent = 'py';
+    titleBar.appendChild(label);
+
+    // Run button
+    const runButton = document.createElement('button');
+    runButton.textContent = '▶';
+    runButton.title = 'Run Python code';
+    runButton.style.background = 'var(--bg-hover)';
+    runButton.style.border = '1px solid var(--border-color)';
+    runButton.style.borderRadius = '3px';
+    runButton.style.padding = '2px 8px';
+    runButton.style.cursor = 'pointer';
+    runButton.style.fontSize = '12px';
+    runButton.style.color = 'var(--text-primary)';
+
+    // Prevent drag when clicking button
+    runButton.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+    });
+
+    // Execute Python code on click
+    runButton.addEventListener('click', async () => {
+        const editor = (element as any).editor;
+        if (!editor) {
+            log.error(SEG.UI, '[PyGlyph] Editor not initialized');
+            return;
+        }
+
+        const currentCode = editor.state.doc.toString();
+
+        try {
+            const response = await apiFetch('/api/python/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: currentCode,
+                    capture_variables: false
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Execution failed: ${response.statusText}`);
+            }
+
+            const result: ExecutionResult = await response.json();
+
+            // Calculate position for result glyph (directly below this py glyph)
+            const pyRect = element.getBoundingClientRect();
+            const canvas = element.parentElement;
+            const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+
+            const pyGridX = Math.round((pyRect.left - canvasRect.left) / GRID_SIZE);
+            const pyBottomY = pyRect.bottom - canvasRect.top;
+            const resultGridY = Math.round(pyBottomY / GRID_SIZE);
+
+            // Create result glyph
+            const resultGlyph: Glyph = {
+                id: `result-${crypto.randomUUID()}`,
+                title: 'Python Result',
+                symbol: 'result',
+                gridX: pyGridX,
+                gridY: resultGridY,
+                width: Math.round(pyRect.width)
+            };
+
+            // Render result glyph
+            const resultElement = createResultGlyph(resultGlyph, result);
+            canvas?.appendChild(resultElement);
+
+            // Persist to uiState with execution result
+            const resultRect = resultElement.getBoundingClientRect();
+            uiState.addCanvasGlyph({
+                id: resultGlyph.id,
+                symbol: 'result',
+                gridX: resultGlyph.gridX,
+                gridY: resultGlyph.gridY,
+                width: Math.round(resultRect.width),
+                height: Math.round(resultRect.height),
+                result: result
+            });
+
+            log.debug(SEG.UI, `[PyGlyph] Spawned result glyph at grid (${pyGridX}, ${resultGridY}), executed in ${result.duration_ms}ms`);
+        } catch (error) {
+            log.error(SEG.UI, '[PyGlyph] Execution failed:', error);
+            console.error('[Python Execution Error]', error);
+        }
+    });
+
+    titleBar.appendChild(runButton);
 
     // TODO: Add click handler to spawn programmature manifestation
     // titleBar.addEventListener('click', () => spawnProgrammatureManifestation(glyph));
