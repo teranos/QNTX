@@ -365,7 +365,11 @@ mod tests {
         }
 
         let response: ExecutionResponse = serde_json::from_slice(&result.body).unwrap();
-        assert!(response.success, "Expected success, got error: {:?}", response.error);
+        assert!(
+            response.success,
+            "Expected success, got error: {:?}",
+            response.error
+        );
         assert!(response.stdout.contains("attest is callable: True"));
     }
 
