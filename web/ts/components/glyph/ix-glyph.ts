@@ -47,6 +47,24 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.overflow = 'hidden';
     element.style.resize = 'both';
 
+    // Textarea (declared early so play button can reference it)
+    const textarea = document.createElement('textarea');
+    textarea.placeholder = 'Enter URL, file path, or data source...';
+    textarea.style.flex = '1';
+    textarea.style.padding = '8px';
+    textarea.style.fontSize = '13px';
+    textarea.style.fontFamily = 'monospace';
+    textarea.style.backgroundColor = 'var(--bg-primary)';
+    textarea.style.color = 'var(--text-primary)';
+    textarea.style.border = '1px solid var(--border-color)';
+    textarea.style.borderRadius = '4px';
+    textarea.style.resize = 'none';
+
+    // Prevent drag from starting on textarea
+    textarea.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+    });
+
     // Title bar
     const titleBar = document.createElement('div');
     titleBar.className = 'canvas-glyph-title-bar';
@@ -69,58 +87,25 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     title.style.fontSize = '13px';
     title.style.flex = '1';
 
-    titleBar.appendChild(symbol);
-    titleBar.appendChild(title);
+    // Play button
+    const playBtn = document.createElement('button');
+    playBtn.textContent = '▶';
+    playBtn.style.width = '24px';
+    playBtn.style.height = '24px';
+    playBtn.style.padding = '0';
+    playBtn.style.fontSize = '12px';
+    playBtn.style.backgroundColor = 'var(--bg-secondary)';
+    playBtn.style.color = 'var(--text-primary)';
+    playBtn.style.border = '1px solid var(--border-color)';
+    playBtn.style.borderRadius = '4px';
+    playBtn.style.cursor = 'pointer';
+    playBtn.style.display = 'flex';
+    playBtn.style.alignItems = 'center';
+    playBtn.style.justifyContent = 'center';
+    playBtn.title = 'Execute';
 
-    // Content area
-    const content = document.createElement('div');
-    content.style.flex = '1';
-    content.style.padding = '12px';
-    content.style.display = 'flex';
-    content.style.flexDirection = 'column';
-    content.style.gap = '8px';
-    content.style.overflow = 'auto';
-
-    // Source label
-    const label = document.createElement('label');
-    label.textContent = 'Source:';
-    label.style.fontSize = '13px';
-    label.style.fontWeight = '500';
-    label.style.color = 'var(--text-primary)';
-
-    // Textarea
-    const textarea = document.createElement('textarea');
-    textarea.placeholder = 'Enter URL, file path, or data source...';
-    textarea.style.flex = '1';
-    textarea.style.padding = '8px';
-    textarea.style.fontSize = '13px';
-    textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = 'var(--bg-primary)';
-    textarea.style.color = 'var(--text-primary)';
-    textarea.style.border = '1px solid var(--border-color)';
-    textarea.style.borderRadius = '4px';
-    textarea.style.resize = 'none';
-    textarea.style.minHeight = '60px';
-
-    // Prevent drag from starting on textarea
-    textarea.addEventListener('mousedown', (e) => {
+    playBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-    });
-
-    // Execute button
-    const executeBtn = document.createElement('button');
-    executeBtn.textContent = 'Execute';
-    executeBtn.style.padding = '6px 12px';
-    executeBtn.style.fontSize = '13px';
-    executeBtn.style.fontWeight = '500';
-    executeBtn.style.backgroundColor = 'var(--accent-primary)';
-    executeBtn.style.color = 'var(--text-primary)';
-    executeBtn.style.border = 'none';
-    executeBtn.style.borderRadius = '4px';
-    executeBtn.style.cursor = 'pointer';
-    executeBtn.style.alignSelf = 'flex-end';
-
-    executeBtn.addEventListener('click', () => {
         const input = textarea.value.trim();
         if (!input) {
             log.debug(SEG.UI, '[IX] No input provided');
@@ -132,10 +117,20 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         alert(`IX execution not yet wired up.\n\nInput: ${input}\n\nThis will be sent to the ix backend.`);
     });
 
+    titleBar.appendChild(symbol);
+    titleBar.appendChild(title);
+    titleBar.appendChild(playBtn);
+
+    // Content area
+    const content = document.createElement('div');
+    content.style.flex = '1';
+    content.style.padding = '12px';
+    content.style.display = 'flex';
+    content.style.flexDirection = 'column';
+    content.style.overflow = 'auto';
+
     // Assemble
-    content.appendChild(label);
     content.appendChild(textarea);
-    content.appendChild(executeBtn);
 
     element.appendChild(titleBar);
     element.appendChild(content);
