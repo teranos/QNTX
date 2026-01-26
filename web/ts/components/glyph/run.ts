@@ -36,7 +36,6 @@ import { type Glyph, getMaximizeDuration } from './glyph';
 import { isInWindowState, setGlyphId } from './dataset';
 import { morphToWindow } from './manifestations/window';
 import { morphToCanvas } from './manifestations/canvas';
-import { morphToIx } from './manifestations/ix';
 
 // Re-export Glyph interface for external use
 export type { Glyph } from './glyph';
@@ -102,14 +101,6 @@ class GlyphRunImpl {
                         glyph,
                         item,
                         (id, element) => this.verifyElementTracking(id, element),
-                        (element, g) => this.reattachGlyphToIndicator(element, g)
-                    );
-                } else if (manifestationType === 'ix') {
-                    morphToIx(
-                        glyph,
-                        item,
-                        (id, element) => this.verifyElementTracking(id, element),
-                        (id) => this.remove(id),
                         (element, g) => this.reattachGlyphToIndicator(element, g)
                     );
                 } else {
@@ -395,14 +386,6 @@ class GlyphRunImpl {
                         glyphElement,
                         glyph,
                         (id, element) => this.verifyElementTracking(id, element),
-                        (element, g) => this.reattachGlyphToIndicator(element, g)
-                    );
-                } else if (manifestationType === 'ix') {
-                    morphToIx(
-                        glyphElement,
-                        glyph,
-                        (id, element) => this.verifyElementTracking(id, element),
-                        (id) => this.remove(id),
                         (element, g) => this.reattachGlyphToIndicator(element, g)
                     );
                 } else {
