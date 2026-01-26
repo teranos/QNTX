@@ -52,9 +52,9 @@ export function createResultGlyph(
     element.style.width = `${width}px`;
     element.style.height = `${height}px`;
     element.style.minHeight = '80px';
-    element.style.backgroundColor = 'var(--bg-secondary)';
+    element.style.backgroundColor = '#1e1e1e'; // Solid dark background
     element.style.borderRadius = '0 0 4px 4px'; // Rounded bottom only
-    element.style.border = '1px solid var(--border-color)';
+    element.style.border = '1px solid #3e3e3e';
     element.style.borderTop = 'none'; // Visually connects to py glyph above
     element.style.display = 'flex';
     element.style.flexDirection = 'column';
