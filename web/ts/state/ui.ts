@@ -66,6 +66,7 @@ export interface CanvasGlyphState {
     gridY: number;
     width?: number;  // Optional: custom width in pixels (for resizable glyphs)
     height?: number; // Optional: custom height in pixels (for resizable glyphs)
+    code?: string;   // Optional: editor content (for programmature glyphs)
 }
 
 /**
