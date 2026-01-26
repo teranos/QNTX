@@ -11,6 +11,7 @@ import type { Glyph } from './glyph';
 import { Pulse } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
+import { createPyGlyph } from './py-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
@@ -124,6 +125,19 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pulseBtn);
+
+    // Add py button
+    const pyBtn = document.createElement('button');
+    pyBtn.className = 'canvas-spawn-button';
+    pyBtn.textContent = 'py';
+    pyBtn.title = 'Spawn Python glyph';
+
+    pyBtn.addEventListener('click', () => {
+        spawnPyGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(pyBtn);
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -183,6 +197,46 @@ function spawnPulseGlyph(
     canvas.appendChild(glyphElement);
 
     log.debug(SEG.UI, `[Canvas] Spawned Pulse glyph at grid (${gridX}, ${gridY})`);
+}
+
+/**
+ * Spawn a new Python glyph at grid position
+ */
+async function spawnPyGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const pyGlyph: Glyph = {
+        id: `py-${crypto.randomUUID()}`,
+        title: 'Python',
+        symbol: 'py',
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Python glyph (TBD)';
+            return content;
+        }
+    };
+
+    // Add to glyphs array
+    glyphs.push(pyGlyph);
+
+    // Persist to uiState
+    uiState.addCanvasGlyph({
+        id: pyGlyph.id,
+        symbol: 'py',
+        gridX,
+        gridY
+    });
+
+    // Render Python editor glyph
+    const glyphElement = await createPyGlyph(pyGlyph);
+    canvas.appendChild(glyphElement);
+
+    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY})`);
 }
 
 /**
