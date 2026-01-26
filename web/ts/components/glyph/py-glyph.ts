@@ -23,6 +23,7 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { getScriptStorage } from '../../storage/script-storage';
 
 /**
  * Create a Python editor glyph with CodeMirror
@@ -38,11 +39,14 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const gridX = glyph.gridX ?? 5;
     const gridY = glyph.gridY ?? 5;
 
-    // Default code
+    // Load code from storage or use default
+    const storage = getScriptStorage();
     const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
+    const savedCode = await storage.load(glyph.id);
+    const code = savedCode ?? defaultCode;
 
     // Calculate initial size based on content (if no saved size)
-    const lineCount = defaultCode.split('\n').length;
+    const lineCount = code.split('\n').length;
     const lineHeight = 24; // Approximate height per line in CodeMirror
     const titleBarHeight = 36;
     const minHeight = 120;
@@ -105,11 +109,9 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     resizeHandle.style.borderTopLeftRadius = '4px';
     element.appendChild(resizeHandle);
 
-    // Initialize CodeMirror
+    // Initialize CodeMirror with loaded code
     // TODO: Add run button in title bar that executes code via /api/python/execute
     // TODO: Add output panel below editor to show execution results
-    // TODO: Load code from persistence layer (filesystem/database) instead of defaultCode
-    // TODO: Auto-save code changes to persistence layer (debounced)
     try {
         const { EditorView, keymap } = await import('@codemirror/view');
         const { EditorState } = await import('@codemirror/state');
@@ -117,15 +119,34 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { python } = await import('@codemirror/lang-python');
 
+        // Debounced auto-save extension
+        let saveTimeout: number | undefined;
+        const autoSaveExtension = EditorView.updateListener.of((update) => {
+            if (update.docChanged) {
+                // Clear existing timeout
+                if (saveTimeout !== undefined) {
+                    clearTimeout(saveTimeout);
+                }
+
+                // Debounce save for 500ms
+                saveTimeout = window.setTimeout(async () => {
+                    const currentCode = update.state.doc.toString();
+                    await storage.save(glyph.id, currentCode);
+                    log.debug(SEG.UI, `[PyGlyph] Auto-saved code for ${glyph.id}`);
+                }, 500);
+            }
+        });
+
         // Create editor and store reference for content access
         const editor = new EditorView({
             state: EditorState.create({
-                doc: defaultCode,
+                doc: code,
                 extensions: [
                     keymap.of(defaultKeymap),
                     python(),
                     oneDark,
-                    EditorView.lineWrapping
+                    EditorView.lineWrapping,
+                    autoSaveExtension
                 ]
             }),
             parent: editorContainer
@@ -133,6 +154,12 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         // Store editor reference for content persistence and run button
         (element as any).editor = editor;
+
+        // Save initial code if this is a new glyph (no saved code)
+        if (!savedCode) {
+            await storage.save(glyph.id, code);
+            log.debug(SEG.UI, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
+        }
 
         log.debug(SEG.UI, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
     } catch (error) {
