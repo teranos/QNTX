@@ -28,4 +28,8 @@ tempfile = "3.0"
 pretty_assertions = "1.4"
 
 [lib]
-crate-type = ["rlib"]
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+ffi = []
