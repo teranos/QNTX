@@ -65,9 +65,9 @@ export function createCanvasGlyph(): Glyph {
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
 
-            // Render existing glyphs
-            glyphs.forEach(glyph => {
-                const glyphElement = renderGlyph(glyph);
+            // Render existing glyphs (async to support py glyphs with CodeMirror)
+            glyphs.forEach(async glyph => {
+                const glyphElement = await renderGlyph(glyph);
                 container.appendChild(glyphElement);
             });
 
@@ -245,8 +245,14 @@ async function spawnPyGlyph(
 
 /**
  * Render a glyph on the canvas
+ * Checks symbol type and creates appropriate glyph element
  */
-function renderGlyph(glyph: Glyph): HTMLElement {
-    // Render at saved position (or default if not set)
+async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
+    // For py glyphs, create full editor
+    if (glyph.symbol === 'py') {
+        return await createPyGlyph(glyph);
+    }
+
+    // Otherwise create simple grid glyph
     return createGridGlyph(glyph);
 }
