@@ -79,6 +79,7 @@ type LocalInferenceConfig struct {
 	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
 	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
 	ContextSize    int    `mapstructure:"context_size"`    // Context window size (0 = model default, e.g., 16384, 32768)
+	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
 }
 
 // OpenRouterConfig configures OpenRouter.ai API access
