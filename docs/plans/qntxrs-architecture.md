@@ -1,12 +1,34 @@
-# QNTXrs: Rust as the Deep Core
+# Q: The Execution Kernel (currently Rust)
 
-This document describes the architectural direction for Rust in QNTX.
+**Q is the kernel**: execution semantics, attestation model, time, storage contracts, parsing, deterministic transforms.
 
-## Vision
+**Rust is an implementation detail** chosen for safety, performance, WASM reach, and FFI viability. The abstractions defined here outlive the language choice.
 
-**Rust is the deep core language.** Domain logic, type definitions, and performance-critical code live in Rust. Go remains important for server distribution, but consumes Rust rather than defining core abstractions.
+## Boundary Definition
 
-**Proto becomes the type source of truth.** Rather than Go generating Rust types (current typegen), types are defined in `.proto` files and generated for both languages. This is industry-standard and we already use proto for plugins.
+### Inside Q (invariant)
+
+These live in the kernel and define QNTX semantics:
+
+- Attestation model and lifecycle
+- Ax query parser and evaluation
+- Storage traits and contracts
+- Deterministic scoring primitives
+- Time representation and ordering
+- Conflict detection logic
+- Execution scheduling primitives
+
+### Outside Q (replaceable)
+
+These consume Q but are not part of it:
+
+- Server transport (HTTP, gRPC, WebSocket)
+- UI rendering (web, desktop, mobile)
+- Cloud deployment glue
+- Ingestion adapters
+- AI/LLM calls
+- Plugin ecosystems
+- Presentation formatting
 
 ## Current State (January 2026)
 
@@ -42,13 +64,13 @@ crates/
 
 ## Aspired Direction
 
-### Consolidate into QNTXrs
+### Consolidate into Q
 
-Merge `qntx` and `qntx-core` into a single `qntxrs` crate:
+Merge `qntx` and `qntx-core` into a single `q` crate:
 
 ```
 crates/
-├── qntxrs/         # THE Rust crate
+├── q/              # The kernel
 │   ├── types/      # Proto-generated types
 │   ├── fuzzy/      # Fuzzy matching engine
 │   ├── storage/    # Storage abstraction
@@ -56,18 +78,20 @@ crates/
 │   ├── parser/     # Ax query parser
 │   ├── plugin/     # Plugin scaffolding
 │   └── proto/      # gRPC definitions
-└── qntx-wasm/      # WASM bindings (uses qntxrs)
+└── q-wasm/         # WASM bindings (uses q, not part of kernel)
 ```
 
 **Rationale:**
-- Single source of truth for Rust code
-- Clear naming (`qntxrs` = Rust implementation of QNTX)
+- Single source of truth for kernel code
+- Clear naming (`q` = the kernel, `q-wasm` = bindings layer)
 - Types and domain logic together
 - Consumers import one crate
 
 ### Proto-First Types
 
-Phase out `typegen` (Go → Rust) in favor of proto definitions:
+Schema boundary types are proto-first because Q must cross environments (server, browser, desktop, plugins) with minimal friction and maximal compatibility.
+
+**Q owns behavior, proto owns the contract surface.**
 
 ```
 proto/
@@ -81,29 +105,28 @@ Both Rust and Go generate from proto:
 - Rust: `prost` + `tonic` (already used for plugins)
 - Go: `protoc-gen-go` (standard)
 
-**Rationale:**
-- Industry standard for cross-language types
-- Already using proto for plugins
-- Rust becomes source of truth for behavior, proto for schema
-- Eliminates custom typegen maintenance
+Phase out `typegen` (Go → Rust) as proto coverage expands.
 
-### Go Server Integration
+### Go as Distribution Host
 
-Go server consumes Rust via:
+Go is a distribution and orchestration host. It consumes Q through stable boundaries (FFI for hot paths, proto for contracts). Core abstractions live in Q.
+
+Integration points:
 1. **CGO/FFI** for hot paths (fuzzy matching) - already working
 2. **Proto types** for data structures - migration path
-3. **Eventually**: More domain logic in Rust, exposed via CGO
+3. **Eventually**: More kernel logic exposed via CGO
 
 ## Future Work (Out of Scope)
 
 These are documented for future reference, not this PR:
 
-- [ ] Rename `qntx-core` → `qntxrs`
-- [ ] Merge `qntx` into `qntxrs`
+- [ ] Rename `qntx-core` → `q`
+- [ ] Merge `qntx` into `q`
+- [ ] Rename `qntx-wasm` → `q-wasm`
 - [ ] Define core types in `.proto` files
 - [ ] Replace typegen with proto generation
 - [ ] Storage backends: SQLite (native), IndexedDB (WASM)
-- [ ] CGO wrapper for storage (Go server uses Rust storage)
+- [ ] CGO wrapper for storage (Go server uses Q storage)
 - [ ] Move workspace profiles to root Cargo.toml
 
 ## References
