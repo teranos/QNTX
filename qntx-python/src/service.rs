@@ -2,6 +2,7 @@
 //!
 //! Implements the DomainPluginService interface for QNTX.
 
+use crate::atsstore;
 use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
@@ -46,6 +47,7 @@ impl PythonPluginService {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
+            ats_client: atsstore::new_shared_client(),
         }));
 
         Ok(Self {
@@ -97,11 +99,23 @@ impl DomainPluginService for PythonPluginService {
 
         // Store configuration
         state.config = Some(PluginConfig {
-            ats_store_endpoint: req.ats_store_endpoint,
+            ats_store_endpoint: req.ats_store_endpoint.clone(),
             queue_endpoint: req.queue_endpoint,
-            auth_token: req.auth_token,
+            auth_token: req.auth_token.clone(),
             config: req.config,
         });
+
+        // Initialize ATSStore client if endpoint is provided
+        if !req.ats_store_endpoint.is_empty() {
+            info!("Initializing ATSStore client for Python attestation support");
+            atsstore::init_shared_client(
+                &state.ats_client,
+                atsstore::AtsStoreConfig {
+                    endpoint: req.ats_store_endpoint,
+                    auth_token: req.auth_token,
+                },
+            );
+        }
 
         // Initialize Python engine with custom paths if provided
         let python_paths: Vec<String> = state
@@ -327,5 +341,64 @@ mod tests {
         assert!(response.success);
         assert_eq!(response.stdout, "Hello from test\n");
         assert_eq!(response.stderr, "");
+    }
+
+    #[tokio::test]
+    async fn test_attest_function_available() {
+        let service = PythonPluginService::new().unwrap();
+
+        // Test that the attest function exists in the Python namespace
+        // It will error when called since ATSStore is not initialized,
+        // but it should be defined and callable.
+        let body = serde_json::json!({
+            "code": "result = callable(attest)\nprint('attest is callable:', result)",
+            "timeout_secs": 5
+        });
+
+        let result = service.handlers.handle_execute(body).await.unwrap();
+
+        #[derive(Deserialize)]
+        struct ExecutionResponse {
+            success: bool,
+            stdout: String,
+            error: Option<String>,
+        }
+
+        let response: ExecutionResponse = serde_json::from_slice(&result.body).unwrap();
+        assert!(
+            response.success,
+            "Expected success, got error: {:?}",
+            response.error
+        );
+        assert!(response.stdout.contains("attest is callable: True"));
+    }
+
+    #[tokio::test]
+    async fn test_attest_without_atsstore_errors() {
+        let service = PythonPluginService::new().unwrap();
+
+        // When ATSStore is not initialized, calling attest should fail gracefully
+        let body = serde_json::json!({
+            "code": r#"
+try:
+    attest(['subject'], ['predicate'], ['context'])
+    print('ERROR: should have raised')
+except RuntimeError as e:
+    print('Got expected error:', str(e))
+"#,
+            "timeout_secs": 5
+        });
+
+        let result = service.handlers.handle_execute(body).await.unwrap();
+
+        #[derive(Deserialize)]
+        struct ExecutionResponse {
+            success: bool,
+            stdout: String,
+        }
+
+        let response: ExecutionResponse = serde_json::from_slice(&result.body).unwrap();
+        assert!(response.success);
+        assert!(response.stdout.contains("Got expected error"));
     }
 }

@@ -11,7 +11,9 @@
 //! - `handlers` - HTTP endpoint handlers
 //! - `service` - gRPC service implementation
 //! - `proto` - Generated protobuf types
+//! - `atsstore` - ATSStore gRPC client for attestation creation
 
+pub mod atsstore;
 pub mod config;
 pub mod engine;
 pub mod execution;
