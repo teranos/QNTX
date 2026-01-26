@@ -30,7 +30,7 @@ func NewRemoteATSStore(ctx context.Context, endpoint string, authToken string, l
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect to ATSStore gRPC endpoint")
 	}
 
 	client := protocol.NewATSStoreServiceClient(conn)
@@ -62,7 +62,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	if cmd.Attributes != nil {
 		attributesJSON, err := attributesToJSON(cmd.Attributes)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to marshal attributes")
 		}
 		protoCmd.AttributesJson = attributesJSON
 	}
@@ -78,7 +78,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 
 	resp, err := r.client.GenerateAndCreateAttestation(r.ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "gRPC GenerateAndCreateAttestation failed")
 	}
 
 	if !resp.Success {
@@ -151,7 +151,7 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 
 	resp, err := r.client.GetAttestations(r.ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "gRPC GetAttestations failed")
 	}
 
 	// Convert response attestations
