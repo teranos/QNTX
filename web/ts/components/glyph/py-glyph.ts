@@ -117,8 +117,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         const { oneDark } = await import('@codemirror/theme-one-dark');
         const { python } = await import('@codemirror/lang-python');
 
-        // Create editor (prefixed with _ since not used yet - will be needed for run button)
-        const _editor = new EditorView({
+        // Create editor and store reference for content access
+        const editor = new EditorView({
             state: EditorState.create({
                 doc: defaultCode,
                 extensions: [
@@ -131,8 +131,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             parent: editorContainer
         });
 
-        // TODO: Store editor reference on element for later access (needed for run button)
-        // (element as any).editor = _editor;
+        // Store editor reference for content persistence and run button
+        (element as any).editor = editor;
 
         log.debug(SEG.UI, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
     } catch (error) {
@@ -158,6 +158,7 @@ function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
     let dragStartY = 0;
     let elementStartX = 0;
     let elementStartY = 0;
+    let abortController: AbortController | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
@@ -175,13 +176,14 @@ function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
         if (!isDragging) return;
         isDragging = false;
 
-        element.style.opacity = '1';
-        element.style.zIndex = '1';
+        element.classList.remove('is-dragging');
 
-        // Save position
-        const rect = element.getBoundingClientRect();
-        const gridX = Math.round(rect.left / GRID_SIZE);
-        const gridY = Math.round(rect.top / GRID_SIZE);
+        // Save position (calculate relative to canvas parent)
+        const canvas = element.parentElement;
+        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const elementRect = element.getBoundingClientRect();
+        const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
+        const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
         glyph.gridX = gridX;
         glyph.gridY = gridY;
 
@@ -196,8 +198,8 @@ function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
 
         log.debug(SEG.UI, `[PyGlyph] Finished dragging ${glyph.id}`);
 
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        abortController?.abort();
+        abortController = null;
     };
 
     handle.addEventListener('mousedown', (e) => {
@@ -211,11 +213,11 @@ function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
         elementStartX = rect.left;
         elementStartY = rect.top;
 
-        element.style.opacity = '0.8';
-        element.style.zIndex = '1000';
+        element.classList.add('is-dragging');
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        abortController = new AbortController();
+        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
+        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
         log.debug(SEG.UI, `[PyGlyph] Started dragging ${glyph.id}`);
     });
@@ -230,6 +232,7 @@ function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
     let startY = 0;
     let startWidth = 0;
     let startHeight = 0;
+    let abortController: AbortController | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isResizing) return;
@@ -248,7 +251,7 @@ function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
         if (!isResizing) return;
         isResizing = false;
 
-        element.style.opacity = '1';
+        element.classList.remove('is-resizing');
 
         // Save final size
         const rect = element.getBoundingClientRect();
@@ -272,8 +275,8 @@ function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
 
         log.debug(SEG.UI, `[PyGlyph] Finished resizing to ${finalWidth}x${finalHeight}`);
 
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        abortController?.abort();
+        abortController = null;
     };
 
     handle.addEventListener('mousedown', (e) => {
@@ -287,10 +290,11 @@ function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
         startWidth = rect.width;
         startHeight = rect.height;
 
-        element.style.opacity = '0.9';
+        element.classList.add('is-resizing');
 
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        abortController = new AbortController();
+        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
+        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
         log.debug(SEG.UI, `[PyGlyph] Started resizing`);
     });
