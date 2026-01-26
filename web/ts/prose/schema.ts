@@ -6,9 +6,30 @@ import { Schema } from 'prosemirror-model';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
 
-// Extend basic schema with ats_code_block and go_code_block nodes
+// Extend basic schema with frontmatter_block, ats_code_block and go_code_block nodes
 const schemaSpec = {
     nodes: addListNodes(basicSchema.spec.nodes, 'paragraph block*', 'block')
+        .addBefore('code_block', 'frontmatter_block', {
+            content: 'text*',
+            marks: '',
+            group: 'block',
+            code: true,
+            defining: true,
+            attrs: {
+                params: { default: 'yaml' }
+            },
+            parseDOM: [{
+                tag: 'div[data-type="frontmatter"]',
+                preserveWhitespace: 'full',
+                getAttrs: (node) => ({
+                    params: (node as HTMLElement).getAttribute('data-params') || 'yaml'
+                })
+            }],
+            toDOM: (node) => ['div', {
+                'data-type': 'frontmatter',
+                'data-params': node.attrs.params
+            }, ['pre', 0]]
+        })
         .addBefore('code_block', 'ats_code_block', {
             content: 'text*',
             marks: '',
