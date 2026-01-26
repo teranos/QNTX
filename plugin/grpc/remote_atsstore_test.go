@@ -104,5 +104,5 @@ func TestRemoteATSStore_CreateAttestation_InvalidToken(t *testing.T) {
 
 	err = client.CreateAttestation(attestation)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid auth token")
+	assert.Contains(t, err.Error(), "invalid authentication token")
 }
