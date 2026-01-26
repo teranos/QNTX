@@ -67,11 +67,13 @@ export function createCanvasGlyph(): Glyph {
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
 
-            // Render existing glyphs (async to support py glyphs with CodeMirror)
-            glyphs.forEach(async glyph => {
-                const glyphElement = await renderGlyph(glyph);
-                container.appendChild(glyphElement);
-            });
+            // Render existing glyphs asynchronously (to support py glyphs with CodeMirror)
+            (async () => {
+                for (const glyph of glyphs) {
+                    const glyphElement = await renderGlyph(glyph);
+                    container.appendChild(glyphElement);
+                }
+            })();
 
             return container;
         }
@@ -230,19 +232,25 @@ async function spawnPyGlyph(
     // Add to glyphs array
     glyphs.push(pyGlyph);
 
-    // Persist to uiState
-    uiState.addCanvasGlyph({
-        id: pyGlyph.id,
-        symbol: 'py',
-        gridX,
-        gridY
-    });
-
     // Render Python editor glyph
     const glyphElement = await createPyGlyph(pyGlyph);
     canvas.appendChild(glyphElement);
 
-    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY})`);
+    // Get actual rendered size and persist (ensures default size is saved)
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: pyGlyph.id,
+        symbol: 'py',
+        gridX,
+        gridY,
+        width,
+        height
+    });
+
+    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
 
 /**
