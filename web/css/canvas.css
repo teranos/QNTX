@@ -102,3 +102,19 @@
 .canvas-grid-glyph:active {
     cursor: grabbing;
 }
+
+/* Python editor glyphs on canvas */
+.canvas-py-glyph {
+    /* Base styles are set inline in py-glyph.ts */
+}
+
+/* Interaction states for glyphs */
+.canvas-py-glyph.is-dragging,
+.canvas-grid-glyph.is-dragging {
+    opacity: 0.8;
+    z-index: 1000;
+}
+
+.canvas-py-glyph.is-resizing {
+    opacity: 0.9;
+}
