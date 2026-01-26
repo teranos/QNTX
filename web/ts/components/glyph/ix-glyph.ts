@@ -30,54 +30,73 @@ export function createIxGlyph(gridX: number, gridY: number): Glyph {
 function createIxInputForm(): HTMLElement {
     const container = document.createElement('div');
     container.className = 'ix-input-form';
-    container.style.padding = '16px';
+    container.style.padding = '12px';
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
-    container.style.gap = '12px';
-    container.style.minWidth = '400px';
+    container.style.gap = '8px';
+    container.style.width = '320px';
 
-    // Label
-    const label = document.createElement('label');
-    label.textContent = 'Source:';
-    label.style.fontSize = '14px';
-    label.style.fontWeight = '500';
-    label.style.color = 'var(--text-primary)';
+    // Header with symbol
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.gap = '8px';
+    header.style.marginBottom = '4px';
+
+    const symbol = document.createElement('span');
+    symbol.textContent = IX;
+    symbol.style.fontSize = '20px';
+
+    const title = document.createElement('span');
+    title.textContent = 'Ingest';
+    title.style.fontSize = '14px';
+    title.style.fontWeight = '500';
+    title.style.color = 'var(--text-primary)';
+
+    header.appendChild(symbol);
+    header.appendChild(title);
 
     // Textarea input
     const textarea = document.createElement('textarea');
     textarea.className = 'ix-input-textarea';
-    textarea.placeholder = 'Enter URL, file path, or data source...\n\nExamples:\n• https://api.example.com/data\n• file:///path/to/data.json\n• /local/path/to/file';
-    textarea.rows = 6;
+    textarea.placeholder = 'URL or file path...';
+    textarea.rows = 4;
     textarea.style.width = '100%';
     textarea.style.padding = '8px';
-    textarea.style.fontSize = '14px';
+    textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
     textarea.style.backgroundColor = 'var(--bg-tertiary)';
     textarea.style.color = 'var(--text-primary)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
-    textarea.style.resize = 'vertical';
+    textarea.style.resize = 'none';
+    textarea.style.boxSizing = 'border-box';
 
-    // Button container
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.gap = '8px';
-    buttonContainer.style.justifyContent = 'flex-end';
+    // Prevent drag from starting on textarea
+    textarea.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+    });
 
     // Execute button
     const executeBtn = document.createElement('button');
     executeBtn.textContent = 'Execute';
     executeBtn.className = 'ix-execute-button';
-    executeBtn.style.padding = '8px 16px';
-    executeBtn.style.fontSize = '14px';
+    executeBtn.style.padding = '6px 12px';
+    executeBtn.style.fontSize = '13px';
     executeBtn.style.fontWeight = '500';
     executeBtn.style.backgroundColor = 'var(--accent-primary)';
     executeBtn.style.color = 'var(--text-primary)';
     executeBtn.style.border = 'none';
     executeBtn.style.borderRadius = '4px';
     executeBtn.style.cursor = 'pointer';
+    executeBtn.style.alignSelf = 'flex-end';
 
-    executeBtn.addEventListener('click', () => {
+    executeBtn.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+    });
+
+    executeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const input = textarea.value.trim();
         if (!input) {
             log.debug(SEG.UI, '[IX] No input provided');
@@ -91,10 +110,9 @@ function createIxInputForm(): HTMLElement {
     });
 
     // Assemble form
-    container.appendChild(label);
+    container.appendChild(header);
     container.appendChild(textarea);
-    buttonContainer.appendChild(executeBtn);
-    container.appendChild(buttonContainer);
+    container.appendChild(executeBtn);
 
     return container;
 }
