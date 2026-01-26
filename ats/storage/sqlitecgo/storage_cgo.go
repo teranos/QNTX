@@ -163,26 +163,6 @@ func (rs *RustStore) AttestationExists(id string) bool {
 	return bool(result.success)
 }
 
-// DeleteAttestation deletes an attestation by ID.
-func (rs *RustStore) DeleteAttestation(id string) error {
-	if rs.store == nil {
-		return errors.New("store is closed")
-	}
-
-	cID := C.CString(id)
-	defer C.free(unsafe.Pointer(cID))
-
-	result := C.storage_delete(rs.store, cID)
-	defer C.storage_result_free(result)
-
-	if !result.success {
-		errMsg := C.GoString(result.error_msg)
-		return errors.New(errMsg)
-	}
-
-	return nil
-}
-
 // UpdateAttestation updates an existing attestation.
 func (rs *RustStore) UpdateAttestation(as *types.As) error {
 	if rs.store == nil {
@@ -252,23 +232,6 @@ func (rs *RustStore) CountAttestations() (int, error) {
 	}
 
 	return int(result.count), nil
-}
-
-// ClearAllAttestations removes all attestations from the store.
-func (rs *RustStore) ClearAllAttestations() error {
-	if rs.store == nil {
-		return errors.New("store is closed")
-	}
-
-	result := C.storage_clear(rs.store)
-	defer C.storage_result_free(result)
-
-	if !result.success {
-		errMsg := C.GoString(result.error_msg)
-		return errors.New(errMsg)
-	}
-
-	return nil
 }
 
 // Version returns the library version.
