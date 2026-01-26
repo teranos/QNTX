@@ -23,6 +23,7 @@ See [External Plugin Development Guide](../docs/development/external-plugin-guid
 - Variable capture for REPL-like usage
 - pip package installation
 - Module availability checking
+- `attest()` function for creating attestations from Python code
 
 ## Building
 
