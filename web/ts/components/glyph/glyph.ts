@@ -18,6 +18,7 @@ export interface Glyph {
 
     // Manifestation configuration
     manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal';  // Default: 'window'
+    // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;
     defaultX?: number;                   // Default position
