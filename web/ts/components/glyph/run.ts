@@ -397,6 +397,14 @@ class GlyphRunImpl {
                         (id, element) => this.verifyElementTracking(id, element),
                         (element, g) => this.reattachGlyphToIndicator(element, g)
                     );
+                } else if (manifestationType === 'ix') {
+                    morphToIx(
+                        glyphElement,
+                        glyph,
+                        (id, element) => this.verifyElementTracking(id, element),
+                        (id) => this.remove(id),
+                        (element, g) => this.reattachGlyphToIndicator(element, g)
+                    );
                 } else {
                     morphToWindow(
                         glyphElement,
