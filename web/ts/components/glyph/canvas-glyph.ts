@@ -12,7 +12,6 @@ import { Pulse, IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
-import { morphToIx } from './manifestations/ix';
 import { createPyGlyph } from './py-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
@@ -69,43 +68,7 @@ export function createCanvasGlyph(): Glyph {
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
 
-            // Click handler for grid glyphs - trigger manifestation
-            container.addEventListener('glyph-click', ((e: CustomEvent) => {
-                const glyph = e.detail.glyph as Glyph;
-                const glyphElement = e.target as HTMLElement;
-
-                log.debug(SEG.UI, `[Canvas] Glyph clicked: ${glyph.id}, manifestationType: ${glyph.manifestationType}`);
-
-                // Route to correct manifestation
-                if (glyph.manifestationType === 'ix') {
-                    morphToIx(
-                        glyphElement,
-                        glyph,
-                        (id, element) => {
-                            // Verify element (simplified - canvas glyphs aren't tracked)
-                            if (element.dataset.glyphId !== id) {
-                                throw new Error(`Element mismatch: expected ${id}, got ${element.dataset.glyphId}`);
-                            }
-                        },
-                        (id) => {
-                            // Remove glyph (simplified - just remove from array)
-                            const index = glyphs.findIndex(g => g.id === id);
-                            if (index !== -1) {
-                                glyphs.splice(index, 1);
-                            }
-                            uiState.removeCanvasGlyph(id);
-                        },
-                        (_element, g) => {
-                            // Reattach to canvas (simplified - not implemented for canvas glyphs yet)
-                            // TODO: When minimizing from IX manifestation, should it go to tray or back to canvas?
-                            log.debug(SEG.UI, `[Canvas] IX glyph ${g.id} minimized - not re-adding to canvas`);
-                        }
-                    );
-                }
-                // TODO: Handle other manifestation types (Pulse, etc.) when implemented
-            }) as EventListener);
-
-            // Render existing glyphs asynchronously (to support py glyphs with CodeMirror)
+            // Render existing glyphs asynchronously (to support py and ix glyphs)
             (async () => {
                 for (const glyph of glyphs) {
                     const glyphElement = await renderGlyph(glyph);
@@ -261,30 +224,47 @@ function spawnPulseGlyph(
 /**
  * Spawn a new IX glyph at grid position
  */
-function spawnIxGlyph(
+async function spawnIxGlyph(
     gridX: number,
     gridY: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
-): void {
-    const ixGlyph = createIxGlyph(gridX, gridY);
+): Promise<void> {
+    const ixGlyph: Glyph = {
+        id: `ix-${crypto.randomUUID()}`,
+        title: 'Ingest',
+        symbol: IX,
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'IX glyph';
+            return content;
+        }
+    };
 
     // Add to glyphs array
     glyphs.push(ixGlyph);
 
-    // Persist to uiState
+    // Render IX glyph with form
+    const glyphElement = await createIxGlyph(ixGlyph);
+    canvas.appendChild(glyphElement);
+
+    // Get actual rendered size and persist
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
     uiState.addCanvasGlyph({
         id: ixGlyph.id,
         symbol: IX,
         gridX,
-        gridY
+        gridY,
+        width,
+        height
     });
 
-    // Render glyph on canvas
-    const glyphElement = createGridGlyph(ixGlyph);
-    canvas.appendChild(glyphElement);
-
-    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at grid (${gridX}, ${gridY})`);
+    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
 
 /**
@@ -341,6 +321,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For py glyphs, create full editor
     if (glyph.symbol === 'py') {
         return await createPyGlyph(glyph);
+    }
+
+    // For IX glyphs, create full form
+    if (glyph.symbol === IX) {
+        return await createIxGlyph(glyph);
     }
 
     // Otherwise create simple grid glyph
