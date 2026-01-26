@@ -32,7 +32,6 @@ package sqlitecgo
 import "C"
 
 import (
-	"encoding/json"
 	"runtime"
 	"unsafe"
 
@@ -99,10 +98,10 @@ func (rs *RustStore) CreateAttestation(as *types.As) error {
 		return errors.New("store is closed")
 	}
 
-	// Marshal to JSON for FFI
-	jsonBytes, err := json.Marshal(as)
+	// Convert to Rust-compatible JSON format
+	jsonBytes, err := toRustJSON(as)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal attestation")
+		return errors.Wrap(err, "failed to convert attestation")
 	}
 
 	cJSON := C.CString(string(jsonBytes))
@@ -141,12 +140,12 @@ func (rs *RustStore) GetAttestation(id string) (*types.As, error) {
 	}
 
 	jsonStr := C.GoString(result.attestation_json)
-	var as types.As
-	if err := json.Unmarshal([]byte(jsonStr), &as); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal attestation")
+	as, err := fromRustJSON([]byte(jsonStr))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to convert from Rust JSON")
 	}
 
-	return &as, nil
+	return as, nil
 }
 
 // AttestationExists checks if an attestation exists.
@@ -190,9 +189,10 @@ func (rs *RustStore) UpdateAttestation(as *types.As) error {
 		return errors.New("store is closed")
 	}
 
-	jsonBytes, err := json.Marshal(as)
+	// Convert to Rust-compatible JSON format
+	jsonBytes, err := toRustJSON(as)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal attestation")
+		return errors.Wrap(err, "failed to convert attestation")
 	}
 
 	cJSON := C.CString(string(jsonBytes))
