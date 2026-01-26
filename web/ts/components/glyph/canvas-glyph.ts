@@ -8,9 +8,10 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse } from '@generated/sym.js';
+import { Pulse, AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
+import { createAxGlyph } from './ax-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
@@ -40,7 +41,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [Pulse], // Symbols that can be spawned
+        onSpawnMenu: () => [Pulse, AX], // Symbols that can be spawned
 
         renderContent: () => {
             const container = document.createElement('div');
@@ -124,6 +125,19 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pulseBtn);
+
+    // Add AX symbol
+    const axBtn = document.createElement('button');
+    axBtn.className = 'canvas-spawn-button';
+    axBtn.textContent = AX;
+    axBtn.title = 'Spawn Ax query glyph';
+
+    axBtn.addEventListener('click', () => {
+        spawnAxGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(axBtn);
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -183,6 +197,37 @@ function spawnPulseGlyph(
     canvas.appendChild(glyphElement);
 
     log.debug(SEG.UI, `[Canvas] Spawned Pulse glyph at grid (${gridX}, ${gridY})`);
+}
+
+/**
+ * Spawn a new Ax query glyph at grid position
+ */
+function spawnAxGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): void {
+    const axGlyph = createAxGlyph();
+    axGlyph.gridX = gridX;
+    axGlyph.gridY = gridY;
+
+    // Add to glyphs array
+    glyphs.push(axGlyph);
+
+    // Persist to uiState
+    uiState.addCanvasGlyph({
+        id: axGlyph.id,
+        symbol: AX,
+        gridX,
+        gridY
+    });
+
+    // Render glyph on canvas
+    const glyphElement = createGridGlyph(axGlyph);
+    canvas.appendChild(glyphElement);
+
+    log.debug(SEG.UI, `[Canvas] Spawned Ax glyph at grid (${gridX}, ${gridY})`);
 }
 
 /**

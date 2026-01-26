@@ -39,8 +39,16 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     // Set initial position
     updatePosition(element, currentGridX, currentGridY);
 
-    // Set symbol content
-    element.textContent = symbol;
+    // Render content for 'ax' manifestation (inline editor)
+    // Otherwise just show the symbol
+    // TODO: As more inline manifestations are added (ix, so, prompt),
+    // consider refactoring to a manifestation registry or strategy pattern
+    if (glyph.manifestationType === 'ax' && glyph.renderContent) {
+        const content = glyph.renderContent();
+        element.appendChild(content);
+    } else {
+        element.textContent = symbol;
+    }
 
     // Make draggable with grid snapping
     let isDragging = false;
