@@ -36,6 +36,10 @@ export interface Glyph {
     gridX?: number;                      // Grid cell X position
     gridY?: number;                      // Grid cell Y position
     symbol?: string;                     // Symbol to display (for grid children)
+
+    // Size metadata (for resizable glyphs)
+    width?: number;                      // Custom width in pixels
+    height?: number;                     // Custom height in pixels
 }
 
 // Function to check if user prefers reduced motion

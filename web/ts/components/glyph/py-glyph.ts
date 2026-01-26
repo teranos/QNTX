@@ -41,7 +41,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Default code
     const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
 
-    // Calculate initial size based on content
+    // Calculate initial size based on content (if no saved size)
     const lineCount = defaultCode.split('\n').length;
     const lineHeight = 24; // Approximate height per line in CodeMirror
     const titleBarHeight = 36;
@@ -49,12 +49,16 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const maxHeight = 600;
     const calculatedHeight = Math.min(maxHeight, Math.max(minHeight, titleBarHeight + lineCount * lineHeight + 40));
 
-    // Style element - auto-sized based on content
+    // Use saved size if available, otherwise use defaults
+    const width = glyph.width ?? 400;
+    const height = glyph.height ?? calculatedHeight;
+
+    // Style element - auto-sized based on content or restored from saved size
     element.style.position = 'absolute';
     element.style.left = `${gridX * GRID_SIZE}px`;
     element.style.top = `${gridY * GRID_SIZE}px`;
-    element.style.width = '400px';
-    element.style.height = `${calculatedHeight}px`;
+    element.style.width = `${width}px`;
+    element.style.height = `${height}px`;
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
     element.style.backgroundColor = 'var(--bg-secondary)';
@@ -140,7 +144,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     makeDraggable(element, titleBar, glyph);
 
     // Make resizable by handle
-    makeResizable(element, resizeHandle);
+    makeResizable(element, resizeHandle, glyph);
 
     return element;
 }
@@ -220,7 +224,7 @@ function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
 /**
  * Make an element resizable by a handle
  */
-function makeResizable(element: HTMLElement, handle: HTMLElement): void {
+function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
     let isResizing = false;
     let startX = 0;
     let startY = 0;
@@ -246,7 +250,27 @@ function makeResizable(element: HTMLElement, handle: HTMLElement): void {
 
         element.style.opacity = '1';
 
-        log.debug(SEG.UI, `[PyGlyph] Finished resizing`);
+        // Save final size
+        const rect = element.getBoundingClientRect();
+        const finalWidth = Math.round(rect.width);
+        const finalHeight = Math.round(rect.height);
+
+        glyph.width = finalWidth;
+        glyph.height = finalHeight;
+
+        // Persist to uiState
+        if (glyph.symbol && glyph.gridX !== undefined && glyph.gridY !== undefined) {
+            uiState.addCanvasGlyph({
+                id: glyph.id,
+                symbol: glyph.symbol,
+                gridX: glyph.gridX,
+                gridY: glyph.gridY,
+                width: finalWidth,
+                height: finalHeight
+            });
+        }
+
+        log.debug(SEG.UI, `[PyGlyph] Finished resizing to ${finalWidth}x${finalHeight}`);
 
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
