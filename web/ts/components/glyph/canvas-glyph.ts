@@ -131,7 +131,6 @@ function showSpawnMenu(
 
     menu.appendChild(pulseBtn);
 
-<<<<<<< HEAD
     // Add AX symbol
     const axBtn = document.createElement('button');
     axBtn.className = 'canvas-spawn-button';
@@ -144,7 +143,7 @@ function showSpawnMenu(
     });
 
     menu.appendChild(axBtn);
-=======
+
     // TODO: Refactor spawn menu to be data-driven
     // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
     // This will make it easier to add new programmature types (go, rs, ts)
@@ -161,7 +160,7 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pyBtn);
->>>>>>> origin/main
+
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -224,20 +223,13 @@ function spawnPulseGlyph(
 }
 
 /**
-<<<<<<< HEAD
  * Spawn a new Ax query glyph at grid position
  */
 function spawnAxGlyph(
-=======
- * Spawn a new Python glyph at grid position
- */
-async function spawnPyGlyph(
->>>>>>> origin/main
     gridX: number,
     gridY: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
-<<<<<<< HEAD
 ): void {
     const axGlyph = createAxGlyph();
     axGlyph.gridX = gridX;
@@ -259,7 +251,16 @@ async function spawnPyGlyph(
     canvas.appendChild(glyphElement);
 
     log.debug(SEG.UI, `[Canvas] Spawned Ax glyph at grid (${gridX}, ${gridY})`);
-=======
+}
+
+/**
+ * Spawn a new Python glyph at grid position
+ */
+async function spawnPyGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
 ): Promise<void> {
     const pyGlyph: Glyph = {
         id: `py-${crypto.randomUUID()}`,
@@ -296,7 +297,6 @@ async function spawnPyGlyph(
     });
 
     log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
->>>>>>> origin/main
 }
 
 /**
