@@ -3,12 +3,16 @@ package async
 import (
 	"time"
 
-	"github.com/teranos/QNTX/ats/ix"
 	"go.uber.org/zap"
 )
 
-// JobProgressEmitter implements ix.ProgressEmitter for async job progress updates.
-// ✿/❀ Opening/Closing: Now saves checkpoints on stage transitions.
+// JobProgressEmitter implements pulse.ProgressEmitter for async job progress updates.
+// This is domain-agnostic infrastructure - it knows nothing about specific domains
+// like attestations, candidates, medical records, etc.
+//
+// Domain-specific code should create wrapper emitters that add convenience methods
+// while delegating to this base emitter. See ats/ix/progress_domain_agnostic_test.go
+// for examples of the wrapper pattern.
 type JobProgressEmitter struct {
 	job               *Job
 	queue             *Queue
@@ -43,8 +47,10 @@ func (e *JobProgressEmitter) EmitStage(stage, message string) {
 	}
 }
 
-// EmitAttestations updates job progress for attestation creation.
-func (e *JobProgressEmitter) EmitAttestations(count int, entities []ix.AttestationEntity) {
+// EmitProgress updates job progress with a count and optional metadata.
+// This is the domain-agnostic method for reporting batch progress.
+// Domains can pass any relevant data in the metadata map.
+func (e *JobProgressEmitter) EmitProgress(count int, metadata map[string]interface{}) {
 	// Update job progress
 	e.job.UpdateProgress(e.job.Progress.Current + count)
 
@@ -52,24 +58,6 @@ func (e *JobProgressEmitter) EmitAttestations(count int, entities []ix.Attestati
 	if err := e.queue.UpdateJob(e.job); err != nil {
 		e.log.Warnw("Failed to update job progress",
 			"count", count,
-			"error", err,
-		)
-	}
-}
-
-// EmitCandidateMatch updates job progress for candidate scoring.
-func (e *JobProgressEmitter) EmitCandidateMatch(candidateID string, score float64, qualified bool, reasoning string) {
-	// Update job progress
-	e.job.UpdateProgress(e.job.Progress.Current + 1)
-
-	// Record cost (assuming cost per score from config)
-	// TODO: Get actual cost from config
-	e.job.RecordCost(0.002)
-
-	// Update job in database
-	if err := e.queue.UpdateJob(e.job); err != nil {
-		e.log.Warnw("Failed to update job progress",
-			"candidate_id", candidateID,
 			"error", err,
 		)
 	}
