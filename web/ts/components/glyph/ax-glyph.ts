@@ -36,7 +36,7 @@ export function createAxGlyph(id?: string, initialQuery: string = 'find all'): G
         id: glyphId,
         title: 'Ax Query',
         symbol: AX,
-        manifestationType: 'ax' as any, // Ax manifestation - inline grid editor
+        manifestationType: 'ax', // Ax manifestation - inline grid editor
         renderContent: () => {
             const container = document.createElement('div');
             container.className = 'ax-query-editor';
