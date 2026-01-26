@@ -1,16 +1,17 @@
 /**
- * IX Glyph - Ingest data from external sources
+ * IX Glyph - Lightweight reference on canvas
  *
- * Provides a form for entering URLs, file paths, or any ix-compatible input.
- * Executes ingestion and creates attestations from the imported data.
+ * A visual marker on the canvas showing an IX operation.
+ * Clicking it opens the full IX manifestation (editor/previewer).
+ * The manifestation can minimize back to the tray, but the canvas glyph persists.
  */
 
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
-import { renderIxManifestation } from './manifestations/ix';
 
 /**
- * Create an IX glyph with IX manifestation
+ * Create a lightweight IX glyph for canvas
+ * This is just a reference/thumbnail - clicking it opens the full IX manifestation
  */
 export function createIxGlyph(gridX: number, gridY: number): Glyph {
     return {
@@ -20,7 +21,12 @@ export function createIxGlyph(gridX: number, gridY: number): Glyph {
         manifestationType: 'ix',
         gridX,
         gridY,
-        renderContent: () => renderIxManifestation()
+        renderContent: () => {
+            // Placeholder - actual content rendered by morphToIx
+            const placeholder = document.createElement('div');
+            placeholder.textContent = 'IX Manifestation';
+            return placeholder;
+        }
     };
 }
 

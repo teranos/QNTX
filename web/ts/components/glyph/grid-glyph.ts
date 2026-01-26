@@ -11,6 +11,8 @@ import { GRID_SIZE } from './grid-constants';
 
 /**
  * Create a grid-positioned glyph element
+ * Canvas glyphs are lightweight references (symbols only)
+ * Clicking them morphs to their full manifestation
  */
 export function createGridGlyph(glyph: Glyph): HTMLElement {
     const element = document.createElement('div');
@@ -22,39 +24,22 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     let currentGridX = glyph.gridX ?? 5;
     let currentGridY = glyph.gridY ?? 5;
 
-    // Check if glyph has content to render (e.g., IX input form)
-    const hasContent = glyph.renderContent !== undefined;
-
-    // Style element
+    // Style element - all canvas glyphs are symbol-only (40px squares)
     element.style.position = 'absolute';
-
-    if (hasContent) {
-        // Content glyphs are larger and render their content
-        element.style.width = 'auto';
-        element.style.height = 'auto';
-        element.style.display = 'block';
-
-        // Render the content
-        const content = glyph.renderContent!();
-        element.appendChild(content);
-    } else {
-        // Symbol-only glyphs are small (40px)
-        element.style.width = `${GRID_SIZE}px`;
-        element.style.height = `${GRID_SIZE}px`;
-        element.style.display = 'flex';
-        element.style.alignItems = 'center';
-        element.style.justifyContent = 'center';
-        element.style.fontSize = '24px';
-
-        // Set symbol content
-        element.textContent = symbol;
-    }
-
+    element.style.width = `${GRID_SIZE}px`;
+    element.style.height = `${GRID_SIZE}px`;
+    element.style.display = 'flex';
+    element.style.alignItems = 'center';
+    element.style.justifyContent = 'center';
+    element.style.fontSize = '24px';
     element.style.cursor = 'move';
     element.style.userSelect = 'none';
     element.style.backgroundColor = 'var(--bg-secondary)';
     element.style.borderRadius = '4px';
     element.style.border = '1px solid var(--border-color)';
+
+    // Set symbol content
+    element.textContent = symbol;
 
     // Set initial position
     updatePosition(element, currentGridX, currentGridY);
