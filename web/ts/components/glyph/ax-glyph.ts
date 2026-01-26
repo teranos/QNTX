@@ -56,8 +56,8 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
 
             // Style element - resizable
             container.style.position = 'absolute';
-            container.style.left = `${(gridX ?? 5) * GRID_SIZE}px`;
-            container.style.top = `${(gridY ?? 5) * GRID_SIZE}px`;
+            container.style.left = `${(glyph.gridX ?? gridX ?? 5) * GRID_SIZE}px`;
+            container.style.top = `${(glyph.gridY ?? gridY ?? 5) * GRID_SIZE}px`;
             container.style.width = `${width}px`;
             container.style.height = `${height}px`;
             container.style.minWidth = '200px';
