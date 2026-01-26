@@ -464,7 +464,7 @@ class ConfigPanel extends BasePanel {
         const paths: Record<string, string> = {
             'system': '/etc/qntx/config.toml',
             'user': '~/.qntx/config.toml',
-            'user_ui': '~/.qntx/config_from_ui.toml',
+            'user_ui': '~/.qntx/am_from_ui.toml',
             'project': 'config.toml (project root)',
             'environment': 'Environment variable (QNTX_*)',
             'default': 'Built-in default value'
