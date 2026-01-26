@@ -67,6 +67,14 @@ export interface CanvasGlyphState {
     width?: number;  // Optional: custom width in pixels (for resizable glyphs)
     height?: number; // Optional: custom height in pixels (for resizable glyphs)
     code?: string;   // Optional: editor content (for programmature glyphs)
+    result?: {       // Optional: execution result (for result glyphs)
+        success: boolean;
+        stdout: string;
+        stderr: string;
+        result: any;
+        error: string | null;
+        duration_ms: number;
+    };
 }
 
 /**
