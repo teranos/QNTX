@@ -54,7 +54,13 @@ impl AtsStoreClient {
 
         // Run async connect in blocking context
         let channel = Handle::current()
-            .block_on(async { Channel::from_shared(endpoint.clone())?.connect().await })
+            .block_on(async {
+                let ep = Channel::from_shared(endpoint.clone())
+                    .map_err(|e| format!("invalid endpoint: {}", e))?;
+                ep.connect()
+                    .await
+                    .map_err(|e| format!("connection failed: {}", e))
+            })
             .map_err(|e| format!("failed to connect to ATSStore at {}: {}", endpoint, e))?;
 
         self.channel = Some(channel.clone());
