@@ -1,6 +1,19 @@
 //! gRPC service implementation for the Python plugin
 //!
 //! Implements the DomainPluginService interface for QNTX.
+//!
+//! TODO: uv-based package management
+//! Add HTTP endpoints for installing Python packages via `uv`:
+//! - POST /uv/install - Install package using `uv pip install <package>`
+//! - GET /uv/check - Check if module is available
+//!
+//! Implementation considerations:
+//! - Option A: New module qntx-python/src/uv.rs that calls uv CLI via std::process::Command
+//! - Option B: Add handlers to service.rs HTTP routing
+//! - Option C: Separate qntx-uv plugin for cleaner separation
+//! - Option D: Go-side wrapper in plugin/python
+//!
+//! Decision deferred - need to evaluate which approach best fits QNTX architecture.
 
 use crate::atsstore;
 use crate::config::PluginConfig;

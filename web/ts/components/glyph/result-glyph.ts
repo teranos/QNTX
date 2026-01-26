@@ -135,6 +135,7 @@ export function createResultGlyph(
     outputContainer.style.fontSize = '12px';
     outputContainer.style.whiteSpace = 'pre-wrap';
     outputContainer.style.wordBreak = 'break-word';
+    outputContainer.style.color = '#e0e0e0'; // Light text for dark background
 
     // Build output text
     let outputText = '';

@@ -68,7 +68,7 @@ export function createCanvasGlyph(): Glyph {
             container.style.height = '100%';
             container.style.position = 'relative';
             container.style.overflow = 'hidden';
-            container.style.backgroundColor = 'var(--bg-primary)';
+            container.style.backgroundColor = '#2a2b2a'; // Mid-dark gray for night work
 
             // Add subtle grid overlay
             const gridOverlay = document.createElement('div');
@@ -96,7 +96,18 @@ export function createCanvasGlyph(): Glyph {
 
 /**
  * Show right-click spawn menu with available symbols
- * TODO: Spawn menu as container glyph, menu items as glyphs
+ *
+ * TODO: Spawn menu as glyph with morphing mini-glyphs
+ *
+ * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
+ * proximity morphing like GlyphRun. As mouse approaches, glyphs morph larger and
+ * reveal labels. Clicking a morphed glyph spawns that type on canvas.
+ *
+ * Implementation:
+ * - Menu container: Glyph entity with renderContent
+ * - Menu items: Array of tiny glyphs with symbols (Pulse, "py", "go", "rs", "ts")
+ * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
+ * - Priority: Medium (after core window↔glyph morphing works)
  */
 function showSpawnMenu(
     mouseX: number,
