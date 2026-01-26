@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-yaml": "^6.1.2",
     "smol-toml": "^1.6.0"
   }
 }
