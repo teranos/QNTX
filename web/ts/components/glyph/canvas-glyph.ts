@@ -22,21 +22,32 @@ import { GRID_SIZE } from './grid-constants';
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
     const savedGlyphs = uiState.getCanvasGlyphs();
-    const glyphs: Glyph[] = savedGlyphs.map(saved => ({
-        id: saved.id,
-        title: 'Pulse Schedule',
-        symbol: saved.symbol,
-        gridX: saved.gridX,
-        gridY: saved.gridY,
-        width: saved.width,   // Restore custom size if saved
-        height: saved.height,
-        // TODO: Clarify if grid glyphs should display content
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Pulse glyph content (TBD)';
-            return content;
+    const glyphs: Glyph[] = savedGlyphs.map(saved => {
+        // For ax glyphs, recreate using factory function to restore full functionality
+        if (saved.symbol === AX) {
+            const axGlyph = createAxGlyph(saved.id, '', saved.gridX, saved.gridY);
+            axGlyph.width = saved.width;
+            axGlyph.height = saved.height;
+            return axGlyph;
         }
-    }));
+
+        // For other glyphs, create simple representation
+        return {
+            id: saved.id,
+            title: 'Pulse Schedule',
+            symbol: saved.symbol,
+            gridX: saved.gridX,
+            gridY: saved.gridY,
+            width: saved.width,   // Restore custom size if saved
+            height: saved.height,
+            // TODO: Clarify if grid glyphs should display content
+            renderContent: () => {
+                const content = document.createElement('div');
+                content.textContent = 'Pulse glyph content (TBD)';
+                return content;
+            }
+        };
+    });
 
     return {
         id: 'canvas-workspace',
@@ -231,26 +242,34 @@ function spawnAxGlyph(
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): void {
-    const axGlyph = createAxGlyph();
-    axGlyph.gridX = gridX;
-    axGlyph.gridY = gridY;
+    const axGlyph = createAxGlyph(undefined, '', gridX, gridY);
 
     // Add to glyphs array
     glyphs.push(axGlyph);
 
-    // Persist to uiState
+    // Render glyph on canvas (ax glyphs now render themselves)
+    const glyphElement = axGlyph.renderContent();
+    canvas.appendChild(glyphElement);
+
+    // Get actual rendered size and persist (ensures default size is saved)
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    // Update glyph with actual dimensions
+    axGlyph.width = width;
+    axGlyph.height = height;
+
     uiState.addCanvasGlyph({
         id: axGlyph.id,
         symbol: AX,
         gridX,
-        gridY
+        gridY,
+        width,
+        height
     });
 
-    // Render glyph on canvas
-    const glyphElement = createGridGlyph(axGlyph);
-    canvas.appendChild(glyphElement);
-
-    log.debug(SEG.UI, `[Canvas] Spawned Ax glyph at grid (${gridX}, ${gridY})`);
+    log.debug(SEG.UI, `[Canvas] Spawned Ax glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
 
 /**
@@ -307,6 +326,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For py glyphs, create full editor
     if (glyph.symbol === 'py') {
         return await createPyGlyph(glyph);
+    }
+
+    // For ax glyphs, render content directly (they handle their own rendering)
+    if (glyph.symbol === AX) {
+        return glyph.renderContent();
     }
 
     // Otherwise create simple grid glyph
