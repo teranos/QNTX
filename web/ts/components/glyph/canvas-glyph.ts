@@ -27,6 +27,8 @@ export function createCanvasGlyph(): Glyph {
         symbol: saved.symbol,
         gridX: saved.gridX,
         gridY: saved.gridY,
+        width: saved.width,   // Restore custom size if saved
+        height: saved.height,
         // TODO: Clarify if grid glyphs should display content
         renderContent: () => {
             const content = document.createElement('div');
