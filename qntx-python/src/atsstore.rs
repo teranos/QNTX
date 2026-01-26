@@ -11,7 +11,6 @@ use pyo3::types::PyDict;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::runtime::Handle;
 use tonic::transport::Channel;
 use tracing::{debug, error, info};
 
@@ -51,19 +50,37 @@ impl AtsStoreClient {
         let endpoint = self.config.endpoint.clone();
         debug!("Connecting to ATSStore at {}", endpoint);
 
-        // Run async connect in blocking context
-        let channel = Handle::current()
-            .block_on(async {
-                let ep = Channel::from_shared(endpoint.clone())
+        // Clone for error message after thread
+        let endpoint_for_error = endpoint.clone();
+
+        // Spawn a separate OS thread with its own runtime (avoid "runtime within runtime" error)
+        let channel = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| format!("failed to create runtime: {}", e))?;
+
+            rt.block_on(async {
+                // Ensure endpoint has http:// scheme for tonic
+                let endpoint_uri = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                    endpoint.clone()
+                } else {
+                    format!("http://{}", endpoint)
+                };
+
+                let ep = Channel::from_shared(endpoint_uri)
                     .map_err(|e| format!("invalid endpoint: {}", e))?;
                 ep.connect()
                     .await
                     .map_err(|e| format!("connection failed: {}", e))
             })
-            .map_err(|e| format!("failed to connect to ATSStore at {}: {}", endpoint, e))?;
+        })
+        .join()
+        .map_err(|e| format!("thread panicked: {:?}", e))?
+        .map_err(|e| format!("failed to connect to ATSStore at {}: {}", endpoint_for_error, e))?;
 
         self.channel = Some(channel.clone());
-        info!("Connected to ATSStore at {}", endpoint);
+        info!("Connected to ATSStore at {}", endpoint_for_error);
         Ok(channel)
     }
 
@@ -78,8 +95,9 @@ impl AtsStoreClient {
         actors: Option<Vec<String>>,
         attributes: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AttestationResult, String> {
-        let channel = self.connect()?;
-        let mut client = AtsStoreServiceClient::new(channel);
+        // Get endpoint for use in spawned thread
+        let endpoint = self.config.endpoint.clone();
+        let auth_token = self.config.auth_token.clone();
 
         // Serialize attributes to JSON if provided
         let attributes_json = match attributes {
@@ -98,15 +116,40 @@ impl AtsStoreClient {
         };
 
         let request = GenerateAttestationRequest {
-            auth_token: self.config.auth_token.clone(),
+            auth_token,
             command: Some(command),
         };
 
-        // Run async gRPC call in blocking context
-        let response = Handle::current()
-            .block_on(async { client.generate_and_create_attestation(request).await })
-            .map_err(|e| format!("gRPC error: {}", e))?
-            .into_inner();
+        // Spawn a separate OS thread with its own runtime (avoid "runtime within runtime" error)
+        let response = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| format!("failed to create runtime: {}", e))?;
+
+            rt.block_on(async {
+                // Create fresh connection inside the spawned thread's async context
+                // Ensure endpoint has http:// scheme for tonic
+                let endpoint_uri = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                    endpoint.clone()
+                } else {
+                    format!("http://{}", endpoint)
+                };
+
+                let ep = Channel::from_shared(endpoint_uri)
+                    .map_err(|e| format!("invalid endpoint: {}", e))?;
+
+                let channel = ep.connect().await
+                    .map_err(|e| format!("connection failed: {}", e))?;
+
+                let mut client = AtsStoreServiceClient::new(channel);
+                client.generate_and_create_attestation(request).await
+                    .map_err(|e| format!("gRPC error: {}", e))
+            })
+        })
+        .join()
+        .map_err(|e| format!("thread panicked: {:?}", e))??
+        .into_inner();
 
         if !response.success {
             error!("Failed to create attestation: {}", response.error);

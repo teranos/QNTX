@@ -130,11 +130,19 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                 })
             });
 
-            if (!response.ok) {
+            // Try to parse response body as ExecutionResult (even on 400)
+            let result: ExecutionResult;
+            try {
+                result = await response.json();
+            } catch (e) {
+                // If we can't parse the body, throw a generic error
                 throw new Error(`Execution failed: ${response.statusText}`);
             }
 
-            const result: ExecutionResult = await response.json();
+            // If response is not ok and we don't have a valid ExecutionResult, throw
+            if (!response.ok && !result) {
+                throw new Error(`Execution failed: ${response.statusText}`);
+            }
 
             // Calculate position for result glyph (directly below this py glyph)
             const pyRect = element.getBoundingClientRect();
