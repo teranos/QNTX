@@ -30,7 +30,7 @@ func NewRemoteATSStore(ctx context.Context, endpoint string, authToken string, l
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect to ATSStore gRPC endpoint")
 	}
 
 	client := protocol.NewATSStoreServiceClient(conn)
@@ -62,7 +62,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	if cmd.Attributes != nil {
 		attributesJSON, err := attributesToJSON(cmd.Attributes)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to marshal attributes")
 		}
 		protoCmd.AttributesJson = attributesJSON
 	}
@@ -78,7 +78,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 
 	resp, err := r.client.GenerateAndCreateAttestation(r.ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "gRPC GenerateAndCreateAttestation failed")
 	}
 
 	if !resp.Success {
@@ -151,7 +151,7 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 
 	resp, err := r.client.GetAttestations(r.ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "gRPC GetAttestations failed")
 	}
 
 	// Convert response attestations
@@ -184,21 +184,44 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 	return attestations, nil
 }
 
-// CreateAttestation is not implemented for remote plugins.
-// Use GenerateAndCreateAttestation instead.
+// CreateAttestation creates an attestation with a pre-generated ID via gRPC.
 func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
-	r.logger.Warn("CreateAttestation not supported for remote plugins - use GenerateAndCreateAttestation")
-	return errors.New("CreateAttestation not supported for remote plugins")
-}
+	// Marshal attributes to JSON string
+	attributesJSON := ""
+	if a.Attributes != nil {
+		json, err := attributesToJSON(a.Attributes)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal attributes")
+		}
+		attributesJSON = json
+	}
 
-// GetAttestation is not implemented for remote plugins.
-func (r *RemoteATSStore) GetAttestation(asid string) (*types.As, error) {
-	r.logger.Warn("GetAttestation not supported for remote plugins yet")
-	return nil, errors.New("GetAttestation not supported for remote plugins yet")
-}
+	protoAtt := &protocol.Attestation{
+		Id:             a.ID,
+		Subjects:       a.Subjects,
+		Predicates:     a.Predicates,
+		Contexts:       a.Contexts,
+		Actors:         a.Actors,
+		Timestamp:      a.Timestamp.Unix(),
+		Source:         a.Source,
+		AttributesJson: attributesJSON,
+		CreatedAt:      a.CreatedAt.Unix(),
+	}
 
-// DeleteAttestation is not implemented for remote plugins.
-func (r *RemoteATSStore) DeleteAttestation(asid string) error {
-	r.logger.Warn("DeleteAttestation not supported for remote plugins")
-	return errors.New("DeleteAttestation not supported for remote plugins")
+	req := &protocol.CreateAttestationRequest{
+		AuthToken:   r.authToken,
+		Attestation: protoAtt,
+	}
+
+	resp, err := r.client.CreateAttestation(r.ctx, req)
+	if err != nil {
+		return errors.Wrap(err, "gRPC CreateAttestation failed")
+	}
+
+	if !resp.Success {
+		return errors.Newf("failed to create attestation: %s", resp.Error)
+	}
+
+	r.logger.Infow("Attestation created via gRPC", "id", a.ID)
+	return nil
 }
