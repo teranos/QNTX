@@ -261,4 +261,3 @@ func TestRustStore_Update(t *testing.T) {
 		t.Errorf("Subjects after update = %v, want [EEG_Beta_Wave]", retrieved.Subjects)
 	}
 }
-

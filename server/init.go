@@ -180,8 +180,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	if pluginRegistry != nil {
 		server.pluginRegistry = pluginRegistry
 
-		// Initialize plugins with services
-		store := storage.NewSQLStore(db, serverLogger)
+		// Initialize plugins with services (uses Rust backend when built with rustsqlite tag)
+		store, err := createAttestationStore(db, dbPath, serverLogger)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create attestation store")
+		}
 		queue := daemon.GetQueue()
 
 		// Start gRPC services for plugins (Issue #138)

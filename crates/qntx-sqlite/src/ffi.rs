@@ -389,6 +389,51 @@ pub extern "C" fn storage_clear(store: *mut SqliteStore) -> StorageResultC {
     }
 }
 
+/// Query attestations with filters (returns JSON array of matching attestations)
+#[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn storage_query(
+    store: *const SqliteStore,
+    filter_json: *const c_char,
+) -> AttestationResultC {
+    if store.is_null() {
+        return AttestationResultC::error("null store pointer");
+    }
+    if filter_json.is_null() {
+        return AttestationResultC::error("null filter JSON");
+    }
+
+    let filter_str = match unsafe { CStr::from_ptr(filter_json) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return AttestationResultC::error("invalid UTF-8 in filter JSON"),
+    };
+
+    if filter_str.len() > MAX_JSON_LENGTH {
+        return AttestationResultC::error("filter JSON exceeds maximum length");
+    }
+
+    let store = unsafe { &*store };
+
+    // Parse filter JSON
+    let filter: qntx_core::AxFilter = match serde_json::from_str(filter_str) {
+        Ok(f) => f,
+        Err(e) => return AttestationResultC::error(&format!("invalid filter JSON: {}", e)),
+    };
+
+    // Query attestations
+    use qntx_core::storage::QueryStore;
+    let result = match store.query(&filter) {
+        Ok(r) => r,
+        Err(e) => return AttestationResultC::error(&format!("query failed: {}", e)),
+    };
+
+    // Convert attestations to JSON array
+    match serde_json::to_string(&result.attestations) {
+        Ok(json) => AttestationResultC::ok(json),
+        Err(e) => AttestationResultC::error(&format!("failed to serialize results: {}", e)),
+    }
+}
+
 // ============================================================================
 // Memory Management
 // ============================================================================
