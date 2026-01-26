@@ -2,12 +2,17 @@
  * Grid Glyph - Visual representation of a glyph on canvas grid
  *
  * Renders a symbol at a grid position, draggable with grid snapping.
+ * Clicking (without dragging) opens the glyph's manifestation.
  */
 
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { glyphRun } from './run';
+
+// Threshold in pixels - if mouse moves less than this, it's a click not a drag
+const CLICK_THRESHOLD = 5;
 
 /**
  * Create a grid-positioned glyph element
@@ -56,6 +61,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     let dragStartY = 0;
     let elementStartX = 0;
     let elementStartY = 0;
+    let totalMovement = 0; // Track total movement to distinguish click from drag
 
     // Event handlers that need cleanup
     const handleMouseMove = (e: MouseEvent) => {
@@ -64,6 +70,10 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         // Calculate new pixel position
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
+
+        // Track total movement for click detection
+        totalMovement = Math.abs(deltaX) + Math.abs(deltaY);
+
         const newX = elementStartX + deltaX;
         const newY = elementStartY + deltaY;
 
@@ -84,7 +94,18 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         element.style.opacity = '1';
         element.style.zIndex = '';
 
-        // Get final grid position
+        // Clean up temporary drag listeners first
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+
+        // Check if this was a click (minimal movement) vs a drag
+        if (totalMovement < CLICK_THRESHOLD) {
+            log.debug(SEG.UI, `[GridGlyph] Click detected on ${glyph.id}, opening manifestation`);
+            openManifestation(glyph);
+            return;
+        }
+
+        // It was a drag - save the new position
         const rect = element.getBoundingClientRect();
         currentGridX = Math.round(rect.left / GRID_SIZE);
         currentGridY = Math.round(rect.top / GRID_SIZE);
@@ -105,16 +126,13 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         }
 
         log.debug(SEG.UI, `[GridGlyph] Finished dragging ${glyph.id} to grid (${currentGridX}, ${currentGridY})`);
-
-        // Clean up temporary drag listeners
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
     };
 
     element.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation(); // Prevent canvas context menu
         isDragging = true;
+        totalMovement = 0; // Reset movement tracking
 
         // Record start positions
         dragStartX = e.clientX;
@@ -130,7 +148,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
 
-        log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
+        log.debug(SEG.UI, `[GridGlyph] Started interaction with ${glyph.id} at grid (${currentGridX}, ${currentGridY})`);
     });
 
     return element;
@@ -142,4 +160,53 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
 function updatePosition(element: HTMLElement, gridX: number, gridY: number): void {
     element.style.left = `${gridX * GRID_SIZE}px`;
     element.style.top = `${gridY * GRID_SIZE}px`;
+}
+
+/**
+ * Open a glyph's manifestation
+ * Creates a new glyph in the tray system and morphs it to its manifestation type
+ *
+ * Canvas glyphs are launch points - clicking them opens a manifestation window.
+ * The canvas glyph persists while the manifestation can be opened/closed/minimized.
+ */
+function openManifestation(glyph: Glyph): void {
+    // Only IX glyphs have manifestations currently
+    if (glyph.manifestationType !== 'ix') {
+        log.debug(SEG.UI, `[GridGlyph] No manifestation for ${glyph.id} (type: ${glyph.manifestationType})`);
+        return;
+    }
+
+    // Create a manifestation glyph ID based on the canvas glyph
+    // This links the manifestation back to its canvas source
+    const manifestationId = `${glyph.id}-manifestation`;
+
+    // Check if this manifestation is already open
+    if (glyphRun.has(manifestationId)) {
+        log.debug(SEG.UI, `[GridGlyph] Manifestation ${manifestationId} already exists`);
+        // TODO: Focus the existing manifestation window
+        return;
+    }
+
+    // Create a new glyph for the manifestation
+    const manifestationGlyph: Glyph = {
+        id: manifestationId,
+        title: glyph.title,
+        symbol: glyph.symbol,
+        manifestationType: 'ix',
+        renderContent: glyph.renderContent
+    };
+
+    // Add to tray (this creates the element via the factory)
+    glyphRun.add(manifestationGlyph);
+
+    // The glyph is now in the tray as a dot - we need to trigger a click to morph it
+    // Use a small delay to ensure the element is in the DOM
+    setTimeout(() => {
+        const element = document.querySelector(`[data-glyph-id="${manifestationId}"]`) as HTMLElement;
+        if (element) {
+            element.click();
+        }
+    }, 0);
+
+    log.debug(SEG.UI, `[GridGlyph] Opened manifestation for ${glyph.id}`);
 }
