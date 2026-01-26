@@ -126,6 +126,10 @@ function showSpawnMenu(
 
     menu.appendChild(pulseBtn);
 
+    // TODO: Refactor spawn menu to be data-driven
+    // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
+    // This will make it easier to add new programmature types (go, rs, ts)
+
     // Add py button
     const pyBtn = document.createElement('button');
     pyBtn.className = 'canvas-spawn-button';

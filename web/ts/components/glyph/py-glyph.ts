@@ -8,6 +8,15 @@
  * - Clicking a py glyph will spawn a full 'programmature' manifestation
  * - That manifestation can minimize to tray like windows
  * - The canvas py glyph remains as a spatial reference/preview
+ *
+ * TODO: Integration points
+ * 1. Click handler to spawn programmature manifestation (manifestations/programmature.ts)
+ * 2. Code persistence - save/load glyph content to filesystem or database
+ * 3. Run button integration with /api/python/execute endpoint
+ * 4. Multi-language support - extract common logic for go, rs, ts variants
+ * 5. Auto-resize based on actual editor content (listen to CodeMirror changes)
+ * 6. Syntax error indicators in title bar
+ * 7. File path association (show file path in title bar)
  */
 
 import type { Glyph } from './glyph';
@@ -17,6 +26,9 @@ import { GRID_SIZE } from './grid-constants';
 
 /**
  * Create a Python editor glyph with CodeMirror
+ *
+ * TODO: Accept code content as parameter instead of always using defaultCode
+ * TODO: Store editor reference for later access (code execution, content updates)
  */
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
@@ -63,6 +75,10 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     titleBar.style.userSelect = 'none';
     titleBar.style.fontWeight = 'bold';
     titleBar.style.fontSize = '14px';
+
+    // TODO: Add click handler to spawn programmature manifestation
+    // titleBar.addEventListener('click', () => spawnProgrammatureManifestation(glyph));
+
     element.appendChild(titleBar);
 
     // Editor container
@@ -86,6 +102,10 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.appendChild(resizeHandle);
 
     // Initialize CodeMirror
+    // TODO: Add run button in title bar that executes code via /api/python/execute
+    // TODO: Add output panel below editor to show execution results
+    // TODO: Load code from persistence layer (filesystem/database) instead of defaultCode
+    // TODO: Auto-save code changes to persistence layer (debounced)
     try {
         const { EditorView, keymap } = await import('@codemirror/view');
         const { EditorState } = await import('@codemirror/state');
@@ -105,6 +125,9 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             }),
             parent: editorContainer
         });
+
+        // TODO: Store editor reference on element for later access
+        // (element as any).editor = editor;
 
         log.debug(SEG.UI, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
     } catch (error) {
