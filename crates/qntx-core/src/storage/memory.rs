@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::attestation::{Attestation, AxFilter, AxResult, AxSummary, Conflict};
+use crate::attestation::{Attestation, AxFilter, AxResult, AxSummary};
 use crate::storage::error::{StoreError, StoreResult};
 use crate::storage::traits::{AttestationStore, QueryStore, StorageStats};
 
