@@ -17,7 +17,7 @@ export interface Glyph {
     renderContent: () => HTMLElement;    // Function to render content
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal';  // Default: 'window'
+    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'ix';  // Default: 'window'
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;
     defaultX?: number;                   // Default position
