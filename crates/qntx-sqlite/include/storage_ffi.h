@@ -149,6 +149,15 @@ CountResultC storage_count(const SqliteStore *store);
  */
 StorageResultC storage_clear(SqliteStore *store);
 
+/**
+ * Query attestations with filters.
+ *
+ * @param store Store handle
+ * @param filter_json JSON-encoded AxFilter
+ * @return Result with JSON array of matching attestations
+ */
+AttestationResultC storage_query(const SqliteStore *store, const char *filter_json);
+
 // ============================================================================
 // Memory Management
 // ============================================================================
