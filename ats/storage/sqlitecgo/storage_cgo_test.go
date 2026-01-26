@@ -80,9 +80,10 @@ func TestRustStore_Exists(t *testing.T) {
 	// Create
 	as := &types.As{
 		ID:         "AS-exists-1",
-		Subjects:   []string{"TEST"},
-		Predicates: []string{"test"},
-		Contexts:   []string{"test"},
+		Subjects:   []string{"CHARLIE"},
+		Predicates: []string{"maintains"},
+		Contexts:   []string{"qntx-sqlite"},
+		Actors:     []string{"human:alice"},
 		Timestamp:  time.Now(),
 		Source:     "test",
 		Attributes: make(map[string]interface{}),
@@ -113,17 +114,31 @@ func TestRustStore_Count(t *testing.T) {
 		t.Errorf("CountAttestations() = %d, want 0", count)
 	}
 
-	// Create two attestations
-	for i := 1; i <= 2; i++ {
-		as := &types.As{
-			ID:         "AS-count-" + string(rune('0'+i)),
-			Subjects:   []string{"TEST"},
-			Predicates: []string{"test"},
-			Contexts:   []string{"test"},
+	// Create two attestations with varied data
+	attestations := []*types.As{
+		{
+			ID:         "AS-count-1",
+			Subjects:   []string{"DOC-123"},
+			Predicates: []string{"reviewed_by"},
+			Contexts:   []string{"Pull Request #333"},
+			Actors:     []string{"human:sebastian"},
 			Timestamp:  time.Now(),
-			Source:     "test",
+			Source:     "github",
 			Attributes: make(map[string]interface{}),
-		}
+		},
+		{
+			ID:         "AS-count-2",
+			Subjects:   []string{"qntx-core"},
+			Predicates: []string{"built_by"},
+			Contexts:   []string{"CI"},
+			Actors:     []string{"bot:github-actions"},
+			Timestamp:  time.Now(),
+			Source:     "ci",
+			Attributes: make(map[string]interface{}),
+		},
+	}
+
+	for _, as := range attestations {
 		if err := store.CreateAttestation(as); err != nil {
 			t.Fatalf("CreateAttestation() error: %v", err)
 		}
@@ -146,20 +161,44 @@ func TestRustStore_ListIDs(t *testing.T) {
 	}
 	defer store.Close()
 
-	// Create attestations
-	ids := []string{"AS-1", "AS-2", "AS-3"}
-	for _, id := range ids {
-		as := &types.As{
-			ID:         id,
-			Subjects:   []string{"TEST"},
-			Predicates: []string{"test"},
-			Contexts:   []string{"test"},
+	// Create attestations with varied domains
+	attestations := []*types.As{
+		{
+			ID:         "AS-1",
+			Subjects:   []string{"Carbonara"},
+			Predicates: []string{"prepared_by"},
+			Contexts:   []string{"Italian cuisine"},
+			Actors:     []string{"human:chef_mario"},
 			Timestamp:  time.Now(),
-			Source:     "test",
+			Source:     "cooking_app",
 			Attributes: make(map[string]interface{}),
-		}
+		},
+		{
+			ID:         "AS-2",
+			Subjects:   []string{"Symphony_No_9"},
+			Predicates: []string{"composed_by"},
+			Contexts:   []string{"Classical"},
+			Actors:     []string{"human:beethoven"},
+			Timestamp:  time.Now(),
+			Source:     "music_db",
+			Attributes: make(map[string]interface{}),
+		},
+		{
+			ID:         "AS-3",
+			Subjects:   []string{"San_Francisco"},
+			Predicates: []string{"temperature"},
+			Contexts:   []string{"2026-01-26"},
+			Actors:     []string{"sensor:weather_station"},
+			Timestamp:  time.Now(),
+			Source:     "weather_api",
+			Attributes: make(map[string]interface{}),
+		},
+	}
+
+	ids := []string{"AS-1", "AS-2", "AS-3"}
+	for _, as := range attestations {
 		if err := store.CreateAttestation(as); err != nil {
-			t.Fatalf("CreateAttestation(%s) error: %v", id, err)
+			t.Fatalf("CreateAttestation(%s) error: %v", as.ID, err)
 		}
 	}
 
@@ -193,11 +232,12 @@ func TestRustStore_Delete(t *testing.T) {
 
 	as := &types.As{
 		ID:         "AS-delete-1",
-		Subjects:   []string{"TEST"},
-		Predicates: []string{"test"},
-		Contexts:   []string{"test"},
+		Subjects:   []string{"BRCA1_gene"},
+		Predicates: []string{"associated_with"},
+		Contexts:   []string{"Breast_cancer_risk"},
+		Actors:     []string{"research:genomics_lab"},
 		Timestamp:  time.Now(),
-		Source:     "test",
+		Source:     "genetics_study",
 		Attributes: make(map[string]interface{}),
 	}
 
@@ -231,11 +271,12 @@ func TestRustStore_Update(t *testing.T) {
 
 	as := &types.As{
 		ID:         "AS-update-1",
-		Subjects:   []string{"ALICE"},
-		Predicates: []string{"knows"},
-		Contexts:   []string{"work"},
+		Subjects:   []string{"EEG_Alpha_Wave"},
+		Predicates: []string{"detected_in"},
+		Contexts:   []string{"Patient_123"},
+		Actors:     []string{"device:neuralink_sensor"},
 		Timestamp:  time.Now(),
-		Source:     "test",
+		Source:     "neurotech",
 		Attributes: make(map[string]interface{}),
 	}
 
@@ -244,8 +285,8 @@ func TestRustStore_Update(t *testing.T) {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 
-	// Update
-	as.Subjects = []string{"BOB"}
+	// Update to Beta wave
+	as.Subjects = []string{"EEG_Beta_Wave"}
 	if err := store.UpdateAttestation(as); err != nil {
 		t.Fatalf("UpdateAttestation() error: %v", err)
 	}
@@ -255,8 +296,8 @@ func TestRustStore_Update(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAttestation() error: %v", err)
 	}
-	if len(retrieved.Subjects) != 1 || retrieved.Subjects[0] != "BOB" {
-		t.Errorf("Subjects after update = %v, want [BOB]", retrieved.Subjects)
+	if len(retrieved.Subjects) != 1 || retrieved.Subjects[0] != "EEG_Beta_Wave" {
+		t.Errorf("Subjects after update = %v, want [EEG_Beta_Wave]", retrieved.Subjects)
 	}
 }
 
@@ -267,17 +308,41 @@ func TestRustStore_Clear(t *testing.T) {
 	}
 	defer store.Close()
 
-	// Create attestations
-	for i := 1; i <= 3; i++ {
-		as := &types.As{
-			ID:         "AS-clear-" + string(rune('0'+i)),
-			Subjects:   []string{"TEST"},
-			Predicates: []string{"test"},
-			Contexts:   []string{"test"},
+	// Create attestations with code domain
+	attestations := []*types.As{
+		{
+			ID:         "AS-clear-1",
+			Subjects:   []string{"qntx-sqlite"},
+			Predicates: []string{"implements"},
+			Contexts:   []string{"AttestationStore_trait"},
+			Actors:     []string{"ai:claude"},
 			Timestamp:  time.Now(),
-			Source:     "test",
+			Source:     "code",
 			Attributes: make(map[string]interface{}),
-		}
+		},
+		{
+			ID:         "AS-clear-2",
+			Subjects:   []string{"storage_cgo.go"},
+			Predicates: []string{"wraps"},
+			Contexts:   []string{"Rust_FFI"},
+			Actors:     []string{"human:sebastian"},
+			Timestamp:  time.Now(),
+			Source:     "code",
+			Attributes: make(map[string]interface{}),
+		},
+		{
+			ID:         "AS-clear-3",
+			Subjects:   []string{"adapter.go"},
+			Predicates: []string{"converts"},
+			Contexts:   []string{"JSON_formats"},
+			Actors:     []string{"ai:claude"},
+			Timestamp:  time.Now(),
+			Source:     "code",
+			Attributes: make(map[string]interface{}),
+		},
+	}
+
+	for _, as := range attestations {
 		if err := store.CreateAttestation(as); err != nil {
 			t.Fatalf("CreateAttestation() error: %v", err)
 		}
