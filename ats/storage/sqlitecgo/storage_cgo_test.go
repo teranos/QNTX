@@ -1,6 +1,3 @@
-//go:build rustsqlite
-// +build rustsqlite
-
 package sqlitecgo
 
 import (

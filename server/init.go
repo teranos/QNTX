@@ -10,6 +10,7 @@ import (
 	appcfg "github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/storage/sqlitecgo"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
@@ -180,10 +181,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	if pluginRegistry != nil {
 		server.pluginRegistry = pluginRegistry
 
-		// Initialize plugins with services (uses Rust backend when built with rustsqlite tag)
-		store, err := createAttestationStore(db, dbPath, serverLogger)
+		// Initialize plugins with services (uses Rust SQLite backend)
+		serverLogger.Infow("Using Rust SQLite storage backend", "path", dbPath)
+		store, err := sqlitecgo.NewFileStore(dbPath)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create attestation store")
+			return nil, errors.Wrap(err, "failed to create Rust storage backend")
 		}
 		queue := daemon.GetQueue()
 
