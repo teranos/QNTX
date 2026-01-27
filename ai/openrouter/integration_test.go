@@ -20,11 +20,13 @@ func TestIntegration_RealAPI(t *testing.T) {
 		t.Skip("OPENROUTER_API_KEY not set, skipping integration tests")
 	}
 
+	temp := 0.1
+	tokens := 50
 	client := NewClient(Config{
 		APIKey:      apiKey,
 		Model:       "openai/gpt-3.5-turbo", // Use a cheaper model for testing
-		Temperature: 0.1,
-		MaxTokens:   50,
+		Temperature: &temp,
+		MaxTokens:   &tokens,
 		Debug:       true, // Enable debug to see actual API calls
 	})
 
