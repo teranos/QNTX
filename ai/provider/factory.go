@@ -6,6 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 )
 
 // AIClient interface for both OpenRouter and Local inference providers
@@ -159,7 +160,7 @@ func (lca *LocalClientAdapter) Chat(ctx context.Context, req openrouter.ChatRequ
 	// Future: Support multi-turn conversations if needed
 	result, err := lca.provider.GenerateTextWithUsage(ctx, req.SystemPrompt, req.UserPrompt)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "local provider text generation failed")
 	}
 
 	return &openrouter.ChatResponse{
@@ -188,11 +189,14 @@ func (lca *LocalClientAdapter) ChatStreaming(ctx context.Context, req openrouter
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return errors.Wrap(ctx.Err(), "streaming cancelled by context")
 		case chunk, ok := <-providerChan:
 			if !ok {
 				// Channel closed, streaming complete
-				return <-errChan
+				if err := <-errChan; err != nil {
+					return errors.Wrap(err, "local provider streaming failed")
+				}
+				return nil
 			}
 			// Convert provider chunk to AI client chunk
 			streamChan <- StreamChunk{
@@ -201,7 +205,10 @@ func (lca *LocalClientAdapter) ChatStreaming(ctx context.Context, req openrouter
 				Error:   chunk.Error,
 			}
 			if chunk.Done || chunk.Error != nil {
-				return chunk.Error
+				if chunk.Error != nil {
+					return errors.Wrap(chunk.Error, "streaming chunk error")
+				}
+				return nil
 			}
 		}
 	}
