@@ -48,7 +48,8 @@ impl AttestationStore for MemoryStore {
         if self.attestations.contains_key(&attestation.id) {
             return Err(StoreError::AlreadyExists(attestation.id));
         }
-        self.attestations.insert(attestation.id.clone(), attestation);
+        self.attestations
+            .insert(attestation.id.clone(), attestation);
         Ok(())
     }
 
@@ -64,7 +65,8 @@ impl AttestationStore for MemoryStore {
         if !self.attestations.contains_key(&attestation.id) {
             return Err(StoreError::NotFound(attestation.id));
         }
-        self.attestations.insert(attestation.id.clone(), attestation);
+        self.attestations
+            .insert(attestation.id.clone(), attestation);
         Ok(())
     }
 
@@ -198,10 +200,7 @@ fn matches_filter(attestation: &Attestation, filter: &AxFilter) -> bool {
 
     // Check actors
     if !filter.actors.is_empty() {
-        let has_match = attestation
-            .actors
-            .iter()
-            .any(|a| filter.actors.contains(a));
+        let has_match = attestation.actors.iter().any(|a| filter.actors.contains(a));
         if !has_match {
             return false;
         }

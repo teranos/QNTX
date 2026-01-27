@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// Higher values indicate more trustworthy sources.
 /// Used for conflict resolution when claims disagree.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[repr(u8)]
 pub enum ActorCredibility {
     /// Unknown external sources (lowest trust)
