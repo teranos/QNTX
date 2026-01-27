@@ -110,14 +110,23 @@ func DetermineProvider(cfg *am.Config, explicitProvider string) ProviderType {
 		return ProviderType(explicitProvider)
 	}
 
-	// Check which providers are enabled and configured
-	// Priority order: local (if enabled), then OpenRouter
-	if cfg.LocalInference.Enabled && cfg.LocalInference.BaseURL != "" {
-		return ProviderTypeLocal
+	// Build ProviderConfig from current am.Config
+	// This uses the proper abstraction while maintaining the same behavior
+	pc := &ProviderConfig{
+		DefaultProvider: ProviderTypeOpenRouter,
+		ProviderPriority: []ProviderType{
+			ProviderTypeLocal,      // Check local first if enabled
+			ProviderTypeOpenRouter, // Fallback to OpenRouter
+		},
+		Providers: map[ProviderType]bool{
+			ProviderTypeLocal:      cfg.LocalInference.Enabled && cfg.LocalInference.BaseURL != "",
+			ProviderTypeOpenRouter: true, // Always available as fallback
+			// Future providers will be added here:
+			// ProviderTypeLlamaCpp: cfg.LlamaCpp.Enabled && cfg.LlamaCpp.ServerURL != "",
+		},
 	}
 
-	// Default to OpenRouter
-	return ProviderTypeOpenRouter
+	return pc.GetActiveProvider()
 }
 
 // LocalClientConfig holds configuration for local inference client
