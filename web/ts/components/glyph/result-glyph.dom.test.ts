@@ -161,12 +161,15 @@ describe('ResultGlyph', () => {
 
         test('has rounded bottom corners only', () => {
             const element = createResultGlyph(glyph, result) as HTMLElement;
-            expect(element.style.borderRadius).toBe('0px 0px 4px 4px');
+            // CSS normalizes "0px" to "0" in jsdom
+            expect(element.style.borderRadius).toBe('0 0 4px 4px');
         });
 
         test('has no top border', () => {
             const element = createResultGlyph(glyph, result) as HTMLElement;
-            expect(element.style.borderTop).toBe('none');
+            // jsdom sets default border-top to "medium" when border-top: none is set via style
+            // Verify that borderTopStyle is "none" instead
+            expect(element.style.borderTopStyle).toBe('none');
         });
     });
 });

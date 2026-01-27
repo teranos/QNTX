@@ -25,6 +25,29 @@ if (USE_JSDOM) {
     globalThis.crypto = {
         randomUUID: () => 'test-uuid-' + Math.random()
     } as any;
+
+    // Add MutationObserver polyfill for CodeMirror
+    // Simple stub that doesn't actually observe
+    globalThis.MutationObserver = class MutationObserver {
+        constructor(callback: any) {}
+        observe() {}
+        disconnect() {}
+        takeRecords() { return []; }
+    } as any;
+
+    // Add requestAnimationFrame polyfill for CodeMirror
+    const rafPolyfill = ((callback: FrameRequestCallback) => {
+        return setTimeout(callback, 0);
+    }) as any;
+
+    const cafPolyfill = ((id: number) => {
+        clearTimeout(id);
+    }) as any;
+
+    globalThis.requestAnimationFrame = rafPolyfill;
+    globalThis.cancelAnimationFrame = cafPolyfill;
+    (window as any).requestAnimationFrame = rafPolyfill;
+    (window as any).cancelAnimationFrame = cafPolyfill;
 }
 
 describe('PyGlyph', () => {
