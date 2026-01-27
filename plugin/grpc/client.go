@@ -151,9 +151,11 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 	// Try to extract endpoints from config (passed by PluginManager)
 	if ep := pluginConfig.GetString("_ats_store_endpoint"); ep != "" {
 		atsStoreEndpoint = ep
+		c.logger.Debugw("Extracted ATSStore endpoint from config", "endpoint", ep)
 	}
 	if ep := pluginConfig.GetString("_queue_endpoint"); ep != "" {
 		queueEndpoint = ep
+		c.logger.Debugw("Extracted Queue endpoint from config", "endpoint", ep)
 	}
 	if token := pluginConfig.GetString("_auth_token"); token != "" {
 		authToken = token
@@ -165,6 +167,12 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		AuthToken:        authToken,
 		Config:           config,
 	}
+
+	c.logger.Infow("Sending Initialize RPC to plugin",
+		"name", c.metadata.Name,
+		"ats_store_endpoint", atsStoreEndpoint,
+		"queue_endpoint", queueEndpoint,
+	)
 
 	_, err := c.client.Initialize(ctx, req)
 	if err != nil {

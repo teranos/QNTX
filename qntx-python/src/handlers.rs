@@ -2,6 +2,7 @@
 //!
 //! Implements handlers for /execute, /evaluate, /pip/*, /version, /modules endpoints.
 
+use crate::atsstore::SharedAtsStoreClient;
 use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
 use crate::proto::{HttpHeader, HttpResponse};
 use parking_lot::RwLock;
@@ -22,6 +23,8 @@ pub(crate) struct PluginState {
     pub initialized: bool,
     /// Default modules to check (can be overridden via plugin config)
     pub default_modules: Vec<String>,
+    /// ATSStore client for attestation creation from Python
+    pub ats_client: SharedAtsStoreClient,
 }
 
 /// Handler context providing access to plugin state
@@ -69,7 +72,9 @@ impl HandlerContext {
 
         let result = {
             let state = self.state.read();
-            state.engine.execute(&req.code, &config)
+            state
+                .engine
+                .execute_with_ats(&req.code, &config, Some(state.ats_client.clone()))
         };
 
         execution_result_to_response(result)
@@ -91,7 +96,9 @@ impl HandlerContext {
 
         let result = {
             let state = self.state.read();
-            state.engine.evaluate(&req.expr)
+            state
+                .engine
+                .evaluate_with_ats(&req.expr, Some(state.ats_client.clone()))
         };
 
         execution_result_to_response(result)
@@ -126,7 +133,9 @@ impl HandlerContext {
 
         let result = {
             let state = self.state.read();
-            state.engine.execute_file(&req.path, &config)
+            state
+                .engine
+                .execute_file_with_ats(&req.path, &config, Some(state.ats_client.clone()))
         };
 
         execution_result_to_response(result)
