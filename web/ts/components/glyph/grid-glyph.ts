@@ -11,6 +11,14 @@ import { GRID_SIZE } from './grid-constants';
 
 /**
  * Create a grid-positioned glyph element
+ * Canvas glyphs are lightweight references (symbols only)
+ * Clicking them morphs to their full manifestation
+ *
+ * TODO: Future enhancements for canvas glyphs:
+ * - Status indicators (active/inactive, running, error states)
+ * - Badge overlays (e.g., count of incoming attestations for IX)
+ * - Visual feedback on state changes
+ * - Context menu on right-click (edit, delete, duplicate)
  */
 export function createGridGlyph(glyph: Glyph): HTMLElement {
     const element = document.createElement('div');
@@ -22,7 +30,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     let currentGridX = glyph.gridX ?? 5;
     let currentGridY = glyph.gridY ?? 5;
 
-    // Style element
+    // Style element - all canvas glyphs are symbol-only (40px squares)
     element.style.position = 'absolute';
     element.style.width = `${GRID_SIZE}px`;
     element.style.height = `${GRID_SIZE}px`;
@@ -36,13 +44,14 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     element.style.borderRadius = '4px';
     element.style.border = '1px solid var(--border-color)';
 
-    // Set initial position
-    updatePosition(element, currentGridX, currentGridY);
-
     // Set symbol content
     element.textContent = symbol;
 
-    // Make draggable with grid snapping
+    // Set initial position
+    updatePosition(element, currentGridX, currentGridY);
+
+    // Make draggable with free-form positioning (no live grid snapping)
+    // Design decision: Free-form dragging provides better UX than grid-snapped dragging
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -59,14 +68,12 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         const newX = elementStartX + deltaX;
         const newY = elementStartY + deltaY;
 
-        // Snap to grid with bounds checking
-        const maxGridX = Math.floor(window.innerWidth / GRID_SIZE) - 1;
-        const maxGridY = Math.floor(window.innerHeight / GRID_SIZE) - 1;
-        const snappedGridX = Math.max(0, Math.min(maxGridX, Math.round(newX / GRID_SIZE)));
-        const snappedGridY = Math.max(0, Math.min(maxGridY, Math.round(newY / GRID_SIZE)));
+        // Track drag distance to distinguish clicks from drags
+        dragDistance = Math.abs(deltaX) + Math.abs(deltaY);
 
-        // Update position
-        updatePosition(element, snappedGridX, snappedGridY);
+        // Update position directly (free-form, no grid snapping during drag)
+        element.style.left = `${newX}px`;
+        element.style.top = `${newY}px`;
     };
 
     let abortController: AbortController | null = null;
@@ -105,10 +112,13 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         abortController = null;
     };
 
+    let dragDistance = 0;
+
     element.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation(); // Prevent canvas context menu
         isDragging = true;
+        dragDistance = 0;
 
         // Record start positions
         dragStartX = e.clientX;
@@ -124,6 +134,23 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
         log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
+    });
+
+    // Detect clicks vs drags - if mouse hasn't moved much, it's a click
+    element.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        // Only trigger click if this wasn't a drag
+        if (dragDistance < 5) {
+            log.debug(SEG.UI, `[GridGlyph] Clicked ${glyph.id}, triggering manifestation`);
+
+            // Dispatch custom event that canvas can listen for
+            const clickEvent = new CustomEvent('glyph-click', {
+                detail: { glyph },
+                bubbles: true
+            });
+            element.dispatchEvent(clickEvent);
+        }
     });
 
     return element;
