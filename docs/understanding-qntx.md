@@ -253,12 +253,12 @@ QNTX's config system has 5 sources with strict precedence:
 ```
 1. System      /etc/qntx/config.toml               (lowest)
 2. User        ~/.qntx/config.toml
-3. User UI     ~/.qntx/config_from_ui.toml
+3. User UI     ~/.qntx/am_from_ui.toml
 4. Project     ./config.toml
 5. Environment QNTX_* environment variables        (highest)
 ```
 
-**The clever part:** Separate `config_from_ui.toml` prevents accidental git commits of user preferences.
+**The clever part:** Separate `am_from_ui.toml` prevents accidental git commits of user preferences.
 
 **Problem it solves:**
 - User toggles "Use Ollama" in web UI
@@ -267,7 +267,7 @@ QNTX's config system has 5 sources with strict precedence:
 - Bad!
 
 **Solution:**
-- UI writes to `~/.qntx/config_from_ui.toml` (home directory, never in project)
+- UI writes to `~/.qntx/am_from_ui.toml` (home directory, never in project)
 - Project config stays clean
 - Git-safe by design
 

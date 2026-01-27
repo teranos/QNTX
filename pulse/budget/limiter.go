@@ -78,24 +78,17 @@ func (r *Limiter) Wait(ctx context.Context) error {
 func (r *Limiter) removeExpiredCalls(now time.Time) {
 	cutoff := now.Add(-r.window)
 
-	// Find the first call that's still within the window
-	validFrom := 0
-	for i, callTime := range r.callTimes {
-		if callTime.After(cutoff) {
-			validFrom = i
+	// Count expired calls from front (timestamps are ordered)
+	expired := 0
+	for _, callTime := range r.callTimes {
+		if !callTime.After(cutoff) {
+			expired++
+		} else {
 			break
 		}
 	}
 
-	// Keep only calls within the window
-	if validFrom > 0 {
-		r.callTimes = r.callTimes[validFrom:]
-	}
-
-	// If all calls are expired, reset the slice
-	if len(r.callTimes) > 0 && !r.callTimes[0].After(cutoff) {
-		r.callTimes = r.callTimes[:0]
-	}
+	r.callTimes = r.callTimes[expired:]
 }
 
 // Reset clears the rate limiter state

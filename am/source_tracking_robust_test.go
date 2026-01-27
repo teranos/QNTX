@@ -137,7 +137,8 @@ port = 2222`),
 		require.NoError(t, err)
 
 		// Observable behavior: Project config wins
-		assert.Equal(t, 2222, cfg.Server.Port)
+		require.NotNil(t, cfg.Server.Port)
+		assert.Equal(t, 2222, *cfg.Server.Port)
 	})
 
 	t.Run("Introspection lists all active settings", func(t *testing.T) {
