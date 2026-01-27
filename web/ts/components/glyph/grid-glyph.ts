@@ -50,7 +50,8 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     // Set initial position
     updatePosition(element, currentGridX, currentGridY);
 
-    // Make draggable with grid snapping
+    // Make draggable with free-form positioning (no live grid snapping)
+    // Design decision: Free-form dragging provides better UX than grid-snapped dragging
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -70,14 +71,9 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         // Track drag distance to distinguish clicks from drags
         dragDistance = Math.abs(deltaX) + Math.abs(deltaY);
 
-        // Snap to grid with bounds checking
-        const maxGridX = Math.floor(window.innerWidth / GRID_SIZE) - 1;
-        const maxGridY = Math.floor(window.innerHeight / GRID_SIZE) - 1;
-        const snappedGridX = Math.max(0, Math.min(maxGridX, Math.round(newX / GRID_SIZE)));
-        const snappedGridY = Math.max(0, Math.min(maxGridY, Math.round(newY / GRID_SIZE)));
-
-        // Update position
-        updatePosition(element, snappedGridX, snappedGridY);
+        // Update position directly (free-form, no grid snapping during drag)
+        element.style.left = `${newX}px`;
+        element.style.top = `${newY}px`;
     };
 
     let abortController: AbortController | null = null;
