@@ -13,6 +13,7 @@ import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
 import { createPyGlyph } from './py-glyph';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
@@ -22,21 +23,34 @@ import { GRID_SIZE } from './grid-constants';
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
     const savedGlyphs = uiState.getCanvasGlyphs();
-    const glyphs: Glyph[] = savedGlyphs.map(saved => ({
-        id: saved.id,
-        title: 'Pulse Schedule',
-        symbol: saved.symbol,
-        gridX: saved.gridX,
-        gridY: saved.gridY,
-        width: saved.width,   // Restore custom size if saved
-        height: saved.height,
-        // TODO: Clarify if grid glyphs should display content
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Pulse glyph content (TBD)';
-            return content;
+    log.debug(SEG.UI, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
+
+    const glyphs: Glyph[] = savedGlyphs.map(saved => {
+        if (saved.symbol === 'result') {
+            log.debug(SEG.UI, `[Canvas] Restoring result glyph ${saved.id}`, {
+                hasResult: !!saved.result,
+                gridX: saved.gridX,
+                gridY: saved.gridY
+            });
         }
-    }));
+
+        return {
+            id: saved.id,
+            title: saved.symbol === 'result' ? 'Python Result' : 'Pulse Schedule',
+            symbol: saved.symbol,
+            gridX: saved.gridX,
+            gridY: saved.gridY,
+            width: saved.width,   // Restore custom size if saved
+            height: saved.height,
+            result: saved.result, // For result glyphs
+            // TODO: Clarify if grid glyphs should display content
+            renderContent: () => {
+                const content = document.createElement('div');
+                content.textContent = 'Pulse glyph content (TBD)';
+                return content;
+            }
+        };
+    });
 
     return {
         id: 'canvas-workspace',
@@ -55,7 +69,7 @@ export function createCanvasGlyph(): Glyph {
             container.style.height = '100%';
             container.style.position = 'relative';
             container.style.overflow = 'hidden';
-            container.style.backgroundColor = 'var(--bg-primary)';
+            container.style.backgroundColor = '#2a2b2a'; // Mid-dark gray for night work
 
             // Add subtle grid overlay
             const gridOverlay = document.createElement('div');
@@ -83,7 +97,18 @@ export function createCanvasGlyph(): Glyph {
 
 /**
  * Show right-click spawn menu with available symbols
- * TODO: Spawn menu as container glyph, menu items as glyphs
+ *
+ * TODO: Spawn menu as glyph with morphing mini-glyphs
+ *
+ * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
+ * proximity morphing like GlyphRun. As mouse approaches, glyphs morph larger and
+ * reveal labels. Clicking a morphed glyph spawns that type on canvas.
+ *
+ * Implementation:
+ * - Menu container: Glyph entity with renderContent
+ * - Menu items: Array of tiny glyphs with symbols (Pulse, "py", "go", "rs", "ts")
+ * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
+ * - Priority: Medium (after core window↔glyph morphing works)
  */
 function showSpawnMenu(
     mouseX: number,
@@ -318,6 +343,11 @@ async function spawnPyGlyph(
  * Checks symbol type and creates appropriate glyph element
  */
 async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
+    log.debug(SEG.UI, `[Canvas] Rendering glyph ${glyph.id}`, {
+        symbol: glyph.symbol,
+        hasResult: !!glyph.result
+    });
+
     // For py glyphs, create full editor
     if (glyph.symbol === 'py') {
         return await createPyGlyph(glyph);
@@ -326,6 +356,12 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For IX glyphs, create full form
     if (glyph.symbol === IX) {
         return await createIxGlyph(glyph);
+    }
+
+    // For result glyphs, create result display
+    if (glyph.symbol === 'result' && glyph.result) {
+        log.debug(SEG.UI, `[Canvas] Creating result glyph for ${glyph.id}`);
+        return createResultGlyph(glyph, glyph.result as ExecutionResult);
     }
 
     // Otherwise create simple grid glyph
