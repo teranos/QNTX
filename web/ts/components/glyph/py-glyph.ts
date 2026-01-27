@@ -167,8 +167,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             const pyBottomY = pyRect.bottom - canvasRect.top;
             const resultGridY = Math.round(pyBottomY / GRID_SIZE);
 
-            // Create result glyph
-            const resultGlyph: Glyph = {
+            // Create result glyph metadata
+            const resultGlyph: Partial<Glyph> & { id: string; symbol: string; gridX: number; gridY: number } = {
                 id: `result-${crypto.randomUUID()}`,
                 title: 'Python Result',
                 symbol: 'result',
@@ -178,7 +178,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             };
 
             // Render result glyph
-            const resultElement = createResultGlyph(resultGlyph, result);
+            const resultElement = createResultGlyph(resultGlyph as Glyph, result);
             canvas?.appendChild(resultElement);
 
             // Persist to uiState with execution result
