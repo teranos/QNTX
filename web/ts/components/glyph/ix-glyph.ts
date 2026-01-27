@@ -4,12 +4,27 @@
  * Shows textarea with ix argument (URL, file path) and execute button.
  * Editable directly on canvas - no hidden windows, no extra clicks.
  *
+ * Execution Architecture:
+ * - IX glyphs execute via Pulse scheduling (one-time jobs)
+ * - Play button wraps input as `ix ${source}` and calls forceTriggerJob()
+ * - Uses existing /api/pulse/schedules endpoint with interval_seconds: 0
+ * - Job execution creates attestations which appear in main attestation store
+ * - Observability: IX jobs tracked in Pulse UI alongside scheduled ATS blocks
+ *
+ * Design Parallel with Prose:
+ * - Prose has ATS code blocks that create scheduled Pulse jobs
+ * - Canvas has IX glyphs that create one-time Pulse jobs
+ * - Both use same backend execution path (Pulse scheduler)
+ * - Difference: ATS blocks can be recurring, IX glyphs are always one-shot
+ * - Future: IX glyphs could also support scheduling (recurring ingestion)
+ *
  * Future enhancements:
- * - Show preview of attestations that would be created
- * - Display type of ix operation (URL, file, API)
- * - Wire execute button to backend /api/ix/execute
- * - Show status (idle, running, complete, error)
- * - Display count of created attestations
+ * - Show preview of attestations before execution (dry-run mode)
+ * - Display type of ix operation inferred from input (URL, file path, API)
+ * - Poll job status and show progress badge (queued → running → complete)
+ * - Create result glyph on completion showing attestation count
+ * - Link to created attestations for exploration
+ * - Optional: Add scheduling UI like ATS blocks (recurring ingestion)
  */
 
 import type { Glyph } from './glyph';
@@ -103,7 +118,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     playBtn.style.justifyContent = 'center';
     playBtn.title = 'Execute';
 
-    playBtn.addEventListener('click', (e) => {
+    playBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const input = textarea.value.trim();
         if (!input) {
@@ -112,8 +127,26 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
 
         log.debug(SEG.UI, `[IX] Executing: ${input}`);
-        // TODO: Wire up to ix backend execution
-        alert(`IX execution not yet wired up.\n\nInput: ${input}\n\nThis will be sent to the ix backend.`);
+
+        // TODO: Wire up to Pulse execution
+        // Implementation:
+        // 1. Import forceTriggerJob from '../../pulse/api.ts'
+        // 2. Wrap input as ATS command: `ix ${input}`
+        // 3. Call: await forceTriggerJob(`ix ${input}`)
+        // 4. Handle response: show job queued state, poll for completion
+        // 5. On completion: create result glyph showing attestation count
+        // 6. Error handling: show error badge if job fails
+        //
+        // Example:
+        //   const job = await forceTriggerJob(`ix ${input}`);
+        //   updateGlyphBadge('queued', job.id);
+        //   pollJobStatus(job.id, (status) => {
+        //     if (status.state === 'complete') {
+        //       createResultGlyph(glyph, status.result);
+        //     }
+        //   });
+
+        alert(`IX execution not yet wired up.\n\nInput: ${input}\n\nWill execute as: ix ${input}\nVia: forceTriggerJob() → /api/pulse/schedules`);
     });
 
     titleBar.appendChild(symbol);
@@ -158,6 +191,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
 /**
  * Make element draggable via handle
+ *
+ * Design decision: IX glyphs (and py glyphs) use free-form dragging without live grid snapping.
+ * This provides smoother UX for larger content glyphs compared to grid-glyph.ts which snaps
+ * during drag. Grid position is calculated only on mouseup for persistence.
+ *
+ * Rationale: Free-form placement is preferred over grid-snapped dragging for content glyphs.
+ * Symbol-only glyphs (grid-glyph.ts) still use grid snapping for visual alignment.
  */
 function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
     let isDragging = false;

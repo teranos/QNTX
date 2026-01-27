@@ -58,7 +58,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [Pulse, IX], // Symbols that can be spawned
+        onSpawnMenu: () => [Pulse, IX], // TODO: Remove Pulse when IX wired up
 
         renderContent: () => {
             const container = document.createElement('div');
@@ -98,6 +98,17 @@ export function createCanvasGlyph(): Glyph {
 /**
  * Show right-click spawn menu with available symbols
  *
+ * TODO: Remove Pulse glyph from spawn menu when IX is wired up
+ *
+ * Architecture Decision:
+ * - Pulse glyph (⧗ symbol on canvas) will be REMOVED once IX uses forceTriggerJob()
+ * - Pulse (scheduling system) stays - it's the execution layer for both IX and ATS
+ * - Rationale: IX glyphs already create one-time Pulse jobs, making Pulse glyph redundant
+ * - Execution paths:
+ *   - One-time execution: IX glyphs on canvas → forceTriggerJob() → Pulse
+ *   - Scheduled execution: ATS blocks in Prose → createScheduledJob() → Pulse
+ *   - No UI need for direct Pulse glyph manipulation
+ *
  * TODO: Spawn menu as glyph with morphing mini-glyphs
  *
  * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
@@ -106,7 +117,7 @@ export function createCanvasGlyph(): Glyph {
  *
  * Implementation:
  * - Menu container: Glyph entity with renderContent
- * - Menu items: Array of tiny glyphs with symbols (Pulse, "py", "go", "rs", "ts")
+ * - Menu items: Array of tiny glyphs with symbols (IX, "py", "go", "rs", "ts")
  * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
  * - Priority: Medium (after core window↔glyph morphing works)
  */
@@ -144,6 +155,7 @@ function showSpawnMenu(
     };
 
     // Add Pulse symbol
+    // TODO: Remove this when IX is wired to Pulse - Pulse glyph becomes redundant
     const pulseBtn = document.createElement('button');
     pulseBtn.className = 'canvas-spawn-button';
     pulseBtn.textContent = Pulse;
@@ -206,6 +218,9 @@ function showSpawnMenu(
 
 /**
  * Spawn a new Pulse glyph at grid position
+ *
+ * TODO: Delete this entire function when IX is wired to Pulse
+ * Pulse glyphs will be redundant once IX glyphs use forceTriggerJob()
  */
 function spawnPulseGlyph(
     gridX: number,
