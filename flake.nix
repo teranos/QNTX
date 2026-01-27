@@ -97,38 +97,8 @@
           };
         };
 
-        # Build QNTX binary with Nix (requires Rust CGO libraries)
-        qntx = pkgs.buildGoModule {
-          pname = "qntx";
-          version = self.rev or "dev";
-          src = ./.;
-
-          # Hash of vendored Go dependencies (computed from go.sum)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
-
-          # Depend on Rust libraries
-          buildInputs = [
-            rustLibs.fuzzy
-            rustLibs.sqlite
-            rustLibs.vidstream
-          ];
-
-          # Enable CGO via preBuild (CGO_ENABLED cannot be set as top-level attribute)
-          preBuild = ''
-            export CGO_ENABLED=1
-            export CGO_LDFLAGS="-L${rustLibs.fuzzy}/lib -L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
-          '';
-
-          ldflags = [
-            "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
-            "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
-          ];
-
-          subPackages = [ "cmd/qntx" ];
-        };
-
         # Rust libraries (CGO dependencies)
+        # Defined before qntx build since qntx depends on these libraries
         rustLibs = {
           # Fuzzy matching library (depends on qntx-core from workspace)
           fuzzy = pkgs.rustPlatform.buildRustPackage {
@@ -136,9 +106,7 @@
             version = self.rev or "dev";
             src = ./.; # Use workspace root (fuzzy-ax is excluded from workspace)
 
-            cargoLock = {
-              lockFile = ./ats/ax/fuzzy-ax/Cargo.lock;
-            };
+            cargoHash = "sha256-Kyua4Hm9MyUs+MTnYqgh9Bw4ZgDsR/oPWPgtUMGfDzc=";
 
             # Build from ats/ax/fuzzy-ax subdirectory
             buildAndTestSubdir = "ats/ax/fuzzy-ax";
@@ -197,6 +165,37 @@
               cp target/release/libqntx_vidstream.a $out/lib/
             '';
           };
+        };
+
+        # Build QNTX binary with Nix (requires Rust CGO libraries)
+        qntx = pkgs.buildGoModule {
+          pname = "qntx";
+          version = self.rev or "dev";
+          src = ./.;
+
+          # Hash of vendored Go dependencies (computed from go.sum)
+          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
+          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+
+          # Depend on Rust libraries
+          buildInputs = [
+            rustLibs.fuzzy
+            rustLibs.sqlite
+            rustLibs.vidstream
+          ];
+
+          # Enable CGO via preBuild (CGO_ENABLED cannot be set as top-level attribute)
+          preBuild = ''
+            export CGO_ENABLED=1
+            export CGO_LDFLAGS="-L${rustLibs.fuzzy}/lib -L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
+          '';
+
+          ldflags = [
+            "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
+            "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
+          ];
+
+          subPackages = [ "cmd/qntx" ];
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
