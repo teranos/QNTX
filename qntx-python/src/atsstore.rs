@@ -101,8 +101,8 @@ impl AtsStoreClient {
         actors: Option<Vec<String>>,
         attributes: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<AttestationResult, String> {
-        // Connect and cache the channel (reuses existing connection if available)
-        let channel = self.connect()?;
+        // Get endpoint for use in spawned thread
+        let endpoint = self.config.endpoint.clone();
         let auth_token = self.config.auth_token.clone();
 
         // Serialize attributes to JSON if provided
@@ -127,7 +127,6 @@ impl AtsStoreClient {
         };
 
         // Spawn a separate OS thread with its own runtime (avoid "runtime within runtime" error)
-        // Clone the cached channel to reuse the connection
         let response = std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -135,7 +134,23 @@ impl AtsStoreClient {
                 .map_err(|e| format!("failed to create runtime: {}", e))?;
 
             rt.block_on(async {
-                // Reuse the cached channel connection
+                // Create fresh connection inside the spawned thread's async context
+                // Ensure endpoint has http:// scheme for tonic
+                let endpoint_uri =
+                    if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                        endpoint.clone()
+                    } else {
+                        format!("http://{}", endpoint)
+                    };
+
+                let ep = Channel::from_shared(endpoint_uri)
+                    .map_err(|e| format!("invalid endpoint: {}", e))?;
+
+                let channel = ep
+                    .connect()
+                    .await
+                    .map_err(|e| format!("connection failed: {}", e))?;
+
                 let mut client = AtsStoreServiceClient::new(channel);
                 client
                     .generate_and_create_attestation(request)
