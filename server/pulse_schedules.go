@@ -197,7 +197,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		// If no active scheduled job found, check for existing temp job and reuse or create new one
 		if err != nil || scheduledJobID == "" {
 			// Try to find existing temp job for this ATS code (prevents proliferation)
-			err = tx.QueryRow(`SELECT id FROM scheduled_pulse_jobs WHERE ats_code = ? AND created_from_doc = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`,
+			err = tx.QueryRow(`SELECT id FROM scheduled_pulse_jobs WHERE ats_code = ? AND created_from_doc_id = '__force_trigger__' ORDER BY created_at DESC LIMIT 1`,
 				req.ATSCode).Scan(&scheduledJobID)
 
 			if err != nil || scheduledJobID == "" {
@@ -209,7 +209,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 				}
 
 				_, err = tx.Exec(`
-					INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc)
+					INSERT INTO scheduled_pulse_jobs (id, ats_code, handler_name, payload, source_url, state, interval_seconds, created_at, updated_at, created_from_doc_id)
 					VALUES (?, ?, ?, ?, ?, 'inactive', 0, ?, ?, '__force_trigger__')
 				`, scheduledJobID, req.ATSCode, parsed.HandlerName, parsed.Payload, parsed.SourceURL, now.Format(time.RFC3339), now.Format(time.RFC3339))
 
