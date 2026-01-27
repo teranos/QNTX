@@ -10,9 +10,9 @@
 
 ## Configuration (am package)
 
-**Zero values are real values:** `0` means zero, not disabled. `0` workers means zero workers, `0` rate limit means no rate limiting. To disable a feature, comment it out or omit it entirely. Don't abuse zero values as disable flags.
+**Zero means zero:** `0` always means literal zero - no special "disabled" or "unlimited" semantics. `0` workers = no workers. `0` ticker interval = no ticking. For "unlimited", use a high value. For "use default", omit the field.
 
-**For Claude**: Ensure sensible defaults in `am/defaults.go`. Zero values must have actual semantic meaning.
+**For Claude**: Ensure sensible positive defaults in `am/defaults.go`. Validation rejects negative values and zero where it has no meaning.
 
 ## Development Workflow
 
