@@ -57,6 +57,7 @@ jobs:
           workspaces: |
             ats/ax/fuzzy-ax
             crates/qntx-core
+            crates/qntx-sqlite
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -92,6 +93,13 @@ jobs:
       - name: Test fuzzy-ax
         run: cd ats/ax/fuzzy-ax && cargo test --lib
 
+      # --- Rust: qntx-sqlite (CGO library) ---
+      - name: Build qntx-sqlite release
+        run: cargo build --release -p qntx-sqlite --features ffi
+
+      - name: Test qntx-sqlite
+        run: cargo test -p qntx-sqlite --features ffi
+
       # --- Go: Always with Rust ---
       - name: Download Go dependencies
         run: go mod download
@@ -100,16 +108,16 @@ jobs:
         run: go build -tags rustfuzzy ./...
         env:
           CGO_ENABLED: "1"
-          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release:${{ github.workspace }}/target/release
 
       - name: Go tests (with Rust)
         run: go test -tags rustfuzzy ./...
         env:
           CGO_ENABLED: "1"
-          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release:${{ github.workspace }}/target/release
 
       - name: Go integration tests (with Rust)
         run: go test -tags "rustfuzzy integration" ./...
         env:
           CGO_ENABLED: "1"
-          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release:${{ github.workspace }}/target/release
