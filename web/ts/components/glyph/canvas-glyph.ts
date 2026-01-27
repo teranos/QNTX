@@ -11,6 +11,8 @@ import type { Glyph } from './glyph';
 import { Pulse } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
+import { createPyGlyph } from './py-glyph';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
@@ -20,19 +22,34 @@ import { GRID_SIZE } from './grid-constants';
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
     const savedGlyphs = uiState.getCanvasGlyphs();
-    const glyphs: Glyph[] = savedGlyphs.map(saved => ({
-        id: saved.id,
-        title: 'Pulse Schedule',
-        symbol: saved.symbol,
-        gridX: saved.gridX,
-        gridY: saved.gridY,
-        // TODO: Clarify if grid glyphs should display content
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Pulse glyph content (TBD)';
-            return content;
+    log.debug(SEG.UI, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
+
+    const glyphs: Glyph[] = savedGlyphs.map(saved => {
+        if (saved.symbol === 'result') {
+            log.debug(SEG.UI, `[Canvas] Restoring result glyph ${saved.id}`, {
+                hasResult: !!saved.result,
+                gridX: saved.gridX,
+                gridY: saved.gridY
+            });
         }
-    }));
+
+        return {
+            id: saved.id,
+            title: saved.symbol === 'result' ? 'Python Result' : 'Pulse Schedule',
+            symbol: saved.symbol,
+            gridX: saved.gridX,
+            gridY: saved.gridY,
+            width: saved.width,   // Restore custom size if saved
+            height: saved.height,
+            result: saved.result, // For result glyphs
+            // TODO: Clarify if grid glyphs should display content
+            renderContent: () => {
+                const content = document.createElement('div');
+                content.textContent = 'Pulse glyph content (TBD)';
+                return content;
+            }
+        };
+    });
 
     return {
         id: 'canvas-workspace',
@@ -51,7 +68,7 @@ export function createCanvasGlyph(): Glyph {
             container.style.height = '100%';
             container.style.position = 'relative';
             container.style.overflow = 'hidden';
-            container.style.backgroundColor = 'var(--bg-primary)';
+            container.style.backgroundColor = '#2a2b2a'; // Mid-dark gray for night work
 
             // Add subtle grid overlay
             const gridOverlay = document.createElement('div');
@@ -64,11 +81,13 @@ export function createCanvasGlyph(): Glyph {
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
 
-            // Render existing glyphs
-            glyphs.forEach(glyph => {
-                const glyphElement = renderGlyph(glyph);
-                container.appendChild(glyphElement);
-            });
+            // Render existing glyphs asynchronously (to support py glyphs with CodeMirror)
+            (async () => {
+                for (const glyph of glyphs) {
+                    const glyphElement = await renderGlyph(glyph);
+                    container.appendChild(glyphElement);
+                }
+            })();
 
             return container;
         }
@@ -77,7 +96,18 @@ export function createCanvasGlyph(): Glyph {
 
 /**
  * Show right-click spawn menu with available symbols
- * TODO: Spawn menu as container glyph, menu items as glyphs
+ *
+ * TODO: Spawn menu as glyph with morphing mini-glyphs
+ *
+ * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
+ * proximity morphing like GlyphRun. As mouse approaches, glyphs morph larger and
+ * reveal labels. Clicking a morphed glyph spawns that type on canvas.
+ *
+ * Implementation:
+ * - Menu container: Glyph entity with renderContent
+ * - Menu items: Array of tiny glyphs with symbols (Pulse, "py", "go", "rs", "ts")
+ * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
+ * - Priority: Medium (after core window↔glyph morphing works)
  */
 function showSpawnMenu(
     mouseX: number,
@@ -124,6 +154,23 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pulseBtn);
+
+    // TODO: Refactor spawn menu to be data-driven
+    // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
+    // This will make it easier to add new programmature types (go, rs, ts)
+
+    // Add py button
+    const pyBtn = document.createElement('button');
+    pyBtn.className = 'canvas-spawn-button';
+    pyBtn.textContent = 'py';
+    pyBtn.title = 'Spawn Python glyph';
+
+    pyBtn.addEventListener('click', () => {
+        spawnPyGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(pyBtn);
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -186,9 +233,72 @@ function spawnPulseGlyph(
 }
 
 /**
- * Render a glyph on the canvas
+ * Spawn a new Python glyph at grid position
  */
-function renderGlyph(glyph: Glyph): HTMLElement {
-    // Render at saved position (or default if not set)
+async function spawnPyGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const pyGlyph: Glyph = {
+        id: `py-${crypto.randomUUID()}`,
+        title: 'Python',
+        symbol: 'py',
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Python glyph (TBD)';
+            return content;
+        }
+    };
+
+    // Add to glyphs array
+    glyphs.push(pyGlyph);
+
+    // Render Python editor glyph
+    const glyphElement = await createPyGlyph(pyGlyph);
+    canvas.appendChild(glyphElement);
+
+    // Get actual rendered size and persist (ensures default size is saved)
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: pyGlyph.id,
+        symbol: 'py',
+        gridX,
+        gridY,
+        width,
+        height
+    });
+
+    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+}
+
+/**
+ * Render a glyph on the canvas
+ * Checks symbol type and creates appropriate glyph element
+ */
+async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
+    log.debug(SEG.UI, `[Canvas] Rendering glyph ${glyph.id}`, {
+        symbol: glyph.symbol,
+        hasResult: !!glyph.result
+    });
+
+    // For py glyphs, create full editor
+    if (glyph.symbol === 'py') {
+        return await createPyGlyph(glyph);
+    }
+
+    // For result glyphs, create result display
+    if (glyph.symbol === 'result' && glyph.result) {
+        log.debug(SEG.UI, `[Canvas] Creating result glyph for ${glyph.id}`);
+        return createResultGlyph(glyph, glyph.result as ExecutionResult);
+    }
+
+    // Otherwise create simple grid glyph
     return createGridGlyph(glyph);
 }

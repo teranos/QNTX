@@ -42,8 +42,8 @@ func (s *QNTXServer) startBackgroundServices() {
 	if s.daemon != nil {
 		enabled, err := s.getDaemonState()
 		if err != nil {
-			s.logger.Warnw("Failed to read daemon state, defaulting to enabled", "error", err)
-			enabled = true
+			s.logger.Warnw("Failed to read daemon state, defaulting to disabled", "error", err)
+			enabled = false
 		}
 
 		if enabled {

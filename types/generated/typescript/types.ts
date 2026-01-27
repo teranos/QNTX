@@ -18,14 +18,14 @@ export interface As {
    */
   subjects: string[];
   /**
-   * What is being claimed
+   * Claims being made
    *
    * @required
    * @minItems 1
    */
   predicates: string[];
   /**
-   * Optional "of" context
+   * Scoping context ("of X")
    *
    * @required
    * @minItems 1
