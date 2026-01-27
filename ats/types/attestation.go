@@ -9,8 +9,8 @@ import (
 type As struct {
 	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
 	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
-	Predicates []string               `db:"predicates" json:"predicates" validate:"required,min=1"` // What is being claimed
-	Contexts   []string               `db:"contexts" json:"contexts" validate:"required,min=1"`     // Optional "of" context
+	Predicates []string               `db:"predicates" json:"predicates" validate:"required,min=1"` // Claims being made
+	Contexts   []string               `db:"contexts" json:"contexts" validate:"required,min=1"`     // Scoping context ("of X")
 	Actors     []string               `db:"actors" json:"actors" validate:"required,min=1"`         // Who made the attestation
 	Timestamp  time.Time              `db:"timestamp" json:"timestamp" validate:"required"`         // When attestation was made
 	Source     string                 `db:"source" json:"source" validate:"required"`               // How attestation was created
