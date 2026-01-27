@@ -147,11 +147,12 @@
           vidstream = pkgs.rustPlatform.buildRustPackage {
             pname = "qntx-vidstream";
             version = self.rev or "dev";
-            src = ./ats/vidstream;
+            src = ./.; # Use workspace root (vidstream depends on qntx from workspace)
 
-            cargoLock = {
-              lockFile = ./ats/vidstream/Cargo.lock;
-            };
+            cargoHash = "sha256-QF/P/g3M7NAvYvIeuDd22pqcesDHds4WMsjH8Bgymqg=";
+
+            # Build from ats/vidstream subdirectory
+            buildAndTestSubdir = "ats/vidstream";
 
             nativeBuildInputs = [ pkgs.pkg-config ];
             buildInputs = [ pkgs.onnxruntime ];
