@@ -6,6 +6,7 @@
 - Don't add features, explanations, or context that weren't requested
 - If something is unclear, ask - don't assume or fill in gaps
 - State only what you can directly verify
+- When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
 
 ## Configuration (am package)
 
