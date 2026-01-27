@@ -12,7 +12,7 @@ Go-to-Python integration via CGo is fragile and version-dependent. This plugin r
 
 Uses PyO3 for memory-safe Python embedding and Nix for reproducible Python environments.
 
-See [External Plugin Development Guide](../docs/development/external-plugin-guide.md) for plugin architecture details.
+See [External Plugin Development Guide](https://github.com/teranos/QNTX/blob/main/docs/development/external-plugin-guide.md) for plugin architecture details and [Python Plugin User Guide](https://github.com/teranos/QNTX/blob/main/docs/development/python-plugin.md) for API usage examples.
 
 ## Features
 
@@ -20,9 +20,12 @@ See [External Plugin Development Guide](../docs/development/external-plugin-guid
 - Evaluate Python expressions
 - Execute Python files
 - Capture stdout/stderr output
-- Variable capture for REPL-like usage
-- pip package installation
-- Module availability checking
+- `attest()` function for creating attestations from Python code
+
+### Planned Features
+
+- uv-based package management (not yet implemented)
+- Module availability checking (not yet implemented)
 
 ## Building
 
@@ -116,35 +119,7 @@ Execute a Python file.
 ```json
 {
   "path": "/path/to/script.py",
-  "capture_variables": true
-}
-```
-
-### POST /pip/install
-
-Install a Python package.
-
-```json
-{
-  "package": "requests"
-}
-```
-
-### GET /pip/check
-
-Check if a module is available.
-
-```json
-{
-  "module": "numpy"
-}
-```
-
-Response:
-```json
-{
-  "module": "numpy",
-  "available": true
+  "capture_variables": false
 }
 ```
 
@@ -154,29 +129,8 @@ Get Python and plugin version info.
 
 ```json
 {
-  "python_version": "3.12.0",
-  "plugin_version": "0.1.0"
-}
-```
-
-### GET /modules
-
-Check availability of modules.
-
-```json
-{
-  "modules": ["numpy", "pandas", "requests"]
-}
-```
-
-Response:
-```json
-{
-  "modules": {
-    "numpy": true,
-    "pandas": false,
-    "requests": true
-  }
+  "python_version": "3.13.0",
+  "plugin_version": "0.3.7"
 }
 ```
 
@@ -196,6 +150,8 @@ The plugin implements the standard QNTX `DomainPluginService` interface, allowin
 
 ## Requirements
 
-- Python 3.8+ installed on the system
+- Python 3.8+ installed on the system (3.13 recommended via Nix)
 - Rust 1.70+ for building
 - protoc for proto compilation during build
+
+**Note:** The Nix build (`make rust-python`) provides Python 3.13 deterministically and is the recommended build method. Plain `cargo build` may have Python linking issues depending on your system.
