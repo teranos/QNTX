@@ -315,6 +315,10 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
 
 /**
  * Make an element draggable by a handle
+ *
+ * Design decision: Python glyphs use free-form dragging without live grid snapping.
+ * This provides smoother UX compared to grid-snapped dragging. Grid position is
+ * calculated only on mouseup for persistence.
  */
 function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
     let isDragging = false;
