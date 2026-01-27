@@ -69,8 +69,8 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.padding = '8px';
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = 'var(--bg-tertiary)';
-    textarea.style.color = 'var(--text-primary)';
+    textarea.style.backgroundColor = '#1a1b1a';
+    textarea.style.color = '#a8e6a1';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
