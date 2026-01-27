@@ -22,6 +22,7 @@ import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { GRID_SIZE } from './grid-constants';
 import { uiState } from '../../state/ui';
+import { sendMessage } from '../../websocket';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -31,9 +32,41 @@ import { uiState } from '../../state/ui';
  * @param gridX Optional grid X position
  * @param gridY Optional grid Y position
  */
+/**
+ * LocalStorage key prefix for ax query persistence
+ */
+const QUERY_STORAGE_KEY = 'qntx-ax-query:';
+
+/**
+ * Load persisted query from localStorage
+ */
+function loadQuery(id: string): string {
+    try {
+        return localStorage.getItem(QUERY_STORAGE_KEY + id) || '';
+    } catch (error) {
+        log.error(SEG.UI, `[AxGlyph] Failed to load query for ${id}:`, error);
+        return '';
+    }
+}
+
+/**
+ * Save query to localStorage
+ */
+function saveQuery(id: string, query: string): void {
+    try {
+        localStorage.setItem(QUERY_STORAGE_KEY + id, query);
+        log.debug(SEG.UI, `[AxGlyph] Saved query for ${id} (${query.length} chars)`);
+    } catch (error) {
+        log.error(SEG.UI, `[AxGlyph] Failed to save query for ${id}:`, error);
+    }
+}
+
 export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: number, gridY?: number): Glyph {
     const glyphId = id || `ax-${crypto.randomUUID()}`;
-    let currentQuery = initialQuery;
+
+    // Load persisted query if available, otherwise use initialQuery
+    const persistedQuery = loadQuery(glyphId);
+    let currentQuery = persistedQuery || initialQuery;
 
     const glyph: Glyph = {
         id: glyphId,
@@ -73,13 +106,58 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
             // Title bar for dragging
             const titleBar = document.createElement('div');
             titleBar.className = 'ax-glyph-title-bar';
-            titleBar.textContent = AX;
             titleBar.style.padding = '8px';
             titleBar.style.backgroundColor = 'var(--bg-tertiary)';
             titleBar.style.cursor = 'move';
             titleBar.style.userSelect = 'none';
             titleBar.style.fontWeight = 'bold';
             titleBar.style.fontSize = '14px';
+            titleBar.style.display = 'flex';
+            titleBar.style.alignItems = 'center';
+            titleBar.style.justifyContent = 'space-between';
+
+            // Label
+            const label = document.createElement('span');
+            label.textContent = AX;
+            titleBar.appendChild(label);
+
+            // Run button (execute query via WebSocket)
+            const runButton = document.createElement('button');
+            runButton.textContent = '▶';
+            runButton.title = 'Execute ax query';
+            runButton.style.background = 'var(--bg-hover)';
+            runButton.style.border = '1px solid var(--border-color)';
+            runButton.style.borderRadius = '3px';
+            runButton.style.padding = '2px 8px';
+            runButton.style.cursor = 'pointer';
+            runButton.style.fontSize = '12px';
+            runButton.style.color = 'var(--text-primary)';
+
+            // Prevent drag when clicking button
+            runButton.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+            });
+
+            // Execute query on click
+            // TODO: Add result visualization (spawn result glyph or update graph)
+            runButton.addEventListener('click', () => {
+                if (!currentQuery.trim()) {
+                    log.warn(SEG.UI, '[AxGlyph] Empty query, not executing');
+                    return;
+                }
+
+                log.info(SEG.UI, `[AxGlyph] Executing query: ${currentQuery}`);
+
+                // Send query via WebSocket to backend
+                // Backend will process and return graph data or results
+                sendMessage({
+                    type: 'ax_query',
+                    query: currentQuery,
+                    glyph_id: glyphId
+                });
+            });
+
+            titleBar.appendChild(runButton);
 
             container.appendChild(titleBar);
 
@@ -108,10 +186,20 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
             editor.style.color = 'var(--text-primary)';
             editor.style.overflow = 'auto';
 
-            // Update current query on change
+            // Auto-save with debouncing (500ms delay)
+            let saveTimeout: number | undefined;
             editor.addEventListener('input', () => {
                 currentQuery = editor.value;
-                log.debug(SEG.UI, `[Ax Glyph ${glyphId}] Query updated: ${currentQuery}`);
+
+                // Clear existing timeout
+                if (saveTimeout !== undefined) {
+                    clearTimeout(saveTimeout);
+                }
+
+                // Debounce save for 500ms
+                saveTimeout = window.setTimeout(() => {
+                    saveQuery(glyphId, currentQuery);
+                }, 500);
             });
 
             editorContainer.appendChild(editor);
