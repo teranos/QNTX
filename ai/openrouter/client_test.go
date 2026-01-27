@@ -21,31 +21,33 @@ func TestClient_Configuration(t *testing.T) {
 		if client.config.Model != "openai/gpt-4o-mini" {
 			t.Errorf("expected default model 'openai/gpt-4o-mini', got %s", client.config.Model)
 		}
-		if client.config.Temperature != 0.2 {
-			t.Errorf("expected default temperature 0.2, got %f", client.config.Temperature)
+		if client.config.Temperature == nil || *client.config.Temperature != 0.2 {
+			t.Errorf("expected default temperature 0.2, got %v", client.config.Temperature)
 		}
-		if client.config.MaxTokens != 1000 {
-			t.Errorf("expected default max tokens 1000, got %d", client.config.MaxTokens)
+		if client.config.MaxTokens == nil || *client.config.MaxTokens != 1000 {
+			t.Errorf("expected default max tokens 1000, got %v", client.config.MaxTokens)
 		}
 	})
 
 	t.Run("preserves custom values", func(t *testing.T) {
+		temp := 0.8
+		tokens := 2000
 		client := NewClient(Config{
 			APIKey:      "test-key",
 			Model:       "custom/model",
-			Temperature: 0.8,
-			MaxTokens:   2000,
+			Temperature: &temp,
+			MaxTokens:   &tokens,
 			Debug:       true,
 		})
 
 		if client.config.Model != "custom/model" {
 			t.Errorf("expected custom model, got %s", client.config.Model)
 		}
-		if client.config.Temperature != 0.8 {
-			t.Errorf("expected custom temperature, got %f", client.config.Temperature)
+		if *client.config.Temperature != 0.8 {
+			t.Errorf("expected custom temperature, got %f", *client.config.Temperature)
 		}
-		if client.config.MaxTokens != 2000 {
-			t.Errorf("expected custom max tokens, got %d", client.config.MaxTokens)
+		if *client.config.MaxTokens != 2000 {
+			t.Errorf("expected custom max tokens, got %d", *client.config.MaxTokens)
 		}
 		if !client.config.Debug {
 			t.Error("expected debug to be true")

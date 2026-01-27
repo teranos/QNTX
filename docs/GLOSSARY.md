@@ -64,12 +64,12 @@ Infrastructure and lifecycle markers:
 ### Configuration Files
 - **Canonical name**: Either `am.toml` (preferred) or `config.toml` (compatibility)
 - **Future standard**: Consider `qntx.toml`
-- **UI config**: `~/.qntx/config_from_ui.toml` (auto-generated, never in project)
+- **UI config**: `~/.qntx/am_from_ui.toml` (auto-generated, never in project)
 
 ### Configuration Precedence (Pluggable)
 1. System (`/etc/qntx/config.toml`) - lowest
 2. User (`~/.qntx/config.toml`)
-3. User UI (`~/.qntx/config_from_ui.toml`)
+3. User UI (`~/.qntx/am_from_ui.toml`)
 4. Project (`./config.toml`)
 5. Environment (`QNTX_*`) - highest
 

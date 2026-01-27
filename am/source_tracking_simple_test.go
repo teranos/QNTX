@@ -63,7 +63,8 @@ path = "am.db"
 		assert.Contains(t, ConfigSources["database.path"].Path, "am.toml")
 
 		// Verify server.port from config.toml is tracked
-		assert.Equal(t, 8080, cfg.Server.Port)
+		require.NotNil(t, cfg.Server.Port)
+		assert.Equal(t, 8080, *cfg.Server.Port)
 		assert.Equal(t, SourceUser, ConfigSources["server.port"].Source)
 		assert.Contains(t, ConfigSources["server.port"].Path, "config.toml")
 	})
