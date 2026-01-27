@@ -19,9 +19,9 @@ package sqlitecgo
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../../crates/qntx-sqlite/include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite
-#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_sqlite -lws2_32 -luserenv
 
 #include "storage_ffi.h"
 #include <stdlib.h>
@@ -37,8 +37,6 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	id "github.com/teranos/vanity-id"
-
-	_ "github.com/teranos/QNTX/ats/internal/cgoflags" // Common system library flags
 )
 
 // RustStore wraps the Rust SqliteStore via CGO

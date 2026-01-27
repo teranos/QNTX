@@ -22,9 +22,9 @@ package fuzzyax
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy
-#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lpthread -ldl -lm
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lpthread -ldl -lm
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lws2_32 -luserenv
 
 #include "fuzzy_engine.h"
 #include <stdlib.h>
@@ -35,8 +35,6 @@ import (
 	"errors"
 	"runtime"
 	"unsafe"
-
-	_ "github.com/teranos/QNTX/ats/internal/cgoflags" // Common system library flags
 )
 
 // VocabularyType specifies which vocabulary to search
