@@ -40,6 +40,16 @@ export interface Glyph {
     // Size metadata (for resizable glyphs)
     width?: number;                      // Custom width in pixels
     height?: number;                     // Custom height in pixels
+
+    // Execution result metadata (for result glyphs)
+    result?: {
+        success: boolean;
+        stdout: string;
+        stderr: string;
+        result: any;
+        error: string | null;
+        duration_ms: number;
+    };
 }
 
 // Function to check if user prefers reduced motion
