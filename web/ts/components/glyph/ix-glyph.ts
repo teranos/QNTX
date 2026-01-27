@@ -33,11 +33,16 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 import { forceTriggerJob } from '../../pulse/api';
+import { getScriptStorage } from '../../storage/script-storage';
 
 /**
  * Create an IX glyph with input form on canvas
  */
 export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
+    // Load saved input from storage
+    const storage = getScriptStorage();
+    const savedInput = await storage.load(glyph.id) ?? '';
+
     const element = document.createElement('div');
     element.className = 'canvas-ix-glyph';
     element.dataset.glyphId = glyph.id;
@@ -65,6 +70,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Textarea (declared early so play button can reference it)
     const textarea = document.createElement('textarea');
     textarea.placeholder = 'Enter URL, file path, or data source...';
+    textarea.value = savedInput; // Restore saved content
     textarea.style.flex = '1';
     textarea.style.padding = '8px';
     textarea.style.fontSize = '13px';
@@ -74,6 +80,19 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
+
+    // Auto-save input with debouncing
+    let saveTimeout: number | undefined;
+    textarea.addEventListener('input', () => {
+        if (saveTimeout !== undefined) {
+            clearTimeout(saveTimeout);
+        }
+        saveTimeout = window.setTimeout(async () => {
+            const currentInput = textarea.value;
+            await storage.save(glyph.id, currentInput);
+            log.debug(SEG.UI, `[IX Glyph] Auto-saved input for ${glyph.id}`);
+        }, 500);
+    });
 
     // Prevent drag from starting on textarea
     textarea.addEventListener('mousedown', (e) => {
@@ -96,11 +115,15 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const symbol = document.createElement('span');
     symbol.textContent = IX;
     symbol.style.fontSize = '16px';
+    symbol.style.color = '#ffffff';
+    symbol.style.fontWeight = 'bold';
 
     const title = document.createElement('span');
     title.textContent = 'Ingest';
     title.style.fontSize = '13px';
     title.style.flex = '1';
+    title.style.color = '#ffffff';
+    title.style.fontWeight = 'bold';
 
     // Play button
     const playBtn = document.createElement('button');
