@@ -117,9 +117,7 @@ mod tests {
 
         // Verify attestations table exists
         let exists: bool = conn
-            .prepare(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='attestations'",
-            )
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='attestations'")
             .unwrap()
             .exists([])
             .unwrap();

@@ -480,9 +480,8 @@ pub extern "C" fn string_array_result_free(result: StringArrayResultC) {
     }
 
     if !result.strings.is_null() && result.strings_len > 0 {
-        let strings_slice = unsafe {
-            std::slice::from_raw_parts_mut(result.strings, result.strings_len)
-        };
+        let strings_slice =
+            unsafe { std::slice::from_raw_parts_mut(result.strings, result.strings_len) };
         for s in strings_slice.iter() {
             if !s.is_null() {
                 unsafe {

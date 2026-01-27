@@ -1,11 +1,11 @@
 //! SQLite storage backend implementing AttestationStore trait
 
-use rusqlite::{Connection, OptionalExtension};
-use std::collections::HashMap;
 use qntx_core::{
     attestation::{Attestation, AxFilter, AxResult, AxSummary},
-    storage::{AttestationStore, QueryStore, StoreError, StorageStats},
+    storage::{AttestationStore, QueryStore, StorageStats, StoreError},
 };
+use rusqlite::{Connection, OptionalExtension};
+use std::collections::HashMap;
 
 type StoreResult<T> = Result<T, StoreError>;
 
@@ -102,7 +102,17 @@ impl AttestationStore for SqliteStore {
             )
             .map_err(|e| StoreError::Backend(e.to_string()))?;
 
-        let result: Option<(String, String, String, String, String, String, String, Option<String>, String)> = stmt
+        let result: Option<(
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+        )> = stmt
             .query_row([id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -186,22 +196,24 @@ impl AttestationStore for SqliteStore {
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
 
         // Update in database (don't update created_at)
-        self.conn.execute(
-            "UPDATE attestations
+        self.conn
+            .execute(
+                "UPDATE attestations
              SET subjects = ?, predicates = ?, contexts = ?, actors = ?,
                  timestamp = ?, source = ?, attributes = ?
              WHERE id = ?",
-            rusqlite::params![
-                subjects_json,
-                predicates_json,
-                contexts_json,
-                actors_json,
-                timestamp_sql,
-                attestation.source,
-                attributes_json,
-                attestation.id,
-            ],
-        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+                rusqlite::params![
+                    subjects_json,
+                    predicates_json,
+                    contexts_json,
+                    actors_json,
+                    timestamp_sql,
+                    attestation.source,
+                    attributes_json,
+                    attestation.id,
+                ],
+            )
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
 
         Ok(())
     }
@@ -243,7 +255,12 @@ impl QueryStore for SqliteStore {
         if !filter.subjects.is_empty() {
             sql.push_str(&format!(
                 " AND EXISTS (SELECT 1 FROM json_each(subjects) WHERE value IN ({}))",
-                filter.subjects.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+                filter
+                    .subjects
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             params.extend(filter.subjects.iter().cloned());
         }
@@ -252,7 +269,12 @@ impl QueryStore for SqliteStore {
         if !filter.predicates.is_empty() {
             sql.push_str(&format!(
                 " AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value IN ({}))",
-                filter.predicates.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+                filter
+                    .predicates
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             params.extend(filter.predicates.iter().cloned());
         }
@@ -261,7 +283,12 @@ impl QueryStore for SqliteStore {
         if !filter.contexts.is_empty() {
             sql.push_str(&format!(
                 " AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value IN ({}))",
-                filter.contexts.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+                filter
+                    .contexts
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             params.extend(filter.contexts.iter().cloned());
         }
@@ -270,7 +297,12 @@ impl QueryStore for SqliteStore {
         if !filter.actors.is_empty() {
             sql.push_str(&format!(
                 " AND EXISTS (SELECT 1 FROM json_each(actors) WHERE value IN ({}))",
-                filter.actors.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+                filter
+                    .actors
+                    .iter()
+                    .map(|_| "?")
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             params.extend(filter.actors.iter().cloned());
         }
@@ -292,27 +324,29 @@ impl QueryStore for SqliteStore {
         }
 
         // Execute query
-        let mut stmt = self.conn.prepare(&sql)
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
             .map_err(|e| StoreError::Backend(e.to_string()))?;
 
-        let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter()
-            .map(|p| p as &dyn rusqlite::ToSql)
-            .collect();
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
 
-        let rows = stmt.query_map(&param_refs[..], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
-                row.get::<_, String>(6)?,
-                row.get::<_, Option<String>>(7)?,
-                row.get::<_, String>(8)?,
-            ))
-        })
-        .map_err(|e| StoreError::Backend(e.to_string()))?;
+        let rows = stmt
+            .query_map(&param_refs[..], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
+                ))
+            })
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
 
         let mut attestations = Vec::new();
         for row_result in rows {
@@ -360,9 +394,12 @@ impl QueryStore for SqliteStore {
     }
 
     fn predicates(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT value FROM attestations, json_each(predicates) ORDER BY value"
-        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT DISTINCT value FROM attestations, json_each(predicates) ORDER BY value",
+            )
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
 
         let predicates = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -374,9 +411,10 @@ impl QueryStore for SqliteStore {
     }
 
     fn contexts(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT value FROM attestations, json_each(contexts) ORDER BY value"
-        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT value FROM attestations, json_each(contexts) ORDER BY value")
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
 
         let contexts = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -388,9 +426,10 @@ impl QueryStore for SqliteStore {
     }
 
     fn subjects(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT value FROM attestations, json_each(subjects) ORDER BY value"
-        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT value FROM attestations, json_each(subjects) ORDER BY value")
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
 
         let subjects = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -402,9 +441,10 @@ impl QueryStore for SqliteStore {
     }
 
     fn actors(&self) -> StoreResult<Vec<String>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT value FROM attestations, json_each(actors) ORDER BY value"
-        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT value FROM attestations, json_each(actors) ORDER BY value")
+            .map_err(|e| StoreError::Backend(e.to_string()))?;
 
         let actors = stmt
             .query_map([], |row| row.get::<_, String>(0))

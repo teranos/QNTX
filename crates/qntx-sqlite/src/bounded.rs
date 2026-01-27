@@ -9,7 +9,7 @@
 
 use qntx_core::{
     attestation::{Attestation, AxFilter, AxResult},
-    storage::{AttestationStore, QueryStore, StoreError, StorageStats},
+    storage::{AttestationStore, QueryStore, StorageStats, StoreError},
 };
 
 use crate::SqliteStore;
@@ -105,7 +105,9 @@ impl BoundedStore {
     /// Check if adding an attestation would exceed quotas
     fn check_quotas(&self, attestation: &Attestation) -> StoreResult<()> {
         // Get actor (first one, or "unknown")
-        let actor = attestation.actors.first()
+        let actor = attestation
+            .actors
+            .first()
             .map(|s| s.as_str())
             .unwrap_or("unknown");
 
@@ -176,7 +178,9 @@ impl AttestationStore for BoundedStore {
         let current_contexts = self.store.contexts()?;
 
         // Get actor
-        let actor = attestation.actors.first()
+        let actor = attestation
+            .actors
+            .first()
             .map(|s| s.as_str())
             .unwrap_or("unknown");
 
@@ -284,8 +288,12 @@ mod tests {
         let mut store = BoundedStore::in_memory_with_quotas(quotas).unwrap();
 
         // Add up to quota
-        store.put(create_test_attestation("AS-1", "ALICE", "knows", "work")).unwrap();
-        store.put(create_test_attestation("AS-2", "BOB", "knows", "work")).unwrap();
+        store
+            .put(create_test_attestation("AS-1", "ALICE", "knows", "work"))
+            .unwrap();
+        store
+            .put(create_test_attestation("AS-2", "BOB", "knows", "work"))
+            .unwrap();
 
         // Should fail - exceeds quota
         let result = store.put(create_test_attestation("AS-3", "CHARLIE", "knows", "work"));
@@ -298,11 +306,17 @@ mod tests {
         let mut store = BoundedStore::in_memory_with_quotas(quotas).unwrap();
 
         // Add up to quota
-        store.put(create_test_attestation("AS-1", "ALICE", "knows", "work")).unwrap();
-        store.put(create_test_attestation("AS-2", "BOB", "works_at", "ACME")).unwrap();
+        store
+            .put(create_test_attestation("AS-1", "ALICE", "knows", "work"))
+            .unwrap();
+        store
+            .put(create_test_attestation("AS-2", "BOB", "works_at", "ACME"))
+            .unwrap();
 
         // Should fail - exceeds predicate quota
-        let result = store.put(create_test_attestation("AS-3", "CHARLIE", "manages", "team"));
+        let result = store.put(create_test_attestation(
+            "AS-3", "CHARLIE", "manages", "team",
+        ));
         assert!(matches!(result, Err(StoreError::QuotaExceeded { .. })));
     }
 
@@ -312,11 +326,17 @@ mod tests {
         let mut store = BoundedStore::in_memory_with_quotas(quotas).unwrap();
 
         // Add up to quota
-        store.put(create_test_attestation("AS-1", "ALICE", "knows", "work")).unwrap();
-        store.put(create_test_attestation("AS-2", "BOB", "knows", "social")).unwrap();
+        store
+            .put(create_test_attestation("AS-1", "ALICE", "knows", "work"))
+            .unwrap();
+        store
+            .put(create_test_attestation("AS-2", "BOB", "knows", "social"))
+            .unwrap();
 
         // Should fail - exceeds context quota
-        let result = store.put(create_test_attestation("AS-3", "CHARLIE", "knows", "family"));
+        let result = store.put(create_test_attestation(
+            "AS-3", "CHARLIE", "knows", "family",
+        ));
         assert!(matches!(result, Err(StoreError::QuotaExceeded { .. })));
     }
 
@@ -326,7 +346,9 @@ mod tests {
         let mut store = BoundedStore::in_memory_with_quotas(quotas).unwrap();
 
         // Add first attestation
-        store.put(create_test_attestation("AS-1", "ALICE", "knows", "work")).unwrap();
+        store
+            .put(create_test_attestation("AS-1", "ALICE", "knows", "work"))
+            .unwrap();
 
         // Should succeed - reuses existing predicate
         let result = store.put(create_test_attestation("AS-2", "BOB", "knows", "social"));
@@ -339,8 +361,12 @@ mod tests {
         let mut store = BoundedStore::in_memory_with_quotas(quotas).unwrap();
 
         // Add attestations
-        store.put(create_test_attestation("AS-1", "ALICE", "knows", "work")).unwrap();
-        store.put(create_test_attestation("AS-2", "BOB", "works_at", "ACME")).unwrap();
+        store
+            .put(create_test_attestation("AS-1", "ALICE", "knows", "work"))
+            .unwrap();
+        store
+            .put(create_test_attestation("AS-2", "BOB", "works_at", "ACME"))
+            .unwrap();
 
         // Try to update with new predicate - should fail
         let updated = create_test_attestation("AS-1", "ALICE", "manages", "work");
@@ -354,8 +380,12 @@ mod tests {
         let mut store = BoundedStore::in_memory_with_quotas(quotas).unwrap();
 
         // Fill quota
-        store.put(create_test_attestation("AS-1", "ALICE", "knows", "work")).unwrap();
-        store.put(create_test_attestation("AS-2", "BOB", "knows", "work")).unwrap();
+        store
+            .put(create_test_attestation("AS-1", "ALICE", "knows", "work"))
+            .unwrap();
+        store
+            .put(create_test_attestation("AS-2", "BOB", "knows", "work"))
+            .unwrap();
 
         // Delete one
         store.delete("AS-1").unwrap();
@@ -371,12 +401,14 @@ mod tests {
 
         // Should be able to add many attestations
         for i in 0..100 {
-            store.put(create_test_attestation(
-                &format!("AS-{}", i),
-                "ALICE",
-                &format!("pred_{}", i),
-                &format!("ctx_{}", i),
-            )).unwrap();
+            store
+                .put(create_test_attestation(
+                    &format!("AS-{}", i),
+                    "ALICE",
+                    &format!("pred_{}", i),
+                    &format!("ctx_{}", i),
+                ))
+                .unwrap();
         }
 
         assert_eq!(store.count().unwrap(), 100);

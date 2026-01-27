@@ -1,6 +1,6 @@
 //! CRUD operation tests for SqliteStore
 
-use qntx_core::{AttestationBuilder, storage::AttestationStore};
+use qntx_core::{storage::AttestationStore, AttestationBuilder};
 use qntx_sqlite::SqliteStore;
 
 /// Helper to create a test attestation
@@ -205,8 +205,14 @@ fn test_attributes() {
     store.put(attestation).unwrap();
 
     let retrieved = store.get("AS-attrs").unwrap().unwrap();
-    assert_eq!(retrieved.attributes.get("key1").unwrap(), &serde_json::json!("value1"));
-    assert_eq!(retrieved.attributes.get("key2").unwrap(), &serde_json::json!(42));
+    assert_eq!(
+        retrieved.attributes.get("key1").unwrap(),
+        &serde_json::json!("value1")
+    );
+    assert_eq!(
+        retrieved.attributes.get("key2").unwrap(),
+        &serde_json::json!(42)
+    );
 }
 
 #[test]
