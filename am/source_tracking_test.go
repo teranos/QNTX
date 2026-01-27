@@ -216,7 +216,8 @@ port = 9090
 		require.NoError(t, err)
 
 		// Verify project config won for port
-		assert.Equal(t, 9090, cfg.Server.Port, "Project config should override user config")
+		require.NotNil(t, cfg.Server.Port, "Port should be set")
+		assert.Equal(t, 9090, *cfg.Server.Port, "Project config should override user config")
 
 		// Get introspection
 		intro, err := GetConfigIntrospection()

@@ -22,72 +22,31 @@ Generator pattern keeps ingestion infrastructure separate from domain knowledge.
 
 ### Basic Ingester Structure
 
-```go
-type DataIngester struct {
-    db     *sql.DB
-    dryRun bool
-    actor  string
-}
-
-func (i *DataIngester) ProcessData(filePath string) error {
-    // 1. Parse source data
-    data, err := parseSourceFile(filePath)
-    if err != nil {
-        return err
-    }
-
-    // 2. Generate attestations
-    generator := ix.NewAttestationGenerator("data-source")
-    attestations := []types.As{}
-
-    for _, record := range data {
-        att := generator.GenerateAttestation(record)
-        attestations = append(attestations, att)
-    }
-
-    // 3. Execute attestations
-    executor := ix.NewExecutionHelper(i.dryRun, i.actor)
-    for _, att := range attestations {
-        if err := executor.ExecuteAttestations(i.db, []types.As{att}, false); err != nil {
-            return err
-        }
-    }
-
-    return nil
-}
+```
+ProcessData(filePath, dryRun):
+    1. Parse source data from filePath
+    2. Create AttestationGenerator for your data source
+    3. For each record, generate an attestation
+    4. Create ExecutionHelper with dryRun flag
+    5. Execute attestations against the store
 ```
 
 ### Structured Execution Pattern
 
-```go
-func ExecuteDataSource(ctx context.Context, filePath string, dryRun bool, opts ix.StructuredOptions) (ix.Result, error) {
-    result := ix.NewResult("data-source")
+```
+ExecuteDataSource(filePath, dryRun, options):
+    result = new Result("data-source")
 
-    // Parse and validate input
-    data, err := parseFile(filePath)
-    if err != nil {
-        result.AddError("parse", "invalid_file", err.Error())
-        return result, err
-    }
+    data = parseFile(filePath)
+    if error: result.AddError("parse", "invalid_file", error)
 
-    // Generate attestations
-    generator := ix.NewAttestationGenerator("data-source")
-    attestations := generateAttestations(generator, data)
+    generator = new AttestationGenerator("data-source")
+    attestations = generateAttestations(generator, data)
 
-    // Execute with dry-run support
-    executor := ix.NewExecutionHelper(dryRun, opts.Actor)
-    if err := executor.ExecuteAttestations(db, attestations, opts.IncludeTrace); err != nil {
-        result.AddError("execute", "attestation_failed", err.Error())
-        return result, err
-    }
+    executor = new ExecutionHelper(dryRun)
+    executor.ExecuteAttestations(store, attestations, options.IncludeTrace)
 
-    // Populate result
-    for _, att := range attestations {
-        result.AddAttestation(att)
-    }
-
-    return result, nil
-}
+    return result
 ```
 
 ## Design Principles
