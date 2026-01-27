@@ -40,7 +40,7 @@ describe('LocalStorageScriptStorage', () => {
         test('persists script to localStorage with correct key', async () => {
             await storage.save('script-123', 'print("hello")');
 
-            const key = 'qntx:script:script-123';
+            const key = 'qntx-script:script-123';
             const stored = localStorage.getItem(key);
             expect(stored).not.toBeNull();
             expect(stored).toBe('print("hello")');
@@ -74,27 +74,29 @@ describe('LocalStorageScriptStorage', () => {
         });
     });
 
-    describe('get', () => {
-        test('returns all script IDs', async () => {
+    describe('list', () => {
+        test('returns all script metadata', async () => {
             await storage.save('script-1', 'code1');
             await storage.save('script-2', 'code2');
             await storage.save('script-3', 'code3');
 
-            const ids = await storage.get();
+            const metadata = await storage.list();
+            const ids = metadata.map(m => m.id).sort();
             expect(ids).toEqual(['script-1', 'script-2', 'script-3']);
         });
 
         test('returns empty array when no scripts exist', async () => {
-            const ids = await storage.get();
-            expect(ids).toEqual([]);
+            const metadata = await storage.list();
+            expect(metadata).toEqual([]);
         });
 
         test('ignores non-script localStorage keys', async () => {
             localStorage.setItem('other-key', 'value');
             await storage.save('script-1', 'code');
 
-            const ids = await storage.get();
-            expect(ids).toEqual(['script-1']);
+            const metadata = await storage.list();
+            expect(metadata.length).toBe(1);
+            expect(metadata[0].id).toBe('script-1');
         });
     });
 
@@ -105,8 +107,8 @@ describe('LocalStorageScriptStorage', () => {
 
             await storage.clear();
 
-            const ids = await storage.get();
-            expect(ids).toEqual([]);
+            const metadata = await storage.list();
+            expect(metadata).toEqual([]);
         });
 
         test('preserves non-script localStorage keys', async () => {

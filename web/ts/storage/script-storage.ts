@@ -54,7 +54,7 @@ export interface ScriptStorage {
  * Stores scripts in browser localStorage with metadata.
  * Storage key pattern: qntx-script:<id>
  */
-class LocalStorageScriptStorage implements ScriptStorage {
+export class LocalStorageScriptStorage implements ScriptStorage {
     private readonly keyPrefix = 'qntx-script:';
     private readonly metadataKey = 'qntx-script-metadata';
 
@@ -131,6 +131,26 @@ class LocalStorageScriptStorage implements ScriptStorage {
         } catch (error) {
             log.error(SEG.UI, `[ScriptStorage] Failed to list scripts:`, error);
             return [];
+        }
+    }
+
+    async clear(): Promise<void> {
+        try {
+            const allMetadata = await this.loadAllMetadata();
+
+            // Remove all script data
+            for (const metadata of allMetadata) {
+                const key = this.getKey(metadata.id);
+                localStorage.removeItem(key);
+            }
+
+            // Clear metadata index
+            localStorage.removeItem(this.metadataKey);
+
+            log.debug(SEG.UI, `[ScriptStorage] Cleared all scripts (${allMetadata.length} removed)`);
+        } catch (error) {
+            log.error(SEG.UI, `[ScriptStorage] Failed to clear scripts:`, error);
+            throw error;
         }
     }
 
