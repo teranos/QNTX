@@ -2,6 +2,7 @@
 //!
 //! Provides execution capabilities for the PythonEngine.
 
+use crate::atsstore::{self, SharedAtsStoreClient};
 use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -18,9 +19,31 @@ const TRUNCATION_SUFFIX: &str = "...";
 impl PythonEngine {
     /// Execute Python code and return the result
     pub fn execute(&self, code: &str, config: &ExecutionConfig) -> ExecutionResult {
+        self.execute_with_ats(code, config, None)
+    }
+
+    /// Execute Python code with optional ATSStore client for attestation support.
+    /// When an ATSStore client is provided, the `attest()` function becomes available
+    /// in the Python execution context.
+    pub fn execute_with_ats(
+        &self,
+        code: &str,
+        config: &ExecutionConfig,
+        ats_client: Option<SharedAtsStoreClient>,
+    ) -> ExecutionResult {
         let start = std::time::Instant::now();
 
-        let result = self.execute_inner(code, config);
+        // Set up ATSStore client for this execution if provided
+        if let Some(ref client) = ats_client {
+            atsstore::set_current_client(client.clone());
+        }
+
+        let result = self.execute_inner(code, config, ats_client.is_some());
+
+        // Clean up ATSStore client
+        if ats_client.is_some() {
+            atsstore::clear_current_client();
+        }
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -45,6 +68,7 @@ impl PythonEngine {
         &self,
         code: &str,
         config: &ExecutionConfig,
+        inject_attest: bool,
     ) -> Result<ExecutionResult, Error> {
         // Create CString for the code
         let code_cstr = CString::new(code)
@@ -100,6 +124,12 @@ impl PythonEngine {
                     .extract()
                     .map_err(|e| Error::context("failed to extract sys.path as list", e))?;
                 let _ = path_list.insert(0, path);
+            }
+
+            // Inject attest() function if ATSStore client is available
+            if inject_attest {
+                atsstore::inject_attest_function(py, &globals)
+                    .map_err(|e| Error::context("failed to inject attest function", e))?;
             }
 
             // Execute the code using py.run
@@ -169,9 +199,19 @@ impl PythonEngine {
     /// Currently reads arbitrary filesystem paths which may be a security concern
     /// depending on deployment context.
     pub fn execute_file(&self, path: &str, config: &ExecutionConfig) -> ExecutionResult {
+        self.execute_file_with_ats(path, config, None)
+    }
+
+    /// Execute a Python file with optional ATSStore client for attestation support.
+    pub fn execute_file_with_ats(
+        &self,
+        path: &str,
+        config: &ExecutionConfig,
+        ats_client: Option<SharedAtsStoreClient>,
+    ) -> ExecutionResult {
         // TODO(sec): Validate path is within allowed directories if config.allow_fs is false
         match std::fs::read_to_string(path) {
-            Ok(code) => self.execute(&code, config),
+            Ok(code) => self.execute_with_ats(&code, config, ats_client),
             Err(e) => ExecutionResult {
                 success: false,
                 stdout: String::new(),
@@ -186,9 +226,18 @@ impl PythonEngine {
 
     /// Evaluate a Python expression and return its value
     pub fn evaluate(&self, expr: &str) -> ExecutionResult {
+        self.evaluate_with_ats(expr, None)
+    }
+
+    /// Evaluate a Python expression with optional ATSStore client.
+    pub fn evaluate_with_ats(
+        &self,
+        expr: &str,
+        ats_client: Option<SharedAtsStoreClient>,
+    ) -> ExecutionResult {
         // Wrap expression to capture result
         let code = format!("_result = ({})", expr);
-        self.execute(&code, &ExecutionConfig::default())
+        self.execute_with_ats(&code, &ExecutionConfig::default(), ats_client)
     }
 
     /// Install a package using pip (if allowed)
