@@ -267,7 +267,16 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 }
 
 // createAIClient creates the appropriate AI client based on payload and frontmatter configuration
-// Priority: payload.Model > frontmatter.Model > config default
+// Priority: payload.Provider > config default
+//
+// TODO(provider-plugins): AI providers should be implemented as Rust-based gRPC plugins
+// following the qntx-python pattern. Each provider (Ollama, OpenRouter, llama.cpp) would be:
+// - A separate Rust crate using tonic for gRPC
+// - Implementing the DomainPluginService interface
+// - Using reqwest/hyper for efficient HTTP streaming to provider APIs
+// - Running as a separate process for isolation and stability
+// This follows the successful pattern of qntx-python-plugin and allows hot-swapping
+// providers without recompiling QNTX core. See qntx-python/README.md for the pattern.
 func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.AIClient {
 	// Determine model to use (payload overrides frontmatter overrides config)
 	model := ""
@@ -277,32 +286,20 @@ func (h *Handler) createAIClient(payload Payload, doc *PromptDocument) provider.
 		model = doc.Metadata.Model
 	}
 
-	// Use provider from payload, or default based on config
-	if payload.Provider == "local" || (payload.Provider == "" && h.config.LocalInference.Enabled) {
-		clientModel := model
-		if clientModel == "" {
-			clientModel = h.config.LocalInference.Model
-		}
-		return provider.NewLocalClient(provider.LocalClientConfig{
-			BaseURL:        h.config.LocalInference.BaseURL,
-			Model:          clientModel,
-			TimeoutSeconds: h.config.LocalInference.TimeoutSeconds,
-			DB:             h.db,
-			OperationType:  "prompt-execute",
-		})
-	}
+	// Determine which provider to use
+	providerType := provider.DetermineProvider(h.config, payload.Provider)
 
-	// Default to OpenRouter
-	clientModel := model
-	if clientModel == "" {
-		clientModel = h.config.OpenRouter.Model
-	}
-	return openrouter.NewClient(openrouter.Config{
-		APIKey:        h.config.OpenRouter.APIKey,
-		Model:         clientModel,
-		DB:            h.db,
-		OperationType: "prompt-execute",
-	})
+	// Create the appropriate client with model override
+	return provider.NewAIClientForProviderWithModel(
+		providerType,
+		h.config,
+		model, // Can be empty string, provider will use default
+		h.db,
+		0, // verbosity
+		"prompt-execute",
+		"", // entityType
+		"", // entityID
+	)
 }
 
 // createResultAttestation creates an attestation from the LLM response
