@@ -17,9 +17,10 @@ export interface Glyph {
     renderContent: () => HTMLElement;    // Function to render content
 
     // Manifestation configuration
-    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'ix';  // Default: 'window'
+    manifestationType?: 'window' | 'fullscreen' | 'canvas' | 'modal' | 'ix' | 'ax';  // Default: 'window'
     // NOTE: 'ix' currently renders inline on canvas (like py), but reserved for future state-specific manifestations
     // Rationale: IX has unique fail/success states (queued, running, preview, error) that may need special UI
+    // NOTE: 'ax' renders inline on canvas for query editing
     // TODO: Add 'programmature' manifestation type for full code editor that can minimize to tray
     initialWidth?: string;               // Initial dimensions (e.g., "800px")
     initialHeight?: string;
