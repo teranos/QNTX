@@ -158,45 +158,22 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             //   }
             // This creates audit trail of all Python executions on canvas.
 
-            // Calculate position for result glyph (directly below this py glyph)
-            const pyRect = element.getBoundingClientRect();
-            const canvas = element.parentElement;
-            const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
-
-            const pyGridX = Math.round((pyRect.left - canvasRect.left) / GRID_SIZE);
-            const pyBottomY = pyRect.bottom - canvasRect.top;
-            const resultGridY = Math.round(pyBottomY / GRID_SIZE);
-
-            // Create result glyph metadata
-            const resultGlyph: Partial<Glyph> & { id: string; symbol: string; gridX: number; gridY: number } = {
-                id: `result-${crypto.randomUUID()}`,
-                title: 'Python Result',
-                symbol: 'result',
-                gridX: pyGridX,
-                gridY: resultGridY,
-                width: Math.round(pyRect.width)
-            };
-
-            // Render result glyph
-            const resultElement = createResultGlyph(resultGlyph as Glyph, result);
-            canvas?.appendChild(resultElement);
-
-            // Persist to uiState with execution result
-            const resultRect = resultElement.getBoundingClientRect();
-            uiState.addCanvasGlyph({
-                id: resultGlyph.id,
-                symbol: 'result',
-                gridX: resultGlyph.gridX,
-                gridY: resultGlyph.gridY,
-                width: Math.round(resultRect.width),
-                height: Math.round(resultRect.height),
-                result: result
-            });
-
-            log.debug(SEG.UI, `[PyGlyph] Spawned result glyph at grid (${pyGridX}, ${resultGridY}), executed in ${result.duration_ms}ms`);
+            // Create result glyph for successful execution
+            createAndDisplayResultGlyph(element, result);
         } catch (error) {
             log.error(SEG.UI, '[PyGlyph] Execution failed:', error);
             console.error('[Python Execution Error]', error);
+
+            // Create error result glyph for network/parse failures
+            const errorResult: ExecutionResult = {
+                success: false,
+                stdout: '',
+                stderr: '',
+                result: null,
+                error: error instanceof Error ? error.message : String(error),
+                duration_ms: 0
+            };
+            createAndDisplayResultGlyph(element, errorResult);
         }
     });
 
@@ -292,6 +269,48 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     makeResizable(element, resizeHandle, glyph);
 
     return element;
+}
+
+/**
+ * Create and display a result glyph for Python execution results
+ */
+function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionResult): void {
+    // Calculate position for result glyph (directly below the py glyph)
+    const pyRect = pyElement.getBoundingClientRect();
+    const canvas = pyElement.parentElement;
+    const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+
+    const pyGridX = Math.round((pyRect.left - canvasRect.left) / GRID_SIZE);
+    const pyBottomY = pyRect.bottom - canvasRect.top;
+    const resultGridY = Math.round(pyBottomY / GRID_SIZE);
+
+    // Create result glyph metadata
+    const resultGlyph: Partial<Glyph> & { id: string; symbol: string; gridX: number; gridY: number } = {
+        id: `result-${crypto.randomUUID()}`,
+        title: 'Python Result',
+        symbol: 'result',
+        gridX: pyGridX,
+        gridY: resultGridY,
+        width: Math.round(pyRect.width)
+    };
+
+    // Render result glyph
+    const resultElement = createResultGlyph(resultGlyph as Glyph, result);
+    canvas?.appendChild(resultElement);
+
+    // Persist to uiState with execution result
+    const resultRect = resultElement.getBoundingClientRect();
+    uiState.addCanvasGlyph({
+        id: resultGlyph.id,
+        symbol: 'result',
+        gridX: resultGlyph.gridX,
+        gridY: resultGlyph.gridY,
+        width: Math.round(resultRect.width),
+        height: Math.round(resultRect.height),
+        result: result
+    });
+
+    log.debug(SEG.UI, `[PyGlyph] Spawned result glyph at grid (${pyGridX}, ${resultGridY}), duration ${result.duration_ms}ms`);
 }
 
 /**
