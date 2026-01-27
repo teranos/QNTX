@@ -18,8 +18,9 @@ jobs:
         image:
           - name: ci-image
             registry: ghcr.io/teranos/qntx
-          - name: qntx-code-plugin-image
-            registry: ghcr.io/teranos/qntx-code-plugin
+          # TODO: Re-enable qntx-code-plugin-image after extraction (#354)
+          # - name: qntx-code-plugin-image
+          #   registry: ghcr.io/teranos/qntx-code-plugin
           - name: qntx-python-plugin-image
             registry: ghcr.io/teranos/qntx-python-plugin
 
@@ -139,8 +140,9 @@ jobs:
         image:
           - name: ci-image
             registry: ghcr.io/teranos/qntx
-          - name: qntx-code-plugin-image
-            registry: ghcr.io/teranos/qntx-code-plugin
+          # TODO: Re-enable qntx-code-plugin-image after extraction (#354)
+          # - name: qntx-code-plugin-image
+          #   registry: ghcr.io/teranos/qntx-code-plugin
           - name: qntx-python-plugin-image
             registry: ghcr.io/teranos/qntx-python-plugin
 
