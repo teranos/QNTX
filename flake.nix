@@ -97,7 +97,7 @@
           };
         };
 
-        # Build QNTX binary with Nix
+        # Build QNTX binary with Nix (requires Rust CGO libraries)
         qntx = pkgs.buildGoModule {
           pname = "qntx";
           version = self.rev or "dev";
@@ -107,12 +107,96 @@
           # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
           vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
 
+          # Depend on Rust libraries
+          buildInputs = [
+            rustLibs.fuzzy
+            rustLibs.sqlite
+            rustLibs.vidstream
+          ];
+
+          # Enable CGO via preBuild (CGO_ENABLED cannot be set as top-level attribute)
+          preBuild = ''
+            export CGO_ENABLED=1
+            export CGO_LDFLAGS="-L${rustLibs.fuzzy}/lib -L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
+          '';
+
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
             "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
           ];
 
           subPackages = [ "cmd/qntx" ];
+        };
+
+        # Rust libraries (CGO dependencies)
+        rustLibs = {
+          # Fuzzy matching library (depends on qntx-core from workspace)
+          fuzzy = pkgs.rustPlatform.buildRustPackage {
+            pname = "qntx-fuzzy";
+            version = self.rev or "dev";
+            src = ./.;  # Use workspace root (fuzzy-ax is excluded from workspace)
+
+            cargoLock = {
+              lockFile = ./ats/ax/fuzzy-ax/Cargo.lock;
+            };
+
+            # Build from ats/ax/fuzzy-ax subdirectory
+            buildAndTestSubdir = "ats/ax/fuzzy-ax";
+
+            # Build only the library
+            cargoBuildFlags = [ "--lib" ];
+
+            # Install static library
+            postInstall = ''
+              mkdir -p $out/lib
+              cp target/release/libqntx_fuzzy.a $out/lib/
+            '';
+          };
+
+          # SQLite storage library
+          sqlite = pkgs.rustPlatform.buildRustPackage {
+            pname = "qntx-sqlite";
+            version = self.rev or "dev";
+            src = ./.;  # Workspace root (qntx-sqlite is part of workspace)
+
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+            };
+
+            nativeBuildInputs = [ pkgs.sqlite ];
+
+            # Build only qntx-sqlite with FFI feature
+            cargoBuildFlags = [ "-p" "qntx-sqlite" "--features" "ffi" ];
+
+            # Install static library
+            postInstall = ''
+              mkdir -p $out/lib
+              cp target/release/libqntx_sqlite.a $out/lib/
+            '';
+          };
+
+          # Video processing library (ONNX support)
+          vidstream = pkgs.rustPlatform.buildRustPackage {
+            pname = "qntx-vidstream";
+            version = self.rev or "dev";
+            src = ./ats/vidstream;
+
+            cargoLock = {
+              lockFile = ./ats/vidstream/Cargo.lock;
+            };
+
+            nativeBuildInputs = [ pkgs.pkg-config ];
+            buildInputs = [ pkgs.onnxruntime ];
+
+            # Build with ONNX feature
+            cargoBuildFlags = [ "--lib" "--features" "onnx" ];
+
+            # Install static library
+            postInstall = ''
+              mkdir -p $out/lib
+              cp target/release/libqntx_vidstream.a $out/lib/
+            '';
+          };
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
@@ -128,7 +212,7 @@
           subPackages = [ "cmd/typegen" ];
         };
 
-        # Build qntx-code plugin binary
+        # Build qntx-code plugin binary (requires Rust CGO libraries via ats/ax/fuzzy-ax)
         qntx-code = pkgs.buildGoModule {
           pname = "qntx-code-plugin";
           version = self.rev or "dev";
@@ -137,6 +221,19 @@
           # Same vendorHash as qntx (shared go.mod)
           # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
           vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+
+          # Depend on Rust libraries
+          buildInputs = [
+            rustLibs.fuzzy
+            rustLibs.sqlite
+            rustLibs.vidstream
+          ];
+
+          # Enable CGO via preBuild (CGO_ENABLED cannot be set as top-level attribute)
+          preBuild = ''
+            export CGO_ENABLED=1
+            export CGO_LDFLAGS="-L${rustLibs.fuzzy}/lib -L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
+          '';
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -369,6 +466,11 @@
 
           # Typegen binary (standalone, no plugins/CGO)
           typegen = typegen;
+
+          # Rust CGO libraries
+          rust-fuzzy = rustLibs.fuzzy;
+          rust-sqlite = rustLibs.sqlite;
+          rust-vidstream = rustLibs.vidstream;
 
           # Plugin binaries
           qntx-code = qntx-code;
