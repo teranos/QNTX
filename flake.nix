@@ -151,7 +151,9 @@
             version = self.rev or "dev";
             src = ./.; # Use workspace root (vidstream depends on qntx from workspace)
 
-            cargoHash = "sha256-QF/P/g3M7NAvYvIeuDd22pqcesDHds4WMsjH8Bgymqg=";
+            cargoLock = {
+              lockFile = ./ats/vidstream/Cargo.lock;
+            };
 
             # Build from ats/vidstream subdirectory
             buildAndTestSubdir = "ats/vidstream";
