@@ -45,7 +45,6 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.display = 'flex';
     element.style.flexDirection = 'column';
     element.style.overflow = 'hidden';
-    element.style.resize = 'both';
 
     // Textarea (declared early so play button can reference it)
     const textarea = document.createElement('textarea');
@@ -135,8 +134,24 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.appendChild(titleBar);
     element.appendChild(content);
 
-    // Make draggable via title bar (similar to py-glyph)
+    // Resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'ix-glyph-resize-handle';
+    resizeHandle.style.position = 'absolute';
+    resizeHandle.style.bottom = '0';
+    resizeHandle.style.right = '0';
+    resizeHandle.style.width = '16px';
+    resizeHandle.style.height = '16px';
+    resizeHandle.style.cursor = 'nwse-resize';
+    resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
+    resizeHandle.style.borderTopLeftRadius = '4px';
+    element.appendChild(resizeHandle);
+
+    // Make draggable via title bar
     makeDraggable(element, titleBar, glyph);
+
+    // Make resizable via handle
+    makeResizable(element, resizeHandle, glyph);
 
     return element;
 }
@@ -202,6 +217,83 @@ function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph):
         }
 
         log.debug(SEG.UI, `[IX Glyph] Moved to grid (${gridX}, ${gridY})`);
+    });
+}
+
+/**
+ * Make an element resizable by a handle
+ */
+function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
+    let isResizing = false;
+    let startX = 0;
+    let startY = 0;
+    let startWidth = 0;
+    let startHeight = 0;
+    let abortController: AbortController | null = null;
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isResizing) return;
+
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+
+        const newWidth = Math.max(200, startWidth + deltaX);
+        const newHeight = Math.max(120, startHeight + deltaY);
+
+        element.style.width = `${newWidth}px`;
+        element.style.height = `${newHeight}px`;
+    };
+
+    const handleMouseUp = () => {
+        if (!isResizing) return;
+        isResizing = false;
+
+        element.classList.remove('is-resizing');
+
+        // Save final size
+        const rect = element.getBoundingClientRect();
+        const finalWidth = Math.round(rect.width);
+        const finalHeight = Math.round(rect.height);
+
+        glyph.width = finalWidth;
+        glyph.height = finalHeight;
+
+        // Persist to uiState
+        if (glyph.symbol && glyph.gridX !== undefined && glyph.gridY !== undefined) {
+            uiState.addCanvasGlyph({
+                id: glyph.id,
+                symbol: glyph.symbol,
+                gridX: glyph.gridX,
+                gridY: glyph.gridY,
+                width: finalWidth,
+                height: finalHeight
+            });
+        }
+
+        log.debug(SEG.UI, `[IX Glyph] Finished resizing to ${finalWidth}x${finalHeight}`);
+
+        abortController?.abort();
+        abortController = null;
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = element.getBoundingClientRect();
+        startWidth = rect.width;
+        startHeight = rect.height;
+
+        element.classList.add('is-resizing');
+
+        abortController = new AbortController();
+        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
+        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
+
+        log.debug(SEG.UI, `[IX Glyph] Started resizing`);
     });
 }
 
