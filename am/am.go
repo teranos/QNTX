@@ -18,17 +18,18 @@ type DatabaseConfig struct {
 	BoundedStorage BoundedStorageConfig `mapstructure:"bounded_storage"`
 }
 
-// BoundedStorageConfig configures storage limits for attestations
+// BoundedStorageConfig configures storage limits for attestations.
+// Values <= 0 are normalized to defaults at runtime (16, 64, 64 respectively).
 type BoundedStorageConfig struct {
-	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair
-	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor
-	EntityActorsLimit  int `mapstructure:"entity_actors_limit"`  // actors per entity
+	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
+	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
+	EntityActorsLimit  int `mapstructure:"entity_actors_limit"`  // actors per entity (default: 64)
 }
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int     `mapstructure:"port"`            // Server port (nil = default 877, 0 = OS-assigned)
-	FrontendPort   int      `mapstructure:"frontend_port"`   // Frontend dev server port (default: 8820)
+	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 = let OS assign ephemeral port (standard socket API behavior)
+	FrontendPort   int      `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
 }
@@ -84,10 +85,10 @@ type LocalInferenceConfig struct {
 
 // OpenRouterConfig configures OpenRouter.ai API access
 type OpenRouterConfig struct {
-	APIKey      string  `mapstructure:"api_key"`     // OpenRouter API key
-	Model       string  `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
-	Temperature float64 `mapstructure:"temperature"` // Sampling temperature (default: 0.2)
-	MaxTokens   int     `mapstructure:"max_tokens"`  // Maximum tokens per request (default: 1000)
+	APIKey      string   `mapstructure:"api_key"`     // OpenRouter API key
+	Model       string   `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
+	Temperature *float64 `mapstructure:"temperature"` // Sampling temperature (nil = default 0.2)
+	MaxTokens   *int     `mapstructure:"max_tokens"`  // Maximum tokens per request (nil = default 1000)
 }
 
 // AxConfig configures the attestation query system
