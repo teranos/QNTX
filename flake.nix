@@ -134,7 +134,7 @@
           fuzzy = pkgs.rustPlatform.buildRustPackage {
             pname = "qntx-fuzzy";
             version = self.rev or "dev";
-            src = ./.;  # Use workspace root (fuzzy-ax is excluded from workspace)
+            src = ./.; # Use workspace root (fuzzy-ax is excluded from workspace)
 
             cargoLock = {
               lockFile = ./ats/ax/fuzzy-ax/Cargo.lock;
@@ -157,7 +157,7 @@
           sqlite = pkgs.rustPlatform.buildRustPackage {
             pname = "qntx-sqlite";
             version = self.rev or "dev";
-            src = ./.;  # Workspace root (qntx-sqlite is part of workspace)
+            src = ./.; # Workspace root (qntx-sqlite is part of workspace)
 
             cargoLock = {
               lockFile = ./Cargo.lock;
