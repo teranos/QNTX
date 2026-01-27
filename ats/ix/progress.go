@@ -7,27 +7,24 @@ import (
 	"time"
 
 	"github.com/pterm/pterm"
+	"github.com/teranos/QNTX/pulse"
 )
 
-// ProgressEmitter defines the interface for emitting progress updates
-// during long-running ix operations. Implementations include:
+// ProgressEmitter extends pulse.ProgressEmitter with domain-specific methods
+// for the attestation system. This allows ATS-specific handlers to use
+// convenience methods like EmitAttestations while maintaining compatibility
+// with the generic pulse infrastructure.
+//
+// Implementations include:
 // - CLIEmitter: Pretty-printed terminal output using pterm
 // - JSONEmitter: Structured JSON events for QNTX server consumption
 type ProgressEmitter interface {
-	// EmitStage announces the start of a processing stage
-	EmitStage(stage string, message string)
+	pulse.ProgressEmitter
 
-	// EmitAttestations announces batch generation of attestations
+	// EmitAttestations announces batch generation of attestations.
+	// This is a domain-specific convenience method that wraps EmitProgress
+	// with attestation-specific semantics.
 	EmitAttestations(count int, entities []AttestationEntity)
-
-	// EmitComplete announces successful completion with summary
-	EmitComplete(summary map[string]interface{})
-
-	// EmitError announces an error during processing
-	EmitError(stage string, err error)
-
-	// EmitInfo emits general informational message
-	EmitInfo(message string)
 }
 
 // JobBroadcaster is an optional interface that ProgressEmitter implementations
@@ -84,7 +81,17 @@ func (e *CLIEmitter) EmitStage(stage string, message string) {
 	pterm.Printf("🔄 %s: %s\n", pterm.LightCyan(stage), message)
 }
 
-// EmitAttestations prints attestation batch count
+// EmitProgress prints generic progress count (domain-agnostic from pulse.ProgressEmitter)
+func (e *CLIEmitter) EmitProgress(count int, metadata map[string]interface{}) {
+	// Check metadata for domain-specific type to customize output
+	if itemType, ok := metadata["type"].(string); ok {
+		pterm.Printf("✅ Processed %s %s\n", pterm.Green(fmt.Sprintf("%d", count)), itemType)
+	} else {
+		pterm.Printf("✅ Processed %s items\n", pterm.Green(fmt.Sprintf("%d", count)))
+	}
+}
+
+// EmitAttestations prints attestation batch count (ATS domain-specific convenience method)
 func (e *CLIEmitter) EmitAttestations(count int, entities []AttestationEntity) {
 	pterm.Printf("✅ Generated %s attestations\n", pterm.Green(fmt.Sprintf("%d", count)))
 }
@@ -156,7 +163,24 @@ func (e *JSONEmitter) EmitStage(stage string, message string) {
 	e.encoder.Encode(event)
 }
 
-// EmitAttestations emits an attestations batch event as JSON
+// EmitProgress emits a generic progress event as JSON (domain-agnostic from pulse.ProgressEmitter)
+func (e *JSONEmitter) EmitProgress(count int, metadata map[string]interface{}) {
+	data := map[string]interface{}{
+		"count": count,
+	}
+	// Merge metadata into data
+	for k, v := range metadata {
+		data[k] = v
+	}
+	event := ProgressEvent{
+		Type:      "progress",
+		Timestamp: time.Now(),
+		Data:      data,
+	}
+	e.encoder.Encode(event)
+}
+
+// EmitAttestations emits an attestations batch event as JSON (ATS domain-specific)
 func (e *JSONEmitter) EmitAttestations(count int, entities []AttestationEntity) {
 	event := ProgressEvent{
 		Type:      "attestations",

@@ -137,6 +137,10 @@ func (m *MedicalProgressEmitter) EmitStage(stage string, message string) {
 	m.base.EmitStage(stage, message)
 }
 
+func (m *MedicalProgressEmitter) EmitProgress(count int, metadata map[string]interface{}) {
+	m.base.EmitProgress(count, metadata)
+}
+
 func (m *MedicalProgressEmitter) EmitAttestations(count int, entities []ix.AttestationEntity) {
 	m.base.EmitAttestations(count, entities)
 }
@@ -193,6 +197,10 @@ func (f *FinancialProgressEmitter) EmitTransactionValidated(txnID string, amount
 
 func (f *FinancialProgressEmitter) EmitStage(stage string, message string) {
 	f.base.EmitStage(stage, message)
+}
+
+func (f *FinancialProgressEmitter) EmitProgress(count int, metadata map[string]interface{}) {
+	f.base.EmitProgress(count, metadata)
 }
 
 func (f *FinancialProgressEmitter) EmitAttestations(count int, entities []ix.AttestationEntity) {
