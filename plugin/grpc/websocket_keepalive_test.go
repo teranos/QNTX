@@ -38,32 +38,45 @@ func TestDefaultKeepaliveConfig(t *testing.T) {
 }
 
 func TestNewKeepaliveConfigFromSettings(t *testing.T) {
+	// Helper to create int pointers
+	intPtr := func(v int) *int { return &v }
+
 	tests := []struct {
 		name              string
 		enabled           bool
-		pingIntervalSecs  int
-		pongTimeoutSecs   int
-		reconnectAttempts int
+		pingIntervalSecs  *int
+		pongTimeoutSecs   *int
+		reconnectAttempts *int
 		wantPingInterval  time.Duration
 		wantPongTimeout   time.Duration
 		wantReconnect     int
 	}{
 		{
-			name:              "all defaults (zeros)",
+			name:              "all defaults (nil)",
 			enabled:           true,
-			pingIntervalSecs:  0,
-			pongTimeoutSecs:   0,
-			reconnectAttempts: 0,
+			pingIntervalSecs:  nil,
+			pongTimeoutSecs:   nil,
+			reconnectAttempts: nil,
 			wantPingInterval:  DefaultPingInterval,
 			wantPongTimeout:   DefaultPongTimeout,
 			wantReconnect:     DefaultReconnectAttempts,
 		},
 		{
+			name:              "explicit zero means zero",
+			enabled:           true,
+			pingIntervalSecs:  intPtr(0),
+			pongTimeoutSecs:   intPtr(0),
+			reconnectAttempts: intPtr(0),
+			wantPingInterval:  0,
+			wantPongTimeout:   0,
+			wantReconnect:     0,
+		},
+		{
 			name:              "custom values",
 			enabled:           false,
-			pingIntervalSecs:  15,
-			pongTimeoutSecs:   45,
-			reconnectAttempts: 5,
+			pingIntervalSecs:  intPtr(15),
+			pongTimeoutSecs:   intPtr(45),
+			reconnectAttempts: intPtr(5),
 			wantPingInterval:  15 * time.Second,
 			wantPongTimeout:   45 * time.Second,
 			wantReconnect:     5,
@@ -71,9 +84,9 @@ func TestNewKeepaliveConfigFromSettings(t *testing.T) {
 		{
 			name:              "mixed custom and defaults",
 			enabled:           true,
-			pingIntervalSecs:  20,
-			pongTimeoutSecs:   0,
-			reconnectAttempts: 0,
+			pingIntervalSecs:  intPtr(20),
+			pongTimeoutSecs:   nil,
+			reconnectAttempts: nil,
 			wantPingInterval:  20 * time.Second,
 			wantPongTimeout:   DefaultPongTimeout,
 			wantReconnect:     DefaultReconnectAttempts,

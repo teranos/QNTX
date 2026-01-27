@@ -78,7 +78,7 @@ type LocalInferenceConfig struct {
 	BaseURL        string `mapstructure:"base_url"`        // e.g., "http://localhost:11434" for Ollama
 	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
 	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
-	ContextSize    int    `mapstructure:"context_size"`    // Context window size (0 = model default, e.g., 16384, 32768)
+	ContextSize    *int   `mapstructure:"context_size"`    // Context window size (nil = model default, e.g., 16384, 32768)
 	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
 }
 
@@ -110,9 +110,9 @@ type PluginWebSocketConfig struct {
 // PluginKeepaliveConfig configures WebSocket keepalive behavior
 type PluginKeepaliveConfig struct {
 	Enabled           bool `mapstructure:"enabled"`            // Enable keepalive (default: true)
-	PingIntervalSecs  int  `mapstructure:"ping_interval_secs"` // Seconds between PING messages (default: 30)
-	PongTimeoutSecs   int  `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (default: 60)
-	ReconnectAttempts int  `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (default: 3)
+	PingIntervalSecs  *int `mapstructure:"ping_interval_secs"` // Seconds between PING messages (nil = default 30)
+	PongTimeoutSecs   *int `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (nil = default 60)
+	ReconnectAttempts *int `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (nil = default 3)
 }
 
 // File system constants
