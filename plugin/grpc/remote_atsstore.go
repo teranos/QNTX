@@ -102,8 +102,10 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 	if resp.Attestation.AttributesJson != "" {
 		attributes, err := attributesFromJSON(resp.Attestation.AttributesJson)
 		if err != nil {
-			// Log warning but don't fail
+			// Surface attribute parsing error to caller via special key
 			r.logger.Warnw("Failed to unmarshal attributes", "error", err, "json", resp.Attestation.AttributesJson)
+			attestation.Attributes["_attribute_parse_error"] = err.Error()
+			attestation.Attributes["_attribute_parse_json"] = resp.Attestation.AttributesJson
 		} else {
 			attestation.Attributes = attributes
 		}
@@ -173,8 +175,10 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 		if protoAtt.AttributesJson != "" {
 			attributes, err := attributesFromJSON(protoAtt.AttributesJson)
 			if err != nil {
-				// Log warning but don't fail
+				// Surface attribute parsing error to caller via special key
 				r.logger.Warnw("Failed to unmarshal attributes", "error", err, "id", protoAtt.Id)
+				attestations[i].Attributes["_attribute_parse_error"] = err.Error()
+				attestations[i].Attributes["_attribute_parse_json"] = protoAtt.AttributesJson
 			} else {
 				attestations[i].Attributes = attributes
 			}

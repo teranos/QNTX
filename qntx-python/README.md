@@ -12,7 +12,7 @@ Go-to-Python integration via CGo is fragile and version-dependent. This plugin r
 
 Uses PyO3 for memory-safe Python embedding and Nix for reproducible Python environments.
 
-See [External Plugin Development Guide](../docs/development/external-plugin-guide.md) for plugin architecture details.
+See [External Plugin Development Guide](https://github.com/teranos/QNTX/blob/main/docs/development/external-plugin-guide.md) for plugin architecture details and [Python Plugin User Guide](https://github.com/teranos/QNTX/blob/main/docs/development/python-plugin.md) for API usage examples.
 
 ## Features
 
