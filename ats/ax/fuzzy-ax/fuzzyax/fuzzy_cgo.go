@@ -1,6 +1,3 @@
-//go:build rustfuzzy
-// +build rustfuzzy
-
 // Package fuzzyax provides a CGO wrapper for the Rust fuzzy matching engine.
 //
 // This package links directly with the Rust library via CGO, providing
@@ -25,9 +22,9 @@ package fuzzyax
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
-#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lpthread -ldl -lm
-#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lpthread -ldl -lm
-#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy -lws2_32 -luserenv
+#cgo linux LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy
+#cgo windows LDFLAGS: -L${SRCDIR}/../../../../target/release -lqntx_fuzzy
 
 #include "fuzzy_engine.h"
 #include <stdlib.h>
@@ -38,6 +35,8 @@ import (
 	"errors"
 	"runtime"
 	"unsafe"
+
+	_ "github.com/teranos/QNTX/ats/internal/cgoflags" // Common system library flags
 )
 
 // VocabularyType specifies which vocabulary to search

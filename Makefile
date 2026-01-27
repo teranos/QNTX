@@ -10,9 +10,9 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI
 	@echo "Building Rust SQLite storage library..."
 	@cargo build --release --features ffi -p qntx-sqlite
 
-cli: rust-fuzzy rust-vidstream rust-sqlite ## Build QNTX CLI binary (with Rust optimizations: fuzzy, video, sqlite)
-	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite)..."
-	@go build -tags "rustfuzzy,rustvideo,rustsqlite" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-fuzzy rust-vidstream rust-sqlite ## Build QNTX CLI binary (with Rust: fuzzy, video, sqlite)
+	@echo "Building QNTX CLI with Rust backend (fuzzy, video, sqlite)..."
+	@go build -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
