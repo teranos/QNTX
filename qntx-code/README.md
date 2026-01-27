@@ -21,11 +21,21 @@ Domain plugin providing software development tools for QNTX.
 
 - `/gopls` - Language server protocol
 
-## Future
+## Future: Separate Repository
+
+**TODO:** Extract to standalone repo ([#354](https://github.com/teranos/QNTX/issues/354))
 
 This plugin will be extracted to its own repository:
 - Repository: `github.com/teranos/qntx-code`
 - Binary: `qntx-code-plugin`
 - Installation: `~/.qntx/plugins/qntx-code-plugin`
+
+**Why:** Currently has unwanted transitive Rust dependencies:
+
+```
+qntx-code → ixgest/git → ats/storage → ats/ax → fuzzyax (Rust CGO)
+```
+
+The plugin only needs basic storage CRUD but inherits query execution dependencies, forcing the Rust toolchain. Extraction will reveal API boundaries and enable pure-Go builds.
 
 See [External Plugin Development Guide](../docs/development/external-plugin-guide.md)
