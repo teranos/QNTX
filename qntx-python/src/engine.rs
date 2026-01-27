@@ -5,7 +5,7 @@
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use qntx::error::{Error, ErrorContext};
+use qntx::error::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
