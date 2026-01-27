@@ -67,14 +67,31 @@ func (ws *WatcherStore) Create(w *Watcher) error {
 		return errors.New("watcher action_type cannot be empty")
 	}
 
+	// Validate MaxFiresPerMinute - zero means disabled (no fires allowed)
+	if w.MaxFiresPerMinute < 0 {
+		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
+	}
+
 	now := time.Now()
 	w.CreatedAt = now
 	w.UpdatedAt = now
 
-	subjectsJSON, _ := json.Marshal(w.Filter.Subjects)
-	predicatesJSON, _ := json.Marshal(w.Filter.Predicates)
-	contextsJSON, _ := json.Marshal(w.Filter.Contexts)
-	actorsJSON, _ := json.Marshal(w.Filter.Actors)
+	subjectsJSON, err := json.Marshal(w.Filter.Subjects)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal subjects")
+	}
+	predicatesJSON, err := json.Marshal(w.Filter.Predicates)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal predicates")
+	}
+	contextsJSON, err := json.Marshal(w.Filter.Contexts)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal contexts")
+	}
+	actorsJSON, err := json.Marshal(w.Filter.Actors)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal actors")
+	}
 
 	var timeStart, timeEnd *string
 	if w.Filter.TimeStart != nil {
@@ -156,12 +173,29 @@ func (ws *WatcherStore) List(enabledOnly bool) ([]*Watcher, error) {
 
 // Update updates a watcher
 func (ws *WatcherStore) Update(w *Watcher) error {
+	// Validate MaxFiresPerMinute
+	if w.MaxFiresPerMinute < 0 {
+		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
+	}
+
 	w.UpdatedAt = time.Now()
 
-	subjectsJSON, _ := json.Marshal(w.Filter.Subjects)
-	predicatesJSON, _ := json.Marshal(w.Filter.Predicates)
-	contextsJSON, _ := json.Marshal(w.Filter.Contexts)
-	actorsJSON, _ := json.Marshal(w.Filter.Actors)
+	subjectsJSON, err := json.Marshal(w.Filter.Subjects)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal subjects")
+	}
+	predicatesJSON, err := json.Marshal(w.Filter.Predicates)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal predicates")
+	}
+	contextsJSON, err := json.Marshal(w.Filter.Contexts)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal contexts")
+	}
+	actorsJSON, err := json.Marshal(w.Filter.Actors)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal actors")
+	}
 
 	var timeStart, timeEnd *string
 	if w.Filter.TimeStart != nil {
