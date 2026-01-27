@@ -237,10 +237,12 @@ attestation = json.loads(_attestation_json)
 `, string(attestationJSON), watcher.ActionData)
 
 	// Call Python plugin
-	reqBody, _ := json.Marshal(map[string]interface{}{
-		"code":             injectedCode,
-		"capture_variables": false,
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"code": injectedCode,
 	})
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal request body")
+	}
 
 	url := e.apiBaseURL + "/api/python/execute"
 	req, err := http.NewRequestWithContext(e.ctx, "POST", url, bytes.NewReader(reqBody))
