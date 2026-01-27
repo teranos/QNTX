@@ -41,17 +41,29 @@ func (pc *ProviderConfig) IsProviderEnabled(provider ProviderType) bool {
 }
 
 // GetActiveProvider returns the provider to use based on configuration
-// Returns the first enabled provider in priority order
+// Priority order is used to determine which provider to use
 func (pc *ProviderConfig) GetActiveProvider() ProviderType {
-	// If default is enabled, use it
-	if pc.IsProviderEnabled(pc.DefaultProvider) {
-		return pc.DefaultProvider
-	}
-
-	// Otherwise check priority order
+	// Priority list determines the order of preference
+	// This is the main logic - check providers in priority order
 	for _, provider := range pc.ProviderPriority {
 		if pc.IsProviderEnabled(provider) {
 			return provider
+		}
+	}
+
+	// If nothing in priority list is enabled, check the default
+	// (only if it's not already in the priority list)
+	if pc.DefaultProvider != "" && pc.IsProviderEnabled(pc.DefaultProvider) {
+		// Check if default is already in priority list
+		inPriority := false
+		for _, p := range pc.ProviderPriority {
+			if p == pc.DefaultProvider {
+				inPriority = true
+				break
+			}
+		}
+		if !inPriority {
+			return pc.DefaultProvider
 		}
 	}
 
