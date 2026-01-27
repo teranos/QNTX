@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse, IX } from '@generated/sym.js';
+import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
@@ -58,7 +58,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [Pulse, IX], // TODO: Remove Pulse when IX wired up
+        onSpawnMenu: () => [IX], // IX and py available, can add go/rs/ts later
 
         renderContent: () => {
             const container = document.createElement('div');
@@ -98,16 +98,15 @@ export function createCanvasGlyph(): Glyph {
 /**
  * Show right-click spawn menu with available symbols
  *
- * TODO: Remove Pulse glyph from spawn menu when IX is wired up
+ * Available glyphs: IX (ingest), py (python editor)
+ * Future: go, rs, ts programmature glyphs
  *
- * Architecture Decision:
- * - Pulse glyph (⧗ symbol on canvas) will be REMOVED once IX uses forceTriggerJob()
- * - Pulse (scheduling system) stays - it's the execution layer for both IX and ATS
- * - Rationale: IX glyphs already create one-time Pulse jobs, making Pulse glyph redundant
+ * Architecture Note:
+ * - Pulse glyph removed - IX glyphs now use forceTriggerJob() for execution
+ * - Pulse (scheduling system) remains the execution layer for both IX and ATS
  * - Execution paths:
  *   - One-time execution: IX glyphs on canvas → forceTriggerJob() → Pulse
  *   - Scheduled execution: ATS blocks in Prose → createScheduledJob() → Pulse
- *   - No UI need for direct Pulse glyph manipulation
  *
  * TODO: Spawn menu as glyph with morphing mini-glyphs
  *
@@ -153,20 +152,6 @@ function showSpawnMenu(
         menu.remove();
         menuRemoved = true;
     };
-
-    // Add Pulse symbol
-    // TODO: Remove this when IX is wired to Pulse - Pulse glyph becomes redundant
-    const pulseBtn = document.createElement('button');
-    pulseBtn.className = 'canvas-spawn-button';
-    pulseBtn.textContent = Pulse;
-    pulseBtn.title = 'Spawn Pulse glyph';
-
-    pulseBtn.addEventListener('click', () => {
-        spawnPulseGlyph(gridX, gridY, canvas, glyphs);
-        removeMenu();
-    });
-
-    menu.appendChild(pulseBtn);
 
     // Add IX symbol
     const ixBtn = document.createElement('button');
@@ -214,51 +199,6 @@ function showSpawnMenu(
     }, 0);
 
     log.debug(SEG.UI, `[Canvas] Spawn menu opened at grid (${gridX}, ${gridY})`);
-}
-
-/**
- * Spawn a new Pulse glyph at grid position
- *
- * TODO: Delete this entire function when IX is wired to Pulse
- * Pulse glyphs will be redundant once IX glyphs use forceTriggerJob()
- */
-function spawnPulseGlyph(
-    gridX: number,
-    gridY: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[]
-): void {
-    // NOTE: Using crypto.randomUUID() for now to ensure uniqueness.
-    // Future: integrate vanity-id generator as Glyph vision expands.
-    const pulseGlyph: Glyph = {
-        id: `pulse-${crypto.randomUUID()}`,
-        title: 'Pulse Schedule',
-        symbol: Pulse,
-        gridX,
-        gridY,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Pulse glyph content (TBD)';
-            return content;
-        }
-    };
-
-    // Add to glyphs array
-    glyphs.push(pulseGlyph);
-
-    // Persist to uiState
-    uiState.addCanvasGlyph({
-        id: pulseGlyph.id,
-        symbol: Pulse,
-        gridX,
-        gridY
-    });
-
-    // Render glyph on canvas
-    const glyphElement = createGridGlyph(pulseGlyph);
-    canvas.appendChild(glyphElement);
-
-    log.debug(SEG.UI, `[Canvas] Spawned Pulse glyph at grid (${gridX}, ${gridY})`);
 }
 
 /**
