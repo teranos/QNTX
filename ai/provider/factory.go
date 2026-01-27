@@ -98,20 +98,17 @@ func (lca *LocalClientAdapter) Chat(ctx context.Context, req openrouter.ChatRequ
 
 	// For now, use simple system+user prompt pattern
 	// Future: Support multi-turn conversations if needed
-	content, err := lca.provider.GenerateText(ctx, req.SystemPrompt, req.UserPrompt)
+	result, err := lca.provider.GenerateTextWithUsage(ctx, req.SystemPrompt, req.UserPrompt)
 	if err != nil {
 		return nil, err
 	}
 
-	// Return response in openrouter.ChatResponse format
-	// Note: Local inference doesn't provide token usage stats by default
-	// Future: Parse from Ollama /api/generate response or estimate tokens
 	return &openrouter.ChatResponse{
-		Content: content,
+		Content: result.Content,
 		Usage: openrouter.Usage{
-			PromptTokens:     0, // TODO(QNTX #68): Estimate or get from provider
-			CompletionTokens: 0, // TODO(QNTX #68): Estimate or get from provider
-			TotalTokens:      0,
+			PromptTokens:     result.PromptTokens,
+			CompletionTokens: result.CompletionTokens,
+			TotalTokens:      result.TotalTokens,
 		},
 	}, nil
 }

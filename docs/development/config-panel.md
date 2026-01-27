@@ -26,7 +26,7 @@ This document specifies the UI/UX design for the QNTX configuration panel. It de
 **Group by source**: Collapsible sections for each config source (see [config-system.md](../architecture/config-system.md) for precedence details):
 - System Config (`/etc/qntx/config.toml`)
 - User Config (`~/.qntx/config.toml`)
-- UI Config (`~/.qntx/config_from_ui.toml`) - **Editable**
+- UI Config (`~/.qntx/am_from_ui.toml`) - **Editable**
 - Project Config (`project/config.toml`)
 - Environment Variables (`QNTX_*`)
 
@@ -39,7 +39,7 @@ This document specifies the UI/UX design for the QNTX configuration panel. It de
 - **Read-only by default**: Most config shown as information
 - **Editable UI config**: Only UI config section allows editing
 - **Inline editing**: Click to edit UI config values
-- **Save feedback**: Clear indication when changes are saved to `~/.qntx/config_from_ui.toml`
+- **Save feedback**: Clear indication when changes are saved to `~/.qntx/am_from_ui.toml`
 
 ### Visual Design
 - **Better typography**: Use code font for config values
@@ -84,7 +84,7 @@ GET /api/config?introspection=true
 Backend implementation is documented in [`docs/architecture/config-system.md`](../architecture/config-system.md).
 
 Current backend capabilities:
-- ✅ Config precedence includes `config_from_ui.toml`
+- ✅ Config precedence includes `am_from_ui.toml`
 - ✅ Introspection tracks granular sources (system/user/user_ui/project/env)
 - ✅ Clean TOML marshaling for updates
 - ✅ POST /api/config with updates writes to UI config only
@@ -162,7 +162,7 @@ Current backend capabilities:
 3. For booleans: toggle switch
 4. For strings: inline text input
 5. For enums (like model): dropdown
-6. Changes auto-save to `~/.qntx/config_from_ui.toml`
+6. Changes auto-save to `~/.qntx/am_from_ui.toml`
 7. Show toast: "Saved to UI config"
 
 ### Source Precedence Display

@@ -25,8 +25,8 @@ func TestLoad_Defaults(t *testing.T) {
 		t.Errorf("expected default database path 'qntx.db', got %q", cfg.Database.Path)
 	}
 
-	if cfg.Server.Port != DefaultServerPort {
-		t.Errorf("expected default port %d, got %d", DefaultServerPort, cfg.Server.Port)
+	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
+		t.Errorf("expected default port %d, got %v", DefaultServerPort, cfg.Server.Port)
 	}
 
 	if cfg.Pulse.Workers != 1 {
@@ -45,7 +45,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "zero workers is valid (disabled)",
+			name: "zero workers is valid (no background workers)",
 			config: Config{
 				Pulse: PulseConfig{Workers: 0},
 			},
@@ -59,7 +59,7 @@ func TestValidate_ZeroValues(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero ticker interval is valid (disabled)",
+			name: "zero ticker interval is valid (no periodic ticking)",
 			config: Config{
 				Pulse: PulseConfig{TickerIntervalSeconds: 0},
 			},
@@ -69,20 +69,6 @@ func TestValidate_ZeroValues(t *testing.T) {
 			name: "negative ticker interval is invalid",
 			config: Config{
 				Pulse: PulseConfig{TickerIntervalSeconds: -1},
-			},
-			wantErr: true,
-		},
-		{
-			name: "zero rate limit is valid (unlimited)",
-			config: Config{
-				Pulse: PulseConfig{HTTPMaxRequestsPerMinute: 0},
-			},
-			wantErr: false,
-		},
-		{
-			name: "negative rate limit is invalid",
-			config: Config{
-				Pulse: PulseConfig{HTTPMaxRequestsPerMinute: -1},
 			},
 			wantErr: true,
 		},
@@ -213,8 +199,8 @@ func TestGetServerPort(t *testing.T) {
 	}
 
 	// Test that default port is set correctly
-	if cfg.Server.Port != DefaultServerPort {
-		t.Errorf("expected default port %d, got %d", DefaultServerPort, cfg.Server.Port)
+	if cfg.Server.Port == nil || *cfg.Server.Port != DefaultServerPort {
+		t.Errorf("expected default port %d, got %v", DefaultServerPort, cfg.Server.Port)
 	}
 }
 
