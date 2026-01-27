@@ -145,7 +145,6 @@ func runServer(cmd *cobra.Command, args []string) error {
 			// Second Ctrl+C - force immediate exit
 			pterm.Warning.Println("\nForce shutdown - exiting immediately")
 			os.Exit(1)
-			return nil // unreachable
 		}
 	}
 }
