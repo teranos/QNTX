@@ -8,9 +8,10 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse } from '@generated/sym.js';
+import { Pulse, IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
+import { createIxGlyph } from './ix-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
@@ -57,7 +58,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [Pulse], // Symbols that can be spawned
+        onSpawnMenu: () => [Pulse, IX], // TODO: Remove Pulse when IX wired up
 
         renderContent: () => {
             const container = document.createElement('div');
@@ -81,7 +82,7 @@ export function createCanvasGlyph(): Glyph {
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
 
-            // Render existing glyphs asynchronously (to support py glyphs with CodeMirror)
+            // Render existing glyphs asynchronously (to support py and ix glyphs)
             (async () => {
                 for (const glyph of glyphs) {
                     const glyphElement = await renderGlyph(glyph);
@@ -97,6 +98,17 @@ export function createCanvasGlyph(): Glyph {
 /**
  * Show right-click spawn menu with available symbols
  *
+ * TODO: Remove Pulse glyph from spawn menu when IX is wired up
+ *
+ * Architecture Decision:
+ * - Pulse glyph (⧗ symbol on canvas) will be REMOVED once IX uses forceTriggerJob()
+ * - Pulse (scheduling system) stays - it's the execution layer for both IX and ATS
+ * - Rationale: IX glyphs already create one-time Pulse jobs, making Pulse glyph redundant
+ * - Execution paths:
+ *   - One-time execution: IX glyphs on canvas → forceTriggerJob() → Pulse
+ *   - Scheduled execution: ATS blocks in Prose → createScheduledJob() → Pulse
+ *   - No UI need for direct Pulse glyph manipulation
+ *
  * TODO: Spawn menu as glyph with morphing mini-glyphs
  *
  * Vision: Menu container is a glyph, menu items are tiny glyphs (8px) that use
@@ -105,7 +117,7 @@ export function createCanvasGlyph(): Glyph {
  *
  * Implementation:
  * - Menu container: Glyph entity with renderContent
- * - Menu items: Array of tiny glyphs with symbols (Pulse, "py", "go", "rs", "ts")
+ * - Menu items: Array of tiny glyphs with symbols (IX, "py", "go", "rs", "ts")
  * - Reuse GlyphRun proximity morphing logic (window-tray.ts:164-285)
  * - Priority: Medium (after core window↔glyph morphing works)
  */
@@ -143,6 +155,7 @@ function showSpawnMenu(
     };
 
     // Add Pulse symbol
+    // TODO: Remove this when IX is wired to Pulse - Pulse glyph becomes redundant
     const pulseBtn = document.createElement('button');
     pulseBtn.className = 'canvas-spawn-button';
     pulseBtn.textContent = Pulse;
@@ -154,6 +167,19 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pulseBtn);
+
+    // Add IX symbol
+    const ixBtn = document.createElement('button');
+    ixBtn.className = 'canvas-spawn-button';
+    ixBtn.textContent = IX;
+    ixBtn.title = 'Spawn IX glyph';
+
+    ixBtn.addEventListener('click', () => {
+        spawnIxGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(ixBtn);
 
     // TODO: Refactor spawn menu to be data-driven
     // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
@@ -192,6 +218,9 @@ function showSpawnMenu(
 
 /**
  * Spawn a new Pulse glyph at grid position
+ *
+ * TODO: Delete this entire function when IX is wired to Pulse
+ * Pulse glyphs will be redundant once IX glyphs use forceTriggerJob()
  */
 function spawnPulseGlyph(
     gridX: number,
@@ -230,6 +259,52 @@ function spawnPulseGlyph(
     canvas.appendChild(glyphElement);
 
     log.debug(SEG.UI, `[Canvas] Spawned Pulse glyph at grid (${gridX}, ${gridY})`);
+}
+
+/**
+ * Spawn a new IX glyph at grid position
+ */
+async function spawnIxGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const ixGlyph: Glyph = {
+        id: `ix-${crypto.randomUUID()}`,
+        title: 'Ingest',
+        symbol: IX,
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'IX glyph';
+            return content;
+        }
+    };
+
+    // Add to glyphs array
+    glyphs.push(ixGlyph);
+
+    // Render IX glyph with form
+    const glyphElement = await createIxGlyph(ixGlyph);
+    canvas.appendChild(glyphElement);
+
+    // Get actual rendered size and persist
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: ixGlyph.id,
+        symbol: IX,
+        gridX,
+        gridY,
+        width,
+        height
+    });
+
+    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
 
 /**
@@ -291,6 +366,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For py glyphs, create full editor
     if (glyph.symbol === 'py') {
         return await createPyGlyph(glyph);
+    }
+
+    // For IX glyphs, create full form
+    if (glyph.symbol === IX) {
+        return await createIxGlyph(glyph);
     }
 
     // For result glyphs, create result display
