@@ -106,7 +106,7 @@
             version = self.rev or "dev";
             src = ./.; # Use workspace root (fuzzy-ax is excluded from workspace)
 
-            cargoHash = "sha256-Kyua4Hm9MyUs+MTnYqgh9Bw4ZgDsR/oPWPgtUMGfDzc=";
+            cargoHash = "sha256-QF/P/g3M7NAvYvIeuDd22pqcesDHds4WMsjH8Bgymqg=";
 
             # Build from ats/ax/fuzzy-ax subdirectory
             buildAndTestSubdir = "ats/ax/fuzzy-ax";
