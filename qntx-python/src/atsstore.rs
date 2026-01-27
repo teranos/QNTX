@@ -62,11 +62,12 @@ impl AtsStoreClient {
 
             rt.block_on(async {
                 // Ensure endpoint has http:// scheme for tonic
-                let endpoint_uri = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
-                    endpoint.clone()
-                } else {
-                    format!("http://{}", endpoint)
-                };
+                let endpoint_uri =
+                    if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                        endpoint.clone()
+                    } else {
+                        format!("http://{}", endpoint)
+                    };
 
                 let ep = Channel::from_shared(endpoint_uri)
                     .map_err(|e| format!("invalid endpoint: {}", e))?;
@@ -77,7 +78,12 @@ impl AtsStoreClient {
         })
         .join()
         .map_err(|e| format!("thread panicked: {:?}", e))?
-        .map_err(|e| format!("failed to connect to ATSStore at {}: {}", endpoint_for_error, e))?;
+        .map_err(|e| {
+            format!(
+                "failed to connect to ATSStore at {}: {}",
+                endpoint_for_error, e
+            )
+        })?;
 
         self.channel = Some(channel.clone());
         info!("Connected to ATSStore at {}", endpoint_for_error);
@@ -130,20 +136,25 @@ impl AtsStoreClient {
             rt.block_on(async {
                 // Create fresh connection inside the spawned thread's async context
                 // Ensure endpoint has http:// scheme for tonic
-                let endpoint_uri = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
-                    endpoint.clone()
-                } else {
-                    format!("http://{}", endpoint)
-                };
+                let endpoint_uri =
+                    if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                        endpoint.clone()
+                    } else {
+                        format!("http://{}", endpoint)
+                    };
 
                 let ep = Channel::from_shared(endpoint_uri)
                     .map_err(|e| format!("invalid endpoint: {}", e))?;
 
-                let channel = ep.connect().await
+                let channel = ep
+                    .connect()
+                    .await
                     .map_err(|e| format!("connection failed: {}", e))?;
 
                 let mut client = AtsStoreServiceClient::new(channel);
-                client.generate_and_create_attestation(request).await
+                client
+                    .generate_and_create_attestation(request)
+                    .await
                     .map_err(|e| format!("gRPC error: {}", e))
             })
         })
