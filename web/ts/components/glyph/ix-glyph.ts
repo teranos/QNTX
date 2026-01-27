@@ -32,6 +32,7 @@ import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { forceTriggerJob } from '../../pulse/api';
 
 /**
  * Create an IX glyph with input form on canvas
@@ -128,25 +129,26 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         log.debug(SEG.UI, `[IX] Executing: ${input}`);
 
-        // TODO: Wire up to Pulse execution
-        // Implementation:
-        // 1. Import forceTriggerJob from '../../pulse/api.ts'
-        // 2. Wrap input as ATS command: `ix ${input}`
-        // 3. Call: await forceTriggerJob(`ix ${input}`)
-        // 4. Handle response: show job queued state, poll for completion
-        // 5. On completion: create result glyph showing attestation count
-        // 6. Error handling: show error badge if job fails
-        //
-        // Example:
-        //   const job = await forceTriggerJob(`ix ${input}`);
-        //   updateGlyphBadge('queued', job.id);
-        //   pollJobStatus(job.id, (status) => {
-        //     if (status.state === 'complete') {
-        //       createResultGlyph(glyph, status.result);
-        //     }
-        //   });
+        try {
+            // Wrap input as ATS command and trigger one-time Pulse job
+            const atsCode = `ix ${input}`;
+            const job = await forceTriggerJob(atsCode);
 
-        alert(`IX execution not yet wired up.\n\nInput: ${input}\n\nWill execute as: ix ${input}\nVia: forceTriggerJob() → /api/pulse/schedules`);
+            log.debug(SEG.UI, `[IX] Job created successfully`, {
+                jobId: job.id,
+                atsCode: atsCode
+            });
+
+            // TODO: Phase 2 - Show job status badge and poll for completion
+            // - updateGlyphBadge('queued', job.id)
+            // - pollJobStatus(job.id, handleStatusUpdate)
+            // - Create result glyph on completion
+
+        } catch (error) {
+            log.error(SEG.UI, '[IX] Failed to create job:', error);
+            // TODO: Phase 2 - Show error badge on glyph instead of console
+            console.error('[IX Execution Error]', error);
+        }
     });
 
     titleBar.appendChild(symbol);
