@@ -58,7 +58,7 @@ func (e *JobProgressEmitter) EmitAttestations(count int, entities []ix.Attestati
 }
 
 // EmitCandidateMatch updates job progress for candidate scoring.
-func (e *JobProgressEmitter) EmitCandidateMatch(candidateID string, score float64, qualified bool, reasoning string) {
+func (e *JobProgressEmitter) EmitCandidateMatch(candidateID string) {
 	// Update job progress
 	e.job.UpdateProgress(e.job.Progress.Current + 1)
 

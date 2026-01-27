@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	stderrors "errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -227,10 +228,15 @@ func (idx *SymbolIndex) getCompletions(prefix string, symbols map[string]int, ki
 		}
 	}
 
-	// TODO(QNTX #45): Implement proper sorting by frequency instead of truncation
-	// Current behavior: truncates to first 10 matches (unsorted)
-	// Desired behavior: sort by count DESC, then alphabetically, then return top 10
-	// This requires sort.Slice() on items using SortText field
+	// Sort by frequency (SortText encodes 9999-count, so lexicographic sort = frequency DESC)
+	// Then alphabetically by label for ties
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].SortText != items[j].SortText {
+			return items[i].SortText < items[j].SortText
+		}
+		return items[i].Label < items[j].Label
+	})
+
 	if len(items) > 10 {
 		items = items[:10]
 	}
