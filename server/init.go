@@ -257,6 +257,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		storagePoller.Start(ctx)
 	}()
 
+	// Initialize watcher engine for reactive attestation triggers
+	if err := server.initWatcherEngine(); err != nil {
+		serverLogger.Warnw("Failed to initialize watcher engine", "error", err)
+		// Non-fatal: server can still run without watchers
+	}
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 

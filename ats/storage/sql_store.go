@@ -143,6 +143,9 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 		return errors.Wrap(err, "failed to insert attestation")
 	}
 
+	// Notify observers after successful creation
+	notifyObservers(as)
+
 	// Enforce bounded storage limits after insertion
 	bs := NewBoundedStore(s.db, s.logger)
 	bs.enforceLimits(as)
