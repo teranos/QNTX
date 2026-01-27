@@ -11,7 +11,7 @@ Configuration is loaded from multiple sources in this order (lowest to highest p
 ```
 1. System      /etc/qntx/config.toml               # System-wide defaults
 2. User        ~/.qntx/config.toml                 # User manual configuration
-3. User UI     ~/.qntx/config_from_ui.toml         # UI-managed configuration
+3. User UI     ~/.qntx/am_from_ui.toml         # UI-managed configuration
 4. Project     ./config.toml                       # Project/team configuration
 5. Environment QNTX_* environment variables        # Runtime overrides
 ```
@@ -38,7 +38,7 @@ Each layer overrides values from lower layers. For example:
 - For settings the user wants to persist across projects
 - Example: Personal API keys, preferred models
 
-### UI Config (`~/.qntx/config_from_ui.toml`)
+### UI Config (`~/.qntx/am_from_ui.toml`)
 - **Auto-generated** - created and managed by the web UI
 - Comments are not preserved (regenerated on each UI change)
 - Git-safe: Never accidentally committed to project repos
@@ -59,7 +59,7 @@ Each layer overrides values from lower layers. For example:
 
 ### UI Updates (Web Interface)
 
-All UI changes write to `~/.qntx/config_from_ui.toml`:
+All UI changes write to `~/.qntx/am_from_ui.toml`:
 
 ```go
 // Example: Toggle Ollama
@@ -71,7 +71,7 @@ config.UpdateLocalInferenceEnabled(true)
 2. Update specific field
 3. Marshal entire config struct to TOML
 4. Create backup (.back1, .back2, .back3 rotation)
-5. Write to `~/.qntx/config_from_ui.toml`
+5. Write to `~/.qntx/am_from_ui.toml`
 
 **Benefits:**
 - Type-safe updates (no regex)
@@ -107,7 +107,7 @@ The introspection endpoint (`/api/config`) shows where each value comes from:
   "local_inference": {
     "enabled": {
       "value": true,
-      "source": "user_ui",        // From ~/.qntx/config_from_ui.toml
+      "source": "user_ui",        // From ~/.qntx/am_from_ui.toml
       "type": "bool"
     },
     "model": {
@@ -122,7 +122,7 @@ The introspection endpoint (`/api/config`) shows where each value comes from:
 **Source values:**
 - `system` - From /etc/qntx/config.toml
 - `user` - From ~/.qntx/config.toml
-- `user_ui` - From ~/.qntx/config_from_ui.toml
+- `user_ui` - From ~/.qntx/am_from_ui.toml
 - `project` - From ./config.toml
 - `environment` - From QNTX_* env vars
 
@@ -136,7 +136,7 @@ func LoadConfig() (*Config, error) {
     // 1. Parse each source separately
     systemCfg := parseConfig("/etc/qntx/config.toml")
     userCfg := parseConfig("~/.qntx/config.toml")
-    uiCfg := parseConfig("~/.qntx/config_from_ui.toml")
+    uiCfg := parseConfig("~/.qntx/am_from_ui.toml")
     projectCfg := parseConfig("./config.toml")
 
     // 2. Build source map (track where each value comes from)
@@ -158,7 +158,7 @@ func LoadConfig() (*Config, error) {
 // Internal/config/persist.go
 func UpdateLocalInferenceEnabled(enabled bool) error {
     // Get UI config path
-    path := GetUIConfigPath()  // ~/.qntx/config_from_ui.toml
+    path := GetUIConfigPath()  // ~/.qntx/am_from_ui.toml
 
     // Load or initialize
     config, err := loadOrInitializeUIConfig()
@@ -180,13 +180,13 @@ func UpdateLocalInferenceEnabled(enabled bool) error {
 
 No migration required:
 - Existing `config.toml` files work unchanged
-- First UI update creates `~/.qntx/config_from_ui.toml`
+- First UI update creates `~/.qntx/am_from_ui.toml`
 - Precedence ensures no breaking changes
 
 ### Comment Preservation
 
 - **Manual config** (`~/.qntx/config.toml`): Comments preserved
-- **UI config** (`~/.qntx/config_from_ui.toml`): Comments not preserved (auto-generated)
+- **UI config** (`~/.qntx/am_from_ui.toml`): Comments not preserved (auto-generated)
 - **Recommendation**: Put important comments in manual config, not UI config
 
 ## Design Rationale
@@ -195,7 +195,7 @@ No migration required:
 
 **Problem:** Original design wrote UI changes to project `config.toml`, risking accidental git commits of user preferences.
 
-**Solution:** Separate `config_from_ui.toml` ensures:
+**Solution:** Separate `am_from_ui.toml` ensures:
 1. UI changes never touch project config
 2. Project config remains team-shared
 3. User preferences stay local

@@ -2,16 +2,16 @@
  * Canvas Workspace - Fractal glyph container with spatial grid layout
  */
 
-/* Canvas workspace - full-screen, no padding */
+/* Canvas workspace - full-screen, no padding, always dark */
 .canvas-workspace {
     width: 100%;
     height: 100%;
     position: relative;
     overflow: hidden;
-    background-color: var(--bg-primary);
+    background-color: #2a2b2a; /* Mid-dark gray between mid-gray and almost-black for night work */
 }
 
-/* Subtle grid overlay */
+/* Subtle grid overlay - adjusted for dark background */
 /* TODO: Document grid overlay math (39px + 1px = 40px GRID_SIZE) */
 .canvas-grid-overlay {
     position: absolute;
@@ -24,15 +24,15 @@
             0deg,
             transparent,
             transparent 39px,
-            rgba(255, 255, 255, 0.03) 39px,
-            rgba(255, 255, 255, 0.03) 40px
+            rgba(255, 255, 255, 0.05) 39px,
+            rgba(255, 255, 255, 0.05) 40px
         ),
         repeating-linear-gradient(
             90deg,
             transparent,
             transparent 39px,
-            rgba(255, 255, 255, 0.03) 39px,
-            rgba(255, 255, 255, 0.03) 40px
+            rgba(255, 255, 255, 0.05) 39px,
+            rgba(255, 255, 255, 0.05) 40px
         );
     pointer-events: none;
     z-index: 0;

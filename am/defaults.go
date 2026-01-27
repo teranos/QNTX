@@ -38,9 +38,7 @@ func SetDefaults(v *viper.Viper) {
 	// Pulse (async job infrastructure) defaults
 	v.SetDefault("pulse.workers", 1)
 	v.SetDefault("pulse.ticker_interval_seconds", 1)
-	v.SetDefault("pulse.http_max_requests_per_minute", 10)     // Prevents bot detection (LinkedIn HTTP 999)
-	v.SetDefault("pulse.http_delay_between_requests_ms", 2000) // 2 second polite delay
-	v.SetDefault("pulse.daily_budget_usd", 3.0)                // Default $3/day limit
+	v.SetDefault("pulse.daily_budget_usd", 3.0) // Default $3/day limit
 	v.SetDefault("pulse.weekly_budget_usd", 7.0)               // Default $7/week limit
 	v.SetDefault("pulse.monthly_budget_usd", 15.0)             // Default $15/month limit
 	v.SetDefault("pulse.cost_per_score_usd", 0.002)            // Default $0.002 per operation
@@ -87,10 +85,10 @@ func BindSensitiveEnvVars(v *viper.Viper) {
 // Returns server.port from config, or DefaultServerPort (877) if not configured
 func GetServerPort() int {
 	cfg, err := Load()
-	if err != nil || cfg.Server.Port == 0 {
+	if err != nil || cfg.Server.Port == nil {
 		return DefaultServerPort
 	}
-	return cfg.Server.Port
+	return *cfg.Server.Port
 }
 
 // GetGraphEventPort returns the event viewer port
