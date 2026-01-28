@@ -110,11 +110,17 @@ type JobChildrenResponse struct {
 
 // toScheduledJobResponse converts a schedule.Job to API response format
 func toScheduledJobResponse(job *schedule.Job) ScheduledJobResponse {
+	// Handle NextRunAt (can be nil for one-time jobs)
+	var nextRunStr string
+	if job.NextRunAt != nil {
+		nextRunStr = job.NextRunAt.Format(time.RFC3339)
+	}
+
 	resp := ScheduledJobResponse{
 		ID:              job.ID,
 		ATSCode:         job.ATSCode,
 		IntervalSeconds: job.IntervalSeconds,
-		NextRunAt:       job.NextRunAt.Format(time.RFC3339),
+		NextRunAt:       nextRunStr,
 		LastExecutionID: job.LastExecutionID,
 		State:           job.State,
 		CreatedFromDoc:  job.CreatedFromDoc,
