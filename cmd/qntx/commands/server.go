@@ -147,6 +147,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 			os.Exit(1)
 		}
 	}
+	return nil // unreachable but required by compiler
 }
 
 // openBrowser attempts to open the URL in the default browser
