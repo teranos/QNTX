@@ -1,4 +1,4 @@
-//go:build cgo
+//go:build cgo && rustfuzzy
 
 package ax
 
@@ -20,11 +20,11 @@ type CGOMatcher struct {
 	engine *fuzzyax.FuzzyEngine
 	logger *zap.SugaredLogger
 
-	mu             sync.RWMutex
-	predicates     []string
-	contexts       []string
-	predicateHash  uint64
-	contextHash    uint64
+	mu            sync.RWMutex
+	predicates    []string
+	contexts      []string
+	predicateHash uint64
+	contextHash   uint64
 }
 
 // NewCGOMatcher creates a new CGO-backed fuzzy matcher.
