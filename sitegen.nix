@@ -216,17 +216,18 @@ let
   # Default OpenGraph description
   defaultDescription = "Continuous Intelligence - systems that continuously evolve their understanding through verifiable attestations.";
 
-  # SEG symbol mappings for semantic navigation
+  # Category metadata for documentation navigation
+  # Note: SEG symbols reserved for semantic meanings (see GLOSSARY.md)
   categoryMeta = {
-    getting-started = { symbol = "⍟"; desc = "Entry points"; };
-    architecture = { symbol = "⌬"; desc = "System design"; };
-    development = { symbol = "⨳"; desc = "Workflows"; };
-    types = { symbol = "≡"; desc = "Type reference"; };
-    api = { symbol = "⋈"; desc = "API reference"; };
-    testing = { symbol = "✦"; desc = "Test guides"; };
-    security = { symbol = "+"; desc = "Security"; };
-    vision = { symbol = "⟶"; desc = "Future direction"; };
-    _root = { symbol = ""; desc = ""; };
+    getting-started = { desc = "Entry points"; };
+    architecture = { desc = "System design"; };
+    development = { desc = "Workflows"; };
+    types = { desc = "Type reference"; };
+    api = { desc = "API reference"; };
+    testing = { desc = "Test guides"; };
+    security = { desc = "Security"; };
+    vision = { desc = "Future direction"; };
+    _root = { desc = ""; };
   };
 
   categoryOrder = [
@@ -386,7 +387,7 @@ let
     (f: if f.dir == "." then "_root" else lib.head (lib.splitString "/" f.dir))
     fileInfos;
 
-  getCategoryMeta = cat: categoryMeta.${cat} or { symbol = ""; desc = ""; };
+  getCategoryMeta = cat: categoryMeta.${cat} or { desc = ""; };
 
   # ============================================================================
   # Page Template System
@@ -504,12 +505,11 @@ let
       category = if fileInfo.dir == "." then null else lib.head (lib.splitString "/" fileInfo.dir);
       categoryMeta = if category == null then null else getCategoryMeta category;
       categoryTitle = if category == null then null else toTitleCase category;
-      categorySymbol = if categoryMeta == null then "" else categoryMeta.symbol;
       documentTitle = toTitleCase fileInfo.name;
 
       homeCrumb = ''<a href="${fileInfo.prefix}/index.html">Home</a>'';
       categoryCrumb = if category == null then "" else
-      ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-category">${categorySymbol} ${categoryTitle}</span>'';
+      ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-category">${categoryTitle}</span>'';
       documentCrumb = ''<span class="breadcrumb-sep">›</span><span class="breadcrumb-current">${documentTitle}</span>'';
     in
     ''<nav class="breadcrumb">${homeCrumb}${categoryCrumb}${documentCrumb}</nav>'';
@@ -635,7 +635,7 @@ let
 
   renderCategoryRow = cat:
     let meta = categoryMeta.${cat};
-    in [ "<code>${html.escape cat}/</code>" meta.symbol (html.escape meta.desc) ];
+    in [ "<code>${html.escape cat}/</code>" (html.escape meta.desc) ];
 
   sortedCategories =
     let
@@ -1004,7 +1004,7 @@ let
           rows = [
             [ "<strong>Pure Nix</strong>" "Entire generator written in Nix - no shell scripts, no external build tools" ]
             [ "<strong>Markdown to HTML</strong>" ''Converts <code>docs/*.md</code> to HTML using <a href="https://github.com/raphlinus/pulldown-cmark">pulldown-cmark</a>'' ]
-            [ "<strong>SEG Symbol Navigation</strong>" "Categories marked with semantic symbols: ⍟ Getting Started, ⌬ Architecture, ⨳ Development, ≡ Types, ⋈ API" ]
+            [ "<strong>Category Navigation</strong>" "Documentation organized by topic: Getting Started, Architecture, Development, Types, API, Testing, Security, Vision" ]
             [ "<strong>Dark Mode</strong>" "Automatic dark/light theme via <code>prefers-color-scheme</code>" ]
             [ "<strong>GitHub Releases</strong>" "Static release downloads fetched at build time via Nix fixed-output derivation" ]
             [ "<strong>Provenance</strong>" "Every page shows commit, tag, date, CI user, and pipeline info" ]
@@ -1120,12 +1120,12 @@ let
       };
 
       segMappingSection = html.section {
-        title = "SEG Category Mapping";
+        title = "Documentation Categories";
         content = ''
-          <p>Directories are mapped to SEG symbols for semantic navigation
+          <p>Directories organized by topic
              (${toString (lib.length sortedCategories)} categories defined):</p>
           ${html.table {
-            headers = [ "Directory" "Symbol" "Meaning" ];
+            headers = [ "Directory" "Description" ];
             rows = map renderCategoryRow sortedCategories;
           }}
         '';
