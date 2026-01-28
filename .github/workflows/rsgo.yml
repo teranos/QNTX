@@ -78,6 +78,21 @@ jobs:
           cd crates/qntx-core
           cargo test --features native
 
+      # --- Rust: fuzzy-ax (CGO library) ---
+      - name: Check fuzzy-ax formatting
+        run: cd ats/ax/fuzzy-ax && cargo fmt --check
+
+      - name: Clippy fuzzy-ax
+        run: cd ats/ax/fuzzy-ax && cargo clippy --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Build fuzzy-ax release
+        run: cd ats/ax/fuzzy-ax && cargo build --release --lib
+
+      - name: Test fuzzy-ax
+        run: cd ats/ax/fuzzy-ax && cargo test --lib
+
       # --- Rust: qntx-sqlite (CGO library) ---
       - name: Build qntx-sqlite release
         run: cargo build --release -p qntx-sqlite --features ffi
@@ -93,16 +108,16 @@ jobs:
         run: go build -tags rustfuzzy ./...
         env:
           CGO_ENABLED: "1"
-          LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release:${{ github.workspace }}/target/release
 
       - name: Go tests (with Rust)
         run: go test -tags rustfuzzy ./...
         env:
           CGO_ENABLED: "1"
-          LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release:${{ github.workspace }}/target/release
 
       - name: Go integration tests (with Rust)
         run: go test -tags "rustfuzzy integration" ./...
         env:
           CGO_ENABLED: "1"
-          LD_LIBRARY_PATH: ${{ github.workspace }}/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/ats/ax/fuzzy-ax/target/release:${{ github.workspace }}/target/release
