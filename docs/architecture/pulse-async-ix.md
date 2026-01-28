@@ -281,6 +281,52 @@ func (wp *WorkerPool) processNextJob() error {
 - Rate limiting before budget checks
 - Job pause/resume on limit violations
 
+### Handler Registration
+
+**Current Limitation**: Handler availability validation happens at job execution time, not at job creation time. This can lead to jobs being created successfully but failing when executed because the required handler is not registered.
+
+**Example Scenario**:
+```
+1. User creates IX job: "ix https://github.com/user/repo"
+2. ATS parser (server/ats_parser.go) hardcodes HandlerName: "ixgest.git"
+3. Job is created successfully in scheduled_pulse_jobs table
+4. Job is executed by ticker and enqueued to async queue
+5. Worker pool tries to execute job
+6. Handler lookup fails: "no handler registered for handler name: ixgest.git"
+7. Job fails with error, pulse_execution record updated to 'failed'
+```
+
+**Why This Happens**:
+- Plugin-provided handlers (e.g., from qntx-code plugin) cannot register with server's HandlerRegistry
+- No bridge exists between plugin initialization and server's handler registry
+- ATS parser runs in server package, has no visibility into plugin state
+- Handler validation only happens in worker pool during execution
+
+**Current Behavior**:
+- Jobs created successfully regardless of handler availability
+- Error feedback provided through pulse_execution table and WebSocket events
+- IX glyphs show red background with "no handler registered" error message
+- Users see full error context in UI (Issue #356)
+
+**Future Improvements** (separate issue):
+
+1. **Early validation**: Check handler availability during job creation
+   - Requires handler registry accessible to ATS parser
+   - May need plugin-to-server handler registration bridge
+
+2. **Plugin-aware parsing**: ATS parser queries plugin registry before hardcoding handler names
+   - Requires dependency on plugin system (architectural trade-off)
+   - May violate domain separation principles
+
+3. **Graceful degradation**: Allow jobs to be created but mark as "pending handler availability"
+   - Job remains in special state until plugin loads
+   - Auto-resume when handler becomes available
+
+**References**:
+- TODO comment in `server/ats_parser.go:137`
+- Issue #356: Wire IX glyphs to Pulse execution
+- PR #357: Add visual status feedback to IX glyphs
+
 ## Implementation Status
 
 ### Phase 1: Pulse Foundation ✅ COMPLETE

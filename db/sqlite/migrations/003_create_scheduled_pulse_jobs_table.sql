@@ -1,3 +1,8 @@
+-- TODO: Consider renaming created_from_doc_id -> created_from
+-- Rationale: Column stores document IDs, glyph IDs, or special markers like '__force_trigger__'
+-- Current name implies it only stores document IDs, but it's more generic
+-- Would require migration to rename column and update all Go/TS code
+
 CREATE TABLE IF NOT EXISTS scheduled_pulse_jobs (
     id TEXT PRIMARY KEY,
     ats_code TEXT NOT NULL,
