@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
+	"github.com/teranos/QNTX/pulse/schedule"
 	"github.com/teranos/QNTX/server/wslogs"
 )
 
@@ -123,9 +124,22 @@ func (s *QNTXServer) startUsageUpdateTicker() {
 }
 
 // startJobUpdateBroadcaster subscribes to job queue updates and broadcasts them to WebSocket clients
+//
+// NOTE: This broadcaster serves dual purposes:
+//  1. Broadcasts generic job_update messages (existing behavior)
+//  2. Updates pulse_executions and broadcasts Pulse-specific events (Issue #356)
+//
+// Alternative architectures considered:
+//   - Option 2: Dedicated Pulse execution broadcaster (separate subscription for clean separation)
+//   - Option 3: Worker-level callbacks (most direct, but changes WorkerPool API)
+// We chose Option 1 (extend existing broadcaster) for minimal code change and reuse of existing subscription.
 func (s *QNTXServer) startJobUpdateBroadcaster() {
 	// Subscribe to job queue updates
 	jobChan := s.daemon.GetQueue().Subscribe()
+
+	// Create stores for Pulse execution tracking
+	executionStore := schedule.NewExecutionStore(s.db)
+	scheduleStore := s.getScheduleStore()
 
 	s.wg.Add(1)
 	go func() {
@@ -143,13 +157,132 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 				s.logger.Debugw("Job update broadcaster stopping due to context cancellation")
 				return
 			case job := <-jobChan:
-				// Broadcast job update to all clients
+				// Broadcast generic job update (existing behavior)
 				s.broadcastJobUpdate(job)
+
+				// NEW: Update pulse_execution and broadcast Pulse-specific events (Issue #356)
+				// This ensures IX glyphs receive execution status updates via pulse:execution:* events
+				if job.Status == "completed" || job.Status == "failed" {
+					s.handlePulseExecutionUpdate(job, executionStore, scheduleStore)
+				}
 			}
 		}
 	}()
 
 	s.logger.Infow("Job update broadcaster started")
+}
+
+// handlePulseExecutionUpdate updates pulse_execution records and broadcasts Pulse-specific events
+// when async jobs complete or fail. This bridges async job updates to Pulse execution tracking.
+func (s *QNTXServer) handlePulseExecutionUpdate(
+	job *async.Job,
+	executionStore *schedule.ExecutionStore,
+	scheduleStore *schedule.Store,
+) {
+	s.logger.Debugw("handlePulseExecutionUpdate called",
+		"async_job_id", job.ID,
+		"job_status", job.Status)
+
+	// Check if this async job has a pulse_execution record
+	execution, err := executionStore.GetExecutionByAsyncJobID(job.ID)
+	if err != nil {
+		s.logger.Warnw("Failed to lookup pulse execution for async job",
+			"async_job_id", job.ID,
+			"error", err)
+		return
+	}
+
+	if execution == nil {
+		// Not all async jobs have pulse executions (only forceTriggerJob and scheduled jobs do)
+		s.logger.Debugw("No pulse execution found for async job (expected for non-Pulse jobs)",
+			"async_job_id", job.ID)
+		return
+	}
+
+	s.logger.Infow("Found pulse execution for async job",
+		"async_job_id", job.ID,
+		"execution_id", execution.ID,
+		"scheduled_job_id", execution.ScheduledJobID)
+
+	// Get scheduled job to retrieve ATS code
+	scheduledJob, err := scheduleStore.GetJob(execution.ScheduledJobID)
+	if err != nil {
+		s.logger.Warnw("Failed to get scheduled job for pulse execution",
+			"scheduled_job_id", execution.ScheduledJobID,
+			"execution_id", execution.ID,
+			"error", err)
+		return
+	}
+
+	// Calculate duration
+	var durationMs int
+	if job.StartedAt != nil && job.CompletedAt != nil {
+		durationMs = int(job.CompletedAt.Sub(*job.StartedAt).Milliseconds())
+	}
+
+	// Update execution record based on job status
+	completedAt := job.CompletedAt.Format(time.RFC3339)
+	execution.CompletedAt = &completedAt
+	execution.DurationMs = &durationMs
+	execution.UpdatedAt = time.Now().Format(time.RFC3339)
+
+	if job.Status == "failed" {
+		execution.Status = schedule.ExecutionStatusFailed
+		execution.ErrorMessage = &job.Error
+
+		// Update database
+		if err := executionStore.UpdateExecution(execution); err != nil {
+			s.logger.Warnw("Failed to update pulse execution on failure",
+				"execution_id", execution.ID,
+				"error", err)
+		}
+
+		// Broadcast Pulse execution failed event (skip if server not fully initialized - tests)
+		if s.ctx != nil {
+			s.logger.Infow("Broadcasting pulse execution failed event",
+				"scheduled_job_id", execution.ScheduledJobID,
+				"execution_id", execution.ID,
+				"ats_code", scheduledJob.ATSCode,
+				"error", job.Error)
+			s.BroadcastPulseExecutionFailed(
+				execution.ScheduledJobID,
+				execution.ID,
+				scheduledJob.ATSCode,
+				job.Error,
+				durationMs,
+			)
+		} else {
+			s.logger.Warnw("Skipping broadcast - server context is nil (test mode?)")
+		}
+
+	} else if job.Status == "completed" {
+		execution.Status = schedule.ExecutionStatusCompleted
+		asyncJobID := job.ID
+		execution.AsyncJobID = &asyncJobID
+
+		// Create result summary
+		summary := fmt.Sprintf("Async job %s completed", job.ID[:8])
+		execution.ResultSummary = &summary
+
+		// Update database
+		if err := executionStore.UpdateExecution(execution); err != nil {
+			s.logger.Warnw("Failed to update pulse execution on completion",
+				"execution_id", execution.ID,
+				"error", err)
+		}
+
+		// Broadcast Pulse execution completed event (skip if server not fully initialized - tests)
+		if s.ctx != nil {
+			s.BroadcastPulseExecutionCompleted(
+				execution.ScheduledJobID,
+				execution.ID,
+				scheduledJob.ATSCode,
+				job.ID,
+				summary,
+				durationMs,
+			)
+		}
+	}
 }
 
 // startDaemonStatusBroadcaster periodically broadcasts daemon status to WebSocket clients
