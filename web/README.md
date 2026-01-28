@@ -83,7 +83,7 @@ The `package.json` locks **exact versions** (no `^` or `~`):
     "@codemirror/view": "6.34.3",
     "@lezer/highlight": "1.2.1",
     "codemirror-languageserver": "1.17.0",   // LSP client
-    "d3": "7.9.0"                             // Legacy graph (being replaced by glyphs)
+    "d3": "7.9.0"                             // Graph visualization (Prose relationships)
   }
 }
 ```
