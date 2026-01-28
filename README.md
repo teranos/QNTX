@@ -39,28 +39,7 @@ QNTX uses semantic symbols as a namespace system. See [GLOSSARY.md](docs/GLOSSAR
 
 ## Configuration
 
-**QNTX works out of the box without configuration.** Sensible defaults are provided for all settings - you can start using QNTX immediately without creating any config files.
-
-Configuration is managed by the `am` package, which provides:
-
-- Multi-source config loading (system, user, project, environment variables)
-- Backward compatibility with existing `config.toml` files
-- Preference for `am.toml` (new format) over `config.toml`
-
-Only create a configuration file if you need to override defaults:
-
-```bash
-# View current configuration (all defaults applied)
-qntx am show
-
-# Get a specific value
-qntx am get database.path
-
-# Validate configuration
-qntx am validate
-```
-
-See the [am package documentation](am/README.md) for details on configuration structure and precedence.
+**QNTX works out of the box without configuration.** See [am package](am/README.md) for details on multi-source configuration and precedence.
 
 ## Testing
 
