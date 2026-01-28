@@ -43,7 +43,7 @@ Use as reference when:
 
 Link to specific types in your docs:
 ```markdown
-See [Job type](./docs/types/async.md#job) for details.
+See [Job type](./async.md#job) for details.
 ```
 
 ## Regeneration
