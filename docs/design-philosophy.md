@@ -1,4 +1,4 @@
-# qntx Design Philosophy
+# QNTX Design Philosophy
 
 Core principles for interface design across qntx CLI and web components.
 
@@ -24,7 +24,7 @@ Fast loading and minimal resource usage are non-negotiable requirements.
 
 Information should be self-describing through consistent use of symbols and semantic markers.
 
-- Use established symbol palette (SEG symbols: ⍟, ≡, ⨳, ⋈, +, =, ∈, ⌬, ✦, ⟶) for semantic meaning
+- Use the established symbol palette (see [Glossary](GLOSSARY.md)) for semantic meaning
 - Consistent patterns for entity relationships and operations
 - Clear visual indicators for status, state, and type information
 
