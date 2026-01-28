@@ -62,7 +62,7 @@ Non-technical users (recruiters, analysts) can customize views by editing TOML c
 - Clear visual differentiation between levels
 
 ### Layout Flexibility
-- **Views (⧉) as Layout Modes:**
+- **Layout Modes:**
   - Grid: Alphabetical/chronological arrangement
   - Hierarchy: Parent-child tree structure
   - Timeline: Temporal progression
@@ -104,7 +104,6 @@ Core QNTX symbols appear progressively:
 - **⌬** (Actor/Agent) - Zoom level 0+
 - **≡** (Configuration) - Zoom level 2+ (if entity has config)
 - **꩜** (Pulse) - Zoom level 2+ (if entity has async jobs)
-- **⧉** (View) - Controls layout mode switching
 
 ## Use Cases
 
