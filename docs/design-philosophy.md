@@ -1,6 +1,6 @@
 # QNTX Design Philosophy
 
-Core principles for interface design across qntx CLI and web components.
+Core principles for interface design across [QNTX](understanding-qntx.md) CLI and web components.
 
 ## Foundational Principles
 
