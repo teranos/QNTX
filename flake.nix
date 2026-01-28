@@ -100,29 +100,6 @@
         # Rust libraries (CGO dependencies)
         # Defined before qntx build since qntx depends on these libraries
         rustLibs = {
-          # Fuzzy matching library (depends on qntx-core from workspace)
-          fuzzy = pkgs.rustPlatform.buildRustPackage {
-            pname = "qntx-fuzzy";
-            version = self.rev or "dev";
-            src = ./.; # Use workspace root (fuzzy-ax is excluded from workspace)
-
-            cargoLock = {
-              lockFile = ./ats/ax/fuzzy-ax/Cargo.lock;
-            };
-
-            # Build from ats/ax/fuzzy-ax subdirectory
-            buildAndTestSubdir = "ats/ax/fuzzy-ax";
-
-            # Build only the library
-            cargoBuildFlags = [ "--lib" ];
-
-            # Install static library
-            postInstall = ''
-              mkdir -p $out/lib
-              cp target/release/libqntx_fuzzy.a $out/lib/
-            '';
-          };
-
           # SQLite storage library
           sqlite = pkgs.rustPlatform.buildRustPackage {
             pname = "qntx-sqlite";
@@ -184,7 +161,6 @@
 
           # Depend on Rust libraries
           buildInputs = [
-            rustLibs.fuzzy
             rustLibs.sqlite
             rustLibs.vidstream
           ];
@@ -192,7 +168,7 @@
           # Enable CGO via preBuild (CGO_ENABLED cannot be set as top-level attribute)
           preBuild = ''
             export CGO_ENABLED=1
-            export CGO_LDFLAGS="-L${rustLibs.fuzzy}/lib -L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
+            export CGO_LDFLAGS="-L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
           '';
 
           ldflags = [
@@ -228,7 +204,6 @@
 
           # Depend on Rust libraries
           buildInputs = [
-            rustLibs.fuzzy
             rustLibs.sqlite
             rustLibs.vidstream
           ];
@@ -236,7 +211,7 @@
           # Enable CGO via preBuild (CGO_ENABLED cannot be set as top-level attribute)
           preBuild = ''
             export CGO_ENABLED=1
-            export CGO_LDFLAGS="-L${rustLibs.fuzzy}/lib -L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
+            export CGO_LDFLAGS="-L${rustLibs.sqlite}/lib -L${rustLibs.vidstream}/lib"
           '';
 
           ldflags = [
@@ -472,7 +447,6 @@
           typegen = typegen;
 
           # Rust CGO libraries
-          rust-fuzzy = rustLibs.fuzzy;
           rust-sqlite = rustLibs.sqlite;
           rust-vidstream = rustLibs.vidstream;
 
