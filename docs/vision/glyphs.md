@@ -290,3 +290,8 @@ Glyphs are the atoms of the QNTX interface. Every visual element that can transf
 
 All sharing the same fundamental behavior: proximity morphing, smooth transformations, and the ability to exist in multiple visual states.
 
+## Related Vision
+
+- [Continuous Intelligence](./continuous-intelligence.md) - The paradigm glyphs manifest
+- [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Tiles as specialized glyph forms
+- [Time-Travel](./time-travel.md) - Navigate glyph states across time

@@ -275,6 +275,7 @@ Each view maintains independent zoom level:
 ## Related Vision
 
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm that tiles visualize
+- [Glyphs](./glyphs.md) - Tiles as glyph manifestations
 - [Time-Travel](./time-travel.md) - Navigate tile states across time
 
 ## Related Documentation
