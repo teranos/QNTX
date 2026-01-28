@@ -77,6 +77,8 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	http.HandleFunc("/api/plugins", s.corsMiddleware(s.HandlePlugins))                    // List installed plugins (GET)
 	http.HandleFunc("/api/types/", s.corsMiddleware(s.HandleTypes))                       // Get specific type (GET /api/types/{typename})
 	http.HandleFunc("/api/types", s.corsMiddleware(s.HandleTypes))                        // List/create types (GET/POST)
+	http.HandleFunc("/api/watchers/", s.corsMiddleware(s.HandleWatchers))                 // Watcher CRUD (GET/PUT/DELETE /api/watchers/{id})
+	http.HandleFunc("/api/watchers", s.corsMiddleware(s.HandleWatchers))                  // List/create watchers (GET/POST)
 	http.HandleFunc("/", s.corsMiddleware(s.HandleStatic))
 }
 
