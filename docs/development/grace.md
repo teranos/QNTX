@@ -257,5 +257,4 @@ config := async.WorkerPoolConfig{
 ```
 
 ---
-**Last updated**: 2025-12-27
 **Status**: Implemented and tested
