@@ -105,7 +105,7 @@ func TestSetDefaults(t *testing.T) {
 		{"server.log_theme", "everforest"},
 		{"pulse.workers", 1},
 		{"pulse.ticker_interval_seconds", 1},
-		{"local_inference.enabled", true},
+		{"local_inference.enabled", false}, // Changed to opt-in
 		{"local_inference.base_url", "http://localhost:11434"},
 		{"code.gopls.enabled", true},
 		{"ax.default_actor", "ax@user"},

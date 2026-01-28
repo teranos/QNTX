@@ -134,7 +134,7 @@ func TestCheckJobs_Integration(t *testing.T) {
 		Payload:         []byte(`{"jd_url":"https://example.com/job/integration","actor":"pulse:SPJ_integration_test"}`),
 		SourceURL:       "https://example.com/job/integration",
 		IntervalSeconds: 3600,
-		NextRunAt:       now.Add(-1 * time.Minute), // Due 1 minute ago
+		NextRunAt:       ptr(now.Add(-1 * time.Minute)), // Due 1 minute ago
 		State:           StateActive,
 		CreatedAt:       now,
 		UpdatedAt:       now,
@@ -173,7 +173,7 @@ func TestCheckJobs_FailsWithoutHandlerName(t *testing.T) {
 		ATSCode:         "ix jd https://example.com/job/missing-handler",
 		HandlerName:     "", // Empty - should cause execution to fail
 		IntervalSeconds: 3600,
-		NextRunAt:       now.Add(-1 * time.Minute), // Due 1 minute ago
+		NextRunAt:       ptr(now.Add(-1 * time.Minute)), // Due 1 minute ago
 		State:           StateActive,
 		CreatedAt:       now,
 		UpdatedAt:       now,

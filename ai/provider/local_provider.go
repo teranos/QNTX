@@ -111,10 +111,10 @@ func (lp *LocalProvider) generateTextWithContext(ctx context.Context, systemProm
 		{Role: "user", Content: userPrompt},
 	}
 
-	// Configure context size from config (0 = use model default)
+	// Configure context size from config (nil = use model default)
 	numCtx := 0
-	if lp.config.ContextSize > 0 {
-		numCtx = lp.config.ContextSize
+	if lp.config.ContextSize != nil {
+		numCtx = *lp.config.ContextSize
 	}
 
 	reqBody := ChatCompletionRequest{
@@ -217,10 +217,10 @@ func (lp *LocalProvider) generateTextStreamingWithContext(ctx context.Context, s
 		{Role: "user", Content: userPrompt},
 	}
 
-	// Configure context size from config (0 = use model default)
+	// Configure context size from config (nil = use model default)
 	numCtx := 0
-	if lp.config.ContextSize > 0 {
-		numCtx = lp.config.ContextSize
+	if lp.config.ContextSize != nil {
+		numCtx = *lp.config.ContextSize
 	}
 
 	reqBody := ChatCompletionRequest{
