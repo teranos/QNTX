@@ -296,7 +296,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		Payload:         parsed.Payload,
 		SourceURL:       parsed.SourceURL,
 		IntervalSeconds: req.IntervalSeconds,
-		NextRunAt:       now, // Run immediately on first execution
+		NextRunAt:       &now, // Run immediately on first execution
 		State:           schedule.StateActive,
 		CreatedFromDoc:  req.CreatedFromDoc,
 		Metadata:        req.Metadata,

@@ -169,7 +169,7 @@ func (t *Ticker) logNextJobInfo(now time.Time) {
 		pulseIndicator = strings.TrimSpace(pulseIndicator) + " "
 	}
 
-	if nextJob == nil {
+	if nextJob == nil || nextJob.NextRunAt == nil {
 		if activeWork > 0 {
 			t.pulseLog.Infow(fmt.Sprintf("%sPulse - no scheduled executions, %d jobs active", pulseIndicator, activeWork))
 		} else {
