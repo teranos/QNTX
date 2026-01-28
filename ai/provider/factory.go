@@ -71,22 +71,9 @@ func NewAIClientForProviderWithModel(provider ProviderType, cfg *am.Config, mode
 		})
 
 	case ProviderTypeOpenRouter:
-		model := modelOverride
-		if model == "" {
-			model = cfg.OpenRouter.Model
-		}
-		return openrouter.NewClient(openrouter.Config{
-			APIKey:        cfg.OpenRouter.APIKey,
-			Model:         model,
-			DB:            db,
-			Verbosity:     verbosity,
-			OperationType: operationType,
-			EntityType:    entityType,
-			EntityID:      entityID,
-		})
-
+		fallthrough
 	default:
-		// Fallback to OpenRouter for unknown providers
+		// OpenRouter is the default/fallback for unknown providers
 		model := modelOverride
 		if model == "" {
 			model = cfg.OpenRouter.Model
