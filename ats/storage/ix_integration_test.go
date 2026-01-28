@@ -60,6 +60,10 @@ func (m *mockEmitter) EmitComplete(summary map[string]interface{}) {
 	m.completeCalls = append(m.completeCalls, summary)
 }
 
+func (m *mockEmitter) EmitProgress(count int, metadata map[string]interface{}) {
+	// Not tracked in mock for now
+}
+
 func (m *mockEmitter) EmitAttestations(count int, entities []ix.AttestationEntity) {
 	// Not tracked in mock for now
 }

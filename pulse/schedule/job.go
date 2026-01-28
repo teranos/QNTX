@@ -11,7 +11,7 @@ type Job struct {
 	Payload         []byte // Pre-computed JSON payload for the handler
 	SourceURL       string // Source URL for deduplication
 	IntervalSeconds int
-	NextRunAt       time.Time
+	NextRunAt       *time.Time // Pointer to handle NULL for one-time jobs (forceTriggerJob)
 	LastRunAt       *time.Time
 	LastExecutionID string
 	State           string
