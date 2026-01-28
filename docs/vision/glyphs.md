@@ -293,5 +293,5 @@ All sharing the same fundamental behavior: proximity morphing, smooth transforma
 ## Related Vision
 
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm glyphs manifest
-- [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Tiles as specialized glyph forms
+- [Tile-Based Typed UI](./tile-based-typed-ui.md) - Tiles as specialized glyph forms
 - [Time-Travel](./time-travel.md) - Navigate glyph states across time

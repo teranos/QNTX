@@ -1,4 +1,4 @@
-# Tile-Based Semantic UI - Vision
+# Tile-Based Typed UI - Vision
 
 **Status:** Aspirational - Core concepts for future UI evolution
 

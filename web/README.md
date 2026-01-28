@@ -26,7 +26,7 @@ See [Glyphs Vision](../docs/vision/glyphs.md) for the full architectural vision 
 The web UI is essential for QNTX's vision of Continuous Intelligence:
 - **Glyph-based visualization** - entities manifest as glyphs that morph and persist state
 - **Real-time updates** show intelligence evolving as new attestations arrive
-- **Foundation for visions** documented in [tile-based semantic UI](../docs/vision/tile-based-semantic-ui.md) and [time-travel](../docs/vision/time-travel.md)
+- **Foundation for visions** documented in [tile-based typed UI](../docs/vision/tile-based-typed-ui.md) and [time-travel](../docs/vision/time-travel.md)
 
 While `ax` queries provide the data, glyphs make the relationships tangible.
 

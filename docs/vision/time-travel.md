@@ -75,7 +75,7 @@ This extends the attestation abstraction to time itself, completing QNTX's domai
 ## Related Vision
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm that generates the history
 - [Glyphs](./glyphs.md) - Attestable glyph state enables time-travel UI
-- [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Visualize time-travel through tile evolution
+- [Tile-Based Typed UI](./tile-based-typed-ui.md) - Visualize time-travel through tile evolution
 
 ## Implementation Roadmap
 
