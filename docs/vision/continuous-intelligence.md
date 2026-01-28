@@ -38,12 +38,12 @@ QNTX provides:
 
 Your choice: privacy with local models or velocity with cloud providers.
 
-## The Core Promise
+## The Core Mechanism
 
-Traditional systems give you answers from data.
-QNTX gives you intelligence that grows from data.
+Traditional systems query static data stores.
+QNTX queries attestations that Pulse keeps current.
 
-The difference: Intelligence understands relationships, remembers context, and evolves continuously.
+The difference: attestations capture relationships and context. Pulse schedules ensure they stay fresh. Queries (⋈ ax) traverse the evolving graph.
 
 ## Related Vision
 
