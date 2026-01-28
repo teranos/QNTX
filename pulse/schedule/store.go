@@ -70,6 +70,11 @@ func (s *Store) CreateJob(job *Job) error {
 		sourceURL = job.SourceURL
 	}
 
+	var nextRunAt interface{}
+	if job.NextRunAt != nil {
+		nextRunAt = job.NextRunAt.Format(time.RFC3339)
+	}
+
 	_, err := s.db.Exec(query,
 		job.ID,
 		job.ATSCode,
@@ -77,7 +82,7 @@ func (s *Store) CreateJob(job *Job) error {
 		payload,
 		sourceURL,
 		job.IntervalSeconds,
-		job.NextRunAt.Format(time.RFC3339),
+		nextRunAt,
 		lastRunAt,
 		job.LastExecutionID,
 		job.State,
@@ -106,8 +111,8 @@ func (s *Store) GetJob(id string) (*Job, error) {
 	`
 
 	var job Job
-	var nextRunAt, createdAt, updatedAt string
-	var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
+	var createdAt, updatedAt string
+	var nextRunAt, lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
 	var handlerName, payload, sourceURL sql.NullString
 
 	err := s.db.QueryRow(query, id).Scan(
@@ -135,9 +140,12 @@ func (s *Store) GetJob(id string) (*Job, error) {
 	}
 
 	// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-	job.NextRunAt, err = time.Parse(time.RFC3339, nextRunAt)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", id)
+	if nextRunAt.Valid {
+		parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", id)
+		}
+		job.NextRunAt = &parsed
 	}
 
 	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
@@ -203,7 +211,8 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
-		var nextRunAt, createdAt, updatedAt string
+		var nextRunAt sql.NullString
+		var createdAt, updatedAt string
 		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
 		var handlerName, payload, sourceURL sql.NullString
 
@@ -228,9 +237,12 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 		}
 
 		// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-		job.NextRunAt, err = time.Parse(time.RFC3339, nextRunAt)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+		if nextRunAt.Valid {
+			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+			}
+			job.NextRunAt = &parsed
 		}
 
 		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
@@ -300,7 +312,8 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
-		var nextRunAt, createdAt, updatedAt string
+		var nextRunAt sql.NullString
+		var createdAt, updatedAt string
 		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
 		var handlerName, payload, sourceURL sql.NullString
 
@@ -325,9 +338,12 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 		}
 
 		// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-		job.NextRunAt, err = time.Parse(time.RFC3339, nextRunAt)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+		if nextRunAt.Valid {
+			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+			}
+			job.NextRunAt = &parsed
 		}
 
 		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
@@ -397,7 +413,8 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 	var jobs []*Job
 	for rows.Next() {
 		var job Job
-		var nextRunAt, createdAt, updatedAt string
+		var nextRunAt sql.NullString
+		var createdAt, updatedAt string
 		var lastRunAt, lastExecutionID, createdFromDoc, metadata sql.NullString
 		var handlerName, payload, sourceURL sql.NullString
 
@@ -422,9 +439,12 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 		}
 
 		// Parse timestamps
-		job.NextRunAt, err = time.Parse(time.RFC3339, nextRunAt)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+		if nextRunAt.Valid {
+			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+			}
+			job.NextRunAt = &parsed
 		}
 
 		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
@@ -571,7 +591,8 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	row := s.db.QueryRow(query, StateActive)
 
 	var job Job
-	var nextRunAt, createdAt, updatedAt string
+	var nextRunAt sql.NullString
+	var createdAt, updatedAt string
 	var lastRunAt sql.NullString
 	var createdFromDoc sql.NullString
 	var metadata sql.NullString
@@ -603,9 +624,12 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	}
 
 	// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
-	job.NextRunAt, err = time.Parse(time.RFC3339, nextRunAt)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+	if nextRunAt.Valid {
+		parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+		}
+		job.NextRunAt = &parsed
 	}
 
 	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)

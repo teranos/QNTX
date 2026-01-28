@@ -40,11 +40,10 @@ func Load() (*Config, error) {
 	return globalConfig, nil
 }
 
-// GetViper returns the Viper instance for advanced configuration access
+// GetViper returns the Viper instance for advanced configuration access.
+// Returns nil if initialization fails - callers should handle nil safely.
 func GetViper() *viper.Viper {
 	v, _ := initViper()
-	// Note: Error is ignored here to maintain backward compatibility.
-	// If initialization fails, v will be nil which may cause issues downstream.
 	return v
 }
 

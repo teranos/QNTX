@@ -166,8 +166,10 @@ func (f *FuzzyEngine) RebuildIndex(predicates, contexts []string) (*RebuildResul
 // Parameters:
 //   - query: The search query
 //   - vocabType: VocabPredicates or VocabContexts
-//   - limit: Maximum results (0 for default of 20)
-//   - minScore: Minimum score 0.0-1.0 (0 for default of 0.6)
+//   - limit: Maximum results. NOTE: The underlying C library treats 0 as "use default 20"
+//     which violates zero-value semantics. Callers should always pass explicit positive limits.
+//   - minScore: Minimum score 0.0-1.0. NOTE: The underlying C library treats 0 as "use default 0.6"
+//     which violates zero-value semantics. Callers should always pass explicit positive scores.
 //
 // Returns matches sorted by score descending and search time in microseconds.
 func (f *FuzzyEngine) FindMatches(query string, vocabType VocabularyType, limit int, minScore float64) ([]Match, uint64, error) {

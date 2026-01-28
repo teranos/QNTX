@@ -18,17 +18,18 @@ type DatabaseConfig struct {
 	BoundedStorage BoundedStorageConfig `mapstructure:"bounded_storage"`
 }
 
-// BoundedStorageConfig configures storage limits for attestations
+// BoundedStorageConfig configures storage limits for attestations.
+// Values <= 0 are normalized to defaults at runtime (16, 64, 64 respectively).
 type BoundedStorageConfig struct {
-	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair
-	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor
-	EntityActorsLimit  int `mapstructure:"entity_actors_limit"`  // actors per entity
+	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
+	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
+	EntityActorsLimit  int `mapstructure:"entity_actors_limit"`  // actors per entity (default: 64)
 }
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int     `mapstructure:"port"`            // Server port (nil = default 877, 0 = OS-assigned)
-	FrontendPort   int      `mapstructure:"frontend_port"`   // Frontend dev server port (default: 8820)
+	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 = let OS assign ephemeral port (standard socket API behavior)
+	FrontendPort   int      `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
 }
@@ -78,16 +79,16 @@ type LocalInferenceConfig struct {
 	BaseURL        string `mapstructure:"base_url"`        // e.g., "http://localhost:11434" for Ollama
 	Model          string `mapstructure:"model"`           // e.g., "mistral", "qwen2.5-coder:7b"
 	TimeoutSeconds int    `mapstructure:"timeout_seconds"` // Request timeout in seconds
-	ContextSize    int    `mapstructure:"context_size"`    // Context window size (0 = model default, e.g., 16384, 32768)
+	ContextSize    *int   `mapstructure:"context_size"`    // Context window size (nil = model default, e.g., 16384, 32768)
 	ONNXModelPath  string `mapstructure:"onnx_model_path"` // Path to ONNX model for vidstream (default: ats/vidstream/models/yolo11n.onnx)
 }
 
 // OpenRouterConfig configures OpenRouter.ai API access
 type OpenRouterConfig struct {
-	APIKey      string  `mapstructure:"api_key"`     // OpenRouter API key
-	Model       string  `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
-	Temperature float64 `mapstructure:"temperature"` // Sampling temperature (default: 0.2)
-	MaxTokens   int     `mapstructure:"max_tokens"`  // Maximum tokens per request (default: 1000)
+	APIKey      string   `mapstructure:"api_key"`     // OpenRouter API key
+	Model       string   `mapstructure:"model"`       // Default model (e.g., "openai/gpt-4o-mini")
+	Temperature *float64 `mapstructure:"temperature"` // Sampling temperature (nil = default 0.2)
+	MaxTokens   *int     `mapstructure:"max_tokens"`  // Maximum tokens per request (nil = default 1000)
 }
 
 // AxConfig configures the attestation query system
@@ -110,9 +111,9 @@ type PluginWebSocketConfig struct {
 // PluginKeepaliveConfig configures WebSocket keepalive behavior
 type PluginKeepaliveConfig struct {
 	Enabled           bool `mapstructure:"enabled"`            // Enable keepalive (default: true)
-	PingIntervalSecs  int  `mapstructure:"ping_interval_secs"` // Seconds between PING messages (default: 30)
-	PongTimeoutSecs   int  `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (default: 60)
-	ReconnectAttempts int  `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (default: 3)
+	PingIntervalSecs  *int `mapstructure:"ping_interval_secs"` // Seconds between PING messages (nil = default 30)
+	PongTimeoutSecs   *int `mapstructure:"pong_timeout_secs"`  // Seconds to wait for PONG (nil = default 60)
+	ReconnectAttempts *int `mapstructure:"reconnect_attempts"` // Number of reconnect attempts (nil = default 3)
 }
 
 // File system constants
