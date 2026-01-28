@@ -81,7 +81,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx-code, qntx-python]
+        # TODO: Re-enable qntx-code after extraction to separate repo (#354)
+        # qntx-code has transitive Rust dependencies that complicate builds
+        package: [qntx-python]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -140,7 +142,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image: [ci-image, qntx-code-plugin-image, qntx-python-plugin-image]
+        # TODO: Re-enable qntx-code-plugin-image after extraction (#354)
+        image: [ci-image, qntx-python-plugin-image]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
