@@ -326,7 +326,7 @@ After installing QNTX:
 
 1. **Configuration**: See [Configuration System](architecture/config-system.md)
 2. **Development**: See [Nix Development Guide](nix-development.md)
-3. **Symbols**: Explore QNTX symbols in the [Glossary](GLOSSARY.md#symbol-system)
+3. **Glyphs**: Explore QNTX glyphs in the [Glossary](GLOSSARY.md#symbol-system)
 
 ---
 
