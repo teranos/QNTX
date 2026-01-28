@@ -244,3 +244,43 @@ rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugin
 	@cp bin/qntx-python-plugin $(PREFIX)/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-python-plugin
 	@echo "✓ qntx-python-plugin installed to $(PREFIX)/plugins/"
+
+# =============================================================================
+# WASM Targets
+# =============================================================================
+
+wasm: ## Build WASM package for browser (requires wasm-pack)
+	@echo "Building WASM package..."
+	@cd crates/qntx-wasm && wasm-pack build --target bundler --out-dir ../../web/pkg
+	@echo "✓ WASM package built in web/pkg/"
+
+wasm-release: ## Build optimized WASM package for production
+	@echo "Building optimized WASM package..."
+	@cd crates/qntx-wasm && wasm-pack build --release --target bundler --out-dir ../../web/pkg
+	@echo "✓ Optimized WASM package built in web/pkg/"
+
+wasm-web: ## Build WASM package for direct browser import (no bundler)
+	@echo "Building WASM package for web..."
+	@cd crates/qntx-wasm && wasm-pack build --target web --out-dir ../../web/pkg
+	@echo "✓ Web WASM package built in web/pkg/"
+
+wasm-test: ## Run WASM tests in headless browser
+	@echo "Running WASM tests..."
+	@cd crates/qntx-wasm && wasm-pack test --headless --chrome
+	@echo "✓ WASM tests passed"
+
+wasm-check: ## Check qntx-core compiles for WASM target
+	@echo "Checking WASM compilation..."
+	@cargo build -p qntx-core --target wasm32-unknown-unknown --features wasm
+	@cargo build -p qntx-wasm --target wasm32-unknown-unknown
+	@echo "✓ WASM compilation check passed"
+
+rust-core-test: ## Run qntx-core tests
+	@echo "Running qntx-core tests..."
+	@cargo test -p qntx-core
+	@echo "✓ qntx-core tests passed"
+
+rust-wasm-test: ## Run qntx-wasm native tests
+	@echo "Running qntx-wasm tests..."
+	@cargo test -p qntx-wasm
+	@echo "✓ qntx-wasm tests passed"
