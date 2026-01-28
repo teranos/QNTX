@@ -238,11 +238,11 @@ qntx am show
 |----------|-------------|---------|---------|
 | Linux | amd64 | GitHub Releases, Nix, Docker, Source | ✅ |
 | Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
-| macOS | Intel (x64) | GitHub Releases, Nix, Source | ✅ |
-| macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Source | ✅ |
-| Windows | x64 | GitHub Releases, Source | ✅ |
-| Android | ARM | Docker | ✅ (via Tauri) |
-| iOS | ARM | Source | ⚠️ (experimental) |
+| macOS | Intel (x64) | GitHub Releases, Nix, Tauri, Source | ✅ |
+| macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Tauri, Source | ✅ |
+| Windows | x64 | GitHub Releases, Tauri, Source | ✅ |
+| Android | ARM | Tauri | ✅ |
+| iOS | ARM | Tauri | ⚠️ (experimental) |
 
 ---
 
