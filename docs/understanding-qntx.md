@@ -211,71 +211,9 @@ Build for that someone. If the conviction is sound, it'll expand.
 
 ---
 
-## Configuration System: Complexity Made Visible
+## Configuration
 
-### The 5-Layer Precedence Chain
-
-QNTX's config system has 5 sources with strict precedence:
-
-```
-1. System      /etc/qntx/config.toml               (lowest)
-2. User        ~/.qntx/config.toml
-3. User UI     ~/.qntx/am_from_ui.toml
-4. Project     ./config.toml
-5. Environment QNTX_* environment variables        (highest)
-```
-
-**The clever part:** Separate `am_from_ui.toml` prevents accidental git commits of user preferences.
-
-**Problem it solves:**
-- User toggles "Use Ollama" in web UI
-- Without separate file, writes to `project/config.toml`
-- User commits personal preference to team repo
-- Bad!
-
-**Solution:**
-- UI writes to `~/.qntx/am_from_ui.toml` (home directory, never in project)
-- Project config stays clean
-- Git-safe by design
-
-### Show Complexity, Don't Hide It
-
-**Core philosophy:** Config is a first-class citizen. Don't hide where values come from.
-
-The config panel shows **all 5 sources** simultaneously:
-- System config (read-only, grayed out)
-- User config (read-only, shows if overridden)
-- UI config (editable, highlighted if active)
-- Project config (read-only, shows if it wins)
-- Environment (read-only, highest precedence)
-
-**Each setting shows:**
-- Current value
-- Which source it came from
-- Whether it's overridden (and by which source)
-
-**Example:**
-```
-┌─────────────────────────────┐
-│ openrouter.api_key          │
-│ sk-or-v1-9bee...            │
-│ [user] ⚠ Overridden by env  │
-└─────────────────────────────┘
-```
-
-**User immediately understands:** "My manually configured key is being ignored because environment variable wins."
-
-**This is dataflow visualization as product design.** Most systems hide complexity. QNTX makes it comprehensible.
-
-**Why this matters:** When config doesn't work as expected, users can **debug themselves** instead of filing support tickets.
-
-### Documentation Integration
-
-The config panel design includes space for inline documentation—"right-click → Go to Definition" UX for configuration, making help contextual and immediately accessible.
-
-### Prepared for Extension
-
-The configuration system with its precedence visualization and source tracking provides a foundation that could support additional configuration sources through plugins.
+QNTX treats configuration as a first-class citizen with full visibility into where values come from. See [Configuration System](architecture/config-system.md) for the 5-layer precedence chain and design rationale.
 
 ---
 
