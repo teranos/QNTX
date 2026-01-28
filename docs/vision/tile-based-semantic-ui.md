@@ -2,6 +2,8 @@
 
 **Status:** Aspirational - Core concepts for future UI evolution
 
+**Implementation Path:** Tiles are [glyph](./glyphs.md) manifestations. The D3 graph approach is being deprecated in favor of the glyph infrastructure, which provides better primitives for morphing, state persistence, and attestable UI.
+
 ## Core Concept
 
 Transform entity visualization from **nodes as dots** to **tiles as always-on surfaces** - a paradigm shift toward pane-based semantic computing where data is visible without interaction.
@@ -76,26 +78,24 @@ Non-technical users (recruiters, analysts) can customize views by editing TOML c
 
 ## Technical Approach
 
-### Progressive Enhancement Path
+### Glyph-Based Implementation
 
-1. **Phase 1:** Render entities as rectangles (vs circles) ✅ *Implemented*
-   - Tiles render as rectangles with multi-line text (label, type, metadata)
-   - Focus mode expands tiles to fill viewport
-   - Tile-to-tile focus transitions working
-2. **Phase 2:** Add multi-line text to tile surface ✅ *In Progress*
-   - Basic multi-line text rendering complete
-   - Header/footer controls in focus mode
-3. **Phase 3:** Implement semantic zoom thresholds
-4. **Phase 4:** Add layout modes (grid, hierarchy)
-5. **Phase 5:** Config-driven field selection
+Tiles are implemented as [glyph](./glyphs.md) manifestations:
+
+- **Tile = Glyph** in expanded state showing entity data
+- **Semantic zoom** = glyph state transitions (collapsed → expanded → focused)
+- **Layout modes** = glyph arrangement patterns
+- **Attestable state** = tile positions/sizes persist via glyph attestations
+
+The previous D3-based progressive enhancement path is deprecated. The glyph infrastructure provides the morphing, state management, and persistence primitives needed for tiles.
 
 ### Implementation Considerations
 
-- Compatible with existing D3/graph visualization
 - Works with WebSocket real-time updates
 - Responsive to different screen sizes
-- Smooth transitions between zoom levels
+- Smooth transitions between zoom levels (glyph morphing)
 - Tile size adapts to content (min/max bounds)
+- State persists via glyph attestations
 
 ## Symbols at Different Zoom Levels
 
