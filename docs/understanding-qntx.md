@@ -68,6 +68,8 @@ The CodeMirror + LSP + ProseMirror integration is **expensive to build**. You do
 
 ## Core Philosophical Stance
 
+For visual and interface design principles, see [Design Philosophy](design-philosophy.md).
+
 ### Pro-Patterns (What It Believes In)
 
 1. **Data-first hierarchy**: Information density > visual polish
