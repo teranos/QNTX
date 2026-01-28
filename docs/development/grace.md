@@ -12,6 +12,7 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 
 ### ❀ Closing (Graceful Shutdown)
 - **Context propagation**: Application → Worker Pool → Jobs → Handlers
+- **Plugin shutdown**: Plugins receive shutdown signal via gRPC, complete in-flight work
 - **Task-level atomicity**: Jobs complete current task before checkpointing
 - **Signal handling**: Application catches signals, triggers shutdown
 - **Worker timeout**: 30 seconds for clean checkpoint and exit
