@@ -316,11 +316,17 @@ qntx db stats --limit 5
 
 ### Unit Tests
 
-See `ats/storage/bounded_storage_integration_test.go` for comprehensive test coverage:
+**Verified by** (`ats/storage/bounded_quota_test.go`):
+- `TestBoundedStorage_DoesNotDeleteDifferentContexts` (:21)
+- `TestBoundedStorage_DeletesWhenExceeding16PerActorContext` (:72)
+- `TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries` (:125)
+- `TestBoundedStorage_MixedContextsPreservation` (:184)
+- `TestBoundedStorage_ExactDomainReproduction` (:256)
 
-- `TestBoundedStorage_DeletesWhenExceeding16PerActorContext`
-- `TestBoundedStorage_DoesNotDeleteDifferentContexts`
-- `TestBoundedStorage_ExactDomainReproduction`
+**Integration tests** (`ats/storage/bounded_storage_integration_test.go`):
+- `TestBoundedStorage_16PerActorContext` (:17)
+- `TestBoundedStorage_SameActorContextPruning` (:54)
+- `TestBoundedStorage_DomainScenario` (:92)
 
 ## Best Practices
 
