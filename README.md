@@ -5,7 +5,7 @@
 
 **QNTX: Continuous Intelligence**
 
-A new paradigm where systems continuously evolve their understanding through verifiable attestations. Always-on, always-learning - scaling from a Raspberry Pi to distributed clusters without configuration.
+A new paradigm where systems continuously evolve their understanding through verifiable attestations.
 
 ```
 Data → Graph → Knowledge → Intelligence → Action
