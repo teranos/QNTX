@@ -1,5 +1,13 @@
 # Local Inference Setup
 
+**QNTX supports multiple LLM providers that can be enabled/disabled independently:**
+- **OpenRouter** - Cloud-based, supports GPT-4, Claude, etc. (configured via `openrouter.*` settings)
+- **Local inference** - Ollama or LocalAI running on your hardware (configured via `local_inference.*` settings)
+
+When `local_inference.enabled = true`, QNTX uses your local Ollama/LocalAI server. When false, it falls back to OpenRouter or other configured providers.
+
+This guide covers setting up and enabling local inference providers.
+
 ## Why Local Inference?
 
 **Privacy, cost, and control.** Cloud LLM APIs are convenient but:
@@ -30,17 +38,18 @@ curl -fsSL https://ollama.com/install.sh | sh
 ### 2. Download a Model
 
 ```bash
-# Recommended: Fast, general-purpose (7B params, 4GB)
-ollama pull mistral
-
-# Alternative: Smaller, faster (3B params, 2GB)
+# Default: Smallest, fastest (3B params, 2GB)
 ollama pull llama3.2:3b
 
-# For code: Optimized for technical content (7B, 4.5GB)
-ollama pull qwen2.5-coder:7b
+# Popular alternatives:
+ollama pull mistral          # General-purpose (7B, 4GB) - better quality
+ollama pull qwen2.5-coder:7b # Code-optimized (7B, 4.5GB) - best for code
+ollama pull phi3:mini        # Microsoft's model (3.8B, 2.3GB) - good balance
+ollama pull gemma2:2b        # Google's smallest (2B, 1.6GB) - very fast
+ollama pull deepseek-coder:6.7b # Code specialist (6.7B, 3.8GB)
 ```
 
-**Why these models?** Balance of size/speed/quality. Smaller models (3B) are fast on CPU. Larger models (7B) give better results but need more RAM.
+**Why these models?** Balance of size/speed/quality. Smaller models (2-3B) are fast on CPU. Larger models (7B) give better results but need more RAM.
 
 ### 3. Start Ollama
 
@@ -56,11 +65,14 @@ Edit `~/.qntx/am.toml` (or project `am.toml`):
 
 ```toml
 [local_inference]
-enabled = true
+enabled = true  # Disabled by default, set to true to use local models
 base_url = "http://localhost:11434"
-model = "mistral"
-timeout_seconds = 120
+model = "llama3.2:3b"  # Default model
+timeout_seconds = 360  # 6 minutes timeout for slow inference
+context_size = 16384   # Context window (0 = use model default)
 ```
+
+**Note:** Local inference is disabled by default. Set `enabled = true` to activate.
 
 **Done.** All QNTX LLM operations now use local inference.
 
@@ -74,7 +86,7 @@ curl http://localhost:11434/api/tags
 curl http://localhost:11434/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "mistral",
+    "model": "llama3.2:3b",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
@@ -93,11 +105,33 @@ Ollama automatically uses GPU if available. No configuration needed.
 
 | Model | Size | CPU Speed | GPU Speed | Quality | Best For |
 |-------|------|-----------|-----------|---------|----------|
-| llama3.2:3b | 2GB | Very Slow | Fast | Good | Testing, quick tasks |
-| mistral | 4GB | Slow | Very Fast | Excellent | General purpose |
-| qwen2.5-coder:7b | 4.5GB | Slow | Very Fast | Excellent | Code/technical |
+| gemma2:2b | 1.6GB | Slow | Fast | Fair | Minimal resources |
+| llama3.2:3b | 2GB | Slow | Fast | Good | Default, balanced |
+| phi3:mini | 2.3GB | Slow | Fast | Good | General purpose |
+| mistral | 4GB | Very Slow | Very Fast | Excellent | Quality output |
+| qwen2.5-coder:7b | 4.5GB | Very Slow | Very Fast | Excellent | Code/technical |
 
 **Why not 13B or 70B models?** Possible but require 8GB+ VRAM and are slower. Diminishing returns for most QNTX operations.
+
+## Environment Variables
+
+**Quick override without editing config files:**
+
+```bash
+# Switch to local provider (Ollama/LocalAI) instead of OpenRouter
+export QNTX_LOCAL_INFERENCE_ENABLED=true
+
+# Point to different Ollama server
+export QNTX_LOCAL_INFERENCE_BASE_URL=http://gpu-server:11434
+
+# Use different model
+export QNTX_LOCAL_INFERENCE_MODEL=mistral
+
+# Start QNTX with overrides
+make dev
+```
+
+**Note:** Environment variables take precedence over all config files. When `QNTX_LOCAL_INFERENCE_ENABLED=true`, QNTX uses Ollama/LocalAI instead of OpenRouter (cloud provider).
 
 ## Cost Tracking
 
@@ -120,12 +154,16 @@ See `pulse/budget/` package TODOs for GPU resource tracking plans.
 
 **Why switch?** Local for bulk operations (save money), cloud for occasional high-quality needs (GPT-4, Claude).
 
-```bash
-# Enable local inference
-qntx config set local_inference.enabled true
+**Option 1: Edit config file**
+```toml
+# ~/.qntx/am.toml
+[local_inference]
+enabled = true  # or false
+```
 
-# Disable (use cloud APIs)
-qntx config set local_inference.enabled false
+**Option 2: Environment variable**
+```bash
+QNTX_LOCAL_INFERENCE_ENABLED=false make dev
 ```
 
 Configuration reloads automatically. No restart required.
@@ -169,7 +207,7 @@ Configuration reloads automatically. No restart required.
 Create `Modelfile`:
 
 ```
-FROM mistral
+FROM llama3.2:3b
 
 SYSTEM You are a code review assistant. Focus on security and correctness.
 

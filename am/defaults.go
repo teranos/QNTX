@@ -19,12 +19,12 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("code.gopls.enabled", true)
 	v.SetDefault("code.gopls.workspace_root", ".")
 
-	// Local Inference (Ollama) defaults
-	v.SetDefault("local_inference.enabled", true)
+	// Local Inference (Ollama/LocalAI) defaults
+	v.SetDefault("local_inference.enabled", false) // Disabled by default - users should opt-in to local providers
 	v.SetDefault("local_inference.base_url", "http://localhost:11434")
 	v.SetDefault("local_inference.model", "llama3.2:3b")
 	v.SetDefault("local_inference.context_size", 16384)
-	v.SetDefault("local_inference.timeout_seconds", 3600)
+	v.SetDefault("local_inference.timeout_seconds", 360) // 6 minutes - reasonable for slow inference
 	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
 
 	// OpenRouter defaults
