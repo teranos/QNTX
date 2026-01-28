@@ -35,20 +35,7 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 ## Segments
 
-### Primary SEG Operators
-- **⍟** i - self (your vantage point)
-- **≡** am - system configuration (being/state)
-- **⨳** ix - ingest/import
-- **⋈** ax - expand/query (contextual surfacing)
-- **⌬** by - actor/catalyst (origin of action)
-- **✦** at - temporal marker
-- **⟶** so - therefore/consequence
-
-### System Infrastructure
-- **꩜** pulse - continuous compute (heartbeat)
-- **⊔** db - database/storage
-
-See [GLOSSARY.md](docs/GLOSSARY.md) for complete symbol definitions including attestation building blocks.
+QNTX uses semantic symbols as a namespace system. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
 
 ## Configuration
 
