@@ -47,5 +47,6 @@ The difference: attestations capture relationships and context. Pulse schedules 
 
 ## Related Vision
 
+- [Glyphs](./glyphs.md) - Universal UI primitive for manifesting intelligence
 - [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Visualize continuous intelligence through always-visible data surfaces
 - [Time-Travel](./time-travel.md) - Navigate the evolution of intelligence across time
