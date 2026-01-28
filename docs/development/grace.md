@@ -33,6 +33,14 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 - Handler implementations - Task-level context checks
 
 ### Testing
+
+**Verified by** (`pulse/async/grace_test.go`):
+- `TestGRACEShutdownFlow` (:25) - Context propagation and clean exit
+- `TestGRACECheckpointSaving` (:145) - Progress preserved on cancel
+- `TestGRACEWorkerShutdownTimeout` (:183) - Timeout enforcement
+- `TestGRACEGracefulStart` (:228) - Orphan detection and recovery
+- `TestGRACEGradualRecovery` (:349) - Super gradual warm start pacing
+
 ```bash
 # Fast tests (~10s)
 go test ./pulse/async -run TestGRACE -short
@@ -92,13 +100,11 @@ if job.Metadata != nil && job.Metadata.Phase == "aggregate" {
 
 ### Testing
 
-Phase recovery is tested in `pulse/async/grace_test.go`:
-
-- `TestGRACEPhaseRecoveryNoChildTasks` - Validates reset when no tasks exist
-- `TestGRACEPhaseRecoveryWithChildTasks` - Validates preservation when tasks exist
+**Verified by** (`pulse/async/grace_test.go`):
+- `TestGRACEPhaseRecoveryNoChildTasks` (:492) - Reset when no tasks exist
+- `TestGRACEPhaseRecoveryWithChildTasks` (:542) - Preserve when tasks exist
 
 ```bash
-# Run phase recovery tests
 go test ./pulse/async -run TestGRACEPhaseRecovery -v
 ```
 
@@ -170,12 +176,12 @@ Failed tasks can be retried automatically (max 3 attempts total):
 
 ### Testing
 
-```bash
-# Test cascade deletion
-go test ./pulse/async -run TestDeleteJobWithChildren -v
+**Verified by:**
+- `TestParentJobHierarchy` - `pulse/async/job_test.go:369`
+- `TestTASBotParentJobHierarchy` - `pulse/async/store_test.go:250`
 
-# Test parent-child lifecycle
-go test ./pulse/async -run TestParentChild -v
+```bash
+go test ./pulse/async -run TestParentJobHierarchy -v
 ```
 
 ## Integration Guide

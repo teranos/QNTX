@@ -83,6 +83,16 @@ No special configuration required. The pattern is implemented through job handle
 4. **Set reasonable timeouts** for aggregate phase
 5. **Use retry logic** appropriately for each phase
 
+## Verified By
+
+Phase recovery during graceful restart:
+- `TestGRACEPhaseRecoveryNoChildTasks` - `pulse/async/grace_test.go:492`
+- `TestGRACEPhaseRecoveryWithChildTasks` - `pulse/async/grace_test.go:542`
+
+Parent-child job hierarchy:
+- `TestParentJobHierarchy` - `pulse/async/job_test.go:369`
+- `TestTASBotParentJobHierarchy` - `pulse/async/store_test.go:250`
+
 ## Related Documentation
 
 - [Pulse Async Architecture](pulse-async-ix.md)
