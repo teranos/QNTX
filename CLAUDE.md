@@ -24,9 +24,11 @@ The developer always uses `make dev` to start the development environment with h
 
 **NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`.
 
-## Segments
+## Symbols
 
-**Note:** These symbols are defined in the `sym` package for consistent use across QNTX. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
+Defined in the `sym` package. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
+
+**Future:** The `sym` package will become `glyph` - see [glyphs.md](docs/vision/glyphs.md).
 
 ## Go Development Standards
 
