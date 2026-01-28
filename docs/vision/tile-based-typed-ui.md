@@ -280,4 +280,4 @@ Each view maintains independent zoom level:
 
 ## Related Documentation
 
-- **Symbols System:** [`sym/README.md`](../../sym/README.md) - QNTX symbol definitions
+- **Glyphs & Symbols:** [GLOSSARY.md](../GLOSSARY.md#symbol-system) - Definitive symbol definitions
