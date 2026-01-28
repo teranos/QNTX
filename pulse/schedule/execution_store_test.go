@@ -11,6 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper function to get pointer to time.Time
+func ptr[T any](v T) *T {
+	return &v
+}
+
 func TestCreateExecution(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 
@@ -20,7 +25,7 @@ func TestCreateExecution(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -61,7 +66,7 @@ func TestUpdateExecution(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -114,7 +119,7 @@ func TestUpdateExecutionWithError(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -163,7 +168,7 @@ func TestListExecutions(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -224,7 +229,7 @@ func TestListExecutionsWithPagination(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -271,7 +276,7 @@ func TestListExecutionsWithStatusFilter(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -353,7 +358,7 @@ func TestCleanupOldExecutions(t *testing.T) {
 		ID:              "SPJ_cleanup_test",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))
@@ -407,7 +412,7 @@ func TestCleanupOldExecutions_NoneToDelete(t *testing.T) {
 		ID:              "SPJ_cleanup_empty_test",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 	require.NoError(t, jobStore.CreateJob(job))

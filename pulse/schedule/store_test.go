@@ -19,7 +19,7 @@ func TestCreateJob(t *testing.T) {
 		ID:              "SPJ_test123",
 		ATSCode:         "ix https://example.com/jobs",
 		IntervalSeconds: 3600, // 1 hour
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 
@@ -47,28 +47,28 @@ func TestListJobsDue(t *testing.T) {
 			ID:              "SPJ_past",
 			ATSCode:         "ix https://past.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(-10 * time.Minute), // Past due
+			NextRunAt:       ptr(now.Add(-10 * time.Minute)), // Past due
 			State:           StateActive,
 		},
 		{
 			ID:              "SPJ_now",
 			ATSCode:         "ix https://now.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now, // Due now
+			NextRunAt:       ptr(now), // Due now
 			State:           StateActive,
 		},
 		{
 			ID:              "SPJ_future",
 			ATSCode:         "ix https://future.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(10 * time.Minute), // Future
+			NextRunAt:       ptr(now.Add(10 * time.Minute)), // Future
 			State:           StateActive,
 		},
 		{
 			ID:              "SPJ_paused",
 			ATSCode:         "ix https://paused.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(-5 * time.Minute), // Past due but paused
+			NextRunAt:       ptr(now.Add(-5 * time.Minute)), // Past due but paused
 			State:           StatePaused,
 		},
 	}
@@ -97,7 +97,7 @@ func TestUpdateState(t *testing.T) {
 		ID:              "SPJ_state_test",
 		ATSCode:         "ix https://example.com",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 
@@ -132,7 +132,7 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 		ID:              "SPJ_exec_test",
 		ATSCode:         "ix https://example.com",
 		IntervalSeconds: 3600, // 1 hour
-		NextRunAt:       now,
+		NextRunAt:       ptr(now),
 		State:           StateActive,
 	}
 
@@ -152,7 +152,7 @@ func TestUpdateJobAfterExecution(t *testing.T) {
 	assert.NotNil(t, retrieved.LastRunAt)
 	assert.WithinDuration(t, now, *retrieved.LastRunAt, 1*time.Second)
 	assert.Equal(t, executionID, retrieved.LastExecutionID)
-	assert.WithinDuration(t, nextRun, retrieved.NextRunAt, 1*time.Second)
+	assert.WithinDuration(t, nextRun, *retrieved.NextRunAt, 1*time.Second)
 }
 
 func TestJobTimeDrift(t *testing.T) {
@@ -165,8 +165,8 @@ func TestJobTimeDrift(t *testing.T) {
 	job := &Job{
 		ID:              "SPJ_drift_test",
 		ATSCode:         "ix https://example.com",
-		IntervalSeconds: 3600,                    // 1 hour
-		NextRunAt:       now.Add(-2 * time.Hour), // Should have run 2 hours ago
+		IntervalSeconds: 3600,                         // 1 hour
+		NextRunAt:       ptr(now.Add(-2 * time.Hour)), // Should have run 2 hours ago
 		State:           StateActive,
 	}
 
@@ -187,7 +187,7 @@ func TestJobTimeDrift(t *testing.T) {
 
 	retrieved, err := store.GetJob(job.ID)
 	require.NoError(t, err)
-	assert.WithinDuration(t, nextRun, retrieved.NextRunAt, 1*time.Second)
+	assert.WithinDuration(t, nextRun, *retrieved.NextRunAt, 1*time.Second)
 }
 
 func TestCreateJobWithMetadata(t *testing.T) {
@@ -199,7 +199,7 @@ func TestCreateJobWithMetadata(t *testing.T) {
 		ID:              "SPJ_metadata_test",
 		ATSCode:         "ix https://example.com",
 		IntervalSeconds: 3600,
-		NextRunAt:       time.Now().Add(1 * time.Hour),
+		NextRunAt:       ptr(time.Now().Add(1 * time.Hour)),
 		State:           StateActive,
 		CreatedFromDoc:  "pm_doc_123",
 		Metadata:        `{"scraper_type": "vacancies", "company": "Base Cyber Security"}`,
@@ -225,28 +225,28 @@ func TestListAllScheduledJobs(t *testing.T) {
 			ID:              "SPJ_active1",
 			ATSCode:         "ix https://active1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(1 * time.Hour),
+			NextRunAt:       ptr(now.Add(1 * time.Hour)),
 			State:           StateActive,
 		},
 		{
 			ID:              "SPJ_paused1",
 			ATSCode:         "ix https://paused1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(2 * time.Hour),
+			NextRunAt:       ptr(now.Add(2 * time.Hour)),
 			State:           StatePaused,
 		},
 		{
 			ID:              "SPJ_inactive1",
 			ATSCode:         "ix https://inactive1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(3 * time.Hour),
+			NextRunAt:       ptr(now.Add(3 * time.Hour)),
 			State:           StateInactive,
 		},
 		{
 			ID:              "SPJ_deleted1",
 			ATSCode:         "ix https://deleted1.com",
 			IntervalSeconds: 3600,
-			NextRunAt:       now.Add(4 * time.Hour),
+			NextRunAt:       ptr(now.Add(4 * time.Hour)),
 			State:           StateDeleted,
 		},
 	}
@@ -288,7 +288,7 @@ func TestUpdateJobInterval(t *testing.T) {
 		ID:              "SPJ_interval_test",
 		ATSCode:         "ix https://example.com",
 		IntervalSeconds: 3600, // 1 hour
-		NextRunAt:       now.Add(1 * time.Hour),
+		NextRunAt:       ptr(now.Add(1 * time.Hour)),
 		State:           StateActive,
 	}
 
@@ -323,14 +323,14 @@ func TestGetNextScheduledJob(t *testing.T) {
 				ID:              "SPJ_paused_next",
 				ATSCode:         "ix https://paused.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       now.Add(-1 * time.Hour), // Past due but paused
+				NextRunAt:       ptr(now.Add(-1 * time.Hour)), // Past due but paused
 				State:           StatePaused,
 			},
 			{
 				ID:              "SPJ_inactive_next",
 				ATSCode:         "ix https://inactive.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       now.Add(-30 * time.Minute), // Past due but inactive
+				NextRunAt:       ptr(now.Add(-30 * time.Minute)), // Past due but inactive
 				State:           StateInactive,
 			},
 		}
@@ -353,21 +353,21 @@ func TestGetNextScheduledJob(t *testing.T) {
 				ID:              "SPJ_future1",
 				ATSCode:         "ix https://future1.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       now.Add(2 * time.Hour),
+				NextRunAt:       ptr(now.Add(2 * time.Hour)),
 				State:           StateActive,
 			},
 			{
 				ID:              "SPJ_soonest",
 				ATSCode:         "ix https://soonest.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       now.Add(30 * time.Minute), // Earliest
+				NextRunAt:       ptr(now.Add(30 * time.Minute)), // Earliest
 				State:           StateActive,
 			},
 			{
 				ID:              "SPJ_future2",
 				ATSCode:         "ix https://future2.com",
 				IntervalSeconds: 3600,
-				NextRunAt:       now.Add(3 * time.Hour),
+				NextRunAt:       ptr(now.Add(3 * time.Hour)),
 				State:           StateActive,
 			},
 		}

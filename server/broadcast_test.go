@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
@@ -74,7 +76,8 @@ func TestHandlePulseExecutionUpdate_Failure(t *testing.T) {
 
 	// Create mock server (broadcasts will be no-ops in test, but that's ok)
 	mockServer := &QNTXServer{
-		db: db,
+		db:     db,
+		logger: zap.NewNop().Sugar(), // No-op logger for tests
 	}
 
 	// Execute the function under test
