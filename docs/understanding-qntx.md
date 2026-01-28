@@ -1,6 +1,4 @@
-# Understanding QNTX: Pattern Recognition Analysis
-
-*Written after migrating 10 issues from ExpGraph and exploring the codebase architecture*
+# Understanding QNTX
 
 ## What This Is
 
@@ -17,7 +15,7 @@ The core primitive is the **attestation**: structured facts of the form "X has p
 
 ### 1. Semantic Segments as Namespaces
 
-The segment symbols (꩜ ⌬ ≡ ⨳ ⋈) are not decoration—they're a **namespace system**:
+The segment symbols (see [Glossary](GLOSSARY.md)) are not decoration—they're a **namespace system**:
 
 - `꩜` (Pulse) - Async operations, scheduling, rate limiting
 - `⌬` (Actor/Agent) - Entity identification and relationships
@@ -67,37 +65,6 @@ Most systems treat their query language as an afterthought. QNTX treats ATS as a
 - Hover documentation
 
 The CodeMirror + LSP + ProseMirror integration is **expensive to build**. You don't do this unless the query language is central to the user experience.
-
-## What the Migration Revealed
-
-Migrating 10 issues from ExpGraph to QNTX exposed **vision clusters**:
-
-### Cluster 1: Live Execution Awareness (#8, #16)
-- Real-time execution state indicators for ATS blocks
-- Refactoring global window pollution for clean event propagation
-
-**Insight**: The system wants to show you *what's running right now*. Not just logs, not just status—active awareness of execution.
-
-### Cluster 2: Interactive Exploration (#9, #10, #11, #12)
-- Hover interactions showing related attestations
-- In-tile documentation from attestations
-- Layout modes for DocBlock views (list, cluster, timeline, radial)
-- Connecting views to live ATS data via API
-
-**Insight**: The UI is not display-only. Every surface should be **explorable and composable**. Click a term, see its connections. Arrange data spatially based on relationships.
-
-### Cluster 3: Language Quality (#13, #14, #15)
-- Tracking semantic token support in codemirror-languageserver
-- LSP performance tuning (debounce timings)
-- Cursor visibility in ATS code blocks
-
-**Insight**: These are **polish issues**, not foundational. The language infrastructure exists; now it's about feel and responsiveness.
-
-### Cluster 4: Data Visualization (#17)
-- Better time-series charting for usage/cost tracking
-- WebSocket streaming for real-time updates
-
-**Insight**: Even operational concerns (usage tracking) get **first-class visualization**. This is not a "just query the database" system.
 
 ## Core Philosophical Stance
 
@@ -244,8 +211,6 @@ Build for that someone. If the conviction is sound, it'll expand.
 
 ## Configuration System: Complexity Made Visible
 
-*Based on config-system.md and config-panel.md*
-
 ### The 5-Layer Precedence Chain
 
 QNTX's config system has 5 sources with strict precedence:
@@ -304,19 +269,15 @@ The config panel shows **all 5 sources** simultaneously:
 
 ### Documentation Integration
 
-The config panel design includes space for inline documentation. See Issue #207 for discussion of ProseMirror-based documentation editing and viewing capabilities.
+The config panel design includes space for inline documentation—"right-click → Go to Definition" UX for configuration, making help contextual and immediately accessible.
 
-The concept is "right-click → Go to Definition" UX for configuration - making help contextual and immediately accessible.
+### Prepared for Extension
 
-### Current Design Prepared for Extension
-
-The current configuration system with its precedence visualization and source tracking provides a solid foundation that could support additional configuration sources in the future through plugins. See Issue #205 for discussion of potential multi-provider support.
+The configuration system with its precedence visualization and source tracking provides a foundation that could support additional configuration sources through plugins.
 
 ---
 
 ## Documentation as Teaching
-
-*Based on config-system.md, task-logging.md*
 
 ### Decision Transparency
 
@@ -352,7 +313,7 @@ The docs don't just say **what** to build—they explain **why** and **what alte
 ### Phase 1: Database Schema ✓ COMPLETED
 ### Phase 2: LogCapturingEmitter ✓ COMPLETED
 ### Phase 3: Integrate in Async Worker Handlers ✓ COMPLETED
-### Phase 4: Integrate in Ticker (PENDING - deferred to Issue #30)
+### Phase 4: Integrate in Ticker (PENDING)
 ...
 ### Phase 9: Documentation & Cleanup ✓ COMPLETED
 ```
@@ -360,7 +321,7 @@ The docs don't just say **what** to build—they explain **why** and **what alte
 **Not just aspirational design docs.** Status tracks reality:
 - 7/9 phases complete
 - Specific file paths and line numbers (e.g., "lines 125-126")
-- Deferred items have issue links (#30)
+- Deferred items are tracked
 - **E2E validation results included in the document**
 
 **Example E2E results:**
@@ -395,61 +356,7 @@ Every doc links to related docs with context:
 
 ---
 
-## The Solo Developer Reality
-
-*Based on Issue #30 and direct confirmation*
-
-### Backend-First Development
-
-**Current state:**
-- Backend: Clean architecture, wrapper patterns, 8/9 phases complete, E2E validated
-- Frontend: **"Heavily WIP and currently broken"** (from Issue #30)
-
-**From Issue #30:**
-> The Pulse panel is heavily WIP and currently broken:
-> - ❌ Fails to get tasks - Task loading is broken
-> - ❌ Panel breaks frequently - Features conflict with each other
-> - ⚠️ Individual features worked independently - Each feature has worked at some point, but never all together
-
-**This is remarkable transparency.** Most projects would say "known issues" or "needs refinement."
-
-Instead: **"heavily WIP and currently broken"** with explicit broken features listed.
-
-**What this reveals:**
-- Solo developer (confirmed) with Go > TypeScript expertise
-- Backend deeply considered, frontend catching up
-- No pretense about state—documented reality, not aspirational
-- Integration complexity underestimated (features work alone, break together)
-
-### Why The Documentation Is So Good
-
-When you're working solo:
-- You **will** forget context in 3 months
-- Writing it down **now** is cheaper than re-learning **later**
-- Docs become conversation with future self
-
-**The decision transparency makes sense:** You're explaining to yourself why you chose X over Y, so when you revisit in 6 months, you don't question the decision without understanding the context.
-
-### The Frontend Gap
-
-**Issue #30 Priority 1:** Fix broken functionality (integration stability)
-
-**The problem:** WebSocket updates, task hierarchy, job polling, execution history—each works in isolation, all break together.
-
-**Likely causes:**
-- Shared mutable state conflicts
-- Race conditions between real-time and polling
-- No integration test suite (28+ tests, but they test features in isolation)
-
-**The fix:** Needs investigation (high priority). Then state management refactor or integration testing.
-
-**The need:** Frontend developer to complement backend expertise.
-
----
-
 ## Implementation Discipline
-
-*Based on task-logging.md, config-system.md*
 
 ### The LogCapturingEmitter Pattern
 
@@ -518,72 +425,7 @@ From task-logging.md:
 
 ---
 
-## The Gap Between Vision and Reality
-
-### Vision (From Docs)
-
-**config-panel.md future sections:**
-- Documentation drawer infrastructure exists (click config → see docs)
-- Content needs to be populated for each config key
-- See GitHub Issues for future enhancements
-
-**task-logging.md future:**
-- Real-time log streaming
-- Advanced filtering (regex, time ranges)
-- Log export functionality
-
-### Reality (From Issue #30)
-
-**Current broken state:**
-- Pulse panel task loading fails
-- Features conflict with each other
-- Integration not stable
-
-**Work in progress:**
-- Task hierarchy display (backend done, UI wiring needed)
-- Budget tracking visualization (backend exists, UI missing)
-- System metrics display (missing)
-
-### Why This Gap Is Healthy
-
-**The vision guides architecture choices NOW:**
-- Multi-source config structure exists (5 layers)
-- Source tracking built into introspection API
-- Precedence visualization in current UI
-
-**Implementation catches up incrementally:**
-- 9 phases for task logging (7 complete, 2 deferred)
-- Phase 1 priority: fix integration, don't add features
-- Explicit status tracking (✅/❌ in docs)
-
-**The mitigation:**
-- Brutal honesty about state ("heavily WIP and currently broken")
-- Phase-based execution with status
-- Deferred work linked to issues (#30)
-- Fix stability before features
-
-**This is strategic incrementalism:**
-- Build foundation that supports future vision
-- Ship incrementally
-- Track reality honestly
-- Don't hide the mess
-
----
-
-## Final Synthesis
-
-### This Is Conviction Software Built Solo
-
-**Evidence:**
-- Backend: Clean patterns, decision docs, test coverage, E2E validation
-- Frontend: Broken, needs help
-- Docs: Teaching style (explaining to future self)
-- Philosophy: Show complexity, don't hide it
-- Development: Incremental phases, honest status tracking
-
-**The architecture is sound.** The implementation is incomplete. The gap is acknowledged and tracked.
-
-### Configuration Is A First-Class Citizen
+## Configuration Is A First-Class Citizen
 
 **Not just "settings"—it's a debuggable dataflow system:**
 - 5-layer precedence clearly visualized
@@ -611,26 +453,3 @@ From task-logging.md:
 - LLMs give better suggestions
 - You don't re-learn in 6 months
 
-### The Path Forward
-
-**Immediate (from Issue #30):**
-1. Fix Pulse frontend integration (highest priority)
-2. Investigate WebSocket/polling conflicts
-3. Add integration test suite
-4. Consider state management refactor
-
-**Near-term:**
-- Complete task hierarchy UI wiring
-- Add budget tracking visualization
-- Stabilize all features working together
-
-**Long-term (tracked in GitHub Issues):**
-- See Issue #205 for multi-provider config discussion
-- Documentation drawer content population
-- Real-time log streaming and advanced filtering
-
-**The key:** Fix integration before adding features. Stable foundation first.
-
----
-
-*This analysis is based on migrating 10 issues, exploring the codebase architecture, reading config-system.md, config-panel.md, task-logging.md, Issue #30, and direct conversation with the developer. It represents honest assessment, not marketing copy.*
