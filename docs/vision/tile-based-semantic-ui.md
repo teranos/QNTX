@@ -2,7 +2,7 @@
 
 **Status:** Aspirational - Core concepts for future UI evolution
 
-**Implementation Path:** Tiles are [glyph](./glyphs.md) manifestations. The D3 graph approach is being deprecated in favor of the glyph infrastructure, which provides better primitives for morphing, state persistence, and attestable UI.
+**Implementation Path:** Tiles are [glyph](./glyphs.md) manifestations. New tile features use the glyph infrastructure (morphing, state persistence, attestable UI). D3 remains for focused graph visualization (e.g., Prose document relationships).
 
 ## Core Concept
 
@@ -87,7 +87,7 @@ Tiles are implemented as [glyph](./glyphs.md) manifestations:
 - **Layout modes** = glyph arrangement patterns
 - **Attestable state** = tile positions/sizes persist via glyph attestations
 
-The previous D3-based progressive enhancement path is deprecated. The glyph infrastructure provides the morphing, state management, and persistence primitives needed for tiles.
+The glyph infrastructure provides the morphing, state management, and persistence primitives needed for tiles. D3 remains valuable for focused graph visualization (Prose relationships, overview maps).
 
 ### Implementation Considerations
 
