@@ -515,7 +515,8 @@ Response:
 
 ## Related Documentation
 
-- **Opening (✿) and Closing (❀)**: `docs/development/grace.md` - Graceful startup/shutdown system
+- **Budget Tracking**: [budget-tracking.md](budget-tracking.md) - ai/tracker and pulse/budget cost management
+- **Opening (✿) and Closing (❀)**: [grace.md](../development/grace.md) - Graceful startup/shutdown system
 - **Handler Implementation**: Applications define domain-specific handlers implementing the JobHandler interface
-- **Configuration**: `docs/architecture/config-system.md` - Configuration system including Pulse settings
-- **Resource Coordination**: `docs/architecture/pulse-resource-coordination.md` - GPU and system resource management
+- **Configuration**: [config-system.md](config-system.md) - Configuration system including Pulse settings
+- **Resource Coordination**: [pulse-resource-coordination.md](pulse-resource-coordination.md) - GPU and system resource management
