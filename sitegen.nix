@@ -1,3 +1,24 @@
+# sitegen.nix - Pure Nix static site generator for QNTX documentation
+#
+# Converts docs/*.md to HTML website with:
+# - Markdown rendering (pulldown-cmark)
+# - GitHub release downloads (fetched at build time)
+# - Nix infrastructure introspection (packages, apps, containers)
+# - Build provenance tracking (git, CI metadata)
+#
+# Called from flake.nix. Output: static HTML site.
+# Symbol definitions: see docs/GLOSSARY.md
+#
+# Sections:
+#   Configuration ........... Base settings
+#   GitHub Releases ......... Build-time API fetch
+#   HTML/Text/Date Utilities  Helper functions
+#   Markdown Discovery ...... Find and parse docs/*.md
+#   Page Template System .... HTML generation
+#   Special Pages ........... Index, downloads, infrastructure, sitegen
+#   Sitemap/RSS ............. SEO and syndication
+#   Final Assembly .......... Combine into output derivation
+
 { pkgs
 , gitRevision ? "unknown"
 , gitShortRev ? "unknown"
