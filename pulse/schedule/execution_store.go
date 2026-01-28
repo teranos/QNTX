@@ -370,6 +370,68 @@ func (s *ExecutionStore) ListRecentCompletions(since time.Time, limit int) ([]*E
 	return executions, nil
 }
 
+// GetExecutionByAsyncJobID retrieves an execution by async job ID
+// Returns nil if no execution is found (not all async jobs have pulse executions)
+func (s *ExecutionStore) GetExecutionByAsyncJobID(asyncJobID string) (*Execution, error) {
+	query := `
+		SELECT id, scheduled_job_id, async_job_id, status,
+		       started_at, completed_at, duration_ms,
+		       logs, result_summary, error_message,
+		       created_at, updated_at
+		FROM pulse_executions
+		WHERE async_job_id = ?
+	`
+
+	var exec Execution
+	var asyncJobIDResult, completedAt, logs, resultSummary, errorMessage sql.NullString
+	var durationMs sql.NullInt64
+
+	err := s.db.QueryRow(query, asyncJobID).Scan(
+		&exec.ID,
+		&exec.ScheduledJobID,
+		&asyncJobIDResult,
+		&exec.Status,
+		&exec.StartedAt,
+		&completedAt,
+		&durationMs,
+		&logs,
+		&resultSummary,
+		&errorMessage,
+		&exec.CreatedAt,
+		&exec.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found - not all async jobs have pulse executions
+		}
+		return nil, errors.Wrap(err, "failed to get execution by async job ID")
+	}
+
+	// Convert sql.Null* types to pointers
+	if asyncJobIDResult.Valid {
+		exec.AsyncJobID = &asyncJobIDResult.String
+	}
+	if completedAt.Valid {
+		exec.CompletedAt = &completedAt.String
+	}
+	if durationMs.Valid {
+		duration := int(durationMs.Int64)
+		exec.DurationMs = &duration
+	}
+	if logs.Valid {
+		exec.Logs = &logs.String
+	}
+	if resultSummary.Valid {
+		exec.ResultSummary = &resultSummary.String
+	}
+	if errorMessage.Valid {
+		exec.ErrorMessage = &errorMessage.String
+	}
+
+	return &exec, nil
+}
+
 // CleanupOldExecutions deletes execution records (and their associated task logs via CASCADE)
 // that are older than the specified retention period.
 // Returns the number of executions deleted.
