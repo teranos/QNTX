@@ -6,6 +6,7 @@ import (
 
 	"github.com/teranos/QNTX/ai/openrouter"
 	"github.com/teranos/QNTX/am"
+	"github.com/teranos/QNTX/errors"
 )
 
 // AIClient interface for both OpenRouter and Local inference providers
@@ -30,15 +31,37 @@ type StreamChunk struct {
 	Error   error  // Error if streaming failed
 }
 
-// NewAIClient creates either an OpenRouter or Local inference client based on configuration
-// This factory function centralizes provider selection logic
+// NewAIClient creates an AI client based on explicit provider selection or configuration
+// This is the main factory for LLM inference providers (not video/ONNX processing)
 func NewAIClient(cfg *am.Config, db *sql.DB, verbosity int, operationType, entityType, entityID string) AIClient {
-	// Check if local inference is enabled
-	if cfg.LocalInference.Enabled {
-		// Use local inference (Ollama, LocalAI, etc.)
+	// Determine which provider to use
+	provider := DetermineProvider(cfg, "")
+	return NewAIClientForProvider(provider, cfg, db, verbosity, operationType, entityType, entityID)
+}
+
+// NewAIClientWithProvider creates an AI client for a specific provider
+// Used when provider is explicitly specified (e.g., in prompt frontmatter)
+func NewAIClientWithProvider(providerName string, cfg *am.Config, db *sql.DB, verbosity int, operationType, entityType, entityID string) AIClient {
+	provider := ProviderType(providerName)
+	return NewAIClientForProvider(provider, cfg, db, verbosity, operationType, entityType, entityID)
+}
+
+// NewAIClientForProvider creates the appropriate client for the given provider type
+func NewAIClientForProvider(provider ProviderType, cfg *am.Config, db *sql.DB, verbosity int, operationType, entityType, entityID string) AIClient {
+	return NewAIClientForProviderWithModel(provider, cfg, "", db, verbosity, operationType, entityType, entityID)
+}
+
+// NewAIClientForProviderWithModel creates the appropriate client with an optional model override
+func NewAIClientForProviderWithModel(provider ProviderType, cfg *am.Config, modelOverride string, db *sql.DB, verbosity int, operationType, entityType, entityID string) AIClient {
+	switch provider {
+	case ProviderTypeLocal:
+		model := modelOverride
+		if model == "" {
+			model = cfg.LocalInference.Model
+		}
 		return NewLocalClient(LocalClientConfig{
 			BaseURL:        cfg.LocalInference.BaseURL,
-			Model:          cfg.LocalInference.Model,
+			Model:          model,
 			TimeoutSeconds: cfg.LocalInference.TimeoutSeconds,
 			DB:             db,
 			Verbosity:      verbosity,
@@ -46,18 +69,51 @@ func NewAIClient(cfg *am.Config, db *sql.DB, verbosity int, operationType, entit
 			EntityType:     entityType,
 			EntityID:       entityID,
 		})
+
+	case ProviderTypeOpenRouter:
+		fallthrough
+	default:
+		// OpenRouter is the default/fallback for unknown providers
+		model := modelOverride
+		if model == "" {
+			model = cfg.OpenRouter.Model
+		}
+		return openrouter.NewClient(openrouter.Config{
+			APIKey:        cfg.OpenRouter.APIKey,
+			Model:         model,
+			DB:            db,
+			Verbosity:     verbosity,
+			OperationType: operationType,
+			EntityType:    entityType,
+			EntityID:      entityID,
+		})
+	}
+}
+
+// DetermineProvider determines which provider to use based on configuration and overrides
+func DetermineProvider(cfg *am.Config, explicitProvider string) ProviderType {
+	// If explicitly specified, use that
+	if explicitProvider != "" {
+		return ProviderType(explicitProvider)
 	}
 
-	// Default to OpenRouter
-	return openrouter.NewClient(openrouter.Config{
-		APIKey:        cfg.OpenRouter.APIKey,
-		Model:         cfg.OpenRouter.Model,
-		DB:            db,
-		Verbosity:     verbosity,
-		OperationType: operationType,
-		EntityType:    entityType,
-		EntityID:      entityID,
-	})
+	// Build ProviderConfig from current am.Config
+	// This uses the proper abstraction while maintaining the same behavior
+	pc := &ProviderConfig{
+		DefaultProvider: ProviderTypeOpenRouter,
+		ProviderPriority: []ProviderType{
+			ProviderTypeLocal,      // Check local first if enabled
+			ProviderTypeOpenRouter, // Fallback to OpenRouter
+		},
+		Providers: map[ProviderType]bool{
+			ProviderTypeLocal:      cfg.LocalInference.Enabled && cfg.LocalInference.BaseURL != "",
+			ProviderTypeOpenRouter: true, // Always available as fallback
+			// Future providers will be added here:
+			// ProviderTypeLlamaCpp: cfg.LlamaCpp.Enabled && cfg.LlamaCpp.ServerURL != "",
+		},
+	}
+
+	return pc.GetActiveProvider()
 }
 
 // LocalClientConfig holds configuration for local inference client
@@ -100,7 +156,7 @@ func (lca *LocalClientAdapter) Chat(ctx context.Context, req openrouter.ChatRequ
 	// Future: Support multi-turn conversations if needed
 	result, err := lca.provider.GenerateTextWithUsage(ctx, req.SystemPrompt, req.UserPrompt)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "local provider text generation failed")
 	}
 
 	return &openrouter.ChatResponse{
@@ -129,11 +185,14 @@ func (lca *LocalClientAdapter) ChatStreaming(ctx context.Context, req openrouter
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return errors.Wrap(ctx.Err(), "streaming cancelled by context")
 		case chunk, ok := <-providerChan:
 			if !ok {
 				// Channel closed, streaming complete
-				return <-errChan
+				if err := <-errChan; err != nil {
+					return errors.Wrap(err, "local provider streaming failed")
+				}
+				return nil
 			}
 			// Convert provider chunk to AI client chunk
 			streamChan <- StreamChunk{
@@ -142,7 +201,10 @@ func (lca *LocalClientAdapter) ChatStreaming(ctx context.Context, req openrouter
 				Error:   chunk.Error,
 			}
 			if chunk.Done || chunk.Error != nil {
-				return chunk.Error
+				if chunk.Error != nil {
+					return errors.Wrap(chunk.Error, "streaming chunk error")
+				}
+				return nil
 			}
 		}
 	}
