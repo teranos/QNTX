@@ -34,12 +34,12 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 
 ### Testing
 
-**Verified by** (`pulse/async/grace_test.go`):
-- `TestGRACEShutdownFlow` (:25) - Context propagation and clean exit
-- `TestGRACECheckpointSaving` (:145) - Progress preserved on cancel
-- `TestGRACEWorkerShutdownTimeout` (:183) - Timeout enforcement
-- `TestGRACEGracefulStart` (:228) - Orphan detection and recovery
-- `TestGRACEGradualRecovery` (:349) - Super gradual warm start pacing
+**Verified by:**
+- `TestGRACEShutdownFlow` - `pulse/async/grace_test.go:25`
+- `TestGRACECheckpointSaving` - `pulse/async/grace_test.go:145`
+- `TestGRACEWorkerShutdownTimeout` - `pulse/async/grace_test.go:183`
+- `TestGRACEGracefulStart` - `pulse/async/grace_test.go:228`
+- `TestGRACEGradualRecovery` - `pulse/async/grace_test.go:349`
 
 ```bash
 # Fast tests (~10s)
@@ -100,9 +100,9 @@ if job.Metadata != nil && job.Metadata.Phase == "aggregate" {
 
 ### Testing
 
-**Verified by** (`pulse/async/grace_test.go`):
-- `TestGRACEPhaseRecoveryNoChildTasks` (:492) - Reset when no tasks exist
-- `TestGRACEPhaseRecoveryWithChildTasks` (:542) - Preserve when tasks exist
+**Verified by:**
+- `TestGRACEPhaseRecoveryNoChildTasks` - `pulse/async/grace_test.go:492`
+- `TestGRACEPhaseRecoveryWithChildTasks` - `pulse/async/grace_test.go:542`
 
 ```bash
 go test ./pulse/async -run TestGRACEPhaseRecovery -v
