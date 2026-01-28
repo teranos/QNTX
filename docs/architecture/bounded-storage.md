@@ -316,17 +316,17 @@ qntx db stats --limit 5
 
 ### Unit Tests
 
-**Verified by** (`ats/storage/bounded_quota_test.go`):
-- `TestBoundedStorage_DoesNotDeleteDifferentContexts` (:21)
-- `TestBoundedStorage_DeletesWhenExceeding16PerActorContext` (:72)
-- `TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries` (:125)
-- `TestBoundedStorage_MixedContextsPreservation` (:184)
-- `TestBoundedStorage_ExactDomainReproduction` (:256)
+**Verified by:**
+- `TestBoundedStorage_DoesNotDeleteDifferentContexts` - `ats/storage/bounded_quota_test.go:21`
+- `TestBoundedStorage_DeletesWhenExceeding16PerActorContext` - `ats/storage/bounded_quota_test.go:72`
+- `TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries` - `ats/storage/bounded_quota_test.go:125`
+- `TestBoundedStorage_MixedContextsPreservation` - `ats/storage/bounded_quota_test.go:184`
+- `TestBoundedStorage_ExactDomainReproduction` - `ats/storage/bounded_quota_test.go:256`
 
-**Integration tests** (`ats/storage/bounded_storage_integration_test.go`):
-- `TestBoundedStorage_16PerActorContext` (:17)
-- `TestBoundedStorage_SameActorContextPruning` (:54)
-- `TestBoundedStorage_DomainScenario` (:92)
+**Integration tests:**
+- `TestBoundedStorage_16PerActorContext` - `ats/storage/bounded_storage_integration_test.go:17`
+- `TestBoundedStorage_SameActorContextPruning` - `ats/storage/bounded_storage_integration_test.go:54`
+- `TestBoundedStorage_DomainScenario` - `ats/storage/bounded_storage_integration_test.go:92`
 
 ## Best Practices
 
