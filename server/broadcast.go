@@ -28,7 +28,8 @@ type broadcastRequest struct {
 	msg      interface{}   // Generic message (for reqType="message")
 	graph    *graph.Graph  // Graph data (for reqType="graph")
 	logBatch *wslogs.Batch // Log batch (for reqType="log")
-	clientID string        // Target client ID (empty = all clients)
+	clientID string        // Target client ID. Empty string means "broadcast to all clients"
+	                       // (semantically: no specific target = all targets).
 	client   *Client       // Client to close (for reqType="close")
 }
 
