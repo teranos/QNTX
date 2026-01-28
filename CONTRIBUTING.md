@@ -41,6 +41,7 @@
 ### Type Generation?
 - Never edit `types/generated/*` directly
 - Fix the generator, then run: `make types`
+- See [typegen.md](docs/typegen.md) for struct tags and troubleshooting
 
 ### Symbol Confusion?
 - See [GLOSSARY.md](docs/GLOSSARY.md) for definitive meanings
