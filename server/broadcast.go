@@ -64,7 +64,7 @@ func (s *QNTXServer) broadcastUsageUpdate() {
 		s.logger.Debugw("Failed to get usage stats",
 			"error", err.Error(),
 		)
-		return // Silent failure for observability
+		return
 	}
 	// Check if usage has changed since last broadcast (with lock for lastUsage access)
 	s.mu.Lock()
