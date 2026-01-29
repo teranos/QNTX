@@ -21,6 +21,14 @@ import (
 	"github.com/teranos/QNTX/typegen"
 )
 
+// pluralize returns singular or plural form based on count
+func pluralize(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
+}
+
 // Endpoint represents a single API endpoint
 type Endpoint struct {
 	Pattern     string   // URL pattern (e.g., "/api/pulse/schedules")
@@ -886,7 +894,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 			return fmt.Errorf("failed to write %s: %w", filePath, err)
 		}
-		fmt.Printf("✓ Generated %s (%d endpoints)\n", filePath, len(cat.Endpoints))
+		fmt.Printf("✓ Generated %s (%d %s)\n", filePath, len(cat.Endpoints), pluralize(len(cat.Endpoints), "endpoint", "endpoints"))
 	}
 
 	// Generate gRPC plugin API documentation
@@ -896,7 +904,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		if err := os.WriteFile(grpcPath, []byte(grpcContent), 0644); err != nil {
 			return fmt.Errorf("failed to write gRPC docs: %w", err)
 		}
-		fmt.Printf("✓ Generated %s (%d methods)\n", grpcPath, len(gen.grpcMethods))
+		fmt.Printf("✓ Generated %s (%d %s)\n", grpcPath, len(gen.grpcMethods), pluralize(len(gen.grpcMethods), "method", "methods"))
 	}
 
 	// Generate WebSocket protocol documentation
@@ -906,7 +914,7 @@ func GenerateAPIDoc(serverDir, outputDir string) error {
 		if err := os.WriteFile(wsPath, []byte(wsContent), 0644); err != nil {
 			return fmt.Errorf("failed to write WebSocket docs: %w", err)
 		}
-		fmt.Printf("✓ Generated %s (%d message types)\n", wsPath, len(gen.wsMessageTypes))
+		fmt.Printf("✓ Generated %s (%d message %s)\n", wsPath, len(gen.wsMessageTypes), pluralize(len(gen.wsMessageTypes), "type", "types"))
 	}
 
 	return nil
@@ -938,22 +946,25 @@ func (g *Generator) generateIndex(categories []Category) string {
 	totalEndpoints := 0
 	for _, cat := range categories {
 		filename := categoryToFilename(cat.Name)
-		sb.WriteString(fmt.Sprintf("- **[%s](./%s)** (%d endpoints)\n", cat.Name, filename, len(cat.Endpoints)))
-		totalEndpoints += len(cat.Endpoints)
+		count := len(cat.Endpoints)
+		sb.WriteString(fmt.Sprintf("- **[%s](./%s)** (%d %s)\n", cat.Name, filename, count, pluralize(count, "endpoint", "endpoints")))
+		totalEndpoints += count
 	}
 
-	sb.WriteString(fmt.Sprintf("\n**Total: %d HTTP endpoints**\n\n", totalEndpoints))
+	sb.WriteString(fmt.Sprintf("\n**Total: %d HTTP %s**\n\n", totalEndpoints, pluralize(totalEndpoints, "endpoint", "endpoints")))
 
 	// WebSocket section
 	if len(g.wsMessageTypes) > 0 {
 		sb.WriteString("## WebSocket Protocol\n\n")
-		sb.WriteString(fmt.Sprintf("- **[WebSocket Protocol](./websocket.md)** (%d message types)\n\n", len(g.wsMessageTypes)))
+		count := len(g.wsMessageTypes)
+		sb.WriteString(fmt.Sprintf("- **[WebSocket Protocol](./websocket.md)** (%d message %s)\n\n", count, pluralize(count, "type", "types")))
 	}
 
 	// gRPC Plugin API section
 	if len(g.grpcMethods) > 0 {
 		sb.WriteString("## Plugin gRPC API\n\n")
-		sb.WriteString(fmt.Sprintf("- **[Plugin gRPC API](./grpc-plugin.md)** (%d methods)\n\n", len(g.grpcMethods)))
+		count := len(g.grpcMethods)
+		sb.WriteString(fmt.Sprintf("- **[Plugin gRPC API](./grpc-plugin.md)** (%d %s)\n\n", count, pluralize(count, "method", "methods")))
 	}
 
 	sb.WriteString("## Type References\n\n")

@@ -46,13 +46,13 @@ func NewExecutor(db *sql.DB) *ax.AxExecutor {
 // Example with semantic query expansion:
 //
 //	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
-//	    QueryExpander: &bcs.BCSQueryExpander{},
+//	    QueryExpander: &myapp.SemanticExpander{},
 //	})
 //
 // Example with both query expansion and entity resolution:
 //
 //	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
-//	    QueryExpander:  &bcs.BCSQueryExpander{},
+//	    QueryExpander:  &myapp.SemanticExpander{},
 //	    EntityResolver: atsAdapter.NewContactEntityResolver(db),
 //	})
 func NewExecutorWithOptions(db *sql.DB, opts ax.AxExecutorOptions) *ax.AxExecutor {
