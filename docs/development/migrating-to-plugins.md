@@ -444,4 +444,3 @@ After successful internal plugin migration:
 - [ADR-001: Domain Plugin Architecture](../architecture/ADR-001-domain-plugin-architecture.md)
 - [Domain Plugin API Reference](domain-plugin-api-reference.md)
 - [External Plugin Guide](external-plugin-guide.md) for building plugins
-- [Rust Plugin Guide](rust-plugin-guide.md) for Rust-based plugins

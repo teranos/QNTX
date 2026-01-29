@@ -1,15 +1,34 @@
 # QNTX Web UI
 
-Web interface for QNTX that enables visual exploration of attestation relationships through real-time graph visualization.
+Web interface for QNTX built on the [Glyph](../docs/vision/glyphs.md) primitive - a universal UI element that morphs between states while maintaining identity.
+
+## Glyph System
+
+Glyphs (⧉) are the atoms of the QNTX interface. A glyph is exactly ONE DOM element for its entire lifetime - it morphs between visual states (dot, window, canvas, modal) through smooth animations.
+
+**Core glyph types:**
+- `glyph.ts` - Base interface and constants
+- `canvas-glyph.ts` - Spatial canvas with grid layout
+- `py-glyph.ts` - Python editor with `attest()` support
+- `ix-glyph.ts` - Ingest operations
+- `result-glyph.ts` - Execution results
+
+**Infrastructure:**
+- `run.ts` - GlyphRun (the tray where collapsed glyphs live)
+- `proximity.ts` - Proximity-based expansion
+- `morph-transaction.ts` - Animation orchestration
+- `manifestations/` - How glyphs render when expanded (window, canvas, etc.)
+
+See [Glyphs Vision](../docs/vision/glyphs.md) for the full architectural vision including attestable glyph state.
 
 ## Why Web UI
 
 The web UI is essential for QNTX's vision of Continuous Intelligence:
-- **Graph visualization** reveals how aggregations and clusters of data relate to meaning - you can immediately see complex relational structures that would be invisible in CLI output
+- **Glyph-based visualization** - entities manifest as glyphs that morph and persist state
 - **Real-time updates** show intelligence evolving as new attestations arrive
-- **Foundation for future visions** documented in [tile-based semantic UI](../docs/vision/tile-based-semantic-ui.md) and [time-travel](../docs/vision/time-travel.md)
+- **Foundation for visions** documented in [tile-based typed UI](../docs/vision/tile-based-typed-ui.md) and [time-travel](../docs/vision/time-travel.md)
 
-While `ax` queries provide the data, the graph makes the relationships obvious.
+While `ax` queries provide the data, glyphs make the relationships tangible.
 
 ## Architecture
 
@@ -20,8 +39,8 @@ Ports are configured in `../am.toml` at project root:
 
 ### Runtime Dependencies
 - **No NPM required at runtime** - All TypeScript is bundled and embedded in the Go binary
-- WebSocket for real-time updates (graph data and LSP)
-- D3.js for graph visualization
+- WebSocket for real-time updates and LSP
+- WAAPI (Web Animations API) for glyph morphing
 - CodeMirror 6 for the ATS query editor with LSP integration
 
 ### Build System: Bun
@@ -64,7 +83,7 @@ The `package.json` locks **exact versions** (no `^` or `~`):
     "@codemirror/view": "6.34.3",
     "@lezer/highlight": "1.2.1",
     "codemirror-languageserver": "1.17.0",   // LSP client
-    "d3": "7.9.0"                             // Graph visualization
+    "d3": "7.9.0"                             // Graph visualization (Prose relationships)
   }
 }
 ```
@@ -134,16 +153,17 @@ make cli
 
 ## Key Features Enabled
 
+### Glyph System
+- Proximity-based morphing (dot → expanded → window)
+- WAAPI animations for smooth state transitions
+- Canvas glyph with spatial grid layout
+- Python programmature glyphs with `attest()` support
+
 ### CodeMirror 6 with LSP
 - Syntax highlighting (semantic tokens from LSP)
 - Autocomplete (via LSP)
 - Error/warning linting (via `@codemirror/lint`)
-- Real-time editing with live graph updates
-
-### Graph Visualization
-- D3.js force-directed graph
-- Interactive node filtering via legend
-- Real-time updates as queries execute
+- Real-time editing with live updates
 
 ## Troubleshooting
 

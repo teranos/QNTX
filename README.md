@@ -1,11 +1,11 @@
-# [꩜](pulse/README.md)  ⌬   [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  +  =  ✦  ⟶
+# [꩜](pulse/README.md)  [≡](am/README.md)  [⨳](ats/ix/README.md)  [⋈](ats/ax/README.md)  +  =  ✦  ⟶
 
 [![Go Tests](https://github.com/teranos/QNTX/actions/workflows/go.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/go.yml)
 [![Nix Image](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml/badge.svg)](https://github.com/teranos/QNTX/actions/workflows/nix-image.yml)
 
 **QNTX: Continuous Intelligence**
 
-A new paradigm where systems continuously evolve their understanding through verifiable attestations. Always-on, always-learning - scaling from a Raspberry Pi to distributed clusters without configuration.
+A new paradigm where systems continuously evolve their understanding through verifiable attestations.
 
 ```
 Data → Graph → Knowledge → Intelligence → Action
@@ -15,7 +15,7 @@ Data → Graph → Knowledge → Intelligence → Action
 
 ## What is QNTX?
 
-QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context.
+QNTX provides a **domain-agnostic foundation** for building knowledge systems. At its core is the **[Attestation Type System (ATS)](ats/README.md)** - a way to track who said what, when, and in what context. For architecture and philosophy, see [Understanding QNTX](docs/understanding-qntx.md).
 
 ### Quick Example
 ```bash
@@ -35,45 +35,11 @@ See [Installation Guide](docs/installation.md) for all installation methods incl
 
 ## Segments
 
-### Primary SEG Operators
-- **⍟** i - self (your vantage point)
-- **≡** am - system configuration (being/state)
-- **⨳** ix - ingest/import
-- **⋈** ax - expand/query (contextual surfacing)
-- **⌬** by - actor/catalyst (origin of action)
-- **✦** at - temporal marker
-- **⟶** so - therefore/consequence
-
-### System Infrastructure
-- **꩜** pulse - continuous compute (heartbeat)
-- **⊔** db - database/storage
-
-See [GLOSSARY.md](docs/GLOSSARY.md) for complete symbol definitions including attestation building blocks.
+QNTX uses semantic symbols as a namespace system. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
 
 ## Configuration
 
-**QNTX works out of the box without configuration.** Sensible defaults are provided for all settings - you can start using QNTX immediately without creating any config files.
-
-Configuration is managed by the `am` package, which provides:
-
-- Multi-source config loading (system, user, project, environment variables)
-- Backward compatibility with existing `config.toml` files
-- Preference for `am.toml` (new format) over `config.toml`
-
-Only create a configuration file if you need to override defaults:
-
-```bash
-# View current configuration (all defaults applied)
-qntx am show
-
-# Get a specific value
-qntx am get database.path
-
-# Validate configuration
-qntx am validate
-```
-
-See the [am package documentation](am/README.md) for details on configuration structure and precedence.
+**QNTX works out of the box without configuration.** See [am package](am/README.md) for details on multi-source configuration and precedence.
 
 ## Testing
 
