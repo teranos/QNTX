@@ -29,7 +29,7 @@ import (
 // This avoids circular dependency between schedule and server packages
 type ExecutionBroadcaster interface {
 	BroadcastPulseExecutionStarted(scheduledJobID, executionID, atsCode string)
-	BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, durationMs int)
+	BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int)
 }
 
 // Ticker manages periodic execution of scheduled ATS jobs
@@ -293,9 +293,12 @@ func (t *Ticker) executeScheduledJob(scheduled *Job, now time.Time) error {
 			"duration_ms", durationMs,
 			"error", err)
 
+		// Extract structured error details for broadcast
+		errorDetails := errors.GetAllDetails(err)
+
 		// Broadcast execution failed event
 		if t.broadcaster != nil {
-			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.ID, execution.ID, scheduled.ATSCode, errorMsg, durationMs)
+			t.broadcaster.BroadcastPulseExecutionFailed(scheduled.ID, execution.ID, scheduled.ATSCode, errorMsg, errorDetails, durationMs)
 		}
 	} else {
 		// Execution succeeded

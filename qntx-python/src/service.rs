@@ -210,6 +210,9 @@ impl DomainPluginService for PythonPluginService {
             ("POST", "/pip/install") => self.handlers.handle_pip_install(body).await,
             ("GET", "/pip/check") => self.handlers.handle_pip_check(body).await,
 
+            // Handler registration
+            ("POST", "/register-handler") => self.handlers.handle_register_handler(body).await,
+
             // Info endpoints
             ("GET", "/version") => self.handlers.handle_version().await,
             ("GET", "/modules") => self.handlers.handle_modules(body).await,

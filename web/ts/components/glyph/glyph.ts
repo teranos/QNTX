@@ -52,6 +52,9 @@ export interface Glyph {
         error: string | null;
         duration_ms: number;
     };
+
+    // Handler metadata (for Python glyphs created as IX handlers)
+    handlerFor?: string;  // e.g., "csv" if this Python script is a handler for "ix csv <args>"
 }
 
 // Function to check if user prefers reduced motion

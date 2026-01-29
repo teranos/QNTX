@@ -181,7 +181,99 @@ impl AtsStoreClient {
             actors: attestation.actors,
             timestamp: attestation.timestamp,
             source: attestation.source,
+            attributes_json: attestation.attributes_json,
         })
+    }
+
+    /// Query attestations by predicate and context
+    pub fn query_by_predicate_context(
+        &mut self,
+        predicate: &str,
+        context: &str,
+    ) -> Result<Vec<AttestationResult>, String> {
+        self.query_attestations(
+            vec![],
+            vec![predicate.to_string()],
+            vec![context.to_string()],
+            0,
+        )
+    }
+
+    /// Query attestations by predicate only
+    pub fn query_by_predicate(
+        &mut self,
+        predicate: &str,
+    ) -> Result<Vec<AttestationResult>, String> {
+        self.query_attestations(vec![], vec![predicate.to_string()], vec![], 0)
+    }
+
+    /// Query attestations with filters (internal helper)
+    fn query_attestations(
+        &mut self,
+        subjects: Vec<String>,
+        predicates: Vec<String>,
+        contexts: Vec<String>,
+        limit: i32,
+    ) -> Result<Vec<AttestationResult>, String> {
+        use crate::proto::{AttestationFilter, GetAttestationsRequest};
+
+        let channel = self.connect()?;
+
+        let filter = AttestationFilter {
+            subjects,
+            predicates,
+            contexts,
+            actors: vec![],
+            time_start: 0,
+            time_end: 0,
+            limit,
+        };
+
+        let request = GetAttestationsRequest {
+            auth_token: self.config.auth_token.clone(),
+            filter: Some(filter),
+        };
+
+        // Spawn thread with its own runtime
+        let response = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| format!("failed to create runtime: {}", e))?;
+
+            rt.block_on(async {
+                let mut client = AtsStoreServiceClient::new(channel);
+                client
+                    .get_attestations(request)
+                    .await
+                    .map_err(|e| format!("gRPC error: {}", e))
+            })
+        })
+        .join()
+        .map_err(|e| format!("thread panicked: {:?}", e))??
+        .into_inner();
+
+        if !response.success {
+            return Err(response.error);
+        }
+
+        // Convert protobuf Attestations to AttestationResult
+        let results = response
+            .attestations
+            .into_iter()
+            .map(|a| AttestationResult {
+                id: a.id,
+                subjects: a.subjects,
+                predicates: a.predicates,
+                contexts: a.contexts,
+                actors: a.actors,
+                timestamp: a.timestamp,
+                source: a.source,
+                attributes_json: a.attributes_json,
+            })
+            .collect();
+
+        Ok(results)
     }
 }
 
@@ -195,6 +287,7 @@ pub struct AttestationResult {
     pub actors: Vec<String>,
     pub timestamp: i64,
     pub source: String,
+    pub attributes_json: String, // JSON-encoded attributes
 }
 
 /// Shared ATSStore client that can be passed to Python execution context
@@ -320,5 +413,6 @@ pub fn inject_attest_function(py: Python<'_>, globals: &Bound<'_, PyDict>) -> Py
     // Create the attest function and add it to globals
     let attest_fn = wrap_pyfunction!(attest, py)?;
     globals.set_item("attest", attest_fn)?;
+
     Ok(())
 }
