@@ -140,7 +140,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 
 	// Create stores for Pulse execution tracking
 	executionStore := schedule.NewExecutionStore(s.db)
-	scheduleStore := s.getScheduleStore()
+	scheduleStore := s.newScheduleStore()
 
 	s.wg.Add(1)
 	go func() {

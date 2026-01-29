@@ -88,7 +88,7 @@ func (s *QNTXServer) HandlePulseSchedule(w http.ResponseWriter, r *http.Request)
 // handleListSchedules lists all schedules
 func (s *QNTXServer) handleListSchedules(w http.ResponseWriter, r *http.Request) {
 	// List all scheduled jobs regardless of state (active, paused, inactive, etc.)
-	jobs, err := s.getScheduleStore().ListAllScheduledJobs()
+	jobs, err := s.newScheduleStore().ListAllScheduledJobs()
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to list scheduled jobs", http.StatusInternalServerError)
 		return
@@ -304,7 +304,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		UpdatedAt:       now,
 	}
 
-	if err := s.getScheduleStore().CreateJob(job); err != nil {
+	if err := s.newScheduleStore().CreateJob(job); err != nil {
 		writeWrappedError(w, s.logger, err, "failed to create scheduled job", http.StatusInternalServerError)
 		return
 	}
@@ -319,7 +319,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 
 // handleGetSchedule retrieves a specific schedule
 func (s *QNTXServer) handleGetSchedule(w http.ResponseWriter, r *http.Request, jobID string) {
-	job, err := s.getScheduleStore().GetJob(jobID)
+	job, err := s.newScheduleStore().GetJob(jobID)
 	if err != nil {
 		handleError(w, s.logger, err, "failed to get scheduled job")
 		return
@@ -349,7 +349,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		if err := s.getScheduleStore().UpdateJobState(jobID, *req.State); err != nil {
+		if err := s.newScheduleStore().UpdateJobState(jobID, *req.State); err != nil {
 			handleError(w, s.logger, err, "failed to update job state")
 			return
 		}
@@ -366,7 +366,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		if err := s.getScheduleStore().UpdateJobInterval(jobID, *req.IntervalSeconds); err != nil {
+		if err := s.newScheduleStore().UpdateJobInterval(jobID, *req.IntervalSeconds); err != nil {
 			writeWrappedError(w, s.logger, err, "failed to update job interval", http.StatusInternalServerError)
 			return
 		}
@@ -377,7 +377,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 	}
 
 	// Return updated job
-	job, err := s.getScheduleStore().GetJob(jobID)
+	job, err := s.newScheduleStore().GetJob(jobID)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "failed to get updated job", http.StatusInternalServerError)
 		return
@@ -389,7 +389,7 @@ func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request
 // handleDeleteSchedule removes a schedule and cancels its async tasks
 func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request, jobID string) {
 	// Get job details before deletion for logging
-	job, err := s.getScheduleStore().GetJob(jobID)
+	job, err := s.newScheduleStore().GetJob(jobID)
 	if err != nil {
 		handleError(w, s.logger, err, "failed to get job for deletion")
 		return
@@ -415,7 +415,7 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 
 	// Set job to deleted state (soft delete)
 	// We don't hard delete to preserve execution history
-	if err := s.getScheduleStore().UpdateJobState(jobID, schedule.StateDeleted); err != nil {
+	if err := s.newScheduleStore().UpdateJobState(jobID, schedule.StateDeleted); err != nil {
 		writeWrappedError(w, s.logger, err, "failed to delete job", http.StatusInternalServerError)
 		return
 	}
@@ -429,6 +429,6 @@ func (s *QNTXServer) handleDeleteSchedule(w http.ResponseWriter, r *http.Request
 }
 
 // getScheduleStore returns the schedule store for database operations
-func (s *QNTXServer) getScheduleStore() *schedule.Store {
+func (s *QNTXServer) newScheduleStore() *schedule.Store {
 	return schedule.NewStore(s.db)
 }
