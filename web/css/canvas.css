@@ -118,3 +118,49 @@
 .canvas-py-glyph.is-resizing {
     opacity: 0.9;
 }
+
+/* ============================================================================
+ * Glyph Selection
+ * ============================================================================ */
+
+/* Selected state - highlighted border on any glyph type */
+.canvas-glyph-selected {
+    outline: 2px solid #5b9bd5;
+    outline-offset: 2px;
+}
+
+/* Action bar - floating toolbar above selected glyph */
+.canvas-action-bar {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    pointer-events: auto;
+}
+
+.canvas-action-button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+
+.canvas-action-button:hover {
+    background: var(--bg-hover);
+}
+
+.canvas-action-delete:hover {
+    background: #5c2020;
+    color: #ff6b6b;
+}
