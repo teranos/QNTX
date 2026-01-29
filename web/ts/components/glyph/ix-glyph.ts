@@ -36,6 +36,7 @@ import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
+import { createPyGlyph } from './py-glyph';
 
 /**
  * IX glyph execution status (persisted in localStorage)
@@ -148,6 +149,10 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     statusSection.style.borderRadius = '4px';
     statusSection.style.fontSize = '12px';
     statusSection.style.fontFamily = 'monospace';
+    statusSection.style.whiteSpace = 'pre-wrap'; // Allow line wrapping for long errors
+    statusSection.style.wordBreak = 'break-word'; // Break long words if needed
+    statusSection.style.overflowY = 'auto'; // Scroll if too long
+    statusSection.style.maxHeight = '150px'; // Limit height
 
     // Track current scheduledJobId for event filtering
     let currentScheduledJobId: string | undefined = savedStatus.scheduledJobId;
@@ -287,7 +292,53 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             log.error(SEG.UI, '[IX] Failed to create job:', error);
             const errorMsg = error instanceof Error ? error.message : String(error);
 
-            // Show error state
+            // Debug: Log error details
+            if (error instanceof Error) {
+                const details = (error as Error & { details?: string[] }).details;
+                log.debug(SEG.UI, '[IX] Error details:', {
+                    message: errorMsg,
+                    hasDetails: !!details,
+                    details: details
+                });
+            }
+
+            // Check if this is a "no ingest script" error
+            const isNoScriptError = errorMsg.includes('no ingest script found');
+
+            log.debug(SEG.UI, '[IX] Error check:', {
+                isNoScriptError,
+                errorMsg
+            });
+
+            if (isNoScriptError && error instanceof Error) {
+                // Check if error has details attached (from API response)
+                const details = (error as Error & { details?: string[] }).details;
+
+                if (details) {
+                    // Parse structured error details to extract script_type
+                    for (const detailLine of details) {
+                        const match = detailLine.match(/script_type=(\w+)/);
+                        if (match) {
+                            const scriptName = match[1];
+                            log.debug(SEG.UI, '[IX] Found script type in details:', scriptName);
+                            showCreateHandlerUI(scriptName);
+                            return;
+                        }
+                    }
+                } else {
+                    log.warn(SEG.UI, '[IX] No details attached to error, falling back to message parsing');
+                    // Fallback: try to extract from error message
+                    const match = errorMsg.match(/script_type=(\w+)/);
+                    if (match) {
+                        const scriptName = match[1];
+                        log.debug(SEG.UI, '[IX] Found script type in message:', scriptName);
+                        showCreateHandlerUI(scriptName);
+                        return;
+                    }
+                }
+            }
+
+            // Show standard error state
             updateStatus({
                 state: 'error',
                 message: `Failed to create job: ${errorMsg}`,
@@ -328,6 +379,136 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     resizeHandle.style.borderTopLeftRadius = '4px';
     element.appendChild(resizeHandle);
 
+    /**
+     * Show "Create handler" UI when script not found
+     */
+    function showCreateHandlerUI(scriptName: string): void {
+        statusSection.style.display = 'block';
+        statusSection.style.color = '#ff6b6b';
+        statusSection.style.backgroundColor = '#2b1a1a';
+        statusSection.innerHTML = ''; // Clear existing content
+
+        // Error message
+        const errorText = document.createElement('div');
+        errorText.textContent = `✗ No handler for '${scriptName}'`;
+        errorText.style.marginBottom = '8px';
+        statusSection.appendChild(errorText);
+
+        // Create handler button
+        const createBtn = document.createElement('button');
+        createBtn.textContent = 'Create handler';
+        createBtn.style.padding = '4px 8px';
+        createBtn.style.fontSize = '12px';
+        createBtn.style.backgroundColor = 'var(--bg-hover)';
+        createBtn.style.color = 'var(--text-primary)';
+        createBtn.style.border = '1px solid var(--border-color)';
+        createBtn.style.borderRadius = '4px';
+        createBtn.style.cursor = 'pointer';
+
+        createBtn.addEventListener('click', async () => {
+            await createIngestHandler(scriptName);
+        });
+
+        statusSection.appendChild(createBtn);
+
+        // Update background
+        element.style.backgroundColor = '#3d1f1f'; // Red tint
+
+        log.debug(SEG.UI, `[IX Glyph] Showing create handler UI for '${scriptName}'`);
+    }
+
+    /**
+     * Create a new Python ingest handler
+     */
+    async function createIngestHandler(scriptName: string): Promise<void> {
+        const template = generateHandlerTemplate(scriptName);
+
+        // Calculate spawn position (offset from IX glyph)
+        const ixGridX = glyph.gridX ?? 5;
+        const ixGridY = glyph.gridY ?? 5;
+        const pyGridX = ixGridX + 3; // Spawn 3 grid units to the right
+        const pyGridY = ixGridY;
+
+        const pyGlyph: Glyph = {
+            id: `py-${crypto.randomUUID()}`,
+            title: 'Python',
+            symbol: 'py',
+            gridX: pyGridX,
+            gridY: pyGridY,
+            handlerFor: scriptName,  // Mark this as a handler for the script type
+            renderContent: () => {
+                const content = document.createElement('div');
+                content.textContent = 'Python handler';
+                return content;
+            }
+        };
+
+        // Save template to storage before rendering
+        const storage = getScriptStorage();
+        await storage.save(pyGlyph.id, template);
+
+        // Get canvas element
+        const canvas = element.parentElement;
+        if (!canvas) {
+            log.error(SEG.UI, '[IX Glyph] Cannot spawn Python glyph: canvas not found');
+            return;
+        }
+
+        // Render Python editor glyph (will load template from storage)
+        const glyphElement = await createPyGlyph(pyGlyph);
+        canvas.appendChild(glyphElement);
+
+        // Get actual rendered size and persist
+        const rect = glyphElement.getBoundingClientRect();
+        const width = Math.round(rect.width);
+        const height = Math.round(rect.height);
+
+        uiState.addCanvasGlyph({
+            id: pyGlyph.id,
+            symbol: 'py',
+            gridX: pyGridX,
+            gridY: pyGridY,
+            width,
+            height
+        });
+
+        log.debug(SEG.UI, `[IX Glyph] Created Python handler for '${scriptName}' at grid (${pyGridX}, ${pyGridY})`);
+
+        // Update status to show handler created
+        updateStatus({
+            state: 'idle',
+            message: `Handler editor created →`,
+            timestamp: Date.now(),
+        });
+    }
+
+    /**
+     * Generate generic Python ingest handler template
+     */
+    function generateHandlerTemplate(scriptName: string): string {
+        return `# IX handler: ${scriptName}
+# Runs periodically when scheduled via: ix ${scriptName}
+
+# TODO: Your ingestion logic here
+# Fetch data from source, parse it, create attestations
+
+# Example: Fetch data from webhook or API
+# import requests
+# response = requests.get("https://api.example.com/data")
+# data = response.json()
+#
+# # Parse and create attestations
+# attest(
+#     subjects=["source:api.example.com"],
+#     predicates=["ingested_via"],
+#     contexts=["${scriptName}"],
+#     attributes={"count": len(data)}
+# )
+
+print("Handler '${scriptName}' executed")
+`;
+    }
+
     // Wire up Pulse execution event listeners
     const handleExecutionStarted = (e: Event) => {
         const detail = (e as CustomEvent<ExecutionStartedDetail>).detail;
@@ -367,10 +548,28 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             eventScheduledJobId: detail.scheduledJobId,
             currentScheduledJobId,
             matches: detail.scheduledJobId === currentScheduledJobId,
-            error: detail.errorMessage
+            error: detail.errorMessage,
+            errorDetails: detail.errorDetails
         });
         if (detail.scheduledJobId !== currentScheduledJobId) return;
 
+        // Check if error is "no ingest script found" sentinel error
+        const isNoScriptError = detail.errorMessage.includes('no ingest script found');
+
+        if (isNoScriptError && detail.errorDetails) {
+            // Parse structured error details to extract script_type
+            // Format: "script_type=csv"
+            for (const detailLine of detail.errorDetails) {
+                const match = detailLine.match(/script_type=(\w+)/);
+                if (match) {
+                    const scriptName = match[1];
+                    showCreateHandlerUI(scriptName);
+                    return;
+                }
+            }
+        }
+
+        // Standard error display
         updateStatus({
             state: 'error',
             scheduledJobId: detail.scheduledJobId,
