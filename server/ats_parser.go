@@ -134,11 +134,9 @@ func parseIxGitCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 		return nil, errors.Wrap(err, "failed to marshal payload")
 	}
 
-	// TODO(Issue #356): Handler availability is not validated at job creation time.
-	// This hardcodes "ixgest.git" without checking if the handler is registered.
-	// If the qntx-code plugin is disabled, the job will fail at execution time with
-	// "no handler registered" error. Consider validating handler availability here
-	// or providing early feedback to users when creating scheduled jobs.
+	// Handler availability is validated in pulse_schedules.go after parsing.
+	// If "ixgest.git" handler is not registered (e.g., qntx-code plugin disabled),
+	// job creation fails with early feedback instead of runtime error.
 	return &ParsedATSCode{
 		HandlerName: "ixgest.git",
 		Payload:     payloadJSON,
