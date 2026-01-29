@@ -160,6 +160,17 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Validate handler availability (fail early if handler not registered)
+	registry := s.daemon.Registry()
+	if registry != nil && !registry.Has(parsed.HandlerName) {
+		writeError(w, http.StatusBadRequest,
+			fmt.Sprintf("handler '%s' not available (required plugin may be disabled)", parsed.HandlerName))
+		s.logger.Warnw("Job creation rejected - handler not available",
+			"handler_name", parsed.HandlerName,
+			"job_id", jobID)
+		return
+	}
+
 	pulseLog.Infow("Pulse create job - parsed",
 		"job_id", jobID,
 		"handler_name", parsed.HandlerName,
