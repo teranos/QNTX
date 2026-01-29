@@ -4,6 +4,12 @@
  * The canvas is a glyph that morphs to full-screen and contains other glyphs
  * arranged on a spatial grid. Right-click spawns new glyphs.
  *
+ * Selection:
+ * - Click a glyph to select it (highlighted border, action bar appears)
+ * - Click canvas background to deselect
+ * - Single selection only
+ * - Action bar provides delete (and future actions)
+ *
  * This demonstrates the fractal principle: all glyphs are containers.
  */
 
@@ -16,6 +22,129 @@ import { createPyGlyph } from './py-glyph';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+
+// ============================================================================
+// Selection State
+// ============================================================================
+
+/** Currently selected glyph ID (null = nothing selected) */
+let selectedGlyphId: string | null = null;
+
+/** Reference to the action bar element */
+let actionBar: HTMLElement | null = null;
+
+/**
+ * Select a glyph on the canvas. Deselects any previous selection.
+ */
+function selectGlyph(glyphId: string, container: HTMLElement): void {
+    deselectAll(container);
+
+    selectedGlyphId = glyphId;
+
+    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    if (el) {
+        el.classList.add('canvas-glyph-selected');
+        showActionBar(el, container);
+    }
+
+    log.debug(SEG.UI, `[Canvas] Selected glyph ${glyphId}`);
+}
+
+/**
+ * Deselect all glyphs and hide action bar
+ */
+function deselectAll(container: HTMLElement): void {
+    if (!selectedGlyphId) return;
+
+    const prev = container.querySelector('.canvas-glyph-selected');
+    if (prev) {
+        prev.classList.remove('canvas-glyph-selected');
+    }
+
+    hideActionBar();
+    selectedGlyphId = null;
+}
+
+/**
+ * Show the action bar positioned above the selected glyph
+ */
+function showActionBar(glyphEl: HTMLElement, container: HTMLElement): void {
+    hideActionBar();
+
+    const bar = document.createElement('div');
+    bar.className = 'canvas-action-bar';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'canvas-action-button canvas-action-delete';
+    deleteBtn.title = 'Delete glyph';
+    deleteBtn.textContent = '\u{1F5D1}';
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteSelectedGlyph(container);
+    });
+
+    bar.appendChild(deleteBtn);
+    container.appendChild(bar);
+
+    positionActionBar(bar, glyphEl, container);
+    actionBar = bar;
+}
+
+/**
+ * Position action bar centered above the glyph element
+ */
+function positionActionBar(bar: HTMLElement, glyphEl: HTMLElement, container: HTMLElement): void {
+    const canvasRect = container.getBoundingClientRect();
+    const glyphRect = glyphEl.getBoundingClientRect();
+
+    const glyphLeft = glyphRect.left - canvasRect.left;
+    const glyphTop = glyphRect.top - canvasRect.top;
+    const glyphCenterX = glyphLeft + glyphRect.width / 2;
+
+    bar.style.position = 'absolute';
+    bar.style.left = `${glyphCenterX}px`;
+    bar.style.top = `${glyphTop - 8}px`;
+    bar.style.transform = 'translate(-50%, -100%)';
+    bar.style.zIndex = '9999';
+}
+
+/**
+ * Hide the action bar
+ */
+function hideActionBar(): void {
+    if (actionBar) {
+        actionBar.remove();
+        actionBar = null;
+    }
+}
+
+/**
+ * Delete the currently selected glyph from the canvas
+ */
+function deleteSelectedGlyph(container: HTMLElement): void {
+    if (!selectedGlyphId) return;
+
+    const glyphId = selectedGlyphId;
+
+    // Remove DOM element
+    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`);
+    if (el) {
+        el.remove();
+    }
+
+    // Remove from persisted state
+    uiState.removeCanvasGlyph(glyphId);
+
+    // Notify the local glyphs array via custom event
+    container.dispatchEvent(new CustomEvent('glyph-deleted', {
+        detail: { glyphId }
+    }));
+
+    hideActionBar();
+    selectedGlyphId = null;
+
+    log.debug(SEG.UI, `[Canvas] Deleted glyph ${glyphId}`);
+}
 
 /**
  * Factory function to create a Canvas glyph
@@ -81,6 +210,32 @@ export function createCanvasGlyph(): Glyph {
                 e.preventDefault();
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
+
+            // Selection: click on a glyph to select, click background to deselect
+            container.addEventListener('click', (e) => {
+                const target = e.target as HTMLElement;
+
+                // Walk up from click target to find a glyph element
+                const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
+
+                if (glyphEl) {
+                    const glyphId = glyphEl.dataset.glyphId;
+                    if (glyphId) {
+                        selectGlyph(glyphId, container);
+                    }
+                } else {
+                    // Clicked on background (not a glyph) — deselect
+                    deselectAll(container);
+                }
+            });
+
+            // Clean up local glyphs array when a glyph is deleted
+            container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
+                const idx = glyphs.findIndex(g => g.id === e.detail.glyphId);
+                if (idx !== -1) {
+                    glyphs.splice(idx, 1);
+                }
+            }) as EventListener);
 
             // Render existing glyphs asynchronously (to support py and ix glyphs)
             (async () => {

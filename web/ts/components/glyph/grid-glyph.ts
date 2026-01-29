@@ -137,9 +137,8 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     });
 
     // Detect clicks vs drags - if mouse hasn't moved much, it's a click
-    element.addEventListener('click', (e) => {
-        e.stopPropagation();
-
+    element.addEventListener('click', () => {
+        // Don't stopPropagation — let click bubble for canvas selection handling
         // Only trigger click if this wasn't a drag
         if (dragDistance < 5) {
             log.debug(SEG.UI, `[GridGlyph] Clicked ${glyph.id}, triggering manifestation`);
