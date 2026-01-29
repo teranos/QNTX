@@ -8,10 +8,11 @@
  */
 
 import type { Glyph } from './glyph';
-import { IX } from '@generated/sym.js';
+import { IX, SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
+import { createPromptGlyph } from './prompt-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
@@ -182,6 +183,19 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pyBtn);
+
+    // Add prompt button
+    const promptBtn = document.createElement('button');
+    promptBtn.className = 'canvas-spawn-button';
+    promptBtn.textContent = SO;
+    promptBtn.title = 'Spawn Prompt glyph';
+
+    promptBtn.addEventListener('click', () => {
+        spawnPromptGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(promptBtn);
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -294,6 +308,49 @@ async function spawnPyGlyph(
 }
 
 /**
+ * Spawn a new Prompt glyph at grid position
+ */
+async function spawnPromptGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const promptGlyph: Glyph = {
+        id: `prompt-${crypto.randomUUID()}`,
+        title: 'Prompt',
+        symbol: SO,
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Prompt glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(promptGlyph);
+
+    const glyphElement = await createPromptGlyph(promptGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: promptGlyph.id,
+        symbol: SO,
+        gridX,
+        gridY,
+        width,
+        height
+    });
+
+    log.debug(SEG.UI, `[Canvas] Spawned Prompt glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+}
+
+/**
  * Render a glyph on the canvas
  * Checks symbol type and creates appropriate glyph element
  */
@@ -311,6 +368,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For IX glyphs, create full form
     if (glyph.symbol === IX) {
         return await createIxGlyph(glyph);
+    }
+
+    // For prompt glyphs, create template editor
+    if (glyph.symbol === SO) {
+        return await createPromptGlyph(glyph);
     }
 
     // For result glyphs, create result display
