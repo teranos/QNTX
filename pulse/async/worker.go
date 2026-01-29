@@ -551,8 +551,8 @@ func (wp *WorkerPool) processNextJob() error {
 }
 
 // checkRateLimit verifies the rate limit and pauses the job if exceeded.
-// Returns true if job was stopped (caller should return), false to continue.
-func (wp *WorkerPool) checkRateLimit(job *Job) (stopped bool, err error) {
+// Returns true if job was paused (caller should return), false to continue.
+func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 	// If no rate limiter configured, skip rate limiting (tests, simple setups)
 	if wp.rateLimiter == nil {
 		return false, nil
@@ -577,8 +577,8 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (stopped bool, err error) {
 }
 
 // checkBudget verifies budget availability and pauses/fails the job if exceeded.
-// Returns true if job was stopped (caller should return), false to continue.
-func (wp *WorkerPool) checkBudget(job *Job) (stopped bool, err error) {
+// Returns true if job was paused or failed (caller should return), false to continue.
+func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 	// If no budget tracker configured, skip budget checks (tests, simple setups)
 	if wp.budgetTracker == nil {
 		return false, nil
