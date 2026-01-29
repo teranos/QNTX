@@ -215,6 +215,96 @@ impl HandlerContext {
         json_response(200, &response)
     }
 
+    /// Handle POST /register-handler - Register a Python script as an IX handler
+    pub async fn handle_register_handler(
+        &self,
+        body: serde_json::Value,
+    ) -> Result<HttpResponse, Status> {
+        use crate::atsstore::AtsStoreClient;
+
+        #[derive(Deserialize)]
+        struct RegisterHandlerRequest {
+            handler_name: String,
+            code: String,
+        }
+
+        let req: RegisterHandlerRequest = serde_json::from_value(body)
+            .map_err(|e| Status::invalid_argument(format!("Invalid request: {}", e)))?;
+
+        if req.handler_name.is_empty() {
+            return Err(Status::invalid_argument("Missing 'handler_name' field"));
+        }
+
+        if req.code.is_empty() {
+            return Err(Status::invalid_argument("Missing 'code' field"));
+        }
+
+        // Validate handler name (lowercase alphanumeric + hyphen)
+        if !req
+            .handler_name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
+            return Err(Status::invalid_argument(
+                "handler_name must be lowercase alphanumeric (a-z, 0-9, -)",
+            ));
+        }
+
+        // Create attestation attributes with code
+        let mut attrs = HashMap::new();
+        attrs.insert("code".to_string(), serde_json::Value::String(req.code));
+        attrs.insert(
+            "language".to_string(),
+            serde_json::Value::String("python".to_string()),
+        );
+
+        // Create attestation: 'as python_script is ix_handler of csv by canvas_glyph at temporal'
+        // Subject: auto-generated ASID (python_script)
+        // Predicate: "ix_handler"
+        // Context: handler name (e.g., "csv")
+        // Actor: canvas_glyph
+        // Temporal: implicit (timestamp)
+        let result = {
+            let state = self.state.read();
+            let mut guard = state.ats_client.lock();
+            match guard.as_mut() {
+                Some(client) => {
+                    client.create_attestation(
+                        vec![], // Empty - ASID will be auto-generated as subject
+                        vec!["ix_handler".to_string()],
+                        vec![req.handler_name.clone()],
+                        Some(vec!["canvas_glyph".to_string()]),
+                        Some(attrs),
+                    )
+                }
+                None => Err("ATSStore client not initialized".to_string()),
+            }
+        };
+
+        match result {
+            Ok(attestation) => {
+                #[derive(Serialize)]
+                struct RegisterHandlerResponse {
+                    success: bool,
+                    attestation_id: String,
+                    handler_name: String,
+                }
+
+                let response = RegisterHandlerResponse {
+                    success: true,
+                    attestation_id: attestation.id,
+                    handler_name: req.handler_name,
+                };
+
+                json_response(200, &response)
+            }
+            Err(e) => Err(Status::internal(format!(
+                "Failed to register handler: {}",
+                e
+            ))),
+        }
+    }
+
     /// Handle GET /modules - Check availability of common modules
     pub async fn handle_modules(&self, body: serde_json::Value) -> Result<HttpResponse, Status> {
         #[derive(Deserialize, Default)]

@@ -93,6 +93,72 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     label.textContent = 'py';
     titleBar.appendChild(label);
 
+    // Button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '6px';
+
+    // Save button (only for handler scripts)
+    if (glyph.handlerFor) {
+        const saveButton = document.createElement('button');
+        saveButton.textContent = 'Save';
+        saveButton.title = `Register as ${glyph.handlerFor} handler`;
+        saveButton.style.background = 'var(--bg-hover)';
+        saveButton.style.border = '1px solid var(--border-color)';
+        saveButton.style.borderRadius = '3px';
+        saveButton.style.padding = '2px 8px';
+        saveButton.style.cursor = 'pointer';
+        saveButton.style.fontSize = '12px';
+        saveButton.style.color = 'var(--text-primary)';
+
+        saveButton.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
+        saveButton.addEventListener('click', async () => {
+            const editor = (element as any).editor;
+            if (!editor) {
+                log.error(SEG.UI, '[PyGlyph] Editor not initialized');
+                return;
+            }
+
+            const currentCode = editor.state.doc.toString();
+
+            try {
+                const response = await apiFetch('/api/python/register-handler', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        handler_name: glyph.handlerFor,
+                        code: currentCode
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ error: response.statusText }));
+                    throw new Error(error.error || response.statusText);
+                }
+
+                const result = await response.json();
+                log.info(SEG.UI, `[PyGlyph] Handler registered:`, result);
+
+                // Visual feedback
+                saveButton.textContent = '✓ Saved';
+                setTimeout(() => {
+                    saveButton.textContent = 'Save';
+                }, 2000);
+            } catch (error) {
+                log.error(SEG.UI, '[PyGlyph] Failed to register handler:', error);
+                saveButton.textContent = '✗ Failed';
+                setTimeout(() => {
+                    saveButton.textContent = 'Save';
+                }, 2000);
+            }
+        });
+
+        buttonContainer.appendChild(saveButton);
+    }
+
     // Run button
     const runButton = document.createElement('button');
     runButton.textContent = '▶';
@@ -109,6 +175,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.addEventListener('mousedown', (e) => {
         e.stopPropagation();
     });
+
+    buttonContainer.appendChild(runButton);
 
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
@@ -177,7 +245,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
     });
 
-    titleBar.appendChild(runButton);
+    titleBar.appendChild(buttonContainer);
 
     // TODO: Add click handler to spawn programmature manifestation
     // titleBar.addEventListener('click', () => spawnProgrammatureManifestation(glyph));

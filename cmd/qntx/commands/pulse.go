@@ -84,6 +84,15 @@ The daemon will:
 		registry := async.NewHandlerRegistry()
 		registry.Register(git.NewGitIngestionHandler(database, logger.Logger))
 
+		// Register Python script handler (executes Python scripts from attestations)
+		// Uses main QNTX server's Python plugin endpoint
+		serverPort := am.DefaultServerPort
+		if cfg.Server.Port != nil {
+			serverPort = *cfg.Server.Port
+		}
+		pythonURL := fmt.Sprintf("http://localhost:%d", serverPort)
+		registry.Register(async.NewPythonScriptHandler(pythonURL, logger.Logger))
+
 		// Create worker pool with registered handlers
 		pool := async.NewWorkerPoolWithRegistry(ctx, database, cfg, poolCfg, logger.Logger, registry, nil, nil)
 
