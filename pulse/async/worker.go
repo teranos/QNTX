@@ -87,7 +87,7 @@ type WorkerPool struct {
 // WorkerPoolConfig contains configuration for the worker pool
 type WorkerPoolConfig struct {
 	Workers            int           `json:"workers"`              // Number of concurrent workers
-	PollInterval       time.Duration `json:"poll_interval"`        // How often to check for new jobs
+	PollInterval       time.Duration `json:"poll_interval"`        // Poll interval: 0 = gradual ramp-up (default), positive = fixed interval, negative = invalid
 	PauseOnBudget      bool          `json:"pause_on_budget"`      // Pause jobs when budget exceeded
 	GracefulStartPhase time.Duration `json:"graceful_start_phase"` // Duration of each graceful start phase (default: 5min, test: 10s)
 }
@@ -130,6 +130,11 @@ func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *am.Config, p
 //
 // Note: budgetTracker and rateLimiter can be nil for simple setups or tests.
 func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger, registry *HandlerRegistry, budgetTracker BudgetTracker, rateLimiter RateLimiter) *WorkerPool {
+	// Validate config: PollInterval must be >= 0 (0 = gradual ramp-up, positive = fixed interval)
+	if poolCfg.PollInterval < 0 {
+		panic("WorkerPoolConfig.PollInterval must be >= 0")
+	}
+
 	// Create child context so we can cancel workers independently if needed
 	// But cancellation of parent context will also cancel child
 	workerCtx, cancel := context.WithCancel(ctx)
@@ -398,12 +403,12 @@ func (wp *WorkerPool) getWorkerInterval() time.Duration {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 
-	// If PollInterval is explicitly configured (non-zero), use that for all phases
+	// If PollInterval is positive, use that for all phases (0 = use gradual ramp-up, negative = invalid)
 	if wp.poolConfig.PollInterval > 0 {
 		return wp.poolConfig.PollInterval
 	}
 
-	// Otherwise, use gradual ramp-up logic for production
+	// PollInterval is 0 (zero value or omitted): use gradual ramp-up logic for production
 	// Warmup period: first 20 jobs OR first 2 minutes, use 1-second intervals
 	elapsed := time.Since(wp.startTime)
 	if wp.jobsProcessed < 20 || elapsed < 2*time.Minute {
