@@ -1,6 +1,6 @@
 # CSS
 
-See [Design Philosophy](../../docs/development/design-philosophy.md) for foundational principles.
+See [Design Philosophy](../../docs/design-philosophy.md) for foundational principles.
 
 Panel styles in `{name}-panel.css`; reusable components (buttons, badges, close icons) in `components.css`.
 
