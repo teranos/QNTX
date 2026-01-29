@@ -55,10 +55,10 @@ metadata: { "start_time": "2020-01-01", "duration_months": "36" }
 **Future (attested):**
 ```
 # Ingestor declares temporal schema via attestations
-ingester:bcs -> has_temporal_field -> "start_time"
-ingester:bcs -> has_duration_field -> "duration_months"
-ingester:bcs -> temporal_unit -> "months"
-ingester:bcs -> temporal_format -> "RFC3339"
+ingester:example -> has_temporal_field -> "start_time"
+ingester:example -> has_duration_field -> "duration_months"
+ingester:example -> temporal_unit -> "months"
+ingester:example -> temporal_format -> "RFC3339"
 
 # Queries discover structure dynamically
 ax * over 5y since "2020"  # System reads attestations to know HOW to aggregate
@@ -74,7 +74,8 @@ This extends the attestation abstraction to time itself, completing QNTX's domai
 
 ## Related Vision
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm that generates the history
-- [Tile-Based Semantic UI](./tile-based-semantic-ui.md) - Visualize time-travel through tile evolution
+- [Glyphs](./glyphs.md) - Attestable glyph state enables time-travel UI
+- [Tile-Based Typed UI](./tile-based-typed-ui.md) - Visualize time-travel through tile evolution
 
 ## Implementation Roadmap
 
@@ -85,7 +86,7 @@ This extends the attestation abstraction to time itself, completing QNTX's domai
   - Test: [TestTemporalAggregation_WithSinceFilter](../../ats/storage/temporal_aggregation_test.go#L370)
 - Domain-agnostic query predicates (seconds, minutes, hours, months, years)
 - SQL injection protection via whitelisted duration fields
-- Multiple test domains: [neural activity](../../ats/storage/temporal_aggregation_test.go), [recruitment](../../ats/storage/ctp2_bcs_temporal_aggregation_test.go), [meetings](../../ats/storage/temporal_aggregation_meetings_test.go)
+- Multiple test domains: [neural activity](../../ats/storage/temporal_aggregation_test.go), [meetings](../../ats/storage/temporal_aggregation_meetings_test.go)
 
 **Phase 2: Semantic Awareness** (planned)
 - Weighted aggregation via relatedness scores

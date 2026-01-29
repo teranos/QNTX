@@ -316,11 +316,17 @@ qntx db stats --limit 5
 
 ### Unit Tests
 
-See `ats/storage/bounded_storage_integration_test.go` for comprehensive test coverage:
+**Verified by:**
+- `TestBoundedStorage_DoesNotDeleteDifferentContexts` - [ats/storage/bounded_quota_test.go:21](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_quota_test.go#L21)
+- `TestBoundedStorage_DeletesWhenExceeding16PerActorContext` - [ats/storage/bounded_quota_test.go:72](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_quota_test.go#L72)
+- `TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries` - [ats/storage/bounded_quota_test.go:125](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_quota_test.go#L125)
+- `TestBoundedStorage_MixedContextsPreservation` - [ats/storage/bounded_quota_test.go:184](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_quota_test.go#L184)
+- `TestBoundedStorage_ExactDomainReproduction` - [ats/storage/bounded_quota_test.go:256](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_quota_test.go#L256)
 
-- `TestBoundedStorage_DeletesWhenExceeding16PerActorContext`
-- `TestBoundedStorage_DoesNotDeleteDifferentContexts`
-- `TestBoundedStorage_ExactDomainReproduction`
+**Integration tests:**
+- `TestBoundedStorage_16PerActorContext` - [ats/storage/bounded_storage_integration_test.go:17](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_storage_integration_test.go#L17)
+- `TestBoundedStorage_SameActorContextPruning` - [ats/storage/bounded_storage_integration_test.go:54](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_storage_integration_test.go#L54)
+- `TestBoundedStorage_DomainScenario` - [ats/storage/bounded_storage_integration_test.go:92](https://github.com/teranos/QNTX/blob/main/ats/storage/bounded_storage_integration_test.go#L92)
 
 ## Best Practices
 

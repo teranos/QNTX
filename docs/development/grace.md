@@ -12,6 +12,7 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 
 ### ❀ Closing (Graceful Shutdown)
 - **Context propagation**: Application → Worker Pool → Jobs → Handlers
+- **Plugin shutdown**: Plugins receive shutdown signal via gRPC, complete in-flight work
 - **Task-level atomicity**: Jobs complete current task before checkpointing
 - **Signal handling**: Application catches signals, triggers shutdown
 - **Worker timeout**: 30 seconds for clean checkpoint and exit
@@ -32,6 +33,14 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 - Handler implementations - Task-level context checks
 
 ### Testing
+
+**Verified by:**
+- `TestGRACEShutdownFlow` - [pulse/async/grace_test.go:25](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L25)
+- `TestGRACECheckpointSaving` - [pulse/async/grace_test.go:145](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L145)
+- `TestGRACEWorkerShutdownTimeout` - [pulse/async/grace_test.go:183](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L183)
+- `TestGRACEGracefulStart` - [pulse/async/grace_test.go:228](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L228)
+- `TestGRACEGradualRecovery` - [pulse/async/grace_test.go:349](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L349)
+
 ```bash
 # Fast tests (~10s)
 go test ./pulse/async -run TestGRACE -short
@@ -91,13 +100,11 @@ if job.Metadata != nil && job.Metadata.Phase == "aggregate" {
 
 ### Testing
 
-Phase recovery is tested in `pulse/async/grace_test.go`:
-
-- `TestGRACEPhaseRecoveryNoChildTasks` - Validates reset when no tasks exist
-- `TestGRACEPhaseRecoveryWithChildTasks` - Validates preservation when tasks exist
+**Verified by:**
+- `TestGRACEPhaseRecoveryNoChildTasks` - [pulse/async/grace_test.go:492](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L492)
+- `TestGRACEPhaseRecoveryWithChildTasks` - [pulse/async/grace_test.go:542](https://github.com/teranos/QNTX/blob/main/pulse/async/grace_test.go#L542)
 
 ```bash
-# Run phase recovery tests
 go test ./pulse/async -run TestGRACEPhaseRecovery -v
 ```
 
@@ -169,12 +176,12 @@ Failed tasks can be retried automatically (max 3 attempts total):
 
 ### Testing
 
-```bash
-# Test cascade deletion
-go test ./pulse/async -run TestDeleteJobWithChildren -v
+**Verified by:**
+- `TestParentJobHierarchy` - [pulse/async/job_test.go:369](https://github.com/teranos/QNTX/blob/main/pulse/async/job_test.go#L369)
+- `TestTASBotParentJobHierarchy` - [pulse/async/store_test.go:250](https://github.com/teranos/QNTX/blob/main/pulse/async/store_test.go#L250)
 
-# Test parent-child lifecycle
-go test ./pulse/async -run TestParentChild -v
+```bash
+go test ./pulse/async -run TestParentJobHierarchy -v
 ```
 
 ## Integration Guide
@@ -257,5 +264,4 @@ config := async.WorkerPoolConfig{
 ```
 
 ---
-**Last updated**: 2025-12-27
 **Status**: Implemented and tested
