@@ -1,6 +1,7 @@
 /* Documentation Site Styles
  * Uses CSS variables from core.css for consistency
  * Design philosophy: data-first hierarchy, semantic clarity, performance
+ * Default: dark background matching application canvas (--bg-dark-hover)
  */
 
 /* Layout - Bloomberg-style dense information */
@@ -9,6 +10,8 @@ body {
     margin: 0 auto;
     padding: 24px 20px;
     line-height: 1.5;
+    background: var(--bg-dark-hover);
+    color: var(--text-on-dark);
 }
 
 @media (max-width: 640px) {
@@ -19,15 +22,15 @@ body {
 
 /* Typography - Code blocks */
 pre {
-    background: var(--bg-code);
+    background: var(--bg-dark);
     padding: 12px 16px;
     overflow-x: auto;
     border-radius: 4px;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border-on-dark);
 }
 
 code {
-    background: var(--bg-code);
+    background: var(--bg-dark);
     padding: 2px 6px;
     border-radius: 3px;
     font-family: var(--font-mono, monospace);
@@ -42,7 +45,7 @@ pre code {
 
 /* Headings - Compact */
 h1 {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 8px;
     font-size: 1.8em;
     margin: 0.5em 0;
@@ -50,7 +53,7 @@ h1 {
 
 h2 {
     margin-top: 1.5em;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 6px;
     font-size: 1.3em;
 }
@@ -62,7 +65,7 @@ h3 {
 
 /* Links */
 a {
-    color: var(--accent-color);
+    color: var(--accent-on-dark);
     text-decoration: none;
 }
 
@@ -74,7 +77,7 @@ a:hover {
 nav.doc-nav {
     margin-bottom: 2em;
     padding: 12px;
-    background: var(--bg-almost-white);
+    background: var(--bg-dark);
     border-radius: 4px;
 }
 
@@ -96,48 +99,48 @@ nav.doc-nav a {
     align-items: center;
     margin-bottom: 1em;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
 .breadcrumb {
     font-size: 0.85em;
-    color: var(--text-secondary);
+    color: var(--text-on-dark-secondary);
 }
 
 .breadcrumb a {
-    color: var(--text-secondary);
+    color: var(--text-on-dark-secondary);
 }
 
 .breadcrumb a:hover {
-    color: var(--accent-color);
+    color: var(--accent-on-dark);
 }
 
 .breadcrumb-sep {
     margin: 0 6px;
-    color: var(--text-tertiary);
+    color: var(--text-on-dark-tertiary);
 }
 
 .breadcrumb-category {
-    color: var(--text-secondary);
+    color: var(--text-on-dark-secondary);
 }
 
 .breadcrumb-current {
-    color: var(--text-primary);
+    color: var(--text-on-dark);
     font-weight: 500;
 }
 
 .edit-link {
     font-size: 0.8em;
-    color: var(--text-tertiary);
+    color: var(--text-on-dark-tertiary);
     padding: 4px 8px;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     white-space: nowrap;
 }
 
 .edit-link:hover {
-    color: var(--accent-color);
-    border-color: var(--accent-color);
+    color: var(--accent-on-dark);
+    border-color: var(--accent-on-dark);
     text-decoration: none;
 }
 
@@ -151,8 +154,8 @@ nav.doc-nav a {
 
 /* Table of Contents */
 .toc {
-    background: var(--bg-almost-white);
-    border: 1px solid var(--border-light);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     padding: 16px 24px;
     margin-bottom: 2em;
@@ -162,7 +165,7 @@ nav.doc-nav a {
     font-weight: 600;
     margin: 0 0 12px 0;
     font-size: 0.9em;
-    color: var(--text-secondary);
+    color: var(--text-on-dark-secondary);
 }
 
 .toc ul {
@@ -184,7 +187,7 @@ nav.doc-nav a {
     display: flex;
     align-items: center;
     margin-bottom: 1.25em;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 10px;
 }
 
@@ -224,7 +227,7 @@ nav.doc-nav a {
 .intro-section {
     margin: 1em 0 1.5em 0;
     padding: 12px 16px;
-    background: var(--bg-almost-white);
+    background: var(--bg-dark);
     border-left: 3px solid var(--accent-color);
     border-radius: 3px;
 }
@@ -243,7 +246,7 @@ nav.doc-nav a {
     margin-bottom: 0;
     font-family: var(--font-mono, monospace);
     font-size: 0.85em;
-    color: var(--text-secondary);
+    color: var(--text-on-dark-secondary);
 }
 
 /* Build Info Section - Compact */
@@ -254,7 +257,7 @@ nav.doc-nav a {
 .build-info-section h2 {
     font-size: 1.1em;
     margin: 0 0 0.5em 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 4px;
 }
 
@@ -272,7 +275,7 @@ nav.doc-nav a {
 
 .build-info-list li {
     padding: 4px 0;
-    border-left: 2px solid var(--border-light);
+    border-left: 2px solid var(--border-on-dark);
     padding-left: 12px;
     margin: 4px 0;
 }
@@ -288,10 +291,10 @@ nav.doc-nav a {
 .quick-link {
     display: inline-block;
     padding: 6px 12px;
-    background: var(--bg-almost-white);
-    border: 1px solid var(--border-color);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 3px;
-    color: var(--accent-color);
+    color: var(--accent-on-dark);
     font-weight: 500;
     font-size: 0.9em;
     text-decoration: none;
@@ -299,7 +302,7 @@ nav.doc-nav a {
 }
 
 .quick-link:hover {
-    background: var(--bg-hover);
+    background: var(--bg-almost-black);
     text-decoration: none;
 }
 
@@ -309,7 +312,7 @@ nav.doc-nav a {
 }
 
 .download-section h2 {
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 4px;
     font-size: 1.1em;
     margin-bottom: 0.75em;
@@ -319,9 +322,9 @@ nav.doc-nav a {
 .download-section.quick-download {
     margin: 0.75em 0 1.5em 0;
     padding: 10px 12px;
-    background: var(--bg-almost-white);
+    background: var(--bg-dark);
     border-radius: 4px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-on-dark);
 }
 
 .download-section.quick-download h2 {
@@ -331,7 +334,7 @@ nav.doc-nav a {
     border: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
     font-weight: 600;
 }
 
@@ -384,21 +387,22 @@ nav.doc-nav a {
 .download-section.quick-download .download-link {
     display: inline-block;
     padding: 6px 12px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 3px;
     font-size: 0.85em;
     transition: all 0.1s;
+    color: var(--text-on-dark);
 }
 
 .download-section.quick-download .download-link:hover {
-    background: var(--bg-almost-white);
-    border-color: var(--accent-color);
+    background: var(--bg-almost-black);
+    border-color: var(--accent-on-dark);
 }
 
 .download-section.quick-download .file-size {
     margin-left: 4px;
-    color: var(--text-tertiary);
+    color: var(--text-on-dark-tertiary);
     font-size: 0.85em;
 }
 
@@ -415,8 +419,8 @@ nav.doc-nav a {
 }
 
 .download-card {
-    background: var(--bg-almost-white);
-    border: 1px solid var(--border-light);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 8px;
     padding: 20px;
     display: flex;
@@ -440,7 +444,7 @@ nav.doc-nav a {
 }
 
 .download-card-desc {
-    color: var(--text-secondary);
+    color: var(--text-on-dark-secondary);
     font-size: 0.9em;
     flex-grow: 1;
     margin-bottom: 16px;
@@ -463,7 +467,7 @@ nav.doc-nav a {
 }
 
 .install-code {
-    background: var(--bg-dark);
+    background: var(--bg-almost-black);
     color: var(--text-on-dark);
     padding: 12px 16px;
     border-radius: 4px;
@@ -481,7 +485,7 @@ nav.doc-nav a {
 
 .platform-list li {
     padding: 6px 0;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-on-dark);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -502,8 +506,8 @@ nav.doc-nav a {
 
 /* Release Version Cards - Compact */
 .release-version {
-    background: var(--bg-almost-white);
-    border: 1px solid var(--border-light);
+    background: var(--bg-dark);
+    border: 1px solid var(--border-on-dark);
     border-radius: 4px;
     padding: 12px 16px;
     margin-bottom: 12px;
@@ -526,7 +530,7 @@ nav.doc-nav a {
 }
 
 .release-date {
-    color: var(--text-tertiary);
+    color: var(--text-on-dark-tertiary);
     font-size: 0.8em;
 }
 
@@ -563,7 +567,7 @@ nav.doc-nav a {
 }
 
 .loading {
-    color: var(--text-secondary);
+    color: var(--text-on-dark-tertiary);
     font-style: italic;
 }
 
@@ -575,7 +579,7 @@ nav.doc-nav a {
 .site-footer {
     margin-top: 4em;
     padding-top: 1em;
-    border-top: 1px solid var(--border-light);
+    border-top: 1px solid var(--border-on-dark);
 }
 
 .provenance {
@@ -590,7 +594,7 @@ nav.doc-nav a {
 }
 
 .provenance a:hover {
-    color: var(--accent-color);
+    color: var(--accent-on-dark);
 }
 
 /* Nix Infrastructure Tables */
@@ -604,16 +608,16 @@ nav.doc-nav a {
 .nix-table td {
     text-align: left;
     padding: 10px 12px;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
 .nix-table th {
-    background: var(--bg-almost-white);
+    background: var(--bg-dark);
     font-weight: 600;
 }
 
 .nix-table code {
-    background: var(--bg-code);
+    background: var(--bg-almost-black);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.85em;
@@ -629,7 +633,7 @@ nav.doc-nav a {
 }
 
 .container-details code {
-    background: var(--bg-code);
+    background: var(--bg-almost-black);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.85em;
@@ -645,20 +649,20 @@ nav.doc-nav a {
     align-items: baseline;
     margin-bottom: 0.75em;
     padding-bottom: 6px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-on-dark);
     gap: 10px;
 }
 
 .category-title {
     margin: 0;
     font-size: 1.1em;
-    color: var(--text-primary);
+    color: var(--text-on-dark);
     font-weight: 600;
 }
 
 .category-desc {
     font-size: 0.85em;
-    color: var(--text-tertiary);
+    color: var(--text-on-dark-tertiary);
     margin-left: auto;
 }
 
@@ -695,9 +699,9 @@ nav.doc-nav a {
 .doc-list a {
     display: block;
     padding: 10px 12px;
-    background: var(--bg-almost-white);
+    background: var(--bg-dark);
     border-radius: 4px;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border-on-dark);
     transition: all 0.1s;
     height: 100%;
     box-sizing: border-box;
@@ -705,9 +709,10 @@ nav.doc-nav a {
 }
 
 .doc-list a:hover {
-    background: var(--bg-hover);
+    background: var(--bg-dark);
     text-decoration: none;
-    border-color: var(--accent-color);
+    border-color: var(--accent-on-dark);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .doc-list .doc-name {
@@ -744,11 +749,11 @@ table {
 th, td {
     text-align: left;
     padding: 8px 12px;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-on-dark);
 }
 
 th {
-    background: var(--bg-almost-white);
+    background: var(--bg-dark);
     font-weight: 600;
 }
 
@@ -771,221 +776,238 @@ th {
     }
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
+/* Light mode override */
+@media (prefers-color-scheme: light) {
     body {
-        background: var(--bg-almost-black);
-        color: var(--text-on-dark);
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
-    h1, h2 {
-        border-color: var(--border-on-dark);
+    h1 {
+        border-color: var(--border-color);
     }
 
-    pre, code {
-        background: var(--bg-dark);
+    h2 {
+        border-color: var(--border-light);
     }
 
     pre {
-        border-color: var(--border-on-dark);
+        background: var(--bg-code);
+        border-color: var(--border-light);
+    }
+
+    code {
+        background: var(--bg-code);
     }
 
     a {
-        color: var(--accent-on-dark);
+        color: var(--accent-color);
     }
 
     nav.doc-nav,
     .toc,
     .doc-list a,
     th {
-        background: var(--bg-dark);
+        background: var(--bg-almost-white);
     }
 
     .toc {
-        border-color: var(--border-on-dark);
-    }
-
-    .doc-list a {
-        background: var(--bg-dark);
-        border-color: var(--border-on-dark);
-    }
-
-    .doc-list a:hover {
-        background: var(--bg-dark);
-        border-color: var(--accent-on-dark);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    .doc-header {
-        border-color: var(--border-on-dark);
+        border-color: var(--border-light);
     }
 
     .page-header {
-        border-color: var(--border-on-dark);
-    }
-
-    .edit-link {
-        color: var(--text-on-dark-tertiary);
-        border-color: var(--border-on-dark);
-    }
-
-    .edit-link:hover {
-        color: var(--accent-on-dark);
-        border-color: var(--accent-on-dark);
+        border-color: var(--border-light);
     }
 
     .breadcrumb {
-        color: var(--text-on-dark-secondary);
+        color: var(--text-secondary);
     }
 
     .breadcrumb a {
-        color: var(--text-on-dark-secondary);
+        color: var(--text-secondary);
     }
 
     .breadcrumb a:hover {
-        color: var(--accent-on-dark);
+        color: var(--accent-color);
     }
 
     .breadcrumb-sep {
-        color: var(--text-on-dark-tertiary);
+        color: var(--text-tertiary);
+    }
+
+    .breadcrumb-category {
+        color: var(--text-secondary);
     }
 
     .breadcrumb-current {
-        color: var(--text-on-dark);
+        color: var(--text-primary);
     }
 
-    .intro-section {
-        background: var(--bg-dark);
-        border-left-color: var(--accent-color);
+    .edit-link {
+        color: var(--text-tertiary);
+        border-color: var(--border-light);
     }
 
-    .intro-section p:last-child {
-        color: var(--text-on-dark-secondary);
-    }
-
-    .build-info-section h2 {
-        border-color: var(--border-on-dark);
-    }
-
-    .build-info-list li {
-        border-left-color: var(--border-on-dark);
-    }
-
-    .download-section.quick-download {
-        background: var(--bg-dark);
-        border-color: var(--border-on-dark);
-    }
-
-    .download-section.quick-download h2 {
-        color: var(--text-on-dark-tertiary);
-    }
-
-    .download-section.quick-download .download-link {
-        background: var(--bg-dark);
-        border-color: var(--border-on-dark);
-        color: var(--text-on-dark);
-    }
-
-    .download-section.quick-download .download-link:hover {
-        background: var(--bg-almost-black);
-        border-color: var(--accent-on-dark);
-    }
-
-    .download-section.quick-download .file-size {
-        color: var(--text-on-dark-tertiary);
-    }
-
-    .quick-link {
-        background: var(--bg-dark);
-        border-color: var(--border-on-dark);
-    }
-
-    .quick-link:hover {
-        background: var(--bg-almost-black);
-    }
-
-    .category-header {
-        border-color: var(--border-on-dark);
-    }
-
-    .category-title {
-        color: var(--text-on-dark);
-    }
-
-    .category-desc {
-        color: var(--text-on-dark-tertiary);
-    }
-
-    .toc-title {
-        color: var(--text-on-dark-secondary);
-    }
-
-    th, td {
-        border-color: var(--border-on-dark);
-    }
-
-    .download-card {
-        background: var(--bg-dark);
-        border-color: var(--border-on-dark);
-    }
-
-    .download-card-desc {
-        color: var(--text-on-dark-secondary);
-    }
-
-    .download-btn {
-        background: var(--accent-color);
-    }
-
-    .download-btn:hover {
-        background: var(--accent-hover);
-    }
-
-    .platform-list li {
-        border-color: var(--border-on-dark);
-    }
-
-    .release-version {
-        background: var(--bg-dark);
-        border-color: var(--border-on-dark);
-    }
-
-    .release-version.latest {
+    .edit-link:hover {
+        color: var(--accent-color);
         border-color: var(--accent-color);
     }
 
+    .toc-title {
+        color: var(--text-secondary);
+    }
+
+    .doc-header {
+        border-color: var(--border-color);
+    }
+
+    .intro-section {
+        background: var(--bg-almost-white);
+    }
+
+    .intro-section p:last-child {
+        color: var(--text-secondary);
+    }
+
+    .build-info-section h2 {
+        border-color: var(--border-color);
+    }
+
+    .build-info-list li {
+        border-left-color: var(--border-light);
+    }
+
+    .quick-link {
+        background: var(--bg-almost-white);
+        border-color: var(--border-color);
+        color: var(--accent-color);
+    }
+
+    .quick-link:hover {
+        background: var(--bg-hover);
+    }
+
+    .download-section h2 {
+        border-color: var(--border-color);
+    }
+
+    .download-section.quick-download {
+        background: var(--bg-almost-white);
+        border-color: var(--border-color);
+    }
+
+    .download-section.quick-download h2 {
+        color: var(--text-secondary);
+    }
+
+    .download-section.quick-download .download-link {
+        background: var(--bg-primary);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    .download-section.quick-download .download-link:hover {
+        background: var(--bg-almost-white);
+        border-color: var(--accent-color);
+    }
+
+    .download-section.quick-download .file-size {
+        color: var(--text-tertiary);
+    }
+
+    .download-card {
+        background: var(--bg-almost-white);
+        border-color: var(--border-light);
+    }
+
+    .download-card-desc {
+        color: var(--text-secondary);
+    }
+
+    .install-code {
+        background: var(--bg-dark);
+    }
+
+    .platform-list li {
+        border-color: var(--border-light);
+    }
+
+    .release-version {
+        background: var(--bg-almost-white);
+        border-color: var(--border-light);
+    }
+
     .release-date {
-        color: var(--text-on-dark-tertiary);
+        color: var(--text-tertiary);
     }
 
     .file-size {
-        color: var(--text-on-dark-secondary);
+        color: var(--text-tertiary);
     }
 
     .loading {
-        color: var(--text-on-dark-tertiary);
+        color: var(--text-secondary);
     }
 
     .site-footer {
-        border-color: var(--border-on-dark);
+        border-color: var(--border-light);
+    }
+
+    .provenance {
+        color: var(--text-tertiary);
+    }
+
+    .provenance a {
+        color: var(--text-tertiary);
     }
 
     .provenance a:hover {
-        color: var(--accent-on-dark);
+        color: var(--accent-color);
+    }
+
+    .category-header {
+        border-color: var(--border-color);
+    }
+
+    .category-title {
+        color: var(--text-primary);
+    }
+
+    .category-desc {
+        color: var(--text-tertiary);
+    }
+
+    .doc-list a {
+        background: var(--bg-almost-white);
+        border-color: var(--border-light);
+    }
+
+    .doc-list a:hover {
+        background: var(--bg-hover);
+        border-color: var(--accent-color);
+        box-shadow: none;
+    }
+
+    th, td {
+        border-color: var(--border-light);
+    }
+
+    th {
+        background: var(--bg-almost-white);
     }
 
     .nix-table th,
     .nix-table td {
-        border-color: var(--border-on-dark);
+        border-color: var(--border-light);
     }
 
     .nix-table th {
-        background: var(--bg-dark);
+        background: var(--bg-almost-white);
     }
 
     .nix-table code,
     .container-details code {
-        background: var(--bg-dark);
+        background: var(--bg-code);
     }
 }
 
@@ -998,6 +1020,8 @@ th {
     body {
         max-width: none;
         padding: 0;
+        background: #fff;
+        color: #000;
     }
 }
 
