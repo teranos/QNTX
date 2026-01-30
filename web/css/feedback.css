@@ -369,15 +369,6 @@
     }
 }
 
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-    to {
-        opacity: 0;
-    }
-}
-
 /* Hixtory - IX operation history */
 .hixtory-item {
     padding: 4px 8px;
