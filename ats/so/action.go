@@ -10,7 +10,8 @@ import (
 // Action represents a parsed semantic operation action.
 // Each action type (csv, prompt, etc.) implements this interface.
 type Action interface {
-	// ToPayload converts the action to a payload for job execution
+	// ToPayload converts the action to a payload for job execution,
+	// clearing SoActions from the filter copy since the action has been extracted
 	ToPayload(filter types.AxFilter) (Payload, error)
 }
 

@@ -99,7 +99,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.HandleTypes(w, req)
 
-		require.Equal(t, http.StatusCreated, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		// Verify Chez Laurent can be found by cuisine and specialties
 		verifyTypeFields(t, srv, "restaurant",
@@ -132,7 +132,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.HandleTypes(w, req)
 
-		require.Equal(t, http.StatusCreated, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		// Verify diners can search for "vegetarian" or "truffle" in ingredients
 		verifyTypeFields(t, srv, "menu_item",
@@ -163,7 +163,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.HandleTypes(w, req)
 
-		require.Equal(t, http.StatusCreated, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		verifyTypeFields(t, srv, "city",
 			[]string{"name", "culinary_scene", "famous_districts", "food_festivals"},
@@ -194,7 +194,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.HandleTypes(w, req)
 
-		require.Equal(t, http.StatusCreated, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		verifyTypeFields(t, srv, "food_review",
 			[]string{"reviewer_name", "review_text", "highlighted_dishes", "ambiance_notes"},
@@ -217,7 +217,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.HandleTypes(w, req)
 
-		require.Equal(t, http.StatusCreated, w.Code)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		// Public pressure: make violation details searchable too
 		updatePayload := TypeRequest{
@@ -242,7 +242,7 @@ func TestRichStringFieldsForRestaurantDomain(t *testing.T) {
 		w = httptest.NewRecorder()
 		srv.HandleTypes(w, req)
 
-		require.Equal(t, http.StatusCreated, w.Code) // Currently always returns 201
+		require.Equal(t, http.StatusOK, w.Code)
 
 		// Verify transparency: violations are now searchable
 		verifyTypeFields(t, srv, "health_inspection",

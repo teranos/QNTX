@@ -35,7 +35,7 @@ func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
 			s.handleGetTypes(w, r)
 		}
 	case http.MethodPost:
-		s.handleCreateType(w, r)
+		s.handleCreateOrUpdateType(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -165,8 +165,8 @@ func validateFieldName(name string) error {
 	return nil
 }
 
-// handleCreateType creates or updates a type attestation
-func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
+// handleCreateOrUpdateType creates or updates a type attestation
+func (s *QNTXServer) handleCreateOrUpdateType(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name             string   `json:"name"`
 		Label            string   `json:"label"`
@@ -268,9 +268,9 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		"array_fields":        req.ArrayFields,
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode create response", "error", err)
+		s.logger.Errorw("Failed to encode response", "error", err)
 	}
 }
 

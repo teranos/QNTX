@@ -74,9 +74,9 @@ func (r *Registry) List() []string {
 	return names
 }
 
-// ListEnabled returns all enabled plugin names (including pre-registered ones) in sorted order
-// This includes plugins that are still loading, not just fully loaded ones
-func (r *Registry) ListEnabled() []string {
+// ListRegistered returns all registered plugin names (including pre-registered ones) in sorted order
+// This includes plugins in any state: loading, running, paused, stopped, or failed
+func (r *Registry) ListRegistered() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

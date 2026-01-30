@@ -149,9 +149,9 @@ func (p *Payload) GetAxFilter() types.AxFilter {
 	return p.AxFilter
 }
 
-// ToPayload converts an Action to a handler Payload
+// ToPayload converts an Action to a handler Payload, clearing SoActions from
+// the filter copy since the action has been extracted from them
 func (a *Action) ToPayload(filter types.AxFilter) (so.Payload, error) {
-	// Clear SoActions from the filter since we've extracted the csv action
 	filter.SoActions = nil
 
 	return &Payload{
