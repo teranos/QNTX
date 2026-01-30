@@ -43,12 +43,12 @@
     position: fixed;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     padding: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     z-index: 10000;
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 /* Spawn menu buttons - just symbols, no text */
@@ -59,12 +59,12 @@
     background: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: 20px;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .canvas-spawn-button:hover {
@@ -88,7 +88,7 @@
     cursor: move;
     user-select: none;
     background-color: var(--bg-secondary);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
     transition: opacity 0.15s ease;
     z-index: 1;

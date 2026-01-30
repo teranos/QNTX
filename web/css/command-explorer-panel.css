@@ -6,7 +6,7 @@
     width: 100%;
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 8px 8px 8px 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
@@ -46,13 +46,13 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--panel-padding-md);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-bottom: 1px solid var(--border-color);
 }
 
 .command-explorer-title {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
@@ -68,10 +68,10 @@
 
 .command-search-input {
     width: 100%;
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-sm);
     border: var(--panel-border);
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     outline: none;
     transition: border-color 0.15s ease;
 }
@@ -90,12 +90,12 @@
 .filter-items {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 8px;
+    gap: var(--gap);
 }
 
 /* Filter Item - uses .panel-card from panel-base.css */
 .filter-item {
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     padding: 12px;
     cursor: pointer;
 }
@@ -104,7 +104,7 @@
     background: var(--bg-hover);
     border-color: #bbb;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Selected state - supports both class (legacy) and data-attribute (issue #114) */
@@ -151,7 +151,7 @@
 }
 
 .filter-item-type {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
     font-family: 'Courier New', monospace;
@@ -165,20 +165,20 @@
 
 /* Item Details */
 .filter-item-label {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-primary);
     margin-bottom: 4px;
     font-weight: 500;
 }
 
 .filter-item-meta {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
     margin-bottom: 8px;
 }
 
 .filter-item-description {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: #555;
     margin-bottom: 8px;
     font-style: italic;
@@ -191,7 +191,7 @@
 }
 
 .filter-item-examples code {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     padding: 4px 6px;
     background: var(--panel-bg);
     border: var(--panel-border);
@@ -216,7 +216,7 @@
 
 .command-explorer-content::-webkit-scrollbar-thumb {
     background: #ccc;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .command-explorer-content::-webkit-scrollbar-thumb:hover {

@@ -8,10 +8,10 @@
     transform: translateY(-50%);
     width: 24px;
     height: 120px;
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border: 1px solid #444;
     border-right: none;
-    border-radius: 4px 0 0 4px;
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -24,7 +24,7 @@
 
 .prompt-indicator-vertical span {
     color: #999;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -32,12 +32,12 @@
 }
 
 .prompt-indicator-vertical:hover {
-    background: #333;
+    background: var(--bg-dark-light);
     transform: translateY(-50%) translateX(-2px);
 }
 
 .prompt-indicator-vertical.active {
-    background: #3a3a3a;
+    background: var(--bg-dark-light);
     border-color: #666;
 }
 
@@ -52,7 +52,7 @@
     right: 0;
     width: 45%; /* Slightly narrower than Prose panel */
     height: 100%;
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     border-left: 1px solid #444;
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
     z-index: 1001; /* Above Prose panel */
@@ -83,15 +83,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    background: #222;
+    padding: var(--panel-padding-md);
+    background: var(--bg-dark);
     border-bottom: 1px solid #444;
 }
 
 .prompt-preview-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .prompt-preview-icon {
@@ -101,19 +101,19 @@
 
 .prompt-preview-name {
     color: #ccc;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: 500;
 }
 
 .prompt-preview-status {
     color: #888;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     margin-left: 12px;
 }
 
 .prompt-preview-controls {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     align-items: center;
 }
 
@@ -158,26 +158,26 @@
 
 .prompt-preview-sample-control label {
     color: #999;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .prompt-preview-sample-control input[type="number"] {
     width: 60px;
     padding: 4px 8px;
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .prompt-preview-run {
     padding: 6px 16px;
     background: #3a5a3a;
     border: 1px solid #4a6a4a;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     color: #9fc99f;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
@@ -190,11 +190,11 @@
 .prompt-preview-filter input {
     width: 100%;
     padding: 6px 10px;
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
@@ -211,7 +211,7 @@
 
 .prompt-preview-empty p {
     margin: 8px 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 /* Comparison cards */
@@ -222,9 +222,9 @@
 }
 
 .prompt-preview-comparison {
-    background: #222;
+    background: var(--bg-dark);
     border: 1px solid #333;
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
 }
 
@@ -232,38 +232,38 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
-    background: #2a2a2a;
+    padding: var(--panel-padding-md);
+    background: var(--bg-dark-hover);
     border-bottom: 1px solid #333;
 }
 
 .comparison-number {
     color: #666;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
 }
 
 .comparison-id {
     color: #888;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
 .comparison-tokens {
     margin-left: auto;
     color: #666;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 .comparison-prompt {
-    padding: 10px 14px;
-    background: #1a1a1a;
+    padding: var(--panel-padding-md);
+    background: var(--bg-almost-black);
     border-bottom: 1px solid #333;
 }
 
 .comparison-prompt code {
     color: #7a9a7a;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', monospace;
     word-break: break-word;
 }
@@ -276,7 +276,7 @@
 
 .comparison-old,
 .comparison-new {
-    padding: 12px 14px;
+    padding: var(--panel-padding-md);
     position: relative;
 }
 
@@ -286,7 +286,7 @@
 
 .comparison-label {
     color: #666;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
@@ -303,7 +303,7 @@
 
 .comparison-content {
     color: #aaa;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     line-height: 1.5;
 }
 
@@ -319,8 +319,8 @@
 
 /* Footer */
 .prompt-preview-footer {
-    padding: 10px 16px;
-    background: #222;
+    padding: var(--panel-padding-md);
+    background: var(--bg-dark);
     border-top: 1px solid #444;
     display: flex;
     justify-content: space-between;
@@ -330,7 +330,7 @@
 .prompt-preview-token-count,
 .prompt-preview-cost-estimate {
     color: #666;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Scrollbar styling */
@@ -339,12 +339,12 @@
 }
 
 .prompt-preview-body::-webkit-scrollbar-track {
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb:hover {
