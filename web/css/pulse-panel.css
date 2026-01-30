@@ -415,7 +415,7 @@
     padding: 16px;
     background: #fff3cd;
     border: 1px solid #ffc107;
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     color: #856404;
     margin-bottom: 12px;
 }
@@ -515,7 +515,7 @@
     align-items: center;
     padding: 12px;
     background: #f8f8f8;
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     border-left: 3px solid #ccc;
 }
 
@@ -584,7 +584,7 @@
     padding: 10px;
     background: var(--bg-hover);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     font-size: 13px;
     color: #007aff;
     cursor: pointer;

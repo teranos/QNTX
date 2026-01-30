@@ -224,7 +224,7 @@
 .prompt-preview-comparison {
     background: #222;
     border: 1px solid #333;
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     overflow: hidden;
 }
 

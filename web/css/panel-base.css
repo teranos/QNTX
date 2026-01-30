@@ -10,6 +10,7 @@
     /* Borders */
     --panel-border: 1px solid var(--border-color);
     --border-radius: 3px;
+    --border-radius-lg: 7px;
 
     /* Colors */
     --panel-bg: var(--bg-primary);

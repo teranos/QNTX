@@ -23,7 +23,7 @@
 #loading-screen .logo {
     width: 80px;
     height: 80px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     margin-bottom: 24px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     opacity: 0.6;
