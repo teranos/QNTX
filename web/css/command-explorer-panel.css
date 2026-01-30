@@ -68,7 +68,7 @@
 
 .command-search-input {
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     font-size: 12px;
     border: var(--panel-border);
     border-radius: 3px;
@@ -104,7 +104,7 @@
     background: var(--bg-hover);
     border-color: #bbb;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Selected state - supports both class (legacy) and data-attribute (issue #114) */

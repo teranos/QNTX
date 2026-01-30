@@ -83,7 +83,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     background: #222;
     border-bottom: 1px solid #444;
 }
@@ -166,7 +166,7 @@
     padding: 4px 8px;
     background: #2a2a2a;
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: #ccc;
     font-size: 13px;
 }
@@ -175,7 +175,7 @@
     padding: 6px 16px;
     background: #3a5a3a;
     border: 1px solid #4a6a4a;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: #9fc99f;
     font-size: 13px;
     cursor: pointer;
@@ -192,7 +192,7 @@
     padding: 6px 10px;
     background: #2a2a2a;
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: #ccc;
     font-size: 13px;
     font-family: 'Monaco', 'Menlo', monospace;
@@ -344,7 +344,7 @@
 
 .prompt-preview-body::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb:hover {

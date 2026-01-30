@@ -17,10 +17,10 @@
 
 .prose-search {
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: var(--text-on-dark);
     font-size: 13px;
     outline: none;
@@ -153,7 +153,7 @@
 
 .prose-tree::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .prose-tree::-webkit-scrollbar-thumb:hover {

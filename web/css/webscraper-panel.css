@@ -11,7 +11,7 @@
 
 /* URL Input Section */
 .scraper-input-section {
-    padding: 16px 20px;
+    padding: var(--panel-padding-lg);
     border-bottom: 1px solid #eee;
 }
 
@@ -32,10 +32,10 @@
 
 .scraper-url-input {
     flex: 1;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     font-size: 12px;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     outline: none;
     font-family: var(--font-mono, monospace);
 }
@@ -54,7 +54,7 @@
     background: #000;
     color: #fff;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -169,7 +169,7 @@
     margin-bottom: 12px;
     background: var(--bg-almost-white);
     border: 1px solid #eee;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .scraper-result-header {
@@ -234,7 +234,7 @@
 /* History Section */
 .scraper-history {
     border-top: 1px solid #eee;
-    padding: 16px 20px;
+    padding: var(--panel-padding-lg);
     background: var(--bg-almost-white);
 }
 

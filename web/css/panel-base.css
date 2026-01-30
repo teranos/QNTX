@@ -171,7 +171,7 @@
 }
 
 .panel-error-details summary {
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     font-size: 11px;
     font-weight: 500;
     color: var(--status-failed-text);
@@ -465,7 +465,7 @@
     position: fixed;
     background: #2d2d2d;
     color: #f0f0f0;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     border-radius: 0;
     font-size: 11px;
     font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
