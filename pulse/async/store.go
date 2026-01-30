@@ -19,6 +19,10 @@ func NewStore(db *sql.DB) *Store {
 
 // CreateJob inserts a new job into the database
 func (s *Store) CreateJob(job *Job) error {
+	if job.HandlerName == "" {
+		return errors.New("job.HandlerName cannot be empty")
+	}
+
 	pulseStateJSON, err := MarshalPulseState(job.PulseState)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal pulse state")
@@ -88,6 +92,10 @@ func (s *Store) GetJob(id string) (*Job, error) {
 
 // UpdateJob updates an existing job in the database
 func (s *Store) UpdateJob(job *Job) error {
+	if job.HandlerName == "" {
+		return errors.New("job.HandlerName cannot be empty")
+	}
+
 	pulseStateJSON, err := MarshalPulseState(job.PulseState)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal pulse state")
