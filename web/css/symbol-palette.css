@@ -7,7 +7,7 @@
     gap: 2px;
     width: 100%;
     padding: 6px 8px;
-    background: #fff;
+    background: var(--bg-primary);
     font-family: 'Courier New', monospace;
     user-select: none;
     margin-bottom: 4px;
@@ -23,12 +23,12 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-size: 13px; /* Default size for mobile */
+    font-size: var(--font-size-md); /* Default size for mobile */
     color: #000;
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border: 1px solid var(--border-color);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
     position: relative;
     font-weight: 500; /* Slightly bolder for better visibility */
     /* Reset button defaults */
@@ -46,8 +46,8 @@
     background: rgba(0, 0, 0, 0.85);
     color: #fff;
     padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 11px; /* Slightly larger tooltip text */
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm); /* Slightly larger tooltip text */
     font-family: 'Courier New', monospace;
     white-space: nowrap;
     opacity: 0;
@@ -130,13 +130,13 @@
         gap: 1px;
         padding: 6px 4px;
         padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-        background: #fff;
+        background: var(--bg-primary);
         margin-bottom: 0;
     }
 
     .palette-cell {
         padding: 8px 2px;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
         min-height: 40px; /* Touch-friendly tap target */
         display: flex;
         align-items: center;
