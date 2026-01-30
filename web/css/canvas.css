@@ -125,7 +125,7 @@
 
 /* Selected state - highlighted border on any glyph type */
 .canvas-glyph-selected {
-    outline: 2px solid #5b9bd5;
+    outline: 2px solid #c47a2a;
     outline-offset: 2px;
 }
 
