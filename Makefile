@@ -28,22 +28,25 @@ server: cli ## Start QNTX WebSocket server
 	@./bin/qntx server
 
 dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
-	@echo "🚀 Starting development environment..."
-	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
-	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
-	@echo "  Database: Uses am.toml configuration"
-	@echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"
-	@echo ""
-	@# Clean up any lingering processes on dev ports
-	@lsof -ti:$${BACKEND_PORT:-877} | xargs kill -9 2>/dev/null || true
-	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
-	@pkill -f "bun.*dev" 2>/dev/null || true
-	@trap 'echo ""; echo "Shutting down dev servers..."; \
-		lsof -ti:$${BACKEND_PORT:-877},$${FRONTEND_PORT:-8820} | xargs kill -TERM 2>/dev/null || true; \
-		pkill -f "bun.*dev" 2>/dev/null || true; \
+	@# Read port from am.toml if exists, otherwise use default
+	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_PORT:-8773}}; \
+	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
+	echo "🚀 Starting development environment..."; \
+	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
+	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
+	echo "  Database: Uses am.toml configuration"; \
+	echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"; \
+	echo ""; \
+	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
+	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
+	pkill -f "bun.*dev" 2>/dev/null || true; \
+	trap "echo ''; echo 'Shutting down dev servers...'; \
+		lsof -ti:$$BACKEND_PORT,$$FRONTEND_PORT | xargs kill -TERM 2>/dev/null || true; \
+		pkill -f 'bun.*dev' 2>/dev/null || true; \
 		sleep 1; \
-		lsof -ti:$${BACKEND_PORT:-877},$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
-		echo "✓ Servers stopped"' EXIT INT TERM; \
+		lsof -ti:$$BACKEND_PORT,$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
+		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
 	cd web && bun run dev & \
