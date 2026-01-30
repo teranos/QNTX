@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/pulse/schedule"
@@ -163,11 +164,10 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	// Validate handler availability (fail early if handler not registered)
 	registry := s.daemon.Registry()
 	if registry != nil && !registry.Has(parsed.HandlerName) {
-		writeError(w, http.StatusBadRequest,
-			fmt.Sprintf("handler '%s' not available (required plugin may be disabled)", parsed.HandlerName))
-		s.logger.Warnw("Job creation rejected - handler not available",
-			"handler_name", parsed.HandlerName,
-			"job_id", jobID)
+		err := errors.Newf("handler '%s' not available (required plugin may be disabled)", parsed.HandlerName)
+		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", req.ATSCode))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", parsed.HandlerName))
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
 		return
 	}
 
