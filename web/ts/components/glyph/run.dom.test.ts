@@ -17,7 +17,7 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 // Setup jsdom if enabled
 if (USE_JSDOM) {
     const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body><div id="graph-container"></div></body></html>');
+    const dom = new JSDOM('<!DOCTYPE html><html><body><div id="graph-viewer"></div></body></html>');
     const { window } = dom;
     const { document } = window;
 
@@ -36,7 +36,7 @@ describe('Glyph Single Element Axiom', () => {
 
     beforeEach(() => {
         // Clear the glyph run state
-        document.body.innerHTML = '<div id="graph-container"></div>';
+        document.body.innerHTML = '<div id="graph-viewer"></div>';
         // Reset the singleton (this is a bit hacky but needed for testing)
         (glyphRun as any).element = null;
         (glyphRun as any).indicatorContainer = null;
@@ -172,8 +172,8 @@ describe('Glyph Single Element Axiom', () => {
     });
 
     test('Deferred initialization: Glyphs added before DOM ready are handled', () => {
-        // Remove graph-container to simulate DOM not ready
-        const graphContainer = document.getElementById('graph-container');
+        // Remove graph-viewer to simulate DOM not ready
+        const graphContainer = document.getElementById('graph-viewer');
         graphContainer?.remove();
 
         const testGlyph: Glyph = {
@@ -191,7 +191,7 @@ describe('Glyph Single Element Axiom', () => {
 
         // Recreate graph container
         const newContainer = document.createElement('div');
-        newContainer.id = 'graph-container';
+        newContainer.id = 'graph-viewer';
         document.body.appendChild(newContainer);
 
         // Now init with graph container present
@@ -260,7 +260,7 @@ describe('Glyph State Transitions', () => {
     }
 
     beforeEach(() => {
-        document.body.innerHTML = '<div id="graph-container"></div>';
+        document.body.innerHTML = '<div id="graph-viewer"></div>';
         (glyphRun as any).element = null;
         (glyphRun as any).indicatorContainer = null;
         (glyphRun as any).items.clear();

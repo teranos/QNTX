@@ -40,9 +40,9 @@ export function focusOnTile(node: D3Node): void {
     }
 
     const domCache = getDomCache();
-    const container = domCache.get('graphContainer', '#graph-container');
+    const container = domCache.get('graphViewer', '#graph-viewer');
     if (!container) {
-        console.warn('[focus] container not found', { selector: '#graph-container' });
+        console.warn('[focus] container not found', { selector: '#graph-viewer' });
         return;
     }
 

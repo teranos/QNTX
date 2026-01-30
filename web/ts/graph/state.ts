@@ -26,7 +26,7 @@ let isFocusAnimating: boolean = false; // Flag to ignore zoom events during prog
 // DOM cache interface for performance optimization
 // Avoid Sin #2: DOM Thrashing - Cache element references instead of repeated querySelector
 interface DOMCache {
-    graphContainer: HTMLElement | null;
+    graphViewer: HTMLElement | null;
     isolatedToggle: HTMLElement | null;
     typeAttestations: HTMLElement | null;
     get(key: keyof DOMCache, selector: string): HTMLElement | null;
@@ -34,7 +34,7 @@ interface DOMCache {
 }
 
 const domCache: DOMCache = {
-    graphContainer: null,
+    graphViewer: null,
     isolatedToggle: null,
     typeAttestations: null,
     get: function(key: keyof DOMCache, selector: string): HTMLElement | null {
@@ -45,7 +45,7 @@ const domCache: DOMCache = {
         return this[key] as HTMLElement | null;
     },
     clear: function(): void {
-        this.graphContainer = null;
+        this.graphViewer = null;
         this.isolatedToggle = null;
         this.typeAttestations = null;
     }

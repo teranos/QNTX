@@ -34,11 +34,11 @@ describe('Graph State Management', () => {
             const domCache = getDomCache();
 
             // First access should query the DOM
-            const el1 = domCache.get('graphContainer', 'test-element');
+            const el1 = domCache.get('graphViewer', 'test-element');
             expect(el1).toBe(testDiv);
 
             // Second access should return cached value (not query DOM again)
-            const el2 = domCache.get('graphContainer', 'test-element');
+            const el2 = domCache.get('graphViewer', 'test-element');
             expect(el2).toBe(testDiv);
             expect(el2).toBe(el1); // Same reference
 
@@ -48,7 +48,7 @@ describe('Graph State Management', () => {
 
         it('should return null for non-existent elements', () => {
             const domCache = getDomCache();
-            const el = domCache.get('graphContainer', 'non-existent-element');
+            const el = domCache.get('graphViewer', 'non-existent-element');
             expect(el).toBeNull();
         });
 
@@ -64,18 +64,18 @@ describe('Graph State Management', () => {
             const domCache = getDomCache();
 
             // Cache elements
-            domCache.get('graphContainer', 'test-1');
+            domCache.get('graphViewer', 'test-1');
             domCache.get('isolatedToggle', 'test-2');
 
             // Verify cached
-            expect(domCache.graphContainer).toBe(testDiv1);
+            expect(domCache.graphViewer).toBe(testDiv1);
             expect(domCache.isolatedToggle).toBe(testDiv2);
 
             // Clear cache
             domCache.clear();
 
             // Verify cleared
-            expect(domCache.graphContainer).toBeNull();
+            expect(domCache.graphViewer).toBeNull();
             expect(domCache.isolatedToggle).toBeNull();
 
             // Cleanup
@@ -96,7 +96,7 @@ describe('Graph State Management', () => {
             const domCache = getDomCache();
 
             // Test getElementById (via #id)
-            const el1 = domCache.get('graphContainer', 'test-id');
+            const el1 = domCache.get('graphViewer', 'test-id');
             expect(el1).toBe(idElement);
 
             // Test querySelector (via .class)
@@ -173,13 +173,13 @@ describe('Graph State Management', () => {
             const testDiv = document.createElement('div');
             testDiv.id = 'test-element';
             document.body.appendChild(testDiv);
-            getDomCache().get('graphContainer', 'test-element');
+            getDomCache().get('graphViewer', 'test-element');
 
             // Verify state is set
             expect(getFocusedNodeId()).toBe('node-123');
             expect(getPreFocusTransform()).not.toBeNull();
             expect(getIsFocusAnimating()).toBe(true);
-            expect(getDomCache().graphContainer).toBe(testDiv);
+            expect(getDomCache().graphViewer).toBe(testDiv);
 
             // Clear all state
             clearState();
@@ -189,7 +189,7 @@ describe('Graph State Management', () => {
             expect(getPreFocusTransform()).toBeNull();
             expect(getIsFocusAnimating()).toBe(false);
             expect(getSimulation()).toBeNull();
-            expect(getDomCache().graphContainer).toBeNull();
+            expect(getDomCache().graphViewer).toBeNull();
 
             // Note: hiddenNodes set is not cleared by clearState()
             // This may be intentional to preserve visibility preferences

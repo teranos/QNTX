@@ -53,7 +53,7 @@ export class FuzzySearchView {
         this.container.appendChild(this.resultsElement);
 
         // Add to graph container
-        const graphContainer = document.getElementById('graph-container');
+        const graphContainer = document.getElementById('graph-viewer');
         if (graphContainer) {
             graphContainer.appendChild(this.container);
         }

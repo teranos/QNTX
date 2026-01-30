@@ -34,8 +34,8 @@
     --meta-color: var(--text-secondary);  /* Mid-gray for de-emphasized text */
 }
 
-/* Graph Container */
-#graph-container {
+/* Graph Viewer */
+#graph-viewer {
     flex: 1;
     position: relative;
     background: var(--bg-primary);

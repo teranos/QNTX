@@ -12,10 +12,9 @@ export const DEFAULT_TILE_HEIGHT = 80;
  * Focus mode always resets to zoom 1.0 for a consistent viewing experience
  */
 export function calculateFocusedTileDimensions(): { width: number; height: number; scale: number } {
-    // TODO: When #graph-container is renamed to #graph-viewer, update this selector
-    // Use graph-container dimensions (the actual graph viewing area)
+    // Use graph-viewer dimensions (the actual graph viewing area)
     const domCache = getDomCache();
-    const container = domCache.get('graphContainer', '#graph-container');
+    const container = domCache.get('graphViewer', '#graph-viewer');
     if (!container) {
         console.warn('[dimensions] container not found, using defaults', {
             defaults: { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT, scale: 1 }
