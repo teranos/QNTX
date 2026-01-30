@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: var(--panel-padding-lg);
   background: var(--bg-almost-white);
   border-bottom: 2px solid var(--border-light);
   flex-shrink: 0;
@@ -45,7 +45,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 20px;
+  padding: var(--panel-padding-lg);
   background: var(--bg-almost-white);
 }
 
@@ -317,7 +317,7 @@
   margin-bottom: 10px;
   padding: 8px 10px;
   background: var(--status-pending-bg);
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
 }
 
 .job-detail-error-details {
@@ -340,7 +340,7 @@
   margin-top: 8px;
   padding: 10px;
   background: var(--bg-almost-white);
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   font-size: 11px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   white-space: pre-wrap;
@@ -355,7 +355,7 @@
   background: var(--color-scheduled);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;

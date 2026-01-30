@@ -113,7 +113,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: var(--panel-padding-lg);
     border-bottom: 1px solid var(--border-on-dark);
     background: var(--bg-dark);
 }
@@ -223,7 +223,7 @@
     padding: 8px;
     background: #1e1e1e;
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: #e0e0e0;
     font-size: 13px;
 }
@@ -381,8 +381,8 @@
 
 #prose-editor .ProseMirror pre {
     background: var(--bg-dark);
-    padding: 12px 16px;
-    border-radius: 4px;
+    padding: var(--panel-padding-md);
+    border-radius: var(--panel-border-radius);
     overflow-x: auto;
     margin: 12px 0;
     white-space: pre-wrap;  /* Allow code to wrap */
@@ -442,7 +442,7 @@
     box-sizing: border-box;
     position: relative;
     border: 1px solid var(--border-on-dark);
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     min-width: 100px;
 }
 
@@ -521,7 +521,7 @@
 
 .prose-editor-container::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .prose-editor-container::-webkit-scrollbar-thumb:hover {
@@ -532,7 +532,7 @@
 .frontmatter-block {
     margin: 12px 0;
     border: 1px solid #333;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     background: #1a1a1a;
     position: relative;
 }

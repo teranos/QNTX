@@ -29,12 +29,12 @@
 
 .form-input {
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     font-size: 13px;
     font-family: 'JetBrains Mono', monospace;
     background: var(--panel-bg, #fff);
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: var(--panel-text-primary, #333);
 }
 
@@ -55,7 +55,7 @@
     width: 60px;
     height: 36px;
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     cursor: pointer;
 }
 
@@ -79,7 +79,7 @@
     font-size: 12px;
     font-weight: 600;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     cursor: pointer;
     transition: background 0.2s ease;
 }
@@ -159,12 +159,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--panel-bg, #fff);
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--panel-transition-normal);
 }
 
 .field-item:hover {
@@ -242,7 +242,7 @@
     font-size: 12px;
     background: var(--panel-bg, #fff);
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     color: var(--panel-text-primary, #333);
 }
 
@@ -259,7 +259,7 @@
     background: var(--accent-color, #0066cc);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     cursor: pointer;
     transition: background 0.2s ease;
 }

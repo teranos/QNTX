@@ -97,7 +97,7 @@
 .pulse-btn {
   padding: 6px 12px;
   border: 1px solid var(--border-light);
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   background: #fff;
   cursor: pointer;
   font-size: 14px;
@@ -129,7 +129,7 @@
   margin-top: 12px;
   padding: 8px;
   background: #f8f9fa;
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
 }
 
 .children-header {
@@ -142,9 +142,9 @@
 .execution-child {
   background: #fff;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   margin-bottom: 8px;
-  padding: 8px 12px;
+  padding: var(--panel-padding-sm);
 }
 
 .execution-child.expanded {
@@ -432,7 +432,7 @@
     background: #ffc107;
     color: #000;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
@@ -469,7 +469,7 @@
     margin-bottom: 8px;
     padding: 6px 8px;
     background: var(--status-pending-bg);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 .pulse-error-details {
@@ -492,7 +492,7 @@
     margin-top: 8px;
     padding: 8px;
     background: var(--bg-almost-white);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     font-size: 11px;
     font-family: 'SF Mono', Monaco, 'Courier New', monospace;
     white-space: pre-wrap;

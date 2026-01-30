@@ -20,9 +20,9 @@ body {
 /* Typography - Code blocks */
 pre {
     background: #f4f4f4;
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     overflow-x: auto;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     border: 1px solid var(--border-light);
 }
 
@@ -75,7 +75,7 @@ nav.doc-nav {
     margin-bottom: 2em;
     padding: 12px;
     background: var(--bg-almost-white);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
 }
 
 nav.doc-nav a {
@@ -131,7 +131,7 @@ nav.doc-nav a {
     color: var(--text-tertiary);
     padding: 4px 8px;
     border: 1px solid var(--border-light);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     white-space: nowrap;
 }
 
@@ -153,7 +153,7 @@ nav.doc-nav a {
 .toc {
     background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     padding: 16px 24px;
     margin-bottom: 2em;
 }
@@ -223,7 +223,7 @@ nav.doc-nav a {
 /* Intro Section - Compact */
 .intro-section {
     margin: 1em 0 1.5em 0;
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     background: var(--bg-almost-white);
     border-left: 3px solid var(--accent-color);
     border-radius: 3px;
@@ -320,7 +320,7 @@ nav.doc-nav a {
     margin: 0.75em 0 1.5em 0;
     padding: 10px 12px;
     background: var(--bg-almost-white);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     border: 1px solid var(--border-color);
 }
 
@@ -451,7 +451,7 @@ nav.doc-nav a {
     background: var(--accent-color);
     color: #fff;
     padding: 10px 20px;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     text-align: center;
     font-weight: 500;
     transition: background 0.15s;
@@ -465,8 +465,8 @@ nav.doc-nav a {
 .install-code {
     background: var(--bg-dark);
     color: var(--text-on-dark);
-    padding: 12px 16px;
-    border-radius: 4px;
+    padding: var(--panel-padding-md);
+    border-radius: var(--panel-border-radius);
     font-family: var(--font-mono, monospace);
     font-size: 0.9em;
     overflow-x: auto;
@@ -504,8 +504,8 @@ nav.doc-nav a {
 .release-version {
     background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
-    border-radius: 4px;
-    padding: 12px 16px;
+    border-radius: var(--panel-border-radius);
+    padding: var(--panel-padding-md);
     margin-bottom: 12px;
 }
 
@@ -534,7 +534,7 @@ nav.doc-nav a {
     background: var(--accent-color);
     color: #fff;
     padding: 2px 8px;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     font-size: 0.75em;
     font-weight: 500;
     margin-left: 8px;
@@ -545,7 +545,7 @@ nav.doc-nav a {
     background: var(--color-warning, #ffaa00);
     color: #000;
     padding: 2px 8px;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     font-size: 0.75em;
     font-weight: 500;
     margin-left: 8px;
@@ -696,7 +696,7 @@ nav.doc-nav a {
     display: block;
     padding: 10px 12px;
     background: var(--bg-almost-white);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     border: 1px solid var(--border-light);
     transition: all 0.1s;
     height: 100%;
@@ -729,7 +729,7 @@ nav.doc-nav a {
     }
 
     .doc-list a {
-        padding: 8px 12px;
+        padding: var(--panel-padding-sm);
         font-size: 0.9em;
     }
 }
@@ -743,7 +743,7 @@ table {
 
 th, td {
     text-align: left;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     border-bottom: 1px solid var(--border-light);
 }
 
@@ -988,5 +988,5 @@ th {
 .error-code { font-size: 0.9em; color: var(--text-on-dark-tertiary); }
 .error-404 .explanation { color: var(--text-on-dark-secondary); line-height: 1.6; margin: 20px 0; }
 .error-404 .attestation { font-family: var(--font-mono); background: var(--bg-almost-black); padding: 15px; margin: 20px 0; border-left: 3px solid var(--accent-color); text-align: left; font-size: 0.85em; white-space: pre-line; }
-.home-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: var(--accent-color); color: #fff; text-decoration: none; border-radius: 4px; }
+.home-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: var(--accent-color); color: #fff; text-decoration: none; border-radius: var(--panel-border-radius); }
 .home-link:hover { opacity: 0.9; }

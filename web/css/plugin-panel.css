@@ -231,7 +231,7 @@
 /* Plugin message (health status message) */
 .plugin-message {
     margin-top: 12px;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     font-size: 11px;
     background: #f8f8f8;
     border-radius: var(--panel-border-radius);
@@ -246,7 +246,7 @@
 /* Plugin details (health details) */
 .plugin-details {
     margin-top: 12px;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--bg-almost-white);
     border-radius: var(--panel-border-radius);
     font-size: 11px;
@@ -353,7 +353,7 @@
     flex-direction: column;
     gap: 1px;
     background: #e0e0e0;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     overflow: hidden;
 }
 
@@ -540,7 +540,7 @@
     padding: 10px 12px;
     background: var(--status-pending-bg);
     border: 1px solid #ef6c00;
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     font-size: 11px;
     color: var(--status-pending-text);
     line-height: 1.4;

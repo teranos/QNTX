@@ -23,7 +23,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: #252525; /* Slightly lighter than bg-almost-black for header */
     border-bottom: 1px solid var(--border-on-dark);
     cursor: pointer;
@@ -324,7 +324,7 @@
 .toast {
     background: #000;
     color: #fff;
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     border: 1px solid var(--border-on-dark);
     font-size: 12px;
     line-height: 1.5;

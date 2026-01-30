@@ -217,7 +217,7 @@ body.disconnected #container {
 
 /* Stats */
 #stats {
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     margin-bottom: 32px; /* Space for fixed log panel at bottom */
     background: #fff;
     border-top: 1px solid var(--border-color);

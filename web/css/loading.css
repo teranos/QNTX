@@ -63,7 +63,7 @@
     overflow-y: auto;
     background: #0f0f0f;
     border: 1px solid var(--bg-dark);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     padding: 8px 10px;
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 10px;
@@ -74,10 +74,10 @@
 
 #metamask-warning {
     display: none;
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: 4px;
+    border-radius: var(--panel-border-radius);
     max-width: 400px;
     text-align: center;
 }

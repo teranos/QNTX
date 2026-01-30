@@ -20,7 +20,7 @@
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: var(--panel-transition-normal);
   position: relative;
 }
 
@@ -58,7 +58,7 @@
   border: 1px solid var(--color-border, #333);
   background: var(--color-bg, #0d0d0d);
   color: var(--color-text, #fff);
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
 }
 
 #load-pr-btn {
@@ -66,7 +66,7 @@
   background: var(--color-primary, #4a9eff);
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   cursor: pointer;
   font-weight: 500;
   transition: background 0.2s;
@@ -108,9 +108,9 @@
   margin-bottom: 0.75rem;
   border-left: 4px solid var(--color-border, #333);
   background: var(--color-bg-secondary, #1a1a1a);
-  border-radius: 4px;
+  border-radius: var(--panel-border-radius);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--panel-transition-fast);
 }
 
 .suggestion-item:hover {

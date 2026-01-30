@@ -13,7 +13,7 @@
     width: 280px;
     color: #fff;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-xl);
     z-index: 999;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -94,7 +94,7 @@
     cursor: pointer;
     border: 1px solid rgba(255, 255, 255, 0.2);
     font-family: inherit;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .config-actions button[type="button"] {

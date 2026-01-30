@@ -28,7 +28,7 @@
     background: #f8f8f8;
     border: 1px solid var(--border-color);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
     position: relative;
     font-weight: 500; /* Slightly bolder for better visibility */
     /* Reset button defaults */

@@ -23,7 +23,7 @@
 
 /* Header */
 .draggable-window-header {
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     border-bottom: var(--panel-border);
     cursor: move;
     display: flex;
@@ -99,7 +99,7 @@
 
 /* Footer - for runtime stats and metrics */
 .draggable-window-footer {
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     border-top: var(--panel-border);
     background: var(--panel-bg-secondary, #f8f8f8);
     font-size: 11px;
@@ -195,7 +195,7 @@
 
 /* Error display */
 .window-error {
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: #fee;
     border: 1px solid #c88;
     border-radius: var(--panel-border-radius);
