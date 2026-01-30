@@ -64,7 +64,7 @@
     background: #0f0f0f;
     border: 1px solid var(--bg-dark);
     border-radius: var(--panel-border-radius);
-    padding: 8px 10px;
+    padding: var(--panel-padding-sm);
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 10px;
     color: var(--text-secondary);

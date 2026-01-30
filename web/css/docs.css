@@ -287,7 +287,7 @@ nav.doc-nav a {
 
 .quick-link {
     display: inline-block;
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--bg-almost-white);
     border: 1px solid var(--border-color);
     border-radius: 3px;
@@ -318,7 +318,7 @@ nav.doc-nav a {
 /* Quick Download Bar - Horizontal compact layout at top */
 .download-section.quick-download {
     margin: 0.75em 0 1.5em 0;
-    padding: 10px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--bg-almost-white);
     border-radius: var(--panel-border-radius);
     border: 1px solid var(--border-color);
@@ -383,7 +383,7 @@ nav.doc-nav a {
 
 .download-section.quick-download .download-link {
     display: inline-block;
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: #fff;
     border: 1px solid var(--border-color);
     border-radius: 3px;
@@ -603,7 +603,7 @@ nav.doc-nav a {
 .nix-table th,
 .nix-table td {
     text-align: left;
-    padding: 10px 12px;
+    padding: var(--panel-padding-sm);
     border-bottom: 1px solid var(--border-light);
 }
 
@@ -694,7 +694,7 @@ nav.doc-nav a {
 
 .doc-list a {
     display: block;
-    padding: 10px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--bg-almost-white);
     border-radius: var(--panel-border-radius);
     border: 1px solid var(--border-light);

@@ -232,7 +232,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: var(--panel-padding-md);
     background: #2a2a2a;
     border-bottom: 1px solid #333;
 }
@@ -256,7 +256,7 @@
 }
 
 .comparison-prompt {
-    padding: 10px 14px;
+    padding: var(--panel-padding-md);
     background: #1a1a1a;
     border-bottom: 1px solid #333;
 }
@@ -276,7 +276,7 @@
 
 .comparison-old,
 .comparison-new {
-    padding: 12px 14px;
+    padding: var(--panel-padding-md);
     position: relative;
 }
 
@@ -319,7 +319,7 @@
 
 /* Footer */
 .prompt-preview-footer {
-    padding: 10px 16px;
+    padding: var(--panel-padding-md);
     background: #222;
     border-top: 1px solid #444;
     display: flex;

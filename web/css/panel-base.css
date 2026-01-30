@@ -229,7 +229,7 @@
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 10px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--status-failed-bg);
     border: 1px solid var(--status-failed-text);
     border-radius: var(--panel-border-radius);
@@ -318,7 +318,7 @@
     background: none;
     border: var(--panel-border);
     border-radius: var(--panel-border-radius);
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     font-size: 12px;
     cursor: pointer;
     transition: var(--panel-transition-fast);

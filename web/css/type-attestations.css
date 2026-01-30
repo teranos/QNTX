@@ -19,7 +19,7 @@
     display: block;
     width: 100%;
     margin: 0 0 4px 0;
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     border: 1px solid var(--control-border);
     background: #fff;
     color: #000;
