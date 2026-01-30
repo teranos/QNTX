@@ -67,6 +67,45 @@ jobs:
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
 
+  qntx-sqlite:
+    name: SQLite Backend
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check --package qntx-core --package qntx-sqlite
+
+      - name: Clippy
+        run: cargo clippy --package qntx-core --package qntx-sqlite --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test Rust libraries
+        run: cargo test --package qntx-core --package qntx-sqlite
+
+      - name: Build release with FFI
+        run: cargo rustc --release --package qntx-sqlite --features ffi --crate-type cdylib
+
+      - name: Test CGO integration
+        run: |
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+          go test -v ./ats/storage/sqlitecgo/...
+
   qntx-python:
     name: Python Plugin
     runs-on: ubuntu-latest
