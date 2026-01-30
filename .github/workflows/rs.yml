@@ -7,6 +7,8 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
+      - 'crates/qntx-core/Cargo.toml'
+      - 'crates/qntx-sqlite/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
