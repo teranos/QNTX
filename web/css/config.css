@@ -13,7 +13,7 @@
     width: 280px;
     color: #fff;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', 'Source Code Pro', monospace;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-xl);
     z-index: 999;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -26,7 +26,7 @@
 .pulse-config-panel {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--gap);
 }
 
 .pulse-config-header {
@@ -39,7 +39,7 @@
 
 .pulse-config-header h2 {
     margin: 0;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-on-dark-tertiary);
     text-transform: uppercase;
@@ -59,7 +59,7 @@
 .config-field label {
     display: block;
     margin-bottom: 4px;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     color: var(--text-on-dark-tertiary);
 }
 
@@ -70,7 +70,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 2px;
     color: #fff;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-family: inherit;
 }
 
@@ -82,7 +82,7 @@
 
 .config-actions {
     display: flex;
-    gap: 6px;
+    gap: var(--gap);
     justify-content: flex-end;
     margin-top: 6px;
 }
@@ -90,11 +90,11 @@
 .config-actions button {
     padding: 4px 10px;
     border-radius: 2px;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     cursor: pointer;
     border: 1px solid rgba(255, 255, 255, 0.2);
     font-family: inherit;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .config-actions button[type="button"] {

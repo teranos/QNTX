@@ -703,7 +703,6 @@ let
 
       introText = ''
         <div class="intro-section">
-          <h2 style="text-align: center; margin: 20px 0;">Continuous Intelligence</h2>
           <p>QNTX implements <strong>Continuous Intelligence</strong> - systems that continuously evolve their understanding through verifiable attestations.</p>
           <ul>
             <li><strong>⨳ ix</strong> - Import external data into attestations</li>
@@ -736,7 +735,7 @@ let
         <div class="doc-header">
           <img src="./qntx.jpg" alt="QNTX Logo">
           <h1>QNTX</h1>
-          <p style="margin-top: 0; font-size: 1.1em;">Continuous Intelligence</p>
+          <span class="doc-header-subtitle">Continuous Intelligence</span>
         </div>
 
         <nav class="quick-links">
@@ -1300,6 +1299,7 @@ let
   # XSLT colors automatically extracted from core.css (single source of truth!)
   xsltColors = {
     bgDark = extractCssVar "bg-dark";
+    bgDarkHover = extractCssVar "bg-dark-hover";
     textOnDark = extractCssVar "text-on-dark";
     textOnDarkEmphasis = extractCssVar "text-on-dark-emphasis";
     textOnDarkSecondary = extractCssVar "text-on-dark-secondary";
@@ -1325,7 +1325,7 @@ let
               table { width: 100%; border-collapse: collapse; }
               th { text-align: left; padding: 12px; background: ${xsltColors.bgAlmostBlack}; color: ${xsltColors.textOnDarkEmphasis}; border-bottom: 2px solid ${xsltColors.borderOnDark}; }
               td { padding: 10px 12px; border-bottom: 1px solid ${xsltColors.borderOnDark}; }
-              tr:hover td { background: #2a2a2a; }
+              tr:hover td { background: ${xsltColors.bgDarkHover}; }
               a { color: ${xsltColors.accentColor}; text-decoration: none; }
               a:hover { text-decoration: underline; }
               .priority { color: ${xsltColors.textOnDarkTertiary}; }

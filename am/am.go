@@ -19,7 +19,7 @@ type DatabaseConfig struct {
 }
 
 // BoundedStorageConfig configures storage limits for attestations.
-// Values <= 0 are normalized to defaults at runtime (16, 64, 64 respectively).
+// Values <= 0 default to: ActorContextLimit=16, ActorContextsLimit=64, EntityActorsLimit=64.
 type BoundedStorageConfig struct {
 	ActorContextLimit  int `mapstructure:"actor_context_limit"`  // attestations per (actor, context) pair (default: 16)
 	ActorContextsLimit int `mapstructure:"actor_contexts_limit"` // contexts per actor (default: 64)
@@ -28,7 +28,7 @@ type BoundedStorageConfig struct {
 
 // ServerConfig configures the QNTX web server
 type ServerConfig struct {
-	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 = let OS assign ephemeral port (standard socket API behavior)
+	Port           *int     `mapstructure:"port"`          // Server port: nil = default 877, 0 is invalid (omit for default)
 	FrontendPort   int      `mapstructure:"frontend_port"` // Frontend dev server port (default: 8820)
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	LogTheme       string   `mapstructure:"log_theme"` // Color theme: gruvbox, everforest
