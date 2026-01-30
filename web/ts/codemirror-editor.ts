@@ -16,7 +16,7 @@ import { languageServer } from 'codemirror-languageserver';
 // DISABLED: LSP WebSocket transport conflicts with main WebSocket
 // import { createLSPClient } from './lsp-websocket-transport.js';
 import { sendMessage, validateBackendURL } from './websocket.ts';
-import { requestParse } from './ats-semantic-tokens-client.ts';
+import { requestParse, PARSE_DEBOUNCE_MS } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 import { FuzzySearchView } from './fuzzy-search-view.ts';
 
@@ -256,7 +256,7 @@ function handleDocumentChange(update: any): void {
                 const cursorPos = editorView.state.selection.main.head;
                 requestParse(doc, 1, cursorPos);
             }
-        }, 150); // 150ms debounce for syntax highlighting
+        }, PARSE_DEBOUNCE_MS);
     }
 
     // Execute query with debounce based on mode
