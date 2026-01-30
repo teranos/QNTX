@@ -14,7 +14,7 @@
     --link-opacity: 0.6;  /* Semi-transparent to reduce visual weight */
 
     /* Tooltip styles - high contrast for readability */
-    --tooltip-padding: 8px 10px;
+    --tooltip-padding: var(--panel-padding-sm);
     --tooltip-bg: #000;  /* Black background for clear overlay */
     --tooltip-color: #fff;  /* White text for maximum contrast */
     --tooltip-font-size: 11px;

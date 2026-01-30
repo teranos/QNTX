@@ -14,7 +14,7 @@
 
 .config-search-input {
     width: 100%;
-    padding: 10px 14px;
+    padding: var(--panel-padding-md);
     font-size: 12px;
     border: var(--panel-border);
     border-radius: var(--panel-border-radius);

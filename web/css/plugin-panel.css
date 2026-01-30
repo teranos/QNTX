@@ -16,7 +16,7 @@
 
 .plugin-search-input {
     width: 100%;
-    padding: 10px 14px;
+    padding: var(--panel-padding-md);
     font-size: 12px;
     border: var(--panel-border);
     border-radius: var(--panel-border-radius);
@@ -521,7 +521,7 @@
 
 .plugin-config-row-error-msg {
     grid-column: 1 / -1;
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--status-failed-bg);
     color: var(--status-failed-text);
     font-size: 11px;
@@ -537,7 +537,7 @@
 }
 
 .plugin-config-warning {
-    padding: 10px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--status-pending-bg);
     border: 1px solid #ef6c00;
     border-radius: var(--panel-border-radius);

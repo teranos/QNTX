@@ -243,7 +243,7 @@
 }
 
 .ollama-model-selector {
-    padding: 10px 14px;
+    padding: var(--panel-padding-md);
     background: #f8f8f8;
     border: var(--panel-border);
     border-radius: 6px;

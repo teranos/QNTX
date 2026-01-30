@@ -95,7 +95,7 @@
 }
 
 .pulse-btn {
-  padding: 6px 12px;
+  padding: var(--panel-padding-sm);
   border: 1px solid var(--border-light);
   border-radius: var(--panel-border-radius);
   background: #fff;
@@ -428,7 +428,7 @@
 
 .pulse-retry-button {
     margin-top: 12px;
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: #ffc107;
     color: #000;
     border: none;

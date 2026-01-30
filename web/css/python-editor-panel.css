@@ -63,7 +63,7 @@
 }
 
 .python-run-btn {
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: #3776ab;
     color: white;
     border: none;
@@ -83,7 +83,7 @@
 }
 
 .python-example-btn {
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: transparent;
     color: var(--editor-text-muted, #858585);
     border: 1px solid var(--editor-border, #3e3e42);
