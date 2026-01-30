@@ -107,7 +107,7 @@
             src = ./.; # Use workspace root (fuzzy-ax is excluded from workspace)
 
             cargoLock = {
-              lockFile = ./Cargo.lock;  # Now uses workspace Cargo.lock
+              lockFile = ./Cargo.lock; # Now uses workspace Cargo.lock
             };
 
             # Build from ats/ax/fuzzy-ax subdirectory
