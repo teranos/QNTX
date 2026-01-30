@@ -135,7 +135,7 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--panel-padding-md);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -214,7 +214,7 @@
 
 .provider-btn:hover {
     border-color: var(--panel-text-tertiary);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
 }
 
 .provider-btn.active {
@@ -244,7 +244,7 @@
 
 .ollama-model-selector {
     padding: var(--panel-padding-md);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border: var(--panel-border);
     border-radius: var(--border-radius-lg);
     display: flex;

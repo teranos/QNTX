@@ -49,7 +49,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
 }
 
 .plugin-summary-stats {
@@ -233,7 +233,7 @@
     margin-top: 12px;
     padding: var(--panel-padding-sm);
     font-size: var(--font-size-sm);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-radius: var(--border-radius);
     color: var(--panel-text-secondary);
 }
@@ -378,14 +378,14 @@
     display: grid;
     grid-template-columns: 1fr 2fr;
     gap: 1px;
-    background: #fff;
+    background: var(--bg-primary);
     align-items: center;
     cursor: help;
     min-height: 32px;
 }
 
 .plugin-config-row:hover {
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
 }
 
 .plugin-config-row-changed {
@@ -405,7 +405,7 @@
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: #000;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 .plugin-config-row-changed .plugin-config-label,
@@ -436,7 +436,7 @@
     font-size: var(--font-size-sm);
     border: none;
     outline: none;
-    background: #fff;
+    background: var(--bg-primary);
     transition: var(--panel-transition-fast);
 }
 
@@ -446,7 +446,7 @@
     align-items: center;
     gap: var(--gap);
     padding: 6px 10px;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 .plugin-config-row-changed .plugin-config-value-cell {
@@ -491,7 +491,7 @@
     font-size: var(--font-size-sm);
     border: 1px solid #ccc;
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 .plugin-config-edit-container .plugin-config-value-new:focus {
@@ -559,7 +559,7 @@
 }
 
 .plugin-config-cancel-btn {
-    background: #fff;
+    background: var(--bg-primary);
     border-color: #d0d0d0;
     color: var(--text-secondary);
 }

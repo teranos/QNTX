@@ -63,7 +63,7 @@
 }
 
 .scraper-submit-btn:hover:not(:disabled) {
-    background: #333;
+    background: var(--bg-dark-light);
 }
 
 .scraper-submit-btn:disabled {
@@ -212,7 +212,7 @@
     color: var(--text-primary);
     line-height: 1.5;
     padding: 8px;
-    background: #fff;
+    background: var(--bg-primary);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     margin: 8px 0;
@@ -265,7 +265,7 @@
     align-items: center;
     padding: 8px;
     margin-bottom: 4px;
-    background: #fff;
+    background: var(--bg-primary);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     cursor: pointer;

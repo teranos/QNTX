@@ -199,7 +199,7 @@
 
 .completion-menu {
     position: absolute;
-    background: #fff;
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -278,7 +278,7 @@
 
 .hover-tooltip {
     position: absolute;
-    background: #2c2c2c;
+    background: var(--bg-dark-hover);
     color: #fff;
     padding: var(--panel-padding-sm);
     border-radius: var(--border-radius);
@@ -348,7 +348,7 @@
     /* Uncomment when dark mode is implemented */
     /*
     .completion-menu {
-        background: #1e1e1e;
+        background: var(--bg-almost-black);
         border-color: #3e3e3e;
     }
 
@@ -358,7 +358,7 @@
 
     .completion-item:hover,
     .completion-item.selected {
-        background: #2e2e2e;
+        background: var(--bg-dark-hover);
     }
 
     .completion-label {

@@ -38,7 +38,7 @@
 #graph-container {
     flex: 1;
     position: relative;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 #graph {

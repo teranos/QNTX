@@ -8,7 +8,7 @@
     transform: translateY(-50%);
     width: 24px;
     height: 120px;
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border: 1px solid #444;
     border-right: none;
     border-radius: var(--border-radius) 0 0 var(--border-radius);
@@ -32,12 +32,12 @@
 }
 
 .prompt-indicator-vertical:hover {
-    background: #333;
+    background: var(--bg-dark-light);
     transform: translateY(-50%) translateX(-2px);
 }
 
 .prompt-indicator-vertical.active {
-    background: #3a3a3a;
+    background: var(--bg-dark-light);
     border-color: #666;
 }
 
@@ -52,7 +52,7 @@
     right: 0;
     width: 45%; /* Slightly narrower than Prose panel */
     height: 100%;
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     border-left: 1px solid #444;
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
     z-index: 1001; /* Above Prose panel */
@@ -84,7 +84,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--panel-padding-md);
-    background: #222;
+    background: var(--bg-dark);
     border-bottom: 1px solid #444;
 }
 
@@ -164,7 +164,7 @@
 .prompt-preview-sample-control input[type="number"] {
     width: 60px;
     padding: 4px 8px;
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border: 1px solid #444;
     border-radius: var(--border-radius);
     color: #ccc;
@@ -190,7 +190,7 @@
 .prompt-preview-filter input {
     width: 100%;
     padding: 6px 10px;
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border: 1px solid #444;
     border-radius: var(--border-radius);
     color: #ccc;
@@ -222,7 +222,7 @@
 }
 
 .prompt-preview-comparison {
-    background: #222;
+    background: var(--bg-dark);
     border: 1px solid #333;
     border-radius: var(--border-radius-lg);
     overflow: hidden;
@@ -233,7 +233,7 @@
     align-items: center;
     gap: 12px;
     padding: var(--panel-padding-md);
-    background: #2a2a2a;
+    background: var(--bg-dark-hover);
     border-bottom: 1px solid #333;
 }
 
@@ -257,7 +257,7 @@
 
 .comparison-prompt {
     padding: var(--panel-padding-md);
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     border-bottom: 1px solid #333;
 }
 
@@ -320,7 +320,7 @@
 /* Footer */
 .prompt-preview-footer {
     padding: var(--panel-padding-md);
-    background: #222;
+    background: var(--bg-dark);
     border-top: 1px solid #444;
     display: flex;
     justify-content: space-between;
@@ -339,7 +339,7 @@
 }
 
 .prompt-preview-body::-webkit-scrollbar-track {
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb {
