@@ -321,7 +321,7 @@
    Animations
    ============================================================================ */
 
-@keyframes fadeIn {
+@keyframes fadeInUp {
     from {
         opacity: 0;
         transform: translateY(-4px);
@@ -333,11 +333,11 @@
 }
 
 .completion-menu {
-    animation: fadeIn 0.15s ease-out;
+    animation: fadeInUp 0.15s ease-out;
 }
 
 .hover-tooltip {
-    animation: fadeIn 0.2s ease-out;
+    animation: fadeInUp 0.2s ease-out;
 }
 
 /* ============================================================================

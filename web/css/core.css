@@ -139,41 +139,6 @@ body.disconnected #container {
     color: rgba(136, 201, 153, 0.4);
 }
 
-/* Common Animations - Consolidated for reuse */
-@keyframes fadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateX(-100%);
-    }
-    to {
-        transform: translateX(0);
-    }
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
-}
-
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
     .attestation-line {
@@ -259,12 +224,6 @@ body.disconnected #container {
     background: #4ade80;
     margin-left: 2px;
     animation: blink 1s step-end infinite;
-}
-
-@keyframes blink {
-    50% {
-        opacity: 0;
-    }
 }
 
 .llm-model, .llm-stage {
