@@ -256,9 +256,10 @@ type WorkerPoolConfig struct {
 For faster testing, use shorter intervals:
 
 ```go
+pollInterval := 100 * time.Millisecond
 config := async.WorkerPoolConfig{
     Workers:         1,
-    PollInterval:    100 * time.Millisecond,
+    PollInterval:    &pollInterval,
     ShutdownTimeout: 2 * time.Second,
 }
 ```

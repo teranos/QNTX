@@ -43,10 +43,11 @@ func TestGRACEShutdownFlow(t *testing.T) {
 	defer cancel()
 
 	// Create worker pool with parent context and fast polling for tests
+	pollInterval := 100 * time.Millisecond
 	wp := NewWorkerPoolWithContext(ctx, db, cfg, WorkerPoolConfig{
 		Workers:       1,
 		PauseOnBudget: false,
-		PollInterval:  100 * time.Millisecond, // Fast polling for tests
+		PollInterval:  &pollInterval, // Fast polling for tests
 	}, zap.NewNop().Sugar())
 
 	// Register a mock handler for protein sequence analysis (generic bioinformatics job)
