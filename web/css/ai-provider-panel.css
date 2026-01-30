@@ -206,7 +206,7 @@
     padding: 16px 12px;
     background: var(--panel-bg);
     border: 2px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     cursor: pointer;
     transition: var(--panel-transition-normal);
     font-family: inherit;
@@ -246,7 +246,7 @@
     padding: var(--panel-padding-md);
     background: #f8f8f8;
     border: var(--panel-border);
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     display: flex;
     align-items: center;
     gap: 10px;

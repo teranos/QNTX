@@ -71,7 +71,7 @@
 
 /* Job Items - extends panel-card */
 .job-item {
-    border-radius: 6px; /* Slightly more rounded than default */
+    border-radius: var(--border-radius-lg);
     margin-bottom: 8px;
 }
 

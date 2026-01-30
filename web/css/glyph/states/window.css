@@ -20,7 +20,7 @@
     padding: 0 12px;
     cursor: move;
     user-select: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
 }
 
 .window-title-bar span {
