@@ -49,7 +49,7 @@
 
 .job-list-title {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
@@ -66,7 +66,7 @@
 /* Empty state uses panel-empty from base */
 .job-list-empty p {
     margin: 4px 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 /* Job Items - extends panel-card */
@@ -105,7 +105,7 @@
 
 .job-title {
     flex: 1;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 500;
     color: #000;
 }
@@ -147,13 +147,13 @@
 }
 
 .job-progress-text {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
 /* Cost Info */
 .job-cost {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
@@ -161,14 +161,14 @@
 /* Job Actions */
 .job-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     margin-top: 8px;
 }
 
 .job-action-btn {
     flex: 1;
     padding: var(--panel-padding-sm);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
@@ -237,7 +237,7 @@
 }
 
 .expand-icon {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     transition: transform 0.2s ease;
     width: 16px;
@@ -252,7 +252,7 @@
 }
 
 .task-list-empty {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     padding: 8px;
     text-align: center;
@@ -337,7 +337,7 @@
 .new-ix-btn {
     width: 100%;
     padding: var(--panel-padding-sm);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     border: 1px dashed #999;
     border-radius: var(--border-radius);
@@ -361,7 +361,7 @@
     margin-top: 8px;
     padding: 0;
     font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     max-height: 300px;
     overflow-y: auto;
     display: flex;
@@ -443,7 +443,7 @@
 }
 
 .details-header {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 8px;
@@ -454,13 +454,13 @@
 .details-content {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--gap);
 }
 
 .metadata-item {
     display: flex;
-    gap: 8px;
-    font-size: 11px;
+    gap: var(--gap);
+    font-size: var(--font-size-sm);
     line-height: 1.4;
 }
 
@@ -490,7 +490,7 @@
 }
 
 .no-metadata {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     text-align: center;
     padding: 8px;

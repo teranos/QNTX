@@ -24,7 +24,7 @@
 
 .prompt-indicator-vertical span {
     color: #999;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -91,7 +91,7 @@
 .prompt-preview-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .prompt-preview-icon {
@@ -101,19 +101,19 @@
 
 .prompt-preview-name {
     color: #ccc;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: 500;
 }
 
 .prompt-preview-status {
     color: #888;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     margin-left: 12px;
 }
 
 .prompt-preview-controls {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     align-items: center;
 }
 
@@ -158,7 +158,7 @@
 
 .prompt-preview-sample-control label {
     color: #999;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .prompt-preview-sample-control input[type="number"] {
@@ -168,7 +168,7 @@
     border: 1px solid #444;
     border-radius: var(--border-radius);
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .prompt-preview-run {
@@ -177,7 +177,7 @@
     border: 1px solid #4a6a4a;
     border-radius: var(--border-radius);
     color: #9fc99f;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
@@ -194,7 +194,7 @@
     border: 1px solid #444;
     border-radius: var(--border-radius);
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
@@ -211,7 +211,7 @@
 
 .prompt-preview-empty p {
     margin: 8px 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 /* Comparison cards */
@@ -239,20 +239,20 @@
 
 .comparison-number {
     color: #666;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
 }
 
 .comparison-id {
     color: #888;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', monospace;
 }
 
 .comparison-tokens {
     margin-left: auto;
     color: #666;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 .comparison-prompt {
@@ -263,7 +263,7 @@
 
 .comparison-prompt code {
     color: #7a9a7a;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', monospace;
     word-break: break-word;
 }
@@ -286,7 +286,7 @@
 
 .comparison-label {
     color: #666;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
@@ -303,7 +303,7 @@
 
 .comparison-content {
     color: #aaa;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     line-height: 1.5;
 }
 
@@ -330,7 +330,7 @@
 .prompt-preview-token-count,
 .prompt-preview-cost-estimate {
     color: #666;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Scrollbar styling */

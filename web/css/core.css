@@ -108,7 +108,7 @@ body.disconnected #container {
     z-index: 0;
     padding: 20px;
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     line-height: 1.4;
     /* Improved contrast: 0.15 -> 0.35 for better visibility */
     color: rgba(100, 255, 100, 0.35);
@@ -216,7 +216,7 @@ body.disconnected #container {
 
 #header .subtitle {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
@@ -226,7 +226,7 @@ body.disconnected #container {
     margin-bottom: 32px; /* Space for fixed log panel at bottom */
     background: #fff;
     border-top: 1px solid var(--border-color);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
@@ -249,7 +249,7 @@ body.disconnected #container {
 
 .llm-stream-content {
     font-family: Courier New, monospace;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     line-height: 1.4;
     padding: 8px;
     color: #d4d4d4;

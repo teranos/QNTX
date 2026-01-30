@@ -16,7 +16,7 @@
     position: absolute;
     top: 8px;
     right: 12px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     letter-spacing: 0.5px;
     z-index: 10;
@@ -32,7 +32,7 @@
 
 .code-block .cm-scroller {
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     line-height: 1.6;
 }
 

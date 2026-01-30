@@ -4,7 +4,7 @@
     width: 100%;
     height: 100%;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 /* Match existing ATS editor styling */

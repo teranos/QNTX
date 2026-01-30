@@ -17,7 +17,7 @@
 .plugin-search-input {
     width: 100%;
     padding: var(--panel-padding-md);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     border: var(--panel-border);
     border-radius: var(--border-radius);
     outline: none;
@@ -40,7 +40,7 @@
     text-align: center;
     padding: 32px 16px;
     color: var(--panel-text-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 /* Summary card */
@@ -59,13 +59,13 @@
 }
 
 .plugin-count {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
 
 .plugin-health-summary {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 .plugin-health-good {
@@ -77,7 +77,7 @@
 }
 
 .plugin-refresh-btn {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Plugin list */
@@ -102,17 +102,17 @@
 .plugin-name-row {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .plugin-name {
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
 
 .plugin-version {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
 }
 
@@ -121,7 +121,7 @@
 /* Plugin badges container */
 .plugin-badges {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     align-items: center;
 }
 
@@ -130,7 +130,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     padding: 4px 8px;
     border-radius: var(--border-radius-lg);
@@ -153,7 +153,7 @@
 }
 
 .plugin-state-icon {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
 }
 
 /* Plugin status indicator */
@@ -161,7 +161,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     padding: 4px 8px;
     border-radius: var(--border-radius-lg);
@@ -178,7 +178,7 @@
 }
 
 .plugin-status-icon {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
 }
 
 /* Plugin controls */
@@ -187,12 +187,12 @@
     padding-top: 12px;
     border-top: 1px solid #eee;
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .plugin-pause-btn,
 .plugin-resume-btn {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     cursor: pointer;
 }
 
@@ -218,7 +218,7 @@
 
 /* Plugin description */
 .plugin-description {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
     margin-bottom: 12px;
     line-height: 1.5;
@@ -232,7 +232,7 @@
 .plugin-message {
     margin-top: 12px;
     padding: var(--panel-padding-sm);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     background: #f8f8f8;
     border-radius: var(--border-radius);
     color: var(--panel-text-secondary);
@@ -249,13 +249,13 @@
     padding: var(--panel-padding-sm);
     background: var(--bg-almost-white);
     border-radius: var(--border-radius);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
 
 .plugin-detail-item {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     padding: 2px 0;
 }
 
@@ -308,12 +308,12 @@
 
     .plugin-card-header {
         flex-direction: column;
-        gap: 8px;
+        gap: var(--gap);
     }
 
     .plugin-meta {
         flex-direction: column;
-        gap: 8px;
+        gap: var(--gap);
     }
 }
 
@@ -362,7 +362,7 @@
     grid-template-columns: 1fr 2fr;
     gap: 1px;
     background: var(--bg-almost-white);
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
     color: var(--panel-text-tertiary);
@@ -402,7 +402,7 @@
 
 .plugin-config-label {
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: #000;
     background: #fff;
@@ -425,7 +425,7 @@
 
 .plugin-config-value-old {
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
     font-family: var(--font-mono, monospace);
     background: var(--bg-almost-white);
@@ -433,7 +433,7 @@
 
 .plugin-config-value-new {
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     border: none;
     outline: none;
     background: #fff;
@@ -444,7 +444,7 @@
 .plugin-config-value-cell {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap);
     padding: 6px 10px;
     background: #fff;
 }
@@ -459,7 +459,7 @@
 
 .plugin-config-value-display {
     flex: 1;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: var(--font-mono, monospace);
     color: var(--text-primary);
     cursor: pointer;
@@ -488,7 +488,7 @@
 .plugin-config-edit-container .plugin-config-value-new {
     flex: 1;
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     border: 1px solid #ccc;
     border-radius: var(--border-radius);
     background: #fff;
@@ -506,7 +506,7 @@
     color: var(--panel-text-tertiary);
     cursor: pointer;
     padding: 2px 6px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .plugin-config-field-cancel:hover {
@@ -524,14 +524,14 @@
     padding: var(--panel-padding-sm);
     background: var(--status-failed-bg);
     color: var(--status-failed-text);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 .plugin-config-actions {
     margin-top: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--gap);
     padding-top: 10px;
     border-top: 1px solid #eee;
 }
@@ -541,7 +541,7 @@
     background: var(--status-pending-bg);
     border: 1px solid #ef6c00;
     border-radius: var(--border-radius);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--status-pending-text);
     line-height: 1.4;
 }
@@ -549,13 +549,13 @@
 .plugin-config-actions-buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .plugin-config-cancel-btn,
 .plugin-config-save-btn {
     padding: 8px 16px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .plugin-config-cancel-btn {

@@ -13,7 +13,7 @@
   background: var(--bg-almost-white);
   border-top: 1px solid var(--border-light);
   border-radius: 0 0 4px 4px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 /* Inline error display */
@@ -23,7 +23,7 @@
   border-left: 3px solid #ff0033;
   border-radius: var(--border-radius);
   color: #ff0033;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   margin-bottom: 4px;
 }
@@ -32,12 +32,12 @@
 .pulse-controls-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap);
 }
 
 /* Pulse icon */
 .pulse-icon {
-  font-size: 14px;
+  font-size: var(--font-size-md);
   opacity: 0.7;
 }
 
@@ -45,7 +45,7 @@
 .pulse-schedule-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap);
   padding: 4px 8px;
   border-radius: var(--border-radius-lg);
   font-weight: 500;
@@ -69,11 +69,11 @@
 
 .pulse-interval {
   font-family: var(--font-mono, 'Monaco', 'Menlo', monospace);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .pulse-state {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -100,7 +100,7 @@
   border-radius: var(--border-radius);
   background: white;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   transition: all 0.2s;
 }
 
@@ -150,7 +150,7 @@
 
 /* Confirmation hint (shows below interval picker) */
 .pulse-confirm-hint {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   color: var(--status-pending-text);
   margin-left: auto;
   font-style: italic;
@@ -166,7 +166,7 @@
   border: 1px solid var(--border-light);
   border-radius: var(--border-radius);
   background: white;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   cursor: pointer;
 }
 
@@ -180,11 +180,11 @@
 .pulse-interval-picker {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap);
 }
 
 .pulse-label {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   color: var(--color-text-secondary, #757575);
 }
 
