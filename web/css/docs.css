@@ -19,7 +19,7 @@ body {
 
 /* Typography - Code blocks */
 pre {
-    background: #f4f4f4;
+    background: var(--bg-code);
     padding: 12px 16px;
     overflow-x: auto;
     border-radius: 4px;
@@ -27,7 +27,7 @@ pre {
 }
 
 code {
-    background: #f4f4f4;
+    background: var(--bg-code);
     padding: 2px 6px;
     border-radius: 3px;
     font-family: var(--font-mono, monospace);
@@ -50,7 +50,7 @@ h1 {
 
 h2 {
     margin-top: 1.5em;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-light);
     padding-bottom: 6px;
     font-size: 1.3em;
 }
@@ -162,7 +162,7 @@ nav.doc-nav a {
     font-weight: 600;
     margin: 0 0 12px 0;
     font-size: 0.9em;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 .toc ul {
@@ -243,7 +243,7 @@ nav.doc-nav a {
     margin-bottom: 0;
     font-family: var(--font-mono, monospace);
     font-size: 0.85em;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 /* Build Info Section - Compact */
@@ -299,7 +299,7 @@ nav.doc-nav a {
 }
 
 .quick-link:hover {
-    background: #eee;
+    background: var(--bg-hover);
     text-decoration: none;
 }
 
@@ -384,7 +384,7 @@ nav.doc-nav a {
 .download-section.quick-download .download-link {
     display: inline-block;
     padding: 6px 12px;
-    background: #fff;
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 3px;
     font-size: 0.85em;
@@ -440,7 +440,7 @@ nav.doc-nav a {
 }
 
 .download-card-desc {
-    color: #555;
+    color: var(--text-secondary);
     font-size: 0.9em;
     flex-grow: 1;
     margin-bottom: 16px;
@@ -458,7 +458,7 @@ nav.doc-nav a {
 }
 
 .download-btn:hover {
-    background: #0055aa;
+    background: var(--accent-hover);
     text-decoration: none;
 }
 
@@ -526,7 +526,7 @@ nav.doc-nav a {
 }
 
 .release-date {
-    color: #777;
+    color: var(--text-tertiary);
     font-size: 0.8em;
 }
 
@@ -613,7 +613,7 @@ nav.doc-nav a {
 }
 
 .nix-table code {
-    background: #f4f4f4;
+    background: var(--bg-code);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.85em;
@@ -629,7 +629,7 @@ nav.doc-nav a {
 }
 
 .container-details code {
-    background: #f4f4f4;
+    background: var(--bg-code);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.85em;
@@ -658,7 +658,7 @@ nav.doc-nav a {
 
 .category-desc {
     font-size: 0.85em;
-    color: #777;
+    color: var(--text-tertiary);
     margin-left: auto;
 }
 
@@ -779,11 +779,7 @@ th {
     }
 
     h1, h2 {
-        border-color: var(--text-primary);
-    }
-
-    h2 {
-        border-color: var(--bg-dark);
+        border-color: var(--border-on-dark);
     }
 
     pre, code {
@@ -791,11 +787,11 @@ th {
     }
 
     pre {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     a {
-        color: #6db3f2;
+        color: var(--accent-on-dark);
     }
 
     nav.doc-nav,
@@ -806,26 +802,61 @@ th {
     }
 
     .toc {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .doc-list a {
         background: var(--bg-dark);
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .doc-list a:hover {
         background: var(--bg-dark);
+        border-color: var(--accent-on-dark);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .doc-header {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
+    }
+
+    .page-header {
+        border-color: var(--border-on-dark);
+    }
+
+    .edit-link {
+        color: var(--text-on-dark-tertiary);
+        border-color: var(--border-on-dark);
+    }
+
+    .edit-link:hover {
+        color: var(--accent-on-dark);
+        border-color: var(--accent-on-dark);
+    }
+
+    .breadcrumb {
+        color: var(--text-on-dark-secondary);
+    }
+
+    .breadcrumb a {
+        color: var(--text-on-dark-secondary);
+    }
+
+    .breadcrumb a:hover {
+        color: var(--accent-on-dark);
+    }
+
+    .breadcrumb-sep {
+        color: var(--text-on-dark-tertiary);
+    }
+
+    .breadcrumb-current {
+        color: var(--text-on-dark);
     }
 
     .intro-section {
         background: var(--bg-dark);
-        border-left-color: #0077cc;
+        border-left-color: var(--accent-color);
     }
 
     .intro-section p:last-child {
@@ -833,16 +864,16 @@ th {
     }
 
     .build-info-section h2 {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .build-info-list li {
-        border-left-color: var(--text-primary);
+        border-left-color: var(--border-on-dark);
     }
 
     .download-section.quick-download {
-        background: #222;
-        border-color: var(--text-primary);
+        background: var(--bg-dark);
+        border-color: var(--border-on-dark);
     }
 
     .download-section.quick-download h2 {
@@ -856,25 +887,25 @@ th {
     }
 
     .download-section.quick-download .download-link:hover {
-        background: #333;
-        border-color: #0077cc;
+        background: var(--bg-almost-black);
+        border-color: var(--accent-on-dark);
     }
 
     .download-section.quick-download .file-size {
-        color: #777;
+        color: var(--text-on-dark-tertiary);
     }
 
     .quick-link {
         background: var(--bg-dark);
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .quick-link:hover {
-        background: var(--bg-dark);
+        background: var(--bg-almost-black);
     }
 
     .category-header {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .category-title {
@@ -882,7 +913,7 @@ th {
     }
 
     .category-desc {
-        color: var(--text-tertiary);
+        color: var(--text-on-dark-tertiary);
     }
 
     .toc-title {
@@ -890,12 +921,12 @@ th {
     }
 
     th, td {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .download-card {
         background: var(--bg-dark);
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .download-card-desc {
@@ -903,24 +934,24 @@ th {
     }
 
     .download-btn {
-        background: #0077cc;
+        background: var(--accent-color);
     }
 
     .download-btn:hover {
-        background: #0088dd;
+        background: var(--accent-hover);
     }
 
     .platform-list li {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .release-version {
         background: var(--bg-dark);
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .release-version.latest {
-        border-color: #0077cc;
+        border-color: var(--accent-color);
     }
 
     .release-date {
@@ -928,7 +959,7 @@ th {
     }
 
     .file-size {
-        color: var(--text-secondary);
+        color: var(--text-on-dark-secondary);
     }
 
     .loading {
@@ -936,16 +967,16 @@ th {
     }
 
     .site-footer {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .provenance a:hover {
-        color: #6db3f2;
+        color: var(--accent-on-dark);
     }
 
     .nix-table th,
     .nix-table td {
-        border-color: var(--text-primary);
+        border-color: var(--border-on-dark);
     }
 
     .nix-table th {
