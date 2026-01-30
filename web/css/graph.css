@@ -14,10 +14,10 @@
     --link-opacity: 0.6;  /* Semi-transparent to reduce visual weight */
 
     /* Tooltip styles - high contrast for readability */
-    --tooltip-padding: 8px 10px;
+    --tooltip-padding: var(--panel-padding-sm);
     --tooltip-bg: #000;  /* Black background for clear overlay */
     --tooltip-color: #fff;  /* White text for maximum contrast */
-    --tooltip-font-size: 11px;
+    --tooltip-font-size: var(--font-size-sm);
 
     /* Layout spacing */
     --control-offset: 16px;
@@ -30,7 +30,7 @@
 
     /* Meta overlay - gray for secondary information */
     --meta-max-width: 300px;
-    --meta-font-size: 11px;
+    --meta-font-size: var(--font-size-sm);
     --meta-color: var(--text-secondary);  /* Mid-gray for de-emphasized text */
 }
 
@@ -38,7 +38,7 @@
 #graph-container {
     flex: 1;
     position: relative;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 #graph {
@@ -63,7 +63,7 @@
 
 #meta-overlay h3 {
     margin: 0 0 8px 0;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
     color: #000;
@@ -122,8 +122,8 @@
     padding: 4px 10px;
     background: rgba(46, 204, 113, 0.15);
     border: 1px solid rgba(46, 204, 113, 0.3);
-    border-radius: 3px;
-    font-size: 10px;
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: rgba(46, 204, 113, 0.9); /* Subtle green */
     transition: all 0.4s ease-out;
