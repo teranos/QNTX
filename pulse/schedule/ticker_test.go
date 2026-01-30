@@ -18,7 +18,7 @@ type mockBroadcaster struct{}
 
 func (m *mockBroadcaster) BroadcastPulseExecutionStarted(scheduledJobID, executionID, atsCode string) {
 }
-func (m *mockBroadcaster) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, durationMs int) {
+func (m *mockBroadcaster) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int) {
 }
 
 func TestEnqueueAsyncJob_WithPrecomputedHandler(t *testing.T) {
