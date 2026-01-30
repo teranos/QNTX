@@ -153,14 +153,17 @@ type SystemMetrics struct {
 
 ## WorkerPoolConfig {#workerpoolconfig}
 
-**Source**: [`pulse/async/worker.go:88`](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go#L88)
+**Source**: [`pulse/async/worker.go:100`](https://github.com/teranos/QNTX/blob/main/pulse/async/worker.go#L100)
 
 
 ```go
 type WorkerPoolConfig struct {
 	Workers int `json:"workers"`
-	PollInterval time.Duration `json:"poll_interval"`
+	PollInterval *time.Duration `json:"poll_interval"`
 	PauseOnBudget bool `json:"pause_on_budget"`
 	GracefulStartPhase time.Duration `json:"graceful_start_phase"`
+	WorkerStopTimeout time.Duration `json:"worker_stop_timeout"`
+	MaxConsecutiveErrors int `json:"max_consecutive_errors"`
+	MaxBackoff time.Duration `json:"max_backoff"`
 }
 ```
