@@ -1300,6 +1300,7 @@ let
   # XSLT colors automatically extracted from core.css (single source of truth!)
   xsltColors = {
     bgDark = extractCssVar "bg-dark";
+    bgDarkHover = extractCssVar "bg-dark-hover";
     textOnDark = extractCssVar "text-on-dark";
     textOnDarkEmphasis = extractCssVar "text-on-dark-emphasis";
     textOnDarkSecondary = extractCssVar "text-on-dark-secondary";
@@ -1325,7 +1326,7 @@ let
               table { width: 100%; border-collapse: collapse; }
               th { text-align: left; padding: 12px; background: ${xsltColors.bgAlmostBlack}; color: ${xsltColors.textOnDarkEmphasis}; border-bottom: 2px solid ${xsltColors.borderOnDark}; }
               td { padding: 10px 12px; border-bottom: 1px solid ${xsltColors.borderOnDark}; }
-              tr:hover td { background: #2a2a2a; }
+              tr:hover td { background: ${xsltColors.bgDarkHover}; }
               a { color: ${xsltColors.accentColor}; text-decoration: none; }
               a:hover { text-decoration: underline; }
               .priority { color: ${xsltColors.textOnDarkTertiary}; }
