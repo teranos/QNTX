@@ -44,7 +44,7 @@
 
 /* Config File Info - uses .panel-card from panel-base.css */
 .config-file-info {
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     margin-bottom: 20px;
     display: flex;
     flex-direction: column;
@@ -177,7 +177,7 @@
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
     border: 1px solid #ccc;
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-primary);
     min-width: 100px;
 }
 
@@ -232,7 +232,7 @@
 }
 
 .config-cancel-btn {
-    background: #fff;
+    background: var(--bg-primary);
     color: var(--text-secondary);
 }
 
@@ -279,7 +279,7 @@
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: #333;
+    background: var(--bg-dark-light);
     color: #fff;
     padding: 12px 20px;
     border-radius: var(--border-radius);

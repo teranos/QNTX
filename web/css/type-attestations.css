@@ -21,7 +21,7 @@
     margin: 0 0 4px 0;
     padding: var(--panel-padding-sm);
     border: 1px solid var(--control-border);
-    background: #fff;
+    background: var(--bg-primary);
     color: #000;
     cursor: pointer;
     font-size: var(--meta-font-size);

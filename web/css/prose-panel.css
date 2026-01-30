@@ -153,7 +153,7 @@
 .prose-sidebar {
     width: 250px;
     flex-shrink: 0;  /* Prevent sidebar from shrinking */
-    background: #252525;
+    background: var(--bg-dark);
     border-right: 1px solid #333;
     display: flex;
     flex-direction: column;
@@ -221,7 +221,7 @@
 .prose-search {
     width: 100%;
     padding: 8px;
-    background: #1e1e1e;
+    background: var(--bg-almost-black);
     border: 1px solid #444;
     border-radius: var(--border-radius);
     color: #e0e0e0;
@@ -483,7 +483,7 @@
     align-items: center;
     padding: 8px 20px;
     border-top: 1px solid var(--border-on-dark);
-    background: #252525;
+    background: var(--bg-dark);
     font-size: var(--font-size-sm);
     color: var(--text-on-dark-tertiary);
 }
@@ -533,7 +533,7 @@
     margin: 12px 0;
     border: 1px solid #333;
     border-radius: var(--border-radius);
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
     position: relative;
 }
 
@@ -555,7 +555,7 @@
 }
 
 .frontmatter-editor {
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
 }
 
 .frontmatter-block .cm-editor {

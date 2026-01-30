@@ -24,7 +24,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--panel-padding-sm);
-    background: #252525; /* Slightly lighter than bg-almost-black for header */
+    background: var(--bg-dark); /* Slightly lighter than bg-almost-black for header */
     border-bottom: 1px solid var(--border-on-dark);
     cursor: pointer;
     user-select: none;
@@ -58,7 +58,7 @@
 
 #download-logs,
 #clear-logs {
-    background: #333;
+    background: var(--bg-dark-light);
     border: 1px solid var(--border-on-dark);
     color: var(--text-tertiary);
     cursor: pointer;
@@ -69,7 +69,7 @@
 
 #download-logs:hover,
 #clear-logs:hover {
-    background: #3a3a3a;
+    background: var(--bg-dark-light);
     color: #fff;
 }
 
@@ -83,7 +83,7 @@
     display: flex;
     flex: 1;
     gap: 1px;
-    background: #333;
+    background: var(--bg-dark-light);
     overflow: hidden;
 }
 
@@ -101,7 +101,7 @@
 
 .log-column-header {
     padding: 4px 8px;
-    background: #252525;
+    background: var(--bg-dark);
     border-bottom: 1px solid var(--border-on-dark);
     font-size: 9px;
     font-weight: 600;
@@ -129,7 +129,7 @@
 }
 
 .log-column-header .mini-btn:hover {
-    background: #333;
+    background: var(--bg-dark-light);
     color: var(--text-tertiary);
 }
 
@@ -203,7 +203,7 @@
 #verbosity-select {
     padding: 2px 6px;
     border: 1px solid var(--border-on-dark);
-    background: #333;
+    background: var(--bg-dark-light);
     font-size: var(--font-size-sm);
     color: var(--text-on-dark);
     margin-right: 8px;
@@ -389,7 +389,7 @@
 }
 
 .hixtory-item:hover {
-    background: #252525;
+    background: var(--bg-dark);
     border-left-color: var(--text-secondary);
 }
 

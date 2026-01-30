@@ -46,7 +46,7 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--panel-padding-md);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -95,7 +95,7 @@
 
 /* Filter Item - uses .panel-card from panel-base.css */
 .filter-item {
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     padding: 12px;
     cursor: pointer;
 }

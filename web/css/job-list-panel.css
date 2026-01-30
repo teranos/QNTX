@@ -172,7 +172,7 @@
     font-weight: 500;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
     transition: var(--panel-transition-fast);
@@ -275,7 +275,7 @@
     cursor: pointer;
     transition: var(--panel-transition-normal);
     position: relative;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 .task-square:hover {
@@ -287,7 +287,7 @@
 /* Pending/Queued - Empty square */
 .task-square.pending,
 .task-square.queued {
-    background: #fff;
+    background: var(--bg-primary);
     border-color: #d0d0d0;
 }
 
@@ -330,7 +330,7 @@
 /* Footer */
 .job-list-footer {
     padding: var(--panel-padding-sm);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-top: 1px solid var(--border-color);
 }
 
@@ -341,7 +341,7 @@
     font-weight: 500;
     border: 1px dashed #999;
     border-radius: var(--border-radius);
-    background: #fff;
+    background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
     transition: var(--panel-transition-fast);
@@ -369,7 +369,7 @@
 }
 
 .stream-header {
-    background: #2d2d2d;
+    background: var(--bg-dark-hover);
     padding: var(--panel-padding-sm);
     border-bottom: 1px solid #3d3d3d;
     color: #4ec9b0;

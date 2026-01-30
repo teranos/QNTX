@@ -206,7 +206,7 @@
     overflow-x: auto;
     max-height: 200px;
     overflow-y: auto;
-    background: #2d2d2d;
+    background: var(--bg-dark-hover);
     color: #f0f0f0;
     border-radius: 0 0 var(--border-radius) var(--border-radius);
 }
@@ -343,7 +343,7 @@
 }
 
 .panel-btn-primary:hover {
-    background: #333;
+    background: var(--bg-dark-light);
 }
 
 .panel-btn-sm {
@@ -471,7 +471,7 @@
 /* Terminal-style interactive tooltip */
 .panel-tooltip {
     position: fixed;
-    background: #2d2d2d;
+    background: var(--bg-dark-hover);
     color: #f0f0f0;
     padding: var(--panel-padding-sm);
     border-radius: 0;
