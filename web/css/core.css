@@ -275,7 +275,7 @@ body.disconnected #container {
 .llm-model, .llm-stage {
     font-size: 9px;
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     margin-left: 8px;
 }
 

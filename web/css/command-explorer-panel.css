@@ -71,7 +71,7 @@
     padding: var(--panel-padding-sm);
     font-size: 12px;
     border: var(--panel-border);
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     outline: none;
     transition: border-color 0.15s ease;
 }
