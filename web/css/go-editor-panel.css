@@ -18,7 +18,7 @@
 /* Header icon styling */
 .go-editor-icon {
     font-family: monospace;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: bold;
 }
 
@@ -27,7 +27,7 @@
     padding: 10px;
     background: var(--editor-info-bg);
     color: var(--editor-text);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     border-bottom: 1px solid var(--editor-border);
 }
 
@@ -83,12 +83,12 @@
 
 .go-editor-error-help {
     margin-top: 10px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted);
 }
 
 .go-editor-error-help code {
     background: var(--editor-code-bg);
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
 }

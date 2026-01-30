@@ -113,7 +113,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: var(--panel-padding-lg);
     border-bottom: 1px solid var(--border-on-dark);
     background: var(--bg-dark);
 }
@@ -136,7 +136,7 @@
 
 .prose-breadcrumb {
     color: var(--text-on-dark-tertiary);
-    font-size: 14px;
+    font-size: var(--font-size-md);
 }
 
 /* Close button styles moved to components.css */
@@ -153,7 +153,7 @@
 .prose-sidebar {
     width: 250px;
     flex-shrink: 0;  /* Prevent sidebar from shrinking */
-    background: #252525;
+    background: var(--bg-dark);
     border-right: 1px solid #333;
     display: flex;
     flex-direction: column;
@@ -221,11 +221,11 @@
 .prose-search {
     width: 100%;
     padding: 8px;
-    background: #1e1e1e;
+    background: var(--bg-almost-black);
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     color: #e0e0e0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .prose-search::placeholder {
@@ -238,14 +238,14 @@
     overflow-y: auto;
     padding: 12px;
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .prose-recent {
     overflow-y: auto;
     padding: 12px;
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     border-bottom: 1px solid #333;
     flex-shrink: 0;  /* Don't shrink, but don't grow either */
 }
@@ -374,15 +374,15 @@
 #prose-editor .ProseMirror code {
     background: var(--bg-dark);
     padding: 2px 4px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 14px;
+    font-size: var(--font-size-md);
 }
 
 #prose-editor .ProseMirror pre {
     background: var(--bg-dark);
-    padding: 12px 16px;
-    border-radius: 4px;
+    padding: var(--panel-padding-md);
+    border-radius: var(--border-radius);
     overflow-x: auto;
     margin: 12px 0;
     white-space: pre-wrap;  /* Allow code to wrap */
@@ -442,7 +442,7 @@
     box-sizing: border-box;
     position: relative;
     border: 1px solid var(--border-on-dark);
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     min-width: 100px;
 }
 
@@ -483,8 +483,8 @@
     align-items: center;
     padding: 8px 20px;
     border-top: 1px solid var(--border-on-dark);
-    background: #252525;
-    font-size: 12px;
+    background: var(--bg-dark);
+    font-size: var(--font-size-sm);
     color: var(--text-on-dark-tertiary);
 }
 
@@ -521,7 +521,7 @@
 
 .prose-editor-container::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
 }
 
 .prose-editor-container::-webkit-scrollbar-thumb:hover {
@@ -532,8 +532,8 @@
 .frontmatter-block {
     margin: 12px 0;
     border: 1px solid #333;
-    border-radius: 4px;
-    background: #1a1a1a;
+    border-radius: var(--border-radius);
+    background: var(--bg-almost-black);
     position: relative;
 }
 
@@ -544,7 +544,7 @@
     background: none;
     border: none;
     color: #666;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     padding: 4px 8px;
     cursor: pointer;
     z-index: 10;
@@ -555,7 +555,7 @@
 }
 
 .frontmatter-editor {
-    background: #1a1a1a;
+    background: var(--bg-almost-black);
 }
 
 .frontmatter-block .cm-editor {

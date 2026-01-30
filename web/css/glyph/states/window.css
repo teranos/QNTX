@@ -20,12 +20,12 @@
     padding: 0 12px;
     cursor: move;
     user-select: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
 }
 
 .window-title-bar span {
     flex: 1;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-on-dark);
     white-space: nowrap;
@@ -44,7 +44,7 @@
     line-height: 1;
     padding: 0;
     margin-left: 4px;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     display: flex;
     align-items: center;
     justify-content: center;

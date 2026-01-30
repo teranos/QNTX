@@ -105,7 +105,7 @@ func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 		return errors.WithHint(err, "increase daily budget in config or wait for the 24-hour window to reset")
 	}
 
-	if weeklyBudget > 0 && status.WeeklySpend+estimatedCostUSD > weeklyBudget {
+	if status.WeeklySpend+estimatedCostUSD > weeklyBudget {
 		err := errors.Newf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.WeeklySpend, estimatedCostUSD, weeklyBudget)
 		return errors.WithHint(err, "increase weekly budget in config or wait for the 7-day rolling window to reset")

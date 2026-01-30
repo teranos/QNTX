@@ -18,7 +18,7 @@ import type { ParseResponseMessage } from '../types/websocket';
 
 // Debounce timings
 // TODO(issue #14): Tune these values based on actual latency metrics
-const PARSE_DEBOUNCE_MS: number = 150;      // Fast feedback for highlighting
+export const PARSE_DEBOUNCE_MS: number = 150;      // Fast feedback for highlighting
 
 // State
 let parseTimeout: ReturnType<typeof setTimeout> | null = null;
