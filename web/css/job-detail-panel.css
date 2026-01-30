@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: var(--panel-padding-lg);
   background: var(--bg-almost-white);
   border-bottom: 2px solid var(--border-light);
   flex-shrink: 0;
@@ -26,10 +26,10 @@
 .job-detail-back {
   background: none;
   border: 1px solid var(--border-light);
-  padding: 6px 12px;
-  border-radius: var(--panel-border-radius);
+  padding: var(--panel-padding-sm);
+  border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   color: var(--panel-text-secondary);
   transition: var(--panel-transition-fast);
 }
@@ -45,7 +45,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 20px;
+  padding: var(--panel-padding-lg);
   background: var(--bg-almost-white);
 }
 
@@ -58,7 +58,7 @@
   display: flex;
   justify-content: space-between;
   padding: 6px 0;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .job-info-label {
@@ -101,13 +101,13 @@
 
 .section-header h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   color: #000;
 }
 
 .execution-count {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--panel-text-secondary);
   font-weight: 500;
 }
@@ -121,7 +121,7 @@
 
 /* Execution cards - uses .panel-card from panel-base.css */
 .execution-card {
-  padding: 12px 14px;
+  padding: var(--panel-padding-md);
 }
 
 .execution-card.expanded {
@@ -147,7 +147,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
   user-select: none;
 }
@@ -157,7 +157,7 @@
 }
 
 .execution-expand-icon {
-  font-size: 10px;
+  font-size: var(--font-size-sm);
   color: var(--color-scheduled);
   width: 16px;
   transition: transform 0.2s ease;
@@ -193,19 +193,19 @@
 /* Execution summary and error */
 .execution-summary {
   margin-top: 8px;
-  padding: 8px 10px;
+  padding: var(--panel-padding-sm);
   background: var(--bg-almost-white);
-  border-radius: 3px;
-  font-size: 12px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
   color: var(--text-primary);
 }
 
 .execution-error {
   margin-top: 8px;
-  padding: 8px 10px;
+  padding: var(--panel-padding-sm);
   background: rgba(198, 40, 40, 0.08);
-  border-radius: 3px;
-  font-size: 12px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
   color: var(--status-failed-text);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -214,8 +214,8 @@
   margin-top: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11px;
+  gap: var(--gap);
+  font-size: var(--font-size-sm);
   color: var(--panel-text-secondary);
 }
 
@@ -227,7 +227,7 @@
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   background: var(--bg-almost-white);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--border-radius);
 }
 
 /* Execution logs */
@@ -241,9 +241,9 @@
   background: var(--bg-dark);
   color: #d4d4d4;
   padding: 12px;
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   max-height: 400px;
   overflow-y: auto;
@@ -257,7 +257,7 @@
   text-align: center;
   padding: 20px;
   color: var(--color-scheduled);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-style: italic;
 }
 
@@ -270,11 +270,11 @@
 
 .execution-empty p {
   margin: 8px 0;
-  font-size: 14px;
+  font-size: var(--font-size-md);
 }
 
 .execution-hint {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   opacity: 0.7;
 }
 
@@ -283,9 +283,9 @@
   padding: 16px;
   background: rgba(255, 0, 51, 0.1);
   border-left: 3px solid #ff0033;
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   color: #ff0033;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   margin-bottom: 12px;
 }
 
@@ -299,25 +299,25 @@
 
 .job-detail-error-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--font-size-md);
   color: var(--status-failed-text);
   margin-bottom: 6px;
 }
 
 .job-detail-error-message {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   color: var(--text-primary);
   margin-bottom: 10px;
 }
 
 .job-detail-error-suggestion {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
   font-style: italic;
   margin-bottom: 10px;
-  padding: 8px 10px;
+  padding: var(--panel-padding-sm);
   background: var(--status-pending-bg);
-  border-radius: 4px;
+  border-radius: var(--border-radius);
 }
 
 .job-detail-error-details {
@@ -327,7 +327,7 @@
 
 .job-detail-error-details summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--text-secondary);
   user-select: none;
 }
@@ -340,8 +340,8 @@
   margin-top: 8px;
   padding: 10px;
   background: var(--bg-almost-white);
-  border-radius: 4px;
-  font-size: 11px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   white-space: pre-wrap;
   word-break: break-word;
@@ -355,9 +355,9 @@
   background: var(--color-scheduled);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   transition: background 0.2s;
 }
@@ -379,10 +379,10 @@
 .pagination-btn {
   padding: 8px 14px;
   border: 1px solid var(--border-light);
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   background: var(--panel-bg);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   transition: all 0.2s;
   color: var(--text-primary);
 }
@@ -399,7 +399,7 @@
 }
 
 .pagination-info {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--panel-text-secondary);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
