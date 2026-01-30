@@ -156,7 +156,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	// This validates the ATS code format and makes the ticker domain-agnostic
 	parsed, err := ParseATSCodeWithForce(req.ATSCode, jobID, req.Force)
 	if err != nil {
-		writeWrappedError(w, s.logger, err, "invalid ATS code", http.StatusBadRequest)
+		writeRichError(w, s.logger, err, http.StatusBadRequest)
 		return
 	}
 
