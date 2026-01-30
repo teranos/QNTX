@@ -669,12 +669,7 @@ func TestBroadcastMessage(t *testing.T) {
 		"message": "hello",
 	}
 
-	sent := srv.broadcastMessage(testMsg)
-
-	// Verify message was sent to both clients
-	if sent != 2 {
-		t.Errorf("Expected message sent to 2 clients, got %d", sent)
-	}
+	srv.broadcastMessage(testMsg)
 
 	// Verify clients received the message
 	select {

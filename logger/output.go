@@ -188,8 +188,8 @@ func ShouldShowAxMatches(verbosity int) bool {
 	return ShouldOutput(verbosity, OutputAxMatches)
 }
 
-// ShouldShowAxSQL returns true if Ax SQL queries should be displayed
-func ShouldShowAxSQL(verbosity int) bool {
+// ShouldShowSQL returns true if SQL queries should be displayed
+func ShouldShowSQL(verbosity int) bool {
 	return ShouldOutput(verbosity, OutputSQLQueries)
 }
 
