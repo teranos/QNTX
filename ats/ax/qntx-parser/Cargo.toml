@@ -1,0 +1,31 @@
+[package]
+name = "qntx-parser"
+version = "0.1.0"
+edition = "2021"
+description = "AX query parser for QNTX - lexer and parser with FFI support"
+license = "MIT"
+authors = ["QNTX Contributors"]
+
+[dependencies]
+# Static hash maps for keyword lookup (compile-time perfect hashing)
+phf = { version = "0.11", features = ["macros"] }
+
+# Utilities
+thiserror = "1.0"        # Ergonomic error types
+
+[dev-dependencies]
+criterion = "0.5"        # Benchmarking
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[lib]
+name = "qntx_parser"
+path = "src/lib.rs"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[[bench]]
+name = "lexer_bench"
+harness = false
