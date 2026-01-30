@@ -22,6 +22,7 @@ import { createPyGlyph } from './py-glyph';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { getMinimizeDuration } from './glyph';
 
 // ============================================================================
 // Selection State
@@ -120,30 +121,48 @@ function hideActionBar(): void {
 
 /**
  * Delete the currently selected glyph from the canvas
+ * Animates scale-down + fade-out before removal (respects reduced motion)
  */
 function deleteSelectedGlyph(container: HTMLElement): void {
     if (!selectedGlyphId) return;
 
     const glyphId = selectedGlyphId;
+    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
 
-    // Remove DOM element
-    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`);
-    if (el) {
-        el.remove();
-    }
+    // Clear selection immediately (prevent double-delete)
+    hideActionBar();
+    selectedGlyphId = null;
 
-    // Remove from persisted state
+    // Remove from persisted state and local array immediately
     uiState.removeCanvasGlyph(glyphId);
-
-    // Notify the local glyphs array via custom event
     container.dispatchEvent(new CustomEvent('glyph-deleted', {
         detail: { glyphId }
     }));
 
-    hideActionBar();
-    selectedGlyphId = null;
+    if (!el) return;
 
-    log.debug(SEG.UI, `[Canvas] Deleted glyph ${glyphId}`);
+    const duration = getMinimizeDuration();
+
+    if (duration === 0) {
+        el.remove();
+        log.debug(SEG.UI, `[Canvas] Deleted glyph ${glyphId}`);
+        return;
+    }
+
+    // Animate out, then remove
+    const animation = el.animate([
+        { opacity: 1, transform: 'scale(1)' },
+        { opacity: 0, transform: 'scale(0.85)' }
+    ], {
+        duration,
+        easing: 'ease-in',
+        fill: 'forwards'
+    });
+
+    animation.onfinish = () => {
+        el.remove();
+        log.debug(SEG.UI, `[Canvas] Deleted glyph ${glyphId}`);
+    };
 }
 
 /**
