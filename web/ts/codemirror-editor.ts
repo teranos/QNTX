@@ -16,13 +16,12 @@ import { languageServer } from 'codemirror-languageserver';
 // DISABLED: LSP WebSocket transport conflicts with main WebSocket
 // import { createLSPClient } from './lsp-websocket-transport.js';
 import { sendMessage, validateBackendURL } from './websocket.ts';
-import { requestParse, PARSE_DEBOUNCE_MS } from './ats-semantic-tokens-client.ts';
+import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 import { FuzzySearchView } from './fuzzy-search-view.ts';
 
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
-let parseTimeout: ReturnType<typeof setTimeout> | null = null;
 let fuzzySearchView: FuzzySearchView | null = null;
 let editorMode: 'ats' | 'fuzzy' = 'ats'; // Track current mode
 
@@ -248,15 +247,10 @@ function handleDocumentChange(update: any): void {
     // Request parse for syntax highlighting (via existing WebSocket custom protocol)
     // Only in ATS mode - fuzzy search doesn't need LSP parsing
     if (editorMode === 'ats') {
-        if (parseTimeout) {
-            clearTimeout(parseTimeout);
+        if (editorView) {
+            const cursorPos = editorView.state.selection.main.head;
+            requestParse(doc, 1, cursorPos);
         }
-        parseTimeout = setTimeout(() => {
-            if (editorView) {
-                const cursorPos = editorView.state.selection.main.head;
-                requestParse(doc, 1, cursorPos);
-            }
-        }, PARSE_DEBOUNCE_MS);
     }
 
     // Execute query with debounce based on mode
