@@ -1,6 +1,3 @@
-//go:build rustfuzzy
-// +build rustfuzzy
-
 // Package fuzzyax provides a CGO wrapper for the Rust fuzzy matching engine.
 //
 // This package links directly with the Rust library via CGO, providing

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"net"
 
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/plugin/grpc/protocol"
 	"github.com/teranos/QNTX/pulse/async"
@@ -37,7 +37,7 @@ func NewServicesManager(logger *zap.SugaredLogger) *ServicesManager {
 }
 
 // Start starts the gRPC service servers with dynamic port allocation
-func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, queue *async.Queue) (*ServiceEndpoints, error) {
+func (m *ServicesManager) Start(ctx context.Context, store ats.AttestationStore, queue *async.Queue) (*ServiceEndpoints, error) {
 	// Generate authentication token
 	authToken, err := generateAuthToken()
 	if err != nil {
@@ -70,7 +70,7 @@ func (m *ServicesManager) Start(ctx context.Context, store *storage.SQLStore, qu
 }
 
 // startATSStoreService starts the ATSStore gRPC service
-func (m *ServicesManager) startATSStoreService(ctx context.Context, store *storage.SQLStore, authToken string) (string, error) {
+func (m *ServicesManager) startATSStoreService(ctx context.Context, store ats.AttestationStore, authToken string) (string, error) {
 	// Listen on dynamic port
 	// Use explicit IPv4 127.0.0.1 instead of "localhost" to avoid IPv6 [::1] resolution
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
