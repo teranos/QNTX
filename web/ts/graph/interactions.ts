@@ -38,7 +38,7 @@ export function initGraphResize(): void {
     window.addEventListener('resize', function() {
         const simulation = getSimulation();
         if (simulation) {
-            const container = document.getElementById('graph-container');
+            const container = document.getElementById('graph-viewer');
             if (!container) return;
 
             const width = container.clientWidth;

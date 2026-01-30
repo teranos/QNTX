@@ -59,7 +59,7 @@ function renderGraph(data: GraphData): void {
     // Query documentation attestations when tiles are selected
 
     const domCache = getDomCache();
-    const container = domCache.get('graphContainer', '#graph-container');
+    const container = domCache.get('graphViewer', '#graph-viewer');
     if (!container) {
         console.error('Graph container not found');
         return;

@@ -46,7 +46,7 @@ describe('Graph Rendering Integration', () => {
             <!DOCTYPE html>
             <html>
             <body>
-                <div id="graph-container" style="width: 800px; height: 600px;">
+                <div id="graph-viewer" style="width: 800px; height: 600px;">
                     <svg id="graph"></svg>
                 </div>
                 <div id="controls"></div>
@@ -68,7 +68,7 @@ describe('Graph Rendering Integration', () => {
     });
 
     test('should create graph container with correct structure', () => {
-        const container = document.getElementById('graph-container');
+        const container = document.getElementById('graph-viewer');
         expect(container).not.toBeNull();
         expect(container?.style.width).toBe('800px');
         expect(container?.style.height).toBe('600px');
@@ -79,7 +79,7 @@ describe('Graph Rendering Integration', () => {
     });
 
     test('should have all required UI elements', () => {
-        expect(document.getElementById('graph-container')).not.toBeNull();
+        expect(document.getElementById('graph-viewer')).not.toBeNull();
         expect(document.getElementById('graph')).not.toBeNull();
         expect(document.getElementById('controls')).not.toBeNull();
         expect(document.querySelector('.type-attestations')).not.toBeNull();
@@ -119,7 +119,7 @@ describe('Graph Rendering Integration', () => {
     });
 
     test('should verify container has style attributes', () => {
-        const container = document.getElementById('graph-container') as HTMLElement;
+        const container = document.getElementById('graph-viewer') as HTMLElement;
         // JSDOM doesn't compute layout, but we can verify style attributes exist
         expect(container.style.width).toBe('800px');
         expect(container.style.height).toBe('600px');

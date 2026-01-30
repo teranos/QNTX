@@ -144,9 +144,9 @@ class GlyphRunImpl {
     public init(): void {
         if (this.element) return; // Already initialized
 
-        const graphContainer = document.getElementById('graph-container');
+        const graphContainer = document.getElementById('graph-viewer');
         if (!graphContainer) {
-            log.warn(SEG.UI, 'GlyphRun: #graph-container not found, deferring init');
+            log.warn(SEG.UI, 'GlyphRun: #graph-viewer not found, deferring init');
             return;
         }
 

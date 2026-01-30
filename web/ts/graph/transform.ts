@@ -25,7 +25,7 @@ export function centerGraph(): void {
     const bounds = (g.node() as any).getBBox();
     if (bounds.width === 0 || bounds.height === 0) return;
 
-    const container = document.getElementById('graph-container');
+    const container = document.getElementById('graph-viewer');
     if (!container) return;
 
     const fullWidth = container.clientWidth;

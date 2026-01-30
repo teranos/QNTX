@@ -302,7 +302,7 @@ body.disconnected #container {
     }
 
     /* Graph takes full viewport minus bottom bar */
-    #graph-container {
+    #graph-viewer {
         position: fixed;
         top: 0;
         left: 0;

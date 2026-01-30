@@ -22,8 +22,8 @@ export function setFocusUIVisibility(visible: boolean): void {
     const transition = `transform ${duration}ms ease, opacity ${duration}ms ease`;
 
     // Darken the graph background when focused using a CSS overlay
-    // This ensures the overlay is clipped to the graph-container bounds
-    const container = document.getElementById('graph-container');
+    // This ensures the overlay is clipped to the graph-viewer bounds
+    const container = document.getElementById('graph-viewer');
     if (container) {
         let overlay = container.querySelector('.focus-overlay') as HTMLElement;
 
@@ -89,9 +89,8 @@ export function setFocusUIVisibility(visible: boolean): void {
     // TODO: When #controls is renamed to #type-attestations-container, update this selector
     slideLeft(document.getElementById('controls')); // Contains type attestations
 
-    // Expand graph-container to full width when focused
-    // TODO: When #graph-container is renamed to #graph-viewer, update this selector
-    const graphContainer = domCache.get('graphContainer', '#graph-container');
+    // Expand graph-viewer to full width when focused
+    const graphContainer = domCache.get('graphViewer', '#graph-viewer');
     if (graphContainer) {
         graphContainer.style.setProperty('transition', transition, 'important');
         if (visible) {
