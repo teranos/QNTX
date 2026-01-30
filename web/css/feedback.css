@@ -477,7 +477,7 @@
 .status-indicator.connection-connecting .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: fadeLoop 1.5s ease-in-out infinite;
 }
 
 /* Pulse Indicator States */
@@ -495,7 +495,7 @@
 .status-indicator.pulse-stopping .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: pulse 1s ease-in-out infinite;
+    animation: fadeLoop 1s ease-in-out infinite;
 }
 
 .status-dot {
@@ -517,7 +517,7 @@ body.disconnected .status-dot {
 body.connecting .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: fadeLoop 1.5s ease-in-out infinite;
 }
 
 /* Reduced motion preference */

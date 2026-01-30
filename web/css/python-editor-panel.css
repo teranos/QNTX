@@ -190,7 +190,7 @@
 
 .python-status-dot.running {
     background: #3776ab;
-    animation: pulse 1s infinite;
+    animation: fadeLoop 1s infinite;
 }
 
 .python-status-dot.success {
