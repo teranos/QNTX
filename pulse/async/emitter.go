@@ -63,9 +63,11 @@ func (e *JobProgressEmitter) EmitProgress(count int, metadata map[string]interfa
 	}
 }
 
-// EmitComplete handles job completion (handled by worker).
+// EmitComplete is a no-op for JobProgressEmitter.
+// Job completion is handled by the worker via job status updates in the database,
+// so this emitter doesn't need to take any action when the handler calls EmitComplete.
 func (e *JobProgressEmitter) EmitComplete(summary map[string]interface{}) {
-	// Job completion handled by worker
+	// Intentionally empty - worker handles completion via UpdateJob
 }
 
 // EmitError logs errors, updates job state, and broadcasts to WebSocket clients.

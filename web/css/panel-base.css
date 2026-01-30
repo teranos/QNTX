@@ -9,7 +9,15 @@
 
     /* Borders */
     --panel-border: 1px solid var(--border-color);
-    --panel-border-radius: 4px;
+    --border-radius: 3px;
+    --border-radius-lg: 7px;
+
+    /* Typography */
+    --font-size-sm: 11px;
+    --font-size-md: 13px;
+
+    /* Spacing */
+    --gap: 7px;
 
     /* Colors */
     --panel-bg: var(--bg-primary);
@@ -39,7 +47,7 @@
 .panel-card {
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: var(--panel-padding-md);
     transition: var(--panel-transition-fast);
 }
@@ -64,10 +72,10 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: var(--border-radius-lg);
     white-space: nowrap;
 }
 
@@ -96,7 +104,7 @@
 .panel-badge-icon {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--gap);
     padding: 4px 10px;
 }
 
@@ -106,7 +114,7 @@
     text-align: center;
     padding: 32px 16px;
     color: var(--panel-text-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .panel-empty-icon {
@@ -119,12 +127,12 @@
     text-align: center;
     padding: 32px 16px;
     color: var(--panel-text-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .panel-empty-hint {
     margin-top: 8px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-tertiary);
 }
 
@@ -135,19 +143,19 @@
     padding: 32px 16px;
     background: var(--status-failed-bg);
     border: 1px solid var(--status-failed-text);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 16px;
 }
 
 .panel-error-title {
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: var(--status-failed-text);
     margin: 0 0 8px 0;
 }
 
 .panel-error-message {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-primary);
     margin: 0 0 12px 0;
     word-break: break-word;
@@ -155,7 +163,7 @@
 
 /* Suggestion text - helpful hint for resolving the error */
 .panel-error-suggestion {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
     margin: 0 0 16px 0;
     font-style: italic;
@@ -166,13 +174,13 @@
     text-align: left;
     margin: 16px 0;
     border: 1px solid rgba(211, 47, 47, 0.3);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: rgba(255, 255, 255, 0.5);
 }
 
 .panel-error-details summary {
-    padding: 8px 12px;
-    font-size: 11px;
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--status-failed-text);
     cursor: pointer;
@@ -190,7 +198,7 @@
 .panel-error-details-content {
     padding: 12px;
     margin: 0;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
     line-height: 1.5;
     white-space: pre-wrap;
@@ -198,18 +206,18 @@
     overflow-x: auto;
     max-height: 200px;
     overflow-y: auto;
-    background: #2d2d2d;
+    background: var(--bg-dark-hover);
     color: #f0f0f0;
-    border-radius: 0 0 var(--panel-border-radius) var(--panel-border-radius);
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
 }
 
 .panel-error-retry {
     background: var(--status-failed-text);
     color: #fff;
     border: none;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: 8px 16px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     cursor: pointer;
     transition: var(--panel-transition-fast);
@@ -228,19 +236,19 @@
 .panel-error-inline {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: var(--gap);
+    padding: var(--panel-padding-sm);
     background: var(--status-failed-bg);
     border: 1px solid var(--status-failed-text);
-    border-radius: var(--panel-border-radius);
-    font-size: 12px;
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
     color: var(--status-failed-text);
     margin-top: 8px;
 }
 
 .panel-error-inline-icon {
     flex-shrink: 0;
-    font-size: 14px;
+    font-size: var(--font-size-md);
 }
 
 .panel-error-inline-content {
@@ -275,7 +283,7 @@
 }
 
 .panel-list-compact {
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .panel-list-spacious {
@@ -285,7 +293,7 @@
 /* === HEADERS === */
 
 .panel-section-header {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: var(--panel-text-primary);
     margin-bottom: 12px;
@@ -299,8 +307,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    gap: var(--gap);
+    font-size: var(--font-size-sm);
 }
 
 .panel-info-label {
@@ -317,9 +325,9 @@
 .panel-btn {
     background: none;
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
-    padding: 6px 12px;
-    font-size: 12px;
+    border-radius: var(--border-radius);
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-sm);
     cursor: pointer;
     transition: var(--panel-transition-fast);
 }
@@ -335,12 +343,12 @@
 }
 
 .panel-btn-primary:hover {
-    background: #333;
+    background: var(--bg-dark-light);
 }
 
 .panel-btn-sm {
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Warning button - for two-click confirmation pattern */
@@ -368,7 +376,7 @@
 /* Confirmation hint - shows below button during confirmation state */
 .panel-confirm-hint {
     display: block;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--status-pending-text);
     margin-top: 4px;
     font-style: italic;
@@ -386,23 +394,23 @@
 
 .panel-code {
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     background: var(--panel-bg-secondary);
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
 }
 
 /* === TIMESTAMPS === */
 
 .panel-timestamp {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-tertiary);
 }
 
 /* === PROGRESS INDICATORS === */
 
 .panel-progress {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
 }
 
@@ -439,7 +447,7 @@
 .panel-flex-center {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 /* Text utilities */
@@ -448,7 +456,7 @@
 }
 
 .panel-text-small {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Truncation */
@@ -463,11 +471,11 @@
 /* Terminal-style interactive tooltip */
 .panel-tooltip {
     position: fixed;
-    background: #2d2d2d;
+    background: var(--bg-dark-hover);
     color: #f0f0f0;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     border-radius: 0;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
     line-height: 1.6;
     white-space: pre-wrap;
