@@ -156,7 +156,7 @@
   font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
   background: var(--color-bg, #0d0d0d);
-  border-radius: 3px;
+  border-radius: var(--panel-border-radius);
   font-weight: 600;
   color: var(--color-text-secondary, #888);
   text-transform: uppercase;

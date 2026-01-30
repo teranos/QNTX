@@ -9,7 +9,7 @@
 
     /* Borders */
     --panel-border: 1px solid var(--border-color);
-    --panel-border-radius: 4px;
+    --panel-border-radius: 3px;
 
     /* Colors */
     --panel-bg: var(--bg-primary);
@@ -389,7 +389,7 @@
     font-size: 11px;
     background: var(--panel-bg-secondary);
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
 }
 
 /* === TIMESTAMPS === */

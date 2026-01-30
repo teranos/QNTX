@@ -61,7 +61,7 @@
     cursor: pointer;
     color: var(--text-on-dark-secondary);
     font-size: 12px;
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     transition: all 0.2s;
     white-space: nowrap;
     overflow: hidden;
@@ -126,7 +126,7 @@
     cursor: pointer;
     color: #ccc;
     font-size: 13px;
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     transition: background 0.2s;
 }
 

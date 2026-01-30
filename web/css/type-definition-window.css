@@ -131,7 +131,7 @@
 .type-def-color {
     width: 20px;
     height: 20px;
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     border: 1px solid var(--panel-border-color, #ddd);
 }
 

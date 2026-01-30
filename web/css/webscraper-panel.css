@@ -97,7 +97,7 @@
     width: 50px;
     padding: 3px 6px;
     border: 1px solid var(--border-color);
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     font-size: 10px;
     font-family: var(--font-mono, monospace);
 }
@@ -214,7 +214,7 @@
     padding: 8px;
     background: #fff;
     border: 1px solid var(--border-light);
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     margin: 8px 0;
     font-family: var(--font-mono, monospace);
 }
@@ -267,7 +267,7 @@
     margin-bottom: 4px;
     background: #fff;
     border: 1px solid var(--border-light);
-    border-radius: 3px;
+    border-radius: var(--panel-border-radius);
     cursor: pointer;
     transition: background 0.15s;
 }
