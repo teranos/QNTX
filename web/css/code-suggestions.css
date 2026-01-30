@@ -58,7 +58,7 @@
   border: 1px solid var(--color-border, #333);
   background: var(--color-bg, #0d0d0d);
   color: var(--color-text, #fff);
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
 }
 
 #load-pr-btn {
@@ -66,7 +66,7 @@
   background: var(--color-primary, #4a9eff);
   color: #fff;
   border: none;
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   cursor: pointer;
   font-weight: 500;
   transition: background 0.2s;
@@ -108,7 +108,7 @@
   margin-bottom: 0.75rem;
   border-left: 4px solid var(--color-border, #333);
   background: var(--color-bg-secondary, #1a1a1a);
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: var(--panel-transition-fast);
 }
@@ -156,7 +156,7 @@
   font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
   background: var(--color-bg, #0d0d0d);
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   font-weight: 600;
   color: var(--color-text-secondary, #888);
   text-transform: uppercase;

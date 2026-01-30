@@ -67,7 +67,7 @@
     background: #3776ab;
     color: white;
     border: none;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     cursor: pointer;
     font-size: 12px;
     transition: background 0.2s ease;
@@ -87,7 +87,7 @@
     background: transparent;
     color: var(--editor-text-muted, #858585);
     border: 1px solid var(--editor-border, #3e3e42);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     cursor: pointer;
     font-size: 12px;
     transition: var(--panel-transition-normal);
@@ -139,7 +139,7 @@
 .python-output-content {
     background: var(--editor-code-bg, var(--bg-dark));
     padding: 10px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -225,5 +225,5 @@
 .python-error-help code {
     background: var(--editor-code-bg, var(--bg-dark));
     padding: 2px 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }

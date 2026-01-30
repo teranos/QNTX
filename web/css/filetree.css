@@ -20,7 +20,7 @@
     padding: var(--panel-padding-sm);
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     color: var(--text-on-dark);
     font-size: 13px;
     outline: none;
@@ -61,7 +61,7 @@
     cursor: pointer;
     color: var(--text-on-dark-secondary);
     font-size: 12px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     transition: all 0.2s;
     white-space: nowrap;
     overflow: hidden;
@@ -126,7 +126,7 @@
     cursor: pointer;
     color: #ccc;
     font-size: 13px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     transition: background 0.2s;
 }
 
@@ -153,7 +153,7 @@
 
 .prose-tree::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .prose-tree::-webkit-scrollbar-thumb:hover {

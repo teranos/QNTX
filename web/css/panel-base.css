@@ -9,7 +9,7 @@
 
     /* Borders */
     --panel-border: 1px solid var(--border-color);
-    --panel-border-radius: 3px;
+    --border-radius: 3px;
 
     /* Colors */
     --panel-bg: var(--bg-primary);
@@ -39,7 +39,7 @@
 .panel-card {
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: var(--panel-padding-md);
     transition: var(--panel-transition-fast);
 }
@@ -135,7 +135,7 @@
     padding: 32px 16px;
     background: var(--status-failed-bg);
     border: 1px solid var(--status-failed-text);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 16px;
 }
 
@@ -166,7 +166,7 @@
     text-align: left;
     margin: 16px 0;
     border: 1px solid rgba(211, 47, 47, 0.3);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: rgba(255, 255, 255, 0.5);
 }
 
@@ -200,14 +200,14 @@
     overflow-y: auto;
     background: #2d2d2d;
     color: #f0f0f0;
-    border-radius: 0 0 var(--panel-border-radius) var(--panel-border-radius);
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
 }
 
 .panel-error-retry {
     background: var(--status-failed-text);
     color: #fff;
     border: none;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: 8px 16px;
     font-size: 12px;
     font-weight: 500;
@@ -232,7 +232,7 @@
     padding: var(--panel-padding-sm);
     background: var(--status-failed-bg);
     border: 1px solid var(--status-failed-text);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 12px;
     color: var(--status-failed-text);
     margin-top: 8px;
@@ -317,7 +317,7 @@
 .panel-btn {
     background: none;
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: var(--panel-padding-sm);
     font-size: 12px;
     cursor: pointer;
@@ -389,7 +389,7 @@
     font-size: 11px;
     background: var(--panel-bg-secondary);
     padding: 2px 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 /* === TIMESTAMPS === */

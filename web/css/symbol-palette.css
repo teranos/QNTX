@@ -46,7 +46,7 @@
     background: rgba(0, 0, 0, 0.85);
     color: #fff;
     padding: 4px 8px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 11px; /* Slightly larger tooltip text */
     font-family: 'Courier New', monospace;
     white-space: nowrap;

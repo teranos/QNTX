@@ -6,7 +6,7 @@
     width: 100%;
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
@@ -52,7 +52,7 @@
     flex: 1;
     padding: 6px 10px;
     border: 1px solid var(--border-color);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: var(--bg-color);
     color: var(--text-color);
     font-family: var(--font-mono);
@@ -63,7 +63,7 @@
 .api-key-save {
     padding: 4px 8px;
     border: 1px solid var(--border-color);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: var(--button-bg);
     cursor: pointer;
     font-size: 14px;
@@ -267,7 +267,7 @@
     padding: 6px 10px;
     font-size: 11px;
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: var(--panel-bg);
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }

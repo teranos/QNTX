@@ -27,14 +27,14 @@ pre {
     background: var(--bg-dark);
     padding: var(--panel-padding-sm);
     overflow-x: auto;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
 }
 
 code {
     background: var(--bg-dark);
     padding: 2px 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-family: var(--font-mono, monospace);
     font-size: 0.9em;
 }
@@ -80,7 +80,7 @@ nav.doc-nav {
     margin-bottom: 0.75em;
     padding: var(--panel-padding-sm);
     background: var(--bg-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 nav.doc-nav a {
@@ -136,7 +136,7 @@ nav.doc-nav a {
     color: var(--text-on-dark-tertiary);
     padding: 4px 8px;
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     white-space: nowrap;
 }
 
@@ -158,7 +158,7 @@ nav.doc-nav a {
 .toc {
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: var(--panel-padding-sm);
     margin-bottom: 0.75em;
 }
@@ -220,7 +220,7 @@ nav.doc-nav a {
     padding: 6px 10px;
     background: var(--bg-dark);
     border-left: 3px solid var(--accent-color);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .intro-section p {
@@ -294,7 +294,7 @@ nav.doc-nav a {
     padding: 3px 8px;
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     color: var(--accent-on-dark);
     font-weight: 500;
     font-size: 0.85em;
@@ -324,7 +324,7 @@ nav.doc-nav a {
     margin: 0.4em 0 0.75em 0;
     padding: 6px 10px;
     background: var(--bg-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
 }
 
@@ -390,7 +390,7 @@ nav.doc-nav a {
     padding: 3px 8px;
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 0.85em;
     transition: all 0.1s;
     color: var(--text-on-dark);
@@ -422,7 +422,7 @@ nav.doc-nav a {
 .download-card {
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -456,7 +456,7 @@ nav.doc-nav a {
     background: var(--accent-color);
     color: #fff;
     padding: 6px 14px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     text-align: center;
     font-weight: 500;
     transition: background 0.15s;
@@ -471,7 +471,7 @@ nav.doc-nav a {
     background: var(--bg-almost-black);
     color: var(--text-on-dark);
     padding: var(--panel-padding-sm);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-family: var(--font-mono, monospace);
     font-size: 0.85em;
     overflow-x: auto;
@@ -509,7 +509,7 @@ nav.doc-nav a {
 .release-version {
     background: var(--bg-dark);
     border: 1px solid var(--border-on-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     padding: var(--panel-padding-sm);
     margin-bottom: 6px;
 }
@@ -539,7 +539,7 @@ nav.doc-nav a {
     background: var(--accent-color);
     color: #fff;
     padding: 2px 8px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 0.75em;
     font-weight: 500;
     margin-left: 8px;
@@ -550,7 +550,7 @@ nav.doc-nav a {
     background: var(--color-warning, #ffaa00);
     color: #000;
     padding: 2px 8px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 0.75em;
     font-weight: 500;
     margin-left: 8px;
@@ -620,7 +620,7 @@ nav.doc-nav a {
 .nix-table code {
     background: var(--bg-almost-black);
     padding: 2px 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 0.85em;
 }
 
@@ -636,7 +636,7 @@ nav.doc-nav a {
 .container-details code {
     background: var(--bg-almost-black);
     padding: 2px 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 0.85em;
 }
 
@@ -701,7 +701,7 @@ nav.doc-nav a {
     display: block;
     padding: 6px 10px;
     background: var(--bg-dark);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
     transition: all 0.1s;
     height: 100%;
@@ -1048,5 +1048,5 @@ th {
 .error-code { font-size: 0.9em; color: var(--text-on-dark-tertiary); }
 .error-404 .explanation { color: var(--text-on-dark-secondary); line-height: 1.4; margin: 12px 0; }
 .error-404 .attestation { font-family: var(--font-mono); background: var(--bg-almost-black); padding: 10px; margin: 12px 0; border-left: 3px solid var(--accent-color); text-align: left; font-size: 0.85em; white-space: pre-line; }
-.home-link { display: inline-block; margin-top: 12px; padding: 6px 14px; background: var(--accent-color); color: #fff; text-decoration: none; border-radius: var(--panel-border-radius); }
+.home-link { display: inline-block; margin-top: 12px; padding: 6px 14px; background: var(--accent-color); color: #fff; text-decoration: none; border-radius: var(--border-radius); }
 .home-link:hover { opacity: 0.9; }

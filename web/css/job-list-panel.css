@@ -6,7 +6,7 @@
     width: 100%;
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 8px;
     box-shadow: var(--shadow-lg);
     z-index: 100;
@@ -135,7 +135,7 @@
     width: 100%;
     height: 6px;
     background: #e0e0e0;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     overflow: hidden;
     margin-bottom: 4px;
 }
@@ -171,7 +171,7 @@
     font-size: 11px;
     font-weight: 500;
     border: 1px solid var(--border-color);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: #fff;
     color: var(--text-primary);
     cursor: pointer;
@@ -231,7 +231,7 @@
 
 .job-header.clickable:hover {
     background: var(--bg-almost-white);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: -4px;
     padding: 4px;
 }
@@ -340,7 +340,7 @@
     font-size: 12px;
     font-weight: 500;
     border: 1px dashed #999;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: #fff;
     color: var(--text-primary);
     cursor: pointer;
@@ -357,7 +357,7 @@
 .llm-stream-output {
     background: var(--bg-dark);
     border: 1px solid #3d3d3d;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin-top: 8px;
     padding: 0;
     font-family: 'Courier New', monospace;
@@ -411,7 +411,7 @@
     color: #f48771;
     padding: 8px;
     background: #3d2020;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin-top: 8px;
 }
 
@@ -426,7 +426,7 @@
 
 .stream-content::-webkit-scrollbar-thumb {
     background: #3d3d3d;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .stream-content::-webkit-scrollbar-thumb:hover {
@@ -439,7 +439,7 @@
     padding: 12px;
     background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .details-header {
@@ -467,7 +467,7 @@
 .metadata-item.error {
     background: var(--status-failed-bg);
     padding: 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     border-left: 3px solid #f44336;
 }
 

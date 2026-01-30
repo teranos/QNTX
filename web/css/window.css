@@ -9,7 +9,7 @@
     left: 100px;
     background: var(--panel-bg, #fff);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     box-shadow: var(--shadow-md);
     z-index: 9999;
     display: none;
@@ -118,7 +118,7 @@
     background: var(--panel-bg, #fff);
     border: var(--panel-border);
     color: var(--panel-text-primary, #333);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-family: inherit;
     font-size: 11px;
     margin-bottom: 8px;
@@ -198,7 +198,7 @@
     padding: var(--panel-padding-sm);
     background: #fee;
     border: 1px solid #c88;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     color: #a00;
     font-size: 11px;
     margin-bottom: 8px;
@@ -229,7 +229,7 @@
     margin-bottom: 8px;
     padding: 4px 8px;
     background: var(--panel-bg-secondary, #f8f8f8);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .window-model-info span {
@@ -299,7 +299,7 @@
     padding: 3px 8px;
     background: var(--panel-bg-secondary, #f0f0f0);
     border: 1px solid var(--panel-border-color, #d0d0d0);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 11px;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     color: var(--panel-text-primary, #333);

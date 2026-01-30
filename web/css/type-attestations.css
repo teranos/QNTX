@@ -96,7 +96,7 @@
     margin-left: auto;
     padding: 1px 4px;
     background: rgba(0, 0, 0, 0.05);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 #isolated-toggle {
@@ -107,7 +107,7 @@
     padding: 8px;
     cursor: pointer;
     background: rgba(0,0,0,0.3);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 11px;
 }
 
