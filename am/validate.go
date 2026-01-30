@@ -7,6 +7,14 @@ func (c *Config) Validate() error {
 	// Database path is optional - empty defaults to "qntx.db" per defaults.go:11
 	// No validation needed here
 
+	// Server port: 0 is invalid (omit for default), negative is invalid
+	if c.Server.Port != nil && *c.Server.Port == 0 {
+		return errors.New("server.port cannot be 0 (omit for default port 877)")
+	}
+	if c.Server.Port != nil && *c.Server.Port < 0 {
+		return errors.Newf("server.port must be positive, got %d", *c.Server.Port)
+	}
+
 	// Pulse workers: 0 = no background workers, negative = invalid
 	if c.Pulse.Workers < 0 {
 		return errors.Newf("pulse.workers must be >= 0, got %d", c.Pulse.Workers)

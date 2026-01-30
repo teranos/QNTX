@@ -86,17 +86,17 @@ type WorkerPool struct {
 
 // WorkerPoolConfig contains configuration for the worker pool
 type WorkerPoolConfig struct {
-	Workers            int           `json:"workers"`              // Number of concurrent workers
-	PollInterval       time.Duration `json:"poll_interval"`        // How often to check for new jobs
-	PauseOnBudget      bool          `json:"pause_on_budget"`      // Pause jobs when budget exceeded
-	GracefulStartPhase time.Duration `json:"graceful_start_phase"` // Duration of each graceful start phase (default: 5min, test: 10s)
+	Workers            int            `json:"workers"`              // Number of concurrent workers
+	PollInterval       *time.Duration `json:"poll_interval"`        // Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
+	PauseOnBudget      bool           `json:"pause_on_budget"`      // Pause jobs when budget exceeded
+	GracefulStartPhase time.Duration  `json:"graceful_start_phase"` // Duration of each graceful start phase (default: 5min, test: 10s)
 }
 
 // DefaultWorkerPoolConfig returns sensible defaults
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
 		Workers:            1,               // Single worker to avoid race conditions initially
-		PollInterval:       5 * time.Second, // Check for jobs every 5 seconds
+		PollInterval:       nil,             // nil = gradual ramp-up (production default)
 		PauseOnBudget:      true,            // Pause when budget exceeded
 		GracefulStartPhase: 5 * time.Minute, // 5min per phase = 15min total graceful start
 	}
@@ -130,6 +130,11 @@ func NewWorkerPoolWithContext(ctx context.Context, db *sql.DB, cfg *am.Config, p
 //
 // Note: budgetTracker and rateLimiter can be nil for simple setups or tests.
 func NewWorkerPoolWithRegistry(ctx context.Context, db *sql.DB, cfg *am.Config, poolCfg WorkerPoolConfig, logger *zap.SugaredLogger, registry *HandlerRegistry, budgetTracker BudgetTracker, rateLimiter RateLimiter) *WorkerPool {
+	// Validate config: PollInterval (if set) must be >= 0 (nil = gradual ramp-up, 0 = no polling, positive = fixed interval)
+	if poolCfg.PollInterval != nil && *poolCfg.PollInterval < 0 {
+		panic("WorkerPoolConfig.PollInterval must be >= 0")
+	}
+
 	// Create child context so we can cancel workers independently if needed
 	// But cancellation of parent context will also cancel child
 	workerCtx, cancel := context.WithCancel(ctx)
@@ -398,12 +403,13 @@ func (wp *WorkerPool) getWorkerInterval() time.Duration {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 
-	// If PollInterval is explicitly configured (non-zero), use that for all phases
-	if wp.poolConfig.PollInterval > 0 {
-		return wp.poolConfig.PollInterval
+	// If PollInterval is set (not nil), use that value directly
+	// nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
+	if wp.poolConfig.PollInterval != nil {
+		return *wp.poolConfig.PollInterval
 	}
 
-	// Otherwise, use gradual ramp-up logic for production
+	// PollInterval is nil: use gradual ramp-up logic for production
 	// Warmup period: first 20 jobs OR first 2 minutes, use 1-second intervals
 	elapsed := time.Since(wp.startTime)
 	if wp.jobsProcessed < 20 || elapsed < 2*time.Minute {
@@ -545,8 +551,8 @@ func (wp *WorkerPool) processNextJob() error {
 }
 
 // checkRateLimit verifies the rate limit and pauses the job if exceeded.
-// Returns true if job was stopped (caller should return), false to continue.
-func (wp *WorkerPool) checkRateLimit(job *Job) (stopped bool, err error) {
+// Returns true if job was paused (caller should return), false to continue.
+func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 	// If no rate limiter configured, skip rate limiting (tests, simple setups)
 	if wp.rateLimiter == nil {
 		return false, nil
@@ -571,8 +577,8 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (stopped bool, err error) {
 }
 
 // checkBudget verifies budget availability and pauses/fails the job if exceeded.
-// Returns true if job was stopped (caller should return), false to continue.
-func (wp *WorkerPool) checkBudget(job *Job) (stopped bool, err error) {
+// Returns true if job was paused or failed (caller should return), false to continue.
+func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 	// If no budget tracker configured, skip budget checks (tests, simple setups)
 	if wp.budgetTracker == nil {
 		return false, nil

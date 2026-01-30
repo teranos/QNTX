@@ -97,6 +97,9 @@ func NewJobWithPayload(handlerName string, source string, payload json.RawMessag
 // NewChildJobWithPayload creates a new job with an optional parent job ID.
 // Use this when creating child jobs that should be grouped under a parent orchestrator job.
 func NewChildJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, estimatedCost float64, actor string, parentJobID string) (*Job, error) {
+	if handlerName == "" {
+		return nil, errors.New("handlerName cannot be empty")
+	}
 	if actor == "" {
 		actor = "system"
 	}
