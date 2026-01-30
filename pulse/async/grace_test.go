@@ -201,7 +201,7 @@ func TestGRACEWorkerShutdownTimeout(t *testing.T) {
 	select {
 	case <-stopDone:
 		t.Log("✓ Worker pool stopped cleanly")
-	case <-time.After(35 * time.Second): // 30s timeout + 5s buffer
+	case <-time.After(25 * time.Second): // 20s timeout + 5s buffer
 		t.Error("Worker pool shutdown exceeded timeout")
 	}
 }
