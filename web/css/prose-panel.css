@@ -498,7 +498,7 @@
 
 .prose-save-indicator {
     color: #ffcc00;
-    animation: pulse 2s infinite;
+    animation: fadeLoop 2s infinite;
 }
 
 .prose-save-indicator.hidden {

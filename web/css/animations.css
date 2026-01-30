@@ -27,7 +27,7 @@
     }
 }
 
-@keyframes pulse {
+@keyframes fadeLoop {
     0%, 100% {
         opacity: 1;
     }
