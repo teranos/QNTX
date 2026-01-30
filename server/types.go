@@ -13,7 +13,7 @@ const (
 	MaxClientMessageQueueSize = 256
 	// ShutdownTimeout is how long to wait for graceful shutdown
 	// Set to 60s to accommodate:
-	// - WorkerPool.Stop() can take up to 30s for checkpoint completion
+	// - WorkerPool.Stop() can take up to 20s for checkpoint completion (configurable via WorkerPoolConfig.WorkerStopTimeout)
 	// - Additional time for other goroutines (WebSocket, config watcher, etc.)
 	ShutdownTimeout = 60 * time.Second
 )

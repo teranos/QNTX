@@ -4,7 +4,7 @@
 .code-block {
     margin: 16px 0;
     border: 1px solid var(--ats-editor-border);
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     background: var(--ats-editor-bg);
     overflow: hidden;
     box-shadow: 0 2px 8px var(--ats-editor-shadow);
@@ -16,13 +16,13 @@
     position: absolute;
     top: 8px;
     right: 12px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     letter-spacing: 0.5px;
     z-index: 10;
     background: var(--ats-editor-badge-bg);
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
 }
 
 /* CodeMirror integration */
@@ -32,7 +32,7 @@
 
 .code-block .cm-scroller {
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     line-height: 1.6;
 }
 

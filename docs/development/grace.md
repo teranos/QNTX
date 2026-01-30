@@ -15,7 +15,7 @@ _(Formerly codename: GRACE - Graceful Async Cancellation Engine)_
 - **Plugin shutdown**: Plugins receive shutdown signal via gRPC, complete in-flight work
 - **Task-level atomicity**: Jobs complete current task before checkpointing
 - **Signal handling**: Application catches signals, triggers shutdown
-- **Worker timeout**: 30 seconds for clean checkpoint and exit
+- **Worker timeout**: 20 seconds for clean checkpoint and exit (configurable via `WorkerPoolConfig.WorkerStopTimeout`)
 - **Job re-queuing**: Cancelled jobs transition to `queued` status with checkpoint intact
 
 ### ✿ Opening (Graceful Start)
@@ -165,12 +165,12 @@ When a parent job completes or fails:
 
 **Location**: `pulse/async/error.go:RetryableError()`
 
-Failed tasks can be retried automatically (max 3 attempts total):
+Failed tasks can be retried automatically (max 2 retries = 3 total attempts):
 
 1. Task fails with retryable error (AI failure, network error, timeout)
 2. System increments `retry_count` and re-queues job
 3. Logs retry attempt: `꩜ Retry 1/2: operation failed | job:JB_abc123`
-4. After max retries, logs: `꩜ Max retries exceeded (2): operation failed | job:JB_abc123`
+4. After max retries exceeded, logs: `꩜ Max retries exceeded (2): operation failed | job:JB_abc123`
 
 **Database tracking**: Each retry attempt updates the job record with retry count and error details, providing full audit trail.
 
@@ -195,7 +195,7 @@ Applications using Pulse should propagate shutdown signals:
 ctx, cancel := context.WithCancel(context.Background())
 defer cancel()
 
-workerPool := async.NewWorkerPool(ctx, db, queue, executor, config)
+workerPool := async.NewWorkerPool(ctx, db, cfg, poolCfg, logger)
 workerPool.Start()
 
 // Handle shutdown signals
@@ -204,12 +204,9 @@ signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 <-sigChan
 log.Println("Shutdown signal received, stopping workers...")
-cancel() // Triggers graceful shutdown
 
-// Wait for workers to finish (with timeout)
-shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-defer shutdownCancel()
-workerPool.StopWithContext(shutdownCtx)
+// Stop() cancels context and waits for workers with timeout (default 20s, configurable via poolCfg.WorkerStopTimeout)
+workerPool.Stop()
 ```
 
 ### Handler Context Checks
@@ -245,9 +242,13 @@ func (h *MyHandler) Execute(ctx context.Context, job *async.Job) error {
 
 ```go
 type WorkerPoolConfig struct {
-    Workers       int           // Number of concurrent workers
-    PollInterval  time.Duration // How often to check for jobs
-    ShutdownTimeout time.Duration // Max time to wait for graceful shutdown
+    Workers              int           // Number of concurrent workers
+    PollInterval         *time.Duration // Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
+    PauseOnBudget        bool          // Pause jobs when budget exceeded
+    GracefulStartPhase   time.Duration // Duration of each graceful start phase (default: 5min, test: 10s)
+    WorkerStopTimeout    time.Duration // Max time to wait for workers to checkpoint and exit (default: 20s)
+    MaxConsecutiveErrors int           // Threshold for applying exponential backoff (default: 5)
+    MaxBackoff           time.Duration // Maximum exponential backoff duration (default: 30s)
 }
 ```
 
@@ -256,10 +257,14 @@ type WorkerPoolConfig struct {
 For faster testing, use shorter intervals:
 
 ```go
+pollInterval := 100 * time.Millisecond
 config := async.WorkerPoolConfig{
-    Workers:         1,
-    PollInterval:    100 * time.Millisecond,
-    ShutdownTimeout: 2 * time.Second,
+    Workers:              1,
+    PollInterval:         &pollInterval,
+    GracefulStartPhase:   10 * time.Second,
+    WorkerStopTimeout:    2 * time.Second,
+    MaxConsecutiveErrors: 3,
+    MaxBackoff:           5 * time.Second,
 }
 ```
 
