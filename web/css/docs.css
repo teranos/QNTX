@@ -10,7 +10,7 @@ body {
     margin: 0 auto;
     padding: var(--panel-padding-md);
     line-height: 1.3;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     background: var(--bg-dark-hover);
     color: var(--text-on-dark);
 }
@@ -18,7 +18,7 @@ body {
 @media (max-width: 640px) {
     body {
         padding: 6px 8px;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
     }
 }
 
@@ -150,7 +150,7 @@ nav.doc-nav a {
     .page-header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 8px;
+        gap: var(--gap);
     }
 }
 
@@ -191,7 +191,7 @@ nav.doc-nav a {
     margin-bottom: 0.4em;
     border-bottom: 1px solid var(--border-on-dark);
     padding-bottom: 4px;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .doc-header img {
@@ -349,7 +349,7 @@ nav.doc-nav a {
 .download-section.quick-download .release-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap);
     margin-bottom: 4px;
 }
 
@@ -415,7 +415,7 @@ nav.doc-nav a {
 .download-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 6px;
+    gap: var(--gap);
     margin-top: 0.5em;
 }
 
@@ -651,7 +651,7 @@ nav.doc-nav a {
     margin-bottom: 0.4em;
     padding-bottom: 3px;
     border-bottom: 1px solid var(--border-on-dark);
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .category-title {

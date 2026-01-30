@@ -3,7 +3,7 @@
 /* Header icon styling */
 .python-editor-icon {
     font-family: monospace;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: bold;
     color: #3776ab; /* Python blue */
 }
@@ -22,7 +22,7 @@
     border-bottom: 2px solid transparent;
     color: var(--editor-text-muted, #858585);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     transition: var(--panel-transition-normal);
 }
 
@@ -59,7 +59,7 @@
 
 .python-editor-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .python-run-btn {
@@ -69,7 +69,7 @@
     border: none;
     border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     transition: background 0.2s ease;
 }
 
@@ -89,7 +89,7 @@
     border: 1px solid var(--editor-border, #3e3e42);
     border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     transition: var(--panel-transition-normal);
 }
 
@@ -99,7 +99,7 @@
 }
 
 .python-shortcut-hint {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted, #858585);
 }
 
@@ -118,7 +118,7 @@
     background: var(--editor-bg, #1e1e1e);
     color: var(--editor-text, #cccccc);
     font-family: monospace;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .python-output-section {
@@ -130,7 +130,7 @@
 }
 
 .python-output-label {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted, #858585);
     text-transform: uppercase;
     margin-bottom: 6px;
@@ -177,8 +177,8 @@
 .python-status {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: var(--gap);
+    font-size: var(--font-size-sm);
 }
 
 .python-status-dot {
@@ -218,7 +218,7 @@
 
 .python-error-help {
     margin-top: 10px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted, #858585);
 }
 

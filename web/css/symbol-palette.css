@@ -23,7 +23,7 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-size: 13px; /* Default size for mobile */
+    font-size: var(--font-size-md); /* Default size for mobile */
     color: #000;
     background: #f8f8f8;
     border: 1px solid var(--border-color);
@@ -47,7 +47,7 @@
     color: #fff;
     padding: 4px 8px;
     border-radius: var(--border-radius);
-    font-size: 11px; /* Slightly larger tooltip text */
+    font-size: var(--font-size-sm); /* Slightly larger tooltip text */
     font-family: 'Courier New', monospace;
     white-space: nowrap;
     opacity: 0;
@@ -136,7 +136,7 @@
 
     .palette-cell {
         padding: 8px 2px;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
         min-height: 40px; /* Touch-friendly tap target */
         display: flex;
         align-items: center;

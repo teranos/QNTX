@@ -22,7 +22,7 @@
     border: 1px solid var(--border-on-dark);
     border-radius: var(--border-radius);
     color: var(--text-on-dark);
-    font-size: 13px;
+    font-size: var(--font-size-md);
     outline: none;
 }
 
@@ -37,7 +37,7 @@
 }
 
 .prose-recent-header {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-on-dark-tertiary);
     text-transform: uppercase;
@@ -60,7 +60,7 @@
     padding: 4px 8px;
     cursor: pointer;
     color: var(--text-on-dark-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     border-radius: var(--border-radius);
     transition: all 0.2s;
     white-space: nowrap;
@@ -112,7 +112,7 @@
     width: 16px;
     cursor: pointer;
     color: var(--text-on-dark-tertiary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     transition: color 0.2s;
 }
 
@@ -125,7 +125,7 @@
     padding: 4px 8px;
     cursor: pointer;
     color: #ccc;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     border-radius: var(--border-radius);
     transition: background 0.2s;
 }

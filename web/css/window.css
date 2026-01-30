@@ -14,7 +14,7 @@
     z-index: 9999;
     display: none;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .draggable-window[data-visible="true"] {
@@ -39,7 +39,7 @@
 
 .draggable-window-title {
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     color: var(--panel-text-primary, #333);
 }
 
@@ -86,7 +86,7 @@
 /* Version text next to title */
 .draggable-window-version {
     font-weight: 400;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-tertiary, #999);
     margin-left: 6px;
     cursor: help;
@@ -102,7 +102,7 @@
     padding: var(--panel-padding-sm);
     border-top: var(--panel-border);
     background: var(--panel-bg-secondary, #f8f8f8);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary, #666);
     display: none;
 }
@@ -120,7 +120,7 @@
     color: var(--panel-text-primary, #333);
     border-radius: var(--border-radius);
     font-family: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     margin-bottom: 8px;
 }
 
@@ -162,7 +162,7 @@
 /* Controls row */
 .window-controls {
     display: flex;
-    gap: 6px;
+    gap: var(--gap);
     margin-bottom: 8px;
 }
 
@@ -170,7 +170,7 @@
     margin-left: auto;
     align-self: center;
     color: var(--panel-text-secondary, #666);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Video viewport */
@@ -200,7 +200,7 @@
     border: 1px solid #c88;
     border-radius: var(--border-radius);
     color: #a00;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     margin-bottom: 8px;
     font-family: inherit;
     word-break: break-word;
@@ -213,7 +213,7 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary, #666);
 }
 
@@ -224,7 +224,7 @@
 
 /* Model info */
 .window-model-info {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary, #666);
     margin-bottom: 8px;
     padding: 4px 8px;
@@ -281,7 +281,7 @@
 }
 
 .db-stat-section-title {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: var(--panel-text-primary, #333);
     margin: 0 8px 8px 8px;
@@ -290,7 +290,7 @@
 .rich-fields-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--gap);
     padding: 0 8px;
 }
 
@@ -300,7 +300,7 @@
     background: var(--panel-bg-secondary, #f0f0f0);
     border: 1px solid var(--panel-border-color, #d0d0d0);
     border-radius: var(--border-radius);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     color: var(--panel-text-primary, #333);
     transition: background-color 0.2s ease;

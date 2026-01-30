@@ -17,7 +17,7 @@
 
 .scraper-label {
     display: block;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -27,13 +27,13 @@
 
 .scraper-input-group {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .scraper-url-input {
     flex: 1;
     padding: var(--panel-padding-sm);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     outline: none;
@@ -55,7 +55,7 @@
     color: #fff;
     border: none;
     border-radius: var(--border-radius);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     cursor: pointer;
     text-transform: uppercase;
@@ -85,7 +85,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
@@ -98,7 +98,7 @@
     padding: 3px 6px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     font-family: var(--font-mono, monospace);
 }
 
@@ -106,7 +106,7 @@
 .scraper-status {
     margin: 0 20px;
     padding: 10px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: var(--font-mono, monospace);
     border-left: 3px solid transparent;
 }
@@ -148,7 +148,7 @@
 
 /* Results Section */
 .scraper-results-title {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -180,7 +180,7 @@
 }
 
 .scraper-result-title {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
     margin: 0;
@@ -193,7 +193,7 @@
 .scraper-result-link {
     color: var(--accent-color);
     text-decoration: none;
-    font-size: 14px;
+    font-size: var(--font-size-md);
 }
 
 .scraper-result-link:hover {
@@ -201,14 +201,14 @@
 }
 
 .scraper-result-description {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     line-height: 1.5;
     margin: 8px 0;
 }
 
 .scraper-result-content {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-primary);
     line-height: 1.5;
     padding: 8px;
@@ -221,14 +221,14 @@
 
 .scraper-result-links,
 .scraper-result-images {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     padding: 4px 0;
 }
 
 .scraper-result-error {
     color: #dc2626;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 /* History Section */
@@ -239,7 +239,7 @@
 }
 
 .scraper-history-title {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -253,7 +253,7 @@
 }
 
 .scraper-history-empty {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     text-align: center;
     padding: 16px;
@@ -277,7 +277,7 @@
 }
 
 .scraper-history-url {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-primary);
     flex: 1;
     overflow: hidden;
@@ -287,7 +287,7 @@
 }
 
 .scraper-history-time {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     margin-left: 8px;
 }
