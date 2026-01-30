@@ -201,11 +201,6 @@
     background: var(--status-error, #f48771);
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
 /* Error display */
 .python-error-display {
     padding: 20px;

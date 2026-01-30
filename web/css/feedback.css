@@ -329,7 +329,7 @@
     font-size: 12px;
     line-height: 1.5;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: slideIn 0.3s ease-out;
+    animation: slideInFromRight 0.3s ease-out;
 }
 
 .toast.error {
@@ -358,7 +358,7 @@
     color: #ffa502;
 }
 
-@keyframes slideIn {
+@keyframes slideInFromRight {
     from {
         transform: translateX(400px);
         opacity: 0;
@@ -518,11 +518,6 @@ body.connecting .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
     animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
 }
 
 /* Reduced motion preference */
