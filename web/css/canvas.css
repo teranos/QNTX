@@ -59,7 +59,7 @@
     background: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: 20px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -88,7 +88,7 @@
     cursor: move;
     user-select: none;
     background-color: var(--bg-secondary);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
     transition: opacity 0.15s ease;
     z-index: 1;

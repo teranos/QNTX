@@ -150,7 +150,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   color: #666;
   font-size: 18px;
   transition: background-color 0.15s ease, color 0.15s ease;
@@ -195,7 +195,7 @@
   padding: 16px;
   background: rgba(255, 0, 51, 0.1);
   border-left: 3px solid #ff0033;
-  border-radius: var(--panel-border-radius);
+  border-radius: var(--border-radius);
   color: #ff0033;
   font-size: 12px;
   margin-bottom: 12px;

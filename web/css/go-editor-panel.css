@@ -90,5 +90,5 @@
 .go-editor-error-help code {
     background: var(--editor-code-bg);
     padding: 2px 6px;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }

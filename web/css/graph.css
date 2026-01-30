@@ -122,7 +122,7 @@
     padding: 4px 10px;
     background: rgba(46, 204, 113, 0.15);
     border: 1px solid rgba(46, 204, 113, 0.3);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     font-size: 10px;
     font-weight: 500;
     color: rgba(46, 204, 113, 0.9); /* Subtle green */
