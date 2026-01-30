@@ -943,7 +943,7 @@ func TestRegistry_AsyncLoadingReadiness(t *testing.T) {
 		assert.False(t, registry.IsReady("test"))
 	})
 
-	t.Run("ListEnabled returns all plugins including loading", func(t *testing.T) {
+	t.Run("ListRegistered returns all plugins including loading", func(t *testing.T) {
 		registry := NewRegistry("1.0.0", testLogger(t))
 
 		// Pre-register some plugins (loading state)
@@ -954,12 +954,12 @@ func TestRegistry_AsyncLoadingReadiness(t *testing.T) {
 		plugin := newMockPlugin("registered")
 		require.NoError(t, registry.Register(plugin))
 
-		// ListEnabled should return all enabled plugins (pre-registered + registered)
-		enabled := registry.ListEnabled()
-		assert.Len(t, enabled, 3)
-		assert.Contains(t, enabled, "loading1")
-		assert.Contains(t, enabled, "loading2")
-		assert.Contains(t, enabled, "registered")
+		// ListRegistered should return all plugins (pre-registered + registered)
+		registered := registry.ListRegistered()
+		assert.Len(t, registered, 3)
+		assert.Contains(t, registered, "loading1")
+		assert.Contains(t, registered, "loading2")
+		assert.Contains(t, registered, "registered")
 
 		// List should only return fully registered plugins
 		list := registry.List()

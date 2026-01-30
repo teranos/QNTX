@@ -158,7 +158,7 @@ func (e *ParseError) Unwrap() error {
 	return e.Err
 }
 
-// IsWarning returns true if this is a warning (not an error)
+// IsWarning returns true if this error has warning severity specifically
 func (e *ParseError) IsWarning() bool {
 	return e.Severity == SeverityWarning
 }

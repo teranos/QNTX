@@ -13,7 +13,7 @@ func (s *QNTXServer) setupHTTPRoutes() {
 	// This allows routes to be registered immediately while plugins load asynchronously
 	if s.pluginRegistry != nil {
 		pluginHandler := s.corsMiddleware(s.handlePluginRequest)
-		for _, name := range s.pluginRegistry.ListEnabled() {
+		for _, name := range s.pluginRegistry.ListRegistered() {
 			// Register exact match for /api/{plugin} (e.g., /api/code)
 			exactPattern := "/api/" + name
 			http.HandleFunc(exactPattern, pluginHandler)
