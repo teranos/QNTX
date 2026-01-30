@@ -53,7 +53,7 @@ func (s *QNTXServer) HandleJobExecutions(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Get executions from store
-	execStore := s.getExecutionStore()
+	execStore := s.newExecutionStore()
 	executions, total, err := execStore.ListExecutions(jobID, limit, offset, statusFilter)
 	if err != nil {
 		s.logger.Errorw("Failed to list executions", "error", err, "job_id", jobID)
@@ -98,7 +98,7 @@ func (s *QNTXServer) HandlePulseExecution(w http.ResponseWriter, r *http.Request
 	isLogsRequest := len(parts) > 1 && parts[1] == "logs"
 
 	// Get execution from store
-	execStore := s.getExecutionStore()
+	execStore := s.newExecutionStore()
 	execution, err := execStore.GetExecution(executionID)
 	if err != nil {
 		if errors.IsNotFoundError(err) {
@@ -155,8 +155,8 @@ func parseIntQueryParam(r *http.Request, name string, defaultValue, min, max int
 
 // Note: writeJSON and writeError functions removed - use writeJSON/writeError from response.go
 
-// getExecutionStore returns the execution store (lazy init helper)
-func (s *QNTXServer) getExecutionStore() *schedule.ExecutionStore {
+// newExecutionStore creates a new execution store instance
+func (s *QNTXServer) newExecutionStore() *schedule.ExecutionStore {
 	// TODO: Consider caching the store instance on QNTXServer
 	return schedule.NewExecutionStore(s.db)
 }

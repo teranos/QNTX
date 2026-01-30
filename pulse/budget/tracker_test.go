@@ -24,6 +24,7 @@ func TestTracker_ReadsFromActualUsage(t *testing.T) {
 	// Create budget tracker with $5 daily limit
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.00,
+		WeeklyBudgetUSD:  999999.0, // High limit for tests not testing weekly budget
 		MonthlyBudgetUSD: 30.00,
 		CostPerScoreUSD:  0.002,
 	}
@@ -60,6 +61,7 @@ func TestTracker_EnforcesDailyLimit(t *testing.T) {
 	// Create budget tracker with $5 daily limit
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.00,
+		WeeklyBudgetUSD:  999999.0, // High limit for tests not testing weekly budget
 		MonthlyBudgetUSD: 30.00,
 		CostPerScoreUSD:  0.002,
 	}
@@ -89,6 +91,7 @@ func TestTracker_AllowsWithinLimits(t *testing.T) {
 	// Create budget tracker with $5 daily limit
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.00,
+		WeeklyBudgetUSD:  999999.0, // High limit for tests not testing weekly budget
 		MonthlyBudgetUSD: 30.00,
 		CostPerScoreUSD:  0.002,
 	}
@@ -128,8 +131,9 @@ func TestTracker_EnforcesMonthlyLimit(t *testing.T) {
 
 	// Create budget tracker with $30 monthly limit
 	config := BudgetConfig{
-		DailyBudgetUSD:   10.00, // Daily check should pass ($1.00 < $10.00)
-		MonthlyBudgetUSD: 30.00, // Monthly check should fail ($26.20 + $5.00 > $30.00)
+		DailyBudgetUSD:   10.00,    // Daily check should pass ($1.00 < $10.00)
+		WeeklyBudgetUSD:  999999.0, // High limit for tests not testing weekly budget
+		MonthlyBudgetUSD: 30.00,    // Monthly check should fail ($26.20 + $5.00 > $30.00)
 		CostPerScoreUSD:  0.002,
 	}
 	tracker := NewTracker(db, config)
@@ -161,6 +165,7 @@ func TestTracker_MultipleJobsCounted(t *testing.T) {
 	// Create budget tracker with $5 daily limit
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.00,
+		WeeklyBudgetUSD:  999999.0, // High limit for tests not testing weekly budget
 		MonthlyBudgetUSD: 30.00,
 		CostPerScoreUSD:  0.002,
 	}

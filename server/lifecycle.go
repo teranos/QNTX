@@ -143,7 +143,7 @@ func (s *QNTXServer) monitorBrowserConnection() {
 		s.mu.Unlock()
 
 		if clientCount == 0 {
-			s.logger.Warnw("Browser slow to connect",
+			s.logger.Warnw("No browser connected after 5 seconds",
 				"elapsed_seconds", 5,
 				"hint", "Browser may be delayed by extensions, previous pages, or system settings",
 			)

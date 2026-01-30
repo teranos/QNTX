@@ -48,6 +48,7 @@ func TestBudgetTracker_GetStatus(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   10.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 100.0,
 		CostPerScoreUSD:  0.002,
 	}
@@ -82,6 +83,7 @@ func TestBudgetTracker_GetStatus_NoUsage(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 50.0,
 		CostPerScoreUSD:  0.001,
 	}
@@ -107,6 +109,7 @@ func TestBudgetTracker_CheckBudget_WithinLimits(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   10.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 100.0,
 		CostPerScoreUSD:  0.002,
 	}
@@ -132,6 +135,7 @@ func TestBudgetTracker_CheckBudget_ExceedsDailyLimit(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 100.0,
 		CostPerScoreUSD:  0.002,
 	}
@@ -158,8 +162,9 @@ func TestBudgetTracker_CheckBudget_ExceedsMonthlyLimit(t *testing.T) {
 	defer db.Close()
 
 	config := BudgetConfig{
-		DailyBudgetUSD:   20.0, // High daily limit
-		MonthlyBudgetUSD: 50.0, // Low monthly limit
+		DailyBudgetUSD:   20.0,      // High daily limit
+		WeeklyBudgetUSD:  999999.0,  // High value - don't test weekly limits here
+		MonthlyBudgetUSD: 50.0,      // Low monthly limit
 		CostPerScoreUSD:  0.002,
 	}
 
@@ -187,6 +192,7 @@ func TestBudgetTracker_CheckBudget_ExactLimit(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   10.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 100.0,
 		CostPerScoreUSD:  0.002,
 	}
@@ -213,6 +219,7 @@ func TestBudgetTracker_EstimateOperationCost(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   10.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 100.0,
 		CostPerScoreUSD:  0.0025, // $0.0025 per score
 	}
@@ -246,6 +253,7 @@ func TestBudgetTracker_UpdateDailyBudget(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 50.0,
 		CostPerScoreUSD:  0.001,
 	}
@@ -273,6 +281,7 @@ func TestBudgetTracker_UpdateMonthlyBudget(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 50.0,
 		CostPerScoreUSD:  0.001,
 	}
@@ -299,6 +308,7 @@ func TestBudgetTracker_UpdateBudget_NegativeValues(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   5.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 50.0,
 		CostPerScoreUSD:  0.001,
 	}
@@ -328,6 +338,7 @@ func TestBudgetTracker_IgnoresFailedOperations(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   10.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 100.0,
 		CostPerScoreUSD:  0.002,
 	}
@@ -359,6 +370,7 @@ func TestBudgetTracker_MultipleConcurrentOperations(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   100.0,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 1000.0,
 		CostPerScoreUSD:  0.002,
 	}
@@ -395,7 +407,8 @@ func TestBudgetTracker_ZeroBudget(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   0.0, // Zero budget
-		MonthlyBudgetUSD: 0.0,
+		WeeklyBudgetUSD:  0.0, // Zero budget
+		MonthlyBudgetUSD: 0.0, // Zero budget
 		CostPerScoreUSD:  0.002,
 	}
 
@@ -418,6 +431,7 @@ func TestBudgetTracker_GetBudgetLimits(t *testing.T) {
 
 	config := BudgetConfig{
 		DailyBudgetUSD:   12.50,
+		WeeklyBudgetUSD:  999999.0, // High value - don't test weekly limits here
 		MonthlyBudgetUSD: 250.75,
 		CostPerScoreUSD:  0.0035,
 	}

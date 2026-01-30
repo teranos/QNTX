@@ -23,14 +23,13 @@ func SetDefaults(v *viper.Viper) {
 	v.SetDefault("local_inference.enabled", false) // Disabled by default - users should opt-in to local providers
 	v.SetDefault("local_inference.base_url", "http://localhost:11434")
 	v.SetDefault("local_inference.model", "llama3.2:3b")
-	v.SetDefault("local_inference.context_size", 16384)
+	// context_size is optional: nil = model default (checked in ai/provider/local_provider.go)
 	v.SetDefault("local_inference.timeout_seconds", 360) // 6 minutes - reasonable for slow inference
 	v.SetDefault("local_inference.onnx_model_path", "ats/vidstream/models/yolo11n.onnx")
 
 	// OpenRouter defaults
 	v.SetDefault("openrouter.model", "openai/gpt-4o-mini") // Cost-effective default
-	v.SetDefault("openrouter.temperature", 0.2)            // Deterministic
-	v.SetDefault("openrouter.max_tokens", 1000)            // Token limit
+	// temperature and max_tokens are optional: nil = defaults (0.2, 1000) checked in ai/openrouter/client.go
 
 	// Ax (attestation query) defaults
 	v.SetDefault("ax.default_actor", "ax@user")
@@ -62,9 +61,7 @@ func SetDefaults(v *viper.Viper) {
 		"./plugins",       // Project-level plugins
 	})
 	v.SetDefault("plugin.websocket.keepalive.enabled", true)
-	v.SetDefault("plugin.websocket.keepalive.ping_interval_secs", 30)
-	v.SetDefault("plugin.websocket.keepalive.pong_timeout_secs", 60)
-	v.SetDefault("plugin.websocket.keepalive.reconnect_attempts", 3)
+	// ping_interval_secs, pong_timeout_secs, reconnect_attempts are optional: nil = defaults (30, 60, 3) in plugin/grpc/websocket_keepalive.go
 }
 
 // BindSensitiveEnvVars explicitly binds sensitive configuration to environment variables
