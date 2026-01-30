@@ -92,6 +92,7 @@ impl AttestationStore for SqliteStore {
         Ok(())
     }
 
+    #[allow(clippy::type_complexity)]
     fn get(&self, id: &str) -> StoreResult<Option<Attestation>> {
         let mut stmt = self
             .conn
