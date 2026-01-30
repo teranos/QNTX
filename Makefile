@@ -34,19 +34,19 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	@echo "  Database: Uses am.toml configuration"
 	@echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"
 	@echo ""
-	@# Clean up any lingering processes on dev ports (only this instance's ports)
+	@# Clean up any lingering processes on dev ports
 	@lsof -ti:$${BACKEND_PORT:-877} | xargs kill -9 2>/dev/null || true
 	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
-	@trap 'echo "Shutting down dev servers..."; \
-		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
-		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
-		wait 2>/dev/null || true; \
-		echo "✓ Servers stopped cleanly"' INT; \
+	@pkill -f "bun.*dev" 2>/dev/null || true
+	@trap 'echo ""; echo "Shutting down dev servers..."; \
+		lsof -ti:$${BACKEND_PORT:-877},$${FRONTEND_PORT:-8820} | xargs kill -TERM 2>/dev/null || true; \
+		pkill -f "bun.*dev" 2>/dev/null || true; \
+		sleep 1; \
+		lsof -ti:$${BACKEND_PORT:-877},$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
+		echo "✓ Servers stopped"' EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
-	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
-	FRONTEND_PID=$$!; \
 	echo "✨ Development servers running"; \
 	echo "Press Ctrl+C to stop both servers"; \
 	wait
