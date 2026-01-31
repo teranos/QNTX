@@ -165,7 +165,7 @@ func (s *PluginServer) Metadata(ctx context.Context, _ *protocol.Empty) (*protoc
 
 // Initialize initializes the plugin with configuration.
 // This method is idempotent - concurrent calls will block until the first completes.
-func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeRequest) (*protocol.Empty, error) {
+func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeRequest) (*protocol.InitializeResponse, error) {
 	// Use sync.Once to ensure initialization happens exactly once,
 	// even under concurrent access
 	s.initOnce.Do(func() {
@@ -198,7 +198,11 @@ func (s *PluginServer) Initialize(ctx context.Context, req *protocol.InitializeR
 		return nil, s.initErr
 	}
 
-	return &protocol.Empty{}, nil
+	// Phase 1: Return empty handler list (no plugins announce handlers yet)
+	// Phase 2+: Plugins will implement optional interface to announce handlers
+	return &protocol.InitializeResponse{
+		HandlerNames: []string{},
+	}, nil
 }
 
 // Shutdown shuts down the plugin.
@@ -381,4 +385,12 @@ func (s *PluginServer) ConfigSchema(ctx context.Context, _ *protocol.Empty) (*pr
 	return &protocol.ConfigSchemaResponse{
 		Fields: fields,
 	}, nil
+}
+
+// ExecuteJob executes an async job (Phase 1: stub implementation).
+// Phase 2+: Plugins will implement optional interface to handle async jobs.
+func (s *PluginServer) ExecuteJob(ctx context.Context, req *protocol.ExecuteJobRequest) (*protocol.ExecuteJobResponse, error) {
+	// Phase 1: Return unimplemented
+	// This allows the protocol to be updated without breaking existing functionality
+	return nil, errors.New("ExecuteJob not yet implemented - Phase 1 protocol update only")
 }

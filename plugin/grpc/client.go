@@ -27,6 +27,9 @@ type ExternalDomainProxy struct {
 	addr     string
 	metadata plugin.Metadata
 
+	// Handler names this plugin can execute (populated during Initialize)
+	handlerNames []string
+
 	// WebSocket configuration (set via SetWebSocketConfig)
 	keepaliveConfig *KeepaliveConfig
 	wsConfig        *WebSocketConfig
@@ -95,6 +98,12 @@ func (c *ExternalDomainProxy) SetWebSocketConfig(keepalive KeepaliveConfig, ws W
 // Metadata returns the plugin's metadata (cached from connection).
 func (c *ExternalDomainProxy) Metadata() plugin.Metadata {
 	return c.metadata
+}
+
+// GetHandlerNames returns the async handler names this plugin announced during Initialize.
+// Returns empty slice if plugin provides no async handlers (Phase 1: all plugins return empty).
+func (c *ExternalDomainProxy) GetHandlerNames() []string {
+	return c.handlerNames
 }
 
 // Initialize initializes the remote plugin.
@@ -174,10 +183,19 @@ func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.Se
 		"queue_endpoint", queueEndpoint,
 	)
 
-	_, err := c.client.Initialize(ctx, req)
+	resp, err := c.client.Initialize(ctx, req)
 	if err != nil {
 		wrappedErr := errors.Wrapf(err, "failed to initialize remote plugin %s at %s", c.metadata.Name, c.addr)
 		return errors.WithHint(wrappedErr, "check plugin logs for initialization errors or verify required configuration is set")
+	}
+
+	// Store handler names announced by plugin
+	c.handlerNames = resp.GetHandlerNames()
+	if len(c.handlerNames) > 0 {
+		c.logger.Infow("Plugin announced async handlers",
+			"plugin", c.metadata.Name,
+			"handlers", c.handlerNames,
+		)
 	}
 
 	c.logger.Infow("Remote plugin initialized",
