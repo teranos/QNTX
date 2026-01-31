@@ -28,10 +28,20 @@ impl SqliteStore {
         Self { conn }
     }
 
+    /// Helper to execute SQL and convert errors to StoreError
+    fn execute_sql<P>(&self, sql: &str, params: P) -> StoreResult<usize>
+    where
+        P: rusqlite::Params,
+    {
+        self.conn
+            .execute(sql, params)
+            .map_err(|e| crate::error::SqliteError::Database(e).into())
+    }
+
     /// Create a new in-memory SQLite store (for testing)
     pub fn in_memory() -> crate::error::Result<Self> {
-        let conn = Connection::open_in_memory()?;
-        crate::migrate::migrate(&conn)?;
+        let conn = Connection::open_in_memory()?;  // rusqlite::Error -> SqliteError via #[from]
+        crate::migrate::migrate(&conn)?;           // Already returns SqliteError
         Ok(Self::new(conn))
     }
 
@@ -56,24 +66,24 @@ impl AttestationStore for SqliteStore {
             return Err(StoreError::AlreadyExists(attestation.id.clone()));
         }
 
-        // Serialize JSON fields
+        // Serialize JSON fields - these already return SqliteError, convert to StoreError
         let subjects_json = serialize_string_vec(&attestation.subjects)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            .map_err(|e| StoreError::from(e))?;
         let predicates_json = serialize_string_vec(&attestation.predicates)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            .map_err(|e| StoreError::from(e))?;
         let contexts_json = serialize_string_vec(&attestation.contexts)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            .map_err(|e| StoreError::from(e))?;
         let actors_json = serialize_string_vec(&attestation.actors)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            .map_err(|e| StoreError::from(e))?;
         let attributes_json = serialize_attributes(&attestation.attributes)
-            .map_err(|e| StoreError::Serialization(e.to_string()))?;
+            .map_err(|e| StoreError::from(e))?;
 
         // Convert timestamp to SQL format
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
         let created_at_sql = timestamp_to_sql(attestation.created_at);
 
-        // Insert into database
-        self.conn.execute(
+        // Insert into database - use our helper method
+        self.execute_sql(
             "INSERT INTO attestations (id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             rusqlite::params![
@@ -87,7 +97,7 @@ impl AttestationStore for SqliteStore {
                 attributes_json,
                 created_at_sql,
             ],
-        ).map_err(|e| StoreError::Backend(e.to_string()))?;
+        )?;
 
         Ok(())
     }
