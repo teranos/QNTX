@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/ai/openrouter"
@@ -116,29 +117,43 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	// Decode payload
 	var payload Payload
 	if err := json.Unmarshal(job.Payload, &payload); err != nil {
-		return errors.Wrap(err, "failed to decode prompt payload")
+		err = errors.Wrap(err, "failed to decode prompt payload")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Payload length: %d bytes", len(job.Payload)))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
+		return err
 	}
 
 	// Parse frontmatter from template
 	doc, err := ParseFrontmatter(payload.Template)
 	if err != nil {
+		err = errors.Wrap(err, "failed to parse frontmatter")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
+		err = errors.WithDetail(err, fmt.Sprintf("Template length: %d bytes", len(payload.Template)))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
 		logger.AddAxSymbol(logger.Logger).Errorw("Frontmatter parsing failed",
 			"error", err,
 			"template_length", len(payload.Template),
 			"job_id", job.ID,
 			"prompt_id", payload.PromptID,
 		)
-		return errors.Wrap(err, "failed to parse frontmatter")
+		return err
 	}
 
 	// Parse template body (after frontmatter)
 	tmpl, err := Parse(doc.Body)
 	if err != nil {
+		err = errors.Wrap(err, "failed to parse prompt template")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
+		err = errors.WithDetail(err, fmt.Sprintf("Template body length: %d bytes", len(doc.Body)))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
 		logger.AddAxSymbol(logger.Logger).Errorw("Template parsing failed",
 			"error", err,
 			"template_length", len(doc.Body),
 		)
-		return errors.Wrap(err, "failed to parse prompt template")
+		return err
 	}
 
 	// Apply temporal cursor filter for incremental processing
@@ -151,7 +166,14 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	executor := ax.NewAxExecutor(h.queryStore, h.aliasResolver)
 	result, err := executor.ExecuteAsk(ctx, filter)
 	if err != nil {
-		return errors.Wrap(err, "failed to execute ax query")
+		err = errors.Wrap(err, "failed to execute ax query")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Prompt ID: %s", payload.PromptID))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", filter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter predicates: %v", filter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter contexts: %v", filter.Contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", HandlerName))
+		return err
 	}
 
 	if len(result.Attestations) == 0 {
@@ -181,7 +203,13 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		// Interpolate template
 		prompt, err := tmpl.Execute(&as)
 		if err != nil {
-			return errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
+			err = errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation subjects: %v", as.Subjects))
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation predicates: %v", as.Predicates))
+			err = errors.WithDetail(err, fmt.Sprintf("Processing: %d of %d", i+1, len(result.Attestations)))
+			return err
 		}
 
 		// Call LLM with timing
@@ -213,12 +241,20 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		duration := time.Since(startTime)
 
 		if err != nil {
+			err = errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Provider: %s", payload.Provider))
+			err = errors.WithDetail(err, fmt.Sprintf("Model: %s", payload.Model))
+			err = errors.WithDetail(err, fmt.Sprintf("Duration: %dms", duration.Milliseconds()))
+			err = errors.WithDetail(err, fmt.Sprintf("Processing: %d of %d", i+1, len(result.Attestations)))
+			err = errors.WithDetail(err, fmt.Sprintf("Prompt length: %d chars", len(prompt)))
 			logger.AddAxSymbol(logger.Logger).Errorw("LLM call failed",
 				"error", err,
 				"attestation_id", as.ID,
 				"duration_ms", duration.Milliseconds(),
 			)
-			return errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
+			return err
 		}
 
 		// Log successful LLM call with duration and token usage
@@ -233,7 +269,13 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 		// Create result attestation
 		resultAs, err := h.createResultAttestation(&as, resp.Content, payload)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create result attestation for %s", as.ID)
+			err = errors.Wrapf(err, "failed to create result attestation for %s", as.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Response length: %d chars", len(resp.Content)))
+			err = errors.WithDetail(err, fmt.Sprintf("Result predicate: %s", payload.ResultPredicate))
+			err = errors.WithDetail(err, fmt.Sprintf("Result actor: %s", payload.ResultActor))
+			return err
 		}
 
 		results = append(results, Result{
@@ -258,7 +300,10 @@ func (h *Handler) Execute(ctx context.Context, job *async.Job) error {
 	if len(results) > 0 {
 		resultsJSON, err := json.Marshal(results)
 		if err != nil {
-			return errors.Wrap(err, "failed to marshal execution results")
+			err = errors.Wrap(err, "failed to marshal execution results")
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Results count: %d", len(results)))
+			return err
 		}
 		job.Source = string(resultsJSON)
 	}
@@ -337,7 +382,12 @@ func (h *Handler) createResultAttestation(
 	// Generate ASID: subject, predicate, context, actor
 	asid, err := id.GenerateASID(sourceAs.Subjects[0], predicate, sourceAs.ID, actor)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate ASID")
+		err = errors.Wrap(err, "failed to generate ASID")
+		err = errors.WithDetail(err, fmt.Sprintf("Source attestation: %s", sourceAs.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Subject: %s", sourceAs.Subjects[0]))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicate: %s", predicate))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", actor))
+		return nil, err
 	}
 
 	now := time.Now()
@@ -359,7 +409,13 @@ func (h *Handler) createResultAttestation(
 
 	// Store the attestation
 	if err := h.store.CreateAttestation(resultAs); err != nil {
-		return nil, errors.Wrap(err, "failed to store result attestation")
+		err = errors.Wrap(err, "failed to store result attestation")
+		err = errors.WithDetail(err, fmt.Sprintf("Result ASID: %s", asid))
+		err = errors.WithDetail(err, fmt.Sprintf("Source attestation: %s", sourceAs.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", resultAs.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicate: %s", predicate))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", actor))
+		return nil, err
 	}
 
 	return resultAs, nil
@@ -379,20 +435,31 @@ func ExecuteOneShot(
 	// Parse frontmatter from template
 	doc, err := ParseFrontmatter(template)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse frontmatter")
+		err = errors.Wrap(err, "failed to parse frontmatter")
+		err = errors.WithDetail(err, fmt.Sprintf("Template length: %d bytes", len(template)))
+		err = errors.WithDetail(err, "Function: ExecuteOneShot")
+		return nil, err
 	}
 
 	// Parse template body (after frontmatter)
 	tmpl, err := Parse(doc.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse prompt template")
+		err = errors.Wrap(err, "failed to parse prompt template")
+		err = errors.WithDetail(err, fmt.Sprintf("Template body length: %d bytes", len(doc.Body)))
+		err = errors.WithDetail(err, "Function: ExecuteOneShot")
+		return nil, err
 	}
 
 	// Execute ax query
 	executor := ax.NewAxExecutor(queryStore, aliasResolver)
 	axResult, err := executor.ExecuteAsk(ctx, filter)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to execute ax query")
+		err = errors.Wrap(err, "failed to execute ax query")
+		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", filter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter predicates: %v", filter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter contexts: %v", filter.Contexts))
+		err = errors.WithDetail(err, "Function: ExecuteOneShot")
+		return nil, err
 	}
 
 	if len(axResult.Attestations) == 0 {
@@ -412,7 +479,11 @@ func ExecuteOneShot(
 		// Interpolate template
 		prompt, err := tmpl.Execute(&as)
 		if err != nil {
-			return results, errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
+			err = errors.Wrapf(err, "failed to interpolate template for attestation %s", as.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", as.Subjects))
+			err = errors.WithDetail(err, "Function: ExecuteOneShot")
+			return results, err
 		}
 
 		// Call LLM with frontmatter metadata applied
@@ -434,7 +505,12 @@ func ExecuteOneShot(
 
 		resp, err := client.Chat(ctx, chatReq)
 		if err != nil {
-			return results, errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
+			err = errors.Wrapf(err, "LLM call failed for attestation %s", as.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Prompt length: %d chars", len(prompt)))
+			err = errors.WithDetail(err, fmt.Sprintf("System prompt length: %d chars", len(systemPrompt)))
+			err = errors.WithDetail(err, "Function: ExecuteOneShot")
+			return results, err
 		}
 
 		results = append(results, Result{
