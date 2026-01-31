@@ -14,6 +14,7 @@ import (
 
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/qntx-code/ixgest/git"
 	"github.com/teranos/QNTX/qntx-code/vcs/github"
 )
@@ -152,6 +153,7 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 	// Get validated workspace root (Issue #2)
 	workspaceRoot, err := getWorkspaceRoot()
 	if err != nil {
+		err = errors.WithDetail(err, fmt.Sprintf("Code path requested: %s", codePath))
 		logger.Errorw("Failed to get workspace root", "error", err)
 		http.Error(w, "Workspace configuration error", http.StatusInternalServerError)
 		return
@@ -160,6 +162,8 @@ func (p *Plugin) handleCodeContent(w http.ResponseWriter, r *http.Request) {
 	// Validate path for security (Issue #1)
 	cleanPath, err := validateCodePath(codePath, workspaceRoot)
 	if err != nil {
+		err = errors.WithDetail(err, fmt.Sprintf("Workspace root: %s", workspaceRoot))
+		err = errors.WithDetail(err, fmt.Sprintf("Request method: %s", r.Method))
 		logger.Warnw("Path validation failed", "path", codePath, "error", err)
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
@@ -216,6 +220,8 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 	suggestions, err := github.FetchFixSuggestions(prNumber)
 	if err != nil {
 		// Issue #6: Add error logging with context
+		err = errors.WithDetail(err, fmt.Sprintf("PR number: %d", prNumber))
+		err = errors.WithDetail(err, "Handler: handlePRSuggestions")
 		logger.Errorw("Failed to fetch PR suggestions", "pr", prNumber, "error", err)
 		http.Error(w, "Failed to fetch suggestions", http.StatusInternalServerError)
 		return
@@ -244,6 +250,7 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 	prs, err := github.FetchOpenPRs()
 	if err != nil {
 		// Issue #6: Add error logging with context
+		err = errors.WithDetail(err, "Handler: handlePRList")
 		logger.Errorw("Failed to fetch open PRs", "error", err)
 		http.Error(w, "Failed to fetch PRs", http.StatusInternalServerError)
 		return
@@ -287,6 +294,9 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 	if !filepath.IsAbs(repoPath) {
 		workspaceRoot, err := getWorkspaceRoot()
 		if err != nil {
+			err = errors.WithDetail(err, fmt.Sprintf("Repository path: %s", req.Path))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", req.Actor))
+			err = errors.WithDetail(err, "Handler: handleGitIxgest")
 			logger.Errorw("Failed to get workspace root", "error", err)
 			http.Error(w, "Workspace configuration error", http.StatusInternalServerError)
 			return
@@ -313,6 +323,9 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 	// Set incremental filter if --since is provided
 	if req.Since != "" {
 		if err := processor.SetSince(req.Since); err != nil {
+			err = errors.WithDetail(err, fmt.Sprintf("Repository: %s", repoPath))
+			err = errors.WithDetail(err, fmt.Sprintf("Since value: %s", req.Since))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", req.Actor))
 			http.Error(w, fmt.Sprintf("Invalid since value: %v", err), http.StatusBadRequest)
 			return
 		}
@@ -321,6 +334,12 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 	// Process repository
 	result, err := processor.ProcessGitRepository(repoPath)
 	if err != nil {
+		err = errors.WithDetail(err, fmt.Sprintf("Repository: %s", repoPath))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", req.Actor))
+		err = errors.WithDetail(err, fmt.Sprintf("Since: %s", req.Since))
+		err = errors.WithDetail(err, fmt.Sprintf("Verbosity: %d", req.Verbosity))
+		err = errors.WithDetail(err, fmt.Sprintf("Dry run: %t", req.DryRun))
+		err = errors.WithDetail(err, "Handler: handleGitIxgest")
 		logger.Errorw("Git ingestion failed", "path", repoPath, "error", err)
 		http.Error(w, fmt.Sprintf("Git ingestion failed: %v", err), http.StatusInternalServerError)
 		return
@@ -344,7 +363,9 @@ func (p *Plugin) buildCodeTree() ([]CodeEntry, error) {
 	// Issue #2: Use validated workspace root
 	workspaceRoot, err := getWorkspaceRoot()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get workspace root: %w", err)
+		err = fmt.Errorf("failed to get workspace root: %w", err)
+		err = errors.WithDetail(err, "Operation: buildCodeTree")
+		return nil, err
 	}
 
 	return p.buildCodeTreeFromFS(workspaceRoot, "")
@@ -413,6 +434,9 @@ func (p *Plugin) serveCodeFile(w http.ResponseWriter, r *http.Request, codePath 
 			http.Error(w, "File not found", http.StatusNotFound)
 		} else {
 			// Issue #6: Add error logging with context
+			err = errors.WithDetail(err, fmt.Sprintf("File path: %s", codePath))
+			err = errors.WithDetail(err, fmt.Sprintf("Full path: %s", fullPath))
+			err = errors.WithDetail(err, "Operation: read file")
 			logger.Errorw("Failed to read file", "path", codePath, "error", err)
 			http.Error(w, "Failed to read file", http.StatusInternalServerError)
 		}
@@ -445,6 +469,10 @@ func (p *Plugin) saveCodeFile(w http.ResponseWriter, r *http.Request, codePath s
 
 	if err := os.WriteFile(fullPath, content, 0644); err != nil {
 		// Issue #6: Add error logging with context
+		err = errors.WithDetail(err, fmt.Sprintf("File path: %s", codePath))
+		err = errors.WithDetail(err, fmt.Sprintf("Full path: %s", fullPath))
+		err = errors.WithDetail(err, fmt.Sprintf("Content length: %d bytes", len(content)))
+		err = errors.WithDetail(err, "Operation: write file (dev mode)")
 		logger.Errorw("Failed to write file", "path", codePath, "error", err)
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
