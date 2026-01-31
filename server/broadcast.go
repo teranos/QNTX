@@ -25,10 +25,11 @@ import (
 // broadcastRequest represents a request to broadcast data to clients.
 // All broadcasts go through a dedicated worker goroutine to prevent race conditions.
 type broadcastRequest struct {
-	reqType  string        // "message", "graph", "log", "close"
+	reqType  string        // "message", "graph", "log", "close", "watcher_match"
 	msg      interface{}   // Generic message (for reqType="message")
 	graph    *graph.Graph  // Graph data (for reqType="graph")
 	logBatch *wslogs.Batch // Log batch (for reqType="log")
+	payload  interface{}   // Generic payload (for reqType="watcher_match")
 	clientID string        // Target client ID. Empty string means "broadcast to all clients"
 	                       // (semantically: no specific target = all targets).
 	client   *Client       // Client to close (for reqType="close")
@@ -742,6 +743,10 @@ func (s *QNTXServer) processBroadcastRequest(req *broadcastRequest) {
 		s.sendLogToClient(req.clientID, req.logBatch)
 	case "close":
 		s.closeClientChannels(req.client)
+	case "watcher_match":
+		s.sendMessageToClients(req.payload, req.clientID)
+	case "watcher_error":
+		s.sendMessageToClients(req.payload, req.clientID)
 	default:
 		s.logger.Warnw("Unknown broadcast request type", "type", req.reqType)
 	}
