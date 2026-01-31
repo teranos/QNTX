@@ -94,38 +94,11 @@
     line-height: 1.4;
 }
 
-/* Animations */
-@keyframes fadeInLoader {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes fadeOutLoader {
-    from { opacity: 1; transform: scale(1); }
-    to { opacity: 0; transform: scale(0.98); }
-}
-
 #loading-screen.fade-out {
     animation: fadeOutLoader 500ms ease-out forwards;
 }
 
-/* Log scrollbar styling */
-#loader-logs::-webkit-scrollbar {
-    width: 4px;
-}
-
-#loader-logs::-webkit-scrollbar-track {
-    background: var(--bg-almost-black);
-}
-
-#loader-logs::-webkit-scrollbar-thumb {
-    background: var(--bg-dark-light);
-    border-radius: 2px;
-}
-
-#loader-logs::-webkit-scrollbar-thumb:hover {
-    background: #444;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
