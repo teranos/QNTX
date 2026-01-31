@@ -349,12 +349,75 @@ func watcherToResponse(w *storage.Watcher) WatcherResponse {
 	return resp
 }
 
+// broadcastWatcherMatch broadcasts a watcher match to all connected clients
+func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.As) {
+	msg := WatcherMatchMessage{
+		Type:        "watcher_match",
+		WatcherID:   watcherID,
+		Attestation: attestation,
+		Timestamp:   time.Now().Unix(),
+	}
+
+	// Send to all clients via broadcast worker
+	req := &broadcastRequest{
+		reqType: "watcher_match",
+		payload: msg,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Broadcast watcher match",
+			"watcher_id", watcherID,
+			"attestation_id", attestation.ID)
+	case <-s.ctx.Done():
+		// Server shutting down
+	default:
+		s.logger.Warnw("Broadcast request queue full, dropping watcher match",
+			"watcher_id", watcherID,
+			"attestation_id", attestation.ID)
+	}
+}
+
+// broadcastWatcherError broadcasts a watcher error to all connected clients
+// Used to send parsing errors, validation errors, etc. to the UI for immediate feedback
+func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, severity string) {
+	msg := WatcherErrorMessage{
+		Type:      "watcher_error",
+		WatcherID: watcherID,
+		Error:     errorMsg,
+		Severity:  severity,
+		Timestamp: time.Now().Unix(),
+	}
+
+	// Send to all clients via broadcast worker
+	req := &broadcastRequest{
+		reqType: "watcher_error",
+		payload: msg,
+	}
+
+	select {
+	case s.broadcastReq <- req:
+		s.logger.Debugw("Broadcast watcher error",
+			"watcher_id", watcherID,
+			"error", errorMsg,
+			"severity", severity)
+	case <-s.ctx.Done():
+		// Server shutting down
+	default:
+		s.logger.Warnw("Broadcast request queue full, dropping watcher error",
+			"watcher_id", watcherID)
+	}
+}
+
 // initWatcherEngine initializes the watcher engine and registers it as an observer
 func (s *QNTXServer) initWatcherEngine() error {
 	// Determine API base URL (default to localhost:877 for development)
 	apiBaseURL := "http://localhost:877"
 
 	s.watcherEngine = watcher.NewEngine(s.db, apiBaseURL, s.logger)
+
+	// Set broadcast callback for live results
+	s.watcherEngine.SetBroadcastCallback(s.broadcastWatcherMatch)
 
 	// Register as global observer (notified by SQLStore on all attestation creations)
 	storage.RegisterObserver(s.watcherEngine)

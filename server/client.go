@@ -253,6 +253,8 @@ func (c *Client) routeMessage(msg *QueryMessage) {
 		c.handleVidStreamFrame(*msg)
 	case "get_database_stats":
 		c.handleGetDatabaseStats()
+	case "watcher_upsert":
+		c.handleWatcherUpsert(*msg)
 	case "ping":
 		// Just update deadline, handled by pong handler
 	default:
@@ -994,6 +996,113 @@ func (c *Client) close() {
 			close(c.sendMsg)
 		}
 	})
+}
+
+// handleWatcherUpsert creates or updates a watcher based on AX glyph query
+func (c *Client) handleWatcherUpsert(msg QueryMessage) {
+	c.server.logger.Debugw("Watcher upsert request",
+		"watcher_id", msg.WatcherID,
+		"query", msg.WatcherQuery,
+		"client_id", c.id,
+	)
+
+	// Validate watcher engine
+	if c.server.watcherEngine == nil {
+		c.server.logger.Warnw("Watcher engine not available",
+			"client_id", c.id,
+		)
+		return
+	}
+
+	// Generate ID if not provided
+	watcherID := msg.WatcherID
+	if watcherID == "" {
+		watcherID = fmt.Sprintf("watcher-%d", time.Now().UnixNano())
+	}
+
+	// Create watcher struct
+	watcher := &storage.Watcher{
+		ID:                watcherID,
+		Name:              msg.WatcherName,
+		AxQuery:           msg.WatcherQuery,
+		ActionType:        storage.ActionTypePython, // Default to Python action
+		ActionData:        "",                       // Empty for now
+		MaxFiresPerMinute: 60,                       // Default rate limit
+		Enabled:           msg.Enabled,
+	}
+
+	// Try to get existing watcher first
+	existing, err := c.server.watcherEngine.GetStore().Get(watcherID)
+	if err == nil {
+		// Update existing watcher
+		watcher.CreatedAt = existing.CreatedAt
+		watcher.FireCount = existing.FireCount
+		watcher.ErrorCount = existing.ErrorCount
+		watcher.LastFiredAt = existing.LastFiredAt
+		watcher.LastError = existing.LastError
+
+		if err := c.server.watcherEngine.GetStore().Update(watcher); err != nil {
+			c.server.logger.Errorw("Failed to update watcher",
+				"watcher_id", watcherID,
+				"error", err,
+				"client_id", c.id,
+			)
+			return
+		}
+		c.server.logger.Infow("Updated watcher",
+			"watcher_id", watcherID,
+			"query", msg.WatcherQuery,
+		)
+	} else {
+		// Create new watcher
+		if err := c.server.watcherEngine.GetStore().Create(watcher); err != nil {
+			c.server.logger.Errorw("Failed to create watcher",
+				"watcher_id", watcherID,
+				"error", err,
+				"client_id", c.id,
+			)
+			return
+		}
+		c.server.logger.Infow("Created watcher",
+			"watcher_id", watcherID,
+			"query", msg.WatcherQuery,
+		)
+	}
+
+	// Reload watchers in engine
+	if err := c.server.watcherEngine.ReloadWatchers(); err != nil {
+		c.server.logger.Errorw("Failed to reload watchers",
+			"error", err,
+			"client_id", c.id,
+		)
+		// Broadcast error to frontend
+		c.server.broadcastWatcherError(watcherID, err.Error(), "error")
+		return
+	}
+
+	// Check if watcher was successfully loaded (parsing succeeded)
+	// If parsing failed, the watcher won't be in the engine's in-memory map
+	reloadedWatcher, exists := c.server.watcherEngine.GetWatcher(watcherID)
+	if !exists || reloadedWatcher == nil {
+		// Watcher exists in DB but failed to load (likely parse error)
+		errMsg := "Failed to parse AX query - watcher not activated"
+		c.server.logger.Warnw("Watcher parse failed",
+			"watcher_id", watcherID,
+			"query", msg.WatcherQuery,
+		)
+		c.server.broadcastWatcherError(watcherID, errMsg, "error")
+		return
+	}
+
+	// Query historical matches for the watcher (in goroutine to avoid blocking)
+	go func() {
+		if err := c.server.watcherEngine.QueryHistoricalMatches(watcherID); err != nil {
+			c.server.logger.Errorw("Failed to query historical matches",
+				"watcher_id", watcherID,
+				"error", err,
+			)
+		}
+	}()
 }
 
 // sendSystemCapabilitiesToClient sends system capability information to a newly connected client.

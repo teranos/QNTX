@@ -24,7 +24,8 @@ type Watcher struct {
 	Name string `json:"name"`
 
 	// Filter - what attestations to match (empty = match all)
-	Filter types.AxFilter `json:"filter"`
+	Filter  types.AxFilter `json:"filter"`
+	AxQuery string         `json:"ax_query,omitempty"` // Raw AX query string (alternative to Filter fields)
 
 	// Action - what to do when matched
 	ActionType ActionType `json:"action_type"`
@@ -104,16 +105,16 @@ func (ws *WatcherStore) Create(w *Watcher) error {
 	}
 
 	ctx := context.Background()
-	_, err := ws.db.ExecContext(ctx, `
+	_, err = ws.db.ExecContext(ctx, `
 		INSERT INTO watchers (
 			id, name,
-			subjects, predicates, contexts, actors, time_start, time_end,
+			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
-		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd,
+		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339), w.UpdatedAt.Format(time.RFC3339), nil, 0, 0, nil,
@@ -129,7 +130,7 @@ func (ws *WatcherStore) Get(id string) (*Watcher, error) {
 	ctx := context.Background()
 	row := ws.db.QueryRowContext(ctx, `
 		SELECT id, name,
-			subjects, predicates, contexts, actors, time_start, time_end,
+			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -144,7 +145,7 @@ func (ws *WatcherStore) List(enabledOnly bool) ([]*Watcher, error) {
 
 	query := `
 		SELECT id, name,
-			subjects, predicates, contexts, actors, time_start, time_end,
+			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
 			action_type, action_data,
 			max_fires_per_minute, enabled,
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
@@ -208,16 +209,16 @@ func (ws *WatcherStore) Update(w *Watcher) error {
 	}
 
 	ctx := context.Background()
-	_, err := ws.db.ExecContext(ctx, `
+	_, err = ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			name = ?,
-			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?,
+			subjects = ?, predicates = ?, contexts = ?, actors = ?, time_start = ?, time_end = ?, ax_query = ?,
 			action_type = ?, action_data = ?,
 			max_fires_per_minute = ?, enabled = ?,
 			updated_at = ?
 		WHERE id = ?`,
 		w.Name,
-		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd,
+		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.UpdatedAt.Format(time.RFC3339),
@@ -276,6 +277,7 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	var w Watcher
 	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
 	var timeStart, timeEnd sql.NullString
+	var axQuery sql.NullString
 	var createdAt, updatedAt string
 	var lastFiredAt sql.NullString
 	var lastError sql.NullString
@@ -283,7 +285,7 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 
 	err := row.Scan(
 		&w.ID, &w.Name,
-		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd,
+		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
 		&actionType, &w.ActionData,
 		&w.MaxFiresPerMinute, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
@@ -323,6 +325,11 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 		}
 	}
 
+	// Set AX query string
+	if axQuery.Valid {
+		w.AxQuery = axQuery.String
+	}
+
 	w.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	w.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 
@@ -344,6 +351,7 @@ func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
 	var w Watcher
 	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
 	var timeStart, timeEnd sql.NullString
+	var axQuery sql.NullString
 	var createdAt, updatedAt string
 	var lastFiredAt sql.NullString
 	var lastError sql.NullString
@@ -351,7 +359,7 @@ func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
 
 	err := rows.Scan(
 		&w.ID, &w.Name,
-		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd,
+		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
 		&actionType, &w.ActionData,
 		&w.MaxFiresPerMinute, &w.Enabled,
 		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
@@ -386,6 +394,11 @@ func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
 		if t, err := time.Parse(time.RFC3339, timeEnd.String); err == nil {
 			w.Filter.TimeEnd = &t
 		}
+	}
+
+	// Set AX query string
+	if axQuery.Valid {
+		w.AxQuery = axQuery.String
 	}
 
 	w.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
