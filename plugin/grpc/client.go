@@ -106,6 +106,12 @@ func (c *ExternalDomainProxy) GetHandlerNames() []string {
 	return c.handlerNames
 }
 
+// Client returns the underlying gRPC client for making RPC calls to the plugin.
+// Used by PluginProxyHandler to forward ExecuteJob calls.
+func (c *ExternalDomainProxy) Client() protocol.DomainPluginServiceClient {
+	return c.client
+}
+
 // Initialize initializes the remote plugin.
 func (c *ExternalDomainProxy) Initialize(ctx context.Context, services plugin.ServiceRegistry) error {
 	// Build config map from service registry

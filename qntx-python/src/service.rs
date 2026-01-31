@@ -169,11 +169,12 @@ impl DomainPluginService for PythonPluginService {
             state.engine.python_version()
         );
 
-        // Phase 1: Return empty handler list (backward compatible)
-        // Phase 2+: Return actual handler names like ["python.script", "python.webhook"]
-        Ok(Response::new(InitializeResponse {
-            handler_names: vec![],
-        }))
+        // Announce async handler capabilities
+        let handler_names = vec!["python.script".to_string()];
+
+        info!("Announcing async handlers: {:?}", handler_names);
+
+        Ok(Response::new(InitializeResponse { handler_names }))
     }
 
     /// Shutdown the plugin
@@ -315,17 +316,103 @@ impl DomainPluginService for PythonPluginService {
     }
 
     /// Execute an async job
-    /// Phase 1: Stub implementation (not yet functional)
-    /// Phase 2+: Route to actual handlers based on handler_name
+    /// Routes to appropriate handler based on handler_name
     async fn execute_job(
         &self,
-        _request: Request<ExecuteJobRequest>,
+        request: Request<ExecuteJobRequest>,
     ) -> Result<Response<ExecuteJobResponse>, Status> {
-        // Phase 1: Return unimplemented
-        // This allows the proto to be updated without breaking existing functionality
-        Err(Status::unimplemented(
-            "ExecuteJob not yet implemented - Phase 1 protocol update only",
-        ))
+        let req = request.into_inner();
+
+        debug!("ExecuteJob request: job_id={}, handler={}", req.job_id, req.handler_name);
+
+        // Route to handler based on handler_name
+        match req.handler_name.as_str() {
+            "python.script" => self.execute_python_script_job(req).await,
+            _ => Err(Status::not_found(format!(
+                "Unknown handler: {}",
+                req.handler_name
+            ))),
+        }
+    }
+}
+
+// Helper methods for PythonPluginService
+impl PythonPluginService {
+    /// Execute a python.script job
+    async fn execute_python_script_job(
+        &self,
+        req: ExecuteJobRequest,
+    ) -> Result<Response<ExecuteJobResponse>, Status> {
+        use crate::engine::ExecutionConfig;
+
+        // Parse payload as JSON containing script_code
+        #[derive(serde::Deserialize)]
+        struct PythonScriptPayload {
+            script_code: String,
+            #[serde(default)]
+            script_type: Option<String>,
+        }
+
+        let payload: PythonScriptPayload = serde_json::from_slice(&req.payload)
+            .map_err(|e| Status::invalid_argument(format!("Invalid payload JSON: {}", e)))?;
+
+        if payload.script_code.is_empty() {
+            return Err(Status::invalid_argument("Missing script_code in payload"));
+        }
+
+        // Execute the Python script
+        let config = ExecutionConfig {
+            timeout_secs: if req.timeout_secs > 0 {
+                req.timeout_secs as u64
+            } else {
+                300 // Default 5 minute timeout
+            },
+            capture_variables: false,
+            python_paths: vec![],
+            ..Default::default()
+        };
+
+        let result = {
+            let state = self.handlers.state.read();
+            state
+                .engine
+                .execute_with_ats(&payload.script_code, &config, Some(state.ats_client.clone()))
+        };
+
+        // Convert execution result to ExecuteJobResponse
+        if result.success {
+            // Serialize result as JSON for the result field
+            let result_json = serde_json::json!({
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "duration_ms": result.duration_ms,
+                "result": result.result,
+            });
+
+            let result_bytes = serde_json::to_vec(&result_json)
+                .map_err(|e| Status::internal(format!("Failed to serialize result: {}", e)))?;
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: true,
+                error: String::new(),
+                result: result_bytes,
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        } else {
+            // Execution failed
+            let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: false,
+                error: error_msg,
+                result: vec![],
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        }
     }
 }
 
