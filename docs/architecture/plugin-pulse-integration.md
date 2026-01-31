@@ -6,19 +6,61 @@
 
 ## Implementation Status
 
-### ✓ Completed
-- **Phase 1:** Protocol changes (protobuf updates, handler announcement via `Initialize`)
-- **Phase 2:** Plugin execution (Python plugin implements `ExecuteJob`, Go creates `PluginProxyHandler`)
-- **Cleanup:** Removed hardcoded `qntx-code` import from `server/ats_parser.go`
+### ✅ Phase 1: Protocol Foundation (COMPLETE)
+**Goal:** Enable plugins to announce async handlers and receive execution requests
 
-### 🚧 Remaining Work
-- **Phase 3:** ATS parser integration (currently disabled - all `ix` commands return error)
-- **Phase 4:** Testing and documentation
+**Implemented:**
+- Updated `domain.proto`: `Initialize` returns `InitializeResponse` with `handler_names[]`
+- Added `ExecuteJob` RPC to protocol
+- Regenerated Go/Rust protobuf code
+- Backward compatible: Empty handler lists work fine
 
-### 🔴 Known Issues
-- ATS parser temporarily disabled: all `ix <command>` syntax returns error
-- Server no longer imports from `qntx-code/ixgest/git` (architectural violation fixed)
-- Future work: pluggable ATS parsers to allow plugins to register their own command syntax
+### ✅ Phase 2: Plugin Execution Infrastructure (COMPLETE)
+**Goal:** Python plugin can execute jobs forwarded by Pulse
+
+**Implemented:**
+- Python plugin announces `["python.script"]` in `initialize()`
+- Python plugin implements `execute_job()` RPC
+- `PluginProxyHandler` in Go forwards jobs to plugins via gRPC
+- `server/init.go` auto-registers plugin handlers with Pulse
+- Removed hardcoded `qntx-code` import from `server/ats_parser.go`
+
+**Architecture now working:**
+```
+Job with handler_name="python.script"
+  → Pulse Worker picks up job
+  → PluginProxyHandler.Execute()
+  → gRPC call to Python plugin
+  → Plugin executes code
+  → Returns result/progress/cost to Pulse
+```
+
+### 🚧 Phase 3: Dynamic Handler Discovery (NEXT)
+**Goal:** Python plugin reads saved scripts from ATS store and announces them as handlers
+
+**Plan (needs validation):**
+1. Define attestation schema for saved handler scripts
+2. Python plugin scans ATS store during initialization
+3. For each saved handler script, announce `"python.<handler_name>"`
+4. Example: Script saved as "vacancies" → announces `"python.vacancies"`
+
+### 🚧 Phase 4: Handler Glyph
+**Goal:** User can create/edit handler scripts via UI
+
+**Plan (needs validation):**
+1. New Handler Glyph (shares infrastructure with Python Glyph)
+2. Template generation for new handlers
+3. Save handler script to ATS store as attestation
+4. Trigger plugin re-initialization to announce new handler
+
+### 🚧 Phase 5: ATS Parser Integration
+**Goal:** `ix <command>` syntax discovers and routes to handlers
+
+**Plan (needs validation):**
+1. ATS parser detects unknown `ix <command>`
+2. System prompts: "Handler not found. Create handler?"
+3. Opens Handler Glyph on user confirmation
+4. After saving, route `ix <command>` to `python.<command>`
 
 ---
 
