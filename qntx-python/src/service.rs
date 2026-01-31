@@ -62,6 +62,7 @@ impl PythonPluginService {
                 .map(|s| s.to_string())
                 .collect(),
             ats_client: atsstore::new_shared_client(),
+            discovered_handlers: HashMap::new(),
         }));
 
         Ok(Self {
@@ -75,8 +76,15 @@ impl PythonPluginService {
     }
 
     /// Discover handler scripts from ATS store
-    async fn discover_handlers_from_config(&self, config: Option<PluginConfig>) -> Vec<String> {
-        use crate::proto::{ats_store_service_client::AtsStoreServiceClient, AttestationFilter, GetAttestationsRequest};
+    /// Returns a HashMap of handler_name -> Python code
+    async fn discover_handlers_from_config(
+        &self,
+        config: Option<PluginConfig>,
+    ) -> HashMap<String, String> {
+        use crate::proto::{
+            ats_store_service_client::AtsStoreServiceClient, AttestationFilter,
+            GetAttestationsRequest,
+        };
         use tonic::transport::Channel;
 
         // Check if we have config with ATS store endpoint
@@ -84,7 +92,7 @@ impl PythonPluginService {
             Some(cfg) if !cfg.ats_store_endpoint.is_empty() => cfg,
             _ => {
                 info!("No ATS store endpoint configured, skipping handler discovery");
-                return Vec::new();
+                return HashMap::new();
             }
         };
 
@@ -111,59 +119,70 @@ impl PythonPluginService {
         };
 
         // Connect to ATS store and query
-        let result: Result<Vec<String>, String> = tokio::task::spawn_blocking(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|e| format!("failed to create runtime: {}", e))?;
+        let result: Result<HashMap<String, String>, String> =
+            tokio::task::spawn_blocking(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|e| format!("failed to create runtime: {}", e))?;
 
-            rt.block_on(async {
-                // Ensure endpoint has http:// scheme
-                let endpoint_uri = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
-                    endpoint.clone()
-                } else {
-                    format!("http://{}", endpoint)
-                };
+                rt.block_on(async {
+                    // Ensure endpoint has http:// scheme
+                    let endpoint_uri =
+                        if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                            endpoint.clone()
+                        } else {
+                            format!("http://{}", endpoint)
+                        };
 
-                let channel = Channel::from_shared(endpoint_uri)
-                    .map_err(|e| format!("invalid endpoint: {}", e))?
-                    .connect()
-                    .await
-                    .map_err(|e| format!("connection failed: {}", e))?;
+                    let channel = Channel::from_shared(endpoint_uri)
+                        .map_err(|e| format!("invalid endpoint: {}", e))?
+                        .connect()
+                        .await
+                        .map_err(|e| format!("connection failed: {}", e))?;
 
-                let mut client = AtsStoreServiceClient::new(channel);
-                let response = client
-                    .get_attestations(request)
-                    .await
-                    .map_err(|e| format!("gRPC error: {}", e))?
-                    .into_inner();
+                    let mut client = AtsStoreServiceClient::new(channel);
+                    let response = client
+                        .get_attestations(request)
+                        .await
+                        .map_err(|e| format!("gRPC error: {}", e))?
+                        .into_inner();
 
-                if !response.success {
-                    return Err(format!("Query failed: {}", response.error));
-                }
-
-                // Extract handler names from subjects
-                let mut handlers = Vec::new();
-                for attestation in response.attestations {
-                    if let Some(subject) = attestation.subjects.first() {
-                        handlers.push(subject.clone());
+                    if !response.success {
+                        return Err(format!("Query failed: {}", response.error));
                     }
-                }
 
-                Ok(handlers)
+                    // Extract handler names and code from attestations
+                    let mut handlers = HashMap::new();
+                    for attestation in response.attestations {
+                        if let Some(handler_name) = attestation.subjects.first() {
+                            // Extract Python code from attributes.code
+                            if let Some(code) = attestation.attributes.get("code") {
+                                handlers.insert(handler_name.clone(), code.clone());
+                            } else {
+                                warn!("Handler {} has no code attribute, skipping", handler_name);
+                            }
+                        }
+                    }
+
+                    Ok(handlers)
+                })
             })
-        })
-        .await
-        .unwrap_or_else(|e| Err(format!("task panicked: {:?}", e)));
+            .await
+            .unwrap_or_else(|e| Err(format!("task panicked: {:?}", e)));
 
         match result {
             Ok(handlers) => {
-                info!("Discovered {} handler(s) from ATS store: {:?}", handlers.len(), handlers);
+                info!(
+                    "Discovered {} handler(s) from ATS store: {:?}",
+                    handlers.len(),
+                    handlers.keys().collect::<Vec<_>>()
+                );
                 handlers
             }
             Err(e) => {
                 warn!("Failed to discover handlers from ATS store: {}", e);
-                Vec::new()
+                HashMap::new()
             }
         }
     }
@@ -272,12 +291,18 @@ impl DomainPluginService for PythonPluginService {
         // Discover handler scripts from ATS store
         let discovered_handlers = self.discover_handlers_from_config(state_config).await;
 
+        // Store discovered handlers in plugin state
+        {
+            let mut state = self.handlers.state.write();
+            state.discovered_handlers = discovered_handlers.clone();
+        }
+
         // Announce async handler capabilities
         // Start with built-in handlers
         let mut handler_names = vec!["python.script".to_string()];
 
         // Add discovered handlers with python. prefix
-        for handler_name in discovered_handlers {
+        for handler_name in discovered_handlers.keys() {
             handler_names.push(format!("python.{}", handler_name));
         }
 
@@ -432,11 +457,19 @@ impl DomainPluginService for PythonPluginService {
     ) -> Result<Response<ExecuteJobResponse>, Status> {
         let req = request.into_inner();
 
-        debug!("ExecuteJob request: job_id={}, handler={}", req.job_id, req.handler_name);
+        debug!(
+            "ExecuteJob request: job_id={}, handler={}",
+            req.job_id, req.handler_name
+        );
 
         // Route to handler based on handler_name
         match req.handler_name.as_str() {
             "python.script" => self.execute_python_script_job(req).await,
+            handler_name if handler_name.starts_with("python.") => {
+                // Strip python. prefix to get handler name
+                let handler_key = &handler_name["python.".len()..];
+                self.execute_discovered_handler_job(req, handler_key).await
+            }
             _ => Err(Status::not_found(format!(
                 "Unknown handler: {}",
                 req.handler_name
@@ -483,9 +516,87 @@ impl PythonPluginService {
 
         let result = {
             let state = self.handlers.state.read();
+            state.engine.execute_with_ats(
+                &payload.script_code,
+                &config,
+                Some(state.ats_client.clone()),
+            )
+        };
+
+        // Convert execution result to ExecuteJobResponse
+        if result.success {
+            // Serialize result as JSON for the result field
+            let result_json = serde_json::json!({
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "duration_ms": result.duration_ms,
+                "result": result.result,
+            });
+
+            let result_bytes = serde_json::to_vec(&result_json)
+                .map_err(|e| Status::internal(format!("Failed to serialize result: {}", e)))?;
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: true,
+                error: String::new(),
+                result: result_bytes,
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        } else {
+            // Execution failed
+            let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: false,
+                error: error_msg,
+                result: vec![],
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        }
+    }
+
+    /// Execute a dynamically discovered handler job
+    async fn execute_discovered_handler_job(
+        &self,
+        req: ExecuteJobRequest,
+        handler_key: &str,
+    ) -> Result<Response<ExecuteJobResponse>, Status> {
+        use crate::engine::ExecutionConfig;
+
+        // Retrieve handler code from plugin state
+        let script_code = {
+            let state = self.handlers.state.read();
+            state.discovered_handlers.get(handler_key).cloned()
+        };
+
+        let script_code = script_code.ok_or_else(|| {
+            Status::not_found(format!(
+                "Handler {} not found in discovered handlers",
+                handler_key
+            ))
+        })?;
+
+        // Execute the Python script
+        let config = ExecutionConfig {
+            timeout_secs: if req.timeout_secs > 0 {
+                req.timeout_secs as u64
+            } else {
+                300 // Default 5 minute timeout
+            },
+            capture_variables: false,
+            python_paths: vec![],
+            ..Default::default()
+        };
+
+        let result = {
+            let state = self.handlers.state.read();
             state
                 .engine
-                .execute_with_ats(&payload.script_code, &config, Some(state.ats_client.clone()))
+                .execute_with_ats(&script_code, &config, Some(state.ats_client.clone()))
         };
 
         // Convert execution result to ExecuteJobResponse

@@ -54,9 +54,9 @@ func (h *PluginProxyHandler) Execute(ctx context.Context, job *async.Job) error 
 	// Check if execution succeeded
 	if !resp.Success {
 		if resp.Error != "" {
-			return errors.Newf("plugin execution error: %s", resp.Error)
+			return errors.Newf("plugin execution error (job=%s, handler=%s): %s", job.ID, h.handlerName, resp.Error)
 		}
-		return errors.New("plugin execution failed with no error message")
+		return errors.Newf("plugin execution failed with no error message (job=%s, handler=%s)", job.ID, h.handlerName)
 	}
 
 	// Update job progress if provided by plugin
