@@ -267,23 +267,7 @@
     color: var(--panel-text-primary);
 }
 
-/* Scrollbar styling */
-.plugin-panel-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.plugin-panel-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
-.plugin-panel-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-.plugin-panel-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive */
 @media (max-width: 1200px) {
