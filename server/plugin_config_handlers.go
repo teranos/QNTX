@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,8 +30,6 @@ func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode
 // GET /api/plugins/{name}/config - Get plugin configuration
 // PUT /api/plugins/{name}/config - Update plugin configuration
 func (s *QNTXServer) HandlePluginConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	// Parse plugin name from path: /api/plugins/{name}/config
 	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
 	path = strings.TrimSuffix(path, "/config")
@@ -136,10 +133,7 @@ func (s *QNTXServer) handleGetPluginConfig(w http.ResponseWriter, r *http.Reques
 		"schema": schema,
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode plugin config response", "error", err, "plugin", pluginName)
-		s.writeRichError(w, errors.Wrap(err, "failed to encode plugin config response"), http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 // handleUpdatePluginConfig updates plugin configuration and reinitializes the plugin
@@ -150,8 +144,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		Validate bool              `json:"validate"` // If true, validate config without applying
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.writeRichError(w, errors.Wrap(err, "invalid request body"), http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -193,8 +186,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 					"message": "Configuration validation failed",
 					"errors":  validationErrs,
 				}
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(response)
+				writeJSON(w, http.StatusBadRequest, response)
 				return
 			}
 		}
@@ -221,8 +213,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 				"message": "Configuration saved but plugin reinitialization failed: " + err.Error(),
 				"plugin":  pluginName,
 			}
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(response)
+			writeJSON(w, http.StatusInternalServerError, response)
 			return
 		}
 	}
@@ -235,10 +226,7 @@ func (s *QNTXServer) handleUpdatePluginConfig(w http.ResponseWriter, r *http.Req
 		"config":  req.Config,
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode response", "error", err, "plugin", pluginName)
-		s.writeRichError(w, errors.Wrap(err, "failed to encode response"), http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 // handleValidatePluginConfig validates plugin config without applying changes
@@ -264,10 +252,7 @@ func (s *QNTXServer) handleValidatePluginConfig(w http.ResponseWriter, r *http.R
 		"warning": "Some invalid values may not be detected until plugin restart",
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode validation response", "error", err, "plugin", pluginName)
-		s.writeRichError(w, errors.Wrap(err, "failed to encode validation response"), http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 // validateConfigAgainstSchema validates config values against plugin schema constraints

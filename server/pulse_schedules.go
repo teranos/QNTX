@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -112,8 +111,7 @@ func (s *QNTXServer) handleCreateSchedule(w http.ResponseWriter, r *http.Request
 	pulseLog := logger.AddPulseSymbol(s.logger)
 
 	var req CreateScheduledJobRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeWrappedError(w, s.logger, err, "invalid request body", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -342,8 +340,7 @@ func (s *QNTXServer) handleGetSchedule(w http.ResponseWriter, r *http.Request, j
 // handleUpdateSchedule updates a schedule (pause/resume/change interval)
 func (s *QNTXServer) handleUpdateSchedule(w http.ResponseWriter, r *http.Request, jobID string) {
 	var req UpdateScheduledJobRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeWrappedError(w, s.logger, err, "invalid request body", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
