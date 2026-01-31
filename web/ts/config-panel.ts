@@ -57,34 +57,23 @@ class ConfigPanel extends BasePanel {
         });
     }
 
-    protected getTemplate(): string {
-        return `
-            <div class="panel-header config-panel-header">
-                <h3 class="panel-title config-panel-title">${AM} Configuration</h3>
-                <button class="panel-close config-panel-close" aria-label="Close">✕</button>
-            </div>
-
-            <div class="config-panel-search">
-                <input type="text" placeholder="Filter settings..." class="config-search-input">
-            </div>
-            <div class="panel-content config-panel-content" id="config-panel-content">
-                <div class="panel-loading config-loading">
-                    <p>Loading configuration...</p>
-                </div>
-            </div>
-        `;
+    protected override getTitle(): string {
+        return `${AM} Configuration`;
     }
+
+    protected override hasSearch = true;
+    protected override searchPlaceholder = 'Filter settings...';
 
     protected setupEventListeners(): void {
         // Search input
-        const searchInput = this.$<HTMLInputElement>('.config-search-input');
+        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
         searchInput?.addEventListener('input', (e: Event) => {
             const target = e.target as HTMLInputElement;
             this.filterSettings(target.value);
         });
 
         // Content click handler (event delegation)
-        const content = this.$('.config-panel-content');
+        const content = this.$('.panel-content');
         content?.addEventListener('click', (e: Event) => {
             const target = e.target as HTMLElement;
 
@@ -127,7 +116,7 @@ class ConfigPanel extends BasePanel {
         this.render();
 
         // Focus search input
-        const searchInput = this.$<HTMLInputElement>('.config-search-input');
+        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
         }
@@ -232,7 +221,7 @@ class ConfigPanel extends BasePanel {
     }
 
     private render(): void {
-        const content = this.$('#config-panel-content');
+        const content = this.$('.panel-content');
         if (!content) return;
 
         // Show rich error if there was an error fetching config

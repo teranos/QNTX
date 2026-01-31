@@ -142,23 +142,7 @@
     font-weight: 500;
 }
 
-/* Scrollbar styling for file tree */
-.prose-tree::-webkit-scrollbar {
-    width: 8px;
-}
-
-.prose-tree::-webkit-scrollbar-track {
-    background: var(--bg-dark);
-}
-
-.prose-tree::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: var(--border-radius);
-}
-
-.prose-tree::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive adjustments */
 @media (max-width: 900px) {
