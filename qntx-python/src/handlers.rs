@@ -25,6 +25,8 @@ pub(crate) struct PluginState {
     pub default_modules: Vec<String>,
     /// ATSStore client for attestation creation from Python
     pub ats_client: SharedAtsStoreClient,
+    /// Dynamically discovered handlers: handler_name -> Python code
+    pub discovered_handlers: HashMap<String, String>,
 }
 
 /// Handler context providing access to plugin state
