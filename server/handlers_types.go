@@ -24,7 +24,9 @@ var fieldNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 // POST /api/types - Create or update a type attestation
 // GET /api/types/{typename} - Get a specific type attestation
 func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	if !requireMethods(w, r, http.MethodGet, http.MethodPost) {
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -36,8 +38,6 @@ func (s *QNTXServer) HandleTypes(w http.ResponseWriter, r *http.Request) {
 		}
 	case http.MethodPost:
 		s.handleCreateType(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -55,7 +55,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(query)
 	if err != nil {
 		s.logger.Errorw("Failed to query type attestations", "error", err)
-		http.Error(w, "Failed to fetch type attestations", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to fetch type attestations")
 		return
 	}
 	defer rows.Close()
@@ -93,10 +93,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 		types = append(types, typeObj)
 	}
 
-	if err := json.NewEncoder(w).Encode(types); err != nil {
-		s.logger.Errorw("Failed to encode types response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, types)
 }
 
 // handleGetType returns a specific type attestation
@@ -115,10 +112,10 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 	err := s.db.QueryRow(query, typeName).Scan(&attributesJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Type not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "Type not found")
 		} else {
 			s.logger.Errorw("Failed to query type attestation", "error", err, "type", typeName)
-			http.Error(w, "Failed to fetch type attestation", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "Failed to fetch type attestation")
 		}
 		return
 	}
@@ -145,10 +142,7 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 		"array_fields":        attributes["array_fields"],
 	}
 
-	if err := json.NewEncoder(w).Encode(typeObj); err != nil {
-		s.logger.Errorw("Failed to encode type response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, typeObj)
 }
 
 // validateFieldName validates that a field name follows identifier rules
@@ -177,20 +171,19 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		ArrayFields      []string `json:"array_fields"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
 	// Validate required fields
 	if req.Name == "" {
-		http.Error(w, "Type name is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Type name is required")
 		return
 	}
 
 	// Validate type name follows same rules as field names
 	if err := validateFieldName(req.Name); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid type name '%s': %v", req.Name, err), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid type name '%s': %v", req.Name, err))
 		return
 	}
 
@@ -204,14 +197,14 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	// Check total field count limit
 	totalFields := len(req.RichStringFields) + len(req.ArrayFields)
 	if totalFields > 50 {
-		http.Error(w, fmt.Sprintf("Too many fields: %d. Maximum 50 fields allowed per type", totalFields), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Too many fields: %d. Maximum 50 fields allowed per type", totalFields))
 		return
 	}
 
 	// Validate all field names in rich_string_fields
 	for _, fieldName := range req.RichStringFields {
 		if err := validateFieldName(fieldName); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid rich_string_field '%s': %v", fieldName, err), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid rich_string_field '%s': %v", fieldName, err))
 			return
 		}
 	}
@@ -219,7 +212,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 	// Validate all field names in array_fields
 	for _, fieldName := range req.ArrayFields {
 		if err := validateFieldName(fieldName); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid array_field '%s': %v", fieldName, err), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid array_field '%s': %v", fieldName, err))
 			return
 		}
 	}
@@ -244,7 +237,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 			"type", req.Name,
 			"label", req.Label,
 			"attributes", attributes)
-		http.Error(w, fmt.Sprintf("Failed to create type attestation for '%s': %v", req.Name, err), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create type attestation for '%s': %v", req.Name, err))
 		return
 	}
 
@@ -268,10 +261,7 @@ func (s *QNTXServer) handleCreateType(w http.ResponseWriter, r *http.Request) {
 		"array_fields":        req.ArrayFields,
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode create response", "error", err)
-	}
+	writeJSON(w, http.StatusCreated, response)
 }
 
 // dbAttestationStore implements the AttestationStore interface for types.AttestType
