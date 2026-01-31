@@ -455,6 +455,10 @@ export interface PulseExecutionFailedMessage {
    */
   error_message: string;
   /**
+   * Structured error details from cockroachdb/errors
+   */
+  error_details: string[];
+  /**
    * How long before failure
    */
   duration_ms: number;
