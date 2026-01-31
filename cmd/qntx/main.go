@@ -71,6 +71,7 @@ func init() {
 	rootCmd.AddCommand(commands.AxCmd)
 	// CodeCmd now provided by code domain plugin
 	rootCmd.AddCommand(commands.DbCmd)
+	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.IxCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
