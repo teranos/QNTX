@@ -2,6 +2,7 @@ package async
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
@@ -28,20 +29,30 @@ func (s *Store) CreateJob(job *Job) error {
 		return errors.Wrap(err, "failed to marshal pulse state")
 	}
 
+	var errorDetailsJSON sql.NullString
+	if len(job.ErrorDetails) > 0 {
+		detailsBytes, err := json.Marshal(job.ErrorDetails)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal error details")
+		}
+		errorDetailsJSON = sql.NullString{String: string(detailsBytes), Valid: true}
+	}
+
 	query := `
 		INSERT INTO async_ix_jobs (
 			id, handler_name, source, status,
 			progress_current, progress_total,
 			cost_estimate, cost_actual,
-			pulse_state, payload,
+			pulse_state, error, error_details, payload,
 			parent_job_id, retry_count,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	parentJobID := sql.NullString{String: job.ParentJobID, Valid: job.ParentJobID != ""}
 	handlerName := sql.NullString{String: job.HandlerName, Valid: job.HandlerName != ""}
 	payload := sql.NullString{String: string(job.Payload), Valid: len(job.Payload) > 0}
+	errorMsg := sql.NullString{String: job.Error, Valid: job.Error != ""}
 
 	_, err = s.db.Exec(query,
 		job.ID,
@@ -53,6 +64,8 @@ func (s *Store) CreateJob(job *Job) error {
 		job.CostEstimate,
 		job.CostActual,
 		pulseStateJSON,
+		errorMsg,
+		errorDetailsJSON,
 		payload,
 		parentJobID,
 		job.RetryCount,
@@ -101,6 +114,15 @@ func (s *Store) UpdateJob(job *Job) error {
 		return errors.Wrap(err, "failed to marshal pulse state")
 	}
 
+	var errorDetailsJSON sql.NullString
+	if len(job.ErrorDetails) > 0 {
+		detailsBytes, err := json.Marshal(job.ErrorDetails)
+		if err != nil {
+			return errors.Wrap(err, "failed to marshal error details")
+		}
+		errorDetailsJSON = sql.NullString{String: string(detailsBytes), Valid: true}
+	}
+
 	query := `
 		UPDATE async_ix_jobs
 		SET handler_name = ?,
@@ -111,6 +133,7 @@ func (s *Store) UpdateJob(job *Job) error {
 		    cost_actual = ?,
 		    pulse_state = ?,
 		    error = ?,
+		    error_details = ?,
 		    retry_count = ?,
 		    started_at = ?,
 		    completed_at = ?,
@@ -130,6 +153,7 @@ func (s *Store) UpdateJob(job *Job) error {
 		job.CostActual,
 		pulseStateJSON,
 		job.Error,
+		errorDetailsJSON,
 		job.RetryCount,
 		job.StartedAt,
 		job.CompletedAt,

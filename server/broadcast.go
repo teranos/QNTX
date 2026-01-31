@@ -239,14 +239,12 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 				"execution_id", execution.ID,
 				"ats_code", scheduledJob.ATSCode,
 				"error", job.Error)
-			// Note: job.Error is a string from async job system, not a rich error object
-			// Error details not available in this code path (async job completion callback)
 			s.BroadcastPulseExecutionFailed(
 				execution.ScheduledJobID,
 				execution.ID,
 				scheduledJob.ATSCode,
 				job.Error,
-				nil, // No error details available from async job callback
+				job.ErrorDetails,
 				durationMs,
 			)
 		} else {

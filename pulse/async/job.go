@@ -76,6 +76,7 @@ type Job struct {
 	CostActual   float64         `json:"cost_actual,omitempty"`
 	PulseState   *PulseState     `json:"pulse_state,omitempty"`
 	Error        string          `json:"error,omitempty"`
+	ErrorDetails []string        `json:"error_details,omitempty"` // Structured error context from errors.GetAllDetails()
 	ParentJobID  string          `json:"parent_job_id,omitempty"` // For tasks grouped under parent job
 	RetryCount   int             `json:"retry_count,omitempty"`   // Number of retry attempts (max 2)
 	CreatedAt    time.Time       `json:"created_at"`
@@ -170,11 +171,12 @@ func (j *Job) Complete() {
 	j.UpdatedAt = now
 }
 
-// Fail marks the job as failed with an error message
+// Fail marks the job as failed with an error message and preserves structured error details
 func (j *Job) Fail(err error) {
 	now := time.Now()
 	j.Status = JobStatusFailed
 	j.Error = err.Error()
+	j.ErrorDetails = errors.GetAllDetails(err)
 	j.CompletedAt = &now
 	j.UpdatedAt = now
 }

@@ -235,6 +235,14 @@ func (q *Queue) FailJob(id string, jobErr error) error {
 		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
 		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
 		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+
+		// Preserve structured details from original job error
+		if details := errors.GetAllDetails(jobErr); len(details) > 0 {
+			for _, detail := range details {
+				err = errors.WithDetail(err, detail)
+			}
+		}
+		// Also include the error message itself
 		err = errors.WithDetail(err, fmt.Sprintf("Job error: %s", jobErr.Error()))
 		return err
 	}

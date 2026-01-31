@@ -38,14 +38,14 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	echo "  Database: Uses am.toml configuration"; \
 	echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"; \
 	echo ""; \
-	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
-	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
+	pkill -f "qntx server" 2>/dev/null || true; \
 	pkill -f "bun.*dev" 2>/dev/null || true; \
 	trap "echo ''; echo 'Shutting down dev servers...'; \
-		lsof -ti:$$BACKEND_PORT,$$FRONTEND_PORT | xargs kill -TERM 2>/dev/null || true; \
-		pkill -f 'bun.*dev' 2>/dev/null || true; \
+		pkill -TERM -f 'qntx server' 2>/dev/null || true; \
+		pkill -TERM -f 'bun.*dev' 2>/dev/null || true; \
 		sleep 1; \
-		lsof -ti:$$BACKEND_PORT,$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
+		pkill -9 -f 'qntx server' 2>/dev/null || true; \
+		pkill -9 -f 'bun.*dev' 2>/dev/null || true; \
 		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
