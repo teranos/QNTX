@@ -68,15 +68,14 @@ impl AttestationStore for SqliteStore {
 
         // Serialize JSON fields - these already return SqliteError, convert to StoreError
         let subjects_json =
-            serialize_string_vec(&attestation.subjects).map_err(|e| StoreError::from(e))?;
+            serialize_string_vec(&attestation.subjects).map_err(StoreError::from)?;
         let predicates_json =
-            serialize_string_vec(&attestation.predicates).map_err(|e| StoreError::from(e))?;
+            serialize_string_vec(&attestation.predicates).map_err(StoreError::from)?;
         let contexts_json =
-            serialize_string_vec(&attestation.contexts).map_err(|e| StoreError::from(e))?;
-        let actors_json =
-            serialize_string_vec(&attestation.actors).map_err(|e| StoreError::from(e))?;
+            serialize_string_vec(&attestation.contexts).map_err(StoreError::from)?;
+        let actors_json = serialize_string_vec(&attestation.actors).map_err(StoreError::from)?;
         let attributes_json =
-            serialize_attributes(&attestation.attributes).map_err(|e| StoreError::from(e))?;
+            serialize_attributes(&attestation.attributes).map_err(StoreError::from)?;
 
         // Convert timestamp to SQL format
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
@@ -180,7 +179,7 @@ impl AttestationStore for SqliteStore {
         let rows_affected = self
             .conn
             .execute("DELETE FROM attestations WHERE id = ?", [id])
-            .map_err(|e| crate::error::SqliteError::Database(e))?;
+            .map_err(crate::error::SqliteError::Database)?;
 
         Ok(rows_affected > 0)
     }
