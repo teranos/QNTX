@@ -20,8 +20,9 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty, HealthResponse,
-    HttpHeader, HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
+    ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpHeader, HttpRequest, HttpResponse,
+    InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -102,7 +103,7 @@ impl DomainPluginService for PythonPluginService {
     async fn initialize(
         &self,
         request: Request<InitializeRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    ) -> Result<Response<InitializeResponse>, Status> {
         let req = request.into_inner();
         info!("Initializing Python plugin");
         info!("ATSStore endpoint: {}", req.ats_store_endpoint);
@@ -168,7 +169,11 @@ impl DomainPluginService for PythonPluginService {
             state.engine.python_version()
         );
 
-        Ok(Response::new(Empty {}))
+        // Phase 1: Return empty handler list (backward compatible)
+        // Phase 2+: Return actual handler names like ["python.script", "python.webhook"]
+        Ok(Response::new(InitializeResponse {
+            handler_names: vec![],
+        }))
     }
 
     /// Shutdown the plugin
@@ -307,6 +312,20 @@ impl DomainPluginService for PythonPluginService {
         Ok(Response::new(ConfigSchemaResponse {
             fields: crate::config::build_schema(),
         }))
+    }
+
+    /// Execute an async job
+    /// Phase 1: Stub implementation (not yet functional)
+    /// Phase 2+: Route to actual handlers based on handler_name
+    async fn execute_job(
+        &self,
+        _request: Request<ExecuteJobRequest>,
+    ) -> Result<Response<ExecuteJobResponse>, Status> {
+        // Phase 1: Return unimplemented
+        // This allows the proto to be updated without breaking existing functionality
+        Err(Status::unimplemented(
+            "ExecuteJob not yet implemented - Phase 1 protocol update only",
+        ))
     }
 }
 
