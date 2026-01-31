@@ -97,54 +97,6 @@ body.disconnected #container {
     opacity: 0.7;
 }
 
-/* Attestation Feed - Matrix style background */
-#attestation-feed {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: 0;
-    padding: 20px;
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    font-size: var(--font-size-sm);
-    line-height: 1.4;
-    /* Improved contrast: 0.15 -> 0.35 for better visibility */
-    color: rgba(100, 255, 100, 0.35);
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-}
-
-.attestation-line {
-    opacity: 0;
-    animation: fadeIn 0.5s ease-in forwards;
-    display: inline;
-}
-
-.attestation-line:not(:last-child)::after {
-    content: ' | ';
-    /* Improved contrast: 0.15 -> 0.35 */
-    color: rgba(170, 170, 170, 0.35);
-}
-
-.attestation-line .entity {
-    /* Improved contrast: 0.2 -> 0.4 */
-    color: rgba(126, 179, 255, 0.4);
-}
-
-.attestation-line .relation {
-    /* Improved contrast: 0.15 -> 0.35 */
-    color: rgba(170, 170, 170, 0.35);
-    font-style: italic;
-}
-
-.attestation-line .value {
-    /* Improved contrast: 0.2 -> 0.4 */
-    color: rgba(136, 201, 153, 0.4);
-}
-
 /* Common Animations - Consolidated for reuse */
 @keyframes fadeIn {
     0% { opacity: 0; }

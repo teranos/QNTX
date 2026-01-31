@@ -49,6 +49,10 @@ export interface Job {
   pulse_state?: PulseState | null;
   error?: string;
   /**
+   * Structured error context from errors.GetAllDetails()
+   */
+  error_details?: string[];
+  /**
    * For tasks grouped under parent job
    */
   parent_job_id?: string;
@@ -134,9 +138,9 @@ export interface WorkerPoolConfig {
    */
   workers: number;
   /**
-   * How often to check for new jobs
+   * Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
    */
-  poll_interval: number;
+  poll_interval?: number | null;
   /**
    * Pause jobs when budget exceeded
    */
@@ -145,5 +149,17 @@ export interface WorkerPoolConfig {
    * Duration of each graceful start phase (default: 5min, test: 10s)
    */
   graceful_start_phase: number;
+  /**
+   * Max time to wait for workers to checkpoint and exit (default: 20s)
+   */
+  worker_stop_timeout: number;
+  /**
+   * Threshold for applying exponential backoff (default: 5)
+   */
+  max_consecutive_errors: number;
+  /**
+   * Maximum exponential backoff duration (default: 30s)
+   */
+  max_backoff: number;
 }
 
