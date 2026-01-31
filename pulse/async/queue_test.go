@@ -2,10 +2,12 @@ package async
 
 import (
 	"fmt"
-	qntxtest "github.com/teranos/QNTX/internal/testing"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/teranos/QNTX/errors"
+	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
 // ============================================================================
@@ -830,6 +832,70 @@ func TestConcurrentDeletion(t *testing.T) {
 	t.Log("  ✓ All 15 children are cancelled (no race condition corruption)")
 	t.Log("🏗️ The Lord said: 'Their deletion is now scattered, and their jobs are cancelled!'")
 	t.Log("   Database integrity maintained despite concurrent operations.")
+}
+
+// TestErrorDetailPropagation verifies that structured error details from handler errors
+// are preserved when FailJob updates the job status in the database
+func TestErrorDetailPropagation(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	queue := NewQueue(db)
+
+	job := &Job{
+		ID:          "JOB_ERROR_DETAILS",
+		HandlerName: "test.git-ingest",
+		Source:      "https://github.com/user/repo",
+		Status:      JobStatusQueued,
+		CreatedAt:   time.Now(),
+	}
+
+	if err := queue.Enqueue(job); err != nil {
+		t.Fatalf("Failed to enqueue job: %v", err)
+	}
+
+	// Simulate handler error with structured details
+	handlerErr := fmt.Errorf("failed to parse commit")
+	handlerErr = errors.WithDetail(handlerErr, "Repository: /path/to/repo")
+	handlerErr = errors.WithDetail(handlerErr, "Commit: abc123def456")
+	handlerErr = errors.WithDetail(handlerErr, "Branch: main")
+
+	// Fail the job - should preserve all error details
+	err := queue.FailJob(job.ID, handlerErr)
+	if err != nil {
+		t.Fatalf("FailJob returned error: %v", err)
+	}
+
+	// Verify job is marked as failed with error details persisted
+	failedJob, err := queue.GetJob(job.ID)
+	if err != nil {
+		t.Fatalf("Failed to retrieve job: %v", err)
+	}
+	if failedJob.Status != JobStatusFailed {
+		t.Errorf("Expected status 'failed', got '%s'", failedJob.Status)
+	}
+
+	// Verify error details were persisted to database and retrieved
+	expectedDetails := []string{
+		"Repository: /path/to/repo",
+		"Commit: abc123def456",
+		"Branch: main",
+	}
+
+	if len(failedJob.ErrorDetails) != len(expectedDetails) {
+		t.Fatalf("Expected %d error details, got %d: %v", len(expectedDetails), len(failedJob.ErrorDetails), failedJob.ErrorDetails)
+	}
+
+	for _, expected := range expectedDetails {
+		found := false
+		for _, detail := range failedJob.ErrorDetails {
+			if detail == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected detail '%s' not found in job.ErrorDetails. Got: %v", expected, failedJob.ErrorDetails)
+		}
+	}
 }
 
 // TestVacanciesScraperChildJobsContinue tests that child jobs continue processing after parent completes

@@ -2,6 +2,7 @@ package budget
 
 import (
 	"database/sql"
+	"fmt"
 	"sync"
 
 	"github.com/teranos/QNTX/errors"
@@ -51,19 +52,22 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 	// Query actual daily spend from ai_model_usage
 	dailySpend, dailyOps, err := bt.store.GetActualDailySpend()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get daily spend from usage")
+		err = errors.Wrap(err, "failed to get daily spend from usage")
+		return nil, err
 	}
 
 	// Query actual weekly spend from ai_model_usage
 	weeklySpend, weeklyOps, err := bt.store.GetActualWeeklySpend()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get weekly spend from usage")
+		err = errors.Wrap(err, "failed to get weekly spend from usage")
+		return nil, err
 	}
 
 	// Query actual monthly spend from ai_model_usage
 	monthlySpend, monthlyOps, err := bt.store.GetActualMonthlySpend()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get monthly spend from usage")
+		err = errors.Wrap(err, "failed to get monthly spend from usage")
+		return nil, err
 	}
 
 	bt.mu.RLock()
@@ -90,7 +94,9 @@ func (bt *Tracker) GetStatus() (*Status, error) {
 func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 	status, err := bt.GetStatus()
 	if err != nil {
-		return errors.Wrap(err, "failed to get budget status")
+		err = errors.Wrap(err, "failed to get budget status")
+		err = errors.WithDetail(err, fmt.Sprintf("Estimated cost: $%.4f", estimatedCostUSD))
+		return err
 	}
 
 	bt.mu.RLock()
@@ -102,18 +108,27 @@ func (bt *Tracker) CheckBudget(estimatedCostUSD float64) error {
 	if status.DailySpend+estimatedCostUSD > dailyBudget {
 		err := errors.Newf("daily budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.DailySpend, estimatedCostUSD, dailyBudget)
+		err = errors.WithDetail(err, fmt.Sprintf("Daily spend: $%.4f", status.DailySpend))
+		err = errors.WithDetail(err, fmt.Sprintf("Daily limit: $%.2f", dailyBudget))
+		err = errors.WithDetail(err, fmt.Sprintf("Daily remaining: $%.4f", dailyBudget-status.DailySpend))
 		return errors.WithHint(err, "increase daily budget in config or wait for the 24-hour window to reset")
 	}
 
 	if status.WeeklySpend+estimatedCostUSD > weeklyBudget {
 		err := errors.Newf("weekly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.WeeklySpend, estimatedCostUSD, weeklyBudget)
+		err = errors.WithDetail(err, fmt.Sprintf("Weekly spend: $%.4f", status.WeeklySpend))
+		err = errors.WithDetail(err, fmt.Sprintf("Weekly limit: $%.2f", weeklyBudget))
+		err = errors.WithDetail(err, fmt.Sprintf("Weekly remaining: $%.4f", weeklyBudget-status.WeeklySpend))
 		return errors.WithHint(err, "increase weekly budget in config or wait for the 7-day rolling window to reset")
 	}
 
 	if status.MonthlySpend+estimatedCostUSD > monthlyBudget {
 		err := errors.Newf("monthly budget would be exceeded: current $%.3f + estimated $%.3f > limit $%.2f",
 			status.MonthlySpend, estimatedCostUSD, monthlyBudget)
+		err = errors.WithDetail(err, fmt.Sprintf("Monthly spend: $%.4f", status.MonthlySpend))
+		err = errors.WithDetail(err, fmt.Sprintf("Monthly limit: $%.2f", monthlyBudget))
+		err = errors.WithDetail(err, fmt.Sprintf("Monthly remaining: $%.4f", monthlyBudget-status.MonthlySpend))
 		return errors.WithHint(err, "increase monthly budget in config or wait for the 30-day rolling window to reset")
 	}
 
