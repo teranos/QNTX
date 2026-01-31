@@ -98,7 +98,9 @@ jobs:
         run: cargo test --package qntx-core --package qntx-sqlite
 
       - name: Build release with FFI
-        run: cargo build --release --package qntx-sqlite --features ffi --lib
+        run: |
+          cargo build --release --package qntx-sqlite --features ffi --lib
+          ls -la target/release/libqntx_sqlite.* || echo "No library files found"
 
       - name: Test CGO integration
         run: |
