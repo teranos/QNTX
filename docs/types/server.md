@@ -214,7 +214,7 @@ type LogEntry struct {
 
 ## ParsedATSCode {#parsedatscode}
 
-**Source**: [`server/ats_parser.go:22`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L22)
+**Source**: [`server/ats_parser.go:16`](https://github.com/teranos/QNTX/blob/main/server/ats_parser.go#L16)
 
 
 ```go
