@@ -333,23 +333,7 @@
     font-size: var(--font-size-sm);
 }
 
-/* Scrollbar styling */
-.prompt-preview-body::-webkit-scrollbar {
-    width: 8px;
-}
-
-.prompt-preview-body::-webkit-scrollbar-track {
-    background: var(--bg-almost-black);
-}
-
-.prompt-preview-body::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: var(--border-radius);
-}
-
-.prompt-preview-body::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive adjustments for smaller screens */
 @media (max-width: 1400px) {

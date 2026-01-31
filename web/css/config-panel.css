@@ -294,23 +294,7 @@
     font-weight: 600;
 }
 
-/* Scrollbar styling */
-#config-panel .panel-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-#config-panel .panel-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
-#config-panel .panel-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-#config-panel .panel-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive */
 @media (max-width: 1200px) {
