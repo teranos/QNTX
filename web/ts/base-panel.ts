@@ -488,18 +488,36 @@ export abstract class BasePanel {
      * @param hint Optional secondary hint text
      */
     protected createEmptyState(title: string, hint?: string): HTMLElement {
-        const container = document.createElement('div');
-        container.className = CSS.PANEL.EMPTY;
+        const tpl = document.getElementById('empty-state-template') as HTMLTemplateElement | null;
+        if (!tpl) {
+            // Fallback to createElement if template not found
+            const container = document.createElement('div');
+            container.className = CSS.PANEL.EMPTY;
+            const titleEl = document.createElement('p');
+            titleEl.textContent = title;
+            container.appendChild(titleEl);
+            if (hint) {
+                const hintEl = document.createElement('p');
+                hintEl.className = 'panel-empty-hint';
+                hintEl.textContent = hint;
+                container.appendChild(hintEl);
+            }
+            return container;
+        }
 
-        const titleEl = document.createElement('p');
-        titleEl.textContent = title;
-        container.appendChild(titleEl);
+        const fragment = tpl.content.cloneNode(true) as DocumentFragment;
+        const container = fragment.querySelector('.panel-empty') as HTMLElement;
 
-        if (hint) {
-            const hintEl = document.createElement('p');
-            hintEl.className = 'panel-empty-hint';
+        // Set title
+        const titleEl = container.querySelector('.panel-empty-title');
+        if (titleEl) titleEl.textContent = title;
+
+        // Set or remove hint
+        const hintEl = container.querySelector('.panel-empty-hint');
+        if (hint && hintEl) {
             hintEl.textContent = hint;
-            container.appendChild(hintEl);
+        } else if (hintEl) {
+            hintEl.remove();
         }
 
         return container;
