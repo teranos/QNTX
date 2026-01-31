@@ -1,6 +1,6 @@
 # Plugin-Pulse Integration: Enabling Plugins to Register Async Handlers
 
-**Status:** Phase 1 & 2 Complete ✓
+**Status:** Phases 1-4 Complete ✓
 **Date:** 2026-01-31
 **Branch:** `research/plugin-pulse-integration`
 
@@ -22,10 +22,9 @@
 - Python plugin announces `["python.script"]` in `initialize()`
 - Python plugin implements `execute_job()` RPC
 - `PluginProxyHandler` in Go forwards jobs to plugins via gRPC
-- `server/init.go` auto-registers plugin handlers with Pulse
 - Removed hardcoded `qntx-code` import from `server/ats_parser.go`
 
-**Architecture now working:**
+**Architecture working:**
 ```
 Job with handler_name="python.script"
   → Pulse Worker picks up job
@@ -35,32 +34,50 @@ Job with handler_name="python.script"
   → Returns result/progress/cost to Pulse
 ```
 
-### 🚧 Phase 3: Dynamic Handler Discovery (NEXT)
+### ✅ Phase 3: Dynamic Handler Discovery (COMPLETE)
 **Goal:** Python plugin reads saved scripts from ATS store and announces them as handlers
 
-**Plan (needs validation):**
-1. Define attestation schema for saved handler scripts
-2. Python plugin scans ATS store during initialization
-3. For each saved handler script, announce `"python.<handler_name>"`
-4. Example: Script saved as "vacancies" → announces `"python.vacancies"`
+**Implemented:**
+- CLI command: `qntx handler create <name> --code <code>` or `--file <path>`
+- Handler attestation schema: Subject=handler_name, Predicate="handler", Context="python", Actor=handler_name (self-certifying)
+- Python plugin queries ATS store during `initialize()` for handler attestations
+- Discovered handlers announced in `InitializeResponse` with `python.` prefix
+- Example: Handler "vacancies" stored → plugin announces `"python.vacancies"`
 
-### 🚧 Phase 4: Handler Glyph
-**Goal:** User can create/edit handler scripts via UI
+**Verification:**
+```
+[python v0.3.10] Discovering Python handlers from ATS store
+[python v0.3.10] Discovered 2 handler(s): ["test-handler", "vacancies"]
+[python v0.3.10] Announcing: ["python.script", "python.test-handler", "python.vacancies"]
+```
 
-**Plan (needs validation):**
-1. New Handler Glyph (shares infrastructure with Python Glyph)
-2. Template generation for new handlers
-3. Save handler script to ATS store as attestation
-4. Trigger plugin re-initialization to announce new handler
+### ✅ Phase 4: Pulse Registration Timing (COMPLETE)
+**Goal:** Fix async race where handlers announced but not registered with Pulse
 
-### 🚧 Phase 5: ATS Parser Integration
-**Goal:** `ix <command>` syntax discovers and routes to handlers
+**Problem:** Pulse starts during server init, plugins load asynchronously afterward, handler registration ran before plugins finished loading.
 
-**Plan (needs validation):**
-1. ATS parser detects unknown `ix <command>`
-2. System prompts: "Handler not found. Create handler?"
-3. Opens Handler Glyph on user confirmation
-4. After saving, route `ix <command>` to `python.<command>`
+**Implemented:**
+- Added `GetDaemon()` method to `QNTXServer` for accessing Pulse worker pool
+- Moved handler registration from `server/init.go` to `cmd/qntx/main.go` after `InitializeAll()`
+- Handlers now properly registered with Pulse after plugin initialization completes
+- Unit test `TestGetDaemon` verifies daemon/registry access
+
+**Verification:**
+```
+[plugin-loader] Registering plugin async handlers with Pulse
+[plugin-loader] Registering plugin async handler plugin=python handler=python.script
+[plugin-loader] Registering plugin async handler plugin=python handler=python.test-handler
+[plugin-loader] Registering plugin async handler plugin=python handler=python.vacancies
+[plugin-loader] Plugin async handler registration complete
+```
+
+### 🚧 Phase 5: Migrate ixgest.git to Code Plugin (FUTURE)
+**Goal:** Move remaining hardcoded handler to plugin for pure plugin-based architecture
+
+**Plan:**
+1. Code plugin announces `code.git` handler
+2. Remove any remaining domain imports from core
+3. ATS parser becomes purely generic
 
 ---
 
