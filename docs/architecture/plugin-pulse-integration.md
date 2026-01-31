@@ -1,8 +1,28 @@
 # Plugin-Pulse Integration: Enabling Plugins to Register Async Handlers
 
-**Status:** Research/Proposal
+**Status:** Phase 1 & 2 Complete ✓
 **Date:** 2026-01-31
-**Context:** Feature branch `feature/dynamic-ix-routing` attempts to add Python script execution via Pulse, but does so through an ad-hoc Go handler that makes gRPC calls to the plugin. This document proposes a general architecture for plugins to register async handlers directly with Pulse.
+**Branch:** `research/plugin-pulse-integration`
+
+## Implementation Status
+
+### ✓ Completed
+- **Phase 1:** Protocol changes (protobuf updates, handler announcement via `Initialize`)
+- **Phase 2:** Plugin execution (Python plugin implements `ExecuteJob`, Go creates `PluginProxyHandler`)
+- **Cleanup:** Removed hardcoded `qntx-code` import from `server/ats_parser.go`
+
+### 🚧 Remaining Work
+- **Phase 3:** ATS parser integration (currently disabled - all `ix` commands return error)
+- **Phase 4:** Testing and documentation
+
+### 🔴 Known Issues
+- ATS parser temporarily disabled: all `ix <command>` syntax returns error
+- Server no longer imports from `qntx-code/ixgest/git` (architectural violation fixed)
+- Future work: pluggable ATS parsers to allow plugins to register their own command syntax
+
+---
+
+**Original Context:** Feature branch `feature/dynamic-ix-routing` attempts to add Python script execution via Pulse, but does so through an ad-hoc Go handler that makes gRPC calls to the plugin. This document proposes a general architecture for plugins to register async handlers directly with Pulse.
 
 ## Problem Statement
 
