@@ -24,5 +24,8 @@ type Message struct {
 	VidStreamBackend string `json:"vidstream_backend"`
 	VidStreamOptimized bool `json:"vidstream_optimized"`
 	VidStreamVersion string `json:"vidstream_version"`
+	StorageBackend string `json:"storage_backend"`
+	StorageOptimized bool `json:"storage_optimized"`
+	StorageVersion string `json:"storage_version"`
 }
 ```

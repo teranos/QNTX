@@ -36,4 +36,10 @@ pub struct Message {
     #[serde(rename = "vidstream_version")]
     /// vidstream library version (e.g., "0.1.0")
     pub vid_stream_version: String,
+    /// "rust" or "go" - which storage implementation is active
+    pub storage_backend: String,
+    /// true if using Rust SQLite (optimized), false if Go fallback
+    pub storage_optimized: bool,
+    /// qntx-sqlite library version (e.g., "0.1.0")
+    pub storage_version: String,
 }
