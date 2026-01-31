@@ -26,8 +26,8 @@
     animation: slideDown 0.2s ease;
 }
 
-/* Header */
-.job-list-header {
+/* Header - scoped to job list using skeleton's .panel-header */
+#job-list-panel .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -36,17 +36,15 @@
     border-bottom: var(--panel-border);
 }
 
-.job-list-title {
+#job-list-panel .panel-title {
     margin: 0;
     font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
 
-
-
 /* Content */
-.job-list-content {
+#job-list-panel .panel-content {
     flex: 1;
     overflow-y: auto;
     padding: 8px;

@@ -433,6 +433,31 @@
         </div>
     </div>
 
+    <!-- Panel skeleton - cloned by BasePanel for all standard panels -->
+    <template id="panel-skeleton">
+        <div class="panel-header">
+            <h3 class="panel-title"></h3>
+            <div class="panel-header-actions">
+                <button class="panel-fullscreen-toggle" type="button" aria-label="Enter fullscreen">⛶</button>
+                <button class="panel-close" type="button" aria-label="Close">✕</button>
+            </div>
+        </div>
+        <div class="panel-search" hidden>
+            <input type="text" class="panel-search-input" placeholder="Filter...">
+        </div>
+        <div class="panel-content">
+            <div class="panel-loading"><p>Loading...</p></div>
+        </div>
+    </template>
+
+    <!-- Empty state template - cloned by BasePanel.createEmptyState() -->
+    <template id="empty-state-template">
+        <div class="panel-empty">
+            <p class="panel-empty-title"></p>
+            <p class="panel-empty-hint"></p>
+        </div>
+    </template>
+
     <!-- Load D3.js locally (bundled) - Virtue #2: Minimize external dependencies -->
 
     <!-- async instead of defer: Don't block DOMContentLoaded, load independently -->
