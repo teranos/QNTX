@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,8 +6,8 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy rust-vidstream ## Build QNTX CLI binary (with Rust fuzzy optimization and ONNX video)
-	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video)..."
+cli: rust-fuzzy rust-vidstream rust-sqlite ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, and SQLite backend)
+	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite)..."
 	@go build -tags "rustfuzzy,rustvideo" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
@@ -199,6 +199,13 @@ rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integ
 	@echo "  Static:  libqntx_vidstream.a"
 	@echo "  Shared:  libqntx_vidstream.so (Linux) / libqntx_vidstream.dylib (macOS)"
 	@echo "  Features: ONNX Runtime (download-binaries enabled)"
+
+rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
+	@echo "Building Rust SQLite storage library..."
+	@cargo build --release --package qntx-sqlite --features ffi --lib
+	@echo "✓ libqntx_sqlite built in target/release/"
+	@echo "  Static:  libqntx_sqlite.a"
+	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."
