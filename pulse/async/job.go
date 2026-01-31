@@ -3,6 +3,7 @@ package async
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
@@ -75,6 +76,7 @@ type Job struct {
 	CostActual   float64         `json:"cost_actual,omitempty"`
 	PulseState   *PulseState     `json:"pulse_state,omitempty"`
 	Error        string          `json:"error,omitempty"`
+	ErrorDetails []string        `json:"error_details,omitempty"` // Structured error context from errors.GetAllDetails()
 	ParentJobID  string          `json:"parent_job_id,omitempty"` // For tasks grouped under parent job
 	RetryCount   int             `json:"retry_count,omitempty"`   // Number of retry attempts (max 2)
 	CreatedAt    time.Time       `json:"created_at"`
@@ -98,7 +100,9 @@ func NewJobWithPayload(handlerName string, source string, payload json.RawMessag
 // Use this when creating child jobs that should be grouped under a parent orchestrator job.
 func NewChildJobWithPayload(handlerName string, source string, payload json.RawMessage, totalOps int, estimatedCost float64, actor string, parentJobID string) (*Job, error) {
 	if handlerName == "" {
-		return nil, errors.New("handlerName cannot be empty")
+		err := errors.New("handlerName cannot be empty")
+		err = errors.WithDetail(err, "Handler name is required to create a job")
+		return nil, err
 	}
 	if actor == "" {
 		actor = "system"
@@ -108,7 +112,11 @@ func NewChildJobWithPayload(handlerName string, source string, payload json.RawM
 	// Format: JB + random(2) + handler(5) + random(2) + process(7) + random(2) + source(5) + random(4) + actor(3)
 	jobID, err := id.GenerateJobASID(handlerName, source, actor)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate job ASID")
+		err = errors.Wrap(err, "failed to generate job ASID")
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", handlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", source))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", actor))
+		return nil, err
 	}
 
 	now := time.Now()
@@ -163,11 +171,12 @@ func (j *Job) Complete() {
 	j.UpdatedAt = now
 }
 
-// Fail marks the job as failed with an error message
+// Fail marks the job as failed with an error message and preserves structured error details
 func (j *Job) Fail(err error) {
 	now := time.Now()
 	j.Status = JobStatusFailed
 	j.Error = err.Error()
+	j.ErrorDetails = errors.GetAllDetails(err)
 	j.CompletedAt = &now
 	j.UpdatedAt = now
 }
@@ -206,7 +215,8 @@ func MarshalPulseState(state *PulseState) (string, error) {
 	}
 	data, err := json.Marshal(state)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal pulse state")
+		err = errors.Wrap(err, "failed to marshal pulse state")
+		return "", err
 	}
 	return string(data), nil
 }
@@ -218,7 +228,9 @@ func UnmarshalPulseState(data string) (*PulseState, error) {
 	}
 	var state PulseState
 	if err := json.Unmarshal([]byte(data), &state); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal pulse state")
+		err = errors.Wrap(err, "failed to unmarshal pulse state")
+		err = errors.WithDetail(err, fmt.Sprintf("Data length: %d bytes", len(data)))
+		return nil, err
 	}
 	return &state, nil
 }
