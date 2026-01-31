@@ -120,6 +120,9 @@ const MESSAGE_HANDLERS = {
         import('./database-stats-window.js').then(({ databaseStatsWindow }) => {
             databaseStatsWindow.updateStats({
                 path: data.path,
+                storage_backend: data.storage_backend,
+                storage_optimized: data.storage_optimized,
+                storage_version: data.storage_version,
                 total_attestations: data.total_attestations,
                 unique_actors: data.unique_actors,
                 unique_subjects: data.unique_subjects,

@@ -826,10 +826,19 @@ func (c *Client) handleGetDatabaseStats() {
 		return
 	}
 
+	// Get storage backend info
+	storageBackend := "go"
+	if syscap.IsStorageOptimized() {
+		storageBackend = "rust"
+	}
+
 	// Send stats to client with enhanced field information
 	c.sendJSON(map[string]interface{}{
 		"type":               "database_stats",
 		"path":               c.server.dbPath,
+		"storage_backend":    storageBackend,
+		"storage_optimized":  syscap.IsStorageOptimized(),
+		"storage_version":    syscap.GetStorageVersion(),
 		"total_attestations": totalAttestations,
 		"unique_actors":      uniqueActors,
 		"unique_subjects":    uniqueSubjects,

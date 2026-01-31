@@ -90,7 +90,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Opening/Closing Phase 2: Recreate daemon with server's context for proper shutdown coordination
 	// Reuse config from deps to avoid double-loading (optimization for WS connection speed)
 	poolConfig := async.DefaultWorkerPoolConfig()
-	if deps.config.Pulse.Workers > 0 {
+	if deps.config.Pulse.Workers == 0 {
+		// 0 = no background workers (disable worker pool)
+		poolConfig.Workers = 0
+	} else if deps.config.Pulse.Workers > 0 {
+		// Use configured worker count (defaults to 1 if omitted from config file)
 		poolConfig.Workers = deps.config.Pulse.Workers
 	}
 	daemon := async.NewWorkerPoolWithContext(ctx, db, deps.config, poolConfig, serverLogger)
@@ -98,8 +102,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	// Create Pulse ticker for scheduled job execution
 	scheduleStore := schedule.NewStore(db)
 	tickerCfg := schedule.DefaultTickerConfig()
-	// Override default with config if provided
-	if deps.config.Pulse.TickerIntervalSeconds > 0 {
+	if deps.config.Pulse.TickerIntervalSeconds == 0 {
+		// 0 = no periodic ticking (disable ticker)
+		tickerCfg.Interval = 0
+	} else if deps.config.Pulse.TickerIntervalSeconds > 0 {
+		// Use configured interval (defaults to 1 second if omitted from config file)
 		tickerCfg.Interval = time.Duration(deps.config.Pulse.TickerIntervalSeconds) * time.Second
 	}
 

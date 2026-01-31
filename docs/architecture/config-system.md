@@ -230,6 +230,7 @@ toml.Marshal(config)
 
 ## Related Documentation
 
+- **Budget Tracking**: [budget-tracking.md](budget-tracking.md) - Budget configuration and enforcement
 - **UI Design**: [Config Panel](../development/config-panel.md) - Config panel UI/UX specification and future vision
 - **Glossary**: [Configuration Terms](../GLOSSARY.md#configuration) - Symbol and command reference
 - **User Guide**: How to configure QNTX (TBD)

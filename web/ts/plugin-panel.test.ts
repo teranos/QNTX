@@ -270,7 +270,7 @@ describe('PluginPanel error handling', () => {
     let panel: PluginPanel;
 
     beforeEach(() => {
-        dom = new JSDOM('<!DOCTYPE html><html><body><div id="panel-container"></div></body></html>');
+        dom = new JSDOM('<!DOCTYPE html><html><body><div id="panel-container"></div><template id="panel-skeleton"><div class="panel-header"><h3 class="panel-title"></h3><div class="panel-header-actions"><button class="panel-fullscreen-toggle" type="button" aria-label="Enter fullscreen">⛶</button><button class="panel-close" type="button" aria-label="Close">✕</button></div></div><div class="panel-search" hidden><input type="text" class="panel-search-input" placeholder="Filter..."></div><div class="panel-content"><div class="panel-loading"><p>Loading...</p></div></div></template></body></html>');
         global.document = dom.window.document as unknown as Document;
         global.window = dom.window as unknown as Window & typeof globalThis;
         global.fetch = () => Promise.resolve({

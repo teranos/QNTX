@@ -227,7 +227,7 @@ type ParsedATSCode struct {
 
 ## PluginHealthMessage {#pluginhealthmessage}
 
-**Source**: [`server/types.go:210`](https://github.com/teranos/QNTX/blob/main/server/types.go#L210)
+**Source**: [`server/types.go:211`](https://github.com/teranos/QNTX/blob/main/server/types.go#L211)
 
 
 ```go
@@ -387,7 +387,7 @@ type ProseEntry struct {
 
 ## PulseExecutionCompletedMessage {#pulseexecutioncompletedmessage}
 
-**Source**: [`server/types.go:176`](https://github.com/teranos/QNTX/blob/main/server/types.go#L176)
+**Source**: [`server/types.go:177`](https://github.com/teranos/QNTX/blob/main/server/types.go#L177)
 
 
 ```go
@@ -415,6 +415,7 @@ type PulseExecutionFailedMessage struct {
 	ExecutionID string `json:"execution_id"`
 	ATSCode string `json:"ats_code"`
 	ErrorMessage string `json:"error_message"`
+	ErrorDetails []string `json:"error_details"`
 	DurationMs int `json:"duration_ms"`
 	Timestamp int64 `json:"timestamp"`
 }
@@ -422,7 +423,7 @@ type PulseExecutionFailedMessage struct {
 
 ## PulseExecutionLogStreamMessage {#pulseexecutionlogstreammessage}
 
-**Source**: [`server/types.go:188`](https://github.com/teranos/QNTX/blob/main/server/types.go#L188)
+**Source**: [`server/types.go:189`](https://github.com/teranos/QNTX/blob/main/server/types.go#L189)
 
 
 ```go
@@ -549,7 +550,7 @@ type StatsMessage struct {
 
 ## StorageWarningMessage {#storagewarningmessage}
 
-**Source**: [`server/types.go:197`](https://github.com/teranos/QNTX/blob/main/server/types.go#L197)
+**Source**: [`server/types.go:198`](https://github.com/teranos/QNTX/blob/main/server/types.go#L198)
 
 
 ```go

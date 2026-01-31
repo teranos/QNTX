@@ -22,7 +22,6 @@ import { FuzzySearchView } from './fuzzy-search-view.ts';
 
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
-let parseTimeout: ReturnType<typeof setTimeout> | null = null;
 let fuzzySearchView: FuzzySearchView | null = null;
 let editorMode: 'ats' | 'fuzzy' = 'ats'; // Track current mode
 
@@ -248,15 +247,10 @@ function handleDocumentChange(update: any): void {
     // Request parse for syntax highlighting (via existing WebSocket custom protocol)
     // Only in ATS mode - fuzzy search doesn't need LSP parsing
     if (editorMode === 'ats') {
-        if (parseTimeout) {
-            clearTimeout(parseTimeout);
+        if (editorView) {
+            const cursorPos = editorView.state.selection.main.head;
+            requestParse(doc, 1, cursorPos);
         }
-        parseTimeout = setTimeout(() => {
-            if (editorView) {
-                const cursorPos = editorView.state.selection.main.head;
-                requestParse(doc, 1, cursorPos);
-            }
-        }, 150); // 150ms debounce for syntax highlighting
     }
 
     // Execute query with debounce based on mode

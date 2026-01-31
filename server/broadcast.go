@@ -37,7 +37,7 @@ type broadcastRequest struct {
 
 // broadcastMessage sends a message to all connected clients.
 // This is now thread-safe - all sends go through the dedicated broadcast worker.
-func (s *QNTXServer) broadcastMessage(msg interface{}) int {
+func (s *QNTXServer) broadcastMessage(msg interface{}) {
 	// Send request to broadcast worker
 	req := &broadcastRequest{
 		reqType: "message",
@@ -46,15 +46,9 @@ func (s *QNTXServer) broadcastMessage(msg interface{}) int {
 
 	select {
 	case s.broadcastReq <- req:
-		// Request queued successfully
-		// Note: We can't return exact count anymore since sending is async,
-		// but the worker will handle it properly
-		s.mu.RLock()
-		count := len(s.clients)
-		s.mu.RUnlock()
-		return count
+		// Request queued successfully - actual sends happen asynchronously in broadcast worker
 	case <-s.ctx.Done():
-		return 0
+		// Server shutting down
 	}
 }
 
@@ -65,7 +59,7 @@ func (s *QNTXServer) broadcastUsageUpdate() {
 		s.logger.Debugw("Failed to get usage stats",
 			"error", err.Error(),
 		)
-		return // Silent failure for observability
+		return
 	}
 	// Check if usage has changed since last broadcast (with lock for lastUsage access)
 	s.mu.Lock()
@@ -141,7 +135,7 @@ func (s *QNTXServer) startJobUpdateBroadcaster() {
 
 	// Create stores for Pulse execution tracking
 	executionStore := schedule.NewExecutionStore(s.db)
-	scheduleStore := s.getScheduleStore()
+	scheduleStore := s.newScheduleStore()
 
 	s.wg.Add(1)
 	go func() {
@@ -251,6 +245,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 				execution.ID,
 				scheduledJob.ATSCode,
 				job.Error,
+				job.ErrorDetails,
 				durationMs,
 			)
 		} else {
@@ -350,13 +345,12 @@ func (s *QNTXServer) broadcastJobUpdate(job *async.Job) {
 		Metadata: metadata,
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 
 	s.logger.Debugw("Broadcasted job update",
 		"job_id", job.ID,
 		"status", job.Status,
 		"progress", fmt.Sprintf("%d/%d", job.Progress.Current, job.Progress.Total),
-		"clients", sent,
 	)
 }
 
@@ -429,14 +423,13 @@ func (s *QNTXServer) broadcastDaemonStatus() {
 		Timestamp:          time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 
 	s.logger.Debugw("Broadcasted daemon status",
 		"running", msg.Running,
 		"active_jobs", msg.ActiveJobs,
 		"queued_jobs", msg.QueuedJobs,
 		"load_percent", msg.LoadPercent,
-		"clients", sent,
 	)
 }
 
@@ -588,14 +581,13 @@ func (s *QNTXServer) stopDaemon() error {
 
 // broadcastLLMStream sends streaming LLM output to all connected clients
 func (s *QNTXServer) broadcastLLMStream(msg LLMStreamMessage) {
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 
 	s.logger.Debugw("Broadcasted LLM stream chunk",
 		"job_id", msg.JobID,
 		"content_length", len(msg.Content),
 		"done", msg.Done,
 		"error", msg.Error,
-		"clients", sent,
 	)
 }
 
@@ -609,32 +601,32 @@ func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID,
 		Timestamp:      time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution started",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
-		"clients", sent,
 	)
 }
 
 // broadcastPulseExecutionFailed notifies clients when a Pulse execution fails
-func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, durationMs int) {
+func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int) {
 	msg := PulseExecutionFailedMessage{
 		Type:           "pulse_execution_failed",
 		ScheduledJobID: scheduledJobID,
 		ExecutionID:    executionID,
 		ATSCode:        atsCode,
 		ErrorMessage:   errorMsg,
+		ErrorDetails:   errorDetails,
 		DurationMs:     durationMs,
 		Timestamp:      time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution failed",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"error", errorMsg,
-		"clients", sent,
+		"error_details", errorDetails,
 	)
 }
 
@@ -651,12 +643,11 @@ func (s *QNTXServer) BroadcastPulseExecutionCompleted(scheduledJobID, executionI
 		Timestamp:      time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution completed",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"async_job_id", asyncJobID,
-		"clients", sent,
 	)
 }
 
@@ -670,12 +661,11 @@ func (s *QNTXServer) BroadcastPulseExecutionLogStream(scheduledJobID, executionI
 		Timestamp:      time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 	logger.AddPulseSymbol(s.logger).Debugw("Broadcasted execution log chunk",
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"chunk_length", len(logChunk),
-		"clients", sent,
 	)
 }
 
@@ -693,13 +683,12 @@ func (s *QNTXServer) BroadcastStorageWarning(actor, context string, current, lim
 		Timestamp:     time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 	logger.AddDBSymbol(s.logger).Warnw("Storage limit approaching",
 		"actor", actor,
 		"context", context,
 		"fill_percent", fmt.Sprintf("%.0f%%", fillPercent*100),
 		"time_until_full", timeUntilFull,
-		"clients", sent,
 	)
 }
 
@@ -715,12 +704,11 @@ func (s *QNTXServer) BroadcastPluginHealth(name string, healthy bool, state, mes
 		Timestamp: time.Now().Unix(),
 	}
 
-	sent := s.broadcastMessage(msg)
+	s.broadcastMessage(msg)
 	s.logger.Infow("Broadcasted plugin health update",
 		"plugin", name,
 		"healthy", healthy,
 		"state", state,
-		"clients", sent,
 	)
 }
 

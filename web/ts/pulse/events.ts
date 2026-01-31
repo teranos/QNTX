@@ -44,6 +44,7 @@ export interface ExecutionFailedDetail {
     scheduledJobId: string;
     executionId: string;
     errorMessage: string;
+    errorDetails?: string[]; // Structured error details from cockroachdb/errors
     durationMs: number;
     atsCode: string;
     timestamp: number;
