@@ -12,7 +12,7 @@ This document shows Go type definitions from the codebase.
 
 ## BudgetConfig {#budgetconfig}
 
-**Source**: [`pulse/budget/tracker.go:14`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L14)
+**Source**: [`pulse/budget/tracker.go:15`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L15)
 
 
 ```go
@@ -26,7 +26,7 @@ type BudgetConfig struct {
 
 ## Limiter {#limiter}
 
-**Source**: [`pulse/budget/limiter.go:12`](https://github.com/teranos/QNTX/blob/main/pulse/budget/limiter.go#L12)
+**Source**: [`pulse/budget/limiter.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/budget/limiter.go#L13)
 
 
 ```go
@@ -36,7 +36,7 @@ type Limiter struct {
 
 ## Status {#status}
 
-**Source**: [`pulse/budget/tracker.go:22`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L22)
+**Source**: [`pulse/budget/tracker.go:23`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L23)
 
 
 ```go
@@ -55,7 +55,7 @@ type Status struct {
 
 ## Tracker {#tracker}
 
-**Source**: [`pulse/budget/tracker.go:35`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L35)
+**Source**: [`pulse/budget/tracker.go:36`](https://github.com/teranos/QNTX/blob/main/pulse/budget/tracker.go#L36)
 
 
 ```go

@@ -47,13 +47,20 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	// Decode payload
 	var payload GitIngestionPayload
 	if err := json.Unmarshal(job.Payload, &payload); err != nil {
-		return errors.Wrap(err, "failed to decode payload")
+		err = errors.Wrap(err, "failed to decode payload")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Payload length: %d bytes", len(job.Payload)))
+		return err
 	}
 
 	// Resolve repository (handles URLs with auto-clone)
 	repoSource, err := ResolveRepository(payload.RepositorySource, h.logger)
 	if err != nil {
-		return errors.Wrap(err, "failed to resolve repository")
+		err = errors.Wrap(err, "failed to resolve repository")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Repository source: %s", payload.RepositorySource))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", payload.Actor))
+		return err
 	}
 	defer repoSource.Cleanup()
 
@@ -72,14 +79,25 @@ func (h *GitIngestionHandler) Execute(ctx context.Context, job *async.Job) error
 	// Set incremental filter if --since is provided
 	if payload.Since != "" {
 		if err := processor.SetSince(payload.Since); err != nil {
-			return errors.Wrap(err, "invalid --since value")
+			err = errors.Wrap(err, "invalid --since value")
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Repository: %s", payload.RepositorySource))
+			err = errors.WithDetail(err, fmt.Sprintf("Since value: %s", payload.Since))
+			return err
 		}
 	}
 
 	// Process git repository
 	result, err := processor.ProcessGitRepository(repoPath)
 	if err != nil {
-		return errors.Wrap(err, "git ingestion failed")
+		err = errors.Wrap(err, "git ingestion failed")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Repository: %s", payload.RepositorySource))
+		err = errors.WithDetail(err, fmt.Sprintf("Local path: %s", repoPath))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", payload.Actor))
+		err = errors.WithDetail(err, fmt.Sprintf("Since: %s", payload.Since))
+		err = errors.WithDetail(err, fmt.Sprintf("Dry run: %t", false))
+		return err
 	}
 
 	// Process dependencies unless disabled

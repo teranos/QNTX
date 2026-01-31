@@ -14,10 +14,10 @@
 
 .config-search-input {
     width: 100%;
-    padding: 10px 14px;
-    font-size: 12px;
+    padding: var(--panel-padding-md);
+    font-size: var(--font-size-sm);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     outline: none;
     transition: var(--panel-transition-fast);
     font-family: inherit;
@@ -39,12 +39,12 @@
     text-align: center;
     padding: 32px 16px;
     color: var(--panel-text-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 /* Config File Info - uses .panel-card from panel-base.css */
 .config-file-info {
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     margin-bottom: 20px;
     display: flex;
     flex-direction: column;
@@ -53,13 +53,13 @@
 
 .config-file-info strong {
     color: #000;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
 }
 
 .config-file-hint {
     color: var(--panel-text-secondary);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
 }
 
 /* Config Groups (simple grouping by top-level key) */
@@ -69,7 +69,7 @@
 
 .config-group-title {
     margin: 0 0 12px 0;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: #000;
     text-transform: uppercase;
@@ -85,7 +85,7 @@
     gap: 12px;
     padding: 2px 8px;
     border-bottom: 1px solid #f0f0f0;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
     align-items: center;
     transition: background 0.1s ease;
@@ -154,7 +154,7 @@
     color: var(--panel-text-secondary);
     border: none;
     padding: 2px 6px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     cursor: pointer;
     transition: color 0.1s ease;
 }
@@ -167,17 +167,17 @@
 .config-edit-container {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .config-edit-input {
     flex: 1;
     padding: 4px 8px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
     border: 1px solid #ccc;
-    border-radius: 3px;
-    background: #fff;
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
     min-width: 100px;
 }
 
@@ -195,11 +195,11 @@
 .config-save-btn,
 .config-cancel-btn {
     padding: 4px 10px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     border: 1px solid #ccc;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .config-save-btn {
@@ -232,7 +232,7 @@
 }
 
 .config-cancel-btn {
-    background: #fff;
+    background: var(--bg-primary);
     color: var(--text-secondary);
 }
 
@@ -271,7 +271,7 @@
 
 .config-value-object {
     color: #1976D2;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
 }
 
 /* Toast notification */
@@ -279,11 +279,11 @@
     position: fixed;
     bottom: 20px;
     right: 20px;
-    background: #333;
+    background: var(--bg-dark-light);
     color: #fff;
     padding: 12px 20px;
-    border-radius: 4px;
-    font-size: 12px;
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
     z-index: 10000;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     animation: slideInRight 0.3s ease-out;
@@ -305,7 +305,7 @@
 
 .config-panel-content::-webkit-scrollbar-thumb {
     background: #ccc;
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb:hover {
@@ -335,7 +335,7 @@
 
     .config-setting {
         grid-template-columns: 1fr;
-        gap: 8px;
+        gap: var(--gap);
     }
 
     .config-setting-actions {
@@ -347,7 +347,7 @@
     }
 
     .config-source-title {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
     }
 
     .config-source-subtitle {

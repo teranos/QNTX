@@ -18,6 +18,18 @@ const (
 	// MaxOrphanedJobsToRecover limits how many orphaned jobs we'll attempt to recover
 	// on startup to prevent overwhelming the system after a crash
 	MaxOrphanedJobsToRecover = 1000
+
+	// DefaultWorkerStopTimeout is the default time to wait for workers to checkpoint and exit
+	// during graceful shutdown. Can be overridden via WorkerPoolConfig.
+	DefaultWorkerStopTimeout = 20 * time.Second
+
+	// DefaultMaxConsecutiveErrors is the threshold for applying exponential backoff
+	// when workers encounter repeated errors
+	DefaultMaxConsecutiveErrors = 5
+
+	// DefaultMaxBackoff is the maximum duration for exponential backoff
+	// when workers encounter consecutive errors
+	DefaultMaxBackoff = 30 * time.Second
 )
 
 // BudgetTracker interface defines budget tracking operations
@@ -86,19 +98,25 @@ type WorkerPool struct {
 
 // WorkerPoolConfig contains configuration for the worker pool
 type WorkerPoolConfig struct {
-	Workers            int            `json:"workers"`              // Number of concurrent workers
-	PollInterval       *time.Duration `json:"poll_interval"`        // Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
-	PauseOnBudget      bool           `json:"pause_on_budget"`      // Pause jobs when budget exceeded
-	GracefulStartPhase time.Duration  `json:"graceful_start_phase"` // Duration of each graceful start phase (default: 5min, test: 10s)
+	Workers            int            `json:"workers"`                // Number of concurrent workers
+	PollInterval       *time.Duration `json:"poll_interval"`          // Poll interval: nil = gradual ramp-up (default), 0 = no polling, positive = fixed interval
+	PauseOnBudget      bool           `json:"pause_on_budget"`        // Pause jobs when budget exceeded
+	GracefulStartPhase time.Duration  `json:"graceful_start_phase"`   // Duration of each graceful start phase (default: 5min, test: 10s)
+	WorkerStopTimeout  time.Duration  `json:"worker_stop_timeout"`    // Max time to wait for workers to checkpoint and exit (default: 20s)
+	MaxConsecutiveErrors int          `json:"max_consecutive_errors"` // Threshold for applying exponential backoff (default: 5)
+	MaxBackoff         time.Duration  `json:"max_backoff"`            // Maximum exponential backoff duration (default: 30s)
 }
 
 // DefaultWorkerPoolConfig returns sensible defaults
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
-		Workers:            1,               // Single worker to avoid race conditions initially
-		PollInterval:       nil,             // nil = gradual ramp-up (production default)
-		PauseOnBudget:      true,            // Pause when budget exceeded
-		GracefulStartPhase: 5 * time.Minute, // 5min per phase = 15min total graceful start
+		Workers:              1,                           // Single worker to avoid race conditions initially
+		PollInterval:         nil,                         // nil = gradual ramp-up (production default)
+		PauseOnBudget:        true,                        // Pause when budget exceeded
+		GracefulStartPhase:   5 * time.Minute,             // 5min per phase = 15min total graceful start
+		WorkerStopTimeout:    DefaultWorkerStopTimeout,    // 20s for checkpoint completion
+		MaxConsecutiveErrors: DefaultMaxConsecutiveErrors, // 5 errors before backoff
+		MaxBackoff:           DefaultMaxBackoff,           // 30s maximum backoff
 	}
 }
 
@@ -211,7 +229,10 @@ func (wp *WorkerPool) recoverOrphanedJobs() error {
 	runningStatus := JobStatusRunning
 	orphanedJobs, err := wp.queue.store.ListJobs(&runningStatus, MaxOrphanedJobsToRecover)
 	if err != nil {
-		return errors.Wrap(err, "failed to list running jobs")
+		err = errors.Wrap(err, "failed to list running jobs")
+		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", runningStatus))
+		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", MaxOrphanedJobsToRecover))
+		return err
 	}
 
 	if len(orphanedJobs) == 0 {
@@ -251,7 +272,11 @@ func (wp *WorkerPool) requeueOrphanedJob(job *Job) error {
 	job.Error = "" // Clear any stale error message
 
 	if err := wp.queue.UpdateJob(job); err != nil {
-		return errors.Wrapf(err, "failed to update recovered job %s", job.ID)
+		err = errors.Wrapf(err, "failed to update recovered job %s", job.ID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+		return err
 	}
 
 	wp.logger.Starting("Recovered orphaned job", "job_id", job.ID, "handler", job.HandlerName)
@@ -303,18 +328,21 @@ func (wp *WorkerPool) gradualRecovery(jobs []*Job) {
 
 // Stop gracefully stops the worker pool
 // ❀ Closing: Workers checkpoint and exit cleanly on context cancellation
-// Uses a 30-second timeout to allow jobs to checkpoint without blocking indefinitely
+// Uses a configurable timeout (default 20s) to allow jobs to checkpoint without blocking indefinitely
 func (wp *WorkerPool) Stop() {
 	wp.cancel()
 
-	// Wait for workers to checkpoint and exit (with generous timeout)
+	// Wait for workers to checkpoint and exit (with configurable timeout)
 	done := make(chan struct{})
 	go func() {
 		wp.wg.Wait()
 		close(done)
 	}()
 
-	timeout := 30 * time.Second // Generous timeout for checkpoint completion
+	timeout := wp.poolConfig.WorkerStopTimeout
+	if timeout == 0 {
+		timeout = DefaultWorkerStopTimeout
+	}
 	select {
 	case <-done:
 		wp.logger.Pulse("❀ WorkerPool.Stop() complete - all workers exited cleanly")
@@ -335,9 +363,15 @@ func (wp *WorkerPool) worker(id int) {
 
 	// Error backoff state
 	errorCount := 0
-	const maxConsecutiveErrors = 5
+	maxConsecutiveErrors := wp.poolConfig.MaxConsecutiveErrors
+	if maxConsecutiveErrors == 0 {
+		maxConsecutiveErrors = DefaultMaxConsecutiveErrors
+	}
 	backoffDuration := time.Second
-	const maxBackoff = 30 * time.Second
+	maxBackoff := wp.poolConfig.MaxBackoff
+	if maxBackoff == 0 {
+		maxBackoff = DefaultMaxBackoff
+	}
 
 	for {
 		select {
@@ -433,7 +467,8 @@ func (wp *WorkerPool) processNextJob() error {
 	// Dequeue next job
 	job, err := wp.queue.Dequeue()
 	if err != nil {
-		return errors.Wrap(err, "failed to dequeue job")
+		err = errors.Wrap(err, "failed to dequeue job")
+		return err
 	}
 
 	if job == nil {
@@ -482,7 +517,11 @@ func (wp *WorkerPool) processNextJob() error {
 	// Rate limiting prevents API violations, budget prevents cost overruns
 	if paused, err := wp.checkRateLimit(job); paused || err != nil {
 		if err != nil {
-			return errors.Wrapf(err, "rate limit check failed for job %s", job.ID)
+			err = errors.Wrapf(err, "rate limit check failed for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+			err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+			return err
 		}
 		return nil // Job paused, no error
 	}
@@ -490,7 +529,11 @@ func (wp *WorkerPool) processNextJob() error {
 	// Check budget before processing
 	if paused, err := wp.checkBudget(job); paused || err != nil {
 		if err != nil {
-			return errors.Wrapf(err, "budget check failed for job %s", job.ID)
+			err = errors.Wrapf(err, "budget check failed for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+			err = errors.WithDetail(err, fmt.Sprintf("Estimated cost: $%.4f", job.CostEstimate))
+			return err
 		}
 		return nil // Job paused, no error
 	}
@@ -560,7 +603,11 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 
 	if err := wp.rateLimiter.Allow(); err != nil {
 		if pauseErr := wp.queue.PauseJob(job.ID, "rate_limited"); pauseErr != nil {
-			return false, errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+			pauseErr = errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+			pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Job ID: %s", job.ID))
+			pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Handler: %s", job.HandlerName))
+			pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Pause reason: rate_limited"))
+			return false, pauseErr
 		}
 		// Log rate limit status for visibility
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
@@ -612,7 +659,12 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 
 		if wp.poolConfig.PauseOnBudget {
 			if pauseErr := wp.queue.PauseJob(job.ID, "budget_exceeded"); pauseErr != nil {
-				return false, errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+				pauseErr = errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Job ID: %s", job.ID))
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Handler: %s", job.HandlerName))
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Estimated cost: $%.4f", estimatedCost))
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Pause reason: budget_exceeded"))
+				return false, pauseErr
 			}
 			return true, nil
 		}

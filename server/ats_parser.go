@@ -54,7 +54,8 @@ func ParseATSCodeWithForce(atsCode string, jobID string, force bool) (*ParsedATS
 	case "ix":
 		return parseIxCommand(tokens[1:], jobID)
 	default:
-		return nil, errors.Newf("unknown command: %s (supported: ix)", tokens[0])
+		err := errors.Newf("unknown command: %s (supported: ix)", tokens[0])
+		return nil, errors.WithDetail(err, fmt.Sprintf("ATS code: %s", atsCode))
 	}
 }
 
@@ -74,7 +75,8 @@ func parseIxCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 		if ixgit.IsRepoURL(tokens[0]) {
 			return parseIxGitCommand(tokens, jobID)
 		}
-		return nil, errors.Newf("unknown ix target: %s (expected a git repository URL)", tokens[0])
+		err := errors.Newf("unknown ix target: %s (expected a git repository URL)", tokens[0])
+		return nil, errors.WithDetail(err, fmt.Sprintf("Provided: %s", tokens[0]))
 	}
 }
 

@@ -244,6 +244,7 @@ func (s *QNTXServer) handlePulseExecutionUpdate(
 				execution.ID,
 				scheduledJob.ATSCode,
 				job.Error,
+				job.ErrorDetails,
 				durationMs,
 			)
 		} else {
@@ -607,13 +608,14 @@ func (s *QNTXServer) BroadcastPulseExecutionStarted(scheduledJobID, executionID,
 }
 
 // broadcastPulseExecutionFailed notifies clients when a Pulse execution fails
-func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, durationMs int) {
+func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, atsCode, errorMsg string, errorDetails []string, durationMs int) {
 	msg := PulseExecutionFailedMessage{
 		Type:           "pulse_execution_failed",
 		ScheduledJobID: scheduledJobID,
 		ExecutionID:    executionID,
 		ATSCode:        atsCode,
 		ErrorMessage:   errorMsg,
+		ErrorDetails:   errorDetails,
 		DurationMs:     durationMs,
 		Timestamp:      time.Now().Unix(),
 	}
@@ -623,6 +625,7 @@ func (s *QNTXServer) BroadcastPulseExecutionFailed(scheduledJobID, executionID, 
 		"scheduled_job_id", scheduledJobID,
 		"execution_id", executionID,
 		"error", errorMsg,
+		"error_details", errorDetails,
 	)
 }
 
