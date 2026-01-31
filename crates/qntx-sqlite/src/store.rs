@@ -40,8 +40,8 @@ impl SqliteStore {
 
     /// Create a new in-memory SQLite store (for testing)
     pub fn in_memory() -> crate::error::Result<Self> {
-        let conn = Connection::open_in_memory()?;  // rusqlite::Error -> SqliteError via #[from]
-        crate::migrate::migrate(&conn)?;           // Already returns SqliteError
+        let conn = Connection::open_in_memory()?; // rusqlite::Error -> SqliteError via #[from]
+        crate::migrate::migrate(&conn)?; // Already returns SqliteError
         Ok(Self::new(conn))
     }
 
@@ -67,16 +67,16 @@ impl AttestationStore for SqliteStore {
         }
 
         // Serialize JSON fields - these already return SqliteError, convert to StoreError
-        let subjects_json = serialize_string_vec(&attestation.subjects)
-            .map_err(|e| StoreError::from(e))?;
-        let predicates_json = serialize_string_vec(&attestation.predicates)
-            .map_err(|e| StoreError::from(e))?;
-        let contexts_json = serialize_string_vec(&attestation.contexts)
-            .map_err(|e| StoreError::from(e))?;
-        let actors_json = serialize_string_vec(&attestation.actors)
-            .map_err(|e| StoreError::from(e))?;
-        let attributes_json = serialize_attributes(&attestation.attributes)
-            .map_err(|e| StoreError::from(e))?;
+        let subjects_json =
+            serialize_string_vec(&attestation.subjects).map_err(|e| StoreError::from(e))?;
+        let predicates_json =
+            serialize_string_vec(&attestation.predicates).map_err(|e| StoreError::from(e))?;
+        let contexts_json =
+            serialize_string_vec(&attestation.contexts).map_err(|e| StoreError::from(e))?;
+        let actors_json =
+            serialize_string_vec(&attestation.actors).map_err(|e| StoreError::from(e))?;
+        let attributes_json =
+            serialize_attributes(&attestation.attributes).map_err(|e| StoreError::from(e))?;
 
         // Convert timestamp to SQL format
         let timestamp_sql = timestamp_to_sql(attestation.timestamp);
