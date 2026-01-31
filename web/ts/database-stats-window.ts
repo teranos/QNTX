@@ -17,6 +17,9 @@ interface RichFieldInfo {
 
 interface DatabaseStats {
     path: string;
+    storage_backend?: string;
+    storage_optimized?: boolean;
+    storage_version?: string;
     total_attestations: number;
     unique_actors: number;
     unique_subjects: number;
@@ -69,7 +72,13 @@ class DatabaseStatsWindow {
             return;
         }
 
-        const { path, total_attestations, unique_actors, unique_subjects, unique_contexts, rich_fields } = this.stats;
+        const { path, storage_optimized, storage_version, total_attestations, unique_actors, unique_subjects, unique_contexts, rich_fields } = this.stats;
+
+        // Format storage backend info
+        let storageBackendDisplay = 'go (fallback)';
+        if (storage_optimized) {
+            storageBackendDisplay = `rust (optimized) v${storage_version}`;
+        }
 
         // Format rich fields for display
         let richFieldsSection = '';
@@ -116,6 +125,10 @@ class DatabaseStatsWindow {
                 <div class="db-stat-row">
                     <span class="db-stat-label">Database Path:</span>
                     <span class="db-stat-value db-path has-tooltip" data-path="${path}" data-tooltip="Click to open in file manager">${path}</span>
+                </div>
+                <div class="db-stat-row">
+                    <span class="db-stat-label">Storage Backend:</span>
+                    <span class="db-stat-value">${storageBackendDisplay}</span>
                 </div>
                 <div class="db-stat-row">
                     <span class="db-stat-label">Total Attestations:</span>
