@@ -1,5 +1,6 @@
 //! Error types for SQLite storage backend
 
+use qntx_core::storage::StoreError;
 use thiserror::Error;
 
 /// Result type for storage operations
@@ -31,4 +32,18 @@ pub enum SqliteError {
     /// IO error (for file operations)
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+}
+
+/// Convert SqliteError to StoreError for the storage trait
+impl From<SqliteError> for StoreError {
+    fn from(err: SqliteError) -> Self {
+        match err {
+            SqliteError::AlreadyExists(id) => StoreError::AlreadyExists(id),
+            SqliteError::NotFound(id) => StoreError::NotFound(id),
+            SqliteError::Json(e) => StoreError::Serialization(e.to_string()),
+            SqliteError::Database(e) => StoreError::Backend(format!("SQLite: {}", e)),
+            SqliteError::Migration(msg) => StoreError::Backend(format!("Migration: {}", msg)),
+            SqliteError::Io(e) => StoreError::Backend(format!("IO: {}", e)),
+        }
+    }
 }
