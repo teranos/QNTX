@@ -145,71 +145,69 @@ class WebscraperPanel extends BasePanel {
         };
     }
 
-    protected getTemplate(): string {
-        return `
-            <div class="panel-header">
-                <h3 class="panel-title">Web Scraper</h3>
-                <button class="panel-close" aria-label="Close">&#10005;</button>
+    protected override getTitle(): string {
+        return 'Web Scraper';
+    }
+
+    protected override populateContent(): void {
+        const content = this.$('.panel-content')!;
+        content.innerHTML = `
+            <!-- URL Input Section -->
+            <div class="scraper-input-section">
+                <label for="scraper-url" class="scraper-label">URL to Scrape:</label>
+                <div class="scraper-input-group">
+                    <input
+                        type="text"
+                        id="scraper-url"
+                        class="scraper-url-input"
+                        placeholder="example.com or https://example.com"
+                        autocomplete="url"
+                    />
+                    <button id="scraper-submit" class="scraper-submit-btn">
+                        Scrape
+                    </button>
+                </div>
             </div>
 
-            <div class="panel-content">
-                <!-- URL Input Section -->
-                <div class="scraper-input-section">
-                    <label for="scraper-url" class="scraper-label">URL to Scrape:</label>
-                    <div class="scraper-input-group">
-                        <input
-                            type="text"
-                            id="scraper-url"
-                            class="scraper-url-input"
-                            placeholder="example.com or https://example.com"
-                            autocomplete="url"
-                        />
-                        <button id="scraper-submit" class="scraper-submit-btn">
-                            Scrape
-                        </button>
-                    </div>
-                </div>
+            <!-- Options Section -->
+            <div class="scraper-options">
+                <label class="scraper-option">
+                    <input type="checkbox" id="scraper-js" checked />
+                    <span>Render JavaScript</span>
+                </label>
+                <label class="scraper-option">
+                    <input type="checkbox" id="scraper-links" checked />
+                    <span>Extract Links</span>
+                </label>
+                <label class="scraper-option">
+                    <input type="checkbox" id="scraper-images" />
+                    <span>Extract Images</span>
+                </label>
+                <label class="scraper-option">
+                    <span>Wait (ms):</span>
+                    <input type="number" id="scraper-wait" value="2000" min="0" max="10000" step="500" />
+                </label>
+            </div>
 
-                <!-- Options Section -->
-                <div class="scraper-options">
-                    <label class="scraper-option">
-                        <input type="checkbox" id="scraper-js" checked />
-                        <span>Render JavaScript</span>
-                    </label>
-                    <label class="scraper-option">
-                        <input type="checkbox" id="scraper-links" checked />
-                        <span>Extract Links</span>
-                    </label>
-                    <label class="scraper-option">
-                        <input type="checkbox" id="scraper-images" />
-                        <span>Extract Images</span>
-                    </label>
-                    <label class="scraper-option">
-                        <span>Wait (ms):</span>
-                        <input type="number" id="scraper-wait" value="2000" min="0" max="10000" step="500" />
-                    </label>
+            <!-- Status Section -->
+            <div id="scraper-status" class="scraper-status u-hidden">
+                <div class="scraper-status-text"></div>
+                <div class="scraper-progress u-hidden">
+                    <div class="scraper-progress-bar"></div>
                 </div>
+            </div>
 
-                <!-- Status Section -->
-                <div id="scraper-status" class="scraper-status u-hidden">
-                    <div class="scraper-status-text"></div>
-                    <div class="scraper-progress u-hidden">
-                        <div class="scraper-progress-bar"></div>
-                    </div>
-                </div>
+            <!-- Results Section -->
+            <div id="scraper-results" class="scraper-results">
+                <h4 class="scraper-results-title u-hidden">Results</h4>
+                <div class="scraper-results-content"></div>
+            </div>
 
-                <!-- Results Section -->
-                <div id="scraper-results" class="scraper-results">
-                    <h4 class="scraper-results-title u-hidden">Results</h4>
-                    <div class="scraper-results-content"></div>
-                </div>
-
-                <!-- History Section -->
-                <div class="scraper-history">
-                    <h4 class="scraper-history-title">Recent Scrapes</h4>
-                    <div id="scraper-history-list" class="scraper-history-list">
-                        <div class="scraper-history-empty">No recent scrapes</div>
-                    </div>
+            <!-- History Section -->
+            <div class="scraper-history">
+                <h4 class="scraper-history-title">Recent Scrapes</h4>
+                <div id="scraper-history-list" class="scraper-history-list">
+                    <div class="scraper-history-empty">No recent scrapes</div>
                 </div>
             </div>
         `;
