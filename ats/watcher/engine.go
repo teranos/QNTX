@@ -290,6 +290,13 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 		}
 
 		// Check rate limit for action execution
+		// Per QNTX LAW: "Zero means zero" - if MaxFiresPerMinute is 0, never execute
+		if watcher.MaxFiresPerMinute == 0 {
+			e.logger.Debugw("Watcher has MaxFiresPerMinute=0, not executing",
+				"watcher_id", watcher.ID,
+				"attestation_id", as.ID)
+			continue
+		}
 		limiter := e.rateLimiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
 			e.logger.Debugw("Watcher rate limited",
