@@ -13,7 +13,7 @@ const (
 	MaxClientMessageQueueSize = 256
 	// ShutdownTimeout is how long to wait for graceful shutdown
 	// Set to 60s to accommodate:
-	// - WorkerPool.Stop() can take up to 30s for checkpoint completion
+	// - WorkerPool.Stop() can take up to 20s for checkpoint completion (configurable via WorkerPoolConfig.WorkerStopTimeout)
 	// - Additional time for other goroutines (WebSocket, config watcher, etc.)
 	ShutdownTimeout = 60 * time.Second
 )
@@ -163,13 +163,14 @@ type PulseExecutionStartedMessage struct {
 
 // PulseExecutionFailedMessage represents a Pulse execution that failed
 type PulseExecutionFailedMessage struct {
-	Type           string `json:"type"`             // "pulse_execution_failed"
-	ScheduledJobID string `json:"scheduled_job_id"` // Job that failed
-	ExecutionID    string `json:"execution_id"`     // Execution record ID
-	ATSCode        string `json:"ats_code"`         // ATS code that was executed
-	ErrorMessage   string `json:"error_message"`    // Error description
-	DurationMs     int    `json:"duration_ms"`      // How long before failure
-	Timestamp      int64  `json:"timestamp"`        // Unix timestamp
+	Type           string   `json:"type"`             // "pulse_execution_failed"
+	ScheduledJobID string   `json:"scheduled_job_id"` // Job that failed
+	ExecutionID    string   `json:"execution_id"`     // Execution record ID
+	ATSCode        string   `json:"ats_code"`         // ATS code that was executed
+	ErrorMessage   string   `json:"error_message"`    // Error description
+	ErrorDetails   []string `json:"error_details"`    // Structured error details from cockroachdb/errors
+	DurationMs     int      `json:"duration_ms"`      // How long before failure
+	Timestamp      int64    `json:"timestamp"`        // Unix timestamp
 }
 
 // PulseExecutionCompletedMessage represents a Pulse execution that completed successfully

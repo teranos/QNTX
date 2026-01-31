@@ -6,7 +6,7 @@
     width: 100%;
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 8px;
     box-shadow: var(--shadow-lg);
     z-index: 100;
@@ -38,7 +38,7 @@
 
 .job-list-title {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
@@ -55,12 +55,12 @@
 /* Empty state uses panel-empty from base */
 .job-list-empty p {
     margin: 4px 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 /* Job Items - extends panel-card */
 .job-item {
-    border-radius: 6px; /* Slightly more rounded than default */
+    border-radius: var(--border-radius-lg);
     margin-bottom: 8px;
 }
 
@@ -94,7 +94,7 @@
 
 .job-title {
     flex: 1;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 500;
     color: #000;
 }
@@ -124,7 +124,7 @@
     width: 100%;
     height: 6px;
     background: #e0e0e0;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     overflow: hidden;
     margin-bottom: 4px;
 }
@@ -136,13 +136,13 @@
 }
 
 .job-progress-text {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
 /* Cost Info */
 .job-cost {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
@@ -150,21 +150,21 @@
 /* Job Actions */
 .job-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     margin-top: 8px;
 }
 
 .job-action-btn {
     flex: 1;
-    padding: 6px 12px;
-    font-size: 11px;
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-sm);
     font-weight: 500;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: #fff;
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .job-action-btn:hover {
@@ -220,13 +220,13 @@
 
 .job-header.clickable:hover {
     background: var(--bg-almost-white);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     margin: -4px;
     padding: 4px;
 }
 
 .expand-icon {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     transition: transform 0.2s ease;
     width: 16px;
@@ -241,7 +241,7 @@
 }
 
 .task-list-empty {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     padding: 8px;
     text-align: center;
@@ -262,9 +262,9 @@
     border: 1px solid #d0d0d0;
     border-radius: 2px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--panel-transition-normal);
     position: relative;
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 .task-square:hover {
@@ -276,7 +276,7 @@
 /* Pending/Queued - Empty square */
 .task-square.pending,
 .task-square.queued {
-    background: #fff;
+    background: var(--bg-primary);
     border-color: #d0d0d0;
 }
 
@@ -318,22 +318,22 @@
 
 /* Footer */
 .job-list-footer {
-    padding: 8px 12px;
-    background: #f8f8f8;
+    padding: var(--panel-padding-sm);
+    background: var(--bg-almost-white);
     border-top: 1px solid var(--border-color);
 }
 
 .new-ix-btn {
     width: 100%;
-    padding: 8px 12px;
-    font-size: 12px;
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-sm);
     font-weight: 500;
     border: 1px dashed #999;
-    border-radius: 4px;
-    background: #fff;
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: var(--panel-transition-fast);
 }
 
 .new-ix-btn:hover {
@@ -346,11 +346,11 @@
 .llm-stream-output {
     background: var(--bg-dark);
     border: 1px solid #3d3d3d;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     margin-top: 8px;
     padding: 0;
     font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     max-height: 300px;
     overflow-y: auto;
     display: flex;
@@ -358,8 +358,8 @@
 }
 
 .stream-header {
-    background: #2d2d2d;
-    padding: 6px 12px;
+    background: var(--bg-dark-hover);
+    padding: var(--panel-padding-sm);
     border-bottom: 1px solid #3d3d3d;
     color: #4ec9b0;
     font-weight: 600;
@@ -396,7 +396,7 @@
     color: #f48771;
     padding: 8px;
     background: #3d2020;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     margin-top: 8px;
 }
 
@@ -411,7 +411,7 @@
 
 .stream-content::-webkit-scrollbar-thumb {
     background: #3d3d3d;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
 }
 
 .stream-content::-webkit-scrollbar-thumb:hover {
@@ -424,11 +424,11 @@
     padding: 12px;
     background: var(--bg-almost-white);
     border: 1px solid var(--border-light);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
 }
 
 .details-header {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 8px;
@@ -439,20 +439,20 @@
 .details-content {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--gap);
 }
 
 .metadata-item {
     display: flex;
-    gap: 8px;
-    font-size: 11px;
+    gap: var(--gap);
+    font-size: var(--font-size-sm);
     line-height: 1.4;
 }
 
 .metadata-item.error {
     background: var(--status-failed-bg);
     padding: 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     border-left: 3px solid #f44336;
 }
 
@@ -475,7 +475,7 @@
 }
 
 .no-metadata {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     text-align: center;
     padding: 8px;

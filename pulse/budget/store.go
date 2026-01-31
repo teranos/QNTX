@@ -33,7 +33,10 @@ func (s *Store) getActualSpend(window string, period string) (totalCost float64,
 
 	err = s.db.QueryRow(query).Scan(&totalCost, &opCount)
 	if err != nil {
-		return 0, 0, errors.Wrapf(err, "failed to query %s spend", period)
+		err = errors.Wrapf(err, "failed to query %s spend", period)
+		err = errors.WithDetail(err, fmt.Sprintf("Window: %s", window))
+		err = errors.WithDetail(err, fmt.Sprintf("Period: %s", period))
+		return 0, 0, err
 	}
 
 	return totalCost, opCount, nil

@@ -48,19 +48,19 @@
     }
 
     .palette-cell {
-        font-size: 12px;
+        font-size: var(--font-size-sm);
     }
 
     .palette-cell::after {
         bottom: -28px;
-        font-size: 10px;
+        font-size: var(--font-size-sm);
     }
 }
 
 /* Tablet: 768px - 900px */
 @media (min-width: 768px) and (max-width: 900px) {
     .palette-cell {
-        font-size: 14px;
+        font-size: var(--font-size-md);
     }
 }
 

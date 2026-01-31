@@ -12,11 +12,13 @@
     --bg-primary: #fcffff;
     --bg-almost-white: #f7f9f8;
     --bg-hover: #eff1f0;
+    --bg-code: #f0f2f1;
     --bg-gray: #999;
     --bg-dark: #202523;
     --border-color: #dcdedd;
     --border-light: #dfe1e0;
-    --accent-color: #0067cc;
+    --accent-color: #5a9a6a;
+    --accent-hover: #4a8559;
 
     /* Dark mode colors - for dark backgrounds */
     --bg-almost-black: #1a1b1a; /* Like system drawer */
@@ -24,7 +26,11 @@
     --text-on-dark-secondary: #a9abaa; /* Secondary text on dark */
     --text-on-dark-tertiary: #878988; /* Tertiary text on dark */
     --text-on-dark-emphasis: #fefffe; /* Headings/emphasis on dark */
+    --bg-dark-hover: #2a2b2a; /* Hover state on dark backgrounds */
+    --bg-dark-light: #343534; /* Lighter dark surface - buttons, inputs, controls */
     --border-on-dark: #3f4140; /* Borders on dark backgrounds */
+    --accent-on-dark: #7dba8a; /* Accent/links on dark backgrounds */
+    --accent-on-dark-hover: #9acca5; /* Accent hover on dark backgrounds */
 
     /* Status Colors */
     --color-success: #22c65e;
@@ -46,7 +52,7 @@ body {
     font-family: system-ui, -apple-system, sans-serif;
     margin: 0;
     padding: 0;
-    background: #fff;
+    background: var(--bg-primary);
     color: #000;
 }
 
@@ -154,7 +160,7 @@ body.disconnected #container {
 /* Left Panel Structure */
 #left-panel {
     width: 360px;
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
@@ -164,7 +170,7 @@ body.disconnected #container {
 #header {
     padding: 16px;
     border-bottom: 1px solid var(--border-color);
-    background: #fff;
+    background: var(--bg-primary);
 }
 
 #header h1 {
@@ -176,17 +182,17 @@ body.disconnected #container {
 
 #header .subtitle {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
 /* Stats */
 #stats {
-    padding: 12px 16px;
+    padding: var(--panel-padding-md);
     margin-bottom: 32px; /* Space for fixed log panel at bottom */
-    background: #fff;
+    background: var(--bg-primary);
     border-top: 1px solid var(--border-color);
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
@@ -209,7 +215,7 @@ body.disconnected #container {
 
 .llm-stream-content {
     font-family: Courier New, monospace;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     line-height: 1.4;
     padding: 8px;
     color: #d4d4d4;
@@ -229,7 +235,7 @@ body.disconnected #container {
 .llm-model, .llm-stage {
     font-size: 9px;
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     margin-left: 8px;
 }
 
@@ -279,7 +285,7 @@ body.disconnected #container {
         left: 0;
         right: 0;
         z-index: 1000;
-        background: #fff;
+        background: var(--bg-primary);
         border-top: 1px solid var(--border-color);
         box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
         display: flex;
@@ -289,7 +295,7 @@ body.disconnected #container {
     /* Editor area - compact on mobile */
     #query-drop-zone {
         padding: 8px;
-        background: #f8f8f8;
+        background: var(--bg-almost-white);
     }
 
     #codemirror-container {

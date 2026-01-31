@@ -45,7 +45,7 @@ func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error,
 	// Return structured error response
 	errorResponse := map[string]interface{}{
 		"error":   err.Error(),
-		"details": errors.FlattenDetails(err),
+		"details": errors.GetAllDetails(err), // Return array, not flattened string
 	}
 
 	if encErr := json.NewEncoder(w).Encode(errorResponse); encErr != nil && logger != nil {
