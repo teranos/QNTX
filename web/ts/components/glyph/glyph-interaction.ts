@@ -75,6 +75,8 @@ export function makeDraggable(
                 symbol: glyph.symbol,
                 gridX,
                 gridY,
+                width: glyph.width,
+                height: glyph.height,
             });
         }
 
