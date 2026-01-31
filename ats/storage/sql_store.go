@@ -170,6 +170,9 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 		return err
 	}
 
+	// Notify observers after successful creation
+	notifyObservers(as)
+
 	// Enforce bounded storage limits after insertion
 	bs := NewBoundedStore(s.db, s.logger)
 	bs.enforceLimits(as)
