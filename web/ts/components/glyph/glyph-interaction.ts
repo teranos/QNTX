@@ -23,10 +23,37 @@ export interface MakeDraggableOptions {
 export interface MakeResizableOptions {
     /** Label used in log messages, e.g. "PyGlyph". */
     logLabel?: string;
+    /** Minimum width in pixels (default: 200). */
+    minWidth?: number;
+    /** Minimum height in pixels (default: 120). */
+    minHeight?: number;
 }
 
 // ── makeDraggable ───────────────────────────────────────────────────
 
+/**
+ * Make an element draggable by a handle.
+ *
+ * Design decision: Uses free-form dragging without live grid snapping.
+ * Grid position is calculated only on mouseup for persistence. This provides
+ * smoother UX for content glyphs compared to grid-snapped dragging.
+ *
+ * @param element - The element to make draggable
+ * @param handle - The handle that triggers dragging (typically a title bar)
+ * @param glyph - The glyph model to update with position
+ * @param opts - Optional configuration
+ *
+ * @example
+ * // Basic usage
+ * makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
+ *
+ * @example
+ * // Ignore button clicks in the handle
+ * makeDraggable(element, header, glyph, {
+ *   logLabel: 'ResultGlyph',
+ *   ignoreButtons: true
+ * });
+ */
 export function makeDraggable(
     element: HTMLElement,
     handle: HTMLElement,
@@ -113,13 +140,36 @@ export function makeDraggable(
 
 // ── makeResizable ───────────────────────────────────────────────────
 
+/**
+ * Make an element resizable by a handle.
+ *
+ * Enables resize via a handle (typically in the bottom-right corner).
+ * Final dimensions are persisted to the glyph model and uiState.
+ *
+ * @param element - The element to make resizable
+ * @param handle - The resize handle element
+ * @param glyph - The glyph model to update with dimensions
+ * @param opts - Optional configuration
+ *
+ * @example
+ * // Basic usage with default min size (200x120)
+ * makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
+ *
+ * @example
+ * // Custom minimum dimensions
+ * makeResizable(element, resizeHandle, glyph, {
+ *   logLabel: 'PyGlyph',
+ *   minWidth: 300,
+ *   minHeight: 200
+ * });
+ */
 export function makeResizable(
     element: HTMLElement,
     handle: HTMLElement,
     glyph: Glyph,
     opts: MakeResizableOptions = {},
 ): void {
-    const { logLabel = 'Glyph' } = opts;
+    const { logLabel = 'Glyph', minWidth = 200, minHeight = 120 } = opts;
 
     let isResizing = false;
     let startX = 0;
@@ -134,8 +184,8 @@ export function makeResizable(
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
 
-        const newWidth = Math.max(200, startWidth + deltaX);
-        const newHeight = Math.max(120, startHeight + deltaY);
+        const newWidth = Math.max(minWidth, startWidth + deltaX);
+        const newHeight = Math.max(minHeight, startHeight + deltaY);
 
         element.style.width = `${newWidth}px`;
         element.style.height = `${newHeight}px`;
