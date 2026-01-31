@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
@@ -23,9 +24,14 @@ import (
 type Engine struct {
 	store  *storage.WatcherStore
 	logger *zap.SugaredLogger
+	db     *sql.DB // Direct database access for querying historical attestations
 
 	// Base URL for API calls (e.g., "http://localhost:877")
 	apiBaseURL string
+
+	// Broadcast callback for watcher matches (optional)
+	// Called when an attestation matches a watcher's filter
+	broadcastMatch func(watcherID string, attestation *types.As)
 
 	// In-memory state
 	mu           sync.RWMutex
@@ -64,6 +70,7 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 	return &Engine{
 		store:        storage.NewWatcherStore(db),
 		logger:       logger,
+		db:           db,
 		apiBaseURL:   strings.TrimSuffix(apiBaseURL, "/"),
 		watchers:     make(map[string]*storage.Watcher),
 		rateLimiters: make(map[string]*rate.Limiter),
@@ -94,7 +101,7 @@ func (e *Engine) Stop() {
 	e.logger.Info("Watcher engine stopped")
 }
 
-// loadWatchers loads all enabled watchers from the database
+// loadWatchers loads all enabled watchers from the database and parses AX queries
 func (e *Engine) loadWatchers() error {
 	watchers, err := e.store.List(true) // enabled only
 	if err != nil {
@@ -105,6 +112,24 @@ func (e *Engine) loadWatchers() error {
 	defer e.mu.Unlock()
 
 	for _, w := range watchers {
+		// If watcher has an AX query string, parse it into the Filter
+		if w.AxQuery != "" {
+			filter, err := parser.ParseAxCommandWithContext(
+				strings.Fields(w.AxQuery),
+				0,
+				parser.ErrorContextPlain,
+			)
+			if err != nil {
+				e.logger.Warnw("Failed to parse AX query for watcher, skipping",
+					"watcher_id", w.ID,
+					"ax_query", w.AxQuery,
+					"error", err)
+				continue
+			}
+			// Merge parsed filter into watcher's filter
+			w.Filter = *filter
+		}
+
 		e.watchers[w.ID] = w
 		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerMinute)/60.0), 1)
 	}
@@ -115,6 +140,125 @@ func (e *Engine) loadWatchers() error {
 // ReloadWatchers reloads watchers from the database (call after CRUD operations)
 func (e *Engine) ReloadWatchers() error {
 	return e.loadWatchers()
+}
+
+// SetBroadcastCallback sets the callback function for broadcasting watcher matches
+func (e *Engine) SetBroadcastCallback(callback func(watcherID string, attestation *types.As)) {
+	e.broadcastMatch = callback
+}
+
+// GetWatcher returns a watcher from the in-memory map if it exists
+// Used to verify that a watcher was successfully loaded after parsing
+func (e *Engine) GetWatcher(watcherID string) (*storage.Watcher, bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	watcher, exists := e.watchers[watcherID]
+	return watcher, exists
+}
+
+// QueryHistoricalMatches queries all historical attestations and broadcasts matches for a watcher
+// This is called when a watcher is created/updated to show existing matches, not just new ones
+func (e *Engine) QueryHistoricalMatches(watcherID string) error {
+	// Get watcher from in-memory map
+	e.mu.RLock()
+	watcher, exists := e.watchers[watcherID]
+	e.mu.RUnlock()
+
+	if !exists {
+		return errors.Newf("watcher %s not found in engine", watcherID)
+	}
+
+	// Query all attestations from database
+	query := `SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes
+	          FROM attestations
+	          ORDER BY timestamp DESC`
+
+	rows, err := e.db.Query(query)
+	if err != nil {
+		return errors.Wrap(err, "failed to query attestations")
+	}
+	defer rows.Close()
+
+	matchCount := 0
+	for rows.Next() {
+		var as types.As
+		var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON, attributesJSON []byte
+
+		err := rows.Scan(
+			&as.ID,
+			&subjectsJSON,
+			&predicatesJSON,
+			&contextsJSON,
+			&actorsJSON,
+			&as.Timestamp,
+			&as.Source,
+			&attributesJSON,
+		)
+		if err != nil {
+			e.logger.Warnw("Failed to scan attestation row",
+				"watcher_id", watcherID,
+				"error", err)
+			continue
+		}
+
+		// Parse JSON arrays
+		if err := json.Unmarshal(subjectsJSON, &as.Subjects); err != nil {
+			e.logger.Warnw("Failed to unmarshal subjects",
+				"watcher_id", watcherID,
+				"attestation_id", as.ID,
+				"error", err)
+			continue
+		}
+		if err := json.Unmarshal(predicatesJSON, &as.Predicates); err != nil {
+			e.logger.Warnw("Failed to unmarshal predicates",
+				"watcher_id", watcherID,
+				"attestation_id", as.ID,
+				"error", err)
+			continue
+		}
+		if err := json.Unmarshal(contextsJSON, &as.Contexts); err != nil {
+			e.logger.Warnw("Failed to unmarshal contexts",
+				"watcher_id", watcherID,
+				"attestation_id", as.ID,
+				"error", err)
+			continue
+		}
+		if err := json.Unmarshal(actorsJSON, &as.Actors); err != nil {
+			e.logger.Warnw("Failed to unmarshal actors",
+				"watcher_id", watcherID,
+				"attestation_id", as.ID,
+				"error", err)
+			continue
+		}
+		if len(attributesJSON) > 0 && string(attributesJSON) != "null" {
+			if err := json.Unmarshal(attributesJSON, &as.Attributes); err != nil {
+				e.logger.Warnw("Failed to unmarshal attributes",
+					"watcher_id", watcherID,
+					"attestation_id", as.ID,
+					"error", err)
+				// Continue - attributes are optional
+			}
+		}
+
+		// Check if attestation matches watcher filter
+		if e.matchesFilter(&as, watcher) {
+			matchCount++
+			// Broadcast match using callback if set
+			if e.broadcastMatch != nil {
+				e.broadcastMatch(watcherID, &as)
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return errors.Wrap(err, "error iterating attestation rows")
+	}
+
+	e.logger.Infow("Historical query completed",
+		"watcher_id", watcherID,
+		"matches_found", matchCount)
+
+	return nil
 }
 
 // OnAttestationCreated is called when a new attestation is created
@@ -128,11 +272,16 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			continue
 		}
 
-		if !matchesFilter(as, &watcher.Filter) {
+		if !e.matchesFilter(as, watcher) {
 			continue
 		}
 
-		// Check rate limit
+		// Broadcast match to frontend (for live results display)
+		if e.broadcastMatch != nil {
+			e.broadcastMatch(watcher.ID, as)
+		}
+
+		// Check rate limit for action execution
 		limiter := e.rateLimiters[watcher.ID]
 		if limiter != nil && !limiter.Allow() {
 			e.logger.Debugw("Watcher rate limited",
@@ -146,8 +295,10 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 	}
 }
 
-// matchesFilter checks if an attestation matches a watcher's filter (exact matching only)
-func matchesFilter(as *types.As, filter *types.AxFilter) bool {
+// matchesFilter checks if an attestation matches a watcher's filter using exact field matching
+func (e *Engine) matchesFilter(as *types.As, watcher *storage.Watcher) bool {
+	filter := &watcher.Filter
+
 	// Empty filter = match all
 	if len(filter.Subjects) > 0 && !hasOverlap(filter.Subjects, as.Subjects) {
 		return false
