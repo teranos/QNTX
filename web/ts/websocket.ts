@@ -144,6 +144,46 @@ const MESSAGE_HANDLERS = {
         import('./codemirror-editor.js').then(({ handleFuzzySearchResults }) => {
             handleFuzzySearchResults(data);
         });
+    },
+
+    watcher_match: (data: any) => {
+        log.debug(SEG.WS, 'Watcher match:', data.watcher_id, data.attestation?.id);
+
+        // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
+        const watcherIdPrefix = 'ax-glyph-';
+        if (data.watcher_id && data.watcher_id.startsWith(watcherIdPrefix)) {
+            const glyphId = data.watcher_id.substring(watcherIdPrefix.length);
+
+            // Update AX glyph with new result
+            import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphResults }) => {
+                updateAxGlyphResults(glyphId, data.attestation);
+            });
+        } else {
+            log.warn(SEG.WS, 'Received watcher_match with unexpected watcher_id format:', data.watcher_id);
+        }
+
+        // Invoke registered handler
+        messageHandlers['watcher_match']?.(data);
+    },
+
+    watcher_error: (data: any) => {
+        log.warn(SEG.WS, 'Watcher error:', data.watcher_id, data.error, `(${data.severity})`);
+
+        // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
+        const watcherIdPrefix = 'ax-glyph-';
+        if (data.watcher_id && data.watcher_id.startsWith(watcherIdPrefix)) {
+            const glyphId = data.watcher_id.substring(watcherIdPrefix.length);
+
+            // Update AX glyph with error message
+            import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
+                updateAxGlyphError(glyphId, data.error, data.severity);
+            });
+        } else {
+            log.warn(SEG.WS, 'Received watcher_error with unexpected watcher_id format:', data.watcher_id);
+        }
+
+        // Invoke registered handler
+        messageHandlers['watcher_error']?.(data);
     }
 } as const;
 

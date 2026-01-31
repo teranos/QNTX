@@ -123,6 +123,10 @@ export type {
   TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,
+  WatcherCreateRequest,
+  WatcherErrorMessage,
+  WatcherMatchMessage,
+  WatcherResponse,
 } from './server';
 
 // Types from syscap
