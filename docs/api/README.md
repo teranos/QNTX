@@ -8,17 +8,17 @@ Complete API documentation for the QNTX server.
 ## REST API
 
 - **[Health & Status](./health-status.md)** (5 endpoints)
-- **[Configuration](./configuration.md)** (1 endpoint)
+- **[Configuration](./configuration.md)** (1 endpoints)
 - **[Prompt](./prompt.md)** (6 endpoints)
 - **[Pulse Schedules](./pulse-schedules.md)** (2 endpoints)
 - **[Pulse Jobs](./pulse-jobs.md)** (2 endpoints)
-- **[Pulse Executions](./pulse-executions.md)** (1 endpoint)
+- **[Pulse Executions](./pulse-executions.md)** (1 endpoints)
 - **[Plugins](./plugins.md)** (3 endpoints)
 - **[Prose (Documents)](./prose-documents.md)** (2 endpoints)
 - **[WebSocket](./websocket.md)** (2 endpoints)
-- **[Other](./other.md)** (2 endpoints)
+- **[Other](./other.md)** (4 endpoints)
 
-**Total: 26 HTTP endpoints**
+**Total: 28 HTTP endpoints**
 
 ## WebSocket Protocol
 

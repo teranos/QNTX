@@ -74,7 +74,9 @@ export type MessageType =
   | 'system_capabilities'
   | 'webscraper_request'
   | 'webscraper_response'
-  | 'webscraper_progress';
+  | 'webscraper_progress'
+  | 'watcher_match'
+  | 'watcher_error';
 
 // ============================================================================
 // Base Message Interface
@@ -448,6 +450,27 @@ export interface WebscraperProgressMessage extends BaseMessage {
   progress?: number;
 }
 
+/**
+ * Watcher match notification - sent when a watcher matches a new attestation
+ */
+export interface WatcherMatchMessage extends BaseMessage {
+  type: 'watcher_match';
+  watcher_id: string;
+  attestation: any; // TODO: import As type
+  timestamp: number;
+}
+
+/**
+ * Watcher error notification - sent when a watcher encounters an error
+ */
+export interface WatcherErrorMessage extends BaseMessage {
+  type: 'watcher_error';
+  watcher_id: string;
+  error: string;
+  severity: string;
+  timestamp: number;
+}
+
 // ============================================================================
 // Type Definitions for Parse Components
 // ============================================================================
@@ -538,7 +561,9 @@ export type WebSocketMessage =
   | SystemCapabilitiesMessage
   | WebscraperRequestMessage
   | WebscraperResponseMessage
-  | WebscraperProgressMessage;
+  | WebscraperProgressMessage
+  | WatcherMatchMessage
+  | WatcherErrorMessage;
 
 // ============================================================================
 // Message Handler Types
@@ -583,6 +608,8 @@ export interface MessageHandlers {
   webscraper_request?: MessageHandler<WebscraperRequestMessage>;
   webscraper_response?: MessageHandler<WebscraperResponseMessage>;
   webscraper_progress?: MessageHandler<WebscraperProgressMessage>;
+  watcher_match?: MessageHandler<WatcherMatchMessage>;
+  watcher_error?: MessageHandler<WatcherErrorMessage>;
   /**
    * Default handler for messages without explicit handlers.
    * Currently receives raw GraphData from the server (no type field).
