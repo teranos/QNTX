@@ -1,5 +1,5 @@
-//go:build cgo && !integration
-// +build cgo,!integration
+//go:build rustsqlite
+// +build rustsqlite
 
 package sqlitecgo
 
