@@ -49,6 +49,10 @@ export interface Job {
   pulse_state?: PulseState | null;
   error?: string;
   /**
+   * Structured error context from errors.GetAllDetails()
+   */
+  error_details?: string[];
+  /**
    * For tasks grouped under parent job
    */
   parent_job_id?: string;
