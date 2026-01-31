@@ -1,3 +1,6 @@
+//go:build cgo && !integration
+// +build cgo,!integration
+
 package sqlitecgo
 
 import (
