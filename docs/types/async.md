@@ -47,7 +47,7 @@ type ErrorContext struct {
 
 ## Job {#job}
 
-**Source**: [`pulse/async/job.go:67`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L67)
+**Source**: [`pulse/async/job.go:68`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L68)
 
 
 ```go
@@ -62,6 +62,7 @@ type Job struct {
 	CostActual float64 `json:"cost_actual,omitempty"`
 	PulseState *PulseState `json:"pulse_state,omitempty"`
 	Error string `json:"error,omitempty"`
+	ErrorDetails []string `json:"error_details,omitempty"`
 	ParentJobID string `json:"parent_job_id,omitempty"`
 	RetryCount int `json:"retry_count,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
@@ -73,7 +74,7 @@ type Job struct {
 
 ## JobStatus {#jobstatus}
 
-**Source**: [`pulse/async/job.go:13`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L13)
+**Source**: [`pulse/async/job.go:14`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L14)
 
 
 ```go
@@ -91,7 +92,7 @@ const (
 
 ## Progress {#progress}
 
-**Source**: [`pulse/async/job.go:47`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L47)
+**Source**: [`pulse/async/job.go:48`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L48)
 
 
 ```go
@@ -103,7 +104,7 @@ type Progress struct {
 
 ## PulseState {#pulsestate}
 
-**Source**: [`pulse/async/job.go:36`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L36)
+**Source**: [`pulse/async/job.go:37`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L37)
 
 
 ```go
@@ -120,7 +121,7 @@ type PulseState struct {
 
 ## QueueStats {#queuestats}
 
-**Source**: [`pulse/async/queue.go:330`](https://github.com/teranos/QNTX/blob/main/pulse/async/queue.go#L330)
+**Source**: [`pulse/async/queue.go:403`](https://github.com/teranos/QNTX/blob/main/pulse/async/queue.go#L403)
 
 
 ```go

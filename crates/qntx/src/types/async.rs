@@ -81,6 +81,9 @@ pub struct Job {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Structured error context from errors.GetAllDetails()
+    pub error_details: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// For tasks grouped under parent job
     pub parent_job_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
