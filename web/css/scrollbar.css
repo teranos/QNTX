@@ -17,7 +17,7 @@
    Light Theme Scrollbar (for light-background panels)
    ============================================================================ */
 
-/* Standard light scrollbar - 8px width */
+/* Standard light scrollbar - minimal 5px width */
 .config-panel-content::-webkit-scrollbar,
 .plugin-panel-content::-webkit-scrollbar,
 .command-explorer-content::-webkit-scrollbar,
@@ -25,7 +25,7 @@
 .panel-content::-webkit-scrollbar,
 .job-list-content::-webkit-scrollbar,
 .job-detail-content::-webkit-scrollbar {
-    width: 8px;
+    width: 5px;
 }
 
 .config-panel-content::-webkit-scrollbar-track,
@@ -33,12 +33,9 @@
 .command-explorer-content::-webkit-scrollbar-track,
 .panel-content::-webkit-scrollbar-track,
 .job-list-content::-webkit-scrollbar-track,
-.job-detail-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
+.job-detail-content::-webkit-scrollbar-track,
 .completion-menu::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: transparent;
 }
 
 .config-panel-content::-webkit-scrollbar-thumb,
@@ -48,8 +45,7 @@
 .panel-content::-webkit-scrollbar-thumb,
 .job-list-content::-webkit-scrollbar-thumb,
 .job-detail-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
+    background: #ddd;
 }
 
 .config-panel-content::-webkit-scrollbar-thumb:hover,
@@ -59,14 +55,14 @@
 .panel-content::-webkit-scrollbar-thumb:hover,
 .job-list-content::-webkit-scrollbar-thumb:hover,
 .job-detail-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
+    background: #bbb;
 }
 
 /* ============================================================================
    Dark Theme Scrollbar (for dark-background panels)
    ============================================================================ */
 
-/* Standard dark scrollbar - 8px width */
+/* Standard dark scrollbar - minimal 5px width */
 .prompt-preview-body::-webkit-scrollbar,
 .prose-tree::-webkit-scrollbar,
 .prose-editor-container::-webkit-scrollbar,
@@ -74,20 +70,17 @@
 .log-column-content::-webkit-scrollbar,
 #log-content::-webkit-scrollbar,
 #progress-content::-webkit-scrollbar {
-    width: 8px;
+    width: 5px;
 }
 
-.prompt-preview-body::-webkit-scrollbar-track {
-    background: var(--bg-almost-black);
-}
-
+.prompt-preview-body::-webkit-scrollbar-track,
 .prose-tree::-webkit-scrollbar-track,
 .prose-editor-container::-webkit-scrollbar-track,
 .prose-recent::-webkit-scrollbar-track,
 .log-column-content::-webkit-scrollbar-track,
 #log-content::-webkit-scrollbar-track,
 #progress-content::-webkit-scrollbar-track {
-    background: var(--bg-dark);
+    background: transparent;
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb,
@@ -97,8 +90,7 @@
 .log-column-content::-webkit-scrollbar-thumb,
 #log-content::-webkit-scrollbar-thumb,
 #progress-content::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: var(--border-radius);
+    background: #3a3a3a;
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb:hover,
@@ -108,41 +100,39 @@
 .log-column-content::-webkit-scrollbar-thumb:hover,
 #log-content::-webkit-scrollbar-thumb:hover,
 #progress-content::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: #4a4a4a;
 }
 
 /* Dark scrollbar variant for stream content */
 .stream-content::-webkit-scrollbar {
-    width: 8px;
+    width: 5px;
 }
 
 .stream-content::-webkit-scrollbar-track {
-    background: var(--bg-dark);
+    background: transparent;
 }
 
 .stream-content::-webkit-scrollbar-thumb {
-    background: #3d3d3d;
-    border-radius: var(--border-radius);
+    background: #3a3a3a;
 }
 
 .stream-content::-webkit-scrollbar-thumb:hover {
-    background: #4d4d4d;
+    background: #4a4a4a;
 }
 
-/* Dark scrollbar variant for loader logs - narrower width */
+/* Dark scrollbar variant for loader logs - minimal width */
 #loader-logs::-webkit-scrollbar {
     width: 4px;
 }
 
 #loader-logs::-webkit-scrollbar-track {
-    background: var(--bg-almost-black);
+    background: transparent;
 }
 
 #loader-logs::-webkit-scrollbar-thumb {
-    background: var(--bg-dark-light);
-    border-radius: 2px;
+    background: #3a3a3a;
 }
 
 #loader-logs::-webkit-scrollbar-thumb:hover {
-    background: #444;
+    background: #4a4a4a;
 }
