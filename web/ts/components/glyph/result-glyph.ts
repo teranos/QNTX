@@ -9,6 +9,7 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { makeDraggable } from './glyph-interaction';
 
 /**
  * Python execution result data
@@ -177,86 +178,8 @@ export function createResultGlyph(
     element.appendChild(outputContainer);
 
     // Make draggable by header
-    makeDraggable(element, header, glyph);
+    makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
 
     return element;
 }
 
-/**
- * Make result glyph draggable
- */
-function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
-    let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let elementStartX = 0;
-    let elementStartY = 0;
-    let abortController: AbortController | null = null;
-
-    const handleMouseMove = (e: MouseEvent) => {
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - dragStartX;
-        const deltaY = e.clientY - dragStartY;
-        const newX = elementStartX + deltaX;
-        const newY = elementStartY + deltaY;
-
-        element.style.left = `${newX}px`;
-        element.style.top = `${newY}px`;
-    };
-
-    const handleMouseUp = () => {
-        if (!isDragging) return;
-        isDragging = false;
-
-        element.classList.remove('is-dragging');
-
-        // Save position
-        const canvas = element.parentElement;
-        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const elementRect = element.getBoundingClientRect();
-        const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
-        const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
-        glyph.gridX = gridX;
-        glyph.gridY = gridY;
-
-        if (glyph.symbol) {
-            uiState.addCanvasGlyph({
-                id: glyph.id,
-                symbol: glyph.symbol,
-                gridX,
-                gridY
-            });
-        }
-
-        log.debug(SEG.UI, `[ResultGlyph] Finished dragging ${glyph.id}`);
-
-        abortController?.abort();
-        abortController = null;
-    };
-
-    handle.addEventListener('mousedown', (e) => {
-        // Ignore clicks on buttons
-        if ((e.target as HTMLElement).tagName === 'BUTTON') {
-            return;
-        }
-
-        e.preventDefault();
-        e.stopPropagation();
-        isDragging = true;
-
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-        const rect = element.getBoundingClientRect();
-        elementStartX = rect.left;
-        elementStartY = rect.top;
-
-        element.classList.add('is-dragging');
-
-        abortController = new AbortController();
-        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
-        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
-
-        log.debug(SEG.UI, `[ResultGlyph] Started dragging ${glyph.id}`);
-    });
-}
