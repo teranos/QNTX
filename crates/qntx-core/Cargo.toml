@@ -1,0 +1,57 @@
+[package]
+name = "qntx-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QNTX core engine - parser, fuzzy matching, classification (WASM-compatible)"
+
+[features]
+default = ["std"]
+std = []
+
+# Native-only optimizations (not available in WASM)
+simd = ["dep:memchr"]
+parallel = ["dep:rayon"]
+phonetic = ["dep:rphonetic"]
+
+# All native optimizations
+native = ["simd", "parallel", "phonetic"]
+
+# WASM target (excludes native-only deps)
+wasm = []
+
+[dependencies]
+# Serialization (needed for WASM interop)
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# String similarity (pure Rust, works in WASM)
+strsim = "0.11"
+
+# Fast hashing (pure Rust, works in WASM)
+# compile-time-rng uses compile-time randomness, avoiding runtime getrandom issues
+ahash = { version = "0.8", default-features = false, features = ["compile-time-rng"] }
+
+# Native-only: SIMD substring search
+memchr = { version = "2.7", optional = true }
+
+# Native-only: Parallel iteration
+rayon = { version = "1.10", optional = true }
+
+# Native-only: Phonetic matching (Double Metaphone)
+rphonetic = { version = "3.0", optional = true }
+
+[dev-dependencies]
+# For testing
+pretty_assertions = "1.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# WASM-specific deps (if needed later)
+# getrandom = { version = "0.2", features = ["js"] }
+
+[lib]
+crate-type = ["rlib"]
