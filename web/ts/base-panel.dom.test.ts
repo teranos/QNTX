@@ -827,6 +827,34 @@ describe('BasePanel Integration - Error Boundaries', () => {
         console.error = originalConsoleError;
     });
 
+    test('Missing skeleton template shows visible error state', () => {
+        // No <template id="panel-skeleton"> in document — skeleton panels must fail visibly
+        const config: PanelConfig = {
+            id: 'skeleton-test-panel',
+            title: 'Skeleton Test',
+            closeOnOverlayClick: false
+        };
+
+        class SkeletonPanel extends BasePanel {
+            // No getTemplate override → returns null → cloneSkeleton() is called
+            protected setupEventListeners(): void {}
+        }
+
+        const panel = new SkeletonPanel(config);
+
+        const panelEl = document.getElementById('skeleton-test-panel');
+        expect(panelEl).toBeTruthy();
+
+        // Should have created a fallback .panel-content
+        const content = panelEl?.querySelector('.panel-content');
+        expect(content).toBeTruthy();
+
+        // Should show a rich error state, not a blank panel
+        const errorEl = panelEl?.querySelector('[role="alert"]');
+        expect(errorEl).toBeTruthy();
+        expect(errorEl?.textContent).toContain('panel-skeleton');
+    });
+
     test('Error in onHide is logged but hide continues', () => {
         const originalConsoleError = console.error;
         const consoleErrorCalls: any[] = [];

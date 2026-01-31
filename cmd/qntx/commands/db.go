@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/server/syscap"
 	"github.com/teranos/QNTX/sym"
 )
 
@@ -71,6 +72,15 @@ func runDbStats(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s Database Statistics\n", sym.DB)
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 	fmt.Printf("Database Path:      %s\n", cfg.Database.Path)
+
+	// Storage backend info
+	storageBackend := "go (fallback)"
+	storageVersion := syscap.GetStorageVersion()
+	if syscap.IsStorageOptimized() {
+		storageBackend = fmt.Sprintf("rust (optimized) v%s", storageVersion)
+	}
+	fmt.Printf("Storage Backend:    %s\n\n", storageBackend)
+
 	fmt.Printf("Total Attestations: %d\n", totalAttestations)
 	fmt.Printf("Unique Actors:      %d\n", uniqueActors)
 	fmt.Printf("Unique Subjects:    %d\n", uniqueSubjects)
