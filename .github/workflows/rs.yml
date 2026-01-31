@@ -98,7 +98,7 @@ jobs:
         run: cargo test --package qntx-core --package qntx-sqlite
 
       - name: Build release with FFI
-        run: cargo rustc --release --package qntx-sqlite --features ffi --crate-type cdylib
+        run: cargo build --release --package qntx-sqlite --features ffi --lib
 
       - name: Test CGO integration
         run: |
