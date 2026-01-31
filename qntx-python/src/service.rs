@@ -73,6 +73,100 @@ impl PythonPluginService {
     fn python_version(&self) -> String {
         self.handlers.python_version()
     }
+
+    /// Discover handler scripts from ATS store
+    async fn discover_handlers_from_config(&self, config: Option<PluginConfig>) -> Vec<String> {
+        use crate::proto::{ats_store_service_client::AtsStoreServiceClient, AttestationFilter, GetAttestationsRequest};
+        use tonic::transport::Channel;
+
+        // Check if we have config with ATS store endpoint
+        let config = match config {
+            Some(cfg) if !cfg.ats_store_endpoint.is_empty() => cfg,
+            _ => {
+                info!("No ATS store endpoint configured, skipping handler discovery");
+                return Vec::new();
+            }
+        };
+
+        info!("Discovering Python handlers from ATS store");
+
+        let endpoint = config.ats_store_endpoint.clone();
+        let auth_token = config.auth_token.clone();
+
+        // Query ATS store for handler attestations
+        // Filter: predicate="handler" AND context="python"
+        let filter = AttestationFilter {
+            subjects: vec![],
+            predicates: vec!["handler".to_string()],
+            contexts: vec!["python".to_string()],
+            actors: vec![],
+            time_start: 0,
+            time_end: 0,
+            limit: 100, // Limit to 100 handlers
+        };
+
+        let request = GetAttestationsRequest {
+            auth_token,
+            filter: Some(filter),
+        };
+
+        // Connect to ATS store and query
+        let result: Result<Vec<String>, String> = tokio::task::spawn_blocking(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| format!("failed to create runtime: {}", e))?;
+
+            rt.block_on(async {
+                // Ensure endpoint has http:// scheme
+                let endpoint_uri = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                    endpoint.clone()
+                } else {
+                    format!("http://{}", endpoint)
+                };
+
+                let channel = Channel::from_shared(endpoint_uri)
+                    .map_err(|e| format!("invalid endpoint: {}", e))?
+                    .connect()
+                    .await
+                    .map_err(|e| format!("connection failed: {}", e))?;
+
+                let mut client = AtsStoreServiceClient::new(channel);
+                let response = client
+                    .get_attestations(request)
+                    .await
+                    .map_err(|e| format!("gRPC error: {}", e))?
+                    .into_inner();
+
+                if !response.success {
+                    return Err(format!("Query failed: {}", response.error));
+                }
+
+                // Extract handler names from subjects
+                let mut handlers = Vec::new();
+                for attestation in response.attestations {
+                    if let Some(subject) = attestation.subjects.first() {
+                        handlers.push(subject.clone());
+                    }
+                }
+
+                Ok(handlers)
+            })
+        })
+        .await
+        .unwrap_or_else(|e| Err(format!("task panicked: {:?}", e)));
+
+        match result {
+            Ok(handlers) => {
+                info!("Discovered {} handler(s) from ATS store: {:?}", handlers.len(), handlers);
+                handlers
+            }
+            Err(e) => {
+                warn!("Failed to discover handlers from ATS store: {}", e);
+                Vec::new()
+            }
+        }
+    }
 }
 
 impl Default for PythonPluginService {
@@ -109,68 +203,83 @@ impl DomainPluginService for PythonPluginService {
         info!("ATSStore endpoint: {}", req.ats_store_endpoint);
         info!("Queue endpoint: {}", req.queue_endpoint);
 
-        let mut state = self.handlers.state.write();
+        // Clone config for later use after dropping lock
+        let state_config = {
+            let mut state = self.handlers.state.write();
 
-        // Store configuration
-        state.config = Some(PluginConfig {
-            ats_store_endpoint: req.ats_store_endpoint.clone(),
-            queue_endpoint: req.queue_endpoint,
-            auth_token: req.auth_token.clone(),
-            config: req.config,
-        });
+            // Store configuration
+            state.config = Some(PluginConfig {
+                ats_store_endpoint: req.ats_store_endpoint.clone(),
+                queue_endpoint: req.queue_endpoint,
+                auth_token: req.auth_token.clone(),
+                config: req.config,
+            });
 
-        // Initialize ATSStore client if endpoint is provided
-        if !req.ats_store_endpoint.is_empty() {
-            info!("Initializing ATSStore client for Python attestation support");
-            atsstore::init_shared_client(
-                &state.ats_client,
-                atsstore::AtsStoreConfig {
-                    endpoint: req.ats_store_endpoint,
-                    auth_token: req.auth_token,
-                },
-            );
-        }
+            // Initialize ATSStore client if endpoint is provided
+            if !req.ats_store_endpoint.is_empty() {
+                info!("Initializing ATSStore client for Python attestation support");
+                atsstore::init_shared_client(
+                    &state.ats_client,
+                    atsstore::AtsStoreConfig {
+                        endpoint: req.ats_store_endpoint,
+                        auth_token: req.auth_token,
+                    },
+                );
+            }
 
-        // Initialize Python engine with custom paths if provided
-        let python_paths: Vec<String> = state
-            .config
-            .as_ref()
-            .and_then(|c| c.config.get("python_paths"))
-            .map(|p| p.split(':').map(String::from).collect())
-            .unwrap_or_default();
+            // Initialize Python engine with custom paths if provided
+            let python_paths: Vec<String> = state
+                .config
+                .as_ref()
+                .and_then(|c| c.config.get("python_paths"))
+                .map(|p| p.split(':').map(String::from).collect())
+                .unwrap_or_default();
 
-        // Override default modules if provided in config
-        if let Some(modules_str) = state
-            .config
-            .as_ref()
-            .and_then(|c| c.config.get("default_modules"))
-        {
-            state.default_modules = modules_str
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
+            // Override default modules if provided in config
+            if let Some(modules_str) = state
+                .config
+                .as_ref()
+                .and_then(|c| c.config.get("default_modules"))
+            {
+                state.default_modules = modules_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect();
+                info!(
+                    "Using configured default modules: {:?}",
+                    state.default_modules
+                );
+            }
+
+            if let Err(e) = state.engine.initialize(python_paths) {
+                error!("Failed to initialize Python engine: {}", e);
+                return Err(Status::internal(format!(
+                    "Failed to initialize Python engine: {}",
+                    e
+                )));
+            }
+
+            state.initialized = true;
             info!(
-                "Using configured default modules: {:?}",
-                state.default_modules
+                "Python plugin initialized successfully (Python {})",
+                state.engine.python_version()
             );
-        }
 
-        if let Err(e) = state.engine.initialize(python_paths) {
-            error!("Failed to initialize Python engine: {}", e);
-            return Err(Status::internal(format!(
-                "Failed to initialize Python engine: {}",
-                e
-            )));
-        }
+            // Clone config before dropping lock
+            state.config.clone()
+        }; // Lock automatically dropped here
 
-        state.initialized = true;
-        info!(
-            "Python plugin initialized successfully (Python {})",
-            state.engine.python_version()
-        );
+        // Discover handler scripts from ATS store
+        let discovered_handlers = self.discover_handlers_from_config(state_config).await;
 
         // Announce async handler capabilities
-        let handler_names = vec!["python.script".to_string()];
+        // Start with built-in handlers
+        let mut handler_names = vec!["python.script".to_string()];
+
+        // Add discovered handlers with python. prefix
+        for handler_name in discovered_handlers {
+            handler_names.push(format!("python.{}", handler_name));
+        }
 
         info!("Announcing async handlers: {:?}", handler_names);
 
