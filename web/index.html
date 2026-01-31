@@ -450,6 +450,14 @@
         </div>
     </template>
 
+    <!-- Empty state template - cloned by BasePanel.createEmptyState() -->
+    <template id="empty-state-template">
+        <div class="panel-empty">
+            <p class="panel-empty-title"></p>
+            <p class="panel-empty-hint"></p>
+        </div>
+    </template>
+
     <!-- Load D3.js locally (bundled) - Virtue #2: Minimize external dependencies -->
 
     <!-- async instead of defer: Don't block DOMContentLoaded, load independently -->
