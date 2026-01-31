@@ -398,7 +398,11 @@ export abstract class BasePanel {
 
         const tpl = document.getElementById('panel-skeleton') as HTMLTemplateElement | null;
         if (!tpl) {
-            console.error('[▦] <template id="panel-skeleton"> not found in document');
+            // Create minimal content area so showErrorState has somewhere to render
+            const fallback = document.createElement('div');
+            fallback.className = 'panel-content';
+            this.panel.appendChild(fallback);
+            this.showErrorState(new Error('<template id="panel-skeleton"> not found in document'));
             return;
         }
         const fragment = tpl.content.cloneNode(true) as DocumentFragment;
