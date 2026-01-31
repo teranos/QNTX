@@ -29,6 +29,9 @@ type Engine struct {
 	// Base URL for API calls (e.g., "http://localhost:877")
 	apiBaseURL string
 
+	// HTTP client with timeout for external calls
+	httpClient *http.Client
+
 	// Broadcast callback for watcher matches (optional)
 	// Called when an attestation matches a watcher's filter
 	broadcastMatch func(watcherID string, attestation *types.As)
@@ -72,6 +75,9 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		logger:       logger,
 		db:           db,
 		apiBaseURL:   strings.TrimSuffix(apiBaseURL, "/"),
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 		watchers:     make(map[string]*storage.Watcher),
 		rateLimiters: make(map[string]*rate.Limiter),
 		retryQueue:   make([]*PendingExecution, 0),
@@ -131,6 +137,8 @@ func (e *Engine) loadWatchers() error {
 		}
 
 		e.watchers[w.ID] = w
+		// Create rate limiter: MaxFiresPerMinute/60 = fires per second
+		// If MaxFiresPerMinute is 0, rate is 0/60 = 0, which means no fires allowed (QNTX LAW: zero means zero)
 		e.rateLimiters[w.ID] = rate.NewLimiter(rate.Limit(float64(w.MaxFiresPerMinute)/60.0), 1)
 	}
 
@@ -290,8 +298,21 @@ func (e *Engine) OnAttestationCreated(as *types.As) {
 			continue
 		}
 
-		// Execute async
-		go e.executeAction(watcher, as)
+		// Execute async with a deep copy to prevent race conditions
+		// Each goroutine gets its own copy of the attestation
+		asCopy := *as  // Copy the struct
+		// Deep copy slices to prevent shared references
+		asCopy.Subjects = append([]string(nil), as.Subjects...)
+		asCopy.Predicates = append([]string(nil), as.Predicates...)
+		asCopy.Contexts = append([]string(nil), as.Contexts...)
+		asCopy.Actors = append([]string(nil), as.Actors...)
+		if as.Attributes != nil {
+			asCopy.Attributes = make(map[string]interface{})
+			for k, v := range as.Attributes {
+				asCopy.Attributes[k] = v
+			}
+		}
+		go e.executeAction(watcher, &asCopy)
 	}
 }
 
@@ -402,7 +423,7 @@ attestation = json.loads(_attestation_json)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := e.httpClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to execute Python")
 	}
@@ -433,7 +454,7 @@ func (e *Engine) executeWebhook(watcher *storage.Watcher, as *types.As) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := e.httpClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "webhook request failed")
 	}
