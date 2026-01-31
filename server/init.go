@@ -98,27 +98,9 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		poolConfig.Workers = deps.config.Pulse.Workers
 	}
 
-	// Create handler registry and register plugin-provided handlers
+	// Create handler registry (empty - handlers will be registered asynchronously)
+	// Plugin handlers are registered in cmd/qntx/main.go after plugins finish loading
 	registry := async.NewHandlerRegistry()
-	if deps.pluginManager != nil {
-		for _, plugin := range deps.pluginManager.GetAllPlugins() {
-			// Only ExternalDomainProxy supports async handlers (not built-in plugins)
-			externalPlugin, ok := plugin.(*grpcplugin.ExternalDomainProxy)
-			if !ok {
-				continue // Skip built-in plugins
-			}
-
-			handlerNames := externalPlugin.GetHandlerNames()
-			for _, handlerName := range handlerNames {
-				serverLogger.Infow("Registering plugin async handler",
-					"plugin", plugin.Metadata().Name,
-					"handler", handlerName,
-				)
-				proxyHandler := grpcplugin.NewPluginProxyHandler(handlerName, externalPlugin)
-				registry.Register(proxyHandler)
-			}
-		}
-	}
 
 	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.config, poolConfig, serverLogger, registry, nil, nil)
 
