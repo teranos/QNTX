@@ -3,7 +3,6 @@ package prompt
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/teranos/QNTX/ats/storage"
@@ -136,7 +135,7 @@ func (ps *PromptStore) SavePrompt(ctx context.Context, prompt *StoredPrompt, act
 // GetPromptByFilename returns the latest version of a prompt by filename
 func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string) (*StoredPrompt, error) {
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
@@ -144,34 +143,29 @@ func (ps *PromptStore) GetPromptByFilename(ctx context.Context, filename string)
 		LIMIT 1
 	`
 
-	var (
-		asID           string
-		subjectsJSON   string
-		predicatesJSON string
-		contextsJSON   string
-		actorsJSON     string
-		timestamp      time.Time
-		attributesJSON string
-	)
-
-	err := ps.db.QueryRowContext(ctx, query, PredicatePromptTemplate, filename).Scan(
-		&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rows, err := ps.db.QueryContext(ctx, query, PredicatePromptTemplate, filename)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt by filename")
 	}
+	defer rows.Close()
 
-	return ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	as, err := storage.ScanAttestation(rows)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to scan attestation")
+	}
+
+	return ps.attestationToPrompt(as), nil
 }
 
 // GetPromptByName returns the latest version of a prompt by name
 // Note: Since prompts are now keyed by filename, this searches across all files
 func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*StoredPrompt, error) {
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(subjects) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
@@ -179,58 +173,48 @@ func (ps *PromptStore) GetPromptByName(ctx context.Context, name string) (*Store
 		LIMIT 1
 	`
 
-	var (
-		asID           string
-		subjectsJSON   string
-		predicatesJSON string
-		contextsJSON   string
-		actorsJSON     string
-		timestamp      time.Time
-		attributesJSON string
-	)
-
-	err := ps.db.QueryRowContext(ctx, query, name, PredicatePromptTemplate).Scan(
-		&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rows, err := ps.db.QueryContext(ctx, query, name, PredicatePromptTemplate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt by name")
 	}
+	defer rows.Close()
 
-	return ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	as, err := storage.ScanAttestation(rows)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to scan attestation")
+	}
+
+	return ps.attestationToPrompt(as), nil
 }
 
 // GetPromptByID returns a specific prompt by ID
 func (ps *PromptStore) GetPromptByID(ctx context.Context, promptID string) (*StoredPrompt, error) {
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
 		WHERE id = ?
 	`
 
-	var (
-		asID           string
-		subjectsJSON   string
-		predicatesJSON string
-		contextsJSON   string
-		actorsJSON     string
-		timestamp      time.Time
-		attributesJSON string
-	)
-
-	err := ps.db.QueryRowContext(ctx, query, promptID).Scan(
-		&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rows, err := ps.db.QueryContext(ctx, query, promptID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query prompt")
 	}
+	defer rows.Close()
 
-	return ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	as, err := storage.ScanAttestation(rows)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to scan attestation")
+	}
+
+	return ps.attestationToPrompt(as), nil
 }
 
 // ListPrompts returns all prompts, most recent first
@@ -240,7 +224,7 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 	}
 
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		ORDER BY timestamp DESC
@@ -255,25 +239,11 @@ func (ps *PromptStore) ListPrompts(ctx context.Context, limit int) ([]*StoredPro
 
 	var prompts []*StoredPrompt
 	for rows.Next() {
-		var (
-			asID           string
-			subjectsJSON   string
-			predicatesJSON string
-			contextsJSON   string
-			actorsJSON     string
-			timestamp      time.Time
-			attributesJSON string
-		)
-
-		if err := rows.Scan(&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to scan prompt row")
-		}
-
-		prompt, err := ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
+		as, err := storage.ScanAttestation(rows)
 		if err != nil {
 			continue // Skip malformed entries
 		}
-		prompts = append(prompts, prompt)
+		prompts = append(prompts, ps.attestationToPrompt(as))
 	}
 
 	return prompts, nil
@@ -286,7 +256,7 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 	}
 
 	query := `
-		SELECT id, subjects, predicates, contexts, actors, timestamp, attributes
+		SELECT id, subjects, predicates, contexts, actors, timestamp, source, attributes, created_at
 		FROM attestations
 		WHERE EXISTS (SELECT 1 FROM json_each(predicates) WHERE value = ?)
 		  AND EXISTS (SELECT 1 FROM json_each(contexts) WHERE value = ?)
@@ -302,94 +272,62 @@ func (ps *PromptStore) GetPromptVersions(ctx context.Context, filename string, l
 
 	var prompts []*StoredPrompt
 	for rows.Next() {
-		var (
-			asID           string
-			subjectsJSON   string
-			predicatesJSON string
-			contextsJSON   string
-			actorsJSON     string
-			timestamp      time.Time
-			attributesJSON string
-		)
-
-		if err := rows.Scan(&asID, &subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timestamp, &attributesJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to scan prompt row")
-		}
-
-		prompt, err := ps.parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON, timestamp, attributesJSON)
+		as, err := storage.ScanAttestation(rows)
 		if err != nil {
 			continue
 		}
-		prompts = append(prompts, prompt)
+		prompts = append(prompts, ps.attestationToPrompt(as))
 	}
 
 	return prompts, nil
 }
 
-// parsePromptFromRow converts database row data into a StoredPrompt
-func (ps *PromptStore) parsePromptFromRow(asID, subjectsJSON, contextsJSON, actorsJSON string, timestamp time.Time, attributesJSON string) (*StoredPrompt, error) {
-	var subjects []string
-	if err := json.Unmarshal([]byte(subjectsJSON), &subjects); err != nil {
-		return nil, errors.Wrap(err, "failed to parse subjects")
-	}
-
-	var contexts []string
-	if err := json.Unmarshal([]byte(contextsJSON), &contexts); err != nil {
-		return nil, errors.Wrap(err, "failed to parse contexts")
-	}
-
-	var actors []string
-	if err := json.Unmarshal([]byte(actorsJSON), &actors); err != nil {
-		return nil, errors.Wrap(err, "failed to parse actors")
-	}
-
-	var attrs map[string]interface{}
-	if err := json.Unmarshal([]byte(attributesJSON), &attrs); err != nil {
-		return nil, errors.Wrap(err, "failed to parse attributes")
-	}
-
+// attestationToPrompt converts an attestation into a StoredPrompt
+func (ps *PromptStore) attestationToPrompt(as *types.As) *StoredPrompt {
 	name := ""
-	if len(subjects) > 0 {
-		name = subjects[0]
+	if len(as.Subjects) > 0 {
+		name = as.Subjects[0]
 	}
 
 	filename := ""
-	if len(contexts) > 0 {
-		filename = contexts[0]
+	if len(as.Contexts) > 0 {
+		filename = as.Contexts[0]
 	}
 
 	createdBy := ""
-	if len(actors) > 0 {
-		createdBy = actors[0]
+	if len(as.Actors) > 0 {
+		createdBy = as.Actors[0]
 	}
 
 	prompt := &StoredPrompt{
-		ID:        asID,
+		ID:        as.ID,
 		Name:      name,
 		Filename:  filename,
 		CreatedBy: createdBy,
-		CreatedAt: timestamp,
+		CreatedAt: as.Timestamp,
 	}
 
 	// Extract attributes
-	if template, ok := attrs["template"].(string); ok {
-		prompt.Template = template
-	}
-	if systemPrompt, ok := attrs["system_prompt"].(string); ok {
-		prompt.SystemPrompt = systemPrompt
-	}
-	if axPattern, ok := attrs["ax_pattern"].(string); ok {
-		prompt.AxPattern = axPattern
-	}
-	if provider, ok := attrs["provider"].(string); ok {
-		prompt.Provider = provider
-	}
-	if model, ok := attrs["model"].(string); ok {
-		prompt.Model = model
-	}
-	if version, ok := attrs["version"].(float64); ok {
-		prompt.Version = int(version)
+	if as.Attributes != nil {
+		if template, ok := as.Attributes["template"].(string); ok {
+			prompt.Template = template
+		}
+		if systemPrompt, ok := as.Attributes["system_prompt"].(string); ok {
+			prompt.SystemPrompt = systemPrompt
+		}
+		if axPattern, ok := as.Attributes["ax_pattern"].(string); ok {
+			prompt.AxPattern = axPattern
+		}
+		if provider, ok := as.Attributes["provider"].(string); ok {
+			prompt.Provider = provider
+		}
+		if model, ok := as.Attributes["model"].(string); ok {
+			prompt.Model = model
+		}
+		if version, ok := as.Attributes["version"].(float64); ok {
+			prompt.Version = int(version)
+		}
 	}
 
-	return prompt, nil
+	return prompt
 }
