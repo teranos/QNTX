@@ -33,7 +33,7 @@ type ChildJobInfo struct {
 
 ## CompleteMessage {#completemessage}
 
-**Source**: [`server/types.go:102`](https://github.com/teranos/QNTX/blob/main/server/types.go#L102)
+**Source**: [`server/types.go:107`](https://github.com/teranos/QNTX/blob/main/server/types.go#L107)
 
 
 ```go
@@ -85,7 +85,7 @@ type CreateScheduledJobRequest struct {
 
 ## DaemonStatusMessage {#daemonstatusmessage}
 
-**Source**: [`server/types.go:127`](https://github.com/teranos/QNTX/blob/main/server/types.go#L127)
+**Source**: [`server/types.go:132`](https://github.com/teranos/QNTX/blob/main/server/types.go#L132)
 
 
 ```go
@@ -143,7 +143,7 @@ type JobStagesResponse struct {
 
 ## JobUpdateMessage {#jobupdatemessage}
 
-**Source**: [`server/types.go:120`](https://github.com/teranos/QNTX/blob/main/server/types.go#L120)
+**Source**: [`server/types.go:125`](https://github.com/teranos/QNTX/blob/main/server/types.go#L125)
 
 
 ```go
@@ -156,7 +156,7 @@ type JobUpdateMessage struct {
 
 ## LLMStreamMessage {#llmstreammessage}
 
-**Source**: [`server/types.go:144`](https://github.com/teranos/QNTX/blob/main/server/types.go#L144)
+**Source**: [`server/types.go:149`](https://github.com/teranos/QNTX/blob/main/server/types.go#L149)
 
 
 ```go
@@ -227,7 +227,7 @@ type ParsedATSCode struct {
 
 ## PluginHealthMessage {#pluginhealthmessage}
 
-**Source**: [`server/types.go:211`](https://github.com/teranos/QNTX/blob/main/server/types.go#L211)
+**Source**: [`server/types.go:216`](https://github.com/teranos/QNTX/blob/main/server/types.go#L216)
 
 
 ```go
@@ -281,7 +281,7 @@ type PreviewSample struct {
 
 ## ProgressMessage {#progressmessage}
 
-**Source**: [`server/types.go:86`](https://github.com/teranos/QNTX/blob/main/server/types.go#L86)
+**Source**: [`server/types.go:91`](https://github.com/teranos/QNTX/blob/main/server/types.go#L91)
 
 
 ```go
@@ -387,7 +387,7 @@ type ProseEntry struct {
 
 ## PulseExecutionCompletedMessage {#pulseexecutioncompletedmessage}
 
-**Source**: [`server/types.go:177`](https://github.com/teranos/QNTX/blob/main/server/types.go#L177)
+**Source**: [`server/types.go:182`](https://github.com/teranos/QNTX/blob/main/server/types.go#L182)
 
 
 ```go
@@ -405,7 +405,7 @@ type PulseExecutionCompletedMessage struct {
 
 ## PulseExecutionFailedMessage {#pulseexecutionfailedmessage}
 
-**Source**: [`server/types.go:165`](https://github.com/teranos/QNTX/blob/main/server/types.go#L165)
+**Source**: [`server/types.go:170`](https://github.com/teranos/QNTX/blob/main/server/types.go#L170)
 
 
 ```go
@@ -423,7 +423,7 @@ type PulseExecutionFailedMessage struct {
 
 ## PulseExecutionLogStreamMessage {#pulseexecutionlogstreammessage}
 
-**Source**: [`server/types.go:189`](https://github.com/teranos/QNTX/blob/main/server/types.go#L189)
+**Source**: [`server/types.go:194`](https://github.com/teranos/QNTX/blob/main/server/types.go#L194)
 
 
 ```go
@@ -438,7 +438,7 @@ type PulseExecutionLogStreamMessage struct {
 
 ## PulseExecutionStartedMessage {#pulseexecutionstartedmessage}
 
-**Source**: [`server/types.go:156`](https://github.com/teranos/QNTX/blob/main/server/types.go#L156)
+**Source**: [`server/types.go:161`](https://github.com/teranos/QNTX/blob/main/server/types.go#L161)
 
 
 ```go
@@ -481,6 +481,10 @@ type QueryMessage struct {
 	Width int `json:"width"`
 	Height int `json:"height"`
 	Format string `json:"format"`
+	WatcherID string `json:"watcher_id"`
+	WatcherQuery string `json:"watcher_query"`
+	WatcherName string `json:"watcher_name"`
+	Enabled bool `json:"enabled"`
 }
 ```
 
@@ -536,7 +540,7 @@ type StageInfo struct {
 
 ## StatsMessage {#statsmessage}
 
-**Source**: [`server/types.go:94`](https://github.com/teranos/QNTX/blob/main/server/types.go#L94)
+**Source**: [`server/types.go:99`](https://github.com/teranos/QNTX/blob/main/server/types.go#L99)
 
 
 ```go
@@ -550,7 +554,7 @@ type StatsMessage struct {
 
 ## StorageWarningMessage {#storagewarningmessage}
 
-**Source**: [`server/types.go:198`](https://github.com/teranos/QNTX/blob/main/server/types.go#L198)
+**Source**: [`server/types.go:203`](https://github.com/teranos/QNTX/blob/main/server/types.go#L203)
 
 
 ```go
@@ -604,7 +608,7 @@ type UpdateScheduledJobRequest struct {
 
 ## UsageUpdateMessage {#usageupdatemessage}
 
-**Source**: [`server/types.go:108`](https://github.com/teranos/QNTX/blob/main/server/types.go#L108)
+**Source**: [`server/types.go:113`](https://github.com/teranos/QNTX/blob/main/server/types.go#L113)
 
 
 ```go
@@ -617,5 +621,84 @@ type UsageUpdateMessage struct {
 	Models int `json:"models"`
 	Since string `json:"since"`
 	Timestamp int64 `json:"timestamp"`
+}
+```
+
+## WatcherCreateRequest {#watchercreaterequest}
+
+**Source**: [`server/watcher_handlers.go:16`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L16)
+
+
+```go
+type WatcherCreateRequest struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Subjects []string `json:"subjects,omitempty"`
+	Predicates []string `json:"predicates,omitempty"`
+	Contexts []string `json:"contexts,omitempty"`
+	Actors []string `json:"actors,omitempty"`
+	TimeStart string `json:"time_start,omitempty"`
+	TimeEnd string `json:"time_end,omitempty"`
+	ActionType string `json:"action_type"`
+	ActionData string `json:"action_data"`
+	MaxFiresPerMinute int `json:"max_fires_per_minute,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
+}
+```
+
+## WatcherErrorMessage {#watchererrormessage}
+
+**Source**: [`server/types.go:236`](https://github.com/teranos/QNTX/blob/main/server/types.go#L236)
+
+
+```go
+type WatcherErrorMessage struct {
+	Type string `json:"type"`
+	WatcherID string `json:"watcher_id"`
+	Error string `json:"error"`
+	Severity string `json:"severity"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
+## WatcherMatchMessage {#watchermatchmessage}
+
+**Source**: [`server/types.go:227`](https://github.com/teranos/QNTX/blob/main/server/types.go#L227)
+
+
+```go
+type WatcherMatchMessage struct {
+	Type string `json:"type"`
+	WatcherID string `json:"watcher_id"`
+	Attestation interface{} `json:"attestation"`
+	Timestamp int64 `json:"timestamp"`
+}
+```
+
+## WatcherResponse {#watcherresponse}
+
+**Source**: [`server/watcher_handlers.go:32`](https://github.com/teranos/QNTX/blob/main/server/watcher_handlers.go#L32)
+
+
+```go
+type WatcherResponse struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Subjects []string `json:"subjects,omitempty"`
+	Predicates []string `json:"predicates,omitempty"`
+	Contexts []string `json:"contexts,omitempty"`
+	Actors []string `json:"actors,omitempty"`
+	TimeStart string `json:"time_start,omitempty"`
+	TimeEnd string `json:"time_end,omitempty"`
+	ActionType string `json:"action_type"`
+	ActionData string `json:"action_data"`
+	MaxFiresPerMinute int `json:"max_fires_per_minute"`
+	Enabled bool `json:"enabled"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	LastFiredAt string `json:"last_fired_at,omitempty"`
+	FireCount int64 `json:"fire_count"`
+	ErrorCount int64 `json:"error_count"`
+	LastError string `json:"last_error,omitempty"`
 }
 ```
