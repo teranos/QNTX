@@ -6,15 +6,15 @@
 
 /* Note: Tooltip styling is now in panel-base.css (.panel-tooltip) */
 
-/* Search */
-.plugin-panel-search {
+/* Search - scoped to plugin panel using skeleton's .panel-search */
+#plugin-panel .panel-search {
     padding: 12px 20px;
     background: var(--panel-bg);
     border-bottom: 1px solid #eee;
     flex-shrink: 0;
 }
 
-.plugin-search-input {
+#plugin-panel .panel-search-input {
     width: 100%;
     padding: var(--panel-padding-md);
     font-size: var(--font-size-sm);
@@ -25,12 +25,12 @@
     font-family: inherit;
 }
 
-.plugin-search-input:focus {
+#plugin-panel .panel-search-input:focus {
     border-color: #000;
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-.plugin-search-input::placeholder {
+#plugin-panel .panel-search-input::placeholder {
     color: var(--panel-text-tertiary);
 }
 

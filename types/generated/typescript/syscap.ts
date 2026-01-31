@@ -32,5 +32,17 @@ export interface Message {
    * vidstream library version (e.g., "0.1.0")
    */
   vidstream_version: string;
+  /**
+   * "rust" or "go" - which storage implementation is active
+   */
+  storage_backend: string;
+  /**
+   * true if using Rust SQLite (optimized), false if Go fallback
+   */
+  storage_optimized: boolean;
+  /**
+   * qntx-sqlite library version (e.g., "0.1.0")
+   */
+  storage_version: string;
 }
 
