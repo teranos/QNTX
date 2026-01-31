@@ -156,11 +156,32 @@ impl PythonPluginService {
                     let mut handlers = HashMap::new();
                     for attestation in response.attestations {
                         if let Some(handler_name) = attestation.subjects.first() {
-                            // Extract Python code from attributes.code
-                            if let Some(code) = attestation.attributes.get("code") {
-                                handlers.insert(handler_name.clone(), code.clone());
+                            // Parse JSON attributes to extract Python code
+                            if !attestation.attributes_json.is_empty() {
+                                match serde_json::from_str::<HashMap<String, serde_json::Value>>(
+                                    &attestation.attributes_json,
+                                ) {
+                                    Ok(attrs) => {
+                                        if let Some(serde_json::Value::String(code)) =
+                                            attrs.get("code")
+                                        {
+                                            handlers.insert(handler_name.clone(), code.clone());
+                                        } else {
+                                            warn!(
+                                                "Handler {} attributes missing 'code' field, skipping",
+                                                handler_name
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to parse attributes JSON for {}: {}",
+                                            handler_name, e
+                                        );
+                                    }
+                                }
                             } else {
-                                warn!("Handler {} has no code attribute, skipping", handler_name);
+                                warn!("Handler {} has no attributes, skipping", handler_name);
                             }
                         }
                     }
@@ -462,18 +483,21 @@ impl DomainPluginService for PythonPluginService {
             req.job_id, req.handler_name
         );
 
+        // Clone handler name to avoid borrow issues
+        let handler_name = req.handler_name.clone();
+
         // Route to handler based on handler_name
-        match req.handler_name.as_str() {
-            "python.script" => self.execute_python_script_job(req).await,
-            handler_name if handler_name.starts_with("python.") => {
-                // Strip python. prefix to get handler name
-                let handler_key = &handler_name["python.".len()..];
-                self.execute_discovered_handler_job(req, handler_key).await
-            }
-            _ => Err(Status::not_found(format!(
+        if handler_name == "python.script" {
+            self.execute_python_script_job(req).await
+        } else if handler_name.starts_with("python.") {
+            // Strip python. prefix to get handler name
+            let handler_key = handler_name["python.".len()..].to_string();
+            self.execute_discovered_handler_job(req, &handler_key).await
+        } else {
+            Err(Status::not_found(format!(
                 "Unknown handler: {}",
-                req.handler_name
-            ))),
+                handler_name
+            )))
         }
     }
 }
