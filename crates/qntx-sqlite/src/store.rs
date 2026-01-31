@@ -180,7 +180,7 @@ impl AttestationStore for SqliteStore {
         let rows_affected = self
             .conn
             .execute("DELETE FROM attestations WHERE id = ?", [id])
-            .map_err(|e| StoreError::Backend(e.to_string()))?;
+            .map_err(|e| crate::error::SqliteError::Database(e))?;
 
         Ok(rows_affected > 0)
     }
