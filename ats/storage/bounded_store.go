@@ -73,6 +73,7 @@ func NewBoundedStoreWithConfig(db *sql.DB, logger *zap.SugaredLogger, config *Bo
 }
 
 // CreateAttestation inserts a new attestation into the database with quota enforcement (implements ats.AttestationStore)
+// Note: Observer notification is handled by SQLStore.CreateAttestation
 func (bs *BoundedStore) CreateAttestation(as *types.As) error {
 	if err := bs.store.CreateAttestation(as); err != nil {
 		return errors.Wrap(err, "failed to create attestation")
@@ -90,6 +91,7 @@ func (bs *BoundedStore) AttestationExists(asid string) bool {
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation (implements ats.AttestationStore)
+// Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
 func (bs *BoundedStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
 	return bs.store.GenerateAndCreateAttestation(cmd)
 }
@@ -100,8 +102,9 @@ func (bs *BoundedStore) GetAttestations(filters ats.AttestationFilter) ([]*types
 }
 
 // CreateAttestationWithLimits creates an attestation and enforces storage limits (implements ats.BoundedStore)
+// Note: Observer notification is handled by SQLStore.CreateAttestation (called internally)
 func (bs *BoundedStore) CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error) {
-	// First create the attestation
+	// First create the attestation (observer notification happens in SQLStore)
 	as, err := bs.store.GenerateAndCreateAttestation(cmd)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create attestation")
