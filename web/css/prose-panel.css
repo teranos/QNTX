@@ -498,35 +498,14 @@
 
 .prose-save-indicator {
     color: #ffcc00;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    animation: fadeLoop 2s infinite;
 }
 
 .prose-save-indicator.hidden {
     display: none;
 }
 
-/* Scrollbar styling */
-.prose-editor-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.prose-editor-container::-webkit-scrollbar-track {
-    background: var(--bg-dark);
-}
-
-.prose-editor-container::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: var(--border-radius);
-}
-
-.prose-editor-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Frontmatter Block Styles */
 .frontmatter-block {

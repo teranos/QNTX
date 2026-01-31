@@ -94,34 +94,23 @@ export class PluginPanel extends BasePanel {
         });
     }
 
-    protected getTemplate(): string {
-        return `
-            <div class="panel-header plugin-panel-header">
-                <h3 class="panel-title plugin-panel-title">Domain Plugins</h3>
-                <button class="panel-close plugin-panel-close" aria-label="Close">&#10005;</button>
-            </div>
-
-            <div class="plugin-panel-search">
-                <input type="text" placeholder="Filter plugins..." class="plugin-search-input">
-            </div>
-            <div class="panel-content plugin-panel-content" id="plugin-panel-content">
-                <div class="panel-loading plugin-loading">
-                    <p>Loading plugins...</p>
-                </div>
-            </div>
-        `;
+    protected override getTitle(): string {
+        return 'Domain Plugins';
     }
+
+    protected override hasSearch = true;
+    protected override searchPlaceholder = 'Filter plugins...';
 
     protected setupEventListeners(): void {
         // Search input
-        const searchInput = this.$<HTMLInputElement>('.plugin-search-input');
+        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
         searchInput?.addEventListener('input', (e: Event) => {
             const target = e.target as HTMLInputElement;
             this.filterPlugins(target.value);
         });
 
         // Button click handlers (event delegation)
-        const content = this.$('.plugin-panel-content');
+        const content = this.$('.panel-content');
         content?.addEventListener('click', async (e: Event) => {
             const target = e.target as HTMLElement;
 
@@ -224,7 +213,7 @@ export class PluginPanel extends BasePanel {
         this.render();
 
         // Focus search input
-        const searchInput = this.$<HTMLInputElement>('.plugin-search-input');
+        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
         }
@@ -268,7 +257,7 @@ export class PluginPanel extends BasePanel {
     }
 
     private render(): void {
-        const content = this.$('#plugin-panel-content');
+        const content = this.$('.panel-content');
         if (!content) return;
 
         if (this.plugins.length === 0) {

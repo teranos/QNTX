@@ -329,7 +329,7 @@
     font-size: var(--font-size-sm);
     line-height: 1.5;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    animation: slideIn 0.3s ease-out;
+    animation: slideInFromRight 0.3s ease-out;
 }
 
 .toast.error {
@@ -358,7 +358,7 @@
     color: #ffa502;
 }
 
-@keyframes slideIn {
+@keyframes slideInFromRight {
     from {
         transform: translateX(400px);
         opacity: 0;
@@ -366,15 +366,6 @@
     to {
         transform: translateX(0);
         opacity: 1;
-    }
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-    to {
-        opacity: 0;
     }
 }
 
@@ -477,7 +468,7 @@
 .status-indicator.connection-connecting .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: fadeLoop 1.5s ease-in-out infinite;
 }
 
 /* Pulse Indicator States */
@@ -495,7 +486,7 @@
 .status-indicator.pulse-stopping .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: pulse 1s ease-in-out infinite;
+    animation: fadeLoop 1s ease-in-out infinite;
 }
 
 .status-dot {
@@ -517,12 +508,7 @@ body.disconnected .status-dot {
 body.connecting .status-dot {
     background: #ffa502;
     box-shadow: 0 0 4px rgba(255, 165, 2, 0.5);
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    animation: fadeLoop 1.5s ease-in-out infinite;
 }
 
 /* Reduced motion preference */

@@ -18,6 +18,7 @@ import (
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/storage"
 	atstypes "github.com/teranos/QNTX/ats/types"
+	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/ixgest/types"
 	"github.com/teranos/vanity-id"
 )
@@ -172,7 +173,10 @@ func (p *GitIxProcessor) ProcessGitRepository(repoPath string) (*GitProcessingRe
 	if err != nil {
 		result.Success = false
 		result.Message = fmt.Sprintf("Failed to open repository: %v", err)
-		return result, fmt.Errorf("failed to open repository: %w", err)
+		err = fmt.Errorf("failed to open repository: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("Repository path: %s", repoPath))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+		return result, err
 	}
 
 	// Ensure type definitions exist for git node types (skip in dry-run mode)
@@ -206,7 +210,11 @@ func (p *GitIxProcessor) ProcessGitRepository(repoPath string) (*GitProcessingRe
 	if err != nil {
 		result.Success = false
 		result.Message = fmt.Sprintf("Failed to process branches: %v", err)
-		return result, fmt.Errorf("failed to process branches: %w", err)
+		err = fmt.Errorf("failed to process branches: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("Repository: %s", repoPath))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+		err = errors.WithDetail(err, fmt.Sprintf("Dry run: %t", p.dryRun))
+		return result, err
 	}
 	result.Branches = branchResults
 	result.BranchesProcessed = len(branchResults)
@@ -216,7 +224,12 @@ func (p *GitIxProcessor) ProcessGitRepository(repoPath string) (*GitProcessingRe
 	if err != nil {
 		result.Success = false
 		result.Message = fmt.Sprintf("Failed to process commits: %v", err)
-		return result, fmt.Errorf("failed to process commits: %w", err)
+		err = fmt.Errorf("failed to process commits: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("Repository: %s", repoPath))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+		err = errors.WithDetail(err, fmt.Sprintf("Since filter: %s", p.since))
+		err = errors.WithDetail(err, fmt.Sprintf("Dry run: %t", p.dryRun))
+		return result, err
 	}
 	result.Commits = commitResults
 	result.CommitsProcessed = len(commitResults)
@@ -243,7 +256,9 @@ func (p *GitIxProcessor) processBranches(repo *git.Repository) ([]GitBranchResul
 	// Get all branch references
 	refs, err := repo.Branches()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get branches: %w", err)
+		err = fmt.Errorf("failed to get branches: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+		return nil, err
 	}
 
 	err = refs.ForEach(func(ref *plumbing.Reference) error {
@@ -262,7 +277,11 @@ func (p *GitIxProcessor) processBranches(repo *git.Repository) ([]GitBranchResul
 		if !p.dryRun {
 			err := p.storeAttestation([]string{branchName}, []string{"points_to"}, []string{shortHash}, nil, time.Now())
 			if err != nil {
-				return fmt.Errorf("failed to store branch attestation: %w", err)
+				err = fmt.Errorf("failed to store branch attestation: %w", err)
+				err = errors.WithDetail(err, fmt.Sprintf("Branch: %s", branchName))
+				err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", commitHash))
+				err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+				return err
 			}
 		}
 
@@ -274,7 +293,10 @@ func (p *GitIxProcessor) processBranches(repo *git.Repository) ([]GitBranchResul
 		if !p.dryRun {
 			err := p.storeAttestation([]string{branchName}, []string{"node_type"}, []string{types.Branch.Name}, nil, time.Now())
 			if err != nil {
-				return fmt.Errorf("failed to store branch node_type attestation: %w", err)
+				err = fmt.Errorf("failed to store branch node_type attestation: %w", err)
+				err = errors.WithDetail(err, fmt.Sprintf("Branch: %s", branchName))
+				err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+				return err
 			}
 		}
 
@@ -332,7 +354,10 @@ func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult
 	// Get commit iterator
 	commitIter, err := repo.CommitObjects()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commits: %w", err)
+		err = fmt.Errorf("failed to get commits: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("Since filter: %s", p.since))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+		return nil, err
 	}
 	defer commitIter.Close()
 
@@ -363,7 +388,13 @@ func (p *GitIxProcessor) processCommits(repo *git.Repository) ([]GitCommitResult
 
 		commitResult, err := p.processCommit(commit)
 		if err != nil {
-			return fmt.Errorf("failed to process commit %s: %w", commit.Hash.String()[:7], err)
+			err = fmt.Errorf("failed to process commit %s: %w", commit.Hash.String()[:7], err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", commit.Hash.String()))
+			err = errors.WithDetail(err, fmt.Sprintf("Author: %s <%s>", commit.Author.Name, commit.Author.Email))
+			err = errors.WithDetail(err, fmt.Sprintf("Message: %s", strings.TrimSpace(strings.Split(commit.Message, "\n")[0])))
+			err = errors.WithDetail(err, fmt.Sprintf("Timestamp: %s", commit.Author.When.Format(time.RFC3339)))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", p.defaultActor))
+			return err
 		}
 
 		results = append(results, *commitResult)
@@ -458,7 +489,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 		// Context "commit_metadata" groups all commit properties (is_commit, has_message, committed_at)
 		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"is_commit"}, []string{"commit_metadata"}, attrs, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store commit attestation: %w", err)
+			err = fmt.Errorf("failed to store commit attestation: %w", err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+			err = errors.WithDetail(err, fmt.Sprintf("Message: %s", message))
+			return nil, err
 		}
 	}
 
@@ -470,7 +505,10 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	if !p.dryRun {
 		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"node_type"}, []string{types.Commit.Name}, nil, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store node_type attestation: %w", err)
+			err = fmt.Errorf("failed to store node_type attestation: %w", err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+			return nil, err
 		}
 	}
 
@@ -491,7 +529,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 		// Context "authorship" groups all author-related attestations
 		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"authored_by"}, []string{"authorship"}, nil, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store author attestation: %w", err)
+			err = fmt.Errorf("failed to store author attestation: %w", err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+			err = errors.WithDetail(err, fmt.Sprintf("Author: %s <%s>", authorName, authorEmail))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+			return nil, err
 		}
 	}
 
@@ -504,7 +546,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 	if !p.dryRun {
 		err := p.storeAttestationWithActor(shortHash, []string{authorName}, []string{"node_type"}, []string{types.Author.Name}, nil, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store author node_type attestation: %w", err)
+			err = fmt.Errorf("failed to store author node_type attestation: %w", err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+			err = errors.WithDetail(err, fmt.Sprintf("Author: %s <%s>", authorName, authorEmail))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+			return nil, err
 		}
 	}
 
@@ -525,7 +571,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 		// Context "commit_metadata" groups all commit properties
 		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"has_message"}, []string{"commit_metadata"}, nil, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store message attestation: %w", err)
+			err = fmt.Errorf("failed to store message attestation: %w", err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+			err = errors.WithDetail(err, fmt.Sprintf("Message: %s", message))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+			return nil, err
 		}
 	}
 
@@ -547,7 +597,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 		// Context "commit_metadata" groups all commit properties
 		err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"committed_at"}, []string{"commit_metadata"}, nil, timestamp)
 		if err != nil {
-			return nil, fmt.Errorf("failed to store committed_at attestation: %w", err)
+			err = fmt.Errorf("failed to store committed_at attestation: %w", err)
+			err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+			err = errors.WithDetail(err, fmt.Sprintf("Timestamp: %s", timestampStr))
+			err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+			return nil, err
 		}
 	}
 
@@ -562,7 +616,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 			// Context "lineage" groups all parent/child relationships
 			err := p.storeAttestationWithActor(shortHash, []string{shortHash}, []string{"is_child_of"}, []string{"lineage"}, nil, timestamp)
 			if err != nil {
-				return nil, fmt.Errorf("failed to store parent attestation: %w", err)
+				err = fmt.Errorf("failed to store parent attestation: %w", err)
+				err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+				err = errors.WithDetail(err, fmt.Sprintf("Parent: %s", shortParentHash))
+				err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+				return nil, err
 			}
 		}
 	}
@@ -603,7 +661,11 @@ func (p *GitIxProcessor) processCommit(commit *object.Commit) (*GitCommitResult,
 				// This ensures all commits share the same context type
 				err := p.storeAttestationWithActor(shortHash, []string{pkgName}, []string{"modified_in"}, []string{"code_changes"}, nil, timestamp)
 				if err != nil {
-					return nil, fmt.Errorf("failed to store package attestation: %w", err)
+					err = fmt.Errorf("failed to store package attestation: %w", err)
+					err = errors.WithDetail(err, fmt.Sprintf("Commit: %s", hash))
+					err = errors.WithDetail(err, fmt.Sprintf("Package: %s", pkgName))
+					err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", shortHash))
+					return nil, err
 				}
 			}
 		}
@@ -641,7 +703,12 @@ func (p *GitIxProcessor) storeAttestationWithActor(actor string, subjects []stri
 	// Generate ASID with provided actor
 	asid, err := id.GenerateASIDWithVanity(subject, predicate, context, actor)
 	if err != nil {
-		return fmt.Errorf("failed to generate ASID: %w", err)
+		err = fmt.Errorf("failed to generate ASID: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("Subject: %s", subject))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicate: %s", predicate))
+		err = errors.WithDetail(err, fmt.Sprintf("Context: %s", context))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", actor))
+		return err
 	}
 
 	// Create attestation with specified actor
@@ -661,7 +728,13 @@ func (p *GitIxProcessor) storeAttestationWithActor(actor string, subjects []stri
 	// Store in database
 	err = p.store.CreateAttestation(attestation)
 	if err != nil {
-		return fmt.Errorf("failed to store attestation: %w", err)
+		err = fmt.Errorf("failed to store attestation: %w", err)
+		err = errors.WithDetail(err, fmt.Sprintf("ASID: %s", asid))
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Actor: %s", actor))
+		return err
 	}
 
 	return nil

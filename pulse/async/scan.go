@@ -2,6 +2,7 @@ package async
 
 import (
 	"database/sql"
+	"encoding/json"
 
 	"github.com/teranos/QNTX/errors"
 )
@@ -9,13 +10,14 @@ import (
 // JobScanArgs holds all the variables needed for scanning a job from a database row.
 // This follows the same pattern as contact/scan.go and organization/scan.go.
 type JobScanArgs struct {
-	HandlerName    sql.NullString
-	Payload        sql.NullString
-	PulseStateJSON sql.NullString
-	ErrorMsg       sql.NullString
-	ParentJobID    sql.NullString
-	StartedAt      sql.NullTime
-	CompletedAt    sql.NullTime
+	HandlerName       sql.NullString
+	Payload           sql.NullString
+	PulseStateJSON    sql.NullString
+	ErrorMsg          sql.NullString
+	ErrorDetailsJSON  sql.NullString
+	ParentJobID       sql.NullString
+	StartedAt         sql.NullTime
+	CompletedAt       sql.NullTime
 }
 
 // GetJobScanArgs returns a JobScanArgs struct with all variables ready for scanning
@@ -37,6 +39,7 @@ func GetJobScanTargets(job *Job, args *JobScanArgs) []interface{} {
 		&job.CostActual,
 		&args.PulseStateJSON,
 		&args.ErrorMsg,
+		&args.ErrorDetailsJSON,
 		&args.Payload,
 		&args.ParentJobID,
 		&job.RetryCount,
@@ -72,6 +75,11 @@ func ProcessJobScanArgs(job *Job, args *JobScanArgs) error {
 	// Set optional fields
 	if args.ErrorMsg.Valid {
 		job.Error = args.ErrorMsg.String
+	}
+	if args.ErrorDetailsJSON.Valid && args.ErrorDetailsJSON.String != "" {
+		if err := json.Unmarshal([]byte(args.ErrorDetailsJSON.String), &job.ErrorDetails); err != nil {
+			return errors.Wrapf(err, "failed to unmarshal error details for job %s", job.ID)
+		}
 	}
 	if args.ParentJobID.Valid {
 		job.ParentJobID = args.ParentJobID.String
@@ -115,7 +123,7 @@ func StandardJobSelectColumns() string {
 	return `id, handler_name, source, status,
 		progress_current, progress_total,
 		cost_estimate, cost_actual,
-		pulse_state, error, payload,
+		pulse_state, error, error_details, payload,
 		parent_job_id, retry_count,
 		created_at, started_at, completed_at, updated_at`
 }

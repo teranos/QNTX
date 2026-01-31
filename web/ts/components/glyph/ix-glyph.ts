@@ -99,13 +99,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.left = `${gridX * GRID_SIZE}px`;
     element.style.top = `${gridY * GRID_SIZE}px`;
     element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
+    element.style.minHeight = `${height}px`;
     element.style.backgroundColor = 'var(--bg-secondary)';
     element.style.border = '1px solid var(--border-color)';
     element.style.borderRadius = '4px';
     element.style.display = 'flex';
     element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
+    element.style.overflow = 'visible';
 
     // Textarea (declared early so play button can reference it)
     const textarea = document.createElement('textarea');
@@ -148,6 +148,9 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     statusSection.style.borderRadius = '4px';
     statusSection.style.fontSize = '12px';
     statusSection.style.fontFamily = 'monospace';
+    statusSection.style.whiteSpace = 'pre-wrap';
+    statusSection.style.wordBreak = 'break-word';
+    statusSection.style.overflowWrap = 'break-word';
 
     // Track current scheduledJobId for event filtering
     let currentScheduledJobId: string | undefined = savedStatus.scheduledJobId;
@@ -306,7 +309,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     content.style.padding = '12px';
     content.style.display = 'flex';
     content.style.flexDirection = 'column';
-    content.style.overflow = 'auto';
+    content.style.overflow = 'visible';
 
     // Assemble
     content.appendChild(textarea);
