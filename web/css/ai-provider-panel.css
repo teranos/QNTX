@@ -6,7 +6,7 @@
     width: 100%;
     background: var(--panel-bg);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     margin: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 100;
@@ -39,7 +39,7 @@
 .api-key-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .api-key-input-group {
@@ -52,21 +52,21 @@
     flex: 1;
     padding: 6px 10px;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     background: var(--bg-color);
     color: var(--text-color);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .api-key-toggle,
 .api-key-save {
     padding: 4px 8px;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     background: var(--button-bg);
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     transition: var(--transition-fast);
 }
 
@@ -76,7 +76,7 @@
 }
 
 .api-key-hint {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
 }
 
@@ -115,18 +115,7 @@
 
 .provider-btn.ollama-unavailable .provider-detail {
     color: var(--text-error);
-    font-size: 10px;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    font-size: var(--font-size-sm);
 }
 
 /* Header */
@@ -135,13 +124,13 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--panel-padding-md);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
     border-bottom: 1px solid var(--border-color);
 }
 
 .ai-provider-title {
     margin: 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
@@ -150,7 +139,7 @@
 
 /* Content */
 .ai-provider-content {
-    padding: 16px 20px;
+    padding: var(--panel-padding-lg);
     background: var(--panel-bg);
 }
 
@@ -162,7 +151,7 @@
 }
 
 .config-toggle-title {
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--panel-text-secondary);
     text-transform: uppercase;
@@ -170,10 +159,10 @@
 }
 
 .config-toggle-status {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     padding: 3px 10px;
-    border-radius: 12px;
+    border-radius: var(--border-radius-lg);
 }
 
 .config-toggle-status.status-success {
@@ -202,11 +191,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: var(--gap);
     padding: 16px 12px;
     background: var(--panel-bg);
     border: 2px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     cursor: pointer;
     transition: var(--panel-transition-normal);
     font-family: inherit;
@@ -214,7 +203,7 @@
 
 .provider-btn:hover {
     border-color: var(--panel-text-tertiary);
-    background: #f8f8f8;
+    background: var(--bg-almost-white);
 }
 
 .provider-btn.active {
@@ -229,12 +218,12 @@
 }
 
 .provider-name {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
 }
 
 .provider-detail {
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary);
 }
 
@@ -243,14 +232,14 @@
 }
 
 .ollama-model-selector {
-    padding: 10px 14px;
-    background: #f8f8f8;
+    padding: var(--panel-padding-md);
+    background: var(--bg-almost-white);
     border: var(--panel-border);
-    border-radius: 6px;
+    border-radius: var(--border-radius-lg);
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .ollama-model-selector.hidden {
@@ -265,9 +254,9 @@
 #ollama-model-select {
     flex: 1;
     padding: 6px 10px;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     border: var(--panel-border);
-    border-radius: var(--panel-border-radius);
+    border-radius: var(--border-radius);
     background: var(--panel-bg);
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }

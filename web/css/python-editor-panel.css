@@ -3,7 +3,7 @@
 /* Header icon styling */
 .python-editor-icon {
     font-family: monospace;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: bold;
     color: #3776ab; /* Python blue */
 }
@@ -22,8 +22,8 @@
     border-bottom: 2px solid transparent;
     color: var(--editor-text-muted, #858585);
     cursor: pointer;
-    font-size: 12px;
-    transition: all 0.2s ease;
+    font-size: var(--font-size-sm);
+    transition: var(--panel-transition-normal);
 }
 
 .python-editor-tab:hover {
@@ -52,24 +52,24 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--editor-info-bg, #252526);
     border-bottom: 1px solid var(--editor-border, #3e3e42);
 }
 
 .python-editor-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
 }
 
 .python-run-btn {
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: #3776ab;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     transition: background 0.2s ease;
 }
 
@@ -83,14 +83,14 @@
 }
 
 .python-example-btn {
-    padding: 6px 12px;
+    padding: var(--panel-padding-sm);
     background: transparent;
     color: var(--editor-text-muted, #858585);
     border: 1px solid var(--editor-border, #3e3e42);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 12px;
-    transition: all 0.2s ease;
+    font-size: var(--font-size-sm);
+    transition: var(--panel-transition-normal);
 }
 
 .python-example-btn:hover {
@@ -99,7 +99,7 @@
 }
 
 .python-shortcut-hint {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted, #858585);
 }
 
@@ -118,7 +118,7 @@
     background: var(--editor-bg, #1e1e1e);
     color: var(--editor-text, #cccccc);
     font-family: monospace;
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
 
 .python-output-section {
@@ -130,7 +130,7 @@
 }
 
 .python-output-label {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted, #858585);
     text-transform: uppercase;
     margin-bottom: 6px;
@@ -139,7 +139,7 @@
 .python-output-content {
     background: var(--editor-code-bg, var(--bg-dark));
     padding: 10px;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -177,8 +177,8 @@
 .python-status {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: var(--gap);
+    font-size: var(--font-size-sm);
 }
 
 .python-status-dot {
@@ -190,7 +190,7 @@
 
 .python-status-dot.running {
     background: #3776ab;
-    animation: pulse 1s infinite;
+    animation: fadeLoop 1s infinite;
 }
 
 .python-status-dot.success {
@@ -199,11 +199,6 @@
 
 .python-status-dot.error {
     background: var(--status-error, #f48771);
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
 }
 
 /* Error display */
@@ -218,12 +213,12 @@
 
 .python-error-help {
     margin-top: 10px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--editor-text-muted, #858585);
 }
 
 .python-error-help code {
     background: var(--editor-code-bg, var(--bg-dark));
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
 }

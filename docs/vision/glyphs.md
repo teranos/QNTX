@@ -228,13 +228,34 @@ When complete, users will experience a seamless transformation where glyphs in t
 
 ## Future: The Universal Glyph Migration
 
+### The Glyph Symbol: ⧉
+
+The glyph primitive uses **⧉** as its symbol. This sits above the current symbol system (⌬, ≡, ꩜, etc.) as the universal UI primitive that manifests any backend symbol.
+
+### Attestable Glyph State
+
+Glyphs are not just UI decorations - they become **first-class attestable entities**:
+
+```
+GLYPH-abc123 is expanded at {x:100, y:200, w:400, h:300} by USER-xyz at 2025-01-28T...
+GLYPH-def456 is collapsed in GlyphRun by USER-xyz at 2025-01-28T...
+```
+
+This enables:
+- **Persistent UI state**: User glyph positions, sizes, and states survive sessions
+- **Shared workspaces**: Glyph arrangements can be attested and shared
+- **Time-travel UI**: Navigate to how your workspace looked at any point in time
+- **Auditable interactions**: Track how users interact with the interface
+
+The `glyph` package will handle both symbol definitions (current `sym` role) and state persistence logic.
+
 ### Replacing Seg and Sym
 
-The backend will eventually migrate from `seg` (Segment) and `sym` (Symbol) to use `glyph` throughout:
+The backend will migrate from `seg` (Segment) and `sym` (Symbol) to `glyph`:
 
-- The `sym` package will become the `glyph` package
-- All references to segments and symbols will become glyphs
-- Frontend and backend will share the same fundamental primitive: **Glyph**
+- Rename `sym` package → `glyph` package
+- All references to segments and symbols become glyphs
+- Frontend and backend share the same fundamental primitive: **Glyph**
 - Complete coherence between frontend visualization and backend data model
 
 ### GlyphRun Replacing Symbol Palette
@@ -269,3 +290,8 @@ Glyphs are the atoms of the QNTX interface. Every visual element that can transf
 
 All sharing the same fundamental behavior: proximity morphing, smooth transformations, and the ability to exist in multiple visual states.
 
+## Related Vision
+
+- [Continuous Intelligence](./continuous-intelligence.md) - The paradigm glyphs manifest
+- [Tile-Based Typed UI](./tile-based-typed-ui.md) - Tiles as specialized glyph forms
+- [Time-Travel](./time-travel.md) - Navigate glyph states across time

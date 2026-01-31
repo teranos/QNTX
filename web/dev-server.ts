@@ -121,7 +121,7 @@ async function findAvailablePort(startPort: number, maxPort: number): Promise<nu
 
 // Watch for file changes
 function setupWatcher() {
-    const dirs = ["./ts", "./css", "./ctp2", "./index.html"];
+    const dirs = ["./ts", "./css", "./index.html"];
 
     dirs.forEach(dir => {
         watch(dir, { recursive: true }, (eventType, filename) => {

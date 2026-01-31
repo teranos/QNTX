@@ -28,6 +28,7 @@
 - Update relevant documentation with your changes
 - Follow [README template](docs/README_TEMPLATE.md) for new packages
 - Add entries to [GLOSSARY.md](docs/GLOSSARY.md) for new concepts
+- Cross-reference related docs (no doc is an island)
 - Future vision goes in GitHub issues, not documentation
 
 ## Common Issues
@@ -40,6 +41,7 @@
 ### Type Generation?
 - Never edit `types/generated/*` directly
 - Fix the generator, then run: `make types`
+- See [typegen.md](docs/typegen.md) for struct tags and troubleshooting
 
 ### Symbol Confusion?
 - See [GLOSSARY.md](docs/GLOSSARY.md) for definitive meanings

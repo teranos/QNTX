@@ -1,4 +1,4 @@
-# QNTX Development Guide
+# QNTX LAW
 
 **Read, don't infer:**
 
@@ -16,17 +16,31 @@
 
 ## Development Workflow
 
-The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server. That means the developer always run's the latest version of QNTX, given that they used `make dev`. NEVER have a discussion with the developer about having run the latest version or not, expect that the developer is always running the latest version of whatever and do not discuss or fight the developer on this, if there is an issue it is almost guaranteed the be an issue in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX should work without configuration)
+The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server.
+
+**ASSUME** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
+
+## Testing
+
+**The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**
+
+`make test` runs both backend (Go) and frontend (TypeScript) tests.
+
+**It is FORBIDDEN to craft custom test commands.**
+
+**Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
 **Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries.
 
 ## Type Generation
 
-**NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`.
+**NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
-## Segments
+## Glyphs
 
-**Note:** These symbols are defined in the `sym` package for consistent use across QNTX. See [GLOSSARY.md](docs/GLOSSARY.md) for complete definitions.
+Glyphs ⧉  are the universal UI primitive. Currently defined in the `sym` package (will become `glyph`).
+
+See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/vision/glyphs.md) for the architectural vision.
 
 ## Go Development Standards
 

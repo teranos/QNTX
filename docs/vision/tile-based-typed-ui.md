@@ -1,6 +1,8 @@
-# Tile-Based Semantic UI - Vision
+# Tile-Based Typed UI - Vision
 
 **Status:** Aspirational - Core concepts for future UI evolution
+
+**Implementation Path:** Tiles are [glyph](./glyphs.md) manifestations. New tile features use the glyph infrastructure (morphing, state persistence, attestable UI). D3 remains for focused graph visualization (e.g., Prose document relationships).
 
 ## Core Concept
 
@@ -62,7 +64,7 @@ Non-technical users (recruiters, analysts) can customize views by editing TOML c
 - Clear visual differentiation between levels
 
 ### Layout Flexibility
-- **Views (⧉) as Layout Modes:**
+- **Layout Modes:**
   - Grid: Alphabetical/chronological arrangement
   - Hierarchy: Parent-child tree structure
   - Timeline: Temporal progression
@@ -76,26 +78,24 @@ Non-technical users (recruiters, analysts) can customize views by editing TOML c
 
 ## Technical Approach
 
-### Progressive Enhancement Path
+### Glyph-Based Implementation
 
-1. **Phase 1:** Render entities as rectangles (vs circles) ✅ *Implemented*
-   - Tiles render as rectangles with multi-line text (label, type, metadata)
-   - Focus mode expands tiles to fill viewport
-   - Tile-to-tile focus transitions working
-2. **Phase 2:** Add multi-line text to tile surface ✅ *In Progress*
-   - Basic multi-line text rendering complete
-   - Header/footer controls in focus mode
-3. **Phase 3:** Implement semantic zoom thresholds
-4. **Phase 4:** Add layout modes (grid, hierarchy)
-5. **Phase 5:** Config-driven field selection
+Tiles are implemented as [glyph](./glyphs.md) manifestations:
+
+- **Tile = Glyph** in expanded state showing entity data
+- **Semantic zoom** = glyph state transitions (collapsed → expanded → focused)
+- **Layout modes** = glyph arrangement patterns
+- **Attestable state** = tile positions/sizes persist via glyph attestations
+
+The glyph infrastructure provides the morphing, state management, and persistence primitives needed for tiles. D3 remains valuable for focused graph visualization (Prose relationships, overview maps).
 
 ### Implementation Considerations
 
-- Compatible with existing D3/graph visualization
 - Works with WebSocket real-time updates
 - Responsive to different screen sizes
-- Smooth transitions between zoom levels
+- Smooth transitions between zoom levels (glyph morphing)
 - Tile size adapts to content (min/max bounds)
+- State persists via glyph attestations
 
 ## Symbols at Different Zoom Levels
 
@@ -104,7 +104,6 @@ Core QNTX symbols appear progressively:
 - **⌬** (Actor/Agent) - Zoom level 0+
 - **≡** (Configuration) - Zoom level 2+ (if entity has config)
 - **꩜** (Pulse) - Zoom level 2+ (if entity has async jobs)
-- **⧉** (View) - Controls layout mode switching
 
 ## Use Cases
 
@@ -276,8 +275,9 @@ Each view maintains independent zoom level:
 ## Related Vision
 
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm that tiles visualize
+- [Glyphs](./glyphs.md) - Tiles as glyph manifestations
 - [Time-Travel](./time-travel.md) - Navigate tile states across time
 
 ## Related Documentation
 
-- **Symbols System:** [`sym/README.md`](../../sym/README.md) - QNTX symbol definitions
+- **Glyphs & Symbols:** [GLOSSARY.md](../GLOSSARY.md#symbol-system) - Definitive symbol definitions

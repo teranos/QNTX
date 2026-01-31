@@ -20,7 +20,7 @@
 .form-group label {
     display: block;
     margin-bottom: 6px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--panel-text-secondary, #666);
     text-transform: uppercase;
@@ -29,12 +29,12 @@
 
 .form-input {
     width: 100%;
-    padding: 8px 12px;
-    font-size: 13px;
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-md);
     font-family: 'JetBrains Mono', monospace;
     background: var(--panel-bg, #fff);
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     color: var(--panel-text-primary, #333);
 }
 
@@ -47,7 +47,7 @@
 /* Color input wrapper */
 .color-input-wrapper {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     align-items: center;
 }
 
@@ -55,7 +55,7 @@
     width: 60px;
     height: 36px;
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
 }
 
@@ -67,7 +67,7 @@
 /* Form actions */
 .form-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     justify-content: flex-end;
     margin-top: 20px;
     padding-top: 16px;
@@ -76,10 +76,10 @@
 
 .btn {
     padding: 8px 16px;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     transition: background 0.2s ease;
 }
@@ -118,20 +118,20 @@
 
 .type-def-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     color: var(--panel-text-primary, #333);
     font-family: 'JetBrains Mono', monospace;
 }
 
 .type-def-label {
     color: var(--panel-text-secondary, #666);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
 }
 
 .type-def-color {
     width: 20px;
     height: 20px;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     border: 1px solid var(--panel-border-color, #ddd);
 }
 
@@ -142,7 +142,7 @@
 
 .type-def-fields h3 {
     margin: 0 0 12px 0;
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     color: var(--panel-text-primary, #333);
 }
@@ -159,12 +159,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: var(--panel-padding-sm);
     background: var(--panel-bg, #fff);
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--panel-transition-normal);
 }
 
 .field-item:hover {
@@ -199,7 +199,7 @@
 /* Field name */
 .field-name {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--panel-text-primary, #333);
 }
@@ -207,12 +207,12 @@
 /* Field indicators */
 .field-indicators {
     display: flex;
-    gap: 6px;
+    gap: var(--gap);
     align-items: center;
 }
 
 .indicator {
-    font-size: 14px;
+    font-size: var(--font-size-md);
     opacity: 0.8;
     cursor: help;
 }
@@ -229,7 +229,7 @@
 /* Add field input */
 .add-field {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px dashed var(--panel-border-color, #e0e0e0);
@@ -239,10 +239,10 @@
     flex: 1;
     padding: 6px 10px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     background: var(--panel-bg, #fff);
     border: 1px solid var(--panel-border-color, #e0e0e0);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     color: var(--panel-text-primary, #333);
 }
 
@@ -254,12 +254,12 @@
 
 .add-field-btn {
     padding: 6px 16px;
-    font-size: 14px;
+    font-size: var(--font-size-md);
     font-weight: 600;
     background: var(--accent-color, #0066cc);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     transition: background 0.2s ease;
 }
@@ -277,7 +277,7 @@
 
 .field-controls h4 {
     margin: 0 0 12px 0;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-transform: uppercase;
     color: var(--panel-text-secondary, #666);
@@ -294,7 +294,7 @@
 .field-option {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--gap);
     cursor: pointer;
 }
 
@@ -308,13 +308,13 @@
 }
 
 .field-option span:first-of-type {
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 500;
     color: var(--panel-text-primary, #333);
 }
 
 .field-option-desc {
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     color: var(--panel-text-secondary, #666);
     margin-top: 2px;
 }

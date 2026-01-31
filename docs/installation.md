@@ -238,11 +238,11 @@ qntx am show
 |----------|-------------|---------|---------|
 | Linux | amd64 | GitHub Releases, Nix, Docker, Source | ✅ |
 | Linux | arm64 | GitHub Releases, Nix, Docker, Source | ✅ |
-| macOS | Intel (x64) | GitHub Releases, Nix, Source | ✅ |
-| macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Source | ✅ |
-| Windows | x64 | GitHub Releases, Source | ✅ |
-| Android | ARM | Docker | ✅ (via Tauri) |
-| iOS | ARM | Source | ⚠️ (experimental) |
+| macOS | Intel (x64) | GitHub Releases, Nix, Tauri, Source | ✅ |
+| macOS | Apple Silicon (ARM) | GitHub Releases, Nix, Tauri, Source | ✅ |
+| Windows | x64 | GitHub Releases, Tauri, Source | ✅ |
+| Android | ARM | Tauri | ✅ |
+| iOS | ARM | Tauri | ⚠️ (experimental) |
 
 ---
 
@@ -326,7 +326,7 @@ After installing QNTX:
 
 1. **Configuration**: See [Configuration System](architecture/config-system.md)
 2. **Development**: See [Nix Development Guide](nix-development.md)
-3. **Segments**: Explore QNTX symbols in the [Glossary](GLOSSARY.md#symbol-categories)
+3. **Glyphs**: Explore QNTX glyphs in the [Glossary](GLOSSARY.md#symbol-system)
 
 ---
 

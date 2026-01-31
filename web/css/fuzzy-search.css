@@ -20,7 +20,7 @@
     padding: 20px;
     overflow-y: auto;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--font-size-md);
     line-height: 1.6;
     color: var(--text-on-dark);
 }
@@ -37,13 +37,13 @@
 /* Result line */
 .fuzzy-result-line {
     display: flex;
-    gap: 8px;
+    gap: var(--gap);
     align-items: baseline;
     padding: 4px 8px;
     margin-bottom: 1px;
     background: rgba(255, 255, 255, 0.02);
     border-left: 2px solid transparent;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     line-height: 1.4;
     cursor: pointer;
     transition: all 0.1s ease;
@@ -67,7 +67,7 @@
     background: rgba(74, 158, 255, 0.15);
     color: #4a9eff;
     border-radius: 2px;
-    font-size: 10px;
+    font-size: var(--font-size-sm);
     flex-shrink: 0;
 }
 
@@ -75,7 +75,7 @@
 .fuzzy-score {
     flex-shrink: 0;
     color: var(--text-on-dark-tertiary);
-    font-size: 10px;
+    font-size: var(--font-size-sm);
 }
 
 .fuzzy-field-name {
@@ -108,5 +108,5 @@
     margin-top: 50px;
     text-align: center;
     color: var(--text-on-dark-secondary);
-    font-size: 13px;
+    font-size: var(--font-size-md);
 }
