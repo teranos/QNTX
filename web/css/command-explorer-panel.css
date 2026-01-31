@@ -194,23 +194,7 @@
 /* TODO: Add styles for action buttons within command items (retry, stop, view details)
    These should have tooltips and be positioned in the top-right corner of each item */
 
-/* Scrollbar styling */
-.command-explorer-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.command-explorer-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
-.command-explorer-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-.command-explorer-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive */
 @media (max-width: 768px) {

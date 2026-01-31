@@ -1,0 +1,115 @@
+/* Shared Scrollbar Styles
+   Canonical webkit scrollbar definitions — apply to specific selectors.
+
+   Two variants:
+   - Light theme (light gray colors)
+   - Dark theme (dark gray colors)
+
+   Usage: Copy the appropriate variant to your component CSS file
+   with your specific selector. */
+
+/* ============================================================================
+   Light Theme Scrollbar (for light-background panels)
+   ============================================================================ */
+
+/* Standard light scrollbar - 8px width */
+.config-panel-content::-webkit-scrollbar,
+.plugin-panel-content::-webkit-scrollbar,
+.command-explorer-content::-webkit-scrollbar,
+.completion-menu::-webkit-scrollbar {
+    width: 8px;
+}
+
+.config-panel-content::-webkit-scrollbar-track,
+.plugin-panel-content::-webkit-scrollbar-track,
+.command-explorer-content::-webkit-scrollbar-track {
+    background: var(--bg-hover);
+}
+
+.completion-menu::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.config-panel-content::-webkit-scrollbar-thumb,
+.plugin-panel-content::-webkit-scrollbar-thumb,
+.command-explorer-content::-webkit-scrollbar-thumb,
+.completion-menu::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: var(--border-radius);
+}
+
+.config-panel-content::-webkit-scrollbar-thumb:hover,
+.plugin-panel-content::-webkit-scrollbar-thumb:hover,
+.command-explorer-content::-webkit-scrollbar-thumb:hover,
+.completion-menu::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* ============================================================================
+   Dark Theme Scrollbar (for dark-background panels)
+   ============================================================================ */
+
+/* Standard dark scrollbar - 8px width */
+.prompt-preview-body::-webkit-scrollbar,
+.prose-tree::-webkit-scrollbar,
+.prose-editor-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.prompt-preview-body::-webkit-scrollbar-track {
+    background: var(--bg-almost-black);
+}
+
+.prose-tree::-webkit-scrollbar-track,
+.prose-editor-container::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+.prompt-preview-body::-webkit-scrollbar-thumb,
+.prose-tree::-webkit-scrollbar-thumb,
+.prose-editor-container::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: var(--border-radius);
+}
+
+.prompt-preview-body::-webkit-scrollbar-thumb:hover,
+.prose-tree::-webkit-scrollbar-thumb:hover,
+.prose-editor-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Dark scrollbar variant for stream content */
+.stream-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.stream-content::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+.stream-content::-webkit-scrollbar-thumb {
+    background: #3d3d3d;
+    border-radius: var(--border-radius);
+}
+
+.stream-content::-webkit-scrollbar-thumb:hover {
+    background: #4d4d4d;
+}
+
+/* Dark scrollbar variant for loader logs - narrower width */
+#loader-logs::-webkit-scrollbar {
+    width: 4px;
+}
+
+#loader-logs::-webkit-scrollbar-track {
+    background: var(--bg-almost-black);
+}
+
+#loader-logs::-webkit-scrollbar-thumb {
+    background: var(--bg-dark-light);
+    border-radius: 2px;
+}
+
+#loader-logs::-webkit-scrollbar-thumb:hover {
+    background: #444;
+}

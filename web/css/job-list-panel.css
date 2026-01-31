@@ -400,23 +400,7 @@
     margin-top: 8px;
 }
 
-/* Scrollbar styling for stream content */
-.stream-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.stream-content::-webkit-scrollbar-track {
-    background: var(--bg-dark);
-}
-
-.stream-content::-webkit-scrollbar-thumb {
-    background: #3d3d3d;
-    border-radius: var(--border-radius);
-}
-
-.stream-content::-webkit-scrollbar-thumb:hover {
-    background: #4d4d4d;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Job Expanded Details */
 .job-expanded-details {
