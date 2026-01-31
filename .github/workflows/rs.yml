@@ -106,7 +106,7 @@ jobs:
         run: |
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
-          go test -v ./ats/storage/sqlitecgo/...
+          go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
 
   qntx-python:
     name: Python Plugin
