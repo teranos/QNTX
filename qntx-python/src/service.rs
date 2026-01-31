@@ -32,6 +32,9 @@ use tokio_stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::{debug, error, info, warn};
 
+/// Default timeout for Python job execution (5 minutes)
+const DEFAULT_TIMEOUT_SECS: u64 = 300;
+
 /// Python plugin gRPC service
 pub struct PythonPluginService {
     handlers: HandlerContext,
@@ -110,7 +113,7 @@ impl PythonPluginService {
             actors: vec![],
             time_start: 0,
             time_end: 0,
-            limit: 100, // Limit to 100 handlers
+            limit: Some(100), // Limit to 100 handlers
         };
 
         let request = GetAttestationsRequest {
@@ -322,8 +325,10 @@ impl DomainPluginService for PythonPluginService {
         // Start with built-in handlers
         let mut handler_names = vec!["python.script".to_string()];
 
-        // Add discovered handlers with python. prefix
-        for handler_name in discovered_handlers.keys() {
+        // Add discovered handlers with python. prefix (sorted for determinism)
+        let mut sorted_handlers: Vec<_> = discovered_handlers.keys().collect();
+        sorted_handlers.sort();
+        for handler_name in sorted_handlers {
             handler_names.push(format!("python.{}", handler_name));
         }
 
@@ -531,7 +536,7 @@ impl PythonPluginService {
             timeout_secs: if req.timeout_secs > 0 {
                 req.timeout_secs as u64
             } else {
-                300 // Default 5 minute timeout
+                DEFAULT_TIMEOUT_SECS
             },
             capture_variables: false,
             python_paths: vec![],
@@ -609,7 +614,7 @@ impl PythonPluginService {
             timeout_secs: if req.timeout_secs > 0 {
                 req.timeout_secs as u64
             } else {
-                300 // Default 5 minute timeout
+                DEFAULT_TIMEOUT_SECS
             },
             capture_variables: false,
             python_paths: vec![],
