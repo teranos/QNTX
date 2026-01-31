@@ -4,15 +4,15 @@
  * Uses components/base-panel.css for base panel structure
  */
 
-/* Search */
-.config-panel-search {
+/* Search - scoped to config panel using skeleton's .panel-search */
+#config-panel .panel-search {
     padding: 12px 20px;
     background: var(--panel-bg);
     border-bottom: 1px solid #eee;
     flex-shrink: 0;
 }
 
-.config-search-input {
+#config-panel .panel-search-input {
     width: 100%;
     padding: var(--panel-padding-md);
     font-size: var(--font-size-sm);
@@ -23,12 +23,12 @@
     font-family: inherit;
 }
 
-.config-search-input:focus {
+#config-panel .panel-search-input:focus {
     border-color: #000;
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-.config-search-input::placeholder {
+#config-panel .panel-search-input::placeholder {
     color: var(--panel-text-tertiary);
 }
 
@@ -294,23 +294,7 @@
     font-weight: 600;
 }
 
-/* Scrollbar styling */
-.config-panel-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.config-panel-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
-.config-panel-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-.config-panel-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive */
 @media (max-width: 1200px) {
