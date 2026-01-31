@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QNTX WASM Attestation Verification Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 100px;
+            font-family: monospace;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success {
+            border-left: 5px solid #28a745;
+        }
+        .error {
+            border-left: 5px solid #dc3545;
+        }
+        .info {
+            border-left: 5px solid #17a2b8;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+        .attestation-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .attestation-field {
+            margin: 5px 0;
+        }
+        .field-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .field-value {
+            color: #212529;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 QNTX WASM Attestation Verification Demo</h1>
+
+    <div id="loading" class="loading">
+        Loading WASM module...
+    </div>
+
+    <div id="app" style="display: none;">
+        <div class="section">
+            <h2>Module Information</h2>
+            <p>WASM Module Version: <span id="version" style="font-weight: bold;"></span></p>
+            <p>Status: <span id="status" style="color: #28a745; font-weight: bold;">Ready</span></p>
+        </div>
+
+        <div class="section">
+            <h2>Create Test Attestation</h2>
+            <div class="form-group">
+                <label>Attestation ID:</label>
+                <input type="text" id="att-id" value="test-001" />
+            </div>
+            <div class="form-group">
+                <label>Subjects (comma-separated):</label>
+                <input type="text" id="att-subjects" value="user:alice,project:qntx" />
+            </div>
+            <div class="form-group">
+                <label>Predicates (comma-separated):</label>
+                <input type="text" id="att-predicates" value="created,owns" />
+            </div>
+            <div class="form-group">
+                <label>Contexts (comma-separated):</label>
+                <input type="text" id="att-contexts" value="dev,test" />
+            </div>
+            <div class="form-group">
+                <label>Actors (comma-separated):</label>
+                <input type="text" id="att-actors" value="system,admin" />
+            </div>
+            <div class="form-group">
+                <label>Source:</label>
+                <input type="text" id="att-source" value="wasm-demo" />
+            </div>
+            <button onclick="createAttestation()">Create Attestation</button>
+            <div id="create-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>Verify Attestation</h2>
+            <p>Enter patterns to match (leave blank to match any):</p>
+            <div class="form-group">
+                <label>Subject Pattern:</label>
+                <input type="text" id="verify-subject" placeholder="e.g., alice" />
+            </div>
+            <div class="form-group">
+                <label>Predicate Pattern:</label>
+                <input type="text" id="verify-predicate" placeholder="e.g., created" />
+            </div>
+            <div class="form-group">
+                <label>Context Pattern:</label>
+                <input type="text" id="verify-context" placeholder="e.g., dev" />
+            </div>
+            <div class="form-group">
+                <label>Actor Pattern:</label>
+                <input type="text" id="verify-actor" placeholder="e.g., admin" />
+            </div>
+            <button onclick="verifyAttestation()">Verify Current Attestation</button>
+            <div id="verify-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>Bulk Filter Attestations</h2>
+            <div class="form-group">
+                <label>Attestations JSON (array of attestations):</label>
+                <textarea id="bulk-attestations">[
+  {
+    "id": "att-1",
+    "subjects": ["user:alice", "project:qntx"],
+    "predicates": ["created", "owns"],
+    "contexts": ["production"],
+    "actors": ["system"],
+    "timestamp": 1704067200000,
+    "source": "api",
+    "attributes": {}
+  },
+  {
+    "id": "att-2",
+    "subjects": ["user:bob", "project:demo"],
+    "predicates": ["modified", "reviewed"],
+    "contexts": ["staging"],
+    "actors": ["admin"],
+    "timestamp": 1704067300000,
+    "source": "cli",
+    "attributes": {}
+  },
+  {
+    "id": "att-3",
+    "subjects": ["user:alice", "file:readme.md"],
+    "predicates": ["edited"],
+    "contexts": ["production", "documentation"],
+    "actors": ["user:alice"],
+    "timestamp": 1704067400000,
+    "source": "web",
+    "attributes": {}
+  }
+]</textarea>
+            </div>
+            <div class="form-group">
+                <label>Filter - Subject Pattern:</label>
+                <input type="text" id="filter-subject" placeholder="e.g., alice" />
+            </div>
+            <div class="form-group">
+                <label>Filter - Context Pattern:</label>
+                <input type="text" id="filter-context" placeholder="e.g., production" />
+            </div>
+            <button onclick="filterAttestations()">Filter Attestations</button>
+            <div id="filter-result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, {
+            JsAttestation,
+            verify_attestation,
+            has_subject,
+            has_predicate,
+            has_context,
+            has_actor,
+            filter_attestations,
+            version
+        } from '../pkg/qntx_wasm.js';
+
+        let currentAttestation = null;
+
+        async function initialize() {
+            try {
+                await init();
+
+                // Show version
+                const ver = version();
+                document.getElementById('version').textContent = ver;
+
+                // Hide loading, show app
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+
+                console.log('QNTX WASM module initialized, version:', ver);
+            } catch (error) {
+                document.getElementById('loading').innerHTML =
+                    `<div class="error">Failed to load WASM module: ${error}</div>`;
+                console.error('Failed to initialize WASM:', error);
+            }
+        }
+
+        window.createAttestation = function() {
+            try {
+                const id = document.getElementById('att-id').value;
+                const subjects = document.getElementById('att-subjects').value.split(',').map(s => s.trim());
+                const predicates = document.getElementById('att-predicates').value.split(',').map(s => s.trim());
+                const contexts = document.getElementById('att-contexts').value.split(',').map(s => s.trim());
+                const actors = document.getElementById('att-actors').value.split(',').map(s => s.trim());
+                const source = document.getElementById('att-source').value;
+                const timestamp = Date.now();
+
+                currentAttestation = new JsAttestation(
+                    id,
+                    subjects,
+                    predicates,
+                    contexts,
+                    actors,
+                    timestamp,
+                    source,
+                    {} // empty attributes for now
+                );
+
+                const json = currentAttestation.toJSON();
+                document.getElementById('create-result').innerHTML =
+                    `<div class="result success">
+                        <strong>Attestation created successfully!</strong>
+                        <div class="attestation-card">
+                            ${formatAttestation(currentAttestation)}
+                        </div>
+                        <strong>JSON:</strong>
+                        ${json}
+                    </div>`;
+            } catch (error) {
+                document.getElementById('create-result').innerHTML =
+                    `<div class="result error">Error: ${error}</div>`;
+            }
+        };
+
+        window.verifyAttestation = function() {
+            if (!currentAttestation) {
+                document.getElementById('verify-result').innerHTML =
+                    `<div class="result error">Please create an attestation first</div>`;
+                return;
+            }
+
+            try {
+                const subjectPattern = document.getElementById('verify-subject').value || undefined;
+                const predicatePattern = document.getElementById('verify-predicate').value || undefined;
+                const contextPattern = document.getElementById('verify-context').value || undefined;
+                const actorPattern = document.getElementById('verify-actor').value || undefined;
+
+                const isValid = verify_attestation(
+                    currentAttestation,
+                    subjectPattern,
+                    predicatePattern,
+                    contextPattern,
+                    actorPattern
+                );
+
+                // Also test specific checks
+                const checks = [];
+                if (subjectPattern) {
+                    checks.push(`Has subject "${subjectPattern}": ${has_subject(currentAttestation, subjectPattern)}`);
+                }
+                if (predicatePattern) {
+                    checks.push(`Has predicate "${predicatePattern}": ${has_predicate(currentAttestation, predicatePattern)}`);
+                }
+                if (contextPattern) {
+                    checks.push(`Has context "${contextPattern}": ${has_context(currentAttestation, contextPattern)}`);
+                }
+                if (actorPattern) {
+                    checks.push(`Has actor "${actorPattern}": ${has_actor(currentAttestation, actorPattern)}`);
+                }
+
+                document.getElementById('verify-result').innerHTML =
+                    `<div class="result ${isValid ? 'success' : 'error'}">
+                        <strong>Verification Result: ${isValid ? '✅ VALID' : '❌ INVALID'}</strong>
+                        ${checks.length > 0 ? '<br><br>Individual checks:<br>' + checks.join('<br>') : ''}
+                    </div>`;
+            } catch (error) {
+                document.getElementById('verify-result').innerHTML =
+                    `<div class="result error">Error: ${error}</div>`;
+            }
+        };
+
+        window.filterAttestations = function() {
+            try {
+                const attestationsJson = document.getElementById('bulk-attestations').value;
+                const subjectPattern = document.getElementById('filter-subject').value || undefined;
+                const contextPattern = document.getElementById('filter-context').value || undefined;
+
+                const filtered = filter_attestations(
+                    attestationsJson,
+                    subjectPattern,
+                    undefined, // predicate pattern
+                    contextPattern,
+                    undefined  // actor pattern
+                );
+
+                const filteredArray = JSON.parse(filtered);
+
+                document.getElementById('filter-result').innerHTML =
+                    `<div class="result info">
+                        <strong>Filtered Results: ${filteredArray.length} attestation(s) matched</strong>
+                        <br><br>
+                        <strong>Matching Attestations:</strong>
+                        <pre>${JSON.stringify(filteredArray, null, 2)}</pre>
+                    </div>`;
+            } catch (error) {
+                document.getElementById('filter-result').innerHTML =
+                    `<div class="result error">Error: ${error}</div>`;
+            }
+        };
+
+        function formatAttestation(att) {
+            return `
+                <div class="attestation-field">
+                    <span class="field-label">ID:</span>
+                    <span class="field-value">${att.id}</span>
+                </div>
+                <div class="attestation-field">
+                    <span class="field-label">Subjects:</span>
+                    <span class="field-value">${att.subjects.join(', ')}</span>
+                </div>
+                <div class="attestation-field">
+                    <span class="field-label">Predicates:</span>
+                    <span class="field-value">${att.predicates.join(', ')}</span>
+                </div>
+                <div class="attestation-field">
+                    <span class="field-label">Contexts:</span>
+                    <span class="field-value">${att.contexts.join(', ')}</span>
+                </div>
+                <div class="attestation-field">
+                    <span class="field-label">Actors:</span>
+                    <span class="field-value">${att.actors.join(', ')}</span>
+                </div>
+                <div class="attestation-field">
+                    <span class="field-label">Timestamp:</span>
+                    <span class="field-value">${new Date(att.timestamp).toISOString()}</span>
+                </div>
+                <div class="attestation-field">
+                    <span class="field-label">Source:</span>
+                    <span class="field-value">${att.source}</span>
+                </div>
+            `;
+        }
+
+        // Initialize on load
+        initialize();
+    </script>
+</body>
+</html>
