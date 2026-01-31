@@ -22,6 +22,9 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         vidstream_backend: data.vidstream_backend,
         vidstream_optimized: data.vidstream_optimized,
         vidstream_version: data.vidstream_version,
+        storage_backend: data.storage_backend,
+        storage_optimized: data.storage_optimized,
+        storage_version: data.storage_version,
     });
 
     // Update Self diagnostic window

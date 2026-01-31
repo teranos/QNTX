@@ -98,23 +98,7 @@
     animation: fadeOutLoader 500ms ease-out forwards;
 }
 
-/* Log scrollbar styling */
-#loader-logs::-webkit-scrollbar {
-    width: 4px;
-}
-
-#loader-logs::-webkit-scrollbar-track {
-    background: var(--bg-almost-black);
-}
-
-#loader-logs::-webkit-scrollbar-thumb {
-    background: var(--bg-dark-light);
-    border-radius: 2px;
-}
-
-#loader-logs::-webkit-scrollbar-thumb:hover {
-    background: #444;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {

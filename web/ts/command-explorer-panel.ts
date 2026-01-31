@@ -54,29 +54,18 @@ class CommandExplorerPanel extends BasePanel {
         });
     }
 
-    protected getTemplate(): string {
-        return `
-            <div class="command-explorer-header">
-                <h3 class="command-explorer-title"></h3>
-                <button class="panel-close" aria-label="Close">✕</button>
-            </div>
-            <div class="command-explorer-search">
-                <input type="text" placeholder="Filter..." class="command-search-input">
-            </div>
-            <div class="panel-content command-explorer-content"></div>
-        `;
-    }
+    protected override hasSearch = true;
 
     protected setupEventListeners(): void {
         // Search input
-        const searchInput = this.$<HTMLInputElement>('.command-search-input');
+        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
         searchInput?.addEventListener('input', (e: Event) => {
             const target = e.target as HTMLInputElement;
             this.filterItems(target.value);
         });
 
         // Filter items - click to populate editor with command (event delegation)
-        const content = this.$('.command-explorer-content');
+        const content = this.$('.panel-content');
         content?.addEventListener('click', (e: Event) => {
             const target = e.target as HTMLElement;
             const item = target.closest('.filter-item') as HTMLElement | null;
@@ -104,7 +93,7 @@ class CommandExplorerPanel extends BasePanel {
 
     protected async onShow(): Promise<void> {
         // Focus search input
-        const searchInput = this.$<HTMLInputElement>('.command-search-input');
+        const searchInput = this.$<HTMLInputElement>('.panel-search-input');
         if (searchInput) {
             setTimeout(() => searchInput.focus(), 100);
         }
@@ -122,8 +111,8 @@ class CommandExplorerPanel extends BasePanel {
     }
 
     private renderAsHistory(): void {
-        const title = this.$('.command-explorer-title');
-        const content = this.$('.command-explorer-content');
+        const title = this.$('.panel-title');
+        const content = this.$('.panel-content');
 
         if (title) {
             title.textContent = '+ Query History';
@@ -160,8 +149,8 @@ class CommandExplorerPanel extends BasePanel {
     }
 
     private renderAxFilters(): void {
-        const title = this.$('.command-explorer-title');
-        const content = this.$('.command-explorer-content');
+        const title = this.$('.panel-title');
+        const content = this.$('.panel-content');
 
         if (title) {
             title.textContent = `${AX} ax Statements`;
