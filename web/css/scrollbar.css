@@ -1,12 +1,17 @@
 /* Shared Scrollbar Styles
-   Canonical webkit scrollbar definitions — apply to specific selectors.
+   Canonical webkit scrollbar definitions for all scrollable containers.
 
    Two variants:
-   - Light theme (light gray colors)
-   - Dark theme (dark gray colors)
+   - Light theme (light gray colors) - for panels with light backgrounds
+   - Dark theme (dark gray colors) - for panels with dark backgrounds
 
-   Usage: Copy the appropriate variant to your component CSS file
-   with your specific selector. */
+   To add a new scrollable element:
+   1. Identify if it uses light or dark background theme
+   2. Add the selector to the appropriate group below
+   3. Follow the existing pattern (width, track, thumb, thumb:hover)
+
+   Note: Horizontal scrollbars (overflow-x) and utility classes are intentionally
+   not styled to preserve default browser behavior. */
 
 /* ============================================================================
    Light Theme Scrollbar (for light-background panels)
@@ -16,13 +21,19 @@
 .config-panel-content::-webkit-scrollbar,
 .plugin-panel-content::-webkit-scrollbar,
 .command-explorer-content::-webkit-scrollbar,
-.completion-menu::-webkit-scrollbar {
+.completion-menu::-webkit-scrollbar,
+.panel-content::-webkit-scrollbar,
+.job-list-content::-webkit-scrollbar,
+.job-detail-content::-webkit-scrollbar {
     width: 8px;
 }
 
 .config-panel-content::-webkit-scrollbar-track,
 .plugin-panel-content::-webkit-scrollbar-track,
-.command-explorer-content::-webkit-scrollbar-track {
+.command-explorer-content::-webkit-scrollbar-track,
+.panel-content::-webkit-scrollbar-track,
+.job-list-content::-webkit-scrollbar-track,
+.job-detail-content::-webkit-scrollbar-track {
     background: var(--bg-hover);
 }
 
@@ -33,7 +44,10 @@
 .config-panel-content::-webkit-scrollbar-thumb,
 .plugin-panel-content::-webkit-scrollbar-thumb,
 .command-explorer-content::-webkit-scrollbar-thumb,
-.completion-menu::-webkit-scrollbar-thumb {
+.completion-menu::-webkit-scrollbar-thumb,
+.panel-content::-webkit-scrollbar-thumb,
+.job-list-content::-webkit-scrollbar-thumb,
+.job-detail-content::-webkit-scrollbar-thumb {
     background: #ccc;
     border-radius: var(--border-radius);
 }
@@ -41,7 +55,10 @@
 .config-panel-content::-webkit-scrollbar-thumb:hover,
 .plugin-panel-content::-webkit-scrollbar-thumb:hover,
 .command-explorer-content::-webkit-scrollbar-thumb:hover,
-.completion-menu::-webkit-scrollbar-thumb:hover {
+.completion-menu::-webkit-scrollbar-thumb:hover,
+.panel-content::-webkit-scrollbar-thumb:hover,
+.job-list-content::-webkit-scrollbar-thumb:hover,
+.job-detail-content::-webkit-scrollbar-thumb:hover {
     background: #999;
 }
 
@@ -52,7 +69,11 @@
 /* Standard dark scrollbar - 8px width */
 .prompt-preview-body::-webkit-scrollbar,
 .prose-tree::-webkit-scrollbar,
-.prose-editor-container::-webkit-scrollbar {
+.prose-editor-container::-webkit-scrollbar,
+.prose-recent::-webkit-scrollbar,
+.log-column-content::-webkit-scrollbar,
+#log-content::-webkit-scrollbar,
+#progress-content::-webkit-scrollbar {
     width: 8px;
 }
 
@@ -61,20 +82,32 @@
 }
 
 .prose-tree::-webkit-scrollbar-track,
-.prose-editor-container::-webkit-scrollbar-track {
+.prose-editor-container::-webkit-scrollbar-track,
+.prose-recent::-webkit-scrollbar-track,
+.log-column-content::-webkit-scrollbar-track,
+#log-content::-webkit-scrollbar-track,
+#progress-content::-webkit-scrollbar-track {
     background: var(--bg-dark);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb,
 .prose-tree::-webkit-scrollbar-thumb,
-.prose-editor-container::-webkit-scrollbar-thumb {
+.prose-editor-container::-webkit-scrollbar-thumb,
+.prose-recent::-webkit-scrollbar-thumb,
+.log-column-content::-webkit-scrollbar-thumb,
+#log-content::-webkit-scrollbar-thumb,
+#progress-content::-webkit-scrollbar-thumb {
     background: #444;
     border-radius: var(--border-radius);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb:hover,
 .prose-tree::-webkit-scrollbar-thumb:hover,
-.prose-editor-container::-webkit-scrollbar-thumb:hover {
+.prose-editor-container::-webkit-scrollbar-thumb:hover,
+.prose-recent::-webkit-scrollbar-thumb:hover,
+.log-column-content::-webkit-scrollbar-thumb:hover,
+#log-content::-webkit-scrollbar-thumb:hover,
+#progress-content::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
 
