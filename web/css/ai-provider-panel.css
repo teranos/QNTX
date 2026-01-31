@@ -118,17 +118,6 @@
     font-size: var(--font-size-sm);
 }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 /* Header */
 .ai-provider-header {
     display: flex;
