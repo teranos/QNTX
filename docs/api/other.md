@@ -7,6 +7,8 @@
 |--------|----------|----------|
 | GET | `/api/types` | HandleTypes |
 | GET | `/api/types/` | HandleTypes |
+| GET | `/api/watchers` | HandleWatchers |
+| GET | `/api/watchers/` | HandleWatchers |
 
 ---
 
@@ -24,6 +26,26 @@ POST /api/types - Create or update a type attestation
 GET /api/types/{typename} - Get a specific type attestation
 
 **Handler**: `HandleTypes`
+
+---
+
+### `GET` /api/watchers
+
+**Handler**: `HandleWatchers`
+
+---
+
+### `GET` /api/watchers/
+
+HandleWatchers handles watcher CRUD operations
+Routes:
+  GET    /api/watchers       - List all watchers
+  POST   /api/watchers       - Create a new watcher
+  GET    /api/watchers/{id}  - Get a watcher by ID
+  PUT    /api/watchers/{id}  - Update a watcher
+  DELETE /api/watchers/{id}  - Delete a watcher
+
+**Handler**: `HandleWatchers`
 
 ---
 
