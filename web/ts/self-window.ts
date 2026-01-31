@@ -123,6 +123,10 @@ class SelfWindow {
                 `<span class="capability-optimized">✓ Available (ONNX)</span>` :
                 `<span class="capability-degraded">⚠ Unavailable (requires CGO)</span>`;
 
+            const storageStatus = caps.storage_optimized ?
+                `<span class="capability-optimized">✓ Optimized (Rust)</span>` :
+                `<span class="capability-degraded">⚠ Fallback (Go)</span>`;
+
             sections.push(`
                 <div class="self-section">
                     <h3 class="self-section-title">System Capabilities</h3>
@@ -138,6 +142,13 @@ class SelfWindow {
                         <span class="self-info-value">
                             ${caps.vidstream_version ? `v${caps.vidstream_version}` : 'unknown'}
                             ${vidstreamStatus}
+                        </span>
+                    </div>
+                    <div class="self-info-row">
+                        <span class="self-info-label">storage:</span>
+                        <span class="self-info-value">
+                            ${caps.storage_version ? `v${caps.storage_version}` : 'unknown'}
+                            ${storageStatus}
                         </span>
                     </div>
                 </div>

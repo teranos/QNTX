@@ -58,7 +58,14 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 
 	rows, err := db.Query(query, qb.args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query attestations")
+		err = errors.Wrap(err, "failed to query attestations")
+		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", filters.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter predicates: %v", filters.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter contexts: %v", filters.Contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter actors: %v", filters.Actors))
+		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filters.Limit))
+		err = errors.WithDetail(err, "Operation: GetAttestations")
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -66,13 +73,19 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	for rows.Next() {
 		as, err := ScanAttestation(rows)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to scan attestation")
+			err = errors.Wrap(err, "failed to scan attestation")
+			err = errors.WithDetail(err, fmt.Sprintf("Results so far: %d", len(attestations)))
+			err = errors.WithDetail(err, "Operation: GetAttestations scanning")
+			return nil, err
 		}
 		attestations = append(attestations, as)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "error iterating over attestations")
+		err = errors.Wrap(err, "error iterating over attestations")
+		err = errors.WithDetail(err, fmt.Sprintf("Results count: %d", len(attestations)))
+		err = errors.WithDetail(err, "Operation: GetAttestations iteration")
+		return nil, err
 	}
 
 	return attestations, nil
@@ -101,25 +114,40 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 
 	// Unmarshal JSON fields
 	if err := json.Unmarshal([]byte(subjectsJSON), &as.Subjects); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal subjects")
+		err = errors.Wrap(err, "failed to unmarshal subjects")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", subjectsJSON))
+		return nil, err
 	}
 
 	if err := json.Unmarshal([]byte(predicatesJSON), &as.Predicates); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal predicates")
+		err = errors.Wrap(err, "failed to unmarshal predicates")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", predicatesJSON))
+		return nil, err
 	}
 
 	if err := json.Unmarshal([]byte(contextsJSON), &as.Contexts); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal contexts")
+		err = errors.Wrap(err, "failed to unmarshal contexts")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", contextsJSON))
+		return nil, err
 	}
 
 	if err := json.Unmarshal([]byte(actorsJSON), &as.Actors); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal actors")
+		err = errors.Wrap(err, "failed to unmarshal actors")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", actorsJSON))
+		return nil, err
 	}
 
 	// Handle nullable attributes field
 	if attributesJSON.Valid && attributesJSON.String != "null" && attributesJSON.String != "" {
 		if err := json.Unmarshal([]byte(attributesJSON.String), &as.Attributes); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal attributes")
+			err = errors.Wrap(err, "failed to unmarshal attributes")
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("JSON length: %d bytes", len(attributesJSON.String)))
+			return nil, err
 		}
 	}
 

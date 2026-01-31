@@ -29,19 +29,8 @@
     animation: slideDown 0.2s ease;
 }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Header */
-.command-explorer-header {
+/* Header - scoped to command explorer using skeleton's .panel-header */
+#command-explorer-panel .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -50,23 +39,21 @@
     border-bottom: 1px solid var(--border-color);
 }
 
-.command-explorer-title {
+#command-explorer-panel .panel-title {
     margin: 0;
     font-size: var(--font-size-md);
     font-weight: 600;
     color: #000;
 }
 
-
-
 /* Search */
-.command-explorer-search {
+#command-explorer-panel .panel-search {
     padding: 8px 16px;
     background: var(--panel-bg);
     border-bottom: 1px solid #eee;
 }
 
-.command-search-input {
+#command-explorer-panel .panel-search-input {
     width: 100%;
     padding: var(--panel-padding-sm);
     font-size: var(--font-size-sm);
@@ -76,12 +63,12 @@
     transition: border-color 0.15s ease;
 }
 
-.command-search-input:focus {
+#command-explorer-panel .panel-search-input:focus {
     border-color: #000;
 }
 
 /* Content */
-.command-explorer-content {
+#command-explorer-panel .panel-content {
     flex: 1;
     overflow-y: auto;
     padding: 8px;
@@ -205,23 +192,7 @@
 /* TODO: Add styles for action buttons within command items (retry, stop, view details)
    These should have tooltips and be positioned in the top-right corner of each item */
 
-/* Scrollbar styling */
-.command-explorer-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.command-explorer-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
-.command-explorer-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-.command-explorer-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive */
 @media (max-width: 768px) {

@@ -10,9 +10,17 @@
  * - Reusable DOM element builders
  *
  * Subclasses implement:
- * - getTemplate(): HTML content
+ * - getTitle(): panel title text (used by skeleton template)
  * - setupEventListeners(): custom handlers
  * - onShow()/onHide(): lifecycle hooks
+ *
+ * For standard panels (header + optional search + content area):
+ * - Override getTitle() to set the panel title
+ * - Set hasSearch = true if the panel needs a search/filter input
+ * - Override populateContent() to customize the content area after skeleton is cloned
+ *
+ * For custom layouts (editors, multi-section panels):
+ * - Override getTemplate() to return a full HTML string (bypasses skeleton)
  *
  * Configuration guidelines:
  * - useOverlay: true (default) for modal-style panels that dim the rest of the UI
@@ -20,12 +28,8 @@
  * - insertAfter: specify a selector to insert panel after a specific element (e.g., '#symbolPalette')
  * - insertAfter: '' (default) appends panel to document.body
  *
- * DOM Helpers (use in getTemplate() or dynamically):
- * - createCloseButton(): Standard accessible close button
- * - createHeader(title): Header with title and close button
- * - createLoadingState(message): Loading indicator
+ * DOM Helpers (use dynamically):
  * - createEmptyState(title, hint): Empty state placeholder
- * - createErrorState(title, message, onRetry): Error with optional retry
  *
  * Error Boundaries:
  * - Errors in onShow() are caught and displayed via showErrorState()
@@ -94,7 +98,14 @@ export abstract class BasePanel {
 
         // Create panel
         this.panel = this.createPanel();
-        this.panel.innerHTML = this.getTemplate();
+
+        // Two paths: custom template (string) or skeleton clone (null)
+        const template = this.getTemplate();
+        if (template !== null) {
+            this.panel.innerHTML = template;
+        } else {
+            this.cloneSkeleton();
+        }
 
         // Add expand button AFTER setting template
         this.createExpandButton(this.panel);
@@ -378,8 +389,74 @@ export abstract class BasePanel {
         return this.panel ? Array.from(this.panel.querySelectorAll(selector)) : [];
     }
 
-    // Abstract - must implement
-    protected abstract getTemplate(): string;
+    /**
+     * Clone the shared panel skeleton from <template id="panel-skeleton"> in index.html.
+     * Sets up header (title, close, fullscreen), optional search, and content area.
+     */
+    private cloneSkeleton(): void {
+        if (!this.panel) return;
+
+        const tpl = document.getElementById('panel-skeleton') as HTMLTemplateElement | null;
+        if (!tpl) {
+            // Create minimal content area so showErrorState has somewhere to render
+            const fallback = document.createElement('div');
+            fallback.className = 'panel-content';
+            this.panel.appendChild(fallback);
+            this.showErrorState(new Error('<template id="panel-skeleton"> not found in document'));
+            return;
+        }
+        const fragment = tpl.content.cloneNode(true) as DocumentFragment;
+
+        // Set title
+        const titleEl = fragment.querySelector('.panel-title');
+        if (titleEl) titleEl.textContent = this.getTitle();
+
+        // Configure search bar
+        if (this.hasSearch) {
+            const searchEl = fragment.querySelector('.panel-search') as HTMLElement;
+            if (searchEl) searchEl.hidden = false;
+            const searchInput = fragment.querySelector('.panel-search-input') as HTMLInputElement;
+            if (searchInput) searchInput.placeholder = this.searchPlaceholder;
+        } else {
+            fragment.querySelector('.panel-search')?.remove();
+        }
+
+        this.panel.appendChild(fragment);
+
+        // Let subclass customize content area
+        this.populateContent();
+    }
+
+    // =========================================================================
+    // Template Interface
+    // =========================================================================
+
+    /**
+     * Return a custom HTML string for panels with non-standard layouts.
+     * Return null (default) to use the shared skeleton template.
+     * Override this for editors, multi-section panels, or other custom layouts.
+     */
+    protected getTemplate(): string | null { return null; }
+
+    /**
+     * Panel title text, used by the skeleton template.
+     * Override this in subclasses that use the skeleton (i.e. don't override getTemplate).
+     */
+    protected getTitle(): string { return ''; }
+
+    /** Whether the panel has a search/filter input. Set in subclass. */
+    protected hasSearch: boolean = false;
+
+    /** Placeholder text for the search input. */
+    protected searchPlaceholder: string = 'Filter...';
+
+    /**
+     * Called after the skeleton is cloned. Override to add panel-specific
+     * content to .panel-content or modify the cloned structure.
+     */
+    protected populateContent(): void {}
+
+    // Must implement
     protected abstract setupEventListeners(): void;
 
     // Hooks - override as needed
@@ -406,113 +483,44 @@ export abstract class BasePanel {
     // =========================================================================
 
     /**
-     * Create a standard close button with accessibility attributes
-     * @param onClick Optional click handler (defaults to this.hide())
-     */
-    protected createCloseButton(onClick?: () => void): HTMLButtonElement {
-        const btn = document.createElement('button');
-        btn.className = CSS.PANEL.CLOSE;
-        btn.setAttribute('aria-label', 'Close');
-        btn.setAttribute('type', 'button');
-        btn.textContent = '✕';
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (onClick) {
-                onClick();
-            } else {
-                this.hide();
-            }
-        });
-        return btn;
-    }
-
-    /**
-     * Create a standard panel header with title and close button
-     * @param title The header title text
-     * @param options Optional configuration
-     */
-    protected createHeader(
-        title: string,
-        options: { includeClose?: boolean; includeFullscreen?: boolean; className?: string } = {}
-    ): HTMLElement {
-        const { includeClose = true, includeFullscreen = true, className = '' } = options;
-
-        const header = document.createElement('div');
-        header.className = `${CSS.PANEL.HEADER}${className ? ` ${className}` : ''}`;
-
-        const titleEl = document.createElement('h3');
-        titleEl.className = CSS.PANEL.TITLE;
-        titleEl.textContent = title;
-        header.appendChild(titleEl);
-
-        // Create action buttons container
-        const actions = document.createElement('div');
-        actions.className = 'panel-header-actions';
-
-        if (includeFullscreen) {
-            const fullscreenBtn = document.createElement('button');
-            fullscreenBtn.className = 'panel-fullscreen-toggle';
-            fullscreenBtn.setAttribute('aria-label', 'Enter fullscreen');
-            fullscreenBtn.setAttribute('title', 'Toggle fullscreen (F11)');
-            fullscreenBtn.setAttribute('type', 'button');
-            fullscreenBtn.textContent = '⛶';
-            actions.appendChild(fullscreenBtn);
-        }
-
-        if (includeClose) {
-            actions.appendChild(this.createCloseButton());
-        }
-
-        if (actions.children.length > 0) {
-            header.appendChild(actions);
-        }
-
-        return header;
-    }
-
-    /**
-     * Create a loading state element
-     * @param message Optional loading message (defaults to "Loading...")
-     */
-    protected createLoadingState(message: string = 'Loading...'): HTMLElement {
-        return PanelError.createLoadingState(message);
-    }
-
-    /**
      * Create an empty state element
      * @param title Primary empty state message
      * @param hint Optional secondary hint text
      */
     protected createEmptyState(title: string, hint?: string): HTMLElement {
-        const container = document.createElement('div');
-        container.className = CSS.PANEL.EMPTY;
+        const tpl = document.getElementById('empty-state-template') as HTMLTemplateElement | null;
+        if (!tpl) {
+            // Fallback to createElement if template not found
+            const container = document.createElement('div');
+            container.className = CSS.PANEL.EMPTY;
+            const titleEl = document.createElement('p');
+            titleEl.textContent = title;
+            container.appendChild(titleEl);
+            if (hint) {
+                const hintEl = document.createElement('p');
+                hintEl.className = 'panel-empty-hint';
+                hintEl.textContent = hint;
+                container.appendChild(hintEl);
+            }
+            return container;
+        }
 
-        const titleEl = document.createElement('p');
-        titleEl.textContent = title;
-        container.appendChild(titleEl);
+        const fragment = tpl.content.cloneNode(true) as DocumentFragment;
+        const container = fragment.querySelector('.panel-empty') as HTMLElement;
 
-        if (hint) {
-            const hintEl = document.createElement('p');
-            hintEl.className = 'panel-empty-hint';
+        // Set title
+        const titleEl = container.querySelector('.panel-empty-title');
+        if (titleEl) titleEl.textContent = title;
+
+        // Set or remove hint
+        const hintEl = container.querySelector('.panel-empty-hint');
+        if (hint && hintEl) {
             hintEl.textContent = hint;
-            container.appendChild(hintEl);
+        } else if (hintEl) {
+            hintEl.remove();
         }
 
         return container;
-    }
-
-    /**
-     * Create an error state element with optional retry button
-     * @param title Error title
-     * @param message Error message/details
-     * @param onRetry Optional retry callback - if provided, shows retry button
-     */
-    protected createErrorState(
-        title: string,
-        message: string,
-        onRetry?: () => void
-    ): HTMLElement {
-        return PanelError.createErrorState(title, message, onRetry);
     }
 
     // =========================================================================

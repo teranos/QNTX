@@ -10,4 +10,7 @@ type Message struct {
 	VidStreamBackend   string `json:"vidstream_backend"`   // "onnx" or "unavailable" - video inference availability
 	VidStreamOptimized bool   `json:"vidstream_optimized"` // true if ONNX Runtime available (CGO build)
 	VidStreamVersion   string `json:"vidstream_version"`   // vidstream library version (e.g., "0.1.0")
+	StorageBackend     string `json:"storage_backend"`     // "rust" or "go" - which storage implementation is active
+	StorageOptimized   bool   `json:"storage_optimized"`   // true if using Rust SQLite (optimized), false if Go fallback
+	StorageVersion     string `json:"storage_version"`     // qntx-sqlite library version (e.g., "0.1.0")
 }

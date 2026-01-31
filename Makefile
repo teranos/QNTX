@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,9 +6,9 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy rust-vidstream ## Build QNTX CLI binary (with Rust fuzzy optimization and ONNX video)
-	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video)..."
-	@go build -tags "rustfuzzy,rustvideo" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-fuzzy rust-vidstream rust-sqlite ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, and SQLite backend)
+	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite)..."
+	@go build -tags "rustfuzzy,rustvideo,rustsqlite" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
@@ -28,25 +28,28 @@ server: cli ## Start QNTX WebSocket server
 	@./bin/qntx server
 
 dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
-	@echo "🚀 Starting development environment..."
-	@echo "  Backend:  http://localhost:$${BACKEND_PORT:-877}"
-	@echo "  Frontend: http://localhost:$${FRONTEND_PORT:-8820} (with live reload)"
-	@echo "  Database: Uses am.toml configuration"
-	@echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"
-	@echo ""
-	@# Clean up any lingering processes on dev ports (only this instance's ports)
-	@lsof -ti:$${BACKEND_PORT:-877} | xargs kill -9 2>/dev/null || true
-	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
-	@trap 'echo "Shutting down dev servers..."; \
-		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
-		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
-		wait 2>/dev/null || true; \
-		echo "✓ Servers stopped cleanly"' INT; \
+	@# Read port from am.toml if exists, otherwise use default
+	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_PORT:-8773}}; \
+	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
+	echo "🚀 Starting development environment..."; \
+	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
+	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
+	echo "  Database: Uses am.toml configuration"; \
+	echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"; \
+	echo ""; \
+	pkill -f "qntx server" 2>/dev/null || true; \
+	pkill -f "bun.*dev" 2>/dev/null || true; \
+	trap "echo ''; echo 'Shutting down dev servers...'; \
+		pkill -TERM -f 'qntx server' 2>/dev/null || true; \
+		pkill -TERM -f 'bun.*dev' 2>/dev/null || true; \
+		sleep 1; \
+		pkill -9 -f 'qntx server' 2>/dev/null || true; \
+		pkill -9 -f 'bun.*dev' 2>/dev/null || true; \
+		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
-	BACKEND_PID=$$!; \
 	cd web && bun run dev & \
-	FRONTEND_PID=$$!; \
 	echo "✨ Development servers running"; \
 	echo "Press Ctrl+C to stop both servers"; \
 	wait
@@ -199,6 +202,13 @@ rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integ
 	@echo "  Static:  libqntx_vidstream.a"
 	@echo "  Shared:  libqntx_vidstream.so (Linux) / libqntx_vidstream.dylib (macOS)"
 	@echo "  Features: ONNX Runtime (download-binaries enabled)"
+
+rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO integration)
+	@echo "Building Rust SQLite storage library..."
+	@cargo build --release --package qntx-sqlite --features ffi --lib
+	@echo "✓ libqntx_sqlite built in target/release/"
+	@echo "  Static:  libqntx_sqlite.a"
+	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."

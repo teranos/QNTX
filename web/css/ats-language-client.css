@@ -254,23 +254,7 @@
     color: var(--text-tertiary);
 }
 
-/* Scrollbar styling for completion menu */
-.completion-menu::-webkit-scrollbar {
-    width: 8px;
-}
-
-.completion-menu::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.completion-menu::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-.completion-menu::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* ============================================================================
    Hover Tooltip
@@ -321,7 +305,7 @@
    Animations
    ============================================================================ */
 
-@keyframes fadeIn {
+@keyframes fadeInUp {
     from {
         opacity: 0;
         transform: translateY(-4px);
@@ -333,11 +317,11 @@
 }
 
 .completion-menu {
-    animation: fadeIn 0.15s ease-out;
+    animation: fadeInUp 0.15s ease-out;
 }
 
 .hover-tooltip {
-    animation: fadeIn 0.2s ease-out;
+    animation: fadeInUp 0.2s ease-out;
 }
 
 /* ============================================================================
