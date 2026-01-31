@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -280,30 +281,9 @@ type dbAttestationStore struct {
 }
 
 func (s *dbAttestationStore) CreateAttestation(as *types.As) error {
-	// Convert all JSON fields
-	subjectsJSON, err := json.Marshal(as.Subjects)
+	fields, err := storage.MarshalAttestationFields(as)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal subjects")
-	}
-
-	predicatesJSON, err := json.Marshal(as.Predicates)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal predicates")
-	}
-
-	contextsJSON, err := json.Marshal(as.Contexts)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal contexts")
-	}
-
-	actorsJSON, err := json.Marshal(as.Actors)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal actors")
-	}
-
-	attributesJSON, err := json.Marshal(as.Attributes)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal attributes")
+		return errors.Wrap(err, "failed to marshal attestation fields")
 	}
 
 	// Insert attestation into SQLite database
@@ -316,13 +296,13 @@ func (s *dbAttestationStore) CreateAttestation(as *types.As) error {
 
 	_, err = s.db.Exec(query,
 		as.ID,
-		string(subjectsJSON),
-		string(predicatesJSON),
-		string(contextsJSON),
-		string(actorsJSON),
+		fields.SubjectsJSON,
+		fields.PredicatesJSON,
+		fields.ContextsJSON,
+		fields.ActorsJSON,
 		as.Timestamp,
 		as.Source,
-		string(attributesJSON),
+		fields.AttributesJSON,
 		time.Now(),
 	)
 
