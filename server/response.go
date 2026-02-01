@@ -20,16 +20,19 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) error {
 }
 
 // writeError writes a JSON error response
-func writeError(w http.ResponseWriter, status int, message string) {
+func writeError(w http.ResponseWriter, status int, message string) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		return errors.Wrap(err, "failed to encode error response")
+	}
+	return nil
 }
 
 // writeRichError writes a rich error response with details.
 // It logs the full error internally and returns a structured response to clients.
 // Use this for API errors where you want to provide context without exposing internals.
-func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, statusCode int) {
+func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, statusCode int) error {
 	// Log full error with stack trace internally
 	if logger != nil {
 		logger.Errorw("Request failed",
@@ -48,21 +51,25 @@ func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error,
 		"details": errors.GetAllDetails(err), // Return array, not flattened string
 	}
 
-	if encErr := json.NewEncoder(w).Encode(errorResponse); encErr != nil && logger != nil {
-		logger.Errorw("Failed to encode error response", "error", encErr)
+	if encErr := json.NewEncoder(w).Encode(errorResponse); encErr != nil {
+		if logger != nil {
+			logger.Errorw("Failed to encode error response", "error", encErr)
+		}
+		return errors.Wrap(encErr, "failed to encode rich error response")
 	}
+	return nil
 }
 
 // writeWrappedError wraps an error with context, logs it, and writes an appropriate response.
 // This is the preferred method for handling errors in HTTP handlers.
-func writeWrappedError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, context string, statusCode int) {
+func writeWrappedError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, context string, statusCode int) error {
 	wrappedErr := errors.Wrap(err, context)
-	writeRichError(w, logger, wrappedErr, statusCode)
+	return writeRichError(w, logger, wrappedErr, statusCode)
 }
 
 // handleError determines the appropriate status code based on error type and writes the response.
 // It checks for sentinel errors (ErrNotFound, ErrInvalidRequest, etc.) to determine status codes.
-func handleError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, context string) {
+func handleError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, context string) error {
 	wrappedErr := errors.Wrap(err, context)
 
 	statusCode := http.StatusInternalServerError
@@ -77,7 +84,7 @@ func handleError(w http.ResponseWriter, logger *zap.SugaredLogger, err error, co
 		statusCode = http.StatusForbidden
 	}
 
-	writeRichError(w, logger, wrappedErr, statusCode)
+	return writeRichError(w, logger, wrappedErr, statusCode)
 }
 
 // readJSON reads and decodes a JSON request body

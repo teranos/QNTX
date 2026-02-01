@@ -22,8 +22,8 @@ const (
 
 // writeRichErrorMethod is a method wrapper for writeRichError that uses the server's logger.
 // This is kept for backward compatibility - new code should use writeRichError directly.
-func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode int) {
-	writeRichError(w, s.logger, err, statusCode)
+func (s *QNTXServer) writeRichError(w http.ResponseWriter, err error, statusCode int) error {
+	return writeRichError(w, s.logger, err, statusCode)
 }
 
 // HandlePluginConfig handles plugin configuration operations
