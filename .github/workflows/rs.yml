@@ -110,6 +110,8 @@ jobs:
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
 
+  # TODO: Replace container + rustup with Nix derivation (nix build .#qntx-wasm)
+  # This would eliminate the need for the container image and rustup target setup.
   qntx-wasm:
     name: WASM Bridge
     runs-on: ubuntu-latest
