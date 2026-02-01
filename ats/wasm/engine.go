@@ -133,7 +133,11 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 
 		// Write input bytes into WASM memory
 		if !mod.Memory().Write(uint32(inputPtr), inputBytes) {
-			freeFn.Call(ctx, inputPtr, inputSize)
+			// Best effort to free memory, but prioritize returning the write error
+			if _, freeErr := freeFn.Call(ctx, inputPtr, inputSize); freeErr != nil {
+				// Wrap both errors for debugging
+				return "", fmt.Errorf("wasm memory write out of range (also failed to free: %w)", freeErr)
+			}
 			return "", fmt.Errorf("wasm memory write out of range")
 		}
 	}
@@ -142,14 +146,20 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 	results, err := targetFn.Call(ctx, inputPtr, inputSize)
 	if err != nil {
 		if inputSize > 0 {
-			freeFn.Call(ctx, inputPtr, inputSize)
+			// Best effort to free memory on error path
+			if _, freeErr := freeFn.Call(ctx, inputPtr, inputSize); freeErr != nil {
+				return "", fmt.Errorf("wasm call %s failed: %w (also failed to free memory: %v)", fnName, err, freeErr)
+			}
 		}
 		return "", fmt.Errorf("wasm call %s: %w", fnName, err)
 	}
 
 	// Free the input buffer
 	if inputSize > 0 {
-		freeFn.Call(ctx, inputPtr, inputSize)
+		if _, err := freeFn.Call(ctx, inputPtr, inputSize); err != nil {
+			// Input was processed but we failed to free memory - this is a leak
+			return "", fmt.Errorf("wasm memory leak: failed to free input buffer: %w", err)
+		}
 	}
 
 	// Unpack result: (ptr << 32) | len
@@ -172,7 +182,12 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 	copy(output, resultBytes)
 
 	// Free the result buffer
-	freeFn.Call(ctx, uint64(resultPtr), uint64(resultLen))
+	if _, err := freeFn.Call(ctx, uint64(resultPtr), uint64(resultLen)); err != nil {
+		// Critical: failed to free WASM memory - this is a resource leak
+		// We have the data, but leaking memory in WASM is unacceptable for a dev platform
+		// that will be called repeatedly. Return error to force addressing the issue.
+		return "", fmt.Errorf("wasm memory leak detected - failed to free result buffer (size=%d): %w", resultLen, err)
+	}
 
 	return string(output), nil
 }
@@ -213,7 +228,12 @@ func callNoArgsFn(ctx context.Context, mod api.Module, fnName string) (string, e
 	copy(output, resultBytes)
 
 	// Free the result buffer
-	freeFn.Call(ctx, uint64(resultPtr), uint64(resultLen))
+	if _, err := freeFn.Call(ctx, uint64(resultPtr), uint64(resultLen)); err != nil {
+		// Critical: failed to free WASM memory - this is a resource leak
+		// We have the data, but leaking memory in WASM is unacceptable for a dev platform
+		// that will be called repeatedly. Return error to force addressing the issue.
+		return "", fmt.Errorf("wasm memory leak detected - failed to free result buffer (size=%d): %w", resultLen, err)
+	}
 
 	return string(output), nil
 }

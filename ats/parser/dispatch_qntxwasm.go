@@ -15,22 +15,22 @@ import (
 // rustAxQuery mirrors the JSON output from qntx-core's Parser.
 // Field names match the Rust serde serialization of AxQuery.
 type rustAxQuery struct {
-	Subjects   []string             `json:"subjects"`
-	Predicates []string             `json:"predicates"`
-	Contexts   []string             `json:"contexts"`
-	Actors     []string             `json:"actors"`
-	Temporal   *rustTemporalClause  `json:"temporal"`
-	Actions    []string             `json:"actions"`
-	Error      string               `json:"error,omitempty"`
+	Subjects   []string            `json:"subjects"`
+	Predicates []string            `json:"predicates"`
+	Contexts   []string            `json:"contexts"`
+	Actors     []string            `json:"actors"`
+	Temporal   *rustTemporalClause `json:"temporal"`
+	Actions    []string            `json:"actions"`
+	Error      string              `json:"error,omitempty"`
 }
 
 // rustTemporalClause handles the Rust enum serialization.
 // Serde serializes enums as {"VariantName": value}.
 type rustTemporalClause struct {
-	Since   *string          `json:"Since,omitempty"`
-	Until   *string          `json:"Until,omitempty"`
-	On      *string          `json:"On,omitempty"`
-	Between *[2]string       `json:"Between,omitempty"`
+	Since   *string           `json:"Since,omitempty"`
+	Until   *string           `json:"Until,omitempty"`
+	On      *string           `json:"On,omitempty"`
+	Between *[2]string        `json:"Between,omitempty"`
 	Over    *rustDurationExpr `json:"Over,omitempty"`
 }
 
@@ -80,6 +80,16 @@ func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
 	return convertRustQuery(&rq)
 }
 
+// nilIfEmpty returns nil for empty slices to match Go parser behavior.
+// Rust's serde serializes empty Vec<String> as [], which unmarshals to
+// []string{} in Go, but the Go parser returns nil for empty fields.
+func nilIfEmpty(s []string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+	return s
+}
+
 // convertRustQuery maps the Rust parser output to Go's AxFilter,
 // applying case normalization and temporal resolution.
 func convertRustQuery(rq *rustAxQuery) (*types.AxFilter, error) {
@@ -89,18 +99,22 @@ func convertRustQuery(rq *rustAxQuery) (*types.AxFilter, error) {
 	}
 
 	// Case normalization matching Go parser behavior
-	filter.Subjects = uppercaseTokens(rq.Subjects)
-	filter.Predicates = rq.Predicates
-	filter.Contexts = lowercaseTokens(rq.Contexts)
-	filter.Actors = lowercaseTokens(rq.Actors)
-	filter.SoActions = rq.Actions
+	// Rust's serde serializes empty Vec<String> as [], which unmarshals to
+	// []string{} in Go, but the Go parser returns nil for empty fields.
+	// We apply nilIfEmpty after case transformations to ensure consistency.
+	filter.Subjects = nilIfEmpty(uppercaseTokens(rq.Subjects))
+	filter.Predicates = nilIfEmpty(rq.Predicates)
+	filter.Contexts = nilIfEmpty(lowercaseTokens(rq.Contexts))
+	filter.Actors = nilIfEmpty(lowercaseTokens(rq.Actors))
+	filter.SoActions = nilIfEmpty(rq.Actions)
 
 	// Resolve temporal expressions
 	if rq.Temporal != nil {
 		if err := resolveTemporalClause(rq.Temporal, filter); err != nil {
-			// Non-fatal: temporal parsing failure is a warning, not an error
-			// Filter is still usable without temporal constraints
-			_ = err
+			// Return the temporal parsing error with context.
+			// The Go parser returns structured errors for temporal failures,
+			// so the WASM parser should maintain consistency.
+			return nil, errors.Wrap(err, "failed to parse temporal expression")
 		}
 	}
 
@@ -114,7 +128,7 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 	if tc.Since != nil {
 		t, err := ParseTemporalExpression(*tc.Since)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "invalid 'since' expression: %s", *tc.Since)
 		}
 		filter.TimeStart = t
 	}
@@ -122,7 +136,7 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 	if tc.Until != nil {
 		t, err := ParseTemporalExpression(*tc.Until)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "invalid 'until' expression: %s", *tc.Until)
 		}
 		filter.TimeEnd = t
 	}
@@ -130,7 +144,7 @@ func resolveTemporalClause(tc *rustTemporalClause, filter *types.AxFilter) error
 	if tc.On != nil {
 		t, err := ParseTemporalExpression(*tc.On)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "invalid 'on' expression: %s", *tc.On)
 		}
 		startOfDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 		endOfDay := startOfDay.Add(24 * time.Hour)

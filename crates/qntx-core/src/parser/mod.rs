@@ -161,9 +161,17 @@ impl<'a> Parser<'a> {
             | TokenKind::Between
             | TokenKind::Over => self.state = ParserState::Temporal,
             TokenKind::So | TokenKind::Therefore => self.state = ParserState::Actions,
-            TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
-                self.state = ParserState::Subjects
+            // NOTE: User dissatisfaction - this is terrible design. We're routing tokens to
+            // different states based on fragile string patterns. A bare word like "has_experience"
+            // becomes a predicate just because it has an underscore, while "ALICE" is a subject.
+            // A proper parser would have explicit syntax or use actual NLP, not these hacks.
+            TokenKind::NaturalPredicate => {
+                // Bare natural predicates (has_experience, is_member) go directly to predicates
+                let token = self.next().unwrap();
+                self.query.predicates.push(token.text);
+                self.state = ParserState::Start;
             }
+            TokenKind::Identifier | TokenKind::QuotedString => self.state = ParserState::Subjects,
             TokenKind::Unknown | TokenKind::And => {
                 self.next();
             }

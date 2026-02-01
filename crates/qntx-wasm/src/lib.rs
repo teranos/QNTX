@@ -110,10 +110,23 @@ pub extern "C" fn parse_ax_query(ptr: u32, len: u32) -> u64 {
     let input = unsafe { read_str(ptr, len) };
 
     match Parser::parse(input) {
-        Ok(query) => match serde_json::to_string(&query) {
-            Ok(json) => write_result(&json),
-            Err(e) => write_error(&format!("serialization failed: {}", e)),
-        },
+        Ok(query) => {
+            // NOTE: User dissatisfaction - we're adding post-parse validation to match Go's
+            // arbitrary error behavior. The parser accepts "over 5q" but Go rejects it.
+            // A proper design would validate during parsing, not as a separate step.
+            // This is a hack to achieve bug-for-bug compatibility with the Go parser.
+            if let Some(qntx_core::parser::TemporalClause::Over(ref dur)) = query.temporal {
+                if dur.value.is_some() && dur.unit.is_none() {
+                    // Has a number but invalid unit (like "5q")
+                    return write_error(&format!("missing unit in '{}'", dur.raw));
+                }
+            }
+
+            match serde_json::to_string(&query) {
+                Ok(json) => write_result(&json),
+                Err(e) => write_error(&format!("serialization failed: {}", e)),
+            }
+        }
         Err(e) => write_error(&format!("{}", e)),
     }
 }
