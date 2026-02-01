@@ -92,5 +92,16 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Build WASM module
+        run: make rust-wasm
+
       - name: Build
         run: go build ./...
