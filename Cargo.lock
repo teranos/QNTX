@@ -3676,6 +3676,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "qntx-wasm"
+version = "0.1.0"
+dependencies = [
+ "qntx-core",
+ "serde_json",
+]
+
+[[package]]
 name = "quick-xml"
 version = "0.37.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
