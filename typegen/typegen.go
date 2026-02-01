@@ -93,6 +93,9 @@ func DetectGitHubBaseURL() string {
 // for all exported struct types using the provided generator.
 //
 // Import path should be a full Go import path like "github.com/teranos/QNTX/ats/types"
+// TODO: DEPRECATED - This entire typegen approach will be replaced with protoc-based generation
+// Current issue: packages.Load with NeedTypes requires full compilation of all dependencies,
+// creating tight coupling between typegen and build configuration (e.g., requiring build tags)
 func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 	// Load the package
 	cfg := &packages.Config{
@@ -120,14 +123,14 @@ func GenerateFromPackage(importPath string, gen Generator) (*Result, error) {
 
 	// Create language-agnostic result
 	result := &Result{
-		Types:          make(map[string]string),
-		PackageName:    pkg.Name,
-		GitHubBaseURL:  DetectGitHubBaseURL(), // Detect from go.mod
-		TypePositions:  make(map[string]Position),
-		TypeComments:   make(map[string]string),
-		Consts:         make(map[string]string),
-		Arrays:         make(map[string][]string),
-		Maps:           make(map[string]map[string]string),
+		Types:         make(map[string]string),
+		PackageName:   pkg.Name,
+		GitHubBaseURL: DetectGitHubBaseURL(), // Detect from go.mod
+		TypePositions: make(map[string]Position),
+		TypeComments:  make(map[string]string),
+		Consts:        make(map[string]string),
+		Arrays:        make(map[string][]string),
+		Maps:          make(map[string]map[string]string),
 	}
 
 	// Process all files in the package
