@@ -33,10 +33,16 @@ type ErrorContext struct {
 }
 
 // ClassifyError categorizes an error based on its message and stage
-// Panics if err is nil (caller should not classify non-errors)
+// Returns a default ErrorContext if err is nil
 func ClassifyError(stage string, err error) ErrorContext {
 	if err == nil {
-		panic("ClassifyError called with nil error")
+		return ErrorContext{
+			Stage:       stage,
+			Code:        ErrorCodeUnknown,
+			Message:     "ClassifyError called with nil error",
+			Retryable:   false,
+			Recoverable: false,
+		}
 	}
 
 	errMsg := err.Error()

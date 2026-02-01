@@ -133,7 +133,9 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	qb.buildActorFilter(filter.Actors)
 
 	// Add numeric comparison filter (OVER) - now with temporal aggregation support
-	qb.buildOverComparisonFilter(s.queryExpander, filter.OverComparison, len(qb.whereClauses) > 0, filter)
+	if err := qb.buildOverComparisonFilter(s.queryExpander, filter.OverComparison, len(qb.whereClauses) > 0, filter); err != nil {
+		return nil, errors.Wrap(err, "failed to build over comparison filter")
+	}
 
 	// Add temporal filters (attestation timestamp)
 	qb.buildTemporalFilters(filter)
