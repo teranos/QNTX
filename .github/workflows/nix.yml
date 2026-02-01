@@ -51,7 +51,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx, typegen]
+        package: [qntx, typegen, qntx-code]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -83,7 +83,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx-code, qntx-python]
+        package: [qntx-python]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
