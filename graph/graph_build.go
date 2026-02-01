@@ -179,11 +179,11 @@ func (b *AxGraphBuilder) buildGraphFromAttestations(attestations []types.As, que
 
 // Claim represents an individual subject-predicate-context claim
 type Claim struct {
-	Subject   string
-	Predicate string
-	Context   string
-	Actor     string
-	Timestamp string
+	Subject   string `json:"subject"`
+	Predicate string `json:"predicate"`
+	Context   string `json:"context"`
+	Actor     string `json:"actor"`
+	Timestamp string `json:"timestamp"`
 }
 
 // expandAttestation expands a compact attestation into individual subject-predicate-context claims.
