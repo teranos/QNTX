@@ -52,10 +52,21 @@
         cd ..
       fi
 
-      # Generate TypeScript using ts-proto
+      # Generate TypeScript using ts-proto (minimal - interfaces only)
+      # Options to generate ONLY type interfaces:
+      # - outputEncodeMethods=false: skip encode/decode functions
+      # - outputJsonMethods=false: skip JSON serialization
+      # - outputClientImpl=false: skip gRPC client code
+      # - outputServices=false: skip service definitions
+      # - onlyTypes=true: only generate type definitions
       ${pkgs.protobuf}/bin/protoc \
         --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
         --ts_proto_opt=esModuleInterop=true \
+        --ts_proto_opt=outputEncodeMethods=false \
+        --ts_proto_opt=outputJsonMethods=false \
+        --ts_proto_opt=outputClientImpl=false \
+        --ts_proto_opt=outputServices=false \
+        --ts_proto_opt=onlyTypes=true \
         --ts_proto_out=web/ts/generated/proto \
         plugin/grpc/protocol/atsstore.proto
 
