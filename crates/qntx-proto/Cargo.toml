@@ -14,6 +14,3 @@ serde_json = { workspace = true }
 
 [build-dependencies]
 prost-build = "0.13"
-# TODO: Remove protoc-bin-vendored after next version tag when CI container includes protoc
-# This is temporary to ensure CI passes until ghcr.io/teranos/qntx:latest is rebuilt with protoc
-protoc-bin-vendored = "3.0"
