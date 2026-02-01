@@ -69,6 +69,9 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
+      - name: Update flake lock
+        run: nix flake lock --update-input fenix
+
       - name: Build ${{ matrix.package }}
         run: nix build .#${{ matrix.package }} --show-trace
 
@@ -97,6 +100,9 @@ jobs:
         with:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Update flake lock
+        run: nix flake lock --update-input fenix
 
       - name: Build ${{ matrix.package }}
         run: nix build .#${{ matrix.package }} --show-trace
