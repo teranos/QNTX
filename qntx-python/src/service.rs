@@ -20,8 +20,9 @@ use crate::config::PluginConfig;
 use crate::engine::PythonEngine;
 use crate::handlers::{HandlerContext, PluginState};
 use crate::proto::{
-    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty, HealthResponse,
-    HttpHeader, HttpRequest, HttpResponse, InitializeRequest, MetadataResponse, WebSocketMessage,
+    domain_plugin_service_server::DomainPluginService, ConfigSchemaResponse, Empty,
+    ExecuteJobRequest, ExecuteJobResponse, HealthResponse, HttpHeader, HttpRequest, HttpResponse,
+    InitializeRequest, InitializeResponse, MetadataResponse, WebSocketMessage,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -30,6 +31,9 @@ use std::sync::Arc;
 use tokio_stream::Stream;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::{debug, error, info, warn};
+
+/// Default timeout for Python job execution (5 minutes)
+const DEFAULT_TIMEOUT_SECS: u64 = 300;
 
 /// Python plugin gRPC service
 pub struct PythonPluginService {
@@ -61,6 +65,7 @@ impl PythonPluginService {
                 .map(|s| s.to_string())
                 .collect(),
             ats_client: atsstore::new_shared_client(),
+            discovered_handlers: HashMap::new(),
         }));
 
         Ok(Self {
@@ -71,6 +76,139 @@ impl PythonPluginService {
     /// Get Python version for health checks
     fn python_version(&self) -> String {
         self.handlers.python_version()
+    }
+
+    /// Discover handler scripts from ATS store
+    /// Returns a HashMap of handler_name -> Python code
+    async fn discover_handlers_from_config(
+        &self,
+        config: Option<PluginConfig>,
+    ) -> HashMap<String, String> {
+        use crate::proto::{
+            ats_store_service_client::AtsStoreServiceClient, AttestationFilter,
+            GetAttestationsRequest,
+        };
+        use tonic::transport::Channel;
+
+        // Check if we have config with ATS store endpoint
+        let config = match config {
+            Some(cfg) if !cfg.ats_store_endpoint.is_empty() => cfg,
+            _ => {
+                info!("No ATS store endpoint configured, skipping handler discovery");
+                return HashMap::new();
+            }
+        };
+
+        info!("Discovering Python handlers from ATS store");
+
+        let endpoint = config.ats_store_endpoint.clone();
+        let auth_token = config.auth_token.clone();
+
+        // Query ATS store for handler attestations
+        // Filter: predicate="handler" AND context="python"
+        let filter = AttestationFilter {
+            subjects: vec![],
+            predicates: vec!["handler".to_string()],
+            contexts: vec!["python".to_string()],
+            actors: vec![],
+            time_start: 0,
+            time_end: 0,
+            limit: Some(100), // Limit to 100 handlers
+        };
+
+        let request = GetAttestationsRequest {
+            auth_token,
+            filter: Some(filter),
+        };
+
+        // Connect to ATS store and query
+        let result: Result<HashMap<String, String>, String> =
+            tokio::task::spawn_blocking(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(|e| format!("failed to create runtime: {}", e))?;
+
+                rt.block_on(async {
+                    // Ensure endpoint has http:// scheme
+                    let endpoint_uri =
+                        if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+                            endpoint.clone()
+                        } else {
+                            format!("http://{}", endpoint)
+                        };
+
+                    let channel = Channel::from_shared(endpoint_uri)
+                        .map_err(|e| format!("invalid endpoint: {}", e))?
+                        .connect()
+                        .await
+                        .map_err(|e| format!("connection failed: {}", e))?;
+
+                    let mut client = AtsStoreServiceClient::new(channel);
+                    let response = client
+                        .get_attestations(request)
+                        .await
+                        .map_err(|e| format!("gRPC error: {}", e))?
+                        .into_inner();
+
+                    if !response.success {
+                        return Err(format!("Query failed: {}", response.error));
+                    }
+
+                    // Extract handler names and code from attestations
+                    let mut handlers = HashMap::new();
+                    for attestation in response.attestations {
+                        if let Some(handler_name) = attestation.subjects.first() {
+                            // Parse JSON attributes to extract Python code
+                            if !attestation.attributes_json.is_empty() {
+                                match serde_json::from_str::<HashMap<String, serde_json::Value>>(
+                                    &attestation.attributes_json,
+                                ) {
+                                    Ok(attrs) => {
+                                        if let Some(serde_json::Value::String(code)) =
+                                            attrs.get("code")
+                                        {
+                                            handlers.insert(handler_name.clone(), code.clone());
+                                        } else {
+                                            warn!(
+                                                "Handler {} attributes missing 'code' field, skipping",
+                                                handler_name
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            "Failed to parse attributes JSON for {}: {}",
+                                            handler_name, e
+                                        );
+                                    }
+                                }
+                            } else {
+                                warn!("Handler {} has no attributes, skipping", handler_name);
+                            }
+                        }
+                    }
+
+                    Ok(handlers)
+                })
+            })
+            .await
+            .unwrap_or_else(|e| Err(format!("task panicked: {:?}", e)));
+
+        match result {
+            Ok(handlers) => {
+                info!(
+                    "Discovered {} handler(s) from ATS store: {:?}",
+                    handlers.len(),
+                    handlers.keys().collect::<Vec<_>>()
+                );
+                handlers
+            }
+            Err(e) => {
+                warn!("Failed to discover handlers from ATS store: {}", e);
+                HashMap::new()
+            }
+        }
     }
 }
 
@@ -102,73 +240,101 @@ impl DomainPluginService for PythonPluginService {
     async fn initialize(
         &self,
         request: Request<InitializeRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    ) -> Result<Response<InitializeResponse>, Status> {
         let req = request.into_inner();
         info!("Initializing Python plugin");
         info!("ATSStore endpoint: {}", req.ats_store_endpoint);
         info!("Queue endpoint: {}", req.queue_endpoint);
 
-        let mut state = self.handlers.state.write();
+        // Clone config for later use after dropping lock
+        let state_config = {
+            let mut state = self.handlers.state.write();
 
-        // Store configuration
-        state.config = Some(PluginConfig {
-            ats_store_endpoint: req.ats_store_endpoint.clone(),
-            queue_endpoint: req.queue_endpoint,
-            auth_token: req.auth_token.clone(),
-            config: req.config,
-        });
+            // Store configuration
+            state.config = Some(PluginConfig {
+                ats_store_endpoint: req.ats_store_endpoint.clone(),
+                queue_endpoint: req.queue_endpoint,
+                auth_token: req.auth_token.clone(),
+                config: req.config,
+            });
 
-        // Initialize ATSStore client if endpoint is provided
-        if !req.ats_store_endpoint.is_empty() {
-            info!("Initializing ATSStore client for Python attestation support");
-            atsstore::init_shared_client(
-                &state.ats_client,
-                atsstore::AtsStoreConfig {
-                    endpoint: req.ats_store_endpoint,
-                    auth_token: req.auth_token,
-                },
-            );
-        }
+            // Initialize ATSStore client if endpoint is provided
+            if !req.ats_store_endpoint.is_empty() {
+                info!("Initializing ATSStore client for Python attestation support");
+                atsstore::init_shared_client(
+                    &state.ats_client,
+                    atsstore::AtsStoreConfig {
+                        endpoint: req.ats_store_endpoint,
+                        auth_token: req.auth_token,
+                    },
+                );
+            }
 
-        // Initialize Python engine with custom paths if provided
-        let python_paths: Vec<String> = state
-            .config
-            .as_ref()
-            .and_then(|c| c.config.get("python_paths"))
-            .map(|p| p.split(':').map(String::from).collect())
-            .unwrap_or_default();
+            // Initialize Python engine with custom paths if provided
+            let python_paths: Vec<String> = state
+                .config
+                .as_ref()
+                .and_then(|c| c.config.get("python_paths"))
+                .map(|p| p.split(':').map(String::from).collect())
+                .unwrap_or_default();
 
-        // Override default modules if provided in config
-        if let Some(modules_str) = state
-            .config
-            .as_ref()
-            .and_then(|c| c.config.get("default_modules"))
-        {
-            state.default_modules = modules_str
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
+            // Override default modules if provided in config
+            if let Some(modules_str) = state
+                .config
+                .as_ref()
+                .and_then(|c| c.config.get("default_modules"))
+            {
+                state.default_modules = modules_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect();
+                info!(
+                    "Using configured default modules: {:?}",
+                    state.default_modules
+                );
+            }
+
+            if let Err(e) = state.engine.initialize(python_paths) {
+                error!("Failed to initialize Python engine: {}", e);
+                return Err(Status::internal(format!(
+                    "Failed to initialize Python engine: {}",
+                    e
+                )));
+            }
+
+            state.initialized = true;
             info!(
-                "Using configured default modules: {:?}",
-                state.default_modules
+                "Python plugin initialized successfully (Python {})",
+                state.engine.python_version()
             );
+
+            // Clone config before dropping lock
+            state.config.clone()
+        }; // Lock automatically dropped here
+
+        // Discover handler scripts from ATS store
+        let discovered_handlers = self.discover_handlers_from_config(state_config).await;
+
+        // Store discovered handlers in plugin state
+        {
+            let mut state = self.handlers.state.write();
+            state.discovered_handlers = discovered_handlers.clone();
         }
 
-        if let Err(e) = state.engine.initialize(python_paths) {
-            error!("Failed to initialize Python engine: {}", e);
-            return Err(Status::internal(format!(
-                "Failed to initialize Python engine: {}",
-                e
-            )));
+        // Announce async handler capabilities
+        // Start with built-in handlers
+        let mut handler_names = vec!["python.script".to_string()];
+
+        // Add discovered handlers with python. prefix (sorted for determinism)
+        let mut sorted_handlers: Vec<_> = discovered_handlers.keys().collect();
+        sorted_handlers.sort();
+        for handler_name in sorted_handlers {
+            handler_names.push(format!("python.{}", handler_name));
         }
 
-        state.initialized = true;
-        info!(
-            "Python plugin initialized successfully (Python {})",
-            state.engine.python_version()
-        );
+        info!("Announcing async handlers: {:?}", handler_names);
 
-        Ok(Response::new(Empty {}))
+        Ok(Response::new(InitializeResponse { handler_names }))
     }
 
     /// Shutdown the plugin
@@ -307,6 +473,195 @@ impl DomainPluginService for PythonPluginService {
         Ok(Response::new(ConfigSchemaResponse {
             fields: crate::config::build_schema(),
         }))
+    }
+
+    /// Execute an async job
+    /// Routes to appropriate handler based on handler_name
+    async fn execute_job(
+        &self,
+        request: Request<ExecuteJobRequest>,
+    ) -> Result<Response<ExecuteJobResponse>, Status> {
+        let req = request.into_inner();
+
+        debug!(
+            "ExecuteJob request: job_id={}, handler={}",
+            req.job_id, req.handler_name
+        );
+
+        // Clone handler name to avoid borrow issues
+        let handler_name = req.handler_name.clone();
+
+        // Route to handler based on handler_name
+        if handler_name == "python.script" {
+            self.execute_python_script_job(req).await
+        } else if handler_name.starts_with("python.") {
+            // Strip python. prefix to get handler name
+            let handler_key = handler_name["python.".len()..].to_string();
+            self.execute_discovered_handler_job(req, &handler_key).await
+        } else {
+            Err(Status::not_found(format!(
+                "Unknown handler: {}",
+                handler_name
+            )))
+        }
+    }
+}
+
+// Helper methods for PythonPluginService
+impl PythonPluginService {
+    /// Execute a python.script job
+    async fn execute_python_script_job(
+        &self,
+        req: ExecuteJobRequest,
+    ) -> Result<Response<ExecuteJobResponse>, Status> {
+        use crate::engine::ExecutionConfig;
+
+        // Parse payload as JSON containing script_code
+        #[derive(serde::Deserialize)]
+        struct PythonScriptPayload {
+            script_code: String,
+            #[serde(default)]
+            script_type: Option<String>,
+        }
+
+        let payload: PythonScriptPayload = serde_json::from_slice(&req.payload)
+            .map_err(|e| Status::invalid_argument(format!("Invalid payload JSON: {}", e)))?;
+
+        if payload.script_code.is_empty() {
+            return Err(Status::invalid_argument("Missing script_code in payload"));
+        }
+
+        // Execute the Python script
+        let config = ExecutionConfig {
+            timeout_secs: if req.timeout_secs > 0 {
+                req.timeout_secs as u64
+            } else {
+                DEFAULT_TIMEOUT_SECS
+            },
+            capture_variables: false,
+            python_paths: vec![],
+            ..Default::default()
+        };
+
+        let result = {
+            let state = self.handlers.state.read();
+            state.engine.execute_with_ats(
+                &payload.script_code,
+                &config,
+                Some(state.ats_client.clone()),
+            )
+        };
+
+        // Convert execution result to ExecuteJobResponse
+        if result.success {
+            // Serialize result as JSON for the result field
+            let result_json = serde_json::json!({
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "duration_ms": result.duration_ms,
+                "result": result.result,
+            });
+
+            let result_bytes = serde_json::to_vec(&result_json)
+                .map_err(|e| Status::internal(format!("Failed to serialize result: {}", e)))?;
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: true,
+                error: String::new(),
+                result: result_bytes,
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        } else {
+            // Execution failed
+            let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: false,
+                error: error_msg,
+                result: vec![],
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        }
+    }
+
+    /// Execute a dynamically discovered handler job
+    async fn execute_discovered_handler_job(
+        &self,
+        req: ExecuteJobRequest,
+        handler_key: &str,
+    ) -> Result<Response<ExecuteJobResponse>, Status> {
+        use crate::engine::ExecutionConfig;
+
+        // Retrieve handler code from plugin state
+        let script_code = {
+            let state = self.handlers.state.read();
+            state.discovered_handlers.get(handler_key).cloned()
+        };
+
+        let script_code = script_code.ok_or_else(|| {
+            Status::not_found(format!(
+                "Handler {} not found in discovered handlers",
+                handler_key
+            ))
+        })?;
+
+        // Execute the Python script
+        let config = ExecutionConfig {
+            timeout_secs: if req.timeout_secs > 0 {
+                req.timeout_secs as u64
+            } else {
+                DEFAULT_TIMEOUT_SECS
+            },
+            capture_variables: false,
+            python_paths: vec![],
+            ..Default::default()
+        };
+
+        let result = {
+            let state = self.handlers.state.read();
+            state
+                .engine
+                .execute_with_ats(&script_code, &config, Some(state.ats_client.clone()))
+        };
+
+        // Convert execution result to ExecuteJobResponse
+        if result.success {
+            // Serialize result as JSON for the result field
+            let result_json = serde_json::json!({
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "duration_ms": result.duration_ms,
+                "result": result.result,
+            });
+
+            let result_bytes = serde_json::to_vec(&result_json)
+                .map_err(|e| Status::internal(format!("Failed to serialize result: {}", e)))?;
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: true,
+                error: String::new(),
+                result: result_bytes,
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        } else {
+            // Execution failed
+            let error_msg = result.error.unwrap_or_else(|| "Unknown error".to_string());
+
+            Ok(Response::new(ExecuteJobResponse {
+                success: false,
+                error: error_msg,
+                result: vec![],
+                progress_current: 0,
+                progress_total: 0,
+                cost_actual: 0.0,
+            }))
+        }
     }
 }
 

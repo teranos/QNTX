@@ -26,7 +26,7 @@ Complete API documentation for the QNTX server.
 
 ## Plugin gRPC API
 
-- **[Plugin gRPC API](./grpc-plugin.md)** (7 methods)
+- **[Plugin gRPC API](./grpc-plugin.md)** (8 methods)
 
 ## Type References
 

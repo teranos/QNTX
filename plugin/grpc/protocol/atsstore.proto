@@ -38,8 +38,7 @@ message AttestationCommand {
   repeated string predicates = 2;
   repeated string contexts = 3;
   repeated string actors = 4;
-  int64 timestamp = 5;           // Unix timestamp in seconds. NOTE: Currently 0 is treated as "now"
-                                 // which violates zero-value semantics. TODO: Use optional int64.
+  optional int64 timestamp = 5;  // Unix timestamp in seconds. If not set, server uses current time.
   string attributes_json = 6;    // JSON-encoded map[string]interface{}
 }
 
@@ -51,8 +50,7 @@ message AttestationFilter {
   repeated string actors = 4;
   int64 time_start = 5;          // Unix timestamp in seconds (0 = no filter)
   int64 time_end = 6;            // Unix timestamp in seconds (0 = no filter)
-  int32 limit = 7;               // Maximum results. NOTE: Currently 0 is treated as "no limit"
-                                 // which violates zero-value semantics. TODO: Use optional int32.
+  optional int32 limit = 7;      // Maximum results. If not set, no limit applied.
 }
 
 message CreateAttestationRequest {
