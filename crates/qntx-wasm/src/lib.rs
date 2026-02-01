@@ -4,6 +4,17 @@
 //! wazero (pure Go WebAssembly runtime). No WASI imports needed — all
 //! functions are pure computation with shared memory string passing.
 //!
+//! ## Proto Migration Note (ADR-006)
+//!
+//! This crate now includes qntx-proto for potential future use of proto types.
+//! WASM modules can use proto-generated types without any gRPC dependencies,
+//! demonstrating clean separation of concerns:
+//! - qntx-proto: Just types (5 dependencies)
+//! - qntx-grpc: Types + gRPC infrastructure (50+ dependencies)
+//!
+//! Future enhancement: Add functions that accept/return proto-serialized data
+//! for better cross-language compatibility.
+//!
 //! # Memory Protocol
 //!
 //! Strings cross the WASM boundary as (ptr, len) pairs in linear memory.
