@@ -58,6 +58,7 @@ pub struct ErrorContext {
 /// - Domain packages provide handlers and payloads
 /// - HandlerName identifies which handler executes the job
 /// - Payload contains handler-specific data (domain logic controls structure)
+/// - This type will eventually migrate to proto generation
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/async.md#job>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Job {

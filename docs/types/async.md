@@ -47,7 +47,7 @@ type ErrorContext struct {
 
 ## Job {#job}
 
-**Source**: [`pulse/async/job.go:68`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L68)
+**Source**: [`pulse/async/job.go:69`](https://github.com/teranos/QNTX/blob/main/pulse/async/job.go#L69)
 
 
 ```go
