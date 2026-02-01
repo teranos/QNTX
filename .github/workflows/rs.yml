@@ -9,6 +9,7 @@ on:
       - 'crates/qntx/Cargo.toml'
       - 'crates/qntx-core/Cargo.toml'
       - 'crates/qntx-sqlite/Cargo.toml'
+      - 'crates/qntx-wasm/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
@@ -20,6 +21,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
+      - 'crates/qntx-wasm/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
   workflow_dispatch:
@@ -107,6 +109,38 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
+
+  # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#qntx-wasm)
+  qntx-wasm:
+    name: WASM Bridge
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: cargo fmt --check --package qntx-wasm
+
+      - name: Build WASM module
+        run: make rust-wasm
+
+      - name: Test Go integration
+        run: go test -v ./ats/wasm/...
 
   qntx-python:
     name: Python Plugin

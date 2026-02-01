@@ -65,6 +65,7 @@ func (p Progress) Percentage() float64 {
 // - Domain packages provide handlers and payloads
 // - HandlerName identifies which handler executes the job
 // - Payload contains handler-specific data (domain logic controls structure)
+// - This type will eventually migrate to proto generation
 type Job struct {
 	ID           string          `json:"id"`
 	HandlerName  string          `json:"handler_name"`      // "data.batch-import", "bio.sequence-align"

@@ -1,0 +1,19 @@
+[package]
+name = "qntx-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QNTX WASM bridge - exposes qntx-core functions for Go via wazero"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+qntx-core = { path = "../qntx-core", default-features = false, features = ["wasm"] }
+serde_json = { workspace = true }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
