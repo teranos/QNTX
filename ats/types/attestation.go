@@ -6,6 +6,7 @@ import (
 
 // As represents an attestation - a verifiable claim about subjects,
 // predicates, and contexts with actor attribution and timestamps
+// TODO: This type will migrate to proto generation
 type As struct {
 	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
 	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about
