@@ -100,9 +100,21 @@ Gradually migrate all Rust components to WASM:
 
 - ✅ WASM module built (crates/qntx-wasm)
 - ✅ Server integration via wazero
-- ✅ System Diagnostic shows WASM status
+- ✅ System Diagnostic shows WASM status with tooltips
+- ✅ Fixed critical testing gap - CI now tests WASM parser
+- ✅ Achieved parser compatibility (commit 62f55d1)
 - ⏳ web/ts integration pending
 - ⏳ Tauri bundling pending
+
+## Technical Debt Discovered
+
+During WASM integration, significant parser design flaws were exposed:
+
+- **Parser contains domain knowledge** (e.g., understanding job titles)
+- **Arbitrary heuristics** for predicate detection
+- **Inconsistent error handling** between implementations
+
+See [Issue #387](https://github.com/teranos/QNTX/issues/387) for detailed analysis and refactoring plan.
 
 ## Future Considerations
 
