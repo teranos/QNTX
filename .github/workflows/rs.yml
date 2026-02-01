@@ -110,29 +110,28 @@ jobs:
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
 
-  # TODO: Replace container + rustup with Nix derivation (nix build .#qntx-wasm)
-  # This would eliminate the need for the container image and rustup target setup.
+  # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#qntx-wasm)
   qntx-wasm:
     name: WASM Bridge
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/teranos/qntx:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure git safe directory
-        run: git config --global --add safe.directory /__w/QNTX/QNTX
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
-      - name: Add WASM target
-        run: rustup target add wasm32-unknown-unknown
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Check formatting
         run: cargo fmt --check --package qntx-wasm
