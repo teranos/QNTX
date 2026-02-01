@@ -16,6 +16,23 @@
         plugin/grpc/protocol/domain.proto
 
       echo "✓ Proto files generated in plugin/grpc/protocol/"
+
+      # TODO: Generate proto for atsstore.proto and queue.proto (currently only domain.proto)
+
+      # TODO: TypeScript proto generation
+      # - Use ts-proto for TypeScript generation
+      # - Output to web/ts/generated/proto/
+      # - Configure proper import paths
+
+      # TODO: Rust proto generation
+      # - Create qntx-proto crate at crates/qntx-proto/
+      # - Use prost for Rust generation
+      # - Set up build.rs for automatic proto compilation
+
+      # TODO: Go type migration
+      # - Currently generates in plugin/grpc/protocol/
+      # - Need to make generated types available as primary types
+      # - Replace ats/types with proto-generated equivalents
     '');
   };
 }
