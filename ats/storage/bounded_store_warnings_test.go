@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func TestCheckStorageStatus_BelowThreshold(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  time.Now(),
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -115,7 +116,7 @@ func TestCheckStorageStatus_AtThreshold(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  baseTime.Add(time.Duration(i) * time.Hour),
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -181,7 +182,7 @@ func TestCheckStorageStatus_AboveCapacity(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  time.Now(),
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -232,7 +233,7 @@ func TestCheckStorageStatus_AccelerationDetection(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  baseTime.Add(-168 * time.Hour), // 7 days ago
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -247,7 +248,7 @@ func TestCheckStorageStatus_AccelerationDetection(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  baseTime.Add(-time.Duration(24-i) * time.Hour),
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -314,7 +315,7 @@ func TestCheckStorageStatus_SlowRate(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  baseTime,
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -367,7 +368,7 @@ func TestCheckStorageStatus_MultipleContexts(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  baseTime.Add(time.Duration(i) * time.Hour),
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}
@@ -382,7 +383,7 @@ func TestCheckStorageStatus_MultipleContexts(t *testing.T) {
 			Actors:     []string{"test@user"},
 			Timestamp:  baseTime.Add(time.Duration(i) * time.Hour),
 		}
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("failed to create attestation: %v", err)
 		}
 	}

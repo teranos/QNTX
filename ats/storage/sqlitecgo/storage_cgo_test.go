@@ -4,6 +4,7 @@
 package sqlitecgo
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func TestRustStore_CreateAndGet(t *testing.T) {
 	}
 
 	// Create
-	if err := store.CreateAttestation(as); err != nil {
+	if err := store.CreateAttestation(context.Background(), as); err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 
@@ -73,7 +74,7 @@ func TestRustStore_Exists(t *testing.T) {
 	defer store.Close()
 
 	// Check non-existent
-	if store.AttestationExists("AS-nonexistent") {
+	if store.AttestationExists(context.Background(), "AS-nonexistent") {
 		t.Error("AttestationExists() = true for nonexistent ID")
 	}
 
@@ -88,12 +89,12 @@ func TestRustStore_Exists(t *testing.T) {
 		Source:     "test",
 		Attributes: make(map[string]interface{}),
 	}
-	if err := store.CreateAttestation(as); err != nil {
+	if err := store.CreateAttestation(context.Background(), as); err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 
 	// Check exists
-	if !store.AttestationExists("AS-exists-1") {
+	if !store.AttestationExists(context.Background(), "AS-exists-1") {
 		t.Error("AttestationExists() = false for existing ID")
 	}
 }
@@ -139,7 +140,7 @@ func TestRustStore_Count(t *testing.T) {
 	}
 
 	for _, as := range attestations {
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("CreateAttestation() error: %v", err)
 		}
 	}
@@ -197,7 +198,7 @@ func TestRustStore_ListIDs(t *testing.T) {
 
 	ids := []string{"AS-1", "AS-2", "AS-3"}
 	for _, as := range attestations {
-		if err := store.CreateAttestation(as); err != nil {
+		if err := store.CreateAttestation(context.Background(), as); err != nil {
 			t.Fatalf("CreateAttestation(%s) error: %v", as.ID, err)
 		}
 	}
@@ -242,7 +243,7 @@ func TestRustStore_Update(t *testing.T) {
 	}
 
 	// Create
-	if err := store.CreateAttestation(as); err != nil {
+	if err := store.CreateAttestation(context.Background(), as); err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 

@@ -408,7 +408,7 @@ func (h *Handler) createResultAttestation(
 	}
 
 	// Store the attestation
-	if err := h.store.CreateAttestation(resultAs); err != nil {
+	if err := h.store.CreateAttestation(context.Background(), resultAs); err != nil {
 		err = errors.Wrap(err, "failed to store result attestation")
 		err = errors.WithDetail(err, fmt.Sprintf("Result ASID: %s", asid))
 		err = errors.WithDetail(err, fmt.Sprintf("Source attestation: %s", sourceAs.ID))

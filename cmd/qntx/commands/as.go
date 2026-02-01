@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -98,13 +99,13 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		}
 		as = asCommand.ToAs(asid)
 		// Keep the user's specified actor (don't override with ASID)
-		err = boundedStore.CreateAttestation(as)
+		err = boundedStore.CreateAttestation(context.Background(), as)
 		if err != nil {
 			return errors.Wrap(err, "failed to create attestation")
 		}
 	} else {
 		// No actor specified - use self-certifying ASID (avoids bounded storage limits)
-		as, err = boundedStore.CreateAttestationWithLimits(asCommand)
+		as, err = boundedStore.CreateAttestationWithLimits(context.Background(), asCommand)
 		if err != nil {
 			return errors.Wrap(err, "failed to create attestation")
 		}

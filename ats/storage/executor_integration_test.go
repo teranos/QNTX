@@ -81,7 +81,7 @@ func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 	// Insert using the CreateAttestation function from storage package
 	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err)
 	}
 

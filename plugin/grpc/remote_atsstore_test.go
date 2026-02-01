@@ -69,11 +69,11 @@ func TestRemoteATSStore_CreateAttestation(t *testing.T) {
 		CreatedAt:  time.Now(),
 	}
 
-	err = client.CreateAttestation(attestation)
+	err = client.CreateAttestation(context.Background(), attestation)
 	require.NoError(t, err)
 
 	// Verify it exists
-	exists := client.AttestationExists("test-id-123")
+	exists := client.AttestationExists(context.Background(), "test-id-123")
 	assert.True(t, exists)
 }
 
@@ -102,7 +102,7 @@ func TestRemoteATSStore_CreateAttestation_InvalidToken(t *testing.T) {
 		CreatedAt:  time.Now(),
 	}
 
-	err = client.CreateAttestation(attestation)
+	err = client.CreateAttestation(context.Background(), attestation)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid authentication token")
 }

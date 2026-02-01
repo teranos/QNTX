@@ -78,7 +78,7 @@ func TestRefresh(t *testing.T) {
 	}
 
 	for i := range attestations {
-		if err := store.CreateAttestation(&attestations[i]); err != nil {
+		if err := store.CreateAttestation(context.Background(), &attestations[i]); err != nil {
 			t.Fatalf("Failed to create test attestation: %v", err)
 		}
 	}
@@ -121,7 +121,7 @@ func TestGetAttestationCount(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}
@@ -173,7 +173,7 @@ func TestGetSubjectCompletions(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}
@@ -240,7 +240,7 @@ func TestGetPredicateCompletions(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}
@@ -291,7 +291,7 @@ func TestGetContextCompletions(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}
@@ -328,7 +328,7 @@ func TestGetActorCompletions(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}
@@ -362,7 +362,7 @@ func TestCompletions_Metadata(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}
@@ -421,7 +421,7 @@ func TestCompletions_Limit(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("Failed to create attestation: %v", err)
 		}
 	}

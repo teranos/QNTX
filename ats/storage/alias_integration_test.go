@@ -14,13 +14,13 @@ func TestResolver_CreateAlias(t *testing.T) {
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
 	// Test creating a basic alias
-	err := resolver.CreateAlias("BILL", "WILLIAM SMITH")
+	err := resolver.CreateAlias(context.Background(), "BILL", "WILLIAM SMITH")
 	if err != nil {
 		t.Errorf("Expected no error creating alias, got: %v", err)
 	}
 
 	// Test creating another alias for the same person
-	err = resolver.CreateAlias("BILL", "W.SMITH")
+	err = resolver.CreateAlias(context.Background(), "BILL", "W.SMITH")
 	if err != nil {
 		t.Errorf("Expected no error creating second alias, got: %v", err)
 	}
@@ -32,8 +32,8 @@ func TestResolver_ResolveIdentifier(t *testing.T) {
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
 	// Create aliases
-	_ = resolver.CreateAlias("BILL", "WILLIAM SMITH")
-	_ = resolver.CreateAlias("BILL", "W.SMITH")
+	_ = resolver.CreateAlias(context.Background(), "BILL", "WILLIAM SMITH")
+	_ = resolver.CreateAlias(context.Background(), "BILL", "W.SMITH")
 
 	tests := []struct {
 		identifier string
@@ -77,8 +77,8 @@ func TestResolver_GetAliasesFor(t *testing.T) {
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
 	// Create aliases
-	_ = resolver.CreateAlias("ALICE", "ALICE SMITH")
-	_ = resolver.CreateAlias("ALICE", "A.SMITH")
+	_ = resolver.CreateAlias(context.Background(), "ALICE", "ALICE SMITH")
+	_ = resolver.CreateAlias(context.Background(), "ALICE", "A.SMITH")
 
 	aliases, err := resolver.GetAliasesFor(context.Background(), "ALICE")
 	if err != nil {
@@ -113,8 +113,8 @@ func TestResolver_RemoveAlias(t *testing.T) {
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
 	// Create and then remove an alias
-	_ = resolver.CreateAlias("BOB", "ROBERT JONES")
-	_ = resolver.CreateAlias("BOB", "R.JONES")
+	_ = resolver.CreateAlias(context.Background(), "BOB", "ROBERT JONES")
+	_ = resolver.CreateAlias(context.Background(), "BOB", "R.JONES")
 
 	// Verify it was created
 	resolved, _ := resolver.ResolveIdentifier(context.Background(), "BOB")
@@ -123,7 +123,7 @@ func TestResolver_RemoveAlias(t *testing.T) {
 	}
 
 	// Remove one alias
-	err := resolver.RemoveAlias("BOB", "ROBERT JONES")
+	err := resolver.RemoveAlias(context.Background(), "BOB", "ROBERT JONES")
 	if err != nil {
 		t.Errorf("Error removing alias: %v", err)
 	}
@@ -149,10 +149,10 @@ func TestResolver_GetAllAliases(t *testing.T) {
 	resolver := alias.NewResolver(NewAliasStore(testDB))
 
 	// Create several aliases
-	_ = resolver.CreateAlias("CHARLIE", "CHARLES BROWN")
-	_ = resolver.CreateAlias("DAVE", "DAVID GREEN")
+	_ = resolver.CreateAlias(context.Background(), "CHARLIE", "CHARLES BROWN")
+	_ = resolver.CreateAlias(context.Background(), "DAVE", "DAVID GREEN")
 
-	allAliases, err := resolver.GetAllAliases()
+	allAliases, err := resolver.GetAllAliases(context.Background())
 	if err != nil {
 		t.Errorf("Error getting all aliases: %v", err)
 	}

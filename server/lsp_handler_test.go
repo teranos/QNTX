@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -164,7 +165,7 @@ func TestGLSPSemanticTokensWithDatabase(t *testing.T) {
 
 	store := storage.NewSQLStore(db, nil)
 	for _, att := range testAttestations {
-		if err := store.CreateAttestation(&att); err != nil {
+		if err := store.CreateAttestation(context.Background(), &att); err != nil {
 			t.Fatalf("Failed to create test attestation: %v", err)
 		}
 	}
@@ -641,7 +642,7 @@ func TestGLSPContextCompletions(t *testing.T) {
 
 	store := storage.NewSQLStore(db, nil)
 	for _, att := range testAttestations {
-		if err := store.CreateAttestation(&att); err != nil {
+		if err := store.CreateAttestation(context.Background(), &att); err != nil {
 			t.Fatalf("Failed to create test attestation: %v", err)
 		}
 	}
@@ -799,7 +800,7 @@ func TestGLSPActorCompletions(t *testing.T) {
 
 	store := storage.NewSQLStore(db, nil)
 	for _, att := range testAttestations {
-		if err := store.CreateAttestation(&att); err != nil {
+		if err := store.CreateAttestation(context.Background(), &att); err != nil {
 			t.Fatalf("Failed to create test attestation: %v", err)
 		}
 	}

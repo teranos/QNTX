@@ -32,7 +32,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 		Timestamp:  now,
 		Source:     "test",
 	}
-	require.NoError(t, store.CreateAttestation(normalAttestation))
+	require.NoError(t, store.CreateAttestation(context.Background(), normalAttestation))
 
 	t.Run("SQL injection in predicate with single quote", func(t *testing.T) {
 		// Attempt SQL injection via predicate
@@ -45,7 +45,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 			Timestamp:  now,
 			Source:     "test",
 		}
-		require.NoError(t, store.CreateAttestation(maliciousAttestation))
+		require.NoError(t, store.CreateAttestation(context.Background(), maliciousAttestation))
 
 		// Query should treat the malicious string as literal predicate value
 		executor := NewExecutor(testDB)
@@ -70,7 +70,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 			Timestamp:  now,
 			Source:     "test",
 		}
-		require.NoError(t, store.CreateAttestation(percentAttestation))
+		require.NoError(t, store.CreateAttestation(context.Background(), percentAttestation))
 
 		// Query for literal "100% Coverage" should not act as wildcard
 		executor := NewExecutor(testDB)
@@ -95,7 +95,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 			Timestamp:  now,
 			Source:     "test",
 		}
-		require.NoError(t, store.CreateAttestation(underscoreAttestation1))
+		require.NoError(t, store.CreateAttestation(context.Background(), underscoreAttestation1))
 
 		underscoreAttestation2 := &types.As{
 			ID:         "UNDER002",
@@ -106,7 +106,7 @@ func TestSQLInjectionPrevention(t *testing.T) {
 			Timestamp:  now,
 			Source:     "test",
 		}
-		require.NoError(t, store.CreateAttestation(underscoreAttestation2))
+		require.NoError(t, store.CreateAttestation(context.Background(), underscoreAttestation2))
 
 		// Query for "user_id" should not match "userXid"
 		executor := NewExecutor(testDB)
@@ -148,7 +148,7 @@ func TestNumericPredicateParameterization(t *testing.T) {
 		Timestamp:  now,
 		Source:     "test",
 	}
-	require.NoError(t, store.CreateAttestation(numericAttestation))
+	require.NoError(t, store.CreateAttestation(context.Background(), numericAttestation))
 
 	t.Run("Malicious numeric predicate name", func(t *testing.T) {
 		// Attempt SQL injection via numeric predicate name

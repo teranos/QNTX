@@ -703,7 +703,7 @@ func TestServiceIntegration_BookCollectorAttestations(t *testing.T) {
 
 	// 9. Verify attestations were created in database
 	filter := ats.AttestationFilter{Limit: 100}
-	attestations, err := store.GetAttestations(filter)
+	attestations, err := store.GetAttestations(context.Background(), filter)
 	require.NoError(t, err)
 
 	// Should have attestations for collector wants and auction offers

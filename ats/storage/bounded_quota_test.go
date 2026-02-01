@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestBoundedStorage_DoesNotDeleteDifferentContexts(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err, "Failed to catalog %s scroll", subject)
 	}
 
@@ -90,7 +91,7 @@ func TestBoundedStorage_DeletesWhenExceeding16PerActorContext(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err, "Failed to catalog astronomy scroll %d", i)
 	}
 
@@ -142,7 +143,7 @@ func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err)
 	}
 
@@ -159,7 +160,7 @@ func TestBoundedStorage_DoesNotDeleteCrossingContextBoundaries(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err)
 	}
 
@@ -201,7 +202,7 @@ func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err)
 	}
 
@@ -229,7 +230,7 @@ func TestBoundedStorage_MixedContextsPreservation(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err)
 	}
 
@@ -280,7 +281,7 @@ func TestBoundedStorage_ExactDomainReproduction(t *testing.T) {
 				Source:     "test",
 				CreatedAt:  time.Now(),
 			}
-			err := store.CreateAttestation(attestation)
+			err := store.CreateAttestation(context.Background(), attestation)
 			require.NoError(t, err)
 		}
 
@@ -307,7 +308,7 @@ func TestBoundedStorage_ExactDomainReproduction(t *testing.T) {
 				Source:     "test",
 				CreatedAt:  time.Now(),
 			}
-			err := store.CreateAttestation(attestation)
+			err := store.CreateAttestation(context.Background(), attestation)
 			require.NoError(t, err)
 		}
 	}

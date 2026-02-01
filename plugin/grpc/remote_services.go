@@ -18,7 +18,6 @@ import (
 // gRPC plugins receive this registry with endpoints to connect back to QNTX.
 // Services are accessed via gRPC clients that connect to the endpoints.
 type RemoteServiceRegistry struct {
-	ctx              context.Context      // Parent context for cancellation
 	atsStoreEndpoint string
 	queueEndpoint    string
 	authToken        string
@@ -30,9 +29,7 @@ type RemoteServiceRegistry struct {
 }
 
 // NewRemoteServiceRegistry creates a new remote service registry.
-// The provided context is used for all gRPC operations and enables cancellation.
 func NewRemoteServiceRegistry(
-	ctx context.Context,
 	atsStoreEndpoint string,
 	queueEndpoint string,
 	authToken string,
@@ -41,7 +38,6 @@ func NewRemoteServiceRegistry(
 	pluginRef plugin.DomainPlugin,
 ) *RemoteServiceRegistry {
 	return &RemoteServiceRegistry{
-		ctx:              ctx,
 		atsStoreEndpoint: atsStoreEndpoint,
 		queueEndpoint:    queueEndpoint,
 		authToken:        authToken,
@@ -83,7 +79,7 @@ func (r *RemoteServiceRegistry) Config(domain string) plugin.Config {
 // The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) ATSStore() ats.AttestationStore {
 	if r.atsStoreClient == nil && r.atsStoreEndpoint != "" {
-		client, err := NewRemoteATSStore(r.ctx, r.atsStoreEndpoint, r.authToken, r.logger)
+		client, err := NewRemoteATSStore(r.atsStoreEndpoint, r.authToken, r.logger)
 		if err != nil {
 			r.logger.Errorw("Failed to create ATSStore client", "error", err)
 			return nil
@@ -97,7 +93,7 @@ func (r *RemoteServiceRegistry) ATSStore() ats.AttestationStore {
 // The client is lazy-initialized on first access.
 func (r *RemoteServiceRegistry) Queue() plugin.QueueService {
 	if r.queueClient == nil && r.queueEndpoint != "" {
-		client, err := NewRemoteQueue(r.ctx, r.queueEndpoint, r.authToken, r.logger)
+		client, err := NewRemoteQueue(r.queueEndpoint, r.authToken, r.logger)
 		if err != nil {
 			r.logger.Errorw("Failed to create Queue client", "error", err)
 			return nil

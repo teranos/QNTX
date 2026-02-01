@@ -109,7 +109,7 @@ func (e *Engine) Stop() {
 
 // loadWatchers loads all enabled watchers from the database and parses AX queries
 func (e *Engine) loadWatchers() error {
-	watchers, err := e.store.List(true) // enabled only
+	watchers, err := e.store.List(e.ctx, true) // enabled only
 	if err != nil {
 		return err
 	}
@@ -383,7 +383,7 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 			"error", err)
 
 		// Record error
-		e.store.RecordError(watcher.ID, err.Error())
+		e.store.RecordError(e.ctx, watcher.ID, err.Error())
 
 		// Queue for retry
 		e.queueRetry(watcher.ID, as, 1, err.Error())
@@ -393,7 +393,7 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 			"attestation_id", as.ID)
 
 		// Record success
-		e.store.RecordFire(watcher.ID)
+		e.store.RecordFire(e.ctx, watcher.ID)
 	}
 }
 
@@ -571,7 +571,7 @@ func (e *Engine) processRetryQueue() {
 					"attempt", pe.Attempt,
 					"error", err)
 
-				e.store.RecordError(w.ID, err.Error())
+				e.store.RecordError(e.ctx, w.ID, err.Error())
 				e.queueRetry(w.ID, pe.Attestation, pe.Attempt+1, err.Error())
 			} else {
 				e.logger.Infow("Retry succeeded",
@@ -579,7 +579,7 @@ func (e *Engine) processRetryQueue() {
 					"attestation_id", pe.Attestation.ID,
 					"attempt", pe.Attempt)
 
-				e.store.RecordFire(w.ID)
+				e.store.RecordFire(e.ctx, w.ID)
 			}
 		}(pe, watcher)
 	}

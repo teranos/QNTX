@@ -74,7 +74,7 @@ func createMeetingAttestation(t *testing.T, store *SQLStore, meeting *meetingAtt
 		"meeting_type":   meeting.meetingType,
 	}
 
-	err := store.CreateAttestation(&types.As{
+	err := store.CreateAttestation(context.Background(), &types.As{
 		ID:         meeting.meetingID,
 		Subjects:   []string{meeting.personID},
 		Predicates: []string{"meeting_duration_hours"},
