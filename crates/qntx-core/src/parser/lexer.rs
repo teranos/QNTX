@@ -110,7 +110,13 @@ impl<'a> Lexer<'a> {
         // - Support camelCase predicates (isAuthorOf)
         // - Handle multi-word predicates without underscores
         // - Detect semantic patterns like "X of Y" relationships
-        let kind = if text.contains('_') || text.starts_with("is_") || text.starts_with("has_") {
+        //
+        // NOTE: The user correctly points out this is inelegant. We're matching Go's arbitrary
+        // heuristics that treat "has_experience" as a predicate just because it contains an
+        // underscore. This is fragile and unprincipled. A proper redesign would have explicit
+        // predicate markers or use actual linguistic analysis, not string pattern matching.
+        // But for now we need bug-for-bug compatibility with the Go parser's quirks.
+        let kind = if text.contains('_') || text.starts_with("has") || text.starts_with("is") {
             TokenKind::NaturalPredicate
         } else {
             TokenKind::Identifier

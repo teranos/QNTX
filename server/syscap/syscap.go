@@ -28,6 +28,17 @@ func Get(fuzzyBackend ax.MatcherBackend) Message {
 		storageBackend = "go"
 	}
 
+	// Detect parser backend (requires qntxwasm build tag)
+	parserOptimized := parserAvailable()
+	parserBackend := "wasm"
+	parserVersion := parserBackendVersion()
+	parserSize := parserBackendSize()
+	if !parserOptimized {
+		parserBackend = "go"
+		parserVersion = ""
+		parserSize = ""
+	}
+
 	return Message{
 		Type:               "system_capabilities",
 		FuzzyBackend:       string(fuzzyBackend),
@@ -39,6 +50,10 @@ func Get(fuzzyBackend ax.MatcherBackend) Message {
 		StorageBackend:     storageBackend,
 		StorageOptimized:   storageOptimized,
 		StorageVersion:     storageVersion,
+		ParserBackend:      parserBackend,
+		ParserOptimized:    parserOptimized,
+		ParserVersion:      parserVersion,
+		ParserSize:         parserSize,
 	}
 }
 

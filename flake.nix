@@ -11,6 +11,10 @@
       url = "github:cachix/pre-commit-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Binary cache configuration
@@ -20,10 +24,45 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
+        rustWasmToolchain = fenix.packages.${system}.combine [
+          fenix.packages.${system}.stable.cargo
+          fenix.packages.${system}.stable.rustc
+          fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+        ];
+
+        # Build qntx-core as WASM module (used by Go via go:embed)
+        qntx-wasm = (pkgs.makeRustPlatform {
+          cargo = rustWasmToolchain;
+          rustc = rustWasmToolchain;
+        }).buildRustPackage {
+          pname = "qntx-wasm";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          cargoBuildFlags = [ "-p" "qntx-wasm" "--target" "wasm32-unknown-unknown" ];
+          doCheck = false;
+
+          # buildRustPackage expects binaries in target/release/ but we cross-compile
+          installPhase = ''
+            mkdir -p $out/lib
+            cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm $out/lib/qntx_core.wasm
+          '';
+        };
+
+        # Common preBuild hook for Go derivations: copy WASM module for go:embed
+        goWasmPreBuild = ''
+          cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
+        '';
 
         # Pre-commit hooks configuration
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
@@ -104,8 +143,10 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -116,14 +157,23 @@
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
+        # TODO: DEPRECATED - Will be replaced with protoc-based code generation
+        # Current typegen requires full compilation due to packages.Load with NeedTypes
+        # This creates unnecessary coupling to build configuration
         typegen = pkgs.buildGoModule {
           pname = "typegen";
           version = self.rev or "dev";
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
+
+          # HACK: Need qntxwasm tag because typegen compiles the whole codebase
+          # This will be removed when we migrate to protoc-based generation
+          tags = [ "qntxwasm" ];
 
           subPackages = [ "cmd/typegen" ];
         };
@@ -135,8 +185,10 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -374,6 +426,9 @@
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
+          # WASM module (qntx-core compiled to wasm32-unknown-unknown)
+          qntx-wasm = qntx-wasm;
+
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
           docs-site = pkgs.callPackage ./sitegen.nix {
@@ -387,6 +442,7 @@
               { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
               { name = "qntx-python"; description = "Python runtime plugin with PyO3"; }
+              { name = "qntx-wasm"; description = "qntx-core compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
             ];
 
@@ -502,109 +558,98 @@
         formatter = pkgs.nixpkgs-fmt;
 
         # Apps for common tasks
-        apps = {
-          build-docs-site = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "build-docs-site" ''
-              set -e
-              echo "Building documentation site..."
-              ${pkgs.nix}/bin/nix build .#docs-site
+        apps =
+          let
+            protoApps = import ./proto.nix { inherit pkgs; };
+          in
+          {
+            build-docs-site = {
+              type = "app";
+              program = toString (pkgs.writeShellScript "build-docs-site" ''
+                set -e
+                echo "Building documentation site..."
+                ${pkgs.nix}/bin/nix build .#docs-site
 
-              echo "Copying to web/site/..."
-              mkdir -p web/site
-              chmod -R +w web/site 2>/dev/null || true
-              rm -rf web/site/*
-              cp -r result/* web/site/
-              chmod -R +w web/site
+                echo "Copying to web/site/..."
+                mkdir -p web/site
+                chmod -R +w web/site 2>/dev/null || true
+                rm -rf web/site/*
+                cp -r result/* web/site/
+                chmod -R +w web/site
 
-              echo "Documentation site built and copied to web/site/"
-              echo "Files:"
-              ls -lh web/site/
-            '');
+                echo "Documentation site built and copied to web/site/"
+                echo "Files:"
+                ls -lh web/site/
+              '');
+            };
+
+            generate-types = {
+              type = "app";
+              program = toString (pkgs.writeShellScript "generate-types" ''
+                set -e
+                echo "Generating types and documentation..."
+
+                # Check if typegen binary exists and is up-to-date
+                REBUILD_NEEDED=0
+                if [ ! -e ./result/bin/typegen ]; then
+                  echo "Typegen binary not found, building..."
+                  REBUILD_NEEDED=1
+                elif [ cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
+                  echo "Typegen source changed, rebuilding..."
+                  REBUILD_NEEDED=1
+                fi
+
+                # Build typegen only if needed
+                if [ $REBUILD_NEEDED -eq 1 ]; then
+                  ${pkgs.nix}/bin/nix build .#typegen
+                else
+                  echo "Using existing typegen binary (skip rebuild)"
+                fi
+
+                # Run typegen for each language in parallel
+                # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
+                # CSS types output directly to web/css/generated/ (no --output flag)
+                echo "Running typegen for all languages in parallel..."
+                (
+                  ./result/bin/typegen --lang typescript --output types/generated/ &
+                  ./result/bin/typegen --lang python --output types/generated/ &
+                  ./result/bin/typegen --lang rust &
+                  ./result/bin/typegen --lang css &
+                  ./result/bin/typegen --lang markdown &
+                  wait
+                )
+
+                echo "✓ TypeScript types generated in types/generated/typescript/"
+                echo "✓ Python types generated in types/generated/python/"
+                echo "✓ Rust types generated in crates/qntx/src/types/"
+                echo "✓ CSS symbols generated in web/css/generated/"
+                echo "✓ Markdown docs generated in docs/types/"
+              '');
+            };
+
+            check-types = {
+              type = "app";
+              program = toString (pkgs.writeShellScript "check-types" ''
+                set -e
+                # Run typegen check inside dev environment where Go is available.
+                #
+                # NOTE: typegen uses golang.org/x/tools/go/packages which requires
+                # the 'go' command at runtime to load and parse Go packages. This is
+                # a known limitation of go/packages - it shells out to 'go list' for
+                # module resolution and type checking.
+                #
+                # Current approach: Run inside 'nix develop' where Go is in PATH.
+                # More proper solution: Wrap the typegen binary with makeWrapper to
+                # include Go in its runtime closure. This would make the binary truly
+                # self-contained but requires changes to the typegen package definition.
+                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
+              '');
+            };
+
+            generate-proto = protoApps.generate-proto;
+            generate-proto-go = protoApps.generate-proto-go;
+            generate-proto-typescript = protoApps.generate-proto-typescript;
           };
-
-          generate-types = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "generate-types" ''
-              set -e
-              echo "Generating types and documentation..."
-
-              # Check if typegen binary exists and is up-to-date
-              REBUILD_NEEDED=0
-              if [ ! -e ./result/bin/typegen ]; then
-                echo "Typegen binary not found, building..."
-                REBUILD_NEEDED=1
-              elif [ code/typegen -nt ./result/bin/typegen ]; then
-                echo "Typegen source changed, rebuilding..."
-                REBUILD_NEEDED=1
-              fi
-
-              # Build typegen only if needed
-              if [ $REBUILD_NEEDED -eq 1 ]; then
-                ${pkgs.nix}/bin/nix build .#typegen
-              else
-                echo "Using existing typegen binary (skip rebuild)"
-              fi
-
-              # Run typegen for each language in parallel
-              # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
-              # CSS types output directly to web/css/generated/ (no --output flag)
-              echo "Running typegen for all languages in parallel..."
-              (
-                ./result/bin/typegen --lang typescript --output types/generated/ &
-                ./result/bin/typegen --lang python --output types/generated/ &
-                ./result/bin/typegen --lang rust &
-                ./result/bin/typegen --lang css &
-                ./result/bin/typegen --lang markdown &
-                wait
-              )
-
-              echo "✓ TypeScript types generated in types/generated/typescript/"
-              echo "✓ Python types generated in types/generated/python/"
-              echo "✓ Rust types generated in crates/qntx/src/types/"
-              echo "✓ CSS symbols generated in web/css/generated/"
-              echo "✓ Markdown docs generated in docs/types/"
-            '');
-          };
-
-          check-types = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "check-types" ''
-              set -e
-              # Run typegen check inside dev environment where Go is available.
-              #
-              # NOTE: typegen uses golang.org/x/tools/go/packages which requires
-              # the 'go' command at runtime to load and parse Go packages. This is
-              # a known limitation of go/packages - it shells out to 'go list' for
-              # module resolution and type checking.
-              #
-              # Current approach: Run inside 'nix develop' where Go is in PATH.
-              # More proper solution: Wrap the typegen binary with makeWrapper to
-              # include Go in its runtime closure. This would make the binary truly
-              # self-contained but requires changes to the typegen package definition.
-              ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
-            '');
-          };
-
-          generate-proto = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "generate-proto" ''
-              set -e
-              echo "Generating gRPC code from proto files..."
-
-              # Use protoc from nixpkgs with Go plugins
-              ${pkgs.protobuf}/bin/protoc \
-                --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
-                --plugin=${pkgs.protoc-gen-go-grpc}/bin/protoc-gen-go-grpc \
-                --go_out=. --go_opt=paths=source_relative \
-                --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-                plugin/grpc/protocol/domain.proto
-
-              echo "✓ Proto files generated in plugin/grpc/protocol/"
-            '');
-          };
-        };
       }
     );
 }
-
