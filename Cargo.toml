@@ -4,6 +4,7 @@ members = [
     "crates/qntx",
     "crates/qntx-core",
     "crates/qntx-sqlite",
+    "crates/qntx-wasm",
     "qntx-python",
     "web/src-tauri",
 ]
