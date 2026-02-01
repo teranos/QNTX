@@ -85,6 +85,17 @@ fn write_error(msg: &str) -> u64 {
 }
 
 // ============================================================================
+// Version info
+// ============================================================================
+
+/// Get the qntx-core version. Returns a packed u64 (ptr << 32 | len) pointing
+/// to a string containing the version (e.g., "0.1.0").
+#[no_mangle]
+pub extern "C" fn qntx_core_version() -> u64 {
+    write_result(env!("CARGO_PKG_VERSION"))
+}
+
+// ============================================================================
 // Parser
 // ============================================================================
 

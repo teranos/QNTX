@@ -91,6 +91,20 @@ func (e *Engine) Call(fnName string, input string) (string, error) {
 	return callStringFn(context.Background(), e.mod, fnName, input)
 }
 
+// CallNoArgs invokes a named WASM function with no input and returns the
+// string output. Used for functions like qntx_core_version().
+func (e *Engine) CallNoArgs(fnName string) (string, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return callNoArgsFn(context.Background(), e.mod, fnName)
+}
+
+// GetWASMSize returns the size of the embedded WASM module in bytes.
+func GetWASMSize() int {
+	return len(wasmBytes)
+}
+
 // callStringFn handles the shared-memory protocol for string-in, string-out
 // WASM function calls.
 func callStringFn(ctx context.Context, mod api.Module, fnName string, input string) (string, error) {
@@ -136,6 +150,47 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 	// Free the input buffer
 	if inputSize > 0 {
 		freeFn.Call(ctx, inputPtr, inputSize)
+	}
+
+	// Unpack result: (ptr << 32) | len
+	packed := results[0]
+	resultPtr := uint32(packed >> 32)
+	resultLen := uint32(packed & 0xFFFFFFFF)
+
+	if resultPtr == 0 || resultLen == 0 {
+		return "", fmt.Errorf("wasm %s returned null result", fnName)
+	}
+
+	// Read result from WASM memory
+	resultBytes, ok := mod.Memory().Read(resultPtr, resultLen)
+	if !ok {
+		return "", fmt.Errorf("wasm memory read out of range")
+	}
+
+	// Copy before freeing (memory invalidated after free)
+	output := make([]byte, len(resultBytes))
+	copy(output, resultBytes)
+
+	// Free the result buffer
+	freeFn.Call(ctx, uint64(resultPtr), uint64(resultLen))
+
+	return string(output), nil
+}
+
+// callNoArgsFn handles the shared-memory protocol for no-input, string-out
+// WASM function calls (like version queries).
+func callNoArgsFn(ctx context.Context, mod api.Module, fnName string) (string, error) {
+	freeFn := mod.ExportedFunction("wasm_free")
+	targetFn := mod.ExportedFunction(fnName)
+
+	if freeFn == nil || targetFn == nil {
+		return "", fmt.Errorf("wasm: missing export %q", fnName)
+	}
+
+	// Call the function with no arguments
+	results, err := targetFn.Call(ctx)
+	if err != nil {
+		return "", fmt.Errorf("wasm call %s: %w", fnName, err)
 	}
 
 	// Unpack result: (ptr << 32) | len

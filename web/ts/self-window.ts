@@ -83,14 +83,14 @@ class SelfWindow {
 
         const sections: string[] = [];
 
-        // Core QNTX version section
+        // QNTX Server version section
         if (version) {
             const buildTimeFormatted = formatBuildTime(version.build_time) || version.build_time || 'unknown';
             const commitShort = version.commit?.substring(0, 7) || 'unknown';
 
             sections.push(`
                 <div class="self-section">
-                    <h3 class="self-section-title">QNTX Core</h3>
+                    <h3 class="self-section-title">QNTX Server</h3>
                     <div class="self-info-row">
                         <span class="self-info-label">Version:</span>
                         <span class="self-info-value">${version.version || 'unknown'}</span>
@@ -115,6 +115,10 @@ class SelfWindow {
 
         // System Capabilities section
         if (caps) {
+            const parserStatus = caps.parser_optimized ?
+                `<span class="capability-optimized">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
+                `<span class="capability-degraded">⚠ Go native parser</span>`;
+
             const fuzzyStatus = caps.fuzzy_optimized ?
                 `<span class="capability-optimized">✓ Optimized (Rust)</span>` :
                 `<span class="capability-degraded">⚠ Fallback (Go)</span>`;
@@ -130,6 +134,13 @@ class SelfWindow {
             sections.push(`
                 <div class="self-section">
                     <h3 class="self-section-title">System Capabilities</h3>
+                    <div class="self-info-row">
+                        <span class="self-info-label">parser:</span>
+                        <span class="self-info-value">
+                            ${caps.parser_version ? `v${caps.parser_version}` : ''}
+                            ${parserStatus}
+                        </span>
+                    </div>
                     <div class="self-info-row">
                         <span class="self-info-label">fuzzy-ax:</span>
                         <span class="self-info-value">
