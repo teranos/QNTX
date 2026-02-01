@@ -117,7 +117,7 @@ impl AtsStoreClient {
             predicates,
             contexts,
             actors: actors.unwrap_or_default(),
-            timestamp: 0, // Server will use current time
+            timestamp: None, // Server will use current time
             attributes_json,
         };
 

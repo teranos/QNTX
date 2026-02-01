@@ -71,6 +71,7 @@ func init() {
 	rootCmd.AddCommand(commands.AxCmd)
 	// CodeCmd now provided by code domain plugin
 	rootCmd.AddCommand(commands.DbCmd)
+	rootCmd.AddCommand(commands.HandlerCmd)
 	rootCmd.AddCommand(commands.PulseCmd)
 	rootCmd.AddCommand(commands.IxCmd)
 	rootCmd.AddCommand(commands.ServerCmd)
@@ -165,6 +166,36 @@ func loadPluginsAsync(cfg *am.Config, pluginLogger *zap.SugaredLogger, registry 
 			pluginLogger.Errorw("Failed to initialize plugins", "error", err)
 		} else {
 			pluginLogger.Infow("Successfully initialized all plugins")
+		}
+
+		// Phase 4: Register plugin async handlers with Pulse
+		// Now that plugins are initialized, they've announced their handlers in InitializeResponse
+		// Register these handlers with Pulse's worker pool registry
+		daemon := defaultServer.GetDaemon()
+		if daemon != nil {
+			handlerRegistry := daemon.Registry()
+			pluginLogger.Infow("Registering plugin async handlers with Pulse")
+
+			for _, p := range loadedPlugins {
+				// Only ExternalDomainProxy supports async handlers (not built-in plugins)
+				externalPlugin, ok := p.(*grpc.ExternalDomainProxy)
+				if !ok {
+					continue // Skip built-in plugins
+				}
+
+				handlerNames := externalPlugin.GetHandlerNames()
+				for _, handlerName := range handlerNames {
+					pluginLogger.Infow("Registering plugin async handler",
+						"plugin", p.Metadata().Name,
+						"handler", handlerName,
+					)
+					proxyHandler := grpc.NewPluginProxyHandler(handlerName, externalPlugin)
+					handlerRegistry.Register(proxyHandler)
+				}
+			}
+			pluginLogger.Infow("Plugin async handler registration complete")
+		} else {
+			pluginLogger.Warnw("Cannot register handlers - Pulse daemon not available")
 		}
 	} else {
 		pluginLogger.Warnw("Cannot initialize plugins - server or services not available yet")

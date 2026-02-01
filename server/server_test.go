@@ -698,3 +698,31 @@ func TestBroadcastMessage(t *testing.T) {
 		t.Error("Client2 did not receive message")
 	}
 }
+
+// TestGetDaemon verifies that GetDaemon returns the Pulse worker pool
+func TestGetDaemon(t *testing.T) {
+	db := createTestDB(t)
+
+	srv, err := NewQNTXServer(db, ":memory:", 1)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	// Verify GetDaemon returns the daemon
+	daemon := srv.GetDaemon()
+	if daemon == nil {
+		t.Fatal("GetDaemon() returned nil")
+	}
+
+	// Verify we can access the handler registry
+	registry := daemon.Registry()
+	if registry == nil {
+		t.Fatal("daemon.Registry() returned nil")
+	}
+
+	// Verify registry is empty initially (no handlers registered yet)
+	handlers := registry.Names()
+	if len(handlers) != 0 {
+		t.Errorf("Expected 0 handlers, got %d: %v", len(handlers), handlers)
+	}
+}

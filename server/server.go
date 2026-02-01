@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/am"
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/vidstream/vidstream"
+	"github.com/teranos/QNTX/ats/watcher"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -71,6 +72,9 @@ type QNTXServer struct {
 	wg             sync.WaitGroup     // Tracks active goroutines for clean shutdown
 	broadcastDrops atomic.Int64       // Tracks dropped broadcasts for monitoring
 	state          atomic.Int32       // Opening/Closing Phase 4: Server state (Running/Draining/Stopped)
+
+	// Watcher engine for reactive attestation triggers
+	watcherEngine *watcher.Engine
 }
 
 // handleClientRegister handles a new client connection
@@ -274,4 +278,9 @@ func GetDefaultServer() *QNTXServer {
 // GetServices returns the service registry for plugins
 func (s *QNTXServer) GetServices() plugin.ServiceRegistry {
 	return s.services
+}
+
+// GetDaemon returns the Pulse worker pool for dynamic handler registration
+func (s *QNTXServer) GetDaemon() *async.WorkerPool {
+	return s.daemon
 }
