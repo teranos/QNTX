@@ -23,6 +23,7 @@ import { log, SEG } from '../../logger';
 import { GRID_SIZE } from './grid-constants';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
+import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -69,7 +70,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
     let currentQuery = persistedQuery || initialQuery;
 
     // Store matched attestations (will be populated by WebSocket handler)
-    const matchedAttestations: any[] = [];
+    const matchedAttestations: Attestation[] = [];
 
     const glyph: Glyph = {
         id: glyphId,
@@ -271,7 +272,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
 /**
  * Render a single attestation result in the results list
  */
-function renderAttestation(attestation: any): HTMLElement {
+function renderAttestation(attestation: Attestation): HTMLElement {
     const item = document.createElement('div');
     item.className = 'ax-glyph-result-item';
     item.style.padding = '8px';
@@ -300,7 +301,7 @@ function renderAttestation(attestation: any): HTMLElement {
 /**
  * Update the results display with new attestations
  */
-export function updateAxGlyphResults(glyphId: string, attestation: any): void {
+export function updateAxGlyphResults(glyphId: string, attestation: Attestation): void {
     const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`);
     if (!glyph) {
         log.warn(SEG.UI, `[AxGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
