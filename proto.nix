@@ -1,7 +1,7 @@
 { pkgs, ... }:
 
 {
-  generate-proto = {
+  generate-proto-go = {
     type = "app";
     program = toString (pkgs.writeShellScript "generate-proto" ''
       set -e
@@ -33,6 +33,49 @@
       # - Currently generates in plugin/grpc/protocol/
       # - Need to make generated types available as primary types
       # - Replace ats/types with proto-generated equivalents
+    '');
+  };
+
+  generate-proto-typescript = {
+    type = "app";
+    program = toString (pkgs.writeShellScript "generate-proto-typescript" ''
+      set -e
+      echo "Generating TypeScript proto code..."
+
+      # Ensure output directory exists
+      mkdir -p web/ts/generated/proto
+
+      # Install ts-proto locally if not present
+      if ! [ -d web/node_modules/ts-proto ]; then
+        echo "Installing ts-proto..."
+        cd web && ${pkgs.bun}/bin/bun add -d ts-proto
+        cd ..
+      fi
+
+      # Generate TypeScript using ts-proto
+      ${pkgs.protobuf}/bin/protoc \
+        --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
+        --ts_proto_opt=esModuleInterop=true \
+        --ts_proto_out=web/ts/generated/proto \
+        plugin/grpc/protocol/atsstore.proto
+
+      echo "✓ TypeScript proto files generated in web/ts/generated/proto/"
+    '');
+  };
+
+  generate-proto = {
+    type = "app";
+    program = toString (pkgs.writeShellScript "generate-proto" ''
+      set -e
+      echo "Generating all proto code..."
+
+      # Run Go generation
+      nix run .#generate-proto-go
+
+      # Run TypeScript generation
+      nix run .#generate-proto-typescript
+
+      echo "✓ All proto files generated"
     '');
   };
 }
