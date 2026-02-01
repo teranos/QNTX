@@ -4,14 +4,14 @@
 Accepted
 
 ## Context
-When implementing proto generation for TypeScript (ADR-006), we discovered ts-proto generates massive files with features we don't need:
-- Default generation: 1355 lines
-- Includes encode/decode methods
-- Includes JSON serialization
-- Includes gRPC client implementations
+When implementing proto generation for TypeScript (ADR-006), we found ts-proto by default generates:
+- encode/decode methods for protobuf binary format
+- JSON serialization/deserialization functions
+- gRPC client implementations
+- Service definitions and type registries
 - Requires @bufbuild/protobuf dependency
 
-Our TypeScript code communicates via WebSocket with JSON, not gRPC with protobuf.
+Our TypeScript code communicates via WebSocket with JSON, not gRPC with protobuf binary format.
 
 ## Decision
 Generate only TypeScript interfaces from proto files, skipping all serialization and gRPC code.
@@ -26,10 +26,10 @@ ${pkgs.protobuf}/bin/protoc \
   --ts_proto_out=web/ts/generated/proto \
   plugin/grpc/protocol/atsstore.proto
 ```
-Result: 1355 lines, requires @bufbuild/protobuf
+Result: Includes serialization, gRPC clients, requires @bufbuild/protobuf
 
 ### Step 2: Discovery
-We only use the interface definitions. Everything else is dead code.
+We only use the interface definitions. All serialization and gRPC code is unused.
 
 ### Step 3: Optimization
 ```nix
@@ -120,9 +120,23 @@ This is a proven pattern. For any new proto type:
 4. Replace `any` with typed interface
 5. Run `bun run typecheck` to verify
 
-## Known Issues (Deferred)
-- Timestamp format mismatch (proto: int64, JSON: ISO string) - handle in application code when Go types are migrated
-- Attributes encoding difference (proto: JSON string, Go: object) - address during Go migration
+## Field Naming Resolution
+
+Initially discovered that proto field names didn't match Go's JSON output:
+- Proto had `attributes_json`, Go sends `"attributes"`
+- Proto snake_case gets converted to camelCase by default
+
+**Solution:**
+1. Renamed proto fields to match Go exactly (`attributes_json` → `attributes`)
+2. Added `snakeToCamel=false` to preserve snake_case in TypeScript
+3. Now field names align perfectly between Go JSON and TypeScript interfaces
+
+## Remaining Type Mismatches
+
+While field names now match, type representations still differ:
+- **Timestamps:** Proto/TypeScript expect `number` (Unix seconds), Go sends ISO string
+- **Current approach:** Cast at runtime with `as Attestation`
+- **Future fix:** When Go migrates to proto types, it will send correct formats
 
 ## Key Takeaway
 **This pattern works.** When implementing proto generation for other languages, question what you actually need. The best generated code is often the least generated code.

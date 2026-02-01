@@ -18,10 +18,10 @@ export interface Attestation {
   /** Unix timestamp in seconds */
   timestamp: number;
   source: string;
-  /** JSON-encoded map[string]interface{} */
-  attributesJson: string;
+  /** map[string]interface{} as JSON string */
+  attributes: string;
   /** Unix timestamp in seconds */
-  createdAt: number;
+  created_at: number;
 }
 
 /** AttestationCommand is used for creating attestations */
@@ -35,7 +35,7 @@ export interface AttestationCommand {
     | number
     | undefined;
   /** JSON-encoded map[string]interface{} */
-  attributesJson: string;
+  attributes_json: string;
 }
 
 /** AttestationFilter for querying attestations */
@@ -45,16 +45,16 @@ export interface AttestationFilter {
   contexts: string[];
   actors: string[];
   /** Unix timestamp in seconds (0 = no filter) */
-  timeStart: number;
+  time_start: number;
   /** Unix timestamp in seconds (0 = no filter) */
-  timeEnd: number;
+  time_end: number;
   /** Maximum results. If not set, no limit applied. */
   limit?: number | undefined;
 }
 
 export interface CreateAttestationRequest {
   /** Simple token-based auth */
-  authToken: string;
+  auth_token: string;
   attestation: Attestation | undefined;
 }
 
@@ -65,7 +65,7 @@ export interface CreateAttestationResponse {
 }
 
 export interface AttestationExistsRequest {
-  authToken: string;
+  auth_token: string;
   id: string;
 }
 
@@ -74,7 +74,7 @@ export interface AttestationExistsResponse {
 }
 
 export interface GenerateAttestationRequest {
-  authToken: string;
+  auth_token: string;
   command: AttestationCommand | undefined;
 }
 
@@ -86,7 +86,7 @@ export interface GenerateAttestationResponse {
 }
 
 export interface GetAttestationsRequest {
-  authToken: string;
+  auth_token: string;
   filter: AttestationFilter | undefined;
 }
 

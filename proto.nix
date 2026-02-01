@@ -19,20 +19,17 @@
 
       # TODO: Generate proto for atsstore.proto and queue.proto (currently only domain.proto)
 
-      # TODO: TypeScript proto generation
-      # - Use ts-proto for TypeScript generation
-      # - Output to web/ts/generated/proto/
-      # - Configure proper import paths
-
       # TODO: Rust proto generation
+      # See ADR-006 for strategy: Protocol Buffers as Single Source of Truth
       # - Create qntx-proto crate at crates/qntx-proto/
       # - Use prost for Rust generation
-      # - Set up build.rs for automatic proto compilation
+      # - Follow TypeScript pattern from ADR-007 (interfaces only if possible)
 
       # TODO: Go type migration
+      # See ADR-006 for gradual migration approach
       # - Currently generates in plugin/grpc/protocol/
       # - Need to make generated types available as primary types
-      # - Replace ats/types with proto-generated equivalents
+      # - Handle timestamp format differences (time.Time vs int64)
     '');
   };
 
@@ -53,12 +50,14 @@
       fi
 
       # Generate TypeScript using ts-proto (minimal - interfaces only)
+      # See ADR-007: TypeScript Proto Interfaces-Only Pattern
       # Options to generate ONLY type interfaces:
       # - outputEncodeMethods=false: skip encode/decode functions
       # - outputJsonMethods=false: skip JSON serialization
       # - outputClientImpl=false: skip gRPC client code
       # - outputServices=false: skip service definitions
       # - onlyTypes=true: only generate type definitions
+      # - snakeToCamel=false: keep snake_case field names to match Go JSON
       ${pkgs.protobuf}/bin/protoc \
         --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
         --ts_proto_opt=esModuleInterop=true \
@@ -67,6 +66,7 @@
         --ts_proto_opt=outputClientImpl=false \
         --ts_proto_opt=outputServices=false \
         --ts_proto_opt=onlyTypes=true \
+        --ts_proto_opt=snakeToCamel=false \
         --ts_proto_out=web/ts/generated/proto \
         plugin/grpc/protocol/atsstore.proto
 
