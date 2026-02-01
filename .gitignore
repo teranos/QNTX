@@ -26,6 +26,7 @@ web/coverage/
 *.o
 *.out
 *.bin
+*.wasm
 qntx-code-plugin
 qntx-webscraper-plugin
 

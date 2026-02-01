@@ -145,7 +145,7 @@ func ParseAxCommandWithVerbosity(args []string, verbosity int) (*types.AxFilter,
 // ParseAxCommandWithContext parses ax queries with context-aware error formatting
 // Use ErrorContextTerminal for terminal output with ANSI colors, ErrorContextPlain for web UI/logs
 func ParseAxCommandWithContext(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
-	return parseAxQuery(args, verbosity, ctx)
+	return parseAxQueryDispatch(args, verbosity, ctx)
 }
 
 // ParseAskCommand parses natural language ask queries with flexible grammar
@@ -165,8 +165,8 @@ func ParseAskCommandWithContext(args []string, verbosity int, ctx ErrorContext) 
 	return ParseAxCommandWithContext(args, verbosity, ctx)
 }
 
-// parseAxQuery contains the actual implementation for ax query parsing
-func parseAxQuery(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
+// parseAxQueryGo contains the Go implementation for ax query parsing
+func parseAxQueryGo(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
 	filter := &types.AxFilter{
 		Limit:  100,
 		Format: "table",
