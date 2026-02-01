@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -26,13 +27,13 @@ func TestAttestationExists_True(t *testing.T) {
 		Source:     "test",
 	}
 
-	err := store.CreateAttestation(attestation)
+	err := store.CreateAttestation(context.Background(), attestation)
 	if err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 
 	// Check existence
-	exists := store.AttestationExists("test-asid-exists")
+	exists := store.AttestationExists(context.Background(), "test-asid-exists")
 	if !exists {
 		t.Error("AttestationExists() = false, want true for existing attestation")
 	}
@@ -46,7 +47,7 @@ func TestAttestationExists_False(t *testing.T) {
 	store := NewSQLStore(db, nil)
 
 	// Check non-existent ID
-	exists := store.AttestationExists("non-existent-id")
+	exists := store.AttestationExists(context.Background(), "non-existent-id")
 	if exists {
 		t.Error("AttestationExists() = true, want false for non-existent attestation")
 	}
@@ -60,7 +61,7 @@ func TestAttestationExists_EmptyID(t *testing.T) {
 	store := NewSQLStore(db, nil)
 
 	// Check empty ID
-	exists := store.AttestationExists("")
+	exists := store.AttestationExists(context.Background(), "")
 	if exists {
 		t.Error("AttestationExists('') = true, want false for empty ID")
 	}
@@ -85,20 +86,20 @@ func TestAttestationExists_MultipleChecks(t *testing.T) {
 			Timestamp:  time.Now(),
 			Source:     "test",
 		}
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("CreateAttestation(%s) error: %v", id, err)
 		}
 	}
 
 	// Check all existing IDs
 	for _, id := range ids {
-		if !store.AttestationExists(id) {
+		if !store.AttestationExists(context.Background(), id) {
 			t.Errorf("AttestationExists(%q) = false, want true", id)
 		}
 	}
 
 	// Check non-existent ID
-	if store.AttestationExists("id-4") {
+	if store.AttestationExists(context.Background(), "id-4") {
 		t.Error("AttestationExists('id-4') = true, want false for non-existent ID")
 	}
 }
@@ -122,12 +123,12 @@ func TestAttestationExists_AfterDeletion(t *testing.T) {
 		Source:     "test",
 	}
 
-	if err := store.CreateAttestation(attestation); err != nil {
+	if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 
 	// Verify it exists
-	if !store.AttestationExists(id) {
+	if !store.AttestationExists(context.Background(), id) {
 		t.Fatal("Attestation should exist after creation")
 	}
 
@@ -138,7 +139,7 @@ func TestAttestationExists_AfterDeletion(t *testing.T) {
 	}
 
 	// Verify it no longer exists
-	if store.AttestationExists(id) {
+	if store.AttestationExists(context.Background(), id) {
 		t.Error("AttestationExists() = true, want false after deletion")
 	}
 }
@@ -162,18 +163,18 @@ func TestAttestationExists_CaseSensitivity(t *testing.T) {
 		Source:     "test",
 	}
 
-	if err := store.CreateAttestation(attestation); err != nil {
+	if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 		t.Fatalf("CreateAttestation() error: %v", err)
 	}
 
 	// Check with exact case
-	if !store.AttestationExists("TestCaseID") {
+	if !store.AttestationExists(context.Background(), "TestCaseID") {
 		t.Error("AttestationExists('TestCaseID') = false, want true for exact match")
 	}
 
 	// SQLite is case-sensitive for strings by default
 	// Check with different case (should not exist)
-	if store.AttestationExists("testcaseid") {
+	if store.AttestationExists(context.Background(), "testcaseid") {
 		t.Error("AttestationExists('testcaseid') = true, want false (case mismatch)")
 	}
 }
@@ -204,12 +205,12 @@ func TestAttestationExists_SpecialCharacters(t *testing.T) {
 			Source:     "test",
 		}
 
-		if err := store.CreateAttestation(attestation); err != nil {
+		if err := store.CreateAttestation(context.Background(), attestation); err != nil {
 			t.Fatalf("CreateAttestation(%q) error: %v", id, err)
 		}
 
 		// Verify existence
-		if !store.AttestationExists(id) {
+		if !store.AttestationExists(context.Background(), id) {
 			t.Errorf("AttestationExists(%q) = false, want true", id)
 		}
 	}
@@ -233,18 +234,18 @@ func TestCreateAttestation_Duplicate(t *testing.T) {
 	}
 
 	// First creation should succeed
-	err := store.CreateAttestation(attestation)
+	err := store.CreateAttestation(context.Background(), attestation)
 	if err != nil {
 		t.Fatalf("First CreateAttestation() error: %v", err)
 	}
 
 	// Verify exists
-	if !store.AttestationExists("duplicate-test") {
+	if !store.AttestationExists(context.Background(), "duplicate-test") {
 		t.Fatal("Attestation should exist after creation")
 	}
 
 	// Second creation with same ID should fail (UNIQUE constraint)
-	err = store.CreateAttestation(attestation)
+	err = store.CreateAttestation(context.Background(), attestation)
 	if err == nil {
 		t.Error("CreateAttestation() with duplicate ID should fail, got nil error")
 	}

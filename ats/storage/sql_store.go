@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -136,7 +137,7 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 //
 // TODO(QNTX #67): Add comprehensive tests for bounded storage enforcement
 // Focus: 16 attestations per actor/context, 64 contexts per actor, 64 actors per entity
-func (s *SQLStore) CreateAttestation(as *types.As) error {
+func (s *SQLStore) CreateAttestation(ctx context.Context, as *types.As) error {
 	fields, err := MarshalAttestationFields(as)
 	if err != nil {
 		err = errors.Wrap(err, "failed to marshal attestation fields")
@@ -146,7 +147,8 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 		return err
 	}
 
-	_, err = s.db.Exec(
+	_, err = s.db.ExecContext(
+		ctx,
 		AttestationInsertQuery,
 		as.ID,
 		fields.SubjectsJSON,
@@ -181,18 +183,18 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 }
 
 // AttestationExists checks if an attestation with the given ID exists
-func (s *SQLStore) AttestationExists(asid string) bool {
+func (s *SQLStore) AttestationExists(ctx context.Context, asid string) bool {
 	var exists bool
-	err := s.db.QueryRow(AttestationExistsQuery, asid).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, AttestationExistsQuery, asid).Scan(&exists)
 	return err == nil && exists
 }
 
 // GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation
 // The attestation uses its own ASID as its actor to avoid bounded storage limits
-func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+func (s *SQLStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	// Generate vanity ASID with collision detection
 	checkExists := func(asid string) bool {
-		return s.AttestationExists(asid)
+		return s.AttestationExists(ctx, asid)
 	}
 
 	// Use first subject, predicate, and context for vanity generation
@@ -228,7 +230,7 @@ func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As
 	as.Actors = []string{asid}
 
 	// Create in database
-	err = s.CreateAttestation(as)
+	err = s.CreateAttestation(ctx, as)
 	if err != nil {
 		err = errors.Wrap(err, "failed to create attestation")
 		err = errors.WithDetail(err, fmt.Sprintf("ASID: %s", asid))
@@ -242,6 +244,6 @@ func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As
 }
 
 // GetAttestations retrieves attestations based on filters
-func (s *SQLStore) GetAttestations(filters ats.AttestationFilter) ([]*types.As, error) {
-	return GetAttestations(s.db, filters)
+func (s *SQLStore) GetAttestations(ctx context.Context, filters ats.AttestationFilter) ([]*types.As, error) {
+	return GetAttestations(ctx, s.db, filters)
 }

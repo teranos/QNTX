@@ -776,7 +776,7 @@ func (bs *BoundedStore) getTypeDefinitions(ctx context.Context) (map[string][]st
 		Limit:      1000, // Reasonable upper bound on number of types
 	}
 
-	attestations, err := bs.GetAttestations(filter)
+	attestations, err := bs.GetAttestations(ctx, filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query type definitions")
 	}

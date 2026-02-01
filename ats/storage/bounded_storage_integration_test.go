@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ func TestBoundedStorage_16PerActorContext(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err, "Failed to create attestation %d", i)
 	}
 
@@ -73,7 +74,7 @@ func TestBoundedStorage_SameActorContextPruning(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err, "Failed to create attestation %d", i)
 	}
 
@@ -135,7 +136,7 @@ func TestBoundedStorage_DomainScenario(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err, "Failed to create domain attestation: %s", att.pred)
 	}
 

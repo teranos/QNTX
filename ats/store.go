@@ -20,22 +20,22 @@ type AttestationItem = ingestion.Item
 // Implementations can use any backend (SQLite, Postgres, S3, in-memory, etc.)
 type AttestationStore interface {
 	// CreateAttestation inserts a new attestation into storage
-	CreateAttestation(as *types.As) error
+	CreateAttestation(ctx context.Context, as *types.As) error
 
 	// AttestationExists checks if an attestation with the given ID exists
-	AttestationExists(asid string) bool
+	AttestationExists(ctx context.Context, asid string) bool
 
 	// GenerateAndCreateAttestation generates a vanity ASID and creates a self-certifying attestation
-	GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error)
+	GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error)
 
 	// GetAttestations retrieves attestations based on filters
-	GetAttestations(filters AttestationFilter) ([]*types.As, error)
+	GetAttestations(ctx context.Context, filters AttestationFilter) ([]*types.As, error)
 }
 
 // BatchStore defines batch persistence operations for attestations
 type BatchStore interface {
 	// PersistItems converts AttestationItems to attestations and persists them to storage
-	PersistItems(items []AttestationItem, sourcePrefix string) *PersistenceResult
+	PersistItems(ctx context.Context, items []AttestationItem, sourcePrefix string) *PersistenceResult
 }
 
 // BoundedStore defines bounded storage operations that enforce quota limits
@@ -43,25 +43,25 @@ type BoundedStore interface {
 	AttestationStore
 
 	// CreateAttestationWithLimits creates an attestation and enforces storage limits
-	CreateAttestationWithLimits(cmd *types.AsCommand) (*types.As, error)
+	CreateAttestationWithLimits(ctx context.Context, cmd *types.AsCommand) (*types.As, error)
 
 	// GetStorageStats returns current storage statistics
-	GetStorageStats() (*StorageStats, error)
+	GetStorageStats(ctx context.Context) (*StorageStats, error)
 }
 
 // AliasResolver defines alias resolution operations
 type AliasResolver interface {
 	// ResolveAlias returns all identifiers that should be included when searching for the given identifier
-	ResolveAlias(identifier string) ([]string, error)
+	ResolveAlias(ctx context.Context, identifier string) ([]string, error)
 
 	// CreateAlias creates a bidirectional alias between two identifiers
-	CreateAlias(alias, target, createdBy string) error
+	CreateAlias(ctx context.Context, alias, target, createdBy string) error
 
 	// RemoveAlias removes an alias mapping
-	RemoveAlias(alias, target string) error
+	RemoveAlias(ctx context.Context, alias, target string) error
 
 	// GetAllAliases returns all alias mappings
-	GetAllAliases() (map[string][]string, error)
+	GetAllAliases(ctx context.Context) (map[string][]string, error)
 }
 
 // AttestationFilter represents filters for querying attestations

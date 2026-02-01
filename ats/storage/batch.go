@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -46,7 +47,7 @@ func (bp *BatchPersister) WithBoundedStore(bs *BoundedStore) *BatchPersister {
 
 // PersistItems converts AttestationItems to attestations and persists them to the database
 // Returns detailed statistics and error information for reporting
-func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix string) *ats.PersistenceResult {
+func (bp *BatchPersister) PersistItems(ctx context.Context, items []AttestationItem, sourcePrefix string) *ats.PersistenceResult {
 	result := &ats.PersistenceResult{
 		Errors: make([]string, 0),
 	}
@@ -96,7 +97,7 @@ func (bp *BatchPersister) PersistItems(items []AttestationItem, sourcePrefix str
 		}
 
 		// Persist to database
-		if err := bp.store.CreateAttestation(&attestation); err != nil {
+		if err := bp.store.CreateAttestation(ctx, &attestation); err != nil {
 			result.FailureCount++
 			errorMsg := fmt.Sprintf("Failed to persist attestation %s %s %s: %v",
 				item.GetSubject(), item.GetPredicate(), item.GetObject(), err)

@@ -97,7 +97,7 @@ func (s *QNTXServer) HandleWatchers(w http.ResponseWriter, r *http.Request) {
 func (s *QNTXServer) handleListWatchers(w http.ResponseWriter, r *http.Request) {
 	enabledOnly := r.URL.Query().Get("enabled") == "true"
 
-	watchers, err := s.watcherEngine.GetStore().List(enabledOnly)
+	watchers, err := s.watcherEngine.GetStore().List(r.Context(), enabledOnly)
 	if err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to list watchers"), http.StatusInternalServerError)
 		return
@@ -113,7 +113,7 @@ func (s *QNTXServer) handleListWatchers(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *QNTXServer) handleGetWatcher(w http.ResponseWriter, r *http.Request, id string) {
-	watcher, err := s.watcherEngine.GetStore().Get(id)
+	watcher, err := s.watcherEngine.GetStore().Get(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeRichError(w, err, http.StatusNotFound)
@@ -198,7 +198,7 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Create watcher
-	if err := s.watcherEngine.GetStore().Create(watcher); err != nil {
+	if err := s.watcherEngine.GetStore().Create(r.Context(), watcher); err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to create watcher"), http.StatusInternalServerError)
 		return
 	}
@@ -215,7 +215,7 @@ func (s *QNTXServer) handleCreateWatcher(w http.ResponseWriter, r *http.Request)
 
 func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	// Get existing watcher
-	existing, err := s.watcherEngine.GetStore().Get(id)
+	existing, err := s.watcherEngine.GetStore().Get(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeRichError(w, err, http.StatusNotFound)
@@ -277,7 +277,7 @@ func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Update in DB
-	if err := s.watcherEngine.GetStore().Update(existing); err != nil {
+	if err := s.watcherEngine.GetStore().Update(r.Context(), existing); err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to update watcher"), http.StatusInternalServerError)
 		return
 	}
@@ -293,7 +293,7 @@ func (s *QNTXServer) handleUpdateWatcher(w http.ResponseWriter, r *http.Request,
 
 func (s *QNTXServer) handleDeleteWatcher(w http.ResponseWriter, r *http.Request, id string) {
 	// Verify watcher exists
-	if _, err := s.watcherEngine.GetStore().Get(id); err != nil {
+	if _, err := s.watcherEngine.GetStore().Get(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeRichError(w, err, http.StatusNotFound)
 		} else {
@@ -303,7 +303,7 @@ func (s *QNTXServer) handleDeleteWatcher(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Delete
-	if err := s.watcherEngine.GetStore().Delete(id); err != nil {
+	if err := s.watcherEngine.GetStore().Delete(r.Context(), id); err != nil {
 		s.writeRichError(w, errors.Wrap(err, "failed to delete watcher"), http.StatusInternalServerError)
 		return
 	}

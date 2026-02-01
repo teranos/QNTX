@@ -211,7 +211,7 @@ func createActivityAttestation(t *testing.T, store *SQLStore, activity *neuralAc
 		"brain_region":     activity.region,
 	}
 
-	err := store.CreateAttestation(&types.As{
+	err := store.CreateAttestation(context.Background(), &types.As{
 		ID:         activity.activityID,
 		Subjects:   []string{activity.neuronID},
 		Predicates: []string{"activity_duration_s"},
@@ -835,7 +835,7 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 		"brain_region":  "hippocampus_ca1",
 	}
 
-	err := store.CreateAttestation(&types.As{
+	err := store.CreateAttestation(context.Background(), &types.As{
 		ID:         "n042_ongoing",
 		Subjects:   []string{"CA1_PYRAMIDAL_N042"},
 		Predicates: []string{"activity_duration_s"},
@@ -861,7 +861,7 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 		"brain_region":  "hippocampus_ca1",
 	}
 
-	err = store.CreateAttestation(&types.As{
+	err = store.CreateAttestation(context.Background(), &types.As{
 		ID:         "n043_completed",
 		Subjects:   []string{"CA1_PYRAMIDAL_N043"},
 		Predicates: []string{"activity_duration_s"},
@@ -886,7 +886,7 @@ func setupOngoingActivityTestDB(t *testing.T) *sql.DB {
 		"brain_region":  "hippocampus_ca3",
 	}
 
-	err = store.CreateAttestation(&types.As{
+	err = store.CreateAttestation(context.Background(), &types.As{
 		ID:         "n001_ongoing",
 		Subjects:   []string{"CA3_PYRAMIDAL_N001"},
 		Predicates: []string{"activity_duration_s"},
@@ -980,7 +980,7 @@ func setupMultiplePredicatesTestDB(t *testing.T) *sql.DB {
 	})
 
 	// Add neurotransmitter attestation for N042
-	err := store.CreateAttestation(&types.As{
+	err := store.CreateAttestation(context.Background(), &types.As{
 		ID:         "n042_neurotransmitter",
 		Subjects:   []string{"CA1_PYRAMIDAL_N042"},
 		Predicates: []string{"uses_neurotransmitter"},
@@ -1005,7 +1005,7 @@ func setupMultiplePredicatesTestDB(t *testing.T) *sql.DB {
 		attestedAt:   attestationTime,
 	})
 
-	err = store.CreateAttestation(&types.As{
+	err = store.CreateAttestation(context.Background(), &types.As{
 		ID:         "n043_neurotransmitter",
 		Subjects:   []string{"CA1_INTERNEURON_N043"},
 		Predicates: []string{"uses_neurotransmitter"},
@@ -1030,7 +1030,7 @@ func setupMultiplePredicatesTestDB(t *testing.T) *sql.DB {
 		attestedAt:   attestationTime,
 	})
 
-	err = store.CreateAttestation(&types.As{
+	err = store.CreateAttestation(context.Background(), &types.As{
 		ID:         "n001_neurotransmitter",
 		Subjects:   []string{"CA3_PYRAMIDAL_N001"},
 		Predicates: []string{"uses_neurotransmitter"},

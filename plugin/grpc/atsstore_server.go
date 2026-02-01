@@ -49,7 +49,7 @@ func (s *ATSStoreServer) CreateAttestation(ctx context.Context, req *protocol.Cr
 	}
 
 	// Create the attestation
-	if err := s.store.CreateAttestation(as); err != nil {
+	if err := s.store.CreateAttestation(ctx, as); err != nil {
 		return &protocol.CreateAttestationResponse{
 			Success: false,
 			Error:   fmt.Sprintf("failed to create attestation: %v", err),
@@ -71,7 +71,7 @@ func (s *ATSStoreServer) AttestationExists(ctx context.Context, req *protocol.At
 		}, nil
 	}
 
-	exists := s.store.AttestationExists(req.Id)
+	exists := s.store.AttestationExists(ctx, req.Id)
 
 	return &protocol.AttestationExistsResponse{
 		Exists: exists,
@@ -97,7 +97,7 @@ func (s *ATSStoreServer) GenerateAndCreateAttestation(ctx context.Context, req *
 	}
 
 	// Generate and create the attestation
-	as, err := s.store.GenerateAndCreateAttestation(cmd)
+	as, err := s.store.GenerateAndCreateAttestation(ctx, cmd)
 	if err != nil {
 		return &protocol.GenerateAttestationResponse{
 			Success: false,
@@ -135,7 +135,7 @@ func (s *ATSStoreServer) GetAttestations(ctx context.Context, req *protocol.GetA
 	filter := protoToFilter(req.Filter)
 
 	// Query attestations
-	attestations, err := s.store.GetAttestations(filter)
+	attestations, err := s.store.GetAttestations(ctx, filter)
 	if err != nil {
 		return &protocol.GetAttestationsResponse{
 			Success: false,

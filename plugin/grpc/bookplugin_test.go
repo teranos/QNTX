@@ -264,7 +264,7 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Predicates: []string{"wants"},
 			Contexts:   []string{bookID},
 		}
-		if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 			return err
 		}
 	}
@@ -285,7 +285,7 @@ func (p *BookPlugin) setupBookCollector(ctx context.Context) error {
 			Predicates: []string{"offers"},
 			Contexts:   []string{bookID},
 		}
-		if _, err := store.GenerateAndCreateAttestation(cmd); err != nil {
+		if _, err := store.GenerateAndCreateAttestation(context.Background(), cmd); err != nil {
 			return err
 		}
 	}
@@ -329,7 +329,7 @@ func (p *BookPlugin) findMatches(ctx context.Context, collectorID string, wanted
 	filter := ats.AttestationFilter{
 		Limit: 1000,
 	}
-	attestations, err := store.GetAttestations(filter)
+	attestations, err := store.GetAttestations(context.Background(), filter)
 	if err != nil {
 		return nil, err
 	}

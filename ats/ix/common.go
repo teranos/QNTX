@@ -1,6 +1,7 @@
 package ix
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -46,7 +47,7 @@ func (h *ExecutionHelper) ExecuteAttestations(store ats.AttestationStore, attest
 
 		// Generate ASID without actor seed (self-certifying)
 		// The generated ASID will be used as its own actor
-		_, err = store.GenerateAndCreateAttestation(asCommand)
+		_, err = store.GenerateAndCreateAttestation(context.Background(), asCommand)
 		if err != nil {
 			return fmt.Errorf("failed to create attestation '%s': %w", attestationText, err)
 		}
@@ -80,7 +81,7 @@ func (h *ExecutionHelper) ExecuteAliases(aliasResolver *alias.Resolver, aliases 
 			continue
 		}
 
-		err := aliasResolver.CreateAlias(aliasName, targetID)
+		err := aliasResolver.CreateAlias(context.Background(), aliasName, targetID)
 		if err != nil {
 			return fmt.Errorf("failed to create alias '%s' -> '%s': %w", aliasName, targetID, err)
 		}

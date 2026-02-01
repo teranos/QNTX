@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -112,7 +113,7 @@ func runHandlerCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Store attestation
-	err = boundedStore.CreateAttestation(attestation)
+	err = boundedStore.CreateAttestation(context.Background(), attestation)
 	if err != nil {
 		return errors.Wrap(err, "failed to create handler attestation")
 	}

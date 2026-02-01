@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -23,7 +24,7 @@ const (
 )
 
 // GetAttestations retrieves attestations based on optional filters
-func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, error) {
+func GetAttestations(ctx context.Context, db *sql.DB, filters ats.AttestationFilter) ([]*types.As, error) {
 	query := AttestationSelectQuery
 
 	// Use queryBuilder for consistent filter construction
@@ -56,7 +57,7 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
 
-	rows, err := db.Query(query, qb.args...)
+	rows, err := db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
 		err = errors.Wrap(err, "failed to query attestations")
 		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", filters.Subjects))

@@ -20,12 +20,10 @@ type RemoteATSStore struct {
 	conn      *grpc.ClientConn
 	authToken string
 	logger    *zap.SugaredLogger
-	ctx       context.Context // Parent context for cancellation
 }
 
 // NewRemoteATSStore creates a gRPC client connection to the ATSStore service.
-// The provided context is used for all gRPC operations and enables cancellation.
-func NewRemoteATSStore(ctx context.Context, endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteATSStore, error) {
+func NewRemoteATSStore(endpoint string, authToken string, logger *zap.SugaredLogger) (*RemoteATSStore, error) {
 	conn, err := grpc.Dial(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -40,7 +38,6 @@ func NewRemoteATSStore(ctx context.Context, endpoint string, authToken string, l
 		conn:      conn,
 		authToken: authToken,
 		logger:    logger,
-		ctx:       ctx,
 	}, nil
 }
 
@@ -50,7 +47,7 @@ func (r *RemoteATSStore) Close() error {
 }
 
 // GenerateAndCreateAttestation creates an attestation via gRPC.
-func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As, error) {
+func (r *RemoteATSStore) GenerateAndCreateAttestation(ctx context.Context, cmd *types.AsCommand) (*types.As, error) {
 	protoCmd := &protocol.AttestationCommand{
 		Subjects:   cmd.Subjects,
 		Predicates: cmd.Predicates,
@@ -76,7 +73,7 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 		Command:   protoCmd,
 	}
 
-	resp, err := r.client.GenerateAndCreateAttestation(r.ctx, req)
+	resp, err := r.client.GenerateAndCreateAttestation(ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "gRPC GenerateAndCreateAttestation failed")
 	}
@@ -115,13 +112,13 @@ func (r *RemoteATSStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*ty
 }
 
 // AttestationExists checks if an attestation exists via gRPC.
-func (r *RemoteATSStore) AttestationExists(asid string) bool {
+func (r *RemoteATSStore) AttestationExists(ctx context.Context, asid string) bool {
 	req := &protocol.AttestationExistsRequest{
 		AuthToken: r.authToken,
 		Id:        asid,
 	}
 
-	resp, err := r.client.AttestationExists(r.ctx, req)
+	resp, err := r.client.AttestationExists(ctx, req)
 	if err != nil {
 		r.logger.Warnw("Failed to check attestation existence", "error", err)
 		return false
@@ -131,7 +128,7 @@ func (r *RemoteATSStore) AttestationExists(asid string) bool {
 }
 
 // GetAttestations retrieves attestations via gRPC.
-func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types.As, error) {
+func (r *RemoteATSStore) GetAttestations(ctx context.Context, filter ats.AttestationFilter) ([]*types.As, error) {
 	protoFilter := &protocol.AttestationFilter{
 		Actors:     filter.Actors,
 		Subjects:   filter.Subjects,
@@ -151,7 +148,7 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 		Filter:    protoFilter,
 	}
 
-	resp, err := r.client.GetAttestations(r.ctx, req)
+	resp, err := r.client.GetAttestations(ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "gRPC GetAttestations failed")
 	}
@@ -189,7 +186,7 @@ func (r *RemoteATSStore) GetAttestations(filter ats.AttestationFilter) ([]*types
 }
 
 // CreateAttestation creates an attestation with a pre-generated ID via gRPC.
-func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
+func (r *RemoteATSStore) CreateAttestation(ctx context.Context, a *types.As) error {
 	// Marshal attributes to JSON string
 	attributesJSON := ""
 	if a.Attributes != nil {
@@ -217,7 +214,7 @@ func (r *RemoteATSStore) CreateAttestation(a *types.As) error {
 		Attestation: protoAtt,
 	}
 
-	resp, err := r.client.CreateAttestation(r.ctx, req)
+	resp, err := r.client.CreateAttestation(ctx, req)
 	if err != nil {
 		return errors.Wrap(err, "gRPC CreateAttestation failed")
 	}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -1041,7 +1042,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	}
 
 	// Try to get existing watcher first
-	existing, err := c.server.watcherEngine.GetStore().Get(watcherID)
+	existing, err := c.server.watcherEngine.GetStore().Get(context.Background(), watcherID)
 	if err == nil {
 		// Update existing watcher
 		watcher.CreatedAt = existing.CreatedAt
@@ -1050,7 +1051,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		watcher.LastFiredAt = existing.LastFiredAt
 		watcher.LastError = existing.LastError
 
-		if err := c.server.watcherEngine.GetStore().Update(watcher); err != nil {
+		if err := c.server.watcherEngine.GetStore().Update(context.Background(), watcher); err != nil {
 			c.server.logger.Errorw("Failed to update watcher",
 				"watcher_id", watcherID,
 				"error", err,
@@ -1064,7 +1065,7 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 		)
 	} else {
 		// Create new watcher
-		if err := c.server.watcherEngine.GetStore().Create(watcher); err != nil {
+		if err := c.server.watcherEngine.GetStore().Create(context.Background(), watcher); err != nil {
 			c.server.logger.Errorw("Failed to create watcher",
 				"watcher_id", watcherID,
 				"error", err,

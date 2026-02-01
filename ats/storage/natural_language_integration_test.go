@@ -313,7 +313,7 @@ func setupDomainTestDB(t *testing.T) *sql.DB {
 	// Insert attestations
 	store := NewSQLStore(testDB, nil)
 	for _, attestation := range testAttestations {
-		err := store.CreateAttestation(attestation)
+		err := store.CreateAttestation(context.Background(), attestation)
 		require.NoError(t, err)
 	}
 
@@ -599,7 +599,7 @@ func TestCaseInsensitiveContextMatching(t *testing.T) {
 	// Insert all test attestations
 	store := NewSQLStore(testDB, nil)
 	for _, att := range testAttestations {
-		err := store.CreateAttestation(att)
+		err := store.CreateAttestation(context.Background(), att)
 		require.NoError(t, err)
 	}
 

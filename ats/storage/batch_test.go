@@ -79,7 +79,7 @@ func TestPersistItems_Success(t *testing.T) {
 		},
 	}
 
-	result := bp.PersistItems(items, "test-prefix")
+	result := bp.PersistItems(context.Background(), items, "test-prefix")
 
 	// Verify all items persisted successfully
 	if result.PersistedCount != 3 {
@@ -118,7 +118,7 @@ func TestPersistItems_WithMetadata(t *testing.T) {
 		},
 	}
 
-	result := bp.PersistItems(items, "csv-import")
+	result := bp.PersistItems(context.Background(), items, "csv-import")
 
 	if result.PersistedCount != 1 {
 		t.Errorf("PersistedCount = %d, want 1", result.PersistedCount)
@@ -136,7 +136,7 @@ func TestPersistItems_EmptyBatch(t *testing.T) {
 	bp := NewBatchPersister(db, "test-actor", "test-source")
 
 	items := []AttestationItem{}
-	result := bp.PersistItems(items, "test-prefix")
+	result := bp.PersistItems(context.Background(), items, "test-prefix")
 
 	if result.PersistedCount != 0 {
 		t.Errorf("PersistedCount = %d, want 0", result.PersistedCount)
@@ -168,7 +168,7 @@ func TestPersistItems_NilDatabase(t *testing.T) {
 		},
 	}
 
-	result := bp.PersistItems(items, "test-prefix")
+	result := bp.PersistItems(context.Background(), items, "test-prefix")
 
 	// All items should fail with nil database
 	if result.FailureCount != 1 {
@@ -215,7 +215,7 @@ func TestPersistItems_EmptySubject(t *testing.T) {
 		},
 	}
 
-	result := bp.PersistItems(items, "test-prefix")
+	result := bp.PersistItems(context.Background(), items, "test-prefix")
 
 	// All 3 should succeed - empty subject doesn't fail ASID generation
 	if result.PersistedCount != 3 {
@@ -252,7 +252,7 @@ func TestPersistItems_LargeBatch(t *testing.T) {
 		}
 	}
 
-	result := bp.PersistItems(items, "large-batch")
+	result := bp.PersistItems(context.Background(), items, "large-batch")
 
 	if result.PersistedCount != 100 {
 		t.Errorf("PersistedCount = %d, want 100", result.PersistedCount)
@@ -281,7 +281,7 @@ func TestPersistItems_UniqueASIDs(t *testing.T) {
 		&mockItem{subject: "bob", predicate: "knows", object: "alice"},
 	}
 
-	result := bp.PersistItems(items, "test-prefix")
+	result := bp.PersistItems(context.Background(), items, "test-prefix")
 
 	if result.PersistedCount != 3 {
 		t.Errorf("PersistedCount = %d, want 3", result.PersistedCount)
