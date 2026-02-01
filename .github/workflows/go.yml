@@ -51,6 +51,9 @@ jobs:
       - name: Build WASM module
         run: make rust-wasm
 
+      - name: Build Rust SQLite library
+        run: make rust-sqlite
+
       - name: Run tests
         # Test with core tags to ensure we test what we ship
         # TODO: Add rustfuzzy,rustvideo once those are stabilized
@@ -90,6 +93,9 @@ jobs:
       - name: Build WASM module
         run: make rust-wasm
 
+      - name: Build Rust SQLite library
+        run: make rust-sqlite
+
       - name: Run integration tests
         run: go test -tags=integration ./...
 
@@ -126,6 +132,9 @@ jobs:
 
       - name: Build WASM module
         run: make rust-wasm
+
+      - name: Build Rust SQLite library
+        run: make rust-sqlite
 
       - name: Build
         run: go build ./...
