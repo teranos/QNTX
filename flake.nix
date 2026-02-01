@@ -105,7 +105,7 @@
 
           # Hash of vendored Go dependencies (computed from go.sum)
           # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          vendorHash = "sha256-R2jgbtfobHgd91kEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -123,7 +123,7 @@
 
           # Same vendorHash as qntx (shared go.mod)
           # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          vendorHash = "sha256-R2jgbtfobHgd91kEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
 
           subPackages = [ "cmd/typegen" ];
         };
@@ -136,7 +136,7 @@
 
           # Same vendorHash as qntx (shared go.mod)
           # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          vendorHash = "sha256-R2jgbtfobHgd91kEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
