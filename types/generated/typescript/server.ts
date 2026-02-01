@@ -211,7 +211,7 @@ export interface LogEntry {
 
 export interface ParsedATSCode {
   /**
-   * HandlerName is the async handler to invoke (e.g., "ixgest.git")
+   * HandlerName is the async handler to invoke (e.g., "python.script")
    */
   HandlerName: string;
   /**
@@ -219,7 +219,7 @@ export interface ParsedATSCode {
    */
   Payload: number[];
   /**
-   * SourceURL is used for deduplication (e.g., the git repo URL)
+   * SourceURL is used for deduplication
    */
   SourceURL: string;
 }
@@ -607,6 +607,22 @@ export interface QueryMessage {
    * For vidstream_frame: "rgba8", "rgb8", etc.
    */
   format: string;
+  /**
+   * Watcher fields (for watcher_upsert messages)
+   */
+  watcher_id: string;
+  /**
+   * For watcher_upsert: AX query string
+   */
+  watcher_query: string;
+  /**
+   * For watcher_upsert: Human-readable watcher name
+   */
+  watcher_name: string;
+  /**
+   * For watcher_upsert: Whether watcher is enabled
+   */
+  enabled: boolean;
 }
 
 export interface Result {
@@ -776,5 +792,95 @@ export interface UsageUpdateMessage {
    * Unix timestamp
    */
   timestamp: number;
+}
+
+export interface WatcherCreateRequest {
+  id: string;
+  name: string;
+  subjects?: string[];
+  predicates?: string[];
+  contexts?: string[];
+  actors?: string[];
+  /**
+   * RFC3339
+   */
+  time_start?: string;
+  /**
+   * RFC3339
+   */
+  time_end?: string;
+  /**
+   * "python" or "webhook"
+   */
+  action_type: string;
+  /**
+   * Python code or webhook URL
+   */
+  action_data: string;
+  max_fires_per_minute?: number;
+  enabled?: boolean | null;
+}
+
+export interface WatcherErrorMessage {
+  /**
+   * "watcher_error"
+   */
+  type: string;
+  /**
+   * ID of watcher that failed
+   */
+  watcher_id: string;
+  /**
+   * Error message
+   */
+  error: string;
+  /**
+   * "error" or "warning"
+   */
+  severity: string;
+  /**
+   * Unix timestamp
+   */
+  timestamp: number;
+}
+
+export interface WatcherMatchMessage {
+  /**
+   * "watcher_match"
+   */
+  type: string;
+  /**
+   * ID of watcher that matched
+   */
+  watcher_id: string;
+  /**
+   * The matching attestation (types.As)
+   */
+  attestation: unknown;
+  /**
+   * Unix timestamp
+   */
+  timestamp: number;
+}
+
+export interface WatcherResponse {
+  id: string;
+  name: string;
+  subjects?: string[];
+  predicates?: string[];
+  contexts?: string[];
+  actors?: string[];
+  time_start?: string;
+  time_end?: string;
+  action_type: string;
+  action_data: string;
+  max_fires_per_minute: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  last_fired_at?: string;
+  fire_count: number;
+  error_count: number;
+  last_error?: string;
 }
 

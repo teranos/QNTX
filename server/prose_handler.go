@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -22,8 +21,7 @@ type ProseEntry struct {
 
 // HandleProse returns the prose content tree structure
 func (s *QNTXServer) HandleProse(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -31,23 +29,22 @@ func (s *QNTXServer) HandleProse(w http.ResponseWriter, r *http.Request) {
 	tree, err := s.buildProseTree()
 	if err != nil {
 		s.logger.Errorw("Failed to build prose tree", "error", err)
-		http.Error(w, "Failed to load prose content", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to load prose content")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(tree); err != nil {
-		// Note: Headers already sent, can't change status code
-		// Log error for debugging but response is already committed
-		s.logger.Errorw("Failed to encode prose tree", "error", err)
-	}
+	writeJSON(w, http.StatusOK, tree)
 }
 
 // HandleProseContent returns the content of a specific prose file
 func (s *QNTXServer) HandleProseContent(w http.ResponseWriter, r *http.Request) {
 	prosePath, err := s.validateProsePath(r.URL.Path, r.RemoteAddr)
 	if err != nil {
-		http.Error(w, "Invalid path", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid path")
+		return
+	}
+
+	if !requireMethods(w, r, http.MethodGet, http.MethodPut) {
 		return
 	}
 
@@ -56,12 +53,10 @@ func (s *QNTXServer) HandleProseContent(w http.ResponseWriter, r *http.Request) 
 		s.serveProseContent(w, prosePath)
 	case http.MethodPut:
 		if !s.isDevMode() {
-			http.Error(w, "Editing disabled in production mode", http.StatusForbidden)
+			writeError(w, http.StatusForbidden, "Editing disabled in production mode")
 			return
 		}
 		s.saveProseContent(w, r, prosePath)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 

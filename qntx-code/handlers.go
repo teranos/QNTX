@@ -1,7 +1,6 @@
 package qntxcode
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,8 +119,7 @@ func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -131,8 +129,7 @@ func (p *Plugin) handleCodeTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tree)
+	writeJSON(w, http.StatusOK, tree)
 }
 
 // handleCodeContent serves or updates code file content
@@ -198,8 +195,7 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	logger := p.services.Logger("code")
 
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -230,8 +226,7 @@ func (p *Plugin) handlePRSuggestions(w http.ResponseWriter, r *http.Request) {
 	// Create attestation for PR suggestions fetch
 	p.attestPRAction(prNumber, "fetched-suggestions", len(suggestions))
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(suggestions)
+	writeJSON(w, http.StatusOK, suggestions)
 }
 
 // handlePRList returns list of open PRs
@@ -242,8 +237,7 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 
 	logger := p.services.Logger("code")
 
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
@@ -259,8 +253,7 @@ func (p *Plugin) handlePRList(w http.ResponseWriter, r *http.Request) {
 	// Create attestation for PR list fetch
 	p.attestPRListFetch(len(prs))
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(prs)
+	writeJSON(w, http.StatusOK, prs)
 }
 
 // GitIxgestRequest represents a git ingestion request
@@ -278,8 +271,7 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req GitIxgestRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -354,8 +346,7 @@ func (p *Plugin) handleGitIxgest(w http.ResponseWriter, r *http.Request) {
 		"branches", result.BranchesProcessed,
 		"attestations", result.TotalAttestations)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // buildCodeTree builds the code file tree
