@@ -3644,7 +3644,7 @@ dependencies = [
 
 [[package]]
 name = "qntx-python-plugin"
-version = "0.3.9"
+version = "0.4.2"
 dependencies = [
  "clap",
  "parking_lot",
@@ -3673,6 +3673,14 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "qntx-wasm"
+version = "0.1.0"
+dependencies = [
+ "qntx-core",
+ "serde_json",
 ]
 
 [[package]]
