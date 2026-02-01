@@ -75,7 +75,7 @@ func runAsCommand(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to parse command")
 	}
 
-	// Create bounded store (enforces storage limits + telemetry)
+	// Create bounded store (enforces storage limits)
 	boundedStore := storage.NewBoundedStoreWithConfig(
 		database,
 		nil, // logger

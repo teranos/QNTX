@@ -211,7 +211,7 @@ export interface LogEntry {
 
 export interface ParsedATSCode {
   /**
-   * HandlerName is the async handler to invoke (e.g., "ixgest.git")
+   * HandlerName is the async handler to invoke (e.g., "python.script")
    */
   HandlerName: string;
   /**
@@ -219,7 +219,7 @@ export interface ParsedATSCode {
    */
   Payload: number[];
   /**
-   * SourceURL is used for deduplication (e.g., the git repo URL)
+   * SourceURL is used for deduplication
    */
   SourceURL: string;
 }
