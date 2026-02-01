@@ -20,10 +20,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        // Compile protos to OUT_DIR
+        // Compile only gRPC services (not message types - those come from qntx-proto)
         tonic_build::configure()
             .build_server(true)
             .build_client(true)
+            // Skip generating message types - we get those from qntx-proto
+            .compile_well_known_types(false)
+            // Use extern_path to reference types from qntx-proto instead of generating
+            .extern_path(".protocol", "::qntx_proto")
             .compile_protos(&protos, &[&proto_dir])?;
 
         // Rerun if proto files change

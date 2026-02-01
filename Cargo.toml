@@ -1,8 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/qntx",
     "crates/qntx-core",
+    "crates/qntx-grpc",
+    "crates/qntx-proto",
     "crates/qntx-sqlite",
     "crates/qntx-wasm",
     "qntx-python",

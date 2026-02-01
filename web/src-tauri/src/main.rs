@@ -2,8 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use log::info;
-use qntx::error::Error;
-use qntx::types::sym;
+use qntx_grpc::error::Error;
+use qntx_grpc::types::sym;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
