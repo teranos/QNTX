@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -108,9 +107,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 	logger.AddAxSymbol(s.logger).Infow("Prompt preview request with X-sampling")
 
 	var req PromptPreviewRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
-			"Invalid JSON", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -174,10 +171,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 			SampleSize:        req.SampleSize,
 			Samples:           []PreviewSample{},
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 		return
 	}
 
@@ -313,10 +307,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 		response.Error = fmt.Sprintf("All %d samples failed. Check individual sample errors for details.", failureCount)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 // HandlePromptExecute handles POST /api/prompt/execute
@@ -330,9 +321,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 	logger.AddAxSymbol(s.logger).Infow("Prompt execute request")
 
 	var req PromptExecuteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
-			"Invalid JSON", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -406,10 +395,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 		AttestationCount: len(results),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // createPromptAIClient creates an AI client for prompt execution
@@ -492,13 +478,10 @@ func (s *QNTXServer) HandlePromptList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"prompts": prompts,
 		"count":   len(prompts),
-	}); err != nil {
-		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-	}
+	})
 }
 
 // HandlePromptGet handles GET /api/prompt/{id}
@@ -520,10 +503,7 @@ func (s *QNTXServer) HandlePromptGet(w http.ResponseWriter, r *http.Request, pro
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(p); err != nil {
-		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-	}
+	writeJSON(w, http.StatusOK, p)
 }
 
 // HandlePromptVersions handles GET /api/prompt/{name}/versions
@@ -541,13 +521,10 @@ func (s *QNTXServer) HandlePromptVersions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"versions": versions,
 		"count":    len(versions),
-	}); err != nil {
-		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-	}
+	})
 }
 
 // HandlePromptSave handles POST /api/prompt/save
@@ -561,9 +538,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 	logger.AddAxSymbol(s.logger).Infow("Prompt save request")
 
 	var req PromptSaveRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeWrappedError(w, s.logger, errors.Wrap(err, "failed to decode request"),
-			"Invalid JSON", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -595,11 +570,7 @@ func (s *QNTXServer) HandlePromptSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(saved); err != nil {
-		logger.AddAxSymbol(s.logger).Errorw("Failed to encode response", "error", err)
-	}
+	writeJSON(w, http.StatusCreated, saved)
 }
 
 // sampleAttestations randomly samples n attestations from the provided list using Fisher-Yates shuffle.

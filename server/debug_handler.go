@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -74,7 +73,7 @@ func (cb *ConsoleBuffer) GetAll() []ConsoleLog {
 func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 	// Only allow in dev mode
 	if !s.isDevMode() {
-		http.Error(w, "Debug endpoint only available in dev mode", http.StatusForbidden)
+		writeError(w, http.StatusForbidden, "Debug endpoint only available in dev mode")
 		return
 	}
 
@@ -84,18 +83,17 @@ func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 100*1024)
 
 		var log ConsoleLog
-		if err := json.NewDecoder(r.Body).Decode(&log); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		if err := readJSON(w, r, &log); err != nil {
 			return
 		}
 
 		// Validate input
 		if len(log.Message) > 10000 {
-			http.Error(w, "Message too long (max 10000 characters)", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "Message too long (max 10000 characters)")
 			return
 		}
 		if len(log.Stack) > 50000 {
-			http.Error(w, "Stack trace too long (max 50000 characters)", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "Stack trace too long (max 50000 characters)")
 			return
 		}
 
@@ -118,12 +116,9 @@ func (s *QNTXServer) HandleDebug(w http.ResponseWriter, r *http.Request) {
 			logs = s.consoleBuffer.GetAll()
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(logs); err != nil {
-			s.logger.Errorw("Failed to encode console logs", "error", err)
-		}
+		writeJSON(w, http.StatusOK, logs)
 
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }
