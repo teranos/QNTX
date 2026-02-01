@@ -647,6 +647,8 @@
             };
 
             generate-proto = protoApps.generate-proto;
+            generate-proto-go = protoApps.generate-proto-go;
+            generate-proto-typescript = protoApps.generate-proto-typescript;
           };
       }
     );
