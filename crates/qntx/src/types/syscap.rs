@@ -42,4 +42,12 @@ pub struct Message {
     pub storage_optimized: bool,
     /// qntx-sqlite library version (e.g., "0.1.0")
     pub storage_version: String,
+    /// "wasm" or "go" - which parser implementation is active
+    pub parser_backend: String,
+    /// true if using qntx-core via WASM, false if Go parser
+    pub parser_optimized: bool,
+    /// qntx-core version when using WASM (e.g., "0.1.0")
+    pub parser_version: String,
+    /// WASM module size (e.g., "89KB")
+    pub parser_size: String,
 }

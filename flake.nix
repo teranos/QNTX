@@ -157,6 +157,9 @@
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
+        # TODO: DEPRECATED - Will be replaced with protoc-based code generation
+        # Current typegen requires full compilation due to packages.Load with NeedTypes
+        # This creates unnecessary coupling to build configuration
         typegen = pkgs.buildGoModule {
           pname = "typegen";
           version = self.rev or "dev";
@@ -167,6 +170,10 @@
           vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
 
           preBuild = goWasmPreBuild;
+
+          # HACK: Need qntxwasm tag because typegen compiles the whole codebase
+          # This will be removed when we migrate to protoc-based generation
+          tags = [ "qntxwasm" ];
 
           subPackages = [ "cmd/typegen" ];
         };
