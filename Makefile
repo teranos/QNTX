@@ -94,7 +94,9 @@ test-web: ## Run web UI tests
 test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
-	@go test -short -coverprofile=tmp/coverage.out -covermode=count ./...
+	@# Test with core tags to ensure we test what we ship
+	@# TODO: Add rustfuzzy,rustvideo once those are stabilized
+	@go test -tags "rustsqlite,qntxwasm" -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""

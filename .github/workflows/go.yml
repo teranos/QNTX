@@ -52,7 +52,9 @@ jobs:
         run: make rust-wasm
 
       - name: Run tests
-        run: go test ./...
+        # Test with core tags to ensure we test what we ship
+        # TODO: Add rustfuzzy,rustvideo once those are stabilized
+        run: go test -tags "rustsqlite,qntxwasm" ./...
 
   integration:
     name: Go Integration Tests

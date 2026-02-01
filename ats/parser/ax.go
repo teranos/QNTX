@@ -915,6 +915,9 @@ func (p *axParser) addWarning(warning string) {
 // Utility functions
 
 func uppercaseTokens(tokens []string) []string {
+	if tokens == nil {
+		return nil
+	}
 	result := make([]string, len(tokens))
 	for i, token := range tokens {
 		result[i] = strings.ToUpper(token)
@@ -923,6 +926,9 @@ func uppercaseTokens(tokens []string) []string {
 }
 
 func lowercaseTokens(tokens []string) []string {
+	if tokens == nil {
+		return nil
+	}
 	result := make([]string, len(tokens))
 	for i, token := range tokens {
 		result[i] = strings.ToLower(token)
