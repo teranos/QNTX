@@ -20,8 +20,6 @@ The developer always uses `make dev` to start the development environment with h
 
 **ASSUME** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
 
-`make rust-wasm` must run before `go build` — the WASM module (`ats/wasm/qntx_core.wasm`) is embedded at compile time via `go:embed`.
-
 ## Testing
 
 **The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**

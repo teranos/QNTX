@@ -6,7 +6,7 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy rust-vidstream rust-sqlite ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, and SQLite backend)
+cli: rust-fuzzy rust-vidstream rust-sqlite rust-wasm ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, and SQLite backend)
 	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite)..."
 	@go build -tags "rustfuzzy,rustvideo,rustsqlite" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
