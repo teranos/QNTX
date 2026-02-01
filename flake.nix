@@ -11,6 +11,10 @@
       url = "github:cachix/pre-commit-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Binary cache configuration
@@ -20,10 +24,45 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
+        rustWasmToolchain = fenix.packages.${system}.combine [
+          fenix.packages.${system}.stable.cargo
+          fenix.packages.${system}.stable.rustc
+          fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+        ];
+
+        # Build qntx-core as WASM module (used by Go via go:embed)
+        qntx-wasm = (pkgs.makeRustPlatform {
+          cargo = rustWasmToolchain;
+          rustc = rustWasmToolchain;
+        }).buildRustPackage {
+          pname = "qntx-wasm";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          cargoBuildFlags = [ "-p" "qntx-wasm" "--target" "wasm32-unknown-unknown" ];
+          doCheck = false;
+
+          # buildRustPackage expects binaries in target/release/ but we cross-compile
+          installPhase = ''
+            mkdir -p $out/lib
+            cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm $out/lib/qntx_core.wasm
+          '';
+        };
+
+        # Common preBuild hook for Go derivations: copy WASM module for go:embed
+        goWasmPreBuild = ''
+          cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
+        '';
 
         # Pre-commit hooks configuration
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
@@ -104,8 +143,10 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -116,14 +157,23 @@
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
+        # TODO: DEPRECATED - Will be replaced with protoc-based code generation
+        # Current typegen requires full compilation due to packages.Load with NeedTypes
+        # This creates unnecessary coupling to build configuration
         typegen = pkgs.buildGoModule {
           pname = "typegen";
           version = self.rev or "dev";
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
+
+          # HACK: Need qntxwasm tag because typegen compiles the whole codebase
+          # This will be removed when we migrate to protoc-based generation
+          tags = [ "qntxwasm" ];
 
           subPackages = [ "cmd/typegen" ];
         };
@@ -135,8 +185,10 @@
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -374,6 +426,9 @@
           qntx-code = qntx-code;
           qntx-python = qntx-python;
 
+          # WASM module (qntx-core compiled to wasm32-unknown-unknown)
+          qntx-wasm = qntx-wasm;
+
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
           docs-site = pkgs.callPackage ./sitegen.nix {
@@ -387,6 +442,7 @@
               { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
               { name = "qntx-python"; description = "Python runtime plugin with PyO3"; }
+              { name = "qntx-wasm"; description = "qntx-core compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
             ];
 
@@ -595,4 +651,3 @@
       }
     );
 }
-

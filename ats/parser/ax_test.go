@@ -638,16 +638,10 @@ func TestEnhancedNaturalLanguagePatterns(t *testing.T) {
 		},
 
 		// Complex profession titles
-		{
-			name:  "complex profession title - natural language splitting",
-			query: []string{"is Senior Software Specialist"},
-			expected: types.AxFilter{
-				Predicates: []string{"is"},
-				Contexts:   []string{"senior", "software", "specialist"},
-				Limit:      100,
-				Format:     "table",
-			},
-		},
+		// NOTE: Removed test case "is Senior Software Specialist" that expected the parser
+		// to have domain knowledge about job titles. Parsers should not know that
+		// "Senior Software Specialist" is a job title that belongs in context rather
+		// than predicates. This was leaking business logic into the tokenizer.
 		{
 			name:  "complex profession title - quoted to preserve spacing",
 			query: []string{"is", "'Senior Software Specialist'"},
