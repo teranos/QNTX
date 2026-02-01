@@ -16,6 +16,7 @@
 
 /// As represents an attestation - a verifiable claim about subjects,
 /// predicates, and contexts with actor attribution and timestamps
+/// TODO: This type will migrate to proto generation
 #[doc = "Documentation: <https://github.com/teranos/QNTX/blob/main/docs/types/types.md#as>"]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct As {
