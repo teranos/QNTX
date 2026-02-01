@@ -279,3 +279,8 @@ func GetDefaultServer() *QNTXServer {
 func (s *QNTXServer) GetServices() plugin.ServiceRegistry {
 	return s.services
 }
+
+// GetDaemon returns the Pulse worker pool for dynamic handler registration
+func (s *QNTXServer) GetDaemon() *async.WorkerPool {
+	return s.daemon
+}
