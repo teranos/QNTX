@@ -97,7 +97,12 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		// Use configured worker count (defaults to 1 if omitted from config file)
 		poolConfig.Workers = deps.config.Pulse.Workers
 	}
-	daemon := async.NewWorkerPoolWithContext(ctx, db, deps.config, poolConfig, serverLogger)
+
+	// Create handler registry (empty - handlers will be registered asynchronously)
+	// Plugin handlers are registered in cmd/qntx/main.go after plugins finish loading
+	registry := async.NewHandlerRegistry()
+
+	daemon := async.NewWorkerPoolWithRegistry(ctx, db, deps.config, poolConfig, serverLogger, registry, nil, nil)
 
 	// Create Pulse ticker for scheduled job execution
 	scheduleStore := schedule.NewStore(db)
