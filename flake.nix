@@ -534,7 +534,7 @@
               if [ ! -e ./result/bin/typegen ]; then
                 echo "Typegen binary not found, building..."
                 REBUILD_NEEDED=1
-              elif [ code/typegen -nt ./result/bin/typegen ]; then
+              elif [ cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
                 echo "Typegen source changed, rebuilding..."
                 REBUILD_NEEDED=1
               fi
