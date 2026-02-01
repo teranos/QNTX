@@ -249,6 +249,9 @@
             pkgs.go
             pkgs.git
 
+            # Proto compiler for proto-based builds
+            pkgs.protobuf
+
             # Complete Rust toolchain
             pkgs.rustc
             pkgs.cargo
