@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/qntx-core",
     "crates/qntx-grpc",
+    "crates/qntx-indexeddb",
     "crates/qntx-proto",
     "crates/qntx-sqlite",
     "crates/qntx-wasm",
