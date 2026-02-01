@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/teranos/QNTX/errors"
@@ -14,6 +15,7 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("ERROR: failed to encode JSON response: %v (status %d)", err, status)
 		return errors.Wrap(err, "failed to encode JSON")
 	}
 	return nil
@@ -24,6 +26,7 @@ func writeError(w http.ResponseWriter, status int, message string) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		log.Printf("ERROR: failed to encode error response: %v (status %d, message %q)", err, status, message)
 		return errors.Wrap(err, "failed to encode error response")
 	}
 	return nil
@@ -54,6 +57,8 @@ func writeRichError(w http.ResponseWriter, logger *zap.SugaredLogger, err error,
 	if encErr := json.NewEncoder(w).Encode(errorResponse); encErr != nil {
 		if logger != nil {
 			logger.Errorw("Failed to encode error response", "error", encErr)
+		} else {
+			log.Printf("ERROR: failed to encode rich error response: %v (status %d)", encErr, statusCode)
 		}
 		return errors.Wrap(encErr, "failed to encode rich error response")
 	}
