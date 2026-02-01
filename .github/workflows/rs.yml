@@ -9,6 +9,7 @@ on:
       - 'crates/qntx/Cargo.toml'
       - 'crates/qntx-core/Cargo.toml'
       - 'crates/qntx-sqlite/Cargo.toml'
+      - 'crates/qntx-wasm/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
@@ -20,6 +21,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
+      - 'crates/qntx-wasm/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
   workflow_dispatch:
@@ -107,6 +109,37 @@ jobs:
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
+
+  qntx-wasm:
+    name: WASM Bridge
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Check formatting
+        run: cargo fmt --check --package qntx-wasm
+
+      - name: Build WASM module
+        run: make rust-wasm
+
+      - name: Test Go integration
+        run: go test -v ./ats/wasm/...
 
   qntx-python:
     name: Python Plugin
