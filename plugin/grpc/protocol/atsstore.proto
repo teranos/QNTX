@@ -28,7 +28,7 @@ message Attestation {
   repeated string actors = 5;
   int64 timestamp = 6;       // Unix timestamp in seconds
   string source = 7;
-  string attributes_json = 8; // JSON-encoded map[string]interface{}
+  string attributes = 8;      // map[string]interface{} as JSON string
   int64 created_at = 9;       // Unix timestamp in seconds
 }
 
