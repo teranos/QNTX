@@ -28,5 +28,9 @@ type Message struct {
 	StorageBackend string `json:"storage_backend"`
 	StorageOptimized bool `json:"storage_optimized"`
 	StorageVersion string `json:"storage_version"`
+	ParserBackend string `json:"parser_backend"`
+	ParserOptimized bool `json:"parser_optimized"`
+	ParserVersion string `json:"parser_version"`
+	ParserSize string `json:"parser_size"`
 }
 ```
