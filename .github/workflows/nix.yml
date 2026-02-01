@@ -51,7 +51,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx, typegen]
+        package: [qntx, typegen, qntx-code]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -69,11 +69,13 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
+      - name: Update flake lock
+        run: nix flake lock --update-input fenix
+
       - name: Build ${{ matrix.package }}
         run: nix build .#${{ matrix.package }} --show-trace
 
       - name: Push to Cachix
-        if: github.ref == 'refs/heads/main'
         run: nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx
 
   # Rust plugins (parallel builds per OS)
@@ -81,7 +83,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        package: [qntx-code, qntx-python]
+        package: [qntx-python]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
@@ -99,11 +101,13 @@ jobs:
           name: qntx
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
+      - name: Update flake lock
+        run: nix flake lock --update-input fenix
+
       - name: Build ${{ matrix.package }}
         run: nix build .#${{ matrix.package }} --show-trace
 
       - name: Push to Cachix
-        if: github.ref == 'refs/heads/main'
         run: nix build .#${{ matrix.package }} --print-out-paths --no-link | cachix push qntx
 
   # Documentation (single OS, includes link checking)

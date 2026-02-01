@@ -44,6 +44,11 @@ See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/
 
 ## Go Development Standards
 
+### WASM Integration
+
+- **WASM module**: Run `make rust-wasm` to build qntx-core WASM module before building with `qntxwasm` tag
+- **Never use `_wasm.go` suffix**: Go excludes these files unless `GOOS=wasm`. Use different naming like `_qntx.go`
+
 ### Code Quality
 
 - **Deterministic operations**: Use sorted map keys, consistent error patterns, predictable behavior

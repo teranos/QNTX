@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,9 +6,9 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy rust-vidstream rust-sqlite ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, and SQLite backend)
-	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite)..."
-	@go build -tags "rustfuzzy,rustvideo,rustsqlite" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-fuzzy rust-vidstream rust-sqlite rust-wasm ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, SQLite backend, and WASM parser)
+	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite) and WASM parser..."
+	@go build -tags "rustfuzzy,rustvideo,rustsqlite,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
@@ -94,7 +94,9 @@ test-web: ## Run web UI tests
 test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
-	@go test -short -coverprofile=tmp/coverage.out -covermode=count ./...
+	@# Test with core tags to ensure we test what we ship
+	@# TODO: Add rustfuzzy,rustvideo once those are stabilized
+	@go test -tags "rustsqlite,qntxwasm" -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
 	@echo ""
@@ -209,6 +211,13 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "✓ libqntx_sqlite built in target/release/"
 	@echo "  Static:  libqntx_sqlite.a"
 	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
+
+rust-wasm: ## Build qntx-core as WASM module (for wazero integration, no CGO needed)
+	@echo "Building qntx-core WASM module..."
+	@cargo build --release --target wasm32-unknown-unknown --package qntx-wasm
+	@cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm ats/wasm/qntx_core.wasm
+	@echo "✓ qntx_core.wasm built and copied to ats/wasm/"
+	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "  Size: " $$5}'
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."
