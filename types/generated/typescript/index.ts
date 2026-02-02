@@ -103,6 +103,8 @@ export type {
   PluginInfo,
   PreviewSample,
   ProgressMessage,
+  PromptDirectRequest,
+  PromptDirectResponse,
   PromptExecuteRequest,
   PromptExecuteResponse,
   PromptPreviewRequest,
