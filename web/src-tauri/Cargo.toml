@@ -19,7 +19,9 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# QNTX gRPC library (using for error types, but not plugin features)
+# QNTX proto types (generated from .proto files)
+qntx-proto = { path = "../../crates/qntx-proto" }
+# QNTX gRPC library (using for error types and typegen types, but not plugin features)
 qntx-grpc = { path = "../../crates/qntx-grpc", default-features = true }
 
 serde.workspace = true
