@@ -243,8 +243,8 @@
           architecture = arch;
 
           contents = [
-            # Prebuilt QNTX binary
-            qntx
+            # TEMP: Removed qntx to break circular dependency (needs protoc to build)
+            # qntx
             # Go toolchain
             pkgs.go
             pkgs.git
