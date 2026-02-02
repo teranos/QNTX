@@ -99,7 +99,7 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         : `rgba(100, 200, 255, ${intensity * 0.3})`;  // Blue when approaching
     const glowSize = isMelded ? 20 : 12;
 
-    // Ax moving toward prompt (glow on LEFT side only)
+    // Ax moving toward prompt (glow on top, bottom, left - NOT right where it melds)
     const axKeyframes = [
         {
             transform: 'translateX(0)',
@@ -108,12 +108,16 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(${pullAmount}px)`,
-            boxShadow: `${-glowSize * intensity * 0.5}px 0 ${glowSize * intensity}px ${glowColor}`,
+            // Multiple shadows: left, top/bottom combined
+            boxShadow: `
+                ${-glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor},
+                0 0 ${glowSize * intensity}px ${glowColor}
+            `,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
 
-    // Prompt moving toward ax (glow on RIGHT side only)
+    // Prompt moving toward ax (glow on top, bottom, right - NOT left where it melds)
     const promptKeyframes = [
         {
             transform: 'translateX(0)',
@@ -122,7 +126,11 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(-${pullAmount}px)`,
-            boxShadow: `${glowSize * intensity * 0.5}px 0 ${glowSize * intensity}px ${glowColor}`,
+            // Multiple shadows: right, top/bottom combined
+            boxShadow: `
+                ${glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor},
+                0 0 ${glowSize * intensity}px ${glowColor}
+            `,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
