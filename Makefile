@@ -182,9 +182,10 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
-proto-rust: ## Generate Rust proto types (no protoc required - uses vendored fallback)
-	@echo "🐟 Running fish script to generate Rust proto types..."
-	@fish scripts/generate-rust-proto.fish
+proto-rust: ## Rust proto types are now generated automatically at build time
+	@echo "ℹ️  Rust proto types are generated automatically when building qntx-proto"
+	@echo "   No manual generation needed - uses protoc-bin-vendored at build time"
+	@echo "   See: crates/qntx-proto/build.rs"
 
 code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
 	@echo "Building code plugin..."
