@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-embeddings rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python rust-python-test rust-python-check
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -218,6 +218,14 @@ rust-wasm: ## Build qntx-core as WASM module (for wazero integration, no CGO nee
 	@cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm ats/wasm/qntx_core.wasm
 	@echo "✓ qntx_core.wasm built and copied to ats/wasm/"
 	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "  Size: " $$5}'
+
+rust-embeddings: ## Build Rust embeddings library with ONNX support (for CGO integration)
+	@echo "Building Rust embeddings library with ONNX..."
+	@cd ats/embeddings && cargo build --release --features ffi --lib
+	@echo "✓ libqntx_embeddings built in ats/embeddings/target/release/"
+	@echo "  Static:  libqntx_embeddings.a"
+	@echo "  Shared:  libqntx_embeddings.so (Linux) / libqntx_embeddings.dylib (macOS)"
+	@echo "  Features: ONNX Runtime for sentence transformers"
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."
