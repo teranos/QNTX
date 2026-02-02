@@ -1,0 +1,15 @@
+[package]
+name = "qntx-proto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Protocol Buffer types for QNTX"
+
+[dependencies]
+prost = "0.13"
+prost-types = "0.13"
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

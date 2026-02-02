@@ -182,6 +182,10 @@ desktop-build: desktop-prepare ## Build production desktop app (requires: cargo 
 proto: ## Generate Go code from protobuf definitions (via Nix)
 	@nix run .#generate-proto
 
+proto-rust: ## Generate Rust proto types (no protoc required - uses vendored fallback)
+	@echo "🐟 Running fish script to generate Rust proto types..."
+	@fish scripts/generate-rust-proto.fish
+
 code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
 	@echo "Building code plugin..."
 	@mkdir -p $(PREFIX)/plugins

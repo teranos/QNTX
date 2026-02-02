@@ -3592,29 +3592,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "qntx"
-version = "0.1.0"
-dependencies = [
- "http",
- "lazy_static",
- "prost",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tonic",
- "tonic-build",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "qntx-app"
 version = "0.1.0"
 dependencies = [
  "log",
- "qntx",
+ "qntx-grpc",
  "serde",
  "serde_json",
  "tauri",
@@ -3643,6 +3625,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "qntx-grpc"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "lazy_static",
+ "prost",
+ "qntx-proto",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "qntx-proto"
+version = "0.1.0"
+dependencies = [
+ "prost",
+ "prost-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "qntx-python-plugin"
 version = "0.4.2"
 dependencies = [
@@ -3650,7 +3661,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "pyo3",
- "qntx",
+ "qntx-grpc",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
@@ -3668,6 +3679,7 @@ dependencies = [
  "chrono",
  "pretty_assertions",
  "qntx-core",
+ "qntx-proto",
  "rusqlite",
  "serde",
  "serde_json",
@@ -3680,6 +3692,7 @@ name = "qntx-wasm"
 version = "0.1.0"
 dependencies = [
  "qntx-core",
+ "qntx-proto",
  "serde_json",
 ]
 
