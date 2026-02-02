@@ -93,11 +93,11 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
     // Different visual states with heat-based colors
     const isMelded = activePreview.isMelded;
     const glowColor = isMelded
-        ? 'rgba(255, 100, 50, 0.8)'  // Reddish orange when melded/locked
+        ? 'rgba(255, 100, 50, 0.7)'  // Reddish orange when melded/locked
         : distance < MELD_THRESHOLD
-        ? 'rgba(255, 150, 50, 0.6)'  // Orange when ready to meld
-        : `rgba(255, 255, 100, ${intensity * 0.25})`;  // Faint yellow when distant
-    const glowSize = isMelded ? 20 : 12;
+        ? 'rgba(255, 150, 50, 0.5)'  // Orange when ready to meld
+        : `rgba(255, 240, 150, ${intensity * 0.15})`;  // Very faint yellow when distant
+    const glowSize = isMelded ? 16 : 10;
 
     // Ax moving toward prompt (glow on top, bottom, left - NOT right where it melds)
     const axKeyframes = [
@@ -108,8 +108,8 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(${pullAmount}px)`,
-            // Multiple shadows: left glow + general glow for top/bottom
-            boxShadow: `${-glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor}, 0 0 ${glowSize * intensity}px ${glowColor}`,
+            // Only glow on left side - absolutely no glow on right (melding) side
+            boxShadow: `${-glowSize * intensity * 1.2}px 0 ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
@@ -123,8 +123,8 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(-${pullAmount}px)`,
-            // Multiple shadows: right glow + general glow for top/bottom
-            boxShadow: `${glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor}, 0 0 ${glowSize * intensity}px ${glowColor}`,
+            // Only glow on right side - absolutely no glow on left (melding) side
+            boxShadow: `${glowSize * intensity * 1.2}px 0 ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
