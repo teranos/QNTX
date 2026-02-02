@@ -13,3 +13,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+
+[build-dependencies]
+prost-build = "0.13"
+protoc-bin-vendored = "3.1"

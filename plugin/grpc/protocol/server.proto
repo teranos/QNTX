@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+
+// DaemonStatusMessage represents daemon status update sent to clients
+message DaemonStatusMessage {
+  string type = 1;                  // Always "daemon_status"
+  bool running = 2;                 // Is daemon running
+  int32 active_jobs = 3;            // Number of active jobs
+  int32 queued_jobs = 4;            // Number of queued jobs
+  double load_percent = 5;          // CPU/processing load (0-100)
+  double budget_daily = 6;          // Daily budget spent
+  double budget_weekly = 7;         // Weekly budget spent
+  double budget_monthly = 8;        // Monthly budget spent
+  double budget_daily_limit = 9;    // Daily budget limit (config)
+  double budget_weekly_limit = 10;  // Weekly budget limit (config)
+  double budget_monthly_limit = 11; // Monthly budget limit (config)
+  string server_state = 12;         // "running", "draining", "stopped"
+  int64 timestamp = 13;             // Unix timestamp
+}
+
+// JobUpdateMessage represents async job update sent to clients
+message JobUpdateMessage {
+  string type = 1;                    // Always "job_update"
+  // TODO: Add Job field once Job type is migrated to proto
+  // Job job = 2;                     // Full job details
+  map<string, string> metadata = 3;   // Additional metadata
+}
+
+// StorageWarningMessage represents bounded storage warning
+message StorageWarningMessage {
+  string type = 1;           // Always "storage_warning"
+  string actor = 2;          // Actor approaching limit
+  string context = 3;        // Context approaching limit
+  int32 current = 4;         // Current attestation count
+  int32 limit = 5;           // Configured limit
+  double fill_percent = 6;   // Percentage full (0.0-1.0)
+  string time_until_full = 7; // Human-readable time until hitting limit
+  int64 timestamp = 8;       // Unix timestamp
+}

@@ -566,3 +566,96 @@ pub struct ListJobsResponse {
     #[prost(message, repeated, tag = "3")]
     pub jobs: ::prost::alloc::vec::Vec<Job>,
 }
+/// DaemonStatusMessage represents daemon status update sent to clients
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DaemonStatusMessage {
+    /// Always "daemon_status"
+    #[prost(string, tag = "1")]
+    pub r#type: ::prost::alloc::string::String,
+    /// Is daemon running
+    #[prost(bool, tag = "2")]
+    pub running: bool,
+    /// Number of active jobs
+    #[prost(int32, tag = "3")]
+    pub active_jobs: i32,
+    /// Number of queued jobs
+    #[prost(int32, tag = "4")]
+    pub queued_jobs: i32,
+    /// CPU/processing load (0-100)
+    #[prost(double, tag = "5")]
+    pub load_percent: f64,
+    /// Daily budget spent
+    #[prost(double, tag = "6")]
+    pub budget_daily: f64,
+    /// Weekly budget spent
+    #[prost(double, tag = "7")]
+    pub budget_weekly: f64,
+    /// Monthly budget spent
+    #[prost(double, tag = "8")]
+    pub budget_monthly: f64,
+    /// Daily budget limit (config)
+    #[prost(double, tag = "9")]
+    pub budget_daily_limit: f64,
+    /// Weekly budget limit (config)
+    #[prost(double, tag = "10")]
+    pub budget_weekly_limit: f64,
+    /// Monthly budget limit (config)
+    #[prost(double, tag = "11")]
+    pub budget_monthly_limit: f64,
+    /// "running", "draining", "stopped"
+    #[prost(string, tag = "12")]
+    pub server_state: ::prost::alloc::string::String,
+    /// Unix timestamp
+    #[prost(int64, tag = "13")]
+    pub timestamp: i64,
+}
+/// JobUpdateMessage represents async job update sent to clients
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct JobUpdateMessage {
+    /// Always "job_update"
+    #[prost(string, tag = "1")]
+    pub r#type: ::prost::alloc::string::String,
+    /// TODO: Add Job field once Job type is migrated to proto
+    /// Job job = 2;                     // Full job details
+    ///
+    /// Additional metadata
+    #[prost(map = "string, string", tag = "3")]
+    pub metadata: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+}
+/// StorageWarningMessage represents bounded storage warning
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StorageWarningMessage {
+    /// Always "storage_warning"
+    #[prost(string, tag = "1")]
+    pub r#type: ::prost::alloc::string::String,
+    /// Actor approaching limit
+    #[prost(string, tag = "2")]
+    pub actor: ::prost::alloc::string::String,
+    /// Context approaching limit
+    #[prost(string, tag = "3")]
+    pub context: ::prost::alloc::string::String,
+    /// Current attestation count
+    #[prost(int32, tag = "4")]
+    pub current: i32,
+    /// Configured limit
+    #[prost(int32, tag = "5")]
+    pub limit: i32,
+    /// Percentage full (0.0-1.0)
+    #[prost(double, tag = "6")]
+    pub fill_percent: f64,
+    /// Human-readable time until hitting limit
+    #[prost(string, tag = "7")]
+    pub time_until_full: ::prost::alloc::string::String,
+    /// Unix timestamp
+    #[prost(int64, tag = "8")]
+    pub timestamp: i64,
+}
