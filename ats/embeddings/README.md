@@ -1,21 +1,22 @@
-# QNTX Embeddings
+# QNTX Embeddings (Work in Progress)
 
-Sentence transformer embeddings for semantic search in QNTX, using ONNX Runtime for fast inference.
+**STATUS: Non-functional scaffold - returns dummy data**
+
+Sentence transformer embeddings for semantic search in QNTX, intended to use ONNX Runtime.
 
 ## Architecture
 
 This module follows the QNTX pattern for Rust/Go integration:
-- **Rust library** (`src/`) - ONNX Runtime inference engine
+- **Rust library** (`src/`) - Currently dummy implementation returning fake vectors
 - **C FFI** (`src/ffi.rs`) - C-compatible interface
 - **Go wrapper** (`embeddings/`) - CGO integration with fallback
 
-## Features
+## Current State
 
-- ONNX model inference for sentence transformers
-- Fast CPU inference with SIMD optimization
-- JSON-based FFI for easy integration
-- Thread-safe embedding service
-- Batch embedding support
+- ❌ ONNX Runtime integration broken (ort 2.0 API issues)
+- ❌ Returns hardcoded `vec![0.1f32; 384]` instead of real embeddings
+- ❌ sqlite-vec initialization broken
+- ❌ No actual inference capabilities
 
 ## Building
 
