@@ -1,13 +1,16 @@
 [package]
-name = "qntx"
+name = "qntx-grpc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "QNTX shared Rust library - types, plugin infrastructure, and utilities"
+description = "QNTX gRPC plugin infrastructure and utilities"
 publish = false
 
 [dependencies]
+# Proto types
+qntx-proto = { path = "../qntx-proto", optional = true }
+
 # Serialization (always needed for types)
 serde.workspace = true
 serde_json.workspace = true
@@ -35,4 +38,4 @@ tonic-build = { workspace = true, optional = true }
 [features]
 default = ["types"]
 types = []
-plugin = ["dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:http", "dep:tonic-build"]
+plugin = ["dep:qntx-proto", "dep:tokio", "dep:tokio-stream", "dep:tonic", "dep:prost", "dep:http", "dep:tonic-build"]
