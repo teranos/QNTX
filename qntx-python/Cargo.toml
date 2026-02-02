@@ -11,8 +11,8 @@ name = "qntx-python-plugin"
 path = "src/main.rs"
 
 [dependencies]
-# QNTX shared library
-qntx = { path = "../crates/qntx", features = ["plugin"] }
+# QNTX gRPC infrastructure
+qntx-grpc = { path = "../crates/qntx-grpc", features = ["plugin"] }
 
 # gRPC and async
 tonic.workspace = true

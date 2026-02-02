@@ -6,7 +6,7 @@ use crate::atsstore::{self, SharedAtsStoreClient};
 use crate::engine::{ExecutionConfig, ExecutionResult, PythonEngine};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use qntx::error::Error;
+use qntx_grpc::error::Error;
 use std::collections::HashMap;
 use std::ffi::CString;
 

@@ -6,7 +6,10 @@ use tracing::info;
 
 use super::shutdown::shutdown_signal;
 use crate::error::Result;
-use crate::tracing::prefix;
+
+// Pulse symbols for logging
+const PULSE_OPEN: &str = "✿";
+const PULSE_CLOSE: &str = "❀";
 
 /// Builder for creating QNTX plugin servers.
 pub struct PluginServer {
@@ -54,12 +57,7 @@ impl PluginServer {
             + 'static,
         S::Future: Send + 'static,
     {
-        info!(
-            "{} Starting {} v{}",
-            prefix::PULSE_OPEN,
-            self.name,
-            self.version
-        );
+        info!("{} Starting {} v{}", PULSE_OPEN, self.name, self.version);
         info!("  Address: {}", self.addr);
 
         Server::builder()
@@ -67,7 +65,7 @@ impl PluginServer {
             .serve_with_shutdown(self.addr, shutdown_signal())
             .await?;
 
-        info!("{} {} shutdown complete", prefix::PULSE_CLOSE, self.name);
+        info!("{} {} shutdown complete", PULSE_CLOSE, self.name);
         Ok(())
     }
 }

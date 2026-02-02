@@ -7,8 +7,8 @@ license = "MIT"
 authors = ["QNTX Contributors"]
 
 [dependencies]
-# QNTX core - for common error types
-qntx = { path = "../../crates/qntx" }
+# QNTX gRPC - for common error types
+qntx-grpc = { path = "../../crates/qntx-grpc" }
 
 # Video decoding - using ffmpeg-next for safe bindings
 # Note: Requires ffmpeg development libraries installed on system
