@@ -62,6 +62,8 @@ web/site/
 
 # ML models (downloaded separately)
 ats/vidstream/models/
+ats/embeddings/models/
+*.onnx
 
 # CTP prototypes (gitignored - for local development)
 web/ctpm1/
