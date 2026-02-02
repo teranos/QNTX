@@ -97,7 +97,7 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         : distance < MELD_THRESHOLD
         ? 'rgba(255, 150, 50, 0.5)'  // Orange when ready to meld
         : `rgba(255, 240, 150, ${intensity * 0.15})`;  // Very faint yellow when distant
-    const glowSize = isMelded ? 16 : 10;
+    const glowSize = 4;
 
     // Ax moving toward prompt (glow on top, bottom, left - NOT right where it melds)
     const axKeyframes = [
@@ -108,8 +108,8 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(${pullAmount}px)`,
-            // Only glow on left side - absolutely no glow on right (melding) side
-            boxShadow: `${-glowSize * intensity * 1.2}px 0 ${glowSize * intensity}px ${glowColor}`,
+            // Simple shadows for left, top, bottom (no right)
+            boxShadow: `-${glowSize * intensity}px 0 ${glowSize * intensity}px ${glowColor}, 0 -${glowSize * intensity}px ${glowSize * intensity}px ${glowColor}, 0 ${glowSize * intensity}px ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
@@ -123,8 +123,8 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(-${pullAmount}px)`,
-            // Only glow on right side - absolutely no glow on left (melding) side
-            boxShadow: `${glowSize * intensity * 1.2}px 0 ${glowSize * intensity}px ${glowColor}`,
+            // Simple shadows for right, top, bottom (no left)
+            boxShadow: `${glowSize * intensity}px 0 ${glowSize * intensity}px ${glowColor}, 0 -${glowSize * intensity}px ${glowSize * intensity}px ${glowColor}, 0 ${glowSize * intensity}px ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
