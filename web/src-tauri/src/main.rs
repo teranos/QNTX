@@ -21,7 +21,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 // Import generated types from Go source (single source of truth)
 // These types are kept in sync with the backend via `make types`
 #[allow(unused_imports)]
-use qntx::types::{
+use qntx_grpc::types::{
     async_types::{Job, JobStatus},
     server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
 };
