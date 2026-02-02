@@ -4,11 +4,12 @@
 //! used across all QNTX Rust code including WASM modules and gRPC plugins.
 //!
 //! Types are generated with serde support for JSON serialization.
+//! Generated code is committed to avoid requiring protoc in CI.
 
-// Include generated proto code
-// prost generates all types in the 'protocol' module since all protos use 'package protocol'
+// Include generated proto code from committed file
+// Run `make proto-rust` to regenerate when proto files change
 pub mod protocol {
-    include!(concat!(env!("OUT_DIR"), "/protocol.rs"));
+    include!("generated/protocol.rs");
 }
 
 // Re-export commonly used types at crate root for convenience
