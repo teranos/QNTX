@@ -240,6 +240,7 @@
         # This would prevent circular dependencies (CI image needs protoc, but apps need protoc to build).
         # The CI image should be a stable platform that doesn't depend on application compilation.
         # Note: qntx binary should NOT be distributed in the CI image - will have separate pipeline for that.
+        # The CI image should be renamed to ghcr.io/teranos/qntx-ci (not just qntx) for clarity.
         # Helper function to build CI image for specific architecture
         mkCiImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
