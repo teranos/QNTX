@@ -67,6 +67,7 @@ pub mod error;
 pub mod json;
 pub mod migrate;
 pub mod store;
+pub mod vec;
 
 // FFI module for CGO integration
 #[cfg(feature = "ffi")]
