@@ -295,3 +295,4 @@ All sharing the same fundamental behavior: proximity morphing, smooth transforma
 - [Continuous Intelligence](./continuous-intelligence.md) - The paradigm glyphs manifest
 - [Tile-Based Typed UI](./tile-based-typed-ui.md) - Tiles as specialized glyph forms
 - [Time-Travel](./time-travel.md) - Navigate glyph states across time
+- [Glyph Melding](./glyph-melding.md) - Spatial composition through proximity-based fusion
