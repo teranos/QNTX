@@ -294,6 +294,35 @@ type ProgressMessage struct {
 }
 ```
 
+## PromptDirectRequest {#promptdirectrequest}
+
+**Source**: [`server/prompt_handlers.go:73`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L73)
+
+
+```go
+type PromptDirectRequest struct {
+	Template string `json:"template"`
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model string `json:"model,omitempty"`
+}
+```
+
+## PromptDirectResponse {#promptdirectresponse}
+
+**Source**: [`server/prompt_handlers.go:81`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L81)
+
+
+```go
+type PromptDirectResponse struct {
+	Response string `json:"response"`
+	PromptTokens int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens int `json:"total_tokens,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+```
+
 ## PromptExecuteRequest {#promptexecuterequest}
 
 **Source**: [`server/prompt_handlers.go:64`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L64)
@@ -311,7 +340,7 @@ type PromptExecuteRequest struct {
 
 ## PromptExecuteResponse {#promptexecuteresponse}
 
-**Source**: [`server/prompt_handlers.go:93`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L93)
+**Source**: [`server/prompt_handlers.go:110`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L110)
 
 
 ```go
@@ -358,7 +387,7 @@ type PromptPreviewResponse struct {
 
 ## PromptSaveRequest {#promptsaverequest}
 
-**Source**: [`server/prompt_handlers.go:455`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L455)
+**Source**: [`server/prompt_handlers.go:594`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L594)
 
 
 ```go
@@ -491,7 +520,7 @@ type QueryMessage struct {
 
 ## Result {#result}
 
-**Source**: [`server/prompt_handlers.go:73`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L73)
+**Source**: [`server/prompt_handlers.go:90`](https://github.com/teranos/QNTX/blob/main/server/prompt_handlers.go#L90)
 
 
 ```go
