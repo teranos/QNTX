@@ -22,8 +22,15 @@ We have the foundation in place but need to complete the integration to make it 
 
 ### 2. Complete sqlite-vec Integration
 **Location:** `crates/qntx-sqlite/src/vec.rs`
-- Fix the sqlite-vec initialization (function signature mismatch)
-- Test vector operations work correctly
+- Fix the sqlite-vec initialization - use `sqlite3_auto_extension` approach:
+  ```rust
+  unsafe {
+      sqlite3_auto_extension(Some(std::mem::transmute(
+          sqlite_vec::sqlite3_vec_init as *const ()
+      )));
+  }
+  ```
+- Test vector operations work correctly (verify with `SELECT vec_version()`)
 - Ensure migrations with vector tables run successfully
 
 ## Medium Priority Tasks 🟡
