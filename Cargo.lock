@@ -3700,6 +3700,7 @@ version = "0.1.0"
 dependencies = [
  "js-sys",
  "qntx-core",
+ "qntx-proto",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
