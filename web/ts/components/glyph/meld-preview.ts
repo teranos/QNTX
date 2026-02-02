@@ -99,7 +99,7 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         : `rgba(100, 200, 255, ${intensity * 0.3})`;  // Blue when approaching
     const glowSize = isMelded ? 20 : 12;
 
-    // Ax moving toward prompt (no border radius change)
+    // Ax moving toward prompt (glow on LEFT side only)
     const axKeyframes = [
         {
             transform: 'translateX(0)',
@@ -108,12 +108,12 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(${pullAmount}px)`,
-            boxShadow: `${pullAmount}px 0 ${glowSize * intensity}px ${glowColor}`,
+            boxShadow: `${-glowSize * intensity * 0.5}px 0 ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
 
-    // Prompt moving toward ax (no border radius change)
+    // Prompt moving toward ax (glow on RIGHT side only)
     const promptKeyframes = [
         {
             transform: 'translateX(0)',
@@ -122,7 +122,7 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(-${pullAmount}px)`,
-            boxShadow: `${-pullAmount}px 0 ${glowSize * intensity}px ${glowColor}`,
+            boxShadow: `${glowSize * intensity * 0.5}px 0 ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
