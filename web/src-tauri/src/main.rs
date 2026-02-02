@@ -18,13 +18,14 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 #[cfg(not(target_os = "ios"))]
 use tauri_plugin_deep_link::DeepLinkExt;
 
-// Import generated types from Go source (single source of truth)
-// These types are kept in sync with the backend via `make types`
+// Import types from proto (single source of truth)
 #[allow(unused_imports)]
-use qntx_grpc::types::{
-    async_types::{Job, JobStatus},
-    server::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage},
-};
+use qntx_proto::protocol::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage};
+
+// TODO: Import Job and JobStatus once they're migrated to proto
+// For now, these still come from typegen
+#[allow(unused_imports)]
+use qntx_grpc::types::async_types::{Job, JobStatus};
 
 // Video processing module (desktop-only)
 // #[cfg(not(any(target_os = "ios", target_os = "android")))]
