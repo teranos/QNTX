@@ -86,10 +86,6 @@ Gradual replacement:
 - qntx-proto: 5 direct dependencies
 - qntx-grpc with plugin feature: 50+ dependencies
 
-### Build Performance
-- qntx-proto build: ~2s
-- qntx-grpc build: ~15s
-
 ### Binary Size Impact
 - WASM with qntx-proto: 90KB
 - WASM with hypothetical qntx-grpc: 500KB+ (estimated)
