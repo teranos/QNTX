@@ -69,6 +69,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
     element.className = 'canvas-prompt-glyph';
     element.dataset.glyphId = glyph.id;
+    element.dataset.symbol = SO; // Add symbol for meld detection
 
     const gridX = glyph.gridX ?? 5;
     const gridY = glyph.gridY ?? 5;

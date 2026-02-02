@@ -10,6 +10,8 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { updateAxMeldPreview, cleanupMeldPreview } from './meld-preview';
+import { AX } from '@generated/sym.js';
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -79,6 +81,11 @@ export function makeDraggable(
 
         element.style.left = `${newX}px`;
         element.style.top = `${newY}px`;
+
+        // Update meld preview if this is an ax glyph
+        if (glyph.symbol === AX) {
+            updateAxMeldPreview(element);
+        }
     };
 
     const handleMouseUp = () => {
@@ -86,6 +93,11 @@ export function makeDraggable(
         isDragging = false;
 
         element.classList.remove('is-dragging');
+
+        // Clean up meld preview
+        if (glyph.symbol === AX) {
+            cleanupMeldPreview();
+        }
 
         // Save position relative to canvas parent
         const canvas = element.parentElement;
