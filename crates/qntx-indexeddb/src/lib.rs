@@ -39,6 +39,7 @@
 
 pub mod error;
 pub mod idb;
+pub mod proto_convert;
 pub mod store;
 
 pub use error::{IndexedDbError, Result};
