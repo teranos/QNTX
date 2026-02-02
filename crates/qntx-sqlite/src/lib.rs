@@ -66,6 +66,7 @@ pub mod bounded;
 pub mod error;
 pub mod json;
 pub mod migrate;
+pub mod proto_convert;
 pub mod store;
 
 // FFI module for CGO integration

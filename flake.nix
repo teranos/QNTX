@@ -236,44 +236,47 @@
           '';
         };
 
-        # Helper function to build CI image for specific architecture
-        mkCiImage = arch: pkgs.dockerTools.buildLayeredImage {
+        mkQNTXImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
           architecture = arch;
 
           contents = [
-            # Prebuilt QNTX binary
+
             qntx
+
             # Go toolchain
-            pkgs.go
-            pkgs.git
+            pkgs.go # TODO: Remove - build-time only
+            pkgs.git # TODO: Remove - build-time only
+
+            # Proto compiler for proto-based builds
+            pkgs.protobuf # TODO: Remove - build-time only
 
             # Complete Rust toolchain
-            pkgs.rustc
-            pkgs.cargo
-            pkgs.rustfmt
-            pkgs.clippy
+            pkgs.rustc # TODO: Remove - build-time only
+            pkgs.cargo # TODO: Remove - build-time only
+            pkgs.rustfmt # TODO: Remove - build-time only
+            pkgs.clippy # TODO: Remove - build-time only
 
             # Python for qntx-python plugin builds
-            pkgs.python313
+            pkgs.python313 # TODO: Remove unless plugins need Python runtime
 
             # System dependencies
-            pkgs.openssl
-            pkgs.patchelf
+            pkgs.openssl # Keep - runtime SSL/TLS
+            pkgs.patchelf # TODO: Remove - build-time only
 
             # Build tools and utilities
-            pkgs.pkg-config
-            pkgs.sqlite
-            pkgs.gcc
-            pkgs.gnumake
-            pkgs.coreutils
-            pkgs.diffutils
-            pkgs.findutils
-            pkgs.bash
-            pkgs.curl
-            pkgs.unzip
-            pkgs.protobuf
+            pkgs.pkg-config # TODO: Remove - build-time only
+            pkgs.sqlite # Keep - runtime database
+            pkgs.gcc # TODO: Remove - build-time only
+            pkgs.gnumake # TODO: Remove - build-time only
+            pkgs.coreutils # Keep - basic shell utilities
+            pkgs.diffutils # TODO: Remove - build-time only
+            pkgs.findutils # TODO: Remove - build-time only
+            pkgs.bash # Keep - shell
+            pkgs.curl # Keep - might be needed for runtime HTTP
+            pkgs.unzip # TODO: Remove - probably not needed at runtime
+            pkgs.protobuf # TODO: Remove - duplicate and build-time only
 
             # CA certificates for HTTPS
             pkgs.cacert
@@ -310,8 +313,8 @@
           else if system == "aarch64-linux" then "arm64"
           else "amd64";
 
-        # CI image with detected architecture
-        ciImage = mkCiImage dockerArch;
+        # Application image with detected architecture
+        QNTXImage = mkQNTXImage dockerArch;
 
         # Helper function to build qntx-code plugin image for specific architecture
         mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
@@ -455,8 +458,8 @@
 
             nixContainers = [
               {
-                name = "CI Image";
-                description = "Full development environment for CI/CD pipelines";
+                name = "Image";
+                description = "QNTX Application Image";
                 image = "ghcr.io/teranos/qntx:latest";
                 architectures = [ "amd64" "arm64" ];
                 ports = [ ];
@@ -481,11 +484,10 @@
           # Default: CLI binary for easy installation
           default = qntx;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-          # Docker images are Linux-only
-          # CI Docker images (full dev environment)
-          ci-image = ciImage;
-          ci-image-amd64 = mkCiImage "amd64";
-          ci-image-arm64 = mkCiImage "arm64";
+
+          qntx-image = QNTXImage;
+          qntx-image-amd64 = mkQNTXImage "amd64";
+          qntx-image-arm64 = mkQNTXImage "arm64";
 
           # qntx-code plugin Docker images (minimal runtime)
           qntx-code-plugin-image = codeImage;
@@ -549,7 +551,7 @@
             '';
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           # Docker image checks are Linux-only
-          ci-image = ciImage; # Ensure CI image builds
+          qntx-image = QNTXImage; # Ensure QNTX image builds
           qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
           qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds
         };
