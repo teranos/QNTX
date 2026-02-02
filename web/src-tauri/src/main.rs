@@ -19,8 +19,9 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 // Import types from proto (single source of truth)
-#[allow(unused_imports)]
-use qntx_proto::protocol::{DaemonStatusMessage, JobUpdateMessage, StorageWarningMessage};
+use qntx_proto::protocol::{
+    DaemonStatusMessage, JobUpdateMessage, MessageType, StorageWarningMessage,
+};
 
 // TODO: Import Job and JobStatus once they're migrated to proto
 // For now, these still come from typegen
@@ -101,6 +102,8 @@ fn handle_deep_link(app: &tauri::AppHandle, url: &str) {
             // qntx://job/<id> - emit event with job ID
             let job_id = path.strip_prefix("job/").unwrap_or("");
             if !job_id.is_empty() {
+                // TODO: Once Job type is migrated to proto, create and emit a JobUpdateMessage here
+                // This would provide full job details instead of just the ID
                 show_window_and_emit(app, "deep-link-job", job_id.to_string())
             } else {
                 show_window_and_emit(app, "show-hixtory-panel", ())
@@ -144,6 +147,8 @@ fn get_server_url(state: State<ServerState>) -> Option<String> {
 }
 
 /// Send a native notification for job completion
+// TODO: Once Job type is migrated to proto, refactor to accept JobUpdateMessage
+// and emit the full message to frontend for detailed job status
 #[tauri::command]
 fn notify_job_completed(
     app: tauri::AppHandle,
@@ -164,6 +169,8 @@ fn notify_job_completed(
 }
 
 /// Send a native notification for job failure
+// TODO: Once Job type is migrated to proto, refactor to accept JobUpdateMessage
+// with error details and emit the full message to frontend
 #[tauri::command]
 fn notify_job_failed(
     app: tauri::AppHandle,
@@ -181,20 +188,35 @@ fn notify_job_failed(
     )
 }
 
-/// Send a native notification for storage warnings
+/// Send a native notification for storage warnings using proto message
 #[tauri::command]
-fn notify_storage_warning(
-    app: tauri::AppHandle,
-    actor: String,
-    fill_percent: f64,
-) -> Result<(), Error> {
-    let percent = fill_percent * 100.0;
+fn notify_storage_warning(app: tauri::AppHandle, msg: StorageWarningMessage) -> Result<(), Error> {
+    // Construct notification based on warning level
+    let title = match msg.level.as_str() {
+        "critical" => "QNTX: Critical Storage Warning",
+        "warning" => "QNTX: Storage Warning",
+        _ => "QNTX: Storage Notice",
+    };
+
+    let body = if msg.actor.is_empty() {
+        format!("Storage at {}% capacity", msg.fill_percentage)
+    } else {
+        format!("{} is at {}% capacity", msg.actor, msg.fill_percentage)
+    };
+
     send_notification(
         &app,
-        "QNTX: Storage Warning",
-        format!("{} is at {:.0}% capacity", actor, percent),
-        format!("Storage warning: {} at {:.0}%", actor, percent),
-    )
+        title,
+        body.clone(),
+        format!("Storage warning: {}", body),
+    )?;
+
+    // Also emit the full message to frontend for detailed display
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("storage-warning", &msg);
+    }
+
+    Ok(())
 }
 
 /// Send a native notification when server enters draining mode
@@ -202,9 +224,29 @@ fn notify_storage_warning(
 #[tauri::command]
 fn notify_server_draining(
     app: tauri::AppHandle,
-    active_jobs: i64,
-    queued_jobs: i64,
+    active_jobs: i32,
+    queued_jobs: i32,
 ) -> Result<(), Error> {
+    // Create DaemonStatusMessage for draining state
+    let status_msg = DaemonStatusMessage {
+        r#type: MessageType::MessageTypeDaemonStatus.into(),
+        running: true, // Still running but draining
+        active_jobs,
+        queued_jobs,
+        load_percentage: 0, // Load doesn't matter during draining
+        budget_daily: 0.0,
+        budget_weekly: 0.0,
+        budget_monthly: 0.0,
+        budget_daily_limit: 0.0,
+        budget_weekly_limit: 0.0,
+        budget_monthly_limit: 0.0,
+        server_state: "draining".to_string(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+    };
+
     let total = active_jobs + queued_jobs;
     let body = if total > 0 {
         format!("Completing {} remaining job(s) before shutdown", total)
@@ -220,18 +262,52 @@ fn notify_server_draining(
             "Server draining: {} active, {} queued",
             active_jobs, queued_jobs
         ),
-    )
+    )?;
+
+    // Emit the full status message to frontend
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("daemon-status", &status_msg);
+    }
+
+    Ok(())
 }
 
 /// Send a native notification when server stops
 #[tauri::command]
 fn notify_server_stopped(app: tauri::AppHandle) -> Result<(), Error> {
+    // Create DaemonStatusMessage for stopped state
+    let status_msg = DaemonStatusMessage {
+        r#type: MessageType::MessageTypeDaemonStatus.into(),
+        running: false,
+        active_jobs: 0,
+        queued_jobs: 0,
+        load_percentage: 0,
+        budget_daily: 0.0,
+        budget_weekly: 0.0,
+        budget_monthly: 0.0,
+        budget_daily_limit: 0.0,
+        budget_weekly_limit: 0.0,
+        budget_monthly_limit: 0.0,
+        server_state: "stopped".to_string(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+    };
+
     send_notification(
         &app,
         "QNTX: Server Stopped",
         "The QNTX server has stopped".to_string(),
         "Server stopped".to_string(),
-    )
+    )?;
+
+    // Emit the full status message to frontend
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("daemon-status", &status_msg);
+    }
+
+    Ok(())
 }
 
 /// Set taskbar progress indicator (Windows feature, works on other platforms too)
@@ -724,6 +800,9 @@ fn main() {
                             }
                         } else if event.id == "toggle_pulse" {
                             // Toggle Pulse daemon (emit event to frontend)
+                            // TODO: Emit a full DaemonStatusMessage with current daemon state,
+                            // active/queued jobs, load percentage, and budget info
+                            // This would provide a complete status update when toggling the daemon
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.emit("toggle-pulse-daemon", ());
                             }
