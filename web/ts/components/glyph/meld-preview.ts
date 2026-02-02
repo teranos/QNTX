@@ -61,59 +61,69 @@ function smoothIntensity(current: number, target: number, factor: number = 0.3):
  * Create morphing animation for meld preview
  */
 function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, distance: number): void {
-    // Calculate target intensity
-    const targetIntensity = Math.max(0, 1 - (distance / PROXIMITY_THRESHOLD));
+    // If we're in melded state, keep full intensity until unmeld threshold
+    let targetIntensity: number;
+    if (activePreview.isMelded) {
+        // Stay at full intensity while melded
+        targetIntensity = 1.0;
+    } else {
+        // Normal distance-based intensity
+        targetIntensity = Math.max(0, 1 - (distance / PROXIMITY_THRESHOLD));
+    }
 
-    // Smooth the intensity change to reduce jitter
+    // Smooth the intensity change to reduce jitter (unless we're popping out of meld)
     const currentIntensity = activePreview.lastIntensity ?? 0;
-    const intensity = smoothIntensity(currentIntensity, targetIntensity);
+    const wasJustUnmelded = currentIntensity > 0.8 && !activePreview.isMelded && distance > UNMELD_THRESHOLD;
+
+    // If we just unmelded (popped out), snap back instead of smooth transition
+    const intensity = wasJustUnmelded
+        ? targetIntensity
+        : smoothIntensity(currentIntensity, targetIntensity);
+
     activePreview.lastIntensity = intensity;
 
     // Skip animation update if change is too small (reduces jitter)
-    if (Math.abs(intensity - currentIntensity) < 0.02 && activePreview.axAnimation) {
+    if (Math.abs(intensity - currentIntensity) < 0.02 && activePreview.axAnimation && !wasJustUnmelded) {
         return;
     }
 
-    // How much the border radius should deform (max 32px at touching)
-    const morphRadius = Math.round(32 * intensity);
-
     // How much to "pull" toward each other visually (stronger effect)
-    const pullAmount = Math.round(12 * intensity);
+    const pullAmount = Math.round(15 * intensity);
 
-    // Add stronger visual effect when "melded" (very close)
-    const isMeldReady = distance < MELD_THRESHOLD;
-    const glowColor = isMeldReady ? 'rgba(100, 255, 100, 0.6)' : `rgba(100, 200, 255, ${intensity * 0.4})`;
-    const glowSize = isMeldReady ? 30 : 20;
+    // Different visual states: approaching vs melded
+    const isMelded = activePreview.isMelded;
+    const glowColor = isMelded
+        ? 'rgba(100, 255, 100, 0.7)'  // Strong green when melded/locked
+        : distance < MELD_THRESHOLD
+        ? 'rgba(100, 255, 100, 0.4)'  // Medium green when ready to meld
+        : `rgba(100, 200, 255, ${intensity * 0.3})`;  // Blue when approaching
+    const glowSize = isMelded ? 20 : 12;
 
-    // Ax right edge morphing (reaching toward prompt)
+    // Ax moving toward prompt (no border radius change)
     const axKeyframes = [
         {
-            borderRadius: '8px 8px 8px 8px',
             transform: 'translateX(0)',
             boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
             filter: 'brightness(1)'
         },
         {
-            borderRadius: `8px ${8 + morphRadius}px ${8 + morphRadius}px 8px`,
             transform: `translateX(${pullAmount}px)`,
             boxShadow: `${pullAmount}px 0 ${glowSize * intensity}px ${glowColor}`,
-            filter: isMeldReady ? 'brightness(1.1)' : 'brightness(1)'
+            filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
 
-    // Prompt left edge morphing (reaching toward ax)
+    // Prompt moving toward ax (no border radius change)
     const promptKeyframes = [
         {
-            borderRadius: '8px 8px 8px 8px',
             transform: 'translateX(0)',
             boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
             filter: 'brightness(1)'
         },
         {
-            borderRadius: `${8 + morphRadius}px 8px 8px ${8 + morphRadius}px`,
             transform: `translateX(-${pullAmount}px)`,
             boxShadow: `${-pullAmount}px 0 ${glowSize * intensity}px ${glowColor}`,
-            filter: isMeldReady ? 'brightness(1.1)' : 'brightness(1)'
+            filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
 
@@ -121,16 +131,22 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
     activePreview.axAnimation?.cancel();
     activePreview.promptAnimation?.cancel();
 
-    // Create new animations with smoother timing
+    // Use faster animation when "popping" out of meld
+    const animDuration = wasJustUnmelded ? 150 : 300;
+    const animEasing = wasJustUnmelded
+        ? 'cubic-bezier(0.0, 0.0, 0.2, 1)'  // Faster out for pop effect
+        : 'cubic-bezier(0.4, 0.0, 0.2, 1)';  // Normal smooth easing
+
+    // Create new animations with appropriate timing
     activePreview.axAnimation = axElement.animate(axKeyframes, {
-        duration: 300, // Longer duration for smoother movement
-        easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)', // Material Design easing
+        duration: animDuration,
+        easing: animEasing,
         fill: 'forwards'
     });
 
     activePreview.promptAnimation = promptElement.animate(promptKeyframes, {
-        duration: 300,
-        easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
+        duration: animDuration,
+        easing: animEasing,
         fill: 'forwards'
     });
 
@@ -153,14 +169,14 @@ function clearMeldPreview(): void {
         activePreview.axAnimation?.cancel();
         activePreview.axElement.animate([
             {
-                borderRadius: activePreview.axElement.style.borderRadius || '8px 8px 8px 8px',
                 transform: activePreview.axElement.style.transform || 'translateX(0)',
-                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
+                filter: 'brightness(1)'
             },
             {
-                borderRadius: '8px 8px 8px 8px',
                 transform: 'translateX(0)',
-                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
+                filter: 'brightness(1)'
             }
         ], {
             duration: 200,
@@ -174,14 +190,14 @@ function clearMeldPreview(): void {
         activePreview.promptAnimation?.cancel();
         activePreview.promptElement.animate([
             {
-                borderRadius: activePreview.promptElement.style.borderRadius || '8px 8px 8px 8px',
                 transform: activePreview.promptElement.style.transform || 'translateX(0)',
-                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
+                filter: 'brightness(1)'
             },
             {
-                borderRadius: '8px 8px 8px 8px',
                 transform: 'translateX(0)',
-                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.1)',
+                filter: 'brightness(1)'
             }
         ], {
             duration: 200,
@@ -219,22 +235,32 @@ export function updateAxMeldPreview(axElement: HTMLElement): void {
         }
     });
 
-    // Apply hysteresis logic
-    const threshold = activePreview.isMelded ? UNMELD_THRESHOLD : PROXIMITY_THRESHOLD;
+    // Track previous melded state for pop detection
+    const wasMelded = activePreview.isMelded || false;
 
-    if (closestPrompt && closestDistance < threshold) {
-        // Update melded state when very close
-        if (closestDistance < MELD_THRESHOLD) {
+    // Update melded state with hysteresis
+    if (closestDistance !== Infinity) {
+        if (!activePreview.isMelded && closestDistance < MELD_THRESHOLD) {
+            // Enter melded state
             activePreview.isMelded = true;
-        } else if (closestDistance > UNMELD_THRESHOLD) {
+        } else if (activePreview.isMelded && closestDistance > UNMELD_THRESHOLD) {
+            // Exit melded state (will trigger pop)
             activePreview.isMelded = false;
         }
+    }
 
+    // Determine if we should show preview
+    const shouldShowPreview = closestPrompt && (
+        activePreview.isMelded || // Always show when melded
+        closestDistance < PROXIMITY_THRESHOLD // Show when approaching
+    );
+
+    if (shouldShowPreview && closestPrompt) {
         // Show morphing preview
         animateMeldPreview(axElement, closestPrompt, closestDistance);
         activePreview.lastDistance = closestDistance;
     } else {
-        // No prompt nearby or beyond threshold, clear preview
+        // No preview needed
         activePreview.isMelded = false;
         clearMeldPreview();
     }
