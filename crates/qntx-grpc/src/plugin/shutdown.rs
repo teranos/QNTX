@@ -3,6 +3,9 @@
 use tokio::signal;
 use tracing::info;
 
+// Pulse symbol for logging
+const PULSE_CLOSE: &str = "❀";
+
 /// Returns a future that resolves when a shutdown signal is received.
 ///
 /// Handles both Ctrl+C and SIGTERM (on Unix).
@@ -26,10 +29,10 @@ pub async fn shutdown_signal() {
 
     tokio::select! {
         _ = ctrl_c => {
-            info!("{} Received Ctrl+C, shutting down", crate::tracing::prefix::PULSE_CLOSE);
+            info!("{} Received Ctrl+C, shutting down", PULSE_CLOSE);
         }
         _ = terminate => {
-            info!("{} Received terminate signal, shutting down", crate::tracing::prefix::PULSE_CLOSE);
+            info!("{} Received terminate signal, shutting down", PULSE_CLOSE);
         }
     }
 }
