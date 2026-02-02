@@ -90,13 +90,13 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
     // How much to "pull" toward each other visually (stronger effect)
     const pullAmount = Math.round(15 * intensity);
 
-    // Different visual states: approaching vs melded
+    // Different visual states with heat-based colors
     const isMelded = activePreview.isMelded;
     const glowColor = isMelded
-        ? 'rgba(100, 255, 100, 0.7)'  // Strong green when melded/locked
+        ? 'rgba(255, 100, 50, 0.8)'  // Reddish orange when melded/locked
         : distance < MELD_THRESHOLD
-        ? 'rgba(100, 255, 100, 0.4)'  // Medium green when ready to meld
-        : `rgba(100, 200, 255, ${intensity * 0.3})`;  // Blue when approaching
+        ? 'rgba(255, 150, 50, 0.6)'  // Orange when ready to meld
+        : `rgba(255, 255, 100, ${intensity * 0.25})`;  // Faint yellow when distant
     const glowSize = isMelded ? 20 : 12;
 
     // Ax moving toward prompt (glow on top, bottom, left - NOT right where it melds)
