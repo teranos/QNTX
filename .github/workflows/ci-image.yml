@@ -3,7 +3,7 @@ name: Build CI Image
 on:
   push:
     paths:
-      - 'ci.nix'
+      - 'ci/**'
       - '.github/workflows/ci-image.yml'
   workflow_dispatch:
 
@@ -28,7 +28,7 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Build CI image
-        run: nix build ./ci.nix#ci-image-${{ matrix.arch }}
+        run: nix build ./ci#ci-image-${{ matrix.arch }}
 
       - name: Load image into Docker
         run: docker load < result
