@@ -33,8 +33,11 @@ prost-build = "0.13"' >> Cargo.toml
 
 # Build to generate code
 echo "🦀 Generating Rust proto code..."
-cargo build 2>/dev/null
-or echo "Build step completed with proto generation"
+if not cargo build 2>&1 | grep -v "warning:"
+    echo "❌ Proto generation failed"
+    exit 1
+end
+echo "Build step completed with proto generation"
 
 # Find and copy generated file
 set GENERATED_FILE (find ../../target -name "protocol.rs" -type f 2>/dev/null | head -1)

@@ -10,4 +10,6 @@ description = "Protocol Buffer types for QNTX"
 prost = "0.13"
 prost-types = "0.13"
 serde = { workspace = true }
+
+[dev-dependencies]
 serde_json = { workspace = true }
