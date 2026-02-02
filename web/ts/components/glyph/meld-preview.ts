@@ -108,11 +108,8 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(${pullAmount}px)`,
-            // Multiple shadows: left, top/bottom combined
-            boxShadow: `
-                ${-glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor},
-                0 0 ${glowSize * intensity}px ${glowColor}
-            `,
+            // Multiple shadows: left glow + general glow for top/bottom
+            boxShadow: `${-glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor}, 0 0 ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
@@ -126,11 +123,8 @@ function animateMeldPreview(axElement: HTMLElement, promptElement: HTMLElement, 
         },
         {
             transform: `translateX(-${pullAmount}px)`,
-            // Multiple shadows: right, top/bottom combined
-            boxShadow: `
-                ${glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor},
-                0 0 ${glowSize * intensity}px ${glowColor}
-            `,
+            // Multiple shadows: right glow + general glow for top/bottom
+            boxShadow: `${glowSize * intensity * 0.7}px 0 ${glowSize * intensity}px ${glowColor}, 0 0 ${glowSize * intensity}px ${glowColor}`,
             filter: isMelded ? 'brightness(1.15)' : 'brightness(1.05)'
         }
     ];
