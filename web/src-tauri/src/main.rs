@@ -19,9 +19,7 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_deep_link::DeepLinkExt;
 
 // Import types from proto (single source of truth)
-use qntx_proto::protocol::{
-    DaemonStatusMessage, JobUpdateMessage, MessageType, StorageWarningMessage,
-};
+use qntx_proto::protocol::{DaemonStatusMessage, MessageType, StorageWarningMessage};
 
 // TODO: Import Job and JobStatus once they're migrated to proto
 // For now, these still come from typegen
@@ -191,10 +189,10 @@ fn notify_job_failed(
 /// Send a native notification for storage warnings using proto message
 #[tauri::command]
 fn notify_storage_warning(app: tauri::AppHandle, msg: StorageWarningMessage) -> Result<(), Error> {
-    // Construct notification based on warning level
-    let title = match msg.level.as_str() {
-        "critical" => "QNTX: Critical Storage Warning",
-        "warning" => "QNTX: Storage Warning",
+    // Determine severity based on fill percentage
+    let title = match msg.fill_percentage {
+        90..=100 => "QNTX: Critical Storage Warning",
+        75..=89 => "QNTX: Storage Warning",
         _ => "QNTX: Storage Notice",
     };
 
@@ -229,7 +227,7 @@ fn notify_server_draining(
 ) -> Result<(), Error> {
     // Create DaemonStatusMessage for draining state
     let status_msg = DaemonStatusMessage {
-        r#type: MessageType::MessageTypeDaemonStatus.into(),
+        r#type: MessageType::DaemonStatus as i32,
         running: true, // Still running but draining
         active_jobs,
         queued_jobs,
@@ -277,7 +275,7 @@ fn notify_server_draining(
 fn notify_server_stopped(app: tauri::AppHandle) -> Result<(), Error> {
     // Create DaemonStatusMessage for stopped state
     let status_msg = DaemonStatusMessage {
-        r#type: MessageType::MessageTypeDaemonStatus.into(),
+        r#type: MessageType::DaemonStatus as i32,
         running: false,
         active_jobs: 0,
         queued_jobs: 0,
