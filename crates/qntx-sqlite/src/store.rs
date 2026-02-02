@@ -63,7 +63,17 @@ impl SqliteStore {
             String,
         ),
     ) -> StoreResult<Attestation> {
-        let (id, subjects_json, predicates_json, contexts_json, actors_json, timestamp_str, source, attributes_json, created_at_str) = row_data;
+        let (
+            id,
+            subjects_json,
+            predicates_json,
+            contexts_json,
+            actors_json,
+            timestamp_str,
+            source,
+            attributes_json,
+            created_at_str,
+        ) = row_data;
 
         let subjects = deserialize_string_vec(&subjects_json)?;
         let predicates = deserialize_string_vec(&predicates_json)?;
