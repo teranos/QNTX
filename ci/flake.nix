@@ -24,9 +24,6 @@
             pkgs.go
             pkgs.git
 
-            # Proto compiler for proto-based builds
-            pkgs.protobuf
-
             # Complete Rust toolchain
             pkgs.rustc
             pkgs.cargo
@@ -51,7 +48,6 @@
             pkgs.bash
             pkgs.curl
             pkgs.unzip
-            pkgs.protobuf
 
             # CA certificates for HTTPS
             pkgs.cacert
@@ -70,7 +66,7 @@
 
           config = {
             Env = [
-              "PATH=${pkgs.lib.makeBinPath [ pkgs.go pkgs.git pkgs.protobuf pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash pkgs.curl ]}"
+              "PATH=${pkgs.lib.makeBinPath [ pkgs.go pkgs.git pkgs.rustc pkgs.cargo pkgs.rustfmt pkgs.clippy pkgs.python313 pkgs.pkg-config pkgs.gcc pkgs.gnumake pkgs.coreutils pkgs.diffutils pkgs.findutils pkgs.bash pkgs.curl ]}"
               "PKG_CONFIG_PATH=${pkgs.lib.makeSearchPathOutput "dev" "lib/pkgconfig" [ pkgs.openssl ]}"
               "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
               "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}"
