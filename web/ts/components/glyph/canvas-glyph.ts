@@ -8,7 +8,7 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse, IX, AX, SO, Prose } from '@generated/sym.js';
+import { Pulse, IX, AX, SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
@@ -219,18 +219,6 @@ function showSpawnMenu(
 
     menu.appendChild(promptBtn);
 
-    // Add prose button
-    const proseBtn = document.createElement('button');
-    proseBtn.className = 'canvas-spawn-button';
-    proseBtn.textContent = Prose;
-    proseBtn.title = 'Spawn Prose glyph';
-
-    proseBtn.addEventListener('click', () => {
-        spawnProseGlyph(gridX, gridY, canvas, glyphs);
-        removeMenu();
-    });
-
-    menu.appendChild(proseBtn);
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -425,119 +413,6 @@ async function spawnPromptGlyph(
 }
 
 /**
- * Spawn a new Prose glyph at grid position
- */
-async function spawnProseGlyph(
-    gridX: number,
-    gridY: number,
-    canvas: HTMLElement,
-    glyphs: Glyph[]
-): Promise<void> {
-    const proseGlyph: Glyph = {
-        id: `prose-${crypto.randomUUID()}`,
-        title: 'Prose Document',
-        symbol: Prose,
-        gridX,
-        gridY,
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.textContent = 'Prose glyph';
-            return content;
-        }
-    };
-
-    glyphs.push(proseGlyph);
-
-    const glyphElement = await createProseGlyph(proseGlyph);
-    canvas.appendChild(glyphElement);
-
-    const rect = glyphElement.getBoundingClientRect();
-    const width = Math.round(rect.width);
-    const height = Math.round(rect.height);
-
-    uiState.addCanvasGlyph({
-        id: proseGlyph.id,
-        symbol: Prose,
-        gridX,
-        gridY,
-        width,
-        height
-    });
-
-    log.debug(SEG.UI, `[Canvas] Spawned Prose glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
-}
-
-/**
- * Create a prose glyph element with markdown editor
- */
-async function createProseGlyph(glyph: Glyph): Promise<HTMLElement> {
-    const element = document.createElement('div');
-    element.className = 'glyph prose-glyph';
-    element.id = glyph.id;
-    element.style.position = 'absolute';
-    element.style.left = `${glyph.gridX * GRID_SIZE}px`;
-    element.style.top = `${glyph.gridY * GRID_SIZE}px`;
-    element.style.width = `${glyph.width || 400}px`;
-    element.style.height = `${glyph.height || 300}px`;
-
-    // Title bar
-    const titleBar = document.createElement('div');
-    titleBar.className = 'glyph-title-bar';
-    titleBar.innerHTML = `
-        <span class="glyph-symbol">${Prose}</span>
-        <span class="glyph-title">${glyph.title || 'Prose Document'}</span>
-        <button class="glyph-close" aria-label="Close">✕</button>
-    `;
-
-    // Close button
-    const closeBtn = titleBar.querySelector('.glyph-close') as HTMLButtonElement;
-    closeBtn.addEventListener('click', () => {
-        element.remove();
-        uiState.removeCanvasGlyph(glyph.id);
-    });
-
-    // Content area with textarea for markdown editing
-    const contentArea = document.createElement('div');
-    contentArea.className = 'glyph-content prose-editor-content';
-
-    const textarea = document.createElement('textarea');
-    textarea.className = 'prose-markdown-input';
-    textarea.placeholder = 'Write your prose here...';
-    textarea.style.width = '100%';
-    textarea.style.height = '100%';
-    textarea.style.border = 'none';
-    textarea.style.outline = 'none';
-    textarea.style.resize = 'none';
-    textarea.style.fontFamily = 'monospace';
-    textarea.style.fontSize = '14px';
-    textarea.style.padding = '8px';
-
-    contentArea.appendChild(textarea);
-
-    // Resize handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.width = '12px';
-    resizeHandle.style.height = '12px';
-    resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.textContent = '⋰';
-
-    element.appendChild(titleBar);
-    element.appendChild(contentArea);
-    element.appendChild(resizeHandle);
-
-    // Make draggable and resizable using shared infrastructure
-    const { makeDraggable, makeResizable } = await import('./glyph-interaction');
-    makeDraggable(element, titleBar, glyph, { logLabel: 'ProseGlyph' });
-    makeResizable(element, resizeHandle, glyph, { logLabel: 'ProseGlyph' });
-
-    return element;
-}
-
-/**
  * Render a glyph on the canvas
  * Checks symbol type and creates appropriate glyph element
  */
@@ -560,11 +435,6 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For prompt glyphs, create template editor
     if (glyph.symbol === SO) {
         return await createPromptGlyph(glyph);
-    }
-
-    // For prose glyphs, create prose editor
-    if (glyph.symbol === Prose) {
-        return await createProseGlyph(glyph);
     }
 
     // For AX glyphs, render content directly (they handle their own rendering)
