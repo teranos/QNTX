@@ -307,6 +307,27 @@ export interface ProgressMessage {
   message: string;
 }
 
+export interface PromptDirectRequest {
+  /**
+   * Prompt template (no {{variables}} required)
+   */
+  template: string;
+  system_prompt?: string;
+  /**
+   * "openrouter" or "local"
+   */
+  provider?: string;
+  model?: string;
+}
+
+export interface PromptDirectResponse {
+  response: string;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  error?: string;
+}
+
 export interface PromptExecuteRequest {
   ax_query: string;
   template: string;
