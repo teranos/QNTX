@@ -10,6 +10,8 @@ description = "QNTX WASM bridge - exposes qntx-core functions for Go via wazero"
 crate-type = ["cdylib"]
 
 [dependencies]
+# Proto types - demonstrates WASM can use proto without gRPC dependencies (ADR-006)
+qntx-proto = { path = "../qntx-proto" }
 qntx-core = { path = "../qntx-core", default-features = false, features = ["wasm"] }
 serde_json = { workspace = true }
 
