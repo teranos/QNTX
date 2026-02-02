@@ -22,8 +22,17 @@ Uses `prost` for minimal proto → Rust type generation:
 prost = "0.13"
 prost-types = "0.13"
 serde = { workspace = true }
+
+[build-dependencies]
+prost-build = "0.13"
+protoc-bin-vendored = "3.1"  # No protoc installation required
 ```
 Total dependencies: ~5
+
+Build-time generation with protoc-bin-vendored:
+- No protoc installation required on dev machines or CI
+- Generates at build time (standard Rust approach)
+- Reproducible builds with pinned protoc version
 
 Build.rs configuration:
 ```rust
