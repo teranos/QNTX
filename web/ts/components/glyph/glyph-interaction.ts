@@ -83,6 +83,7 @@ export function makeDraggable(
     let elementStartY = 0;
     let dragController: AbortController | null = null;
     let currentMeldTarget: HTMLElement | null = null;
+    let rafId: number | null = null; // Track requestAnimationFrame for meld feedback
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
@@ -95,22 +96,36 @@ export function makeDraggable(
         element.style.left = `${newX}px`;
         element.style.top = `${newY}px`;
 
-        // Check for meld targets if this is an ax-glyph
+        // Cancel any pending meld feedback update to prevent race conditions
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+        }
+
+        // Schedule meld feedback for next frame (prevents interleaving during fast drags)
         if (canInitiateMeld(element)) {
-            const meldInfo = findMeldTarget(element);
-            if (meldInfo.target && meldInfo.distance < 100) {
-                applyMeldFeedback(element, meldInfo.target, meldInfo.distance);
-                currentMeldTarget = meldInfo.target;
-            } else if (currentMeldTarget) {
-                clearMeldFeedback(element);
-                currentMeldTarget = null;
-            }
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                const meldInfo = findMeldTarget(element);
+                if (meldInfo.target && meldInfo.distance < 100) {
+                    applyMeldFeedback(element, meldInfo.target, meldInfo.distance);
+                    currentMeldTarget = meldInfo.target;
+                } else if (currentMeldTarget) {
+                    clearMeldFeedback(element);
+                    currentMeldTarget = null;
+                }
+            });
         }
     };
 
     const handleMouseUp = () => {
         if (!isDragging) return;
         isDragging = false;
+
+        // Cancel any pending meld feedback animation
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
 
         element.classList.remove('is-dragging');
 
@@ -130,7 +145,11 @@ export function makeDraggable(
                     renderContent: () => targetElement
                 };
 
-                // Clean up event listeners before melding
+                // Clean up event listeners and animations before melding
+                if (rafId !== null) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
                 setupController.abort();
                 dragController?.abort();
 
@@ -209,6 +228,9 @@ export function makeDraggable(
 
     // Return cleanup function
     return () => {
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+        }
         setupController.abort();
         dragController?.abort();
     };
