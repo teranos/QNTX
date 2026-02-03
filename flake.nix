@@ -258,58 +258,6 @@
         # Application image with detected architecture
         QNTXImage = mkQNTXImage dockerArch;
 
-        # Helper function to build qntx-code plugin image for specific architecture
-        mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-code-plugin";
-          tag = "latest";
-          architecture = arch;
-
-          contents = [
-            # The qntx-code plugin binary
-            qntx-code
-
-            # Runtime dependencies
-            pkgs.gopls # Go language server (spawned as subprocess)
-            pkgs.git # Git operations for ixgest
-            pkgs.gh # GitHub CLI for PR operations
-
-            # Base utilities
-            pkgs.bash
-            pkgs.coreutils
-
-            # CA certificates for HTTPS
-            pkgs.cacert
-
-            # System files for container compatibility
-            pkgs.dockerTools.fakeNss
-          ];
-
-          extraCommands = ''
-            # Create tmp directory for runtime
-            mkdir -p tmp
-            chmod 1777 tmp
-          '';
-
-          config = {
-            Entrypoint = [ "${qntx-code}/bin/qntx-code-plugin" ];
-            Cmd = [ "--port" "9000" ];
-            Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx-code pkgs.gopls pkgs.git pkgs.gh pkgs.bash pkgs.coreutils ]}"
-              "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-            ];
-            ExposedPorts = {
-              "9000/tcp" = { };
-            };
-            WorkingDir = "/workspace";
-          };
-
-          # Docker images are Linux-only
-          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
-        };
-
-        # qntx-code image with detected architecture
-        codeImage = mkCodeImage dockerArch;
-
         # Helper function to build qntx-python plugin image for specific architecture
         mkPythonImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx-python-plugin";
@@ -368,7 +316,6 @@
           typegen = typegen;
 
           # Plugin binaries
-          qntx-code = qntx-code;
           qntx-python = qntx-python;
 
           # WASM module (qntx-core compiled to wasm32-unknown-unknown)
@@ -430,11 +377,6 @@
           qntx-image = QNTXImage;
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
-
-          # qntx-code plugin Docker images (minimal runtime)
-          qntx-code-plugin-image = codeImage;
-          qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
-          qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
 
           # qntx-python plugin Docker images (minimal runtime)
           qntx-python-plugin-image = pythonImage;
