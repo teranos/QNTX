@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridStack Glyph Melding Demo</title>
+
+    <!-- GridStack CSS -->
+    <link rel="stylesheet" href="node_modules/gridstack/dist/gridstack.min.css">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #2a2b2a;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        h1 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .instructions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        #grid-container {
+            background: #1a1b1a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            min-height: 600px;
+            padding: 10px;
+        }
+
+        .grid-stack {
+            background: transparent;
+        }
+
+        /* Fix GridStack item positioning */
+        .grid-stack-item {
+            position: absolute !important;
+        }
+
+        .grid-stack-item-content {
+            background: rgba(40, 40, 40, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            inset: 5px !important;
+            position: absolute !important;
+            overflow: hidden;
+        }
+
+        .glyph-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: move;
+            user-select: none;
+        }
+
+        .glyph-symbol {
+            font-size: 20px;
+            margin-right: 10px;
+            line-height: 1;
+        }
+
+        .glyph-title {
+            flex: 1;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .glyph-content {
+            flex: 1;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+        }
+
+        .glyph-content input,
+        .glyph-content textarea {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .glyph-content textarea {
+            resize: none;
+            min-height: 60px;
+        }
+
+        /* Glyph-specific colors */
+        .ax-glyph .glyph-symbol {
+            color: #64c8ff;
+        }
+
+        .ax-glyph.grid-stack-item-content,
+        .ax-glyph .grid-stack-item-content {
+            border-left: 4px solid #64c8ff;
+        }
+
+        .prompt-glyph .glyph-symbol {
+            color: #ffc864;
+        }
+
+        .prompt-glyph.grid-stack-item-content,
+        .prompt-glyph .grid-stack-item-content {
+            border-left: 4px solid #ffc864;
+        }
+
+        /* Proximity effects */
+        .proximity-near .grid-stack-item-content {
+            box-shadow: 0 0 20px 5px rgba(255, 240, 150, 0.3);
+        }
+
+        .proximity-ready .grid-stack-item-content {
+            box-shadow: 0 0 30px 10px rgba(255, 150, 50, 0.5);
+            border-color: rgba(255, 150, 50, 0.6);
+        }
+
+        .melding .grid-stack-item-content {
+            box-shadow: 0 0 40px 15px rgba(255, 100, 50, 0.7);
+            border-color: rgba(255, 100, 50, 0.8);
+            background: linear-gradient(135deg,
+                rgba(255, 100, 50, 0.1),
+                rgba(255, 150, 50, 0.1));
+        }
+
+        /* Melded composition */
+        .melded-composition .grid-stack-item-content {
+            background: linear-gradient(135deg,
+                rgba(255, 100, 50, 0.05),
+                rgba(255, 150, 50, 0.05));
+            border: 2px solid rgba(255, 120, 50, 0.6);
+        }
+
+        .melded-composition .glyph-header {
+            background: rgba(255, 120, 50, 0.1);
+            margin: -15px -15px 15px -15px;
+            padding: 15px;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .melded-content {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .melded-glyph {
+            flex: 1;
+            padding: 10px;
+            background: rgba(30, 30, 30, 0.5);
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .meld-arrow {
+            font-size: 20px;
+            color: rgba(255, 150, 50, 0.8);
+        }
+
+        .spawn-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .spawn-btn button {
+            padding: 10px 20px;
+            background: rgba(100, 200, 255, 0.2);
+            border: 1px solid rgba(100, 200, 255, 0.4);
+            color: #64c8ff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .spawn-btn button:hover {
+            background: rgba(100, 200, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* GridStack overrides to fix layout issues */
+        .grid-stack > .grid-stack-item {
+            min-width: 50px;
+            min-height: 50px;
+        }
+
+        .grid-stack-item.ui-draggable-dragging {
+            z-index: 100;
+        }
+
+        .ui-resizable-handle {
+            z-index: 90;
+        }
+    </style>
+</head>
+<body>
+    <h1>GridStack Glyph Melding Demo</h1>
+
+    <div class="instructions">
+        <strong>Instructions:</strong><br>
+        • Drag glyphs around the canvas by their title bars<br>
+        • Drag an Ax glyph (⍰ blue) close to a Prompt glyph (⌗ orange) to see proximity effects<br>
+        • Release when they glow orange to meld them into a pipeline<br>
+        • Pull melded glyphs apart quickly to unmeld them<br>
+        • Click the buttons below to spawn new glyphs
+    </div>
+
+    <div id="grid-container">
+        <div class="grid-stack"></div>
+    </div>
+
+    <div class="spawn-btn">
+        <button onclick="spawnAxGlyph()">+ Spawn Ax Glyph (⍰)</button>
+        <button onclick="spawnPromptGlyph()">+ Spawn Prompt Glyph (⌗)</button>
+        <button onclick="clearAll()">Clear All</button>
+    </div>
+
+    <!-- Use local GridStack if available, otherwise CDN -->
+    <script src="node_modules/gridstack/dist/gridstack-all.js"></script>
+    <script>
+        // Fallback to CDN if local doesn't work
+        if (typeof GridStack === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack-all.js"><\/script>');
+        }
+    </script>
+
+    <script>
+        let grid;
+        let glyphCounter = 0;
+        let dragVelocity = 0;
+
+        // Initialize GridStack
+        function initGrid() {
+            // Clear any existing grid
+            const gridElement = document.querySelector('.grid-stack');
+            if (gridElement) {
+                gridElement.innerHTML = '';
+            }
+
+            grid = GridStack.init({
+                cellHeight: 60,
+                column: 12,
+                margin: 5,
+                float: true,
+                animate: true,
+                resizable: {
+                    handles: 'se, sw, ne, nw'
+                },
+                draggable: {
+                    handle: '.glyph-header'
+                },
+                minRow: 1,
+                removable: false
+            }, '.grid-stack');
+
+            // Set up event handlers
+            setupEventHandlers();
+
+            // Add initial demo glyphs
+            setTimeout(() => {
+                spawnAxGlyph(1, 1);
+                spawnPromptGlyph(6, 1);
+            }, 100);
+        }
+
+        // Create glyph HTML content
+        function createAxGlyphContent(id) {
+            return `
+                <div class="glyph-header">
+                    <span class="glyph-symbol">⍰</span>
+                    <span class="glyph-title">Ax Query</span>
+                </div>
+                <div class="glyph-content">
+                    <input type="text" placeholder="Enter ax query (e.g., 'is git', 'has cert')">
+                    <div style="margin-top: 10px; font-size: 11px; opacity: 0.6;">
+                        Attestation explorer query
+                    </div>
+                </div>
+            `;
+        }
+
+        function createPromptGlyphContent(id) {
+            return `
+                <div class="glyph-header">
+                    <span class="glyph-symbol">⌗</span>
+                    <span class="glyph-title">Prompt Template</span>
+                </div>
+                <div class="glyph-content">
+                    <textarea placeholder="Enter prompt template...">Process these attestations: {{attestations}}</textarea>
+                    <div style="margin-top: 10px; font-size: 11px; opacity: 0.6;">
+                        LLM prompt with variables
+                    </div>
+                </div>
+            `;
+        }
+
+        // Spawn an Ax glyph
+        function spawnAxGlyph(x, y) {
+            const id = `ax-${++glyphCounter}`;
+            const el = grid.addWidget({
+                x: x !== undefined ? x : Math.floor(Math.random() * 6),
+                y: y !== undefined ? y : Math.floor(Math.random() * 6),
+                w: 3,
+                h: 2,
+                content: createAxGlyphContent(id),
+                id: id
+            });
+
+            if (el) {
+                el.classList.add('ax-glyph');
+                el.dataset.glyphType = 'ax';
+                el.dataset.glyphId = id;
+            }
+        }
+
+        // Spawn a Prompt glyph
+        function spawnPromptGlyph(x, y) {
+            const id = `prompt-${++glyphCounter}`;
+            const el = grid.addWidget({
+                x: x !== undefined ? x : Math.floor(Math.random() * 6) + 4,
+                y: y !== undefined ? y : Math.floor(Math.random() * 6),
+                w: 4,
+                h: 3,
+                content: createPromptGlyphContent(id),
+                id: id
+            });
+
+            if (el) {
+                el.classList.add('prompt-glyph');
+                el.dataset.glyphType = 'prompt';
+                el.dataset.glyphId = id;
+            }
+        }
+
+        // Clear all glyphs
+        function clearAll() {
+            grid.removeAll();
+            glyphCounter = 0;
+        }
+
+        // Set up event handlers
+        function setupEventHandlers() {
+            let dragStartPos = null;
+            let dragStartTime = 0;
+
+            grid.on('dragstart', function(event, el) {
+                const node = el.gridstackNode;
+                dragStartPos = { x: node.x, y: node.y };
+                dragStartTime = Date.now();
+                clearProximityEffects();
+            });
+
+            grid.on('drag', function(event, el) {
+                const node = el.gridstackNode;
+                const type = el.dataset.glyphType;
+
+                // Calculate velocity
+                if (dragStartPos && dragStartTime) {
+                    const timeDelta = Date.now() - dragStartTime;
+                    const dist = Math.sqrt(
+                        Math.pow(node.x - dragStartPos.x, 2) +
+                        Math.pow(node.y - dragStartPos.y, 2)
+                    );
+                    dragVelocity = timeDelta > 0 ? (dist / timeDelta) * 1000 : 0;
+                }
+
+                // Check for unmeld if high velocity on melded widget
+                if (el.classList.contains('melded-composition') && dragVelocity > 8) {
+                    unmeldComposition(el);
+                    return;
+                }
+
+                // Check proximity for melding
+                if (type === 'ax' || type === 'prompt') {
+                    checkProximity(el);
+                }
+            });
+
+            grid.on('dragstop', function(event, el) {
+                const type = el.dataset.glyphType;
+
+                // Try to meld if ax glyph near prompt
+                if (type === 'ax') {
+                    const prompts = findNearbyPrompts(el);
+                    if (prompts.length > 0 && prompts[0].distance < 1.5) {
+                        meldGlyphs(el, prompts[0].element);
+                    }
+                }
+
+                clearProximityEffects();
+                dragStartPos = null;
+                dragVelocity = 0;
+            });
+        }
+
+        // Check proximity and apply visual effects
+        function checkProximity(widget) {
+            const type = widget.dataset.glyphType;
+
+            clearProximityEffects();
+
+            if (type === 'ax') {
+                const nearby = findNearbyPrompts(widget);
+                if (nearby.length > 0) {
+                    const closest = nearby[0];
+                    applyProximityEffect(widget, closest.element, closest.distance);
+                }
+            } else if (type === 'prompt') {
+                const nearby = findNearbyAxes(widget);
+                if (nearby.length > 0) {
+                    const closest = nearby[0];
+                    applyProximityEffect(closest.element, widget, closest.distance);
+                }
+            }
+        }
+
+        // Apply proximity visual effect based on distance
+        function applyProximityEffect(axEl, promptEl, distance) {
+            if (distance < 1.5) {
+                axEl.classList.add('melding');
+                promptEl.classList.add('melding');
+            } else if (distance < 2.5) {
+                axEl.classList.add('proximity-ready');
+                promptEl.classList.add('proximity-ready');
+            } else if (distance < 4) {
+                axEl.classList.add('proximity-near');
+                promptEl.classList.add('proximity-near');
+            }
+        }
+
+        // Find nearby prompt glyphs
+        function findNearbyPrompts(axWidget) {
+            const results = [];
+            const axNode = axWidget.gridstackNode;
+
+            document.querySelectorAll('.prompt-glyph').forEach(promptEl => {
+                if (promptEl.classList.contains('ui-draggable-dragging')) return;
+
+                const promptNode = promptEl.gridstackNode;
+                if (!promptNode) return;
+
+                const distance = calculateDistance(axNode, promptNode);
+                if (distance < 5) {
+                    results.push({ element: promptEl, distance });
+                }
+            });
+
+            return results.sort((a, b) => a.distance - b.distance);
+        }
+
+        // Find nearby ax glyphs
+        function findNearbyAxes(promptWidget) {
+            const results = [];
+            const promptNode = promptWidget.gridstackNode;
+
+            document.querySelectorAll('.ax-glyph').forEach(axEl => {
+                if (axEl.classList.contains('ui-draggable-dragging')) return;
+
+                const axNode = axEl.gridstackNode;
+                if (!axNode) return;
+
+                const distance = calculateDistance(axNode, promptNode);
+                if (distance < 5) {
+                    results.push({ element: axEl, distance });
+                }
+            });
+
+            return results.sort((a, b) => a.distance - b.distance);
+        }
+
+        // Calculate distance between two nodes
+        function calculateDistance(node1, node2) {
+            // Use edge-to-edge distance for more accurate proximity
+            const x1 = node1.x + node1.w;  // Right edge of ax
+            const y1 = node1.y + node1.h / 2;  // Vertical center
+            const x2 = node2.x;  // Left edge of prompt
+            const y2 = node2.y + node2.h / 2;  // Vertical center
+
+            return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        }
+
+        // Meld two glyphs together
+        function meldGlyphs(axWidget, promptWidget) {
+            const axNode = axWidget.gridstackNode;
+            const promptNode = promptWidget.gridstackNode;
+            const axId = axWidget.dataset.glyphId;
+            const promptId = promptWidget.dataset.glyphId;
+
+            // Calculate melded size and position
+            const x = Math.min(axNode.x, promptNode.x);
+            const y = Math.min(axNode.y, promptNode.y);
+            const w = Math.max(axNode.x + axNode.w, promptNode.x + promptNode.w) - x;
+            const h = Math.max(axNode.h, promptNode.h) + 1;
+
+            // Remove original widgets
+            grid.removeWidget(axWidget, false);
+            grid.removeWidget(promptWidget, false);
+
+            // Create melded widget
+            const meldedId = `melded-${++glyphCounter}`;
+            const el = grid.addWidget({
+                x, y, w, h,
+                content: `
+                    <div class="glyph-header">
+                        <span class="glyph-symbol">⍰ ⟷ ⌗</span>
+                        <span class="glyph-title">Melded Pipeline</span>
+                    </div>
+                    <div class="melded-content">
+                        <div class="melded-glyph">
+                            <strong>Ax Query</strong><br>
+                            Fetches attestations
+                        </div>
+                        <div class="meld-arrow">→</div>
+                        <div class="melded-glyph">
+                            <strong>Prompt</strong><br>
+                            Processes with LLM
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px; opacity: 0.6; text-align: center;">
+                        Drag quickly to unmeld
+                    </div>
+                `,
+                id: meldedId
+            });
+
+            if (el) {
+                el.classList.add('melded-composition');
+                el.dataset.glyphType = 'melded';
+                el.dataset.glyphId = meldedId;
+                el.dataset.axId = axId;
+                el.dataset.promptId = promptId;
+            }
+        }
+
+        // Unmeld composition back to individual glyphs
+        function unmeldComposition(meldedWidget) {
+            const node = meldedWidget.gridstackNode;
+
+            // Remove melded widget
+            grid.removeWidget(meldedWidget, false);
+
+            // Restore original glyphs with animation
+            setTimeout(() => {
+                spawnAxGlyph(node.x, node.y);
+                spawnPromptGlyph(node.x + 4, node.y);
+            }, 100);
+        }
+
+        // Clear all proximity visual effects
+        function clearProximityEffects() {
+            document.querySelectorAll('.proximity-near, .proximity-ready, .melding').forEach(el => {
+                el.classList.remove('proximity-near', 'proximity-ready', 'melding');
+            });
+        }
+
+        // Initialize on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGrid);
+        } else {
+            initGrid();
+        }
+    </script>
+</body>
+</html>
