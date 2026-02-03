@@ -88,7 +88,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
 
             // Main container
             const container = document.createElement('div');
-            container.className = 'canvas-ax-glyph';
+            container.className = 'canvas-ax-glyph ax-glyph';
             container.dataset.glyphId = glyphId;
 
             // Style element - resizable

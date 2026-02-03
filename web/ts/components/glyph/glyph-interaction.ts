@@ -10,6 +10,13 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import {
+    findMeldTarget,
+    calculateMagneticOffset,
+    applyMeldFeedback,
+    clearMeldFeedback,
+    performMeld
+} from './meld-system';
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -68,14 +75,34 @@ export function makeDraggable(
     let elementStartX = 0;
     let elementStartY = 0;
     let abortController: AbortController | null = null;
+    let currentMeldTarget: HTMLElement | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
 
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
-        const newX = elementStartX + deltaX;
-        const newY = elementStartY + deltaY;
+        let newX = elementStartX + deltaX;
+        let newY = elementStartY + deltaY;
+
+        // Check for meld targets and apply magnetic attraction
+        const meldState = findMeldTarget(element, e.clientX, e.clientY);
+
+        if (meldState.target && meldState.distance < 150) {
+            // Apply magnetic offset (pulls toward target)
+            const magneticOffset = calculateMagneticOffset(meldState.distance);
+            newX += magneticOffset;
+
+            // Apply visual feedback
+            applyMeldFeedback(element, meldState.target, meldState.distance);
+            currentMeldTarget = meldState.target;
+        } else {
+            // Clear feedback if no target
+            if (currentMeldTarget) {
+                clearMeldFeedback(element);
+                currentMeldTarget = null;
+            }
+        }
 
         element.style.left = `${newX}px`;
         element.style.top = `${newY}px`;
@@ -87,24 +114,51 @@ export function makeDraggable(
 
         element.classList.remove('is-dragging');
 
-        // Save position relative to canvas parent
-        const canvas = element.parentElement;
-        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const elementRect = element.getBoundingClientRect();
-        const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
-        const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
-        glyph.gridX = gridX;
-        glyph.gridY = gridY;
+        // Check if we should meld
+        const meldState = findMeldTarget(element, 0, 0);
+        if (meldState.isMeldable && meldState.target) {
+            // Perform the meld
+            clearMeldFeedback(element);
+            const meldedComposition = performMeld(element, meldState.target);
 
-        if (glyph.symbol) {
-            uiState.addCanvasGlyph({
-                id: glyph.id,
-                symbol: glyph.symbol,
-                gridX,
-                gridY,
-                width: glyph.width,
-                height: glyph.height,
-            });
+            if (meldedComposition) {
+                // Make the melded composition draggable
+                // Note: We need to get the glyph data from both elements
+                const meldedGlyph: Glyph = {
+                    id: `melded-${glyph.id}`,
+                    title: 'Melded Composition',
+                    renderContent: () => meldedComposition
+                };
+
+                // Make the composition draggable as a unit
+                makeDraggable(meldedComposition, meldedComposition, meldedGlyph, {
+                    logLabel: 'MeldedComposition'
+                });
+            }
+        } else {
+            // Clear any meld feedback
+            clearMeldFeedback(element);
+            currentMeldTarget = null;
+
+            // Save position relative to canvas parent
+            const canvas = element.parentElement;
+            const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+            const elementRect = element.getBoundingClientRect();
+            const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
+            const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
+            glyph.gridX = gridX;
+            glyph.gridY = gridY;
+
+            if (glyph.symbol) {
+                uiState.addCanvasGlyph({
+                    id: glyph.id,
+                    symbol: glyph.symbol,
+                    gridX,
+                    gridY,
+                    width: glyph.width,
+                    height: glyph.height,
+                });
+            }
         }
 
         log.debug(SEG.UI, `[${logLabel}] Finished dragging ${glyph.id}`);

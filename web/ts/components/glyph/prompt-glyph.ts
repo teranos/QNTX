@@ -67,7 +67,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
 
     const element = document.createElement('div');
-    element.className = 'canvas-prompt-glyph';
+    element.className = 'canvas-prompt-glyph prompt-glyph';
     element.dataset.glyphId = glyph.id;
 
     const gridX = glyph.gridX ?? 5;

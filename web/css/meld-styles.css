@@ -1,0 +1,192 @@
+/**
+ * Styles for glyph melding visual effects
+ */
+
+/* Dragging state */
+.glyph.dragging {
+    opacity: 0.8;
+    cursor: grabbing !important;
+}
+
+/* Draggable mirror (ghost element during drag) */
+.draggable-mirror {
+    opacity: 0.7;
+    transform: rotate(2deg);
+}
+
+/* Melding source (ax-glyph being dragged) */
+.melding-source {
+    transition: all 0.3s ease-out;
+}
+
+/* Melding target (prompt-glyph being approached) */
+.melding-target {
+    transition: all 0.3s ease-out;
+}
+
+/* Active meld target (when in collision range) */
+.meld-target-active {
+    outline: 2px solid rgba(255, 140, 0, 0.6);
+    outline-offset: 2px;
+    animation: pulse-glow 1s infinite alternate;
+}
+
+/* Meld preview connector */
+.meld-preview-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(90deg,
+        rgba(255, 69, 0, 0.2),
+        rgba(255, 140, 0, 0.2));
+    backdrop-filter: blur(2px);
+    transition: all 0.3s ease-out;
+}
+
+.meld-connector {
+    font-size: 24px;
+    color: rgba(255, 140, 0, 0.8);
+    animation: slide-arrow 1s infinite;
+}
+
+/* Melded composition */
+.melded-glyph-composition {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    position: relative;
+    background: linear-gradient(90deg,
+        rgba(255, 255, 255, 0.95),
+        rgba(255, 255, 255, 0.95));
+    border: 1px solid rgba(255, 140, 0, 0.3);
+    border-radius: 8px;
+    padding: 4px;
+    transition: all 0.3s ease-out;
+}
+
+.melded-glyph-composition:hover {
+    box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
+}
+
+/* Individual glyphs within a melded composition */
+.melded-glyph-composition .ax-glyph,
+.melded-glyph-composition .prompt-glyph {
+    border: none;
+    margin: 0;
+    border-radius: 0;
+}
+
+.melded-glyph-composition .ax-glyph {
+    border-right: 1px dashed rgba(255, 140, 0, 0.3);
+    padding-right: 8px;
+}
+
+.melded-glyph-composition .prompt-glyph {
+    padding-left: 8px;
+}
+
+/* Draggable composition */
+.draggable-composition {
+    cursor: grab;
+}
+
+.draggable-composition:active {
+    cursor: grabbing;
+}
+
+/* Proximity-based glow colors */
+.glyph-glow-distant {
+    box-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
+}
+
+.glyph-glow-close {
+    box-shadow: 0 0 20px rgba(255, 140, 0, 0.6);
+}
+
+.glyph-glow-melded {
+    box-shadow: 0 0 30px rgba(255, 69, 0, 0.8);
+}
+
+/* Edge morphing for meld preview */
+.morphing-right-edge {
+    border-top-right-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
+    transition: border-radius 0.2s ease-out;
+}
+
+.morphing-left-edge {
+    border-top-left-radius: 8px !important;
+    border-bottom-left-radius: 8px !important;
+    transition: border-radius 0.2s ease-out;
+}
+
+/* Animations */
+@keyframes pulse-glow {
+    0% {
+        outline-color: rgba(255, 140, 0, 0.4);
+    }
+    100% {
+        outline-color: rgba(255, 140, 0, 0.8);
+        outline-offset: 4px;
+    }
+}
+
+@keyframes slide-arrow {
+    0%, 100% {
+        transform: translateX(-2px);
+    }
+    50% {
+        transform: translateX(2px);
+    }
+}
+
+/* Unmeld button (appears on hover) */
+.melded-glyph-composition::after {
+    content: '⊗';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    background: #ff4444;
+    color: white;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.melded-glyph-composition:hover::after {
+    display: flex;
+}
+
+/* Prevent text selection during drag */
+.draggable--is-dragging * {
+    user-select: none;
+}
+
+/* Collidable plugin visual feedback */
+.draggable-container--is-dragging .prompt-glyph {
+    transition: transform 0.2s ease-out;
+}
+
+.draggable-container--is-dragging .prompt-glyph:hover {
+    transform: scale(1.05);
+}
+
+/* Grid alignment helpers during meld */
+.grid-container .melding-source,
+.grid-container .melding-target {
+    z-index: 100;
+}
+
+/* Smooth transitions for all glyph interactions */
+.ax-glyph,
+.prompt-glyph {
+    transition: box-shadow 0.2s ease-out,
+                border-radius 0.2s ease-out,
+                transform 0.2s ease-out;
+}

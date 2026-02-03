@@ -281,6 +281,7 @@ async function spawnIxGlyph(
         height
     });
 
+
     log.debug(SEG.UI, `[Canvas] Spawned IX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
 
@@ -319,6 +320,7 @@ function spawnAxGlyph(
         width,
         height
     });
+
 
     log.debug(SEG.UI, `[Canvas] Spawned AX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
@@ -366,6 +368,7 @@ async function spawnPyGlyph(
         height
     });
 
+
     log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
 
@@ -408,6 +411,7 @@ async function spawnPromptGlyph(
         width,
         height
     });
+
 
     log.debug(SEG.UI, `[Canvas] Spawned Prompt glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
 }
