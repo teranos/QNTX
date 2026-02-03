@@ -53,11 +53,16 @@
 
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas-glyph';
+import { createGridStackCanvasGlyph } from './components/glyph/canvas-glyph-gridstack';
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {
-    // Canvas Glyph - Fractal container with spatial grid
-    glyphRun.add(createCanvasGlyph());
+    // Use GridStack Canvas for melding support
+    // Uncomment the line below to use the original canvas without melding:
+    // glyphRun.add(createCanvasGlyph());
+
+    // Canvas Glyph with GridStack melding - Fractal container with spatial grid
+    glyphRun.add(createGridStackCanvasGlyph());
 
     // VidStream Glyph
     glyphRun.add({
