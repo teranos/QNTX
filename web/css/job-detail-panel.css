@@ -5,24 +5,7 @@
  */
 
 /* Job detail header - uses .panel-header and .panel-title from panel-base.css */
-/* Custom back button styling */
-
-.job-detail-back {
-  background: none;
-  border: 1px solid var(--border-light);
-  padding: var(--panel-padding-sm);
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  font-size: var(--font-size-md);
-  color: var(--panel-text-secondary);
-  transition: var(--panel-transition-fast);
-}
-
-.job-detail-back:hover {
-  background: #f3e5f5;
-  border-color: var(--color-scheduled);
-  color: var(--color-scheduled);
-}
+/* Back button uses .panel-btn-accent from panel-base.css */
 
 /* Content area */
 .job-detail-content {
@@ -38,22 +21,7 @@
   margin-bottom: 16px;
 }
 
-.job-info-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  font-size: var(--font-size-md);
-}
-
-.job-info-label {
-  font-weight: 500;
-  color: var(--panel-text-secondary);
-}
-
-.job-info-value {
-  color: #000;
-  font-family: var(--font-mono);
-}
+/* Job info rows use .panel-info-row, .panel-info-label, .panel-info-value-mono from panel-base.css */
 
 .job-state-active {
   color: var(--status-completed-text);
@@ -113,18 +81,10 @@
   border-color: var(--color-scheduled);
 }
 
-/* Status color accents */
-.execution-card.status-running {
-  border-left: 3px solid var(--color-scheduled);
-}
-
-.execution-card.status-completed {
-  border-left: 3px solid var(--status-completed-text);
-}
-
-.execution-card.status-failed {
-  border-left: 3px solid var(--status-failed-text);
-}
+/* Status color accents - use .accent-border-* classes from panel-base.css */
+/* .accent-border-scheduled for running */
+/* .accent-border-success for completed */
+/* .accent-border-error for failed */
 
 .execution-header {
   display: flex;
@@ -349,26 +309,9 @@
   border-top: 1px solid var(--border-light);
 }
 
+/* Pagination buttons use .panel-btn-accent from panel-base.css */
 .pagination-btn {
   padding: 8px 14px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--border-radius);
-  background: var(--panel-bg);
-  cursor: pointer;
-  font-size: var(--font-size-md);
-  transition: all 0.2s;
-  color: var(--text-primary);
-}
-
-.pagination-btn:hover:not([disabled]) {
-  background: #f3e5f5;
-  border-color: var(--color-scheduled);
-  color: var(--color-scheduled);
-}
-
-.pagination-btn[disabled] {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .pagination-info {

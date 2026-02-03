@@ -42,6 +42,9 @@
     --status-paused-text: #ef6c00;
     --status-stopped-text: #757575;
     --status-scheduled-bg: #f3e5f5;
+
+    /* Accent/scheduled tint for hover states */
+    --bg-scheduled-tint: #f3e5f5;
 }
 
 /* === CARDS === */
@@ -329,7 +332,7 @@
     margin: 0;
     font-size: var(--font-size-md);
     font-weight: 600;
-    color: #000;
+    color: var(--text-emphasis);
 }
 
 /* Section header - used within panel content */
@@ -339,7 +342,7 @@
     color: var(--panel-text-primary);
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-divider);
 }
 
 /* === METADATA / INFO ROWS === */
@@ -350,15 +353,28 @@
     align-items: center;
     gap: var(--gap);
     font-size: var(--font-size-sm);
+    padding: 6px 0;
 }
 
 .panel-info-label {
     color: var(--panel-text-secondary);
+    font-weight: 500;
+    flex-shrink: 0;
 }
 
 .panel-info-value {
     color: var(--panel-text-primary);
     font-weight: 500;
+}
+
+/* Monospace variant for technical values (IDs, paths, code) */
+.panel-info-value-mono {
+    font-family: var(--font-mono);
+}
+
+/* Wide label variant for forms/tables with consistent label width */
+.panel-info-label-wide {
+    min-width: 100px;
 }
 
 /* === BUTTONS === */
@@ -390,6 +406,29 @@
 .panel-btn-sm {
     padding: 4px 8px;
     font-size: var(--font-size-sm);
+}
+
+/* Accent button - secondary actions with purple/scheduled theme on hover */
+.panel-btn-accent {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-md);
+    color: var(--panel-text-secondary);
+    cursor: pointer;
+    transition: var(--panel-transition-fast);
+}
+
+.panel-btn-accent:hover:not([disabled]) {
+    background: var(--bg-scheduled-tint);
+    border-color: var(--color-scheduled);
+    color: var(--color-scheduled);
+}
+
+.panel-btn-accent[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* Warning button - for two-click confirmation pattern */
@@ -427,8 +466,35 @@
 
 .panel-divider {
     height: 1px;
-    background: #eee;
+    background: var(--border-divider);
     margin: 16px 0;
+}
+
+/* === ACCENT BORDERS === */
+
+/* Left accent borders for status indicators and emphasis */
+.accent-border-left {
+    border-left: 3px solid var(--border-color);
+}
+
+.accent-border-scheduled {
+    border-left: 3px solid var(--color-scheduled);
+}
+
+.accent-border-success {
+    border-left: 3px solid var(--status-completed-text);
+}
+
+.accent-border-error {
+    border-left: 3px solid var(--status-failed-text);
+}
+
+.accent-border-warning {
+    border-left: 3px solid var(--status-pending-text);
+}
+
+.accent-border-info {
+    border-left: 3px solid var(--status-running-text);
 }
 
 /* === CODE/MONOSPACE TEXT === */

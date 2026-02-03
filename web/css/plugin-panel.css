@@ -160,7 +160,7 @@
 .plugin-controls {
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--border-divider);
     display: flex;
     gap: var(--gap);
 }
@@ -225,22 +225,9 @@
     background: var(--bg-almost-white);
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
-    font-family: var(--font-mono);
 }
 
-.plugin-detail-item {
-    display: flex;
-    gap: var(--gap);
-    padding: 2px 0;
-}
-
-.plugin-detail-key {
-    color: var(--panel-text-secondary);
-}
-
-.plugin-detail-value {
-    color: var(--panel-text-primary);
-}
+/* Plugin detail items use .panel-info-row, .panel-info-label, .panel-info-value from panel-base.css */
 
 /* Scrollbar styling moved to scrollbar.css */
 

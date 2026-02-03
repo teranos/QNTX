@@ -9,6 +9,7 @@
     --text-primary: #333433;
     --text-secondary: #656766;
     --text-tertiary: #989a99;
+    --text-emphasis: #000; /* Headings, titles, high-contrast text */
     --bg-primary: #fcffff;
     --bg-almost-white: #f7f9f8;
     --bg-hover: #eff1f0;
@@ -17,6 +18,7 @@
     --bg-dark: #202523;
     --border-color: #dcdedd;
     --border-light: #dfe1e0;
+    --border-divider: #eee; /* Subtle dividers within panels */
     --accent-color: #5a9a6a;
     --accent-hover: #4a8559;
 
