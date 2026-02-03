@@ -2,6 +2,33 @@
 
 **Goal**: Reduce CSS sprawl while preserving the current aesthetic by consolidating duplicated styles into tokens and primitives.
 
+## Implementation Status
+
+- ✅ **Item 1: Monospace Font Token** - COMPLETED
+  - Replaced 15+ inconsistent font-family declarations with `var(--font-mono)`
+  - Files updated: job-detail-panel.css, job-list-panel.css, ai-provider-panel.css, plugin-panel.css, core.css, panel-base.css
+
+- ✅ **Item 2: Panel Header Primitive** - COMPLETED
+  - Added `.panel-header`, `.panel-header-lg`, and `.panel-title` to panel-base.css
+  - Removed duplicate header styles from job-detail-panel.css, ai-provider-panel.css, job-list-panel.css
+  - Eliminated ~120 lines of duplicate CSS
+
+- ⏸️ **Item 3: Accent Hover Button Primitive** - NOT IMPLEMENTED
+  - Deferred for future implementation
+
+- ⏸️ **Item 4: Metadata Row Primitive** - NOT IMPLEMENTED
+  - Deferred for future implementation
+
+- ✅ **Item 5: Status Badge Consolidation** - COMPLETED
+  - Added 3 new badge variants: `.panel-badge-paused`, `.panel-badge-stopped`, `.panel-badge-scheduled`
+  - Added status color tokens: `--status-paused-text`, `--status-stopped-text`, `--status-scheduled-bg`
+  - Removed duplicate badge definitions from job-detail-panel.css, job-list-panel.css, plugin-panel.css
+  - Eliminated ~50 lines of duplicate CSS
+
+**Total Lines Eliminated**: ~170 lines across 6 files
+**New Primitives Created**: 6 (3 header classes + 3 badge variants)
+**New Tokens Added**: 3 color tokens
+
 ---
 
 ## 1. Monospace Font Stack Token

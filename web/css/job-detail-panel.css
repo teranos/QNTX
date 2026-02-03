@@ -4,24 +4,8 @@
  * Extends shared-panel.css for base panel structure
  */
 
-/* Job detail header - with back button */
-.job-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--panel-padding-lg);
-  background: var(--bg-almost-white);
-  border-bottom: 2px solid var(--border-light);
-  flex-shrink: 0;
-}
-
-.job-detail-header h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #000;
-  letter-spacing: 0.3px;
-}
+/* Job detail header - uses .panel-header and .panel-title from panel-base.css */
+/* Custom back button styling */
 
 .job-detail-back {
   background: none;
@@ -68,7 +52,7 @@
 
 .job-info-value {
   color: #000;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
 }
 
 .job-state-active {
@@ -163,21 +147,10 @@
   transition: transform 0.2s ease;
 }
 
-/* Execution status badges - uses .panel-badge from panel-base.css */
-.execution-status-running {
-  background: #f3e5f5;
-  color: var(--color-scheduled);
-}
-
-.execution-status-completed {
-  background: var(--status-completed-bg);
-  color: var(--status-completed-text);
-}
-
-.execution-status-failed {
-  background: var(--status-failed-bg);
-  color: var(--status-failed-text);
-}
+/* Execution status badges - uses .panel-badge-* variants from panel-base.css */
+/* .panel-badge-scheduled for running state */
+/* .panel-badge-completed for completed state */
+/* .panel-badge-failed for failed state */
 
 .execution-time {
   color: var(--panel-text-secondary);
@@ -207,7 +180,7 @@
   border-radius: var(--border-radius);
   font-size: var(--font-size-sm);
   color: var(--status-failed-text);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
 }
 
 .execution-meta {
@@ -224,7 +197,7 @@
 }
 
 .execution-job-id {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   background: var(--bg-almost-white);
   padding: 2px 6px;
   border-radius: var(--border-radius);
@@ -242,7 +215,7 @@
   color: #d4d4d4;
   padding: 12px;
   border-radius: var(--border-radius);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   line-height: 1.5;
   max-height: 400px;
@@ -342,7 +315,7 @@
   background: var(--bg-almost-white);
   border-radius: var(--border-radius);
   font-size: var(--font-size-sm);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 150px;

@@ -108,7 +108,7 @@ body.disconnected #container {
     overflow: hidden;
     z-index: 0;
     padding: 20px;
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     line-height: 1.4;
     /* Improved contrast: 0.15 -> 0.35 for better visibility */
@@ -214,7 +214,7 @@ body.disconnected #container {
 }
 
 .llm-stream-content {
-    font-family: Courier New, monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     line-height: 1.4;
     padding: 8px;
