@@ -258,54 +258,6 @@
         # Application image with detected architecture
         QNTXImage = mkQNTXImage dockerArch;
 
-        # Helper function to build qntx-python plugin image for specific architecture
-        mkPythonImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-python-plugin";
-          tag = "latest";
-          architecture = arch;
-
-          contents = [
-            # The qntx-python plugin binary
-            qntx-python
-
-            # Python runtime (required by PyO3-embedded code)
-            pkgs.python313
-
-            # Base utilities
-            pkgs.bash
-            pkgs.coreutils
-
-            # CA certificates for HTTPS
-            pkgs.cacert
-
-            # System files for container compatibility
-            pkgs.dockerTools.fakeNss
-          ];
-
-          extraCommands = ''
-            # Create tmp directory for runtime
-            mkdir -p tmp
-            chmod 1777 tmp
-          '';
-
-          config = {
-            Entrypoint = [ "${qntx-python}/bin/qntx-python-plugin" ];
-            Cmd = [ "--port" "9000" ];
-            Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx-python pkgs.python313 pkgs.bash pkgs.coreutils ]}"
-              "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-              "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}"
-            ];
-            ExposedPorts = {
-              "9000/tcp" = { };
-            };
-            WorkingDir = "/workspace";
-          };
-        };
-
-        # qntx-python image with detected architecture
-        pythonImage = mkPythonImage dockerArch;
-
       in
       {
         packages = {
@@ -314,9 +266,6 @@
 
           # Typegen binary (standalone, no plugins/CGO)
           typegen = typegen;
-
-          # Plugin binaries
-          qntx-python = qntx-python;
 
           # WASM module (qntx-core compiled to wasm32-unknown-unknown)
           qntx-wasm = qntx-wasm;
@@ -333,7 +282,6 @@
               { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
               { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
-              { name = "qntx-python"; description = "Python runtime plugin with PyO3"; }
               { name = "qntx-wasm"; description = "qntx-core compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
             ];
@@ -360,13 +308,6 @@
                 architectures = [ "amd64" "arm64" ];
                 ports = [ "9000/tcp" ];
               }
-              {
-                name = "qntx-python Plugin";
-                description = "Python runtime plugin container";
-                image = "ghcr.io/teranos/qntx-python-plugin:latest";
-                architectures = [ "amd64" "arm64" ];
-                ports = [ "9000/tcp" ];
-              }
             ];
           };
 
@@ -377,11 +318,6 @@
           qntx-image = QNTXImage;
           qntx-image-amd64 = mkQNTXImage "amd64";
           qntx-image-arm64 = mkQNTXImage "arm64";
-
-          # qntx-python plugin Docker images (minimal runtime)
-          qntx-python-plugin-image = pythonImage;
-          qntx-python-plugin-image-amd64 = mkPythonImage "amd64";
-          qntx-python-plugin-image-arm64 = mkPythonImage "arm64";
         };
 
         # Development shell with same tools
@@ -415,8 +351,6 @@
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
           typegen-build = typegen; # Ensure typegen builds
-          qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
-          qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
           docs-site-links = pkgs.runCommand "docs-site-link-check"
             {
@@ -436,8 +370,6 @@
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           # Docker image checks are Linux-only
           qntx-image = QNTXImage; # Ensure QNTX image builds
-          qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
-          qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds
         };
 
         # Formatter for 'nix fmt'
