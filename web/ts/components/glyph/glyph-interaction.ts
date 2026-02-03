@@ -15,7 +15,9 @@ import {
     findMeldTarget,
     applyMeldFeedback,
     clearMeldFeedback,
-    performMeld
+    performMeld,
+    PROXIMITY_THRESHOLD,
+    MELD_THRESHOLD
 } from './meld-system';
 
 // ── Options ─────────────────────────────────────────────────────────
@@ -106,7 +108,7 @@ export function makeDraggable(
             rafId = requestAnimationFrame(() => {
                 rafId = null;
                 const meldInfo = findMeldTarget(element);
-                if (meldInfo.target && meldInfo.distance < 100) {
+                if (meldInfo.target && meldInfo.distance < PROXIMITY_THRESHOLD) {
                     applyMeldFeedback(element, meldInfo.target, meldInfo.distance);
                     currentMeldTarget = meldInfo.target;
                 } else if (currentMeldTarget) {
@@ -132,7 +134,7 @@ export function makeDraggable(
         // Check if we should meld (for ax-glyphs only)
         if (canInitiateMeld(element)) {
             const meldInfo = findMeldTarget(element);
-            if (meldInfo.target && meldInfo.distance < 30) {
+            if (meldInfo.target && meldInfo.distance < MELD_THRESHOLD) {
                 const targetElement = meldInfo.target; // Store for type safety
 
                 // Get the prompt glyph ID from the target element
