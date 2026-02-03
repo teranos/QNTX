@@ -17,7 +17,7 @@
         qntx-code = pkgs.buildGoModule {
           pname = "qntx-code-plugin";
           version = self.rev or "dev";
-          src = ..; # Root of QNTX repo
+          src = ./..; # Root of QNTX repo
 
           # Same vendorHash as main QNTX
           vendorHash = "sha256-tEJdJ/d8bcGVBzOqNupNJz4ueO4fAK/FD2CiqNvPR4s=";
