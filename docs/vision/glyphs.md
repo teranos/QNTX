@@ -87,6 +87,13 @@ Glyphs are stateful entities that remember their window configuration:
 
 When a window collapses back to a glyph and later re-expands, it restores exactly as the user left it. This reinforces the mental model that the glyph IS the window - it's just temporarily minimized, not destroyed and recreated.
 
+### Attestable State Vision
+
+Canvas state will become attestations: glyph positions, code, results stored as provenance-tracked claims.
+Multi-device sync emerges naturally when canvas layouts are attestations queryable across client and server.
+Client and server share storage traits (qntx-indexeddb, qntx-sqlite) for unified state representation.
+Your canvas becomes queryable history: "show me all glyphs I created with Python code last week."
+
 ## GlyphRun Positioning
 
 The GlyphRun position is configurable - it can dock to either the left or right side of the screen. By default it appears on the right side, vertically centered. Users can configure it to appear on the left side if that better fits their workflow. The vertical stacking of glyphs remains consistent regardless of which side is chosen.
