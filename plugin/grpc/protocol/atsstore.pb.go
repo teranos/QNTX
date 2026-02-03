@@ -237,7 +237,7 @@ type AttestationFilter struct {
 	Actors     []string `protobuf:"bytes,4,rep,name=actors,proto3" json:"actors,omitempty"`
 	TimeStart  int64    `protobuf:"varint,5,opt,name=time_start,json=timeStart,proto3" json:"time_start,omitempty"` // Unix timestamp in seconds (optional)
 	TimeEnd    int64    `protobuf:"varint,6,opt,name=time_end,json=timeEnd,proto3" json:"time_end,omitempty"`       // Unix timestamp in seconds (optional)
-	Limit      int32    `protobuf:"varint,7,opt,name=limit,proto3" json:"limit,omitempty"`                          // Maximum results (0 = no limit)
+	Limit      int32    `protobuf:"varint,7,opt,name=limit,proto3" json:"limit,omitempty"`                          // Maximum results. 0 = server default (100). Kept in sync with atsstore.proto.
 }
 
 func (x *AttestationFilter) Reset() {

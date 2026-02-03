@@ -131,11 +131,10 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 	}
 }
 
-// CreateAttestation inserts a new attestation into the database
-// and enforces bounded storage limits (16/64/64 strategy)
+// CreateAttestation inserts a new attestation and notifies observers.
+// It does NOT enforce storage limits — that is BoundedStore's responsibility.
 //
 // TODO(QNTX #67): Add comprehensive tests for bounded storage enforcement
-// Focus: 16 attestations per actor/context, 64 contexts per actor, 64 actors per entity
 func (s *SQLStore) CreateAttestation(as *types.As) error {
 	fields, err := MarshalAttestationFields(as)
 	if err != nil {
@@ -170,12 +169,7 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 		return err
 	}
 
-	// Notify observers after successful creation
-	notifyObservers(as)
-
-	// Enforce bounded storage limits after insertion
-	bs := NewBoundedStore(s.db, s.logger)
-	bs.enforceLimits(as)
+	notifyObserversAsync(as)
 
 	return nil
 }

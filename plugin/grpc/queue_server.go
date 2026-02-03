@@ -146,7 +146,7 @@ func (s *QueueServer) ListJobs(ctx context.Context, req *protocol.ListJobsReques
 
 	limit := int(req.Limit)
 	if limit == 0 {
-		limit = 100 // Default limit
+		limit = 100 // Server default when caller does not specify a limit
 	}
 
 	// List jobs
