@@ -51,10 +51,12 @@ export interface MakeResizableOptions {
  * @param handle - The handle that triggers dragging (typically a title bar)
  * @param glyph - The glyph model to update with position
  * @param opts - Optional configuration
+ * @returns Cleanup function to remove all event listeners
  *
  * @example
  * // Basic usage
- * makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
+ * const cleanup = makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
+ * // Later: cleanup();
  *
  * @example
  * // Ignore button clicks in the handle
@@ -68,15 +70,18 @@ export function makeDraggable(
     handle: HTMLElement,
     glyph: Glyph,
     opts: MakeDraggableOptions = {},
-): void {
+): () => void {
     const { ignoreButtons = false, logLabel = 'Glyph' } = opts;
+
+    // AbortController for all event listeners (including mousedown)
+    const setupController = new AbortController();
 
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
     let elementStartX = 0;
     let elementStartY = 0;
-    let abortController: AbortController | null = null;
+    let dragController: AbortController | null = null;
     let currentMeldTarget: HTMLElement | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -125,6 +130,10 @@ export function makeDraggable(
                     renderContent: () => targetElement
                 };
 
+                // Clean up event listeners before melding
+                setupController.abort();
+                dragController?.abort();
+
                 // Perform the meld - this reparents the actual DOM elements
                 const composition = performMeld(element, targetElement, glyph, targetGlyph);
 
@@ -140,8 +149,6 @@ export function makeDraggable(
                 });
 
                 log.info(SEG.UI, `[${logLabel}] Melded with prompt glyph`);
-                abortController?.abort();
-                abortController = null;
                 return;
             }
         }
@@ -172,8 +179,8 @@ export function makeDraggable(
 
         log.debug(SEG.UI, `[${logLabel}] Finished dragging ${glyph.id}`);
 
-        abortController?.abort();
-        abortController = null;
+        dragController?.abort();
+        dragController = null;
     };
 
     handle.addEventListener('mousedown', (e) => {
@@ -193,12 +200,18 @@ export function makeDraggable(
 
         element.classList.add('is-dragging');
 
-        abortController = new AbortController();
-        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
-        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
+        dragController = new AbortController();
+        document.addEventListener('mousemove', handleMouseMove, { signal: dragController.signal });
+        document.addEventListener('mouseup', handleMouseUp, { signal: dragController.signal });
 
         log.debug(SEG.UI, `[${logLabel}] Started dragging ${glyph.id}`);
-    });
+    }, { signal: setupController.signal });
+
+    // Return cleanup function
+    return () => {
+        setupController.abort();
+        dragController?.abort();
+    };
 }
 
 // ── makeResizable ───────────────────────────────────────────────────
