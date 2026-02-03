@@ -10,6 +10,15 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import {
+    canInitiateMeld,
+    findMeldTarget,
+    applyMeldFeedback,
+    clearMeldFeedback,
+    performMeld,
+    isMeldedComposition,
+    unmeldComposition
+} from './meld-system';
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -18,6 +27,8 @@ export interface MakeDraggableOptions {
     ignoreButtons?: boolean;
     /** Label used in log messages, e.g. "PyGlyph". */
     logLabel?: string;
+    /** The prompt glyph object (if this is a prompt being made draggable) */
+    promptGlyph?: Glyph;
 }
 
 export interface MakeResizableOptions {
@@ -68,6 +79,7 @@ export function makeDraggable(
     let elementStartX = 0;
     let elementStartY = 0;
     let abortController: AbortController | null = null;
+    let currentMeldTarget: HTMLElement | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
@@ -79,6 +91,18 @@ export function makeDraggable(
 
         element.style.left = `${newX}px`;
         element.style.top = `${newY}px`;
+
+        // Check for meld targets if this is an ax-glyph
+        if (canInitiateMeld(element)) {
+            const meldInfo = findMeldTarget(element);
+            if (meldInfo.target && meldInfo.distance < 100) {
+                applyMeldFeedback(element, meldInfo.target, meldInfo.distance);
+                currentMeldTarget = meldInfo.target;
+            } else if (currentMeldTarget) {
+                clearMeldFeedback(element);
+                currentMeldTarget = null;
+            }
+        }
     };
 
     const handleMouseUp = () => {
@@ -87,7 +111,46 @@ export function makeDraggable(
 
         element.classList.remove('is-dragging');
 
-        // Save position relative to canvas parent
+        // Check if we should meld (for ax-glyphs only)
+        if (canInitiateMeld(element)) {
+            const meldInfo = findMeldTarget(element);
+            if (meldInfo.target && meldInfo.distance < 30) {
+                // Get the prompt glyph ID from the target element
+                const promptGlyphId = meldInfo.target.dataset.glyphId || 'prompt-unknown';
+
+                // Create minimal glyph object for the target
+                const targetGlyph: Glyph = {
+                    id: promptGlyphId,
+                    title: 'Prompt',
+                    renderContent: () => meldInfo.target
+                };
+
+                // Perform the meld - this reparents the actual DOM elements
+                const composition = performMeld(element, meldInfo.target, glyph, targetGlyph);
+
+                // Make the composition draggable as a unit
+                const compositionGlyph: Glyph = {
+                    id: `melded-${glyph.id}-${promptGlyphId}`,
+                    title: 'Melded Composition',
+                    renderContent: () => composition
+                };
+
+                makeDraggable(composition, composition, compositionGlyph, {
+                    logLabel: 'MeldedComposition'
+                });
+
+                log.info(SEG.UI, `[${logLabel}] Melded with prompt glyph`);
+                abortController?.abort();
+                abortController = null;
+                return;
+            }
+        }
+
+        // Clear any meld feedback
+        clearMeldFeedback(element);
+        currentMeldTarget = null;
+
+        // Normal position save
         const canvas = element.parentElement;
         const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const elementRect = element.getBoundingClientRect();
