@@ -4,16 +4,26 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "QNTX WASM bridge - exposes qntx-core functions for Go via wazero"
+description = "QNTX WASM bridge - exposes qntx-core functions for Go via wazero and browser"
 
 [lib]
 crate-type = ["cdylib"]
+
+[features]
+default = []
+browser = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:qntx-indexeddb"]
 
 [dependencies]
 # Proto types - demonstrates WASM can use proto without gRPC dependencies (ADR-006)
 qntx-proto = { path = "../qntx-proto" }
 qntx-core = { path = "../qntx-core", default-features = false, features = ["wasm"] }
 serde_json = { workspace = true }
+
+# Browser-specific dependencies (only with 'browser' feature)
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+qntx-indexeddb = { path = "../qntx-indexeddb", optional = true }
 
 [profile.release]
 opt-level = "s"

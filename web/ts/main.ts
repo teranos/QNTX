@@ -38,6 +38,7 @@ import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
+import { initialize as initQntxWasm } from './qntx-wasm.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -151,6 +152,15 @@ async function init(): Promise<void> {
     } catch (error: unknown) {
         console.error('[Init] Failed to initialize debug interceptor:', error);
         // Continue anyway - debug interception is not critical to app function
+    }
+
+    // Initialize QNTX WASM module with IndexedDB storage
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
+        await initQntxWasm();
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize QNTX WASM:', error);
+        // Continue anyway - WASM storage is not critical for basic graph viewing
     }
 
     // Restore previous session if exists
