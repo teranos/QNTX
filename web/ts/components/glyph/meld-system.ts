@@ -213,18 +213,6 @@ export function performMeld(
     // Add to canvas
     canvas.appendChild(composition);
 
-    // Dispatch event
-    const meldEvent = new CustomEvent('glyph:melded', {
-        detail: {
-            composition,
-            axElement,
-            promptElement,
-            axGlyph,
-            promptGlyph
-        }
-    });
-    document.dispatchEvent(meldEvent);
-
     log.info(SEG.UI, '[MeldSystem] Meld complete - elements reparented');
 
     return composition;
@@ -280,12 +268,6 @@ export function unmeldComposition(composition: HTMLElement): void {
 
     // Remove composition container
     composition.remove();
-
-    // Dispatch event
-    const unmeldEvent = new CustomEvent('glyph:unmelded', {
-        detail: { axElement, promptElement }
-    });
-    document.dispatchEvent(unmeldEvent);
 
     log.info(SEG.UI, '[MeldSystem] Unmeld complete - elements restored');
 }
