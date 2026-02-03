@@ -10,6 +10,7 @@
     gap: 0;
     position: absolute;
     background: transparent;
+    cursor: grab;
     transition: outline 0.2s ease-out;
 }
 
