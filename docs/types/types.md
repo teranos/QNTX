@@ -164,12 +164,12 @@ type OverFilter struct {
 
 ```go
 type RelationshipTypeDef struct {
-	Name string
-	Label string
-	Color string
-	LinkDistance *float64
-	LinkStrength *float64
-	Deprecated bool
+	Name string `json:"name"`
+	Label string `json:"label"`
+	Color string `json:"color,omitempty"`
+	LinkDistance *float64 `json:"link_distance,omitempty"`
+	LinkStrength *float64 `json:"link_strength,omitempty"`
+	Deprecated bool `json:"deprecated"`
 }
 ```
 
@@ -180,12 +180,12 @@ type RelationshipTypeDef struct {
 
 ```go
 type TypeDef struct {
-	Name string
-	Label string
-	Color string
-	Opacity *float64
-	Deprecated bool
-	RichStringFields []string
-	ArrayFields []string
+	Name string `json:"name"`
+	Label string `json:"label"`
+	Color string `json:"color"`
+	Opacity *float64 `json:"opacity,omitempty"`
+	Deprecated bool `json:"deprecated"`
+	RichStringFields []string `json:"rich_string_fields,omitempty"`
+	ArrayFields []string `json:"array_fields,omitempty"`
 }
 ```

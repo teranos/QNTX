@@ -167,7 +167,7 @@ jobs:
         run: cd qntx-python && nix develop .. --command cargo fmt --check
 
       - name: Build via Nix (required for Python linking)
-        run: nix build .#qntx-python --print-build-logs
+        run: nix build ./qntx-python#qntx-python-plugin --print-build-logs
 
       - name: Verify binary works
         run: ./result/bin/qntx-python-plugin --version
