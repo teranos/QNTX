@@ -69,6 +69,23 @@ type PromptExecuteRequest struct {
 	Model        string `json:"model,omitempty"`
 }
 
+// PromptDirectRequest represents a request to execute a prompt without attestations
+type PromptDirectRequest struct {
+	Template     string `json:"template"`           // Prompt template (no {{variables}} required)
+	SystemPrompt string `json:"system_prompt,omitempty"`
+	Provider     string `json:"provider,omitempty"` // "openrouter" or "local"
+	Model        string `json:"model,omitempty"`
+}
+
+// PromptDirectResponse represents the direct execution response
+type PromptDirectResponse struct {
+	Response         string `json:"response"`
+	PromptTokens     int    `json:"prompt_tokens,omitempty"`
+	CompletionTokens int    `json:"completion_tokens,omitempty"`
+	TotalTokens      int    `json:"total_tokens,omitempty"`
+	Error            string `json:"error,omitempty"`
+}
+
 // Result represents the output of a prompt execution
 type Result struct {
 	// SourceAttestationID is the ID of the attestation that was processed
@@ -451,6 +468,128 @@ func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.A
 	})
 }
 
+// HandlePromptDirect handles POST /api/prompt/direct
+// Executes a prompt template directly without attestation interpolation
+func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var req PromptDirectRequest
+	if err := readJSON(w, r, &req); err != nil {
+		return
+	}
+
+	if req.Template == "" {
+		writeError(w, http.StatusBadRequest, "template is required")
+		return
+	}
+
+	// Parse frontmatter to extract config
+	doc, err := prompt.ParseFrontmatter(req.Template)
+	if err != nil {
+		wrappedErr := errors.Wrap(err, "failed to parse frontmatter")
+		writeWrappedError(w, s.logger, wrappedErr, "Failed to parse frontmatter", http.StatusBadRequest)
+		return
+	}
+
+	// Use body directly (no template interpolation needed)
+	promptText := doc.Body
+
+	// Read config values using am package
+	localEnabled := appcfg.GetBool("local_inference.enabled")
+	localBaseURL := appcfg.GetString("local_inference.base_url")
+	localModel := appcfg.GetString("local_inference.model")
+	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")
+	openRouterAPIKey := appcfg.GetString("openrouter.api_key")
+	openRouterModel := appcfg.GetString("openrouter.model")
+
+	// Determine provider (request > default)
+	providerName := req.Provider
+	if providerName == "" && localEnabled {
+		providerName = "local"
+	}
+	if providerName == "" {
+		providerName = "openrouter"
+	}
+
+	// Determine model (request > frontmatter > config default)
+	modelName := req.Model
+	if modelName == "" && doc.Metadata.Model != "" {
+		modelName = doc.Metadata.Model
+	}
+
+	// Create AI client
+	var client provider.AIClient
+	if providerName == "local" {
+		if modelName == "" {
+			modelName = localModel
+		}
+		if modelName == "" {
+			modelName = defaultLocalModel
+		}
+		client = provider.NewLocalClient(provider.LocalClientConfig{
+			BaseURL:        localBaseURL,
+			Model:          modelName,
+			TimeoutSeconds: localTimeout,
+			DB:             s.db,
+			OperationType:  "prompt-direct",
+		})
+	} else {
+		// OpenRouter
+		if modelName == "" {
+			modelName = openRouterModel
+		}
+		if modelName == "" {
+			modelName = defaultOpenRouterModel
+		}
+		client = openrouter.NewClient(openrouter.Config{
+			APIKey:        openRouterAPIKey,
+			Model:         modelName,
+			DB:            s.db,
+			OperationType: "prompt-direct",
+		})
+	}
+
+	// Call LLM using Chat method
+	chatReq := openrouter.ChatRequest{
+		SystemPrompt: req.SystemPrompt,
+		UserPrompt:   promptText,
+	}
+
+	// Set temperature if specified in frontmatter
+	if doc.Metadata.Temperature != nil {
+		chatReq.Temperature = doc.Metadata.Temperature
+	}
+
+	// Set max tokens if specified in frontmatter
+	if doc.Metadata.MaxTokens != nil {
+		chatReq.MaxTokens = doc.Metadata.MaxTokens
+	}
+
+	// Execute prompt
+	resp, err := client.Chat(r.Context(), chatReq)
+	if err != nil {
+		s.logger.Errorw("Prompt direct execution failed",
+			"error", err,
+			"provider", providerName,
+		)
+		writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
+		return
+	}
+
+	// Return response
+	response := PromptDirectResponse{
+		Response:         resp.Content,
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: resp.Usage.CompletionTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
 // PromptSaveRequest represents a request to save a prompt
 type PromptSaveRequest struct {
 	Name         string `json:"name"`
@@ -694,6 +833,8 @@ func (s *QNTXServer) HandlePrompt(w http.ResponseWriter, r *http.Request) {
 		s.HandlePromptPreview(w, r)
 	case path == "/execute":
 		s.HandlePromptExecute(w, r)
+	case path == "/direct":
+		s.HandlePromptDirect(w, r)
 	case path == "/list":
 		s.HandlePromptList(w, r)
 	case path == "/save":

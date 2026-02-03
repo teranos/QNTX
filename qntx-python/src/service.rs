@@ -160,9 +160,9 @@ impl PythonPluginService {
                     for attestation in response.attestations {
                         if let Some(handler_name) = attestation.subjects.first() {
                             // Parse JSON attributes to extract Python code
-                            if !attestation.attributes_json.is_empty() {
+                            if !attestation.attributes.is_empty() {
                                 match serde_json::from_str::<HashMap<String, serde_json::Value>>(
-                                    &attestation.attributes_json,
+                                    &attestation.attributes,
                                 ) {
                                     Ok(attrs) => {
                                         if let Some(serde_json::Value::String(code)) =
