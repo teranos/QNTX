@@ -167,6 +167,9 @@ async function init(): Promise<void> {
         throw error; // Stop initialization - storage is critical
     }
 
+    // Load persisted UI state from IndexedDB (must happen after initStorage())
+    uiState.loadPersistedState();
+
     // Initialize QNTX WASM module with IndexedDB storage
     try {
         if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
