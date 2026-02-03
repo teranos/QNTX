@@ -10,11 +10,12 @@
     gap: 0;
     position: absolute;
     background: transparent;
-    transition: transform 0.2s ease-out;
+    border: 2px solid transparent;
+    transition: border-color 0.2s ease-out;
 }
 
 .melded-composition:hover {
-    transform: scale(1.02);
+    border-color: rgba(0, 120, 0, 0.3);
 }
 
 /* Visual feedback during approach */
