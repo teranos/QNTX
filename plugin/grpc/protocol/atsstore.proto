@@ -50,7 +50,7 @@ message AttestationFilter {
   repeated string actors = 4;
   int64 time_start = 5;          // Unix timestamp in seconds (0 = no filter)
   int64 time_end = 6;            // Unix timestamp in seconds (0 = no filter)
-  optional int32 limit = 7;      // Maximum results. If not set, no limit applied.
+  optional int32 limit = 7;      // Maximum results. 0 or unset = server default (100).
 }
 
 message CreateAttestationRequest {

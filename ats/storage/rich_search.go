@@ -20,6 +20,10 @@ const (
 	maxWordGap = 50
 	// Score multiplier for matches with sequential/nearby words
 	sequentialMatchBoost = 1.5
+	// defaultSearchLimit is applied when the caller passes limit <= 0.
+	// This is a server-side cap, not "unlimited". Callers that want fewer results
+	// must pass a positive limit explicitly. See also queue_server.go.
+	defaultSearchLimit = 100
 )
 
 // Note: Rich string fields are discovered dynamically from type definition attestations.
@@ -74,7 +78,7 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 	}
 
 	if limit <= 0 {
-		limit = 100 // Default limit
+		limit = defaultSearchLimit
 	}
 
 	result := &RichSearchResult{

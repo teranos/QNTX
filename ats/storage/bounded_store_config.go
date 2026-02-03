@@ -7,7 +7,9 @@ const (
 	DefaultEntityActorsLimit  = 64 // actors per entity (subject)
 )
 
-// BoundedStoreConfig defines configurable storage limits
+// BoundedStoreConfig defines configurable storage limits.
+// Invariant: after NewBoundedStoreWithConfig, all fields are > 0.
+// Zero is never a valid limit — it is replaced with the default at construction time.
 type BoundedStoreConfig struct {
 	ActorContextLimit  int // attestations per (actor, context) pair (default: 16)
 	ActorContextsLimit int // contexts per actor (default: 64)

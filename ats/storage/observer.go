@@ -6,7 +6,10 @@ import (
 	"github.com/teranos/QNTX/ats/types"
 )
 
-// AttestationObserver is notified when attestations are created
+// AttestationObserver is notified when attestations are created.
+// Implementations MUST be safe for concurrent use: each callback runs in its
+// own goroutine, fire-and-forget, with no error propagation back to the caller.
+// The *types.As is shared across all observers — do not mutate it.
 type AttestationObserver interface {
 	OnAttestationCreated(as *types.As)
 }
@@ -36,8 +39,10 @@ func UnregisterObserver(observer AttestationObserver) {
 	}
 }
 
-// notifyObservers calls all registered observers (non-blocking, async)
-func notifyObservers(as *types.As) {
+// notifyObserversAsync spawns a goroutine per observer. Errors are silently
+// dropped. The attestation may be evicted by enforceLimits immediately after
+// this returns — observers must not assume the attestation still exists in storage.
+func notifyObserversAsync(as *types.As) {
 	observerMu.RLock()
 	observers := make([]AttestationObserver, len(globalObservers))
 	copy(observers, globalObservers)
