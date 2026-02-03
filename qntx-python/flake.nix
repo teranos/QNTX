@@ -28,9 +28,6 @@
             protobuf
             python313
             openssl
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.IOKit
-            darwin.apple_sdk.frameworks.Security
           ];
 
           nativeBuildInputs = with pkgs; [
