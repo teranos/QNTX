@@ -15,7 +15,7 @@
 
 .melded-composition:hover {
     outline: 2px solid rgba(0, 120, 0, 0.3);
-    outline-offset: 0;
+    outline-offset: 4px;
 }
 
 /* Visual feedback during approach */
