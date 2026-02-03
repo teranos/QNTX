@@ -14,6 +14,7 @@ import type { Glyph } from './glyph';
 // Configuration
 const PROXIMITY_THRESHOLD = 100; // px - distance at which attraction starts
 const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
+const UNMELD_OFFSET = 420; // px - horizontal spacing between glyphs when unmelding
 
 /**
  * Check if element is an ax-glyph that can initiate melding
@@ -230,16 +231,20 @@ export function unmeldComposition(composition: HTMLElement): void {
     }
 
     // Restore absolute positioning
-    const compLeft = parseInt(composition.style.left || '0');
-    const compTop = parseInt(composition.style.top || '0');
+    const compLeft = parseInt(composition.style.left || '0', 10);
+    const compTop = parseInt(composition.style.top || '0', 10);
+
+    // Validate parsed values - fallback to 0 if NaN
+    const left = isNaN(compLeft) ? 0 : compLeft;
+    const top = isNaN(compTop) ? 0 : compTop;
 
     axElement.style.position = 'absolute';
-    axElement.style.left = `${compLeft}px`;
-    axElement.style.top = `${compTop}px`;
+    axElement.style.left = `${left}px`;
+    axElement.style.top = `${top}px`;
 
     promptElement.style.position = 'absolute';
-    promptElement.style.left = `${compLeft + 420}px`; // Offset to the right
-    promptElement.style.top = `${compTop}px`;
+    promptElement.style.left = `${left + UNMELD_OFFSET}px`;
+    promptElement.style.top = `${top}px`;
 
     // Reparent back to canvas
     canvas.insertBefore(axElement, composition);
