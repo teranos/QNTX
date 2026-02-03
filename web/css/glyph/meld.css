@@ -60,5 +60,5 @@
 .melded-composition.is-dragging .canvas-ax-glyph,
 .melded-composition.is-dragging .canvas-py-glyph,
 .melded-composition.is-dragging .canvas-prompt-glyph {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }
