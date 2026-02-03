@@ -12,9 +12,10 @@ import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 
 // Configuration
-const PROXIMITY_THRESHOLD = 100; // px - distance at which attraction starts
-const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
+export const PROXIMITY_THRESHOLD = 100; // px - distance at which attraction starts
+export const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
 const UNMELD_OFFSET = 420; // px - horizontal spacing between glyphs when unmelding
+const MIN_VERTICAL_ALIGNMENT = 0.3; // fraction - minimum vertical overlap required (30%)
 
 /**
  * Check if element is an ax-glyph that can initiate melding
@@ -64,7 +65,7 @@ export function findMeldTarget(axElement: HTMLElement): { target: HTMLElement | 
                               Math.max(axRect.top, promptRect.top);
         const minHeight = Math.min(axRect.height, promptRect.height);
 
-        if (verticalOverlap < minHeight * 0.3) {
+        if (verticalOverlap < minHeight * MIN_VERTICAL_ALIGNMENT) {
             return; // Not aligned vertically
         }
 
