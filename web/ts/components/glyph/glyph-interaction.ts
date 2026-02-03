@@ -15,9 +15,7 @@ import {
     findMeldTarget,
     applyMeldFeedback,
     clearMeldFeedback,
-    performMeld,
-    isMeldedComposition,
-    unmeldComposition
+    performMeld
 } from './meld-system';
 
 // ── Options ─────────────────────────────────────────────────────────
@@ -115,18 +113,20 @@ export function makeDraggable(
         if (canInitiateMeld(element)) {
             const meldInfo = findMeldTarget(element);
             if (meldInfo.target && meldInfo.distance < 30) {
+                const targetElement = meldInfo.target; // Store for type safety
+
                 // Get the prompt glyph ID from the target element
-                const promptGlyphId = meldInfo.target.dataset.glyphId || 'prompt-unknown';
+                const promptGlyphId = targetElement.dataset.glyphId || 'prompt-unknown';
 
                 // Create minimal glyph object for the target
                 const targetGlyph: Glyph = {
                     id: promptGlyphId,
                     title: 'Prompt',
-                    renderContent: () => meldInfo.target
+                    renderContent: () => targetElement
                 };
 
                 // Perform the meld - this reparents the actual DOM elements
-                const composition = performMeld(element, meldInfo.target, glyph, targetGlyph);
+                const composition = performMeld(element, targetElement, glyph, targetGlyph);
 
                 // Make the composition draggable as a unit
                 const compositionGlyph: Glyph = {

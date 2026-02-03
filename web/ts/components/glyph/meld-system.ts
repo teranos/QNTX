@@ -9,7 +9,6 @@
  */
 
 import { log, SEG } from '../../logger';
-import { AX, SO } from '@generated/sym.js';
 import type { Glyph } from './glyph';
 
 // Configuration
