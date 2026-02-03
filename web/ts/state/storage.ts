@@ -1,16 +1,20 @@
 /**
- * Storage - localStorage utility layer
+ * Storage - IndexedDB utility layer
  *
  * Provides consistent error handling, expiry, versioning, and validation
- * for all localStorage operations across the application.
+ * for all storage operations across the application.
+ *
+ * Backend: IndexedDB (via indexeddb-storage.ts in-memory cache)
+ * Replaces: localStorage (migrated for multi-device sync foundation)
  *
  * Used by:
  * - state/ui.ts (high-level state management)
- * - Any module needing localStorage with robust handling
+ * - Any module needing persistent storage with robust handling
  */
 
 import { handleErrorSilent } from '../error-handler.ts';
 import { log, SEG } from '../logger.ts';
+import { getStorageItem, setStorageItem, removeStorageItem } from '../indexeddb-storage.ts';
 
 // ============================================================================
 // Types
@@ -50,7 +54,7 @@ interface StorageEnvelope<T> {
  */
 export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
     try {
-        const raw = localStorage.getItem(key);
+        const raw = getStorageItem(key);
         if (!raw) return null;
 
         const envelope = JSON.parse(raw) as StorageEnvelope<T>;
@@ -107,7 +111,7 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
             timestamp: Date.now(),
             version: options?.version,
         };
-        localStorage.setItem(key, JSON.stringify(envelope));
+        setStorageItem(key, JSON.stringify(envelope));
     } catch (error: unknown) {
         handleErrorSilent(error, `Failed to set storage key "${key}"`, SEG.UI);
     }
@@ -120,7 +124,7 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
  */
 export function removeItem(key: string): void {
     try {
-        localStorage.removeItem(key);
+        removeStorageItem(key);
     } catch (error: unknown) {
         handleErrorSilent(error, `Failed to remove storage key "${key}"`, SEG.UI);
     }
@@ -145,7 +149,7 @@ export function hasItem(key: string, options?: Pick<StorageOptions<unknown>, 'ma
  */
 export function getTimestamp(key: string): number | null {
     try {
-        const raw = localStorage.getItem(key);
+        const raw = getStorageItem(key);
         if (!raw) return null;
 
         const envelope = JSON.parse(raw) as StorageEnvelope<unknown>;
