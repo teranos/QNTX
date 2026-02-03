@@ -405,10 +405,8 @@
     gap: var(--gap);
 }
 
+/* Metadata items use .panel-info-row, .panel-info-label-wide, .panel-info-value-mono from panel-base.css */
 .metadata-item {
-    display: flex;
-    gap: var(--gap);
-    font-size: var(--font-size-sm);
     line-height: 1.4;
 }
 
@@ -416,25 +414,18 @@
     background: var(--status-failed-bg);
     padding: 6px;
     border-radius: var(--border-radius);
-    border-left: 3px solid #f44336;
-}
-
-.metadata-key {
-    font-weight: 600;
-    color: var(--text-secondary);
-    min-width: 100px;
-    flex-shrink: 0;
-}
-
-.metadata-value {
-    color: var(--text-primary);
-    font-family: var(--font-mono);
-    word-break: break-word;
-    flex: 1;
+    /* Use .accent-border-error from panel-base.css */
+    border-left: 3px solid var(--status-failed-text);
 }
 
 .metadata-item.error .metadata-value {
     color: #d32f2f;
+}
+
+/* Override for word-break on values */
+.metadata-value {
+    word-break: break-word;
+    flex: 1;
 }
 
 .no-metadata {
