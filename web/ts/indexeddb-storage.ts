@@ -11,6 +11,7 @@
  */
 
 import { log, SEG } from './logger';
+import { showToast } from './toast';
 
 const DB_NAME = 'qntx-ui-state';
 const DB_VERSION = 1;
@@ -131,8 +132,10 @@ export function setStorageItem(key: string, value: string): void {
     // Queue IndexedDB write (asynchronous, non-blocking)
     writeToIndexedDB(key, value).catch((error) => {
         log.error(SEG.UI, `Failed to persist "${key}" to IndexedDB`, error);
-        // Keep cache entry even if IndexedDB write fails
-        // This ensures UI continues working, data persists next page load from cache
+        showToast('Failed to save canvas state - changes may not persist across sessions', {
+            type: 'error',
+            duration: 8000
+        });
     });
 }
 
@@ -152,6 +155,10 @@ export function removeStorageItem(key: string): void {
     // Queue IndexedDB delete (asynchronous, non-blocking)
     deleteFromIndexedDB(key).catch((error) => {
         log.error(SEG.UI, `Failed to delete "${key}" from IndexedDB`, error);
+        showToast('Failed to delete canvas state - storage may be corrupted', {
+            type: 'error',
+            duration: 8000
+        });
     });
 }
 
