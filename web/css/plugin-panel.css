@@ -125,57 +125,32 @@
     align-items: center;
 }
 
-/* Plugin state indicator */
+/* Plugin state indicator - uses .panel-badge from panel-base.css */
+/* Base structure for plugin-specific badge styling */
 .plugin-state {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: var(--border-radius-lg);
     text-transform: capitalize;
 }
 
-.plugin-state-running {
-    background: var(--status-completed-bg);
-    color: var(--status-completed-text);
-}
-
-.plugin-state-paused {
-    background: var(--status-pending-bg);
-    color: #ef6c00;
-}
-
-.plugin-state-stopped {
-    background: var(--bg-almost-white);
-    color: #757575;
-}
+/* Use .panel-badge-completed for running state */
+/* Use .panel-badge-paused for paused state */
+/* Use .panel-badge-stopped for stopped state */
 
 .plugin-state-icon {
     font-size: var(--font-size-sm);
 }
 
-/* Plugin status indicator */
+/* Plugin status indicator - uses .panel-badge from panel-base.css */
 .plugin-status {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: var(--border-radius-lg);
 }
 
-.plugin-status-healthy {
-    background: var(--status-completed-bg);
-    color: var(--status-completed-text);
-}
-
-.plugin-status-unhealthy {
-    background: var(--status-failed-bg);
-    color: var(--status-failed-text);
-}
+/* Use .panel-badge-completed for healthy state */
+/* Use .panel-badge-failed for unhealthy state */
 
 .plugin-status-icon {
     font-size: var(--font-size-sm);
@@ -250,7 +225,7 @@
     background: var(--bg-almost-white);
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
 }
 
 .plugin-detail-item {

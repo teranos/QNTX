@@ -26,22 +26,7 @@
     animation: slideDown 0.2s ease;
 }
 
-/* Header - scoped to job list using skeleton's .panel-header */
-#job-list-panel .panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--panel-padding-md);
-    background: var(--panel-bg-secondary);
-    border-bottom: var(--panel-border);
-}
-
-#job-list-panel .panel-title {
-    margin: 0;
-    font-size: var(--font-size-md);
-    font-weight: 600;
-    color: #000;
-}
+/* Header - uses .panel-header and .panel-title from panel-base.css */
 
 /* Content */
 #job-list-panel .panel-content {
@@ -97,16 +82,12 @@
     color: #000;
 }
 
-/* Status badges - use panel-badge from base */
+/* Status badges - use .panel-badge-* variants from panel-base.css */
 .job-status-badge {
     text-transform: uppercase;
 }
 
-/* Job-specific badge state colors */
-.job-status-badge.paused {
-    background: var(--status-pending-bg);
-    color: #f57c00;
-}
+/* Use .panel-badge-paused for paused state */
 
 /* Job Details */
 .job-details {
@@ -142,7 +123,7 @@
 .job-cost {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 /* Job Actions */
@@ -347,7 +328,7 @@
     border-radius: var(--border-radius);
     margin-top: 8px;
     padding: 0;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     max-height: 300px;
     overflow-y: auto;
@@ -447,7 +428,7 @@
 
 .metadata-value {
     color: var(--text-primary);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-family: var(--font-mono);
     word-break: break-word;
     flex: 1;
 }
