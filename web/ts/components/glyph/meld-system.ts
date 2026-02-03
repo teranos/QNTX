@@ -10,6 +10,7 @@
 
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
+import { MELDABILITY, getInitiatorClasses, getTargetClasses } from './meldability';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which attraction starts
@@ -18,68 +19,94 @@ const UNMELD_OFFSET = 420; // px - horizontal spacing between glyphs when unmeld
 const MIN_VERTICAL_ALIGNMENT = 0.3; // fraction - minimum vertical overlap required (30%)
 
 /**
- * Check if element is an ax-glyph that can initiate melding
+ * Check if element can initiate melding
  */
 export function canInitiateMeld(element: HTMLElement): boolean {
-    return element.classList.contains('canvas-ax-glyph');
+    return getInitiatorClasses().some(cls =>
+        element.classList.contains(cls)
+    );
 }
 
 /**
- * Check if element is a prompt-glyph that can be melded with
+ * Check if element can receive meld
  */
 export function canReceiveMeld(element: HTMLElement): boolean {
-    return element.classList.contains('canvas-prompt-glyph');
+    return getTargetClasses().some(cls =>
+        element.classList.contains(cls)
+    );
 }
 
 /**
- * Find nearest meldable target for an ax-glyph
+ * Check if two elements are compatible for melding
  */
-export function findMeldTarget(axElement: HTMLElement): { target: HTMLElement | null; distance: number } {
-    if (!canInitiateMeld(axElement)) {
+function areCompatible(initiator: HTMLElement, target: HTMLElement): boolean {
+    for (const [initiatorClass, targetClasses] of Object.entries(MELDABILITY)) {
+        if (initiator.classList.contains(initiatorClass)) {
+            return targetClasses.some(cls => target.classList.contains(cls));
+        }
+    }
+    return false;
+}
+
+/**
+ * Find nearest meldable target for an initiator glyph
+ */
+export function findMeldTarget(initiatorElement: HTMLElement): { target: HTMLElement | null; distance: number } {
+    if (!canInitiateMeld(initiatorElement)) {
         return { target: null, distance: Infinity };
     }
 
-    const canvas = axElement.parentElement;
+    const canvas = initiatorElement.parentElement;
     if (!canvas) {
         return { target: null, distance: Infinity };
     }
 
-    const promptGlyphs = canvas.querySelectorAll('.canvas-prompt-glyph');
+    // Find all potential targets based on meldability rules
+    const potentialTargets: HTMLElement[] = [];
+    for (const targetClass of getTargetClasses()) {
+        canvas.querySelectorAll(`.${targetClass}`).forEach(el => {
+            potentialTargets.push(el as HTMLElement);
+        });
+    }
+
     let closestTarget: HTMLElement | null = null;
     let closestDistance = Infinity;
 
-    const axRect = axElement.getBoundingClientRect();
+    const initiatorRect = initiatorElement.getBoundingClientRect();
 
-    promptGlyphs.forEach(promptEl => {
-        const promptElement = promptEl as HTMLElement;
-
-        // Skip if already in a meld
-        if (promptElement.parentElement?.classList.contains('melded-composition')) {
+    potentialTargets.forEach(targetElement => {
+        // Skip if not compatible with this specific initiator
+        if (!areCompatible(initiatorElement, targetElement)) {
             return;
         }
 
-        const promptRect = promptElement.getBoundingClientRect();
+        // Skip if already in a meld
+        if (targetElement.parentElement?.classList.contains('melded-composition')) {
+            return;
+        }
+
+        const targetRect = targetElement.getBoundingClientRect();
 
         // Check vertical alignment
-        const verticalOverlap = Math.min(axRect.bottom, promptRect.bottom) -
-                              Math.max(axRect.top, promptRect.top);
-        const minHeight = Math.min(axRect.height, promptRect.height);
+        const verticalOverlap = Math.min(initiatorRect.bottom, targetRect.bottom) -
+                              Math.max(initiatorRect.top, targetRect.top);
+        const minHeight = Math.min(initiatorRect.height, targetRect.height);
 
         if (verticalOverlap < minHeight * MIN_VERTICAL_ALIGNMENT) {
             return; // Not aligned vertically
         }
 
-        // Check if ax is to the left of prompt (correct orientation)
-        if (axRect.right > promptRect.left) {
+        // Check if initiator is to the left of target (correct orientation)
+        if (initiatorRect.right > targetRect.left) {
             return; // Wrong orientation
         }
 
-        // Calculate distance between right edge of ax and left edge of prompt
-        const distance = promptRect.left - axRect.right;
+        // Calculate distance between right edge of initiator and left edge of target
+        const distance = targetRect.left - initiatorRect.right;
 
         if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
             closestDistance = distance;
-            closestTarget = promptElement;
+            closestTarget = targetElement;
         }
     });
 
