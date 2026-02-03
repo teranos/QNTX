@@ -101,9 +101,11 @@ The concept builds on decades of research in tangible programming interfaces, wh
 
 - **Tangible-MakeCode**: Bridges physical blocks with web-based programming, using computer vision to translate arrangements into code ([Video Demo](https://www.youtube.com/watch?v=fWfwb8ZSsjc))
 
-### Visual Composition
+### Direct Manipulation & Visual Programming
 
-- **Building Blocks (Distill, 2018)**: Explores composable visual abstractions and how modular pieces can create complex behaviors ([Interactive Article](https://distill.pub/2018/building-blocks/))
+- **Bret Victor - Learnable Programming (2012)**: Seminal essay on making programming systems learnable through immediate visual feedback and direct manipulation ([Essay](http://worrydream.com/LearnableProgramming/))
+
+- **Shneiderman - Direct Manipulation (1983)**: Foundational work defining direct manipulation interfaces - continuous representation of objects and rapid, incremental, reversible actions ([Paper](https://www.cs.umd.edu/~ben/papers/Shneiderman1983Direct.pdf))
 
 ### Key Differentiator
 
@@ -146,6 +148,8 @@ Glyph melding uses **proximity-based fusion** - a more organic, fluid interactio
 
 4. Yu, J., & Garg, R. (2025). Tangible-MakeCode: Bridging Physical Coding Blocks with Web-Based Programming. *CHI 2025*. *[Demo](https://www.youtube.com/watch?v=fWfwb8ZSsjc)*.
 
-5. Olah, C., et al. (2018). The Building Blocks of Interpretability. *Distill*. *[Interactive](https://distill.pub/2018/building-blocks/)*.
+5. Victor, B. (2012). Learnable Programming. *[Essay](http://worrydream.com/LearnableProgramming/)*.
 
-6. MIT CSAIL. (2017). Tangible Computing. *Engineering Interactive Technologies Course Materials*. *[PDF](https://groups.csail.mit.edu/hcie/files/classes/engineering-interactive-technologies/2017-fall/9-tangible-computing.pdf)*.
+6. Shneiderman, B. (1983). Direct Manipulation: A Step Beyond Programming Languages. *IEEE Computer, 16*(8), 57-69.
+
+7. MIT CSAIL. (2017). Tangible Computing. *Engineering Interactive Technologies Course Materials*. *[PDF](https://groups.csail.mit.edu/hcie/files/classes/engineering-interactive-technologies/2017-fall/9-tangible-computing.pdf)*.
