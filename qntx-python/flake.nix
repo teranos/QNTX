@@ -18,41 +18,41 @@
           pname = "qntx-python-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
-          src = ../..; # Root of QNTX repo
+          src = ..; # Root of QNTX repo
 
           cargoLock = {
-            lockFile = ../../Cargo.lock;
-          };
+          lockFile = ../Cargo.lock;
+        };
 
-          buildInputs = with pkgs; [
-            protobuf
-            python313
-            openssl
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.IOKit
-            darwin.apple_sdk.frameworks.Security
-          ];
+        buildInputs = with pkgs; [
+          protobuf
+          python313
+          openssl
+        ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+          darwin.apple_sdk.frameworks.IOKit
+          darwin.apple_sdk.frameworks.Security
+        ];
 
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-            protobuf
-          ];
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+          protobuf
+        ];
 
-          # Set Python for PyO3
-          PYO3_PYTHON = "${pkgs.python313}/bin/python3";
+        # Set Python for PyO3
+        PYO3_PYTHON = "${pkgs.python313}/bin/python3";
 
-          # Build only the qntx-python-plugin package
-          cargoBuildFlags = [ "-p" "qntx-python-plugin" ];
-          cargoTestFlags = [ "-p" "qntx-python-plugin" ];
+        # Build only the qntx-python-plugin package
+        cargoBuildFlags = [ "-p" "qntx-python-plugin" ];
+        cargoTestFlags = [ "-p" "qntx-python-plugin" ];
 
-          # Set rpath/install_name to find Python at runtime
-          postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}:$(patchelf --print-rpath $out/bin/qntx-python-plugin)" \
-              $out/bin/qntx-python-plugin
-          '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
-            install_name_tool -add_rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}" \
-              $out/bin/qntx-python-plugin
-          '';
+        # Set rpath/install_name to find Python at runtime
+        postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+          patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}:$(patchelf --print-rpath $out/bin/qntx-python-plugin)" \
+            $out/bin/qntx-python-plugin
+        '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+          install_name_tool -add_rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}" \
+            $out/bin/qntx-python-plugin
+        '';
         };
 
         # Helper function to build qntx-python plugin image for specific architecture
