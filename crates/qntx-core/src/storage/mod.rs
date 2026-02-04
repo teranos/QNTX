@@ -4,8 +4,8 @@
 //! storage backends. Implementations exist for:
 //!
 //! - **Memory**: In-memory storage for testing (`MemoryStore`)
-//! - **SQLite**: Native SQLite via rusqlite (separate crate, native only)
-//! - **IndexedDB**: Browser storage via idb (separate crate, WASM only)
+//! - **SQLite**: Native SQLite via rusqlite (`qntx-sqlite` crate, native only)
+//! - **IndexedDB**: Browser storage via web-sys (`qntx-indexeddb` crate, WASM only)
 //!
 //! # Example
 //!
@@ -28,20 +28,11 @@
 //! assert!(retrieved.is_some());
 //! ```
 //!
-//! # Future Backends
+//! # Backend Crates
 //!
-//! TODO: Implement SQLite backend for native platforms (Tauri, server)
-//! - Use rusqlite crate
-//! - Port schema from Go's db/sqlite/migrations/
-//! - Implement AttestationStore + QueryStore traits
-//! - Add connection pooling for server use
-//! - Feature-gate behind `sqlite` feature
-//!
-//! TODO: Implement IndexedDB backend for browser WASM
-//! - Use idb or indexed_db_futures crate
-//! - Implement AttestationStore + QueryStore traits
-//! - Handle async nature of IndexedDB (may need async trait variant)
-//! - Feature-gate behind `indexeddb` feature
+//! - `qntx-sqlite`: SQLite backend for native platforms (Tauri, server)
+//! - `qntx-indexeddb`: IndexedDB backend for browser WASM (async API matching
+//!   the same trait contract)
 //!
 //! TODO: Add CGO wrapper for Go server to use Rust storage
 //! - Similar pattern to fuzzy-ax CGO wrapper
