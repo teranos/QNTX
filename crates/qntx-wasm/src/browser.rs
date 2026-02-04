@@ -14,11 +14,14 @@ use wasm_bindgen::prelude::*;
 /// Global store instance (initialized via init_store)
 static mut STORE: Option<IndexedDbStore> = None;
 
+/// Default database name for browser IndexedDB storage
+const DEFAULT_DB_NAME: &str = "qntx";
+
 /// Initialize the IndexedDB store. Must be called before any storage operations.
 /// Returns a Promise that resolves when initialization is complete.
 #[wasm_bindgen]
 pub async fn init_store(db_name: Option<String>) -> Result<(), JsValue> {
-    let name = db_name.unwrap_or_else(|| "qntx".to_string());
+    let name = db_name.unwrap_or_else(|| DEFAULT_DB_NAME.to_string());
 
     let store = IndexedDbStore::open(&name)
         .await
