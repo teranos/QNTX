@@ -196,8 +196,9 @@ pub struct RelationshipTypeDef {
     pub name: String,
     /// Human-readable label for UI (e.g., "Child Of", "Points To")
     pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Optional link color override (hex code)
-    pub color: String,
+    pub color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// D3 force distance override (nil = use default)
     pub link_distance: Option<f64>,
@@ -225,8 +226,10 @@ pub struct TypeDef {
     pub opacity: Option<f64>,
     /// Whether this type is being phased out
     pub deprecated: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Metadata field names containing rich text for semantic search (e.g., ["notes", "description"])
-    pub rich_string_fields: Vec<String>,
+    pub rich_string_fields: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Field names that should be flattened into arrays (e.g., ["skills", "languages", "certifications"])
-    pub array_fields: Vec<String>,
+    pub array_fields: Option<Vec<String>>,
 }
