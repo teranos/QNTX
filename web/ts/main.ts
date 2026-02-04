@@ -39,6 +39,7 @@ import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
+import { initStorage } from './indexeddb-storage.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -153,6 +154,21 @@ async function init(): Promise<void> {
         console.error('[Init] Failed to initialize debug interceptor:', error);
         // Continue anyway - debug interception is not critical to app function
     }
+
+    // Initialize IndexedDB storage for UI state (canvas layouts, preferences)
+    // CRITICAL: Must complete before UI state operations
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Initializing storage...', false, true);
+        await initStorage();
+    } catch (error: unknown) {
+        console.error('[Init] Failed to initialize IndexedDB storage:', error);
+        // BLOCK: Canvas state persistence unavailable
+        // TODO: Show user notification that canvas state won't persist
+        throw error; // Stop initialization - storage is critical
+    }
+
+    // Load persisted UI state from IndexedDB (must happen after initStorage())
+    uiState.loadPersistedState();
 
     // Initialize QNTX WASM module with IndexedDB storage
     try {
