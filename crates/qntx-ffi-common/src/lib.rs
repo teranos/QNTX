@@ -187,13 +187,54 @@ pub fn free_cstring_array(arr: *mut *mut c_char, len: usize) {
     free_boxed_slice(arr, len);
 }
 
-/// Trait for FFI result types with error handling.
+/// Trait for FFI result types with standardized error handling.
 ///
-/// Implement this trait to provide consistent error construction
-/// across different FFI result types.
+/// Types implementing this trait get a consistent `.error()` method
+/// that converts error messages to C strings with fallback handling.
+///
+/// # Example
+/// ```ignore
+/// #[repr(C)]
+/// pub struct MyResultC {
+///     pub success: bool,
+///     pub error_msg: *mut c_char,
+///     pub data: *mut MyData,
+/// }
+///
+/// impl FfiResult for MyResultC {
+///     const ERROR_FALLBACK: &'static str = "unknown error";
+///
+///     fn error_fields(error_msg: *mut c_char) -> Self {
+///         Self {
+///             success: false,
+///             error_msg,
+///             data: ptr::null_mut(),
+///         }
+///     }
+/// }
+///
+/// // Now you can use:
+/// let result = MyResultC::error("operation failed");
+/// ```
 pub trait FfiResult: Sized {
+    /// Fallback message used when the error message contains null bytes.
+    const ERROR_FALLBACK: &'static str;
+
+    /// Construct the result struct with the given error message pointer.
+    ///
+    /// This method receives the already-allocated error_msg pointer
+    /// and should construct the full result struct with error state.
+    fn error_fields(error_msg: *mut c_char) -> Self;
+
     /// Create an error result with the given message.
-    fn error(msg: &str) -> Self;
+    ///
+    /// Converts the message to a C string using `cstring_new_or_fallback`
+    /// with `ERROR_FALLBACK`, then calls `error_fields` to construct the result.
+    #[inline]
+    fn error(msg: &str) -> Self {
+        let error_msg = cstring_new_or_fallback(msg, Self::ERROR_FALLBACK);
+        Self::error_fields(error_msg)
+    }
 }
 
 /// Generate a version function that returns a static C string.

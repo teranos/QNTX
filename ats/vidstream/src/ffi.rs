@@ -25,8 +25,7 @@ use std::ptr;
 use std::slice;
 
 use qntx_ffi_common::{
-    cstr_to_str, cstring_new_or_empty, cstring_new_or_fallback, free_boxed_slice, free_cstring,
-    vec_into_raw,
+    cstr_to_str, cstring_new_or_empty, free_boxed_slice, free_cstring, vec_into_raw, FfiResult,
 };
 
 use crate::engine::VideoEngine;
@@ -121,16 +120,6 @@ pub struct VideoEngineConfigC {
 }
 
 impl VideoResultC {
-    fn error(msg: &str) -> Self {
-        Self {
-            success: false,
-            error_msg: cstring_new_or_fallback(msg, "unknown error"),
-            detections: ptr::null_mut(),
-            detections_len: 0,
-            stats: ProcessingStatsC::default(),
-        }
-    }
-
     fn success(detections: Vec<DetectionC>, stats: ProcessingStatsC) -> Self {
         let (detections_ptr, detections_len) = vec_into_raw(detections);
 
@@ -140,6 +129,20 @@ impl VideoResultC {
             detections: detections_ptr,
             detections_len,
             stats,
+        }
+    }
+}
+
+impl FfiResult for VideoResultC {
+    const ERROR_FALLBACK: &'static str = "unknown error";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            detections: ptr::null_mut(),
+            detections_len: 0,
+            stats: ProcessingStatsC::default(),
         }
     }
 }
