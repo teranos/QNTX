@@ -18,19 +18,16 @@
           pname = "qntx-python-plugin";
           version = self.rev or "dev";
           # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
-          src = ../..; # Root of QNTX repo
+          src = ./..; # Root of QNTX repo
 
           cargoLock = {
-            lockFile = ../../Cargo.lock;
+            lockFile = ./../Cargo.lock;
           };
 
           buildInputs = with pkgs; [
             protobuf
             python313
             openssl
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.IOKit
-            darwin.apple_sdk.frameworks.Security
           ];
 
           nativeBuildInputs = with pkgs; [
