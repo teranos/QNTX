@@ -3,21 +3,16 @@
  *
  * Provides parser and minimal storage functions for browser-based
  * attestation management. Automatically initialized on import.
+ *
+ * Uses proto-generated types (ADR-006, ADR-007) for type consistency
+ * across the TypeScript codebase.
  */
 
 import init, * as wasm from '../wasm/qntx_wasm.js';
+import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
-/** Attestation from IndexedDB */
-export interface Attestation {
-    id: string;
-    subjects: string[];
-    predicates: string[];
-    contexts: string[];
-    actors: string[];
-    timestamp?: number;
-    created_at?: number;
-    [key: string]: unknown;
-}
+// Re-export proto-generated Attestation type for convenience
+export type { Attestation };
 
 /** Parsed AX query */
 export interface AxQuery {
