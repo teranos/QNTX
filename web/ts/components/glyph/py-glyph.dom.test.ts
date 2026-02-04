@@ -48,6 +48,12 @@ if (USE_JSDOM) {
     globalThis.cancelAnimationFrame = cafPolyfill;
     (window as any).requestAnimationFrame = rafPolyfill;
     (window as any).cancelAnimationFrame = cafPolyfill;
+
+    // Add AbortController polyfill
+    // jsdom has AbortController but it's not compatible with addEventListener signal option
+    // Use the window's native implementations
+    globalThis.AbortController = window.AbortController as any;
+    globalThis.AbortSignal = window.AbortSignal as any;
 }
 
 describe('PyGlyph', () => {

@@ -2,7 +2,6 @@ name: TypeScript
 
 on:
   pull_request:
-    branches: [main]
     paths:
       - '**/*.ts'
       - 'web/package.json'

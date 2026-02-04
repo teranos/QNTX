@@ -229,7 +229,10 @@ func (wp *WorkerPool) recoverOrphanedJobs() error {
 	runningStatus := JobStatusRunning
 	orphanedJobs, err := wp.queue.store.ListJobs(&runningStatus, MaxOrphanedJobsToRecover)
 	if err != nil {
-		return errors.Wrap(err, "failed to list running jobs")
+		err = errors.Wrap(err, "failed to list running jobs")
+		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", runningStatus))
+		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", MaxOrphanedJobsToRecover))
+		return err
 	}
 
 	if len(orphanedJobs) == 0 {
@@ -269,7 +272,11 @@ func (wp *WorkerPool) requeueOrphanedJob(job *Job) error {
 	job.Error = "" // Clear any stale error message
 
 	if err := wp.queue.UpdateJob(job); err != nil {
-		return errors.Wrapf(err, "failed to update recovered job %s", job.ID)
+		err = errors.Wrapf(err, "failed to update recovered job %s", job.ID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+		return err
 	}
 
 	wp.logger.Starting("Recovered orphaned job", "job_id", job.ID, "handler", job.HandlerName)
@@ -460,7 +467,8 @@ func (wp *WorkerPool) processNextJob() error {
 	// Dequeue next job
 	job, err := wp.queue.Dequeue()
 	if err != nil {
-		return errors.Wrap(err, "failed to dequeue job")
+		err = errors.Wrap(err, "failed to dequeue job")
+		return err
 	}
 
 	if job == nil {
@@ -509,7 +517,11 @@ func (wp *WorkerPool) processNextJob() error {
 	// Rate limiting prevents API violations, budget prevents cost overruns
 	if paused, err := wp.checkRateLimit(job); paused || err != nil {
 		if err != nil {
-			return errors.Wrapf(err, "rate limit check failed for job %s", job.ID)
+			err = errors.Wrapf(err, "rate limit check failed for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+			err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+			return err
 		}
 		return nil // Job paused, no error
 	}
@@ -517,7 +529,11 @@ func (wp *WorkerPool) processNextJob() error {
 	// Check budget before processing
 	if paused, err := wp.checkBudget(job); paused || err != nil {
 		if err != nil {
-			return errors.Wrapf(err, "budget check failed for job %s", job.ID)
+			err = errors.Wrapf(err, "budget check failed for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+			err = errors.WithDetail(err, fmt.Sprintf("Estimated cost: $%.4f", job.CostEstimate))
+			return err
 		}
 		return nil // Job paused, no error
 	}
@@ -587,7 +603,11 @@ func (wp *WorkerPool) checkRateLimit(job *Job) (paused bool, err error) {
 
 	if err := wp.rateLimiter.Allow(); err != nil {
 		if pauseErr := wp.queue.PauseJob(job.ID, "rate_limited"); pauseErr != nil {
-			return false, errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+			pauseErr = errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+			pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Job ID: %s", job.ID))
+			pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Handler: %s", job.HandlerName))
+			pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Pause reason: rate_limited"))
+			return false, pauseErr
 		}
 		// Log rate limit status for visibility
 		callsInWindow, callsRemaining := wp.rateLimiter.Stats()
@@ -639,7 +659,12 @@ func (wp *WorkerPool) checkBudget(job *Job) (paused bool, err error) {
 
 		if wp.poolConfig.PauseOnBudget {
 			if pauseErr := wp.queue.PauseJob(job.ID, "budget_exceeded"); pauseErr != nil {
-				return false, errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+				pauseErr = errors.Wrapf(pauseErr, "failed to pause job %s", job.ID)
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Job ID: %s", job.ID))
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Handler: %s", job.HandlerName))
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Estimated cost: $%.4f", estimatedCost))
+				pauseErr = errors.WithDetail(pauseErr, fmt.Sprintf("Pause reason: budget_exceeded"))
+				return false, pauseErr
 			}
 			return true, nil
 		}

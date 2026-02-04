@@ -9,6 +9,7 @@
     --text-primary: #333433;
     --text-secondary: #656766;
     --text-tertiary: #989a99;
+    --text-emphasis: #000; /* Headings, titles, high-contrast text */
     --bg-primary: #fcffff;
     --bg-almost-white: #f7f9f8;
     --bg-hover: #eff1f0;
@@ -17,6 +18,7 @@
     --bg-dark: #202523;
     --border-color: #dcdedd;
     --border-light: #dfe1e0;
+    --border-divider: #eee; /* Subtle dividers within panels */
     --accent-color: #5a9a6a;
     --accent-hover: #4a8559;
 
@@ -108,8 +110,8 @@ body.disconnected #container {
     overflow: hidden;
     z-index: 0;
     padding: 20px;
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-    font-size: var(--font-size-sm);
+    font-family: var(--font-mono);
+    font-size: 10px;
     line-height: 1.4;
     /* Improved contrast: 0.15 -> 0.35 for better visibility */
     color: rgba(100, 255, 100, 0.35);
@@ -143,41 +145,6 @@ body.disconnected #container {
 .attestation-line .value {
     /* Improved contrast: 0.2 -> 0.4 */
     color: rgba(136, 201, 153, 0.4);
-}
-
-/* Common Animations - Consolidated for reuse */
-@keyframes fadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateX(-100%);
-    }
-    to {
-        transform: translateX(0);
-    }
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
 }
 
 /* Reduced motion preference */
@@ -249,7 +216,7 @@ body.disconnected #container {
 }
 
 .llm-stream-content {
-    font-family: Courier New, monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     line-height: 1.4;
     padding: 8px;
@@ -265,12 +232,6 @@ body.disconnected #container {
     background: #4ade80;
     margin-left: 2px;
     animation: blink 1s step-end infinite;
-}
-
-@keyframes blink {
-    50% {
-        opacity: 0;
-    }
 }
 
 .llm-model, .llm-stage {

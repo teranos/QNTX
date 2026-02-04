@@ -3,6 +3,7 @@ package schedule
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/teranos/QNTX/errors"
@@ -93,7 +94,13 @@ func (s *Store) CreateJob(job *Job) error {
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "failed to create scheduled job")
+		err = errors.Wrap(err, "failed to create scheduled job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+		if job.HandlerName != "" {
+			err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		}
+		return err
 	}
 
 	return nil
@@ -134,34 +141,50 @@ func (s *Store) GetJob(id string) (*Job, error) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.Newf("scheduled job not found: %s", id)
+			err := errors.Newf("scheduled job not found: %s", id)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+			return nil, err
 		}
-		return nil, errors.Wrap(err, "failed to get scheduled job")
+		err = errors.Wrap(err, "failed to get scheduled job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		return nil, err
 	}
 
 	// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
 	if nextRunAt.Valid {
 		parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", id)
+			err = errors.Wrapf(err, "failed to parse next_run_at for job %s", id)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+			err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", nextRunAt.String))
+			return nil, err
 		}
 		job.NextRunAt = &parsed
 	}
 
 	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse created_at for job %s", id)
+		err = errors.Wrapf(err, "failed to parse created_at for job %s", id)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", createdAt))
+		return nil, err
 	}
 
 	job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse updated_at for job %s", id)
+		err = errors.Wrapf(err, "failed to parse updated_at for job %s", id)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", updatedAt))
+		return nil, err
 	}
 
 	if lastRunAt.Valid {
 		t, err := time.Parse(time.RFC3339, lastRunAt.String)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse last_run_at for job %s", id)
+			err = errors.Wrapf(err, "failed to parse last_run_at for job %s", id)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+			err = errors.WithDetail(err, fmt.Sprintf("Invalid timestamp: %s", lastRunAt.String))
+			return nil, err
 		}
 		job.LastRunAt = &t
 	}
@@ -204,6 +227,8 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 
 	rows, err := s.db.Query(query, StateActive, now.Format(time.RFC3339), MaxDueJobsBatch)
 	if err != nil {
+		err = errors.Wrap(err, "failed to query due jobs")
+		err = errors.WithDetail(err, fmt.Sprintf("Current time: %s", now.Format(time.RFC3339)))
 		return nil, err
 	}
 	defer rows.Close()
@@ -233,6 +258,7 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 			&updatedAt,
 		)
 		if err != nil {
+			err = errors.Wrap(err, "failed to scan job row")
 			return nil, err
 		}
 
@@ -240,25 +266,37 @@ func (s *Store) ListJobsDue(now time.Time) ([]*Job, error) {
 		if nextRunAt.Valid {
 			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+				err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+				return nil, err
 			}
 			job.NextRunAt = &parsed
 		}
 
 		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 
 		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 
 		if lastRunAt.Valid {
 			t, err := time.Parse(time.RFC3339, lastRunAt.String)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+				err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+				return nil, err
 			}
 			job.LastRunAt = &t
 		}
@@ -305,6 +343,8 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 
 	rows, err := s.db.QueryContext(ctx, query, StateActive, now.Format(time.RFC3339), MaxDueJobsBatch)
 	if err != nil {
+		err = errors.Wrap(err, "failed to query due jobs with context")
+		err = errors.WithDetail(err, fmt.Sprintf("Current time: %s", now.Format(time.RFC3339)))
 		return nil, err
 	}
 	defer rows.Close()
@@ -334,6 +374,7 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 			&updatedAt,
 		)
 		if err != nil {
+			err = errors.Wrap(err, "failed to scan job row")
 			return nil, err
 		}
 
@@ -341,25 +382,37 @@ func (s *Store) ListJobsDueContext(ctx context.Context, now time.Time) ([]*Job, 
 		if nextRunAt.Valid {
 			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+				err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+				return nil, err
 			}
 			job.NextRunAt = &parsed
 		}
 
 		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 
 		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 
 		if lastRunAt.Valid {
 			t, err := time.Parse(time.RFC3339, lastRunAt.String)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+				err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+				return nil, err
 			}
 			job.LastRunAt = &t
 		}
@@ -406,6 +459,7 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 
 	rows, err := s.db.Query(query, StateDeleted, MaxListAllJobs)
 	if err != nil {
+		err = errors.Wrap(err, "failed to query all scheduled jobs")
 		return nil, err
 	}
 	defer rows.Close()
@@ -435,6 +489,7 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 			&updatedAt,
 		)
 		if err != nil {
+			err = errors.Wrap(err, "failed to scan job row")
 			return nil, err
 		}
 
@@ -442,25 +497,37 @@ func (s *Store) ListAllScheduledJobs() ([]*Job, error) {
 		if nextRunAt.Valid {
 			parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+				err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+				return nil, err
 			}
 			job.NextRunAt = &parsed
 		}
 
 		job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 
 		job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 
 		if lastRunAt.Valid {
 			t, err := time.Parse(time.RFC3339, lastRunAt.String)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+				err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+				return nil, err
 			}
 			job.LastRunAt = &t
 		}
@@ -500,16 +567,23 @@ func (s *Store) UpdateJobState(jobID string, newState string) error {
 
 	result, err := s.db.Exec(query, newState, time.Now().UTC().Format(time.RFC3339), jobID)
 	if err != nil {
-		return errors.Wrap(err, "failed to update scheduled job state")
+		err = errors.Wrap(err, "failed to update scheduled job state")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		err = errors.WithDetail(err, fmt.Sprintf("New state: %s", newState))
+		return err
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to get rows affected")
+		err = errors.Wrap(err, "failed to get rows affected")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
 	}
 
 	if rows == 0 {
-		return errors.Newf("scheduled job not found: %s", jobID)
+		err := errors.Newf("scheduled job not found: %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
 	}
 
 	return nil
@@ -526,16 +600,23 @@ func (s *Store) UpdateJobInterval(jobID string, newInterval int) error {
 
 	result, err := s.db.Exec(query, newInterval, time.Now().UTC().Format(time.RFC3339), jobID)
 	if err != nil {
-		return errors.Wrap(err, "failed to update scheduled job interval")
+		err = errors.Wrap(err, "failed to update scheduled job interval")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		err = errors.WithDetail(err, fmt.Sprintf("New interval: %d seconds", newInterval))
+		return err
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to get rows affected")
+		err = errors.Wrap(err, "failed to get rows affected")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
 	}
 
 	if rows == 0 {
-		return errors.Newf("scheduled job not found: %s", jobID)
+		err := errors.Newf("scheduled job not found: %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
 	}
 
 	return nil
@@ -560,16 +641,24 @@ func (s *Store) UpdateJobAfterExecution(jobID string, lastRun time.Time, executi
 		jobID)
 
 	if err != nil {
-		return errors.Wrap(err, "failed to update scheduled job")
+		err = errors.Wrap(err, "failed to update scheduled job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		err = errors.WithDetail(err, fmt.Sprintf("Execution ID: %s", executionID))
+		err = errors.WithDetail(err, fmt.Sprintf("Next run: %s", nextRun.Format(time.RFC3339)))
+		return err
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to get rows affected")
+		err = errors.Wrap(err, "failed to get rows affected")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
 	}
 
 	if rows == 0 {
-		return errors.Newf("scheduled job not found: %s", jobID)
+		err := errors.Newf("scheduled job not found: %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		return err
 	}
 
 	return nil
@@ -620,32 +709,45 @@ func (s *Store) GetNextScheduledJob() (*Job, error) {
 	}
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get next scheduled job")
+		err = errors.Wrap(err, "failed to get next scheduled job")
+		return nil, err
 	}
 
 	// Parse timestamps (return error if parsing fails - indicates data corruption or schema mismatch)
 	if nextRunAt.Valid {
 		parsed, err := time.Parse(time.RFC3339, nextRunAt.String)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse next_run_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 		job.NextRunAt = &parsed
 	}
 
 	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+		err = errors.Wrapf(err, "failed to parse created_at for job %s", job.ID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+		return nil, err
 	}
 
 	job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+		err = errors.Wrapf(err, "failed to parse updated_at for job %s", job.ID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+		return nil, err
 	}
 
 	if lastRunAt.Valid {
 		t, err := time.Parse(time.RFC3339, lastRunAt.String)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+			err = errors.Wrapf(err, "failed to parse last_run_at for job %s", job.ID)
+			err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+			err = errors.WithDetail(err, fmt.Sprintf("ATS code: %s", job.ATSCode))
+			return nil, err
 		}
 		job.LastRunAt = &t
 	}

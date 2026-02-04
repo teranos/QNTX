@@ -1,0 +1,24 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const delete_attestation: (a: number, b: number) => any;
+export const exists_attestation: (a: number, b: number) => any;
+export const get_attestation: (a: number, b: number) => any;
+export const init_store: (a: number, b: number) => any;
+export const is_store_initialized: () => number;
+export const list_attestation_ids: () => any;
+export const parse_query: (a: number, b: number) => [number, number];
+export const put_attestation: (a: number, b: number) => any;
+export const version: () => [number, number];
+export const wasm_bindgen__closure__destroy__hd71dd998f6ad6b2e: (a: number, b: number) => void;
+export const wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
+export const wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
+export const wasm_bindgen__convert__closures_____invoke__h2745a8c01784b9af: (a: number, b: number, c: any) => void;
+export const wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_start: () => void;

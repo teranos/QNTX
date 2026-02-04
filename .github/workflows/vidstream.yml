@@ -25,7 +25,7 @@ jobs:
     name: VidStream (CGO + ONNX)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/teranos/qntx:latest
+      image: ghcr.io/teranos/qntx-ci:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

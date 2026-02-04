@@ -39,6 +39,12 @@
     --status-completed-text: var(--color-success);
     --status-failed-bg: #ffebee;
     --status-failed-text: var(--color-error);
+    --status-paused-text: #ef6c00;
+    --status-stopped-text: #757575;
+    --status-scheduled-bg: #f3e5f5;
+
+    /* Accent/scheduled tint for hover states */
+    --bg-scheduled-tint: #f3e5f5;
 }
 
 /* === CARDS === */
@@ -98,6 +104,21 @@
 .panel-badge-failed {
     background: var(--status-failed-bg);
     color: var(--status-failed-text);
+}
+
+.panel-badge-paused {
+    background: var(--status-pending-bg);
+    color: var(--status-paused-text);
+}
+
+.panel-badge-stopped {
+    background: var(--bg-almost-white);
+    color: var(--status-stopped-text);
+}
+
+.panel-badge-scheduled {
+    background: var(--status-scheduled-bg);
+    color: var(--color-scheduled);
 }
 
 /* Badge with icon */
@@ -199,7 +220,7 @@
     padding: 12px;
     margin: 0;
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
+    font-family: var(--font-mono);
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-all;
@@ -292,13 +313,36 @@
 
 /* === HEADERS === */
 
+/* Panel top header - used across all panel types */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--panel-padding-md);
+    background: var(--panel-bg-secondary);
+    border-bottom: var(--panel-border);
+    flex-shrink: 0;
+}
+
+.panel-header-lg {
+    padding: var(--panel-padding-lg);
+}
+
+.panel-title {
+    margin: 0;
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--text-emphasis);
+}
+
+/* Section header - used within panel content */
 .panel-section-header {
     font-size: var(--font-size-md);
     font-weight: 600;
     color: var(--panel-text-primary);
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-divider);
 }
 
 /* === METADATA / INFO ROWS === */
@@ -309,15 +353,28 @@
     align-items: center;
     gap: var(--gap);
     font-size: var(--font-size-sm);
+    padding: 6px 0;
 }
 
 .panel-info-label {
     color: var(--panel-text-secondary);
+    font-weight: 500;
+    flex-shrink: 0;
 }
 
 .panel-info-value {
     color: var(--panel-text-primary);
     font-weight: 500;
+}
+
+/* Monospace variant for technical values (IDs, paths, code) */
+.panel-info-value-mono {
+    font-family: var(--font-mono);
+}
+
+/* Wide label variant for forms/tables with consistent label width */
+.panel-info-label-wide {
+    min-width: 100px;
 }
 
 /* === BUTTONS === */
@@ -349,6 +406,29 @@
 .panel-btn-sm {
     padding: 4px 8px;
     font-size: var(--font-size-sm);
+}
+
+/* Accent button - secondary actions with purple/scheduled theme on hover */
+.panel-btn-accent {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    padding: var(--panel-padding-sm);
+    font-size: var(--font-size-md);
+    color: var(--panel-text-secondary);
+    cursor: pointer;
+    transition: var(--panel-transition-fast);
+}
+
+.panel-btn-accent:hover:not([disabled]) {
+    background: var(--bg-scheduled-tint);
+    border-color: var(--color-scheduled);
+    color: var(--color-scheduled);
+}
+
+.panel-btn-accent[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* Warning button - for two-click confirmation pattern */
@@ -386,14 +466,41 @@
 
 .panel-divider {
     height: 1px;
-    background: #eee;
+    background: var(--border-divider);
     margin: 16px 0;
+}
+
+/* === ACCENT BORDERS === */
+
+/* Left accent borders for status indicators and emphasis */
+.accent-border-left {
+    border-left: 3px solid var(--border-color);
+}
+
+.accent-border-scheduled {
+    border-left: 3px solid var(--color-scheduled);
+}
+
+.accent-border-success {
+    border-left: 3px solid var(--status-completed-text);
+}
+
+.accent-border-error {
+    border-left: 3px solid var(--status-failed-text);
+}
+
+.accent-border-warning {
+    border-left: 3px solid var(--status-pending-text);
+}
+
+.accent-border-info {
+    border-left: 3px solid var(--status-running-text);
 }
 
 /* === CODE/MONOSPACE TEXT === */
 
 .panel-code {
-    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     background: var(--panel-bg-secondary);
     padding: 2px 6px;
@@ -476,7 +583,7 @@
     padding: var(--panel-padding-sm);
     border-radius: 0;
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', 'JetBrains Mono', 'Consolas', monospace;
+    font-family: var(--font-mono);
     line-height: 1.6;
     white-space: pre-wrap;
     z-index: 100000; /* Must be above windows (which start at 9999) */

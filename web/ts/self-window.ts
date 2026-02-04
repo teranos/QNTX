@@ -83,14 +83,14 @@ class SelfWindow {
 
         const sections: string[] = [];
 
-        // Core QNTX version section
+        // QNTX Server version section
         if (version) {
             const buildTimeFormatted = formatBuildTime(version.build_time) || version.build_time || 'unknown';
             const commitShort = version.commit?.substring(0, 7) || 'unknown';
 
             sections.push(`
                 <div class="self-section">
-                    <h3 class="self-section-title">QNTX Core</h3>
+                    <h3 class="self-section-title">QNTX Server</h3>
                     <div class="self-info-row">
                         <span class="self-info-label">Version:</span>
                         <span class="self-info-value">${version.version || 'unknown'}</span>
@@ -115,17 +115,36 @@ class SelfWindow {
 
         // System Capabilities section
         if (caps) {
+            const parserTooltip = caps.parser_optimized ?
+                'Using WebAssembly parser for faster performance and browser compatibility. This enables offline operation and consistent parsing across all platforms.' :
+                'Using Go native parser (fallback). Build with WASM support for better performance and browser compatibility.';
+
+            const parserStatus = caps.parser_optimized ?
+                `<span class="capability-optimized" title="${parserTooltip}">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
+                `<span class="capability-degraded" title="${parserTooltip}">⚠ Go native parser</span>`;
+
             const fuzzyStatus = caps.fuzzy_optimized ?
-                `<span class="capability-optimized">✓ Optimized (Rust)</span>` :
-                `<span class="capability-degraded">⚠ Fallback (Go)</span>`;
+                `<span class="capability-optimized" title="Using Rust-based fuzzy matching for better performance">✓ Optimized (Rust)</span>` :
+                `<span class="capability-degraded" title="Using Go fallback for fuzzy matching">⚠ Fallback (Go)</span>`;
 
             const vidstreamStatus = caps.vidstream_optimized ?
-                `<span class="capability-optimized">✓ Available (ONNX)</span>` :
-                `<span class="capability-degraded">⚠ Unavailable (requires CGO)</span>`;
+                `<span class="capability-optimized" title="Video inference available via ONNX Runtime">✓ Available (ONNX)</span>` :
+                `<span class="capability-degraded" title="Video inference unavailable - requires CGO build">⚠ Unavailable (requires CGO)</span>`;
+
+            const storageStatus = caps.storage_optimized ?
+                `<span class="capability-optimized" title="Using Rust-based SQLite for better performance">✓ Optimized (Rust)</span>` :
+                `<span class="capability-degraded" title="Using Go SQLite driver (fallback)">⚠ Fallback (Go)</span>`;
 
             sections.push(`
                 <div class="self-section">
                     <h3 class="self-section-title">System Capabilities</h3>
+                    <div class="self-info-row">
+                        <span class="self-info-label">parser:</span>
+                        <span class="self-info-value">
+                            ${caps.parser_version ? `v${caps.parser_version}` : ''}
+                            ${parserStatus}
+                        </span>
+                    </div>
                     <div class="self-info-row">
                         <span class="self-info-label">fuzzy-ax:</span>
                         <span class="self-info-value">
@@ -138,6 +157,13 @@ class SelfWindow {
                         <span class="self-info-value">
                             ${caps.vidstream_version ? `v${caps.vidstream_version}` : 'unknown'}
                             ${vidstreamStatus}
+                        </span>
+                    </div>
+                    <div class="self-info-row">
+                        <span class="self-info-label">storage:</span>
+                        <span class="self-info-value">
+                            ${caps.storage_version ? `v${caps.storage_version}` : 'unknown'}
+                            ${storageStatus}
                         </span>
                     </div>
                 </div>
