@@ -13,7 +13,7 @@
 //! This is part of the gradual migration from typegen to proto.
 
 use qntx_core::attestation::Attestation as CoreAttestation;
-use qntx_proto::Attestation as ProtoAttestation;
+use crate::Attestation as ProtoAttestation;
 
 /// Convert a proto Attestation to core Attestation
 ///

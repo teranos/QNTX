@@ -39,8 +39,10 @@
 
 pub mod error;
 pub mod idb;
-pub mod proto_convert;
 pub mod store;
 
 pub use error::{IndexedDbError, Result};
 pub use store::IndexedDbStore;
+
+// Re-export proto conversion utilities from qntx-proto
+pub use qntx_proto::proto_convert;
