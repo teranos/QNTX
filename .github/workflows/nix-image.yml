@@ -21,10 +21,10 @@ jobs:
             path: .
           - name: qntx-code-plugin-image
             registry: ghcr.io/teranos/qntx-code-plugin
-            path: ./plugins/qntx-code
+            path: ./qntx-code
           - name: qntx-python-plugin-image
             registry: ghcr.io/teranos/qntx-python-plugin
-            path: ./plugins/qntx-python
+            path: ./qntx-python
 
     steps:
       - name: Checkout repository
@@ -64,14 +64,14 @@ jobs:
       - name: Build and cache qntx-code plugin binary
         if: matrix.image.name == 'qntx-code-plugin-image'
         run: |
-          nix build .#qntx-code --print-build-logs
-          nix build .#qntx-code --print-out-paths --no-link | cachix push qntx
+          nix build ./qntx-code#qntx-code-plugin --print-build-logs
+          nix build ./qntx-code#qntx-code-plugin --print-out-paths --no-link | cachix push qntx
 
       - name: Build and cache qntx-python plugin binary
         if: matrix.image.name == 'qntx-python-plugin-image'
         run: |
-          nix build .#qntx-python --print-build-logs
-          nix build .#qntx-python --print-out-paths --no-link | cachix push qntx
+          nix build ./qntx-python#qntx-python-plugin --print-build-logs
+          nix build ./qntx-python#qntx-python-plugin --print-out-paths --no-link | cachix push qntx
 
       - name: Build image with Nix
         run: nix build ${{ matrix.image.path }}#${{ matrix.image.name }}-${{ matrix.arch }}

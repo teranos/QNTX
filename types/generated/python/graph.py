@@ -112,10 +112,10 @@ class RelationshipDefinition:
     predicate_name: str
     # Human-readable label
     display_label: str
-    # Optional link color override
-    color: str
     # Whether this relationship type is deprecated
     deprecated: bool
+    # Optional link color override
+    color: str | None = None
     # D3 force distance (nil = use default)
     link_distance: float | None = None
     # D3 force strength (nil = use default)
