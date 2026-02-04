@@ -66,8 +66,10 @@ pub mod bounded;
 pub mod error;
 pub mod json;
 pub mod migrate;
-pub mod proto_convert;
 pub mod store;
+
+// Re-export proto conversion utilities from qntx-proto
+pub use qntx_proto::proto_convert;
 
 // FFI module for CGO integration
 #[cfg(feature = "ffi")]

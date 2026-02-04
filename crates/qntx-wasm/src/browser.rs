@@ -6,9 +6,17 @@
 //!
 //! Unlike the wazero target which uses raw memory passing, these functions
 //! use wasm-bindgen for seamless JavaScript interop.
+//!
+//! ## Proto Boundary (ADR-006, ADR-007)
+//!
+//! This module implements proto conversion at the WASM↔TypeScript boundary:
+//! - TypeScript uses proto-generated `Attestation` interface
+//! - JSON matches proto schema (timestamps as numbers, attributes as string)
+//! - Converted to qntx_core::Attestation for internal storage operations
 
-use qntx_core::{attestation::Attestation, parser::Parser};
+use qntx_core::{attestation::Attestation as CoreAttestation, parser::Parser};
 use qntx_indexeddb::IndexedDbStore;
+use qntx_proto::Attestation as ProtoAttestation;
 use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
@@ -76,14 +84,21 @@ pub fn parse_query(input: &str) -> String {
 
 /// Store an attestation in IndexedDB.
 /// Returns a Promise that resolves to null on success or error message on failure.
+///
+/// Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+/// Converts to internal core::Attestation format before storage.
 #[wasm_bindgen]
 pub async fn put_attestation(json: &str) -> Result<(), JsValue> {
-    let attestation: Attestation = serde_json::from_str(json)
+    // Deserialize from proto-compliant JSON
+    let proto_attestation: ProtoAttestation = serde_json::from_str(json)
         .map_err(|e| JsValue::from_str(&format!("Invalid JSON: {}", e)))?;
+
+    // Convert to core type for storage
+    let core_attestation = qntx_proto::proto_convert::from_proto(proto_attestation);
 
     let store = get_store();
     store
-        .put(attestation)
+        .put(core_attestation)
         .await
         .map_err(|e| JsValue::from_str(&format!("Store error: {:?}", e)))?;
 
@@ -92,6 +107,9 @@ pub async fn put_attestation(json: &str) -> Result<(), JsValue> {
 
 /// Retrieve an attestation by ID from IndexedDB.
 /// Returns a Promise that resolves to JSON-serialized attestation or null if not found.
+///
+/// Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+/// Converts from internal core::Attestation format before serialization.
 #[wasm_bindgen]
 pub async fn get_attestation(id: &str) -> Result<Option<String>, JsValue> {
     let store = get_store();
@@ -101,8 +119,10 @@ pub async fn get_attestation(id: &str) -> Result<Option<String>, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("Store error: {:?}", e)))?;
 
     match result {
-        Some(attestation) => {
-            let json = serde_json::to_string(&attestation)
+        Some(core_attestation) => {
+            // Convert to proto type for JSON serialization
+            let proto_attestation = qntx_proto::proto_convert::to_proto(core_attestation);
+            let json = serde_json::to_string(&proto_attestation)
                 .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))?;
             Ok(Some(json))
         }
@@ -159,5 +179,5 @@ pub fn version() -> String {
 /// Check if the store is initialized.
 #[wasm_bindgen]
 pub fn is_store_initialized() -> bool {
-    unsafe { STORE.is_some() }
+    STORE.get().is_some()
 }
