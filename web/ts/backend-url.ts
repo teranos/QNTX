@@ -18,7 +18,10 @@
  */
 export function validateBackendUrl(url: string): string | null {
     try {
-        const parsed = new URL(url, window.location.origin);
+        // For absolute URLs, no base needed. For relative, use current origin.
+        const parsed = url.startsWith('http://') || url.startsWith('https://')
+            ? new URL(url)
+            : new URL(url, window.location.origin);
 
         // Only allow http/https protocols (will be converted to ws/wss)
         if (!['http:', 'https:'].includes(parsed.protocol)) {
