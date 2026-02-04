@@ -157,9 +157,10 @@
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
-        # TODO: DEPRECATED - Will be replaced with protoc-based code generation
+        # TODO: Type generation moving to protoc (ADR-006), docs generation staying
+        # After proto migration: will be renamed to 'docgen' for API docs + .md files
+        # Original typegen code will be extracted to separate repo as reusable library
         # Current typegen requires full compilation due to packages.Load with NeedTypes
-        # This creates unnecessary coupling to build configuration
         typegen = pkgs.buildGoModule {
           pname = "typegen";
           version = self.rev or "dev";
