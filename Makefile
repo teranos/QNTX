@@ -28,24 +28,25 @@ server: cli ## Start QNTX WebSocket server
 	@./bin/qntx server
 
 dev: web cli ## Build frontend and CLI, then start development servers (backend + frontend with live reload)
-	@# Read port from am.toml if exists, otherwise use default
-	@TOML_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
-	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_PORT:-8773}}; \
-	FRONTEND_PORT=$${FRONTEND_PORT:-8820}; \
+	@# Read ports from am.toml if exists, otherwise use defaults
+	@TOML_BACKEND_PORT=$$(grep -E '^port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	TOML_FRONTEND_PORT=$$(grep -E '^frontend_port\s*=' am.toml 2>/dev/null | head -1 | sed 's/.*=\s*//;s/[^0-9]//g' || echo ""); \
+	BACKEND_PORT=$${BACKEND_PORT:-$${TOML_BACKEND_PORT:-8773}}; \
+	FRONTEND_PORT=$${FRONTEND_PORT:-$${TOML_FRONTEND_PORT:-8820}}; \
 	echo "🚀 Starting development environment..."; \
 	echo "  Backend:  http://localhost:$$BACKEND_PORT"; \
 	echo "  Frontend: http://localhost:$$FRONTEND_PORT (with live reload)"; \
 	echo "  Database: Uses am.toml configuration"; \
 	echo "  Override: BACKEND_PORT=<port> FRONTEND_PORT=<port> make dev"; \
 	echo ""; \
-	pkill -f "qntx server" 2>/dev/null || true; \
-	pkill -f "bun.*dev" 2>/dev/null || true; \
+	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
+	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
 	trap "echo ''; echo 'Shutting down dev servers...'; \
-		pkill -TERM -f 'qntx server' 2>/dev/null || true; \
-		pkill -TERM -f 'bun.*dev' 2>/dev/null || true; \
+		lsof -ti:$$BACKEND_PORT | xargs kill -TERM 2>/dev/null || true; \
+		lsof -ti:$$FRONTEND_PORT | xargs kill -TERM 2>/dev/null || true; \
 		sleep 1; \
-		pkill -9 -f 'qntx server' 2>/dev/null || true; \
-		pkill -9 -f 'bun.*dev' 2>/dev/null || true; \
+		lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
+		lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
 		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
@@ -61,13 +62,12 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	@echo "  iOS:      Launching simulator..."
 	@echo ""
 	@# Clean up any lingering processes
-	@pkill -f "bun.*dev" 2>/dev/null || true
 	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start servers in background
 	@trap 'echo "Shutting down dev servers..."; \
 		test -n "$$BACKEND_PID" && kill -TERM -$$BACKEND_PID 2>/dev/null || true; \
 		test -n "$$FRONTEND_PID" && kill -TERM -$$FRONTEND_PID 2>/dev/null || true; \
-		pkill -f "bun.*dev" 2>/dev/null || true; \
+		lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
 		wait 2>/dev/null || true; \
 		echo "✓ Servers stopped cleanly"' INT; \
 	./bin/qntx server --dev --no-browser -vvv & \
@@ -155,11 +155,10 @@ desktop-dev: desktop-prepare ## Run desktop app in development mode
 	@echo "  Backend will start as sidecar on port $${BACKEND_PORT:-877}"
 	@echo ""
 	@# Clean up any lingering dev server processes
-	@pkill -f "bun.*dev" 2>/dev/null || true
 	@lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true
 	@# Start dev server in background, then launch Tauri
 	@trap 'echo "Shutting down dev server..."; \
-		pkill -f "bun.*dev" 2>/dev/null || true; \
+		lsof -ti:$${FRONTEND_PORT:-8820} | xargs kill -9 2>/dev/null || true; \
 		wait 2>/dev/null || true; \
 		echo "✓ Dev server stopped"' INT; \
 	cd web && bun run dev & \
