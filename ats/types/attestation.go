@@ -5,8 +5,11 @@ import (
 )
 
 // As represents an attestation - a verifiable claim about subjects,
-// predicates, and contexts with actor attribution and timestamps
-// TODO: This type will migrate to proto generation
+// predicates, and contexts with actor attribution and timestamps.
+//
+// This is Go's native representation with struct tags for JSON/DB mapping.
+// Proto definitions (plugin/grpc/protocol/atsstore.proto) are used for gRPC
+// and cross-language boundaries, with manual conversion at boundaries.
 type As struct {
 	ID         string                 `db:"id" json:"id" validate:"required"`                       // ASID: AS + UUID
 	Subjects   []string               `db:"subjects" json:"subjects" validate:"required,min=1"`     // Entities being attested about

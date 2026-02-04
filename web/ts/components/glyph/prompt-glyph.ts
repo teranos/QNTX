@@ -33,7 +33,7 @@ type PromptGlyphStatus = GlyphStatus;
 export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load saved template from storage
     const storage = getScriptStorage();
-    const defaultTemplate = '---\nmodel: "anthropic/claude-sonnet-4"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
+    const defaultTemplate = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
     const savedTemplate = await storage.load(glyph.id) ?? defaultTemplate;
 
     // Load saved status
@@ -63,7 +63,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Template textarea (declared early for play button reference)
     const textarea = document.createElement('textarea');
-    textarea.placeholder = '---\nmodel: "anthropic/claude-sonnet-4"\n---\nYour prompt here...';
+    textarea.placeholder = '---\nmodel: "anthropic/claude-haiku-4.5"\n---\nYour prompt here...';
     textarea.value = savedTemplate;
     textarea.style.flex = '1';
     textarea.style.padding = '8px';
