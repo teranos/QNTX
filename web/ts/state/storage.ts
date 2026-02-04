@@ -46,7 +46,7 @@ interface StorageEnvelope<T> {
 // ============================================================================
 
 /**
- * Get an item from localStorage with error handling, expiry, and validation
+ * Get an item from IndexedDB with error handling, expiry, and validation
  *
  * @param key - Storage key
  * @param options - Optional expiry, version, and validation settings
@@ -98,7 +98,7 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
 }
 
 /**
- * Set an item in localStorage with automatic timestamping
+ * Set an item in IndexedDB with automatic timestamping
  *
  * @param key - Storage key
  * @param value - Value to store
@@ -118,7 +118,7 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
 }
 
 /**
- * Remove an item from localStorage
+ * Remove an item from IndexedDB
  *
  * @param key - Storage key to remove
  */
