@@ -2,6 +2,7 @@ package budget
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -45,8 +46,12 @@ func (r *Limiter) Allow() error {
 
 	// Check if we're at the limit
 	if len(r.callTimes) >= r.maxCallsPerMinute {
-		return errors.Newf("rate limit exceeded: %d calls per minute (limit: %d)",
+		err := errors.Newf("rate limit exceeded: %d calls per minute (limit: %d)",
 			len(r.callTimes), r.maxCallsPerMinute)
+		err = errors.WithDetail(err, fmt.Sprintf("Current calls in window: %d", len(r.callTimes)))
+		err = errors.WithDetail(err, fmt.Sprintf("Max calls per minute: %d", r.maxCallsPerMinute))
+		err = errors.WithDetail(err, fmt.Sprintf("Remaining capacity: 0"))
+		return err
 	}
 
 	// Record this call

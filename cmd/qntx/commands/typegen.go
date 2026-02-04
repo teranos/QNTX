@@ -463,7 +463,7 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 		if lang == "markdown" {
 			outputDir = "docs/types"
 		} else if lang == "rust" {
-			outputDir = "crates/qntx/src/types"
+			outputDir = "crates/qntx-grpc/src/types"
 		} else if lang == "css" {
 			outputDir = "web/css/generated"
 		} else {
@@ -473,7 +473,7 @@ func getOutputConfig(lang string) (outputDir, fileExt string) {
 		// Output specified: use it for all languages
 		// For Rust, markdown, and CSS, preserve the actual output structure to ensure correct import generation
 		if lang == "rust" {
-			outputDir = filepath.Join(typegenOutput, "crates/qntx/src/types")
+			outputDir = filepath.Join(typegenOutput, "crates/qntx-grpc/src/types")
 		} else if lang == "markdown" {
 			outputDir = filepath.Join(typegenOutput, "docs/types")
 		} else if lang == "css" {

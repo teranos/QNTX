@@ -6,15 +6,15 @@
 
 /* Note: Tooltip styling is now in panel-base.css (.panel-tooltip) */
 
-/* Search */
-.plugin-panel-search {
+/* Search - scoped to plugin panel using skeleton's .panel-search */
+#plugin-panel .panel-search {
     padding: 12px 20px;
     background: var(--panel-bg);
     border-bottom: 1px solid #eee;
     flex-shrink: 0;
 }
 
-.plugin-search-input {
+#plugin-panel .panel-search-input {
     width: 100%;
     padding: var(--panel-padding-md);
     font-size: var(--font-size-sm);
@@ -25,12 +25,12 @@
     font-family: inherit;
 }
 
-.plugin-search-input:focus {
+#plugin-panel .panel-search-input:focus {
     border-color: #000;
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-.plugin-search-input::placeholder {
+#plugin-panel .panel-search-input::placeholder {
     color: var(--panel-text-tertiary);
 }
 
@@ -125,57 +125,32 @@
     align-items: center;
 }
 
-/* Plugin state indicator */
+/* Plugin state indicator - uses .panel-badge from panel-base.css */
+/* Base structure for plugin-specific badge styling */
 .plugin-state {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: var(--border-radius-lg);
     text-transform: capitalize;
 }
 
-.plugin-state-running {
-    background: var(--status-completed-bg);
-    color: var(--status-completed-text);
-}
-
-.plugin-state-paused {
-    background: var(--status-pending-bg);
-    color: #ef6c00;
-}
-
-.plugin-state-stopped {
-    background: var(--bg-almost-white);
-    color: #757575;
-}
+/* Use .panel-badge-completed for running state */
+/* Use .panel-badge-paused for paused state */
+/* Use .panel-badge-stopped for stopped state */
 
 .plugin-state-icon {
     font-size: var(--font-size-sm);
 }
 
-/* Plugin status indicator */
+/* Plugin status indicator - uses .panel-badge from panel-base.css */
 .plugin-status {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    padding: 4px 8px;
-    border-radius: var(--border-radius-lg);
 }
 
-.plugin-status-healthy {
-    background: var(--status-completed-bg);
-    color: var(--status-completed-text);
-}
-
-.plugin-status-unhealthy {
-    background: var(--status-failed-bg);
-    color: var(--status-failed-text);
-}
+/* Use .panel-badge-completed for healthy state */
+/* Use .panel-badge-failed for unhealthy state */
 
 .plugin-status-icon {
     font-size: var(--font-size-sm);
@@ -185,7 +160,7 @@
 .plugin-controls {
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--border-divider);
     display: flex;
     gap: var(--gap);
 }
@@ -250,40 +225,11 @@
     background: var(--bg-almost-white);
     border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
 }
 
-.plugin-detail-item {
-    display: flex;
-    gap: var(--gap);
-    padding: 2px 0;
-}
+/* Plugin detail items use .panel-info-row, .panel-info-label, .panel-info-value from panel-base.css */
 
-.plugin-detail-key {
-    color: var(--panel-text-secondary);
-}
-
-.plugin-detail-value {
-    color: var(--panel-text-primary);
-}
-
-/* Scrollbar styling */
-.plugin-panel-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.plugin-panel-content::-webkit-scrollbar-track {
-    background: var(--bg-hover);
-}
-
-.plugin-panel-content::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: var(--border-radius);
-}
-
-.plugin-panel-content::-webkit-scrollbar-thumb:hover {
-    background: #999;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Responsive */
 @media (max-width: 1200px) {

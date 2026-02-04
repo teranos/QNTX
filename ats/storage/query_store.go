@@ -43,7 +43,9 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query predicates")
+		err = errors.Wrap(err, "failed to query predicates")
+		err = errors.WithDetail(err, "Operation: GetAllPredicates")
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -53,7 +55,9 @@ func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) 
 	for rows.Next() {
 		var predicatesJSON string
 		if err := rows.Scan(&predicatesJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to scan predicates")
+			err = errors.Wrap(err, "failed to scan predicates")
+			err = errors.WithDetail(err, "Operation: GetAllPredicates")
+			return nil, err
 		}
 
 		// Simple JSON parsing - extract predicates from JSON array
@@ -79,7 +83,9 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query contexts")
+		err = errors.Wrap(err, "failed to query contexts")
+		err = errors.WithDetail(err, "Operation: GetAllContexts")
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -89,7 +95,9 @@ func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
 	for rows.Next() {
 		var contextsJSON string
 		if err := rows.Scan(&contextsJSON); err != nil {
-			return nil, errors.Wrap(err, "failed to scan contexts")
+			err = errors.Wrap(err, "failed to scan contexts")
+			err = errors.WithDetail(err, "Operation: GetAllContexts")
+			return nil, err
 		}
 
 		// Simple JSON parsing - extract contexts from JSON array
@@ -155,7 +163,14 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	// Execute query
 	rows, err := s.db.QueryContext(ctx, query, qb.args...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to execute query")
+		err = errors.Wrap(err, "failed to execute query")
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", filter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", filter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", filter.Contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", filter.Actors))
+		err = errors.WithDetail(err, fmt.Sprintf("Limit: %d", filter.Limit))
+		err = errors.WithDetail(err, "Operation: ExecuteAxQuery")
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -164,7 +179,11 @@ func (s *SQLQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilte
 	for rows.Next() {
 		as, err := ScanAttestation(rows)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to scan attestation")
+			err = errors.Wrap(err, "failed to scan attestation")
+			err = errors.WithDetail(err, fmt.Sprintf("Query subjects: %v", filter.Subjects))
+			err = errors.WithDetail(err, fmt.Sprintf("Results so far: %d", len(attestations)))
+			err = errors.WithDetail(err, "Operation: ExecuteAxQuery scanning")
+			return nil, err
 		}
 		attestations = append(attestations, as)
 	}

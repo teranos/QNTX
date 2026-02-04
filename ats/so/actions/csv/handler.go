@@ -19,17 +19,32 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 	executor := storage.NewExecutor(db)
 	result, err := executor.ExecuteAsk(ctx, payload.AxFilter)
 	if err != nil {
-		return errors.Wrap(err, "failed to execute query")
+		err = errors.Wrap(err, "failed to execute query")
+		err = errors.WithDetail(err, fmt.Sprintf("Output file: %s", payload.Filename))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", payload.AxFilter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter predicates: %v", payload.AxFilter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter contexts: %v", payload.AxFilter.Contexts))
+		err = errors.WithDetail(err, "Handler: CSV export")
+		return err
 	}
 
 	if len(result.Attestations) == 0 {
-		return errors.New("no attestations found matching query")
+		err := errors.New("no attestations found matching query")
+		err = errors.WithDetail(err, fmt.Sprintf("Output file: %s", payload.Filename))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter subjects: %v", payload.AxFilter.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter predicates: %v", payload.AxFilter.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Filter contexts: %v", payload.AxFilter.Contexts))
+		return err
 	}
 
 	// Create output file
 	file, err := os.Create(payload.Filename)
 	if err != nil {
-		return errors.Wrap(err, "failed to create CSV file")
+		err = errors.Wrap(err, "failed to create CSV file")
+		err = errors.WithDetail(err, fmt.Sprintf("Filename: %s", payload.Filename))
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation count: %d", len(result.Attestations)))
+		err = errors.WithDetail(err, fmt.Sprintf("Delimiter: %s", payload.Delimiter))
+		return err
 	}
 	defer file.Close()
 
@@ -37,7 +52,10 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 	if payload.Delimiter != "" && payload.Delimiter != "," {
 		// Only set delimiter if it's different from default
 		if len(payload.Delimiter) > 1 {
-			return errors.New("csv delimiter must be a single character")
+			err := errors.New("csv delimiter must be a single character")
+			err = errors.WithDetail(err, fmt.Sprintf("Delimiter: %s", payload.Delimiter))
+			err = errors.WithDetail(err, fmt.Sprintf("Filename: %s", payload.Filename))
+			return err
 		}
 		writer.Comma = rune(payload.Delimiter[0])
 	}
@@ -52,17 +70,24 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 
 	// Write headers
 	if err := writer.Write(headers); err != nil {
-		return errors.Wrap(err, "failed to write headers")
+		err = errors.Wrap(err, "failed to write headers")
+		err = errors.WithDetail(err, fmt.Sprintf("Filename: %s", payload.Filename))
+		err = errors.WithDetail(err, fmt.Sprintf("Headers: %v", headers))
+		return err
 	}
 
 	// Write attestations
-	for _, attest := range result.Attestations {
+	for idx, attest := range result.Attestations {
 		row := make([]string, len(headers))
 		for i, header := range headers {
 			row[i] = getFieldValue(&attest, header)
 		}
 		if err := writer.Write(row); err != nil {
-			return errors.Wrap(err, "failed to write row")
+			err = errors.Wrap(err, "failed to write row")
+			err = errors.WithDetail(err, fmt.Sprintf("Filename: %s", payload.Filename))
+			err = errors.WithDetail(err, fmt.Sprintf("Row number: %d of %d", idx+1, len(result.Attestations)))
+			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", attest.ID))
+			return err
 		}
 	}
 

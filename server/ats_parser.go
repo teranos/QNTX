@@ -3,28 +3,22 @@ package server
 // ATS code parsing for scheduled job creation.
 // Parses ATS block syntax and extracts handler name, payload, and source URL.
 //
-// Supported syntax:
-//   ix <git-url>                       - Auto-detect git repo URL and ingest
-//   ix <git-url> --since last_run      - Incremental ingestion since last run
-//   ix <git-url> --no-deps             - Skip dependency ingestion
-//   ix git <url>                       - Explicit git subcommand (same as above)
+// TODO(plugin-pulse-integration): Re-enable ix command parsing via pluggable ATS parsers.
+// Currently disabled to remove hardcoded domain-specific logic.
 
 import (
-	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/teranos/QNTX/errors"
-	ixgit "github.com/teranos/QNTX/qntx-code/ixgest/git"
 )
 
 // ParsedATSCode contains the pre-computed values for a scheduled job
 type ParsedATSCode struct {
-	// HandlerName is the async handler to invoke (e.g., "ixgest.git")
+	// HandlerName is the async handler to invoke (e.g., "python.script")
 	HandlerName string
 	// Payload is the pre-computed JSON payload for the handler
 	Payload []byte
-	// SourceURL is used for deduplication (e.g., the git repo URL)
+	// SourceURL is used for deduplication
 	SourceURL string
 }
 
@@ -32,11 +26,8 @@ type ParsedATSCode struct {
 // The jobID is used for generating unique identifiers if needed.
 // The force flag indicates a one-time execution (affects some behaviors).
 //
-// Supported syntax:
-//   - ix <url>                        - Auto-detect and ingest git repository
-//   - ix <url> --since last_run       - Incremental ingestion since last run
-//   - ix <url> --no-deps              - Skip dependency ingestion
-//   - ix git <url>                    - Explicit git subcommand (same as above)
+// TODO(plugin-pulse-integration): Currently returns error for all ix commands.
+// Will be re-enabled when pluggable ATS parsers are implemented.
 func ParseATSCodeWithForce(atsCode string, jobID string, force bool) (*ParsedATSCode, error) {
 	atsCode = strings.TrimSpace(atsCode)
 	if atsCode == "" {
@@ -58,27 +49,22 @@ func ParseATSCodeWithForce(atsCode string, jobID string, force bool) (*ParsedATS
 	}
 }
 
-// parseIxCommand handles "ix <subcommand|url> <args...>" syntax
-// Supports both explicit subcommands (ix git <url>) and auto-detection (ix <url>)
+// parseIxCommand handles "ix <subcommand> <args...>" syntax.
+// TODO(plugin-pulse-integration): Re-enable via pluggable ATS parsers.
 func parseIxCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 	if len(tokens) == 0 {
-		return nil, errors.New("ix command requires a target (e.g., ix https://github.com/user/repo)")
+		return nil, errors.New("ix command requires a subcommand")
 	}
 
-	// Check for explicit subcommand
-	switch tokens[0] {
-	case "git":
-		return parseIxGitCommand(tokens[1:], jobID)
-	default:
-		// Auto-detect: if the first token looks like a git URL, treat as ix git <url>
-		if ixgit.IsRepoURL(tokens[0]) {
-			return parseIxGitCommand(tokens, jobID)
-		}
-		return nil, errors.Newf("unknown ix target: %s (expected a git repository URL)", tokens[0])
-	}
+	// TODO(plugin-pulse-integration): Re-enable via pluggable ATS parsers.
+	// All ix subcommands temporarily disabled to remove hardcoded domain logic.
+	return nil, errors.New("ix command temporarily disabled - plugin-pulse integration in progress")
 }
 
 // parseIxGitCommand handles "ix git <url> [options]" syntax
+// TODO(plugin-pulse-integration): Re-enable via pluggable ATS parsers to remove hardcoded domain logic
+// DISABLED: Commented out to remove hardcoded dependency on qntx-code plugin.
+/*
 func parseIxGitCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 	if len(tokens) == 0 {
 		return nil, errors.New("ix git requires a repository URL or path")
@@ -143,6 +129,7 @@ func parseIxGitCommand(tokens []string, jobID string) (*ParsedATSCode, error) {
 		SourceURL:   repoURL,
 	}, nil
 }
+*/
 
 // tokenizeATSCode splits ATS code into tokens, respecting quotes
 func tokenizeATSCode(code string) []string {

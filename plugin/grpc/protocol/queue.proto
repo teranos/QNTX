@@ -88,8 +88,7 @@ message UpdateJobResponse {
 message ListJobsRequest {
   string auth_token = 1;
   string status = 2;            // Optional status filter (empty = all)
-  int32 limit = 3;              // Maximum results. NOTE: Currently 0 is treated as "use default 100"
-                                // which violates zero-value semantics. TODO: Use optional int32.
+  optional int32 limit = 3;     // Maximum results. If not set, returns all matching jobs.
 }
 
 message ListJobsResponse {

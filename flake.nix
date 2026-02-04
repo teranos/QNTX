@@ -11,6 +11,10 @@
       url = "github:cachix/pre-commit-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Binary cache configuration
@@ -20,10 +24,45 @@
     extra-experimental-features = [ "impure-derivations" ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, fenix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        # Rust toolchain with wasm32-unknown-unknown target for qntx-wasm
+        rustWasmToolchain = fenix.packages.${system}.combine [
+          fenix.packages.${system}.stable.cargo
+          fenix.packages.${system}.stable.rustc
+          fenix.packages.${system}.targets.wasm32-unknown-unknown.stable.rust-std
+        ];
+
+        # Build qntx-core as WASM module (used by Go via go:embed)
+        qntx-wasm = (pkgs.makeRustPlatform {
+          cargo = rustWasmToolchain;
+          rustc = rustWasmToolchain;
+        }).buildRustPackage {
+          pname = "qntx-wasm";
+          version = self.rev or "dev";
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          cargoBuildFlags = [ "-p" "qntx-wasm" "--target" "wasm32-unknown-unknown" ];
+          doCheck = false;
+
+          # buildRustPackage expects binaries in target/release/ but we cross-compile
+          installPhase = ''
+            mkdir -p $out/lib
+            cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm $out/lib/qntx_core.wasm
+          '';
+        };
+
+        # Common preBuild hook for Go derivations: copy WASM module for go:embed
+        goWasmPreBuild = ''
+          cp ${qntx-wasm}/lib/qntx_core.wasm ats/wasm/qntx_core.wasm
+        '';
 
         # Pre-commit hooks configuration
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
@@ -104,8 +143,10 @@
           src = ./.;
 
           # Hash of vendored Go dependencies (computed from go.sum)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#qntx`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
 
           ldflags = [
             "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
@@ -116,112 +157,68 @@
         };
 
         # Build typegen binary (standalone, no plugins/CGO)
+        # TODO: DEPRECATED - Will be replaced with protoc-based code generation
+        # Current typegen requires full compilation due to packages.Load with NeedTypes
+        # This creates unnecessary coupling to build configuration
         typegen = pkgs.buildGoModule {
           pname = "typegen";
           version = self.rev or "dev";
           src = ./.;
 
           # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
+          # To update: set to `pkgs.lib.fakeHash`, run `nix build .#typegen`, copy the hash from error
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
+
+          preBuild = goWasmPreBuild;
+
+          # HACK: Need qntxwasm tag because typegen compiles the whole codebase
+          # This will be removed when we migrate to protoc-based generation
+          tags = [ "qntxwasm" ];
 
           subPackages = [ "cmd/typegen" ];
         };
 
-        # Build qntx-code plugin binary
-        qntx-code = pkgs.buildGoModule {
-          pname = "qntx-code-plugin";
-          version = self.rev or "dev";
-          src = ./.;
-
-          # Same vendorHash as qntx (shared go.mod)
-          # To update: set to `lib.fakeHash`, run `nix build .#qntx-code`, copy the hash from error
-          vendorHash = "sha256-jdpkm1mu4K4DjTZ3/MpbYE2GfwEhNH22d71PFNyes/Q=";
-
-          ldflags = [
-            "-X 'github.com/teranos/QNTX/internal/version.BuildTime=nix-build'"
-            "-X 'github.com/teranos/QNTX/internal/version.CommitHash=${self.rev or "dirty"}'"
-          ];
-
-          subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
-        };
-
-        # Build qntx-python plugin binary (Rust + PyO3)
-        qntx-python = pkgs.rustPlatform.buildRustPackage {
-          pname = "qntx-python-plugin";
-          version = self.rev or "dev";
-          # Include full repo root because build.rs needs ../plugin/grpc/protocol/*.proto
-          # and qntx-python is part of the workspace
-          src = ./.;
-
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-          };
-
-          nativeBuildInputs = [
-            pkgs.pkg-config
-            pkgs.protobuf
-          ];
-
-          buildInputs = [
-            pkgs.python313
-          ];
-
-          # Point PyO3 to Nix Python
-          PYO3_PYTHON = "${pkgs.python313}/bin/python3";
-
-          # Build only the qntx-python-plugin package
-          cargoBuildFlags = [ "-p" "qntx-python-plugin" ];
-          cargoTestFlags = [ "-p" "qntx-python-plugin" ];
-
-          # Set rpath/install_name to find Python at runtime
-          postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-            patchelf --set-rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}:$(patchelf --print-rpath $out/bin/qntx-python-plugin)" \
-              $out/bin/qntx-python-plugin
-          '' + pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
-            install_name_tool -add_rpath "${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}" \
-              $out/bin/qntx-python-plugin
-          '';
-        };
-
-        # Helper function to build CI image for specific architecture
-        mkCiImage = arch: pkgs.dockerTools.buildLayeredImage {
+        mkQNTXImage = arch: pkgs.dockerTools.buildLayeredImage {
           name = "ghcr.io/teranos/qntx";
           tag = "latest";
           architecture = arch;
 
           contents = [
-            # Prebuilt QNTX binary
+
             qntx
+
             # Go toolchain
-            pkgs.go
-            pkgs.git
+            pkgs.go # TODO: Remove - build-time only
+            pkgs.git # TODO: Remove - build-time only
+
+            # Proto compiler for proto-based builds
+            pkgs.protobuf # TODO: Remove - build-time only
 
             # Complete Rust toolchain
-            pkgs.rustc
-            pkgs.cargo
-            pkgs.rustfmt
-            pkgs.clippy
+            pkgs.rustc # TODO: Remove - build-time only
+            pkgs.cargo # TODO: Remove - build-time only
+            pkgs.rustfmt # TODO: Remove - build-time only
+            pkgs.clippy # TODO: Remove - build-time only
 
             # Python for qntx-python plugin builds
-            pkgs.python313
+            pkgs.python313 # TODO: Remove unless plugins need Python runtime
 
             # System dependencies
-            pkgs.openssl
-            pkgs.patchelf
+            pkgs.openssl # Keep - runtime SSL/TLS
+            pkgs.patchelf # TODO: Remove - build-time only
 
             # Build tools and utilities
-            pkgs.pkg-config
-            pkgs.sqlite
-            pkgs.gcc
-            pkgs.gnumake
-            pkgs.coreutils
-            pkgs.diffutils
-            pkgs.findutils
-            pkgs.bash
-            pkgs.curl
-            pkgs.unzip
-            pkgs.protobuf
+            pkgs.pkg-config # TODO: Remove - build-time only
+            pkgs.sqlite # Keep - runtime database
+            pkgs.gcc # TODO: Remove - build-time only
+            pkgs.gnumake # TODO: Remove - build-time only
+            pkgs.coreutils # Keep - basic shell utilities
+            pkgs.diffutils # TODO: Remove - build-time only
+            pkgs.findutils # TODO: Remove - build-time only
+            pkgs.bash # Keep - shell
+            pkgs.curl # Keep - might be needed for runtime HTTP
+            pkgs.unzip # TODO: Remove - probably not needed at runtime
+            pkgs.protobuf # TODO: Remove - duplicate and build-time only
 
             # CA certificates for HTTPS
             pkgs.cacert
@@ -258,108 +255,8 @@
           else if system == "aarch64-linux" then "arm64"
           else "amd64";
 
-        # CI image with detected architecture
-        ciImage = mkCiImage dockerArch;
-
-        # Helper function to build qntx-code plugin image for specific architecture
-        mkCodeImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-code-plugin";
-          tag = "latest";
-          architecture = arch;
-
-          contents = [
-            # The qntx-code plugin binary
-            qntx-code
-
-            # Runtime dependencies
-            pkgs.gopls # Go language server (spawned as subprocess)
-            pkgs.git # Git operations for ixgest
-            pkgs.gh # GitHub CLI for PR operations
-
-            # Base utilities
-            pkgs.bash
-            pkgs.coreutils
-
-            # CA certificates for HTTPS
-            pkgs.cacert
-
-            # System files for container compatibility
-            pkgs.dockerTools.fakeNss
-          ];
-
-          extraCommands = ''
-            # Create tmp directory for runtime
-            mkdir -p tmp
-            chmod 1777 tmp
-          '';
-
-          config = {
-            Entrypoint = [ "${qntx-code}/bin/qntx-code-plugin" ];
-            Cmd = [ "--port" "9000" ];
-            Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx-code pkgs.gopls pkgs.git pkgs.gh pkgs.bash pkgs.coreutils ]}"
-              "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-            ];
-            ExposedPorts = {
-              "9000/tcp" = { };
-            };
-            WorkingDir = "/workspace";
-          };
-
-          # Docker images are Linux-only
-          meta.platforms = [ "x86_64-linux" "aarch64-linux" ];
-        };
-
-        # qntx-code image with detected architecture
-        codeImage = mkCodeImage dockerArch;
-
-        # Helper function to build qntx-python plugin image for specific architecture
-        mkPythonImage = arch: pkgs.dockerTools.buildLayeredImage {
-          name = "ghcr.io/teranos/qntx-python-plugin";
-          tag = "latest";
-          architecture = arch;
-
-          contents = [
-            # The qntx-python plugin binary
-            qntx-python
-
-            # Python runtime (required by PyO3-embedded code)
-            pkgs.python313
-
-            # Base utilities
-            pkgs.bash
-            pkgs.coreutils
-
-            # CA certificates for HTTPS
-            pkgs.cacert
-
-            # System files for container compatibility
-            pkgs.dockerTools.fakeNss
-          ];
-
-          extraCommands = ''
-            # Create tmp directory for runtime
-            mkdir -p tmp
-            chmod 1777 tmp
-          '';
-
-          config = {
-            Entrypoint = [ "${qntx-python}/bin/qntx-python-plugin" ];
-            Cmd = [ "--port" "9000" ];
-            Env = [
-              "PATH=${pkgs.lib.makeBinPath [ qntx-python pkgs.python313 pkgs.bash pkgs.coreutils ]}"
-              "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-              "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.python313 ]}"
-            ];
-            ExposedPorts = {
-              "9000/tcp" = { };
-            };
-            WorkingDir = "/workspace";
-          };
-        };
-
-        # qntx-python image with detected architecture
-        pythonImage = mkPythonImage dockerArch;
+        # Application image with detected architecture
+        QNTXImage = mkQNTXImage dockerArch;
 
       in
       {
@@ -370,9 +267,8 @@
           # Typegen binary (standalone, no plugins/CGO)
           typegen = typegen;
 
-          # Plugin binaries
-          qntx-code = qntx-code;
-          qntx-python = qntx-python;
+          # WASM module (qntx-core compiled to wasm32-unknown-unknown)
+          qntx-wasm = qntx-wasm;
 
           # Static documentation site with provenance and infrastructure docs
           # For CI builds with full provenance, pass additional args
@@ -386,7 +282,7 @@
               { name = "qntx"; description = "QNTX CLI - main command-line interface"; }
               { name = "typegen"; description = "Type generator for TypeScript, Python, Rust, and Markdown"; }
               { name = "qntx-code"; description = "Code analysis plugin with Git integration"; }
-              { name = "qntx-python"; description = "Python runtime plugin with PyO3"; }
+              { name = "qntx-wasm"; description = "qntx-core compiled to WASM for Go integration via wazero"; }
               { name = "docs-site"; description = "Static documentation website"; }
             ];
 
@@ -399,8 +295,8 @@
 
             nixContainers = [
               {
-                name = "CI Image";
-                description = "Full development environment for CI/CD pipelines";
+                name = "Image";
+                description = "QNTX Application Image";
                 image = "ghcr.io/teranos/qntx:latest";
                 architectures = [ "amd64" "arm64" ];
                 ports = [ ];
@@ -412,34 +308,16 @@
                 architectures = [ "amd64" "arm64" ];
                 ports = [ "9000/tcp" ];
               }
-              {
-                name = "qntx-python Plugin";
-                description = "Python runtime plugin container";
-                image = "ghcr.io/teranos/qntx-python-plugin:latest";
-                architectures = [ "amd64" "arm64" ];
-                ports = [ "9000/tcp" ];
-              }
             ];
           };
 
           # Default: CLI binary for easy installation
           default = qntx;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-          # Docker images are Linux-only
-          # CI Docker images (full dev environment)
-          ci-image = ciImage;
-          ci-image-amd64 = mkCiImage "amd64";
-          ci-image-arm64 = mkCiImage "arm64";
 
-          # qntx-code plugin Docker images (minimal runtime)
-          qntx-code-plugin-image = codeImage;
-          qntx-code-plugin-image-amd64 = mkCodeImage "amd64";
-          qntx-code-plugin-image-arm64 = mkCodeImage "arm64";
-
-          # qntx-python plugin Docker images (minimal runtime)
-          qntx-python-plugin-image = pythonImage;
-          qntx-python-plugin-image-amd64 = mkPythonImage "amd64";
-          qntx-python-plugin-image-arm64 = mkPythonImage "arm64";
+          qntx-image = QNTXImage;
+          qntx-image-amd64 = mkQNTXImage "amd64";
+          qntx-image-arm64 = mkQNTXImage "arm64";
         };
 
         # Development shell with same tools
@@ -473,8 +351,6 @@
           pre-commit = pre-commit-check;
           qntx-build = qntx; # Ensure QNTX builds
           typegen-build = typegen; # Ensure typegen builds
-          qntx-code-build = qntx-code; # Ensure qntx-code plugin builds
-          qntx-python-build = qntx-python; # Ensure qntx-python plugin builds
           docs-site-builds = self.packages.${system}.docs-site; # Ensure docs site builds
           docs-site-links = pkgs.runCommand "docs-site-link-check"
             {
@@ -493,118 +369,105 @@
             '';
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           # Docker image checks are Linux-only
-          ci-image = ciImage; # Ensure CI image builds
-          qntx-code-plugin-image = codeImage; # Ensure qntx-code plugin image builds
-          qntx-python-plugin-image = pythonImage; # Ensure qntx-python plugin image builds
+          qntx-image = QNTXImage; # Ensure QNTX image builds
         };
 
         # Formatter for 'nix fmt'
         formatter = pkgs.nixpkgs-fmt;
 
         # Apps for common tasks
-        apps = {
-          build-docs-site = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "build-docs-site" ''
-              set -e
-              echo "Building documentation site..."
-              ${pkgs.nix}/bin/nix build .#docs-site
+        apps =
+          let
+            protoApps = import ./proto.nix { inherit pkgs; };
+          in
+          {
+            build-docs-site = {
+              type = "app";
+              program = toString (pkgs.writeShellScript "build-docs-site" ''
+                set -e
+                echo "Building documentation site..."
+                ${pkgs.nix}/bin/nix build .#docs-site
 
-              echo "Copying to web/site/..."
-              mkdir -p web/site
-              chmod -R +w web/site 2>/dev/null || true
-              rm -rf web/site/*
-              cp -r result/* web/site/
-              chmod -R +w web/site
+                echo "Copying to web/site/..."
+                mkdir -p web/site
+                chmod -R +w web/site 2>/dev/null || true
+                rm -rf web/site/*
+                cp -r result/* web/site/
+                chmod -R +w web/site
 
-              echo "Documentation site built and copied to web/site/"
-              echo "Files:"
-              ls -lh web/site/
-            '');
+                echo "Documentation site built and copied to web/site/"
+                echo "Files:"
+                ls -lh web/site/
+              '');
+            };
+
+            generate-types = {
+              type = "app";
+              program = toString (pkgs.writeShellScript "generate-types" ''
+                set -e
+                echo "Generating types and documentation..."
+
+                # Check if typegen binary exists and is up-to-date
+                REBUILD_NEEDED=0
+                if [ ! -e ./result/bin/typegen ]; then
+                  echo "Typegen binary not found, building..."
+                  REBUILD_NEEDED=1
+                elif [ cmd/typegen/main.go -nt ./result/bin/typegen ] || [ typegen -nt ./result/bin/typegen ]; then
+                  echo "Typegen source changed, rebuilding..."
+                  REBUILD_NEEDED=1
+                fi
+
+                # Build typegen only if needed
+                if [ $REBUILD_NEEDED -eq 1 ]; then
+                  ${pkgs.nix}/bin/nix build .#typegen
+                else
+                  echo "Using existing typegen binary (skip rebuild)"
+                fi
+
+                # Run typegen for each language in parallel
+                # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
+                # CSS types output directly to web/css/generated/ (no --output flag)
+                echo "Running typegen for all languages in parallel..."
+                (
+                  ./result/bin/typegen --lang typescript --output types/generated/ &
+                  ./result/bin/typegen --lang python --output types/generated/ &
+                  ./result/bin/typegen --lang rust &
+                  ./result/bin/typegen --lang css &
+                  ./result/bin/typegen --lang markdown &
+                  wait
+                )
+
+                echo "✓ TypeScript types generated in types/generated/typescript/"
+                echo "✓ Python types generated in types/generated/python/"
+                echo "✓ Rust types generated in crates/qntx/src/types/"
+                echo "✓ CSS symbols generated in web/css/generated/"
+                echo "✓ Markdown docs generated in docs/types/"
+              '');
+            };
+
+            check-types = {
+              type = "app";
+              program = toString (pkgs.writeShellScript "check-types" ''
+                set -e
+                # Run typegen check inside dev environment where Go is available.
+                #
+                # NOTE: typegen uses golang.org/x/tools/go/packages which requires
+                # the 'go' command at runtime to load and parse Go packages. This is
+                # a known limitation of go/packages - it shells out to 'go list' for
+                # module resolution and type checking.
+                #
+                # Current approach: Run inside 'nix develop' where Go is in PATH.
+                # More proper solution: Wrap the typegen binary with makeWrapper to
+                # include Go in its runtime closure. This would make the binary truly
+                # self-contained but requires changes to the typegen package definition.
+                ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
+              '');
+            };
+
+            generate-proto = protoApps.generate-proto;
+            generate-proto-go = protoApps.generate-proto-go;
+            generate-proto-typescript = protoApps.generate-proto-typescript;
           };
-
-          generate-types = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "generate-types" ''
-              set -e
-              echo "Generating types and documentation..."
-
-              # Check if typegen binary exists and is up-to-date
-              REBUILD_NEEDED=0
-              if [ ! -e ./result/bin/typegen ]; then
-                echo "Typegen binary not found, building..."
-                REBUILD_NEEDED=1
-              elif [ code/typegen -nt ./result/bin/typegen ]; then
-                echo "Typegen source changed, rebuilding..."
-                REBUILD_NEEDED=1
-              fi
-
-              # Build typegen only if needed
-              if [ $REBUILD_NEEDED -eq 1 ]; then
-                ${pkgs.nix}/bin/nix build .#typegen
-              else
-                echo "Using existing typegen binary (skip rebuild)"
-              fi
-
-              # Run typegen for each language in parallel
-              # Note: Rust types now output directly to crates/qntx/src/types/ (no --output flag)
-              # CSS types output directly to web/css/generated/ (no --output flag)
-              echo "Running typegen for all languages in parallel..."
-              (
-                ./result/bin/typegen --lang typescript --output types/generated/ &
-                ./result/bin/typegen --lang python --output types/generated/ &
-                ./result/bin/typegen --lang rust &
-                ./result/bin/typegen --lang css &
-                ./result/bin/typegen --lang markdown &
-                wait
-              )
-
-              echo "✓ TypeScript types generated in types/generated/typescript/"
-              echo "✓ Python types generated in types/generated/python/"
-              echo "✓ Rust types generated in crates/qntx/src/types/"
-              echo "✓ CSS symbols generated in web/css/generated/"
-              echo "✓ Markdown docs generated in docs/types/"
-            '');
-          };
-
-          check-types = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "check-types" ''
-              set -e
-              # Run typegen check inside dev environment where Go is available.
-              #
-              # NOTE: typegen uses golang.org/x/tools/go/packages which requires
-              # the 'go' command at runtime to load and parse Go packages. This is
-              # a known limitation of go/packages - it shells out to 'go list' for
-              # module resolution and type checking.
-              #
-              # Current approach: Run inside 'nix develop' where Go is in PATH.
-              # More proper solution: Wrap the typegen binary with makeWrapper to
-              # include Go in its runtime closure. This would make the binary truly
-              # self-contained but requires changes to the typegen package definition.
-              ${pkgs.nix}/bin/nix develop .#default --command bash -c "go run ./cmd/typegen check"
-            '');
-          };
-
-          generate-proto = {
-            type = "app";
-            program = toString (pkgs.writeShellScript "generate-proto" ''
-              set -e
-              echo "Generating gRPC code from proto files..."
-
-              # Use protoc from nixpkgs with Go plugins
-              ${pkgs.protobuf}/bin/protoc \
-                --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
-                --plugin=${pkgs.protoc-gen-go-grpc}/bin/protoc-gen-go-grpc \
-                --go_out=. --go_opt=paths=source_relative \
-                --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-                plugin/grpc/protocol/domain.proto
-
-              echo "✓ Proto files generated in plugin/grpc/protocol/"
-            '');
-          };
-        };
       }
     );
 }
-

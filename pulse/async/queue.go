@@ -3,6 +3,7 @@ package async
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -36,7 +37,11 @@ func (q *Queue) Enqueue(job *Job) error {
 	defer q.mu.Unlock()
 
 	if err := q.store.CreateJob(job); err != nil {
-		return errors.Wrap(err, "failed to enqueue job")
+		err = errors.Wrap(err, "failed to enqueue job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+		return err
 	}
 
 	// Notify subscribers of new job
@@ -54,7 +59,9 @@ func (q *Queue) Dequeue() (*Job, error) {
 	queuedStatus := JobStatusQueued
 	jobs, err := q.store.ListJobs(&queuedStatus, 1)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get queued jobs")
+		err = errors.Wrap(err, "failed to get queued jobs")
+		err = errors.WithDetail(err, fmt.Sprintf("Status filter: %s", queuedStatus))
+		return nil, err
 	}
 
 	if len(jobs) == 0 {
@@ -65,7 +72,11 @@ func (q *Queue) Dequeue() (*Job, error) {
 	job.Start()
 
 	if err := q.store.UpdateJob(job); err != nil {
-		return nil, errors.Wrap(err, "failed to mark job as running")
+		err = errors.Wrap(err, "failed to mark job as running")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+		return nil, err
 	}
 
 	// Notify subscribers of job update
@@ -88,7 +99,11 @@ func (q *Queue) UpdateJob(job *Job) error {
 	defer q.mu.Unlock()
 
 	if err := q.store.UpdateJob(job); err != nil {
-		return errors.Wrap(err, "failed to update job")
+		err = errors.Wrap(err, "failed to update job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", job.Status))
+		return err
 	}
 
 	// Notify subscribers of job update
@@ -104,17 +119,28 @@ func (q *Queue) PauseJob(id string, reason string) error {
 
 	job, err := q.store.GetJob(id)
 	if err != nil {
-		return errors.Wrapf(err, "failed to pause job %s", id)
+		err = errors.Wrapf(err, "failed to pause job %s", id)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		err = errors.WithDetail(err, fmt.Sprintf("Pause reason: %s", reason))
+		return err
 	}
 
 	if job.Status != JobStatusRunning {
-		return errors.Newf("job %s is not running (status: %s)", id, job.Status)
+		err := errors.Newf("job %s is not running (status: %s)", id, job.Status)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		err = errors.WithDetail(err, fmt.Sprintf("Current status: %s", job.Status))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		return err
 	}
 
 	job.Pause(reason)
 
 	if err := q.store.UpdateJob(job); err != nil {
-		return errors.Wrap(err, "failed to pause job")
+		err = errors.Wrap(err, "failed to pause job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Pause reason: %s", reason))
+		return err
 	}
 
 	// Notify subscribers of job update
@@ -130,17 +156,26 @@ func (q *Queue) ResumeJob(id string) error {
 
 	job, err := q.store.GetJob(id)
 	if err != nil {
-		return errors.Wrapf(err, "failed to resume job %s", id)
+		err = errors.Wrapf(err, "failed to resume job %s", id)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		return err
 	}
 
 	if job.Status != JobStatusPaused {
-		return errors.Newf("job %s is not paused (status: %s)", id, job.Status)
+		err := errors.Newf("job %s is not paused (status: %s)", id, job.Status)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		err = errors.WithDetail(err, fmt.Sprintf("Current status: %s", job.Status))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		return err
 	}
 
 	job.Resume()
 
 	if err := q.store.UpdateJob(job); err != nil {
-		return errors.Wrap(err, "failed to resume job")
+		err = errors.Wrap(err, "failed to resume job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		return err
 	}
 
 	// Notify subscribers of job update
@@ -156,13 +191,19 @@ func (q *Queue) CompleteJob(id string) error {
 
 	job, err := q.store.GetJob(id)
 	if err != nil {
-		return errors.Wrapf(err, "failed to complete job %s", id)
+		err = errors.Wrapf(err, "failed to complete job %s", id)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		return err
 	}
 
 	job.Complete()
 
 	if err := q.store.UpdateJob(job); err != nil {
-		return errors.Wrap(err, "failed to complete job")
+		err = errors.Wrap(err, "failed to complete job")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+		return err
 	}
 
 	// Notify subscribers of job update
@@ -182,13 +223,28 @@ func (q *Queue) FailJob(id string, jobErr error) error {
 
 	job, err := q.store.GetJob(id)
 	if err != nil {
-		return errors.Wrapf(err, "failed to mark job %s as failed", id)
+		err = errors.Wrapf(err, "failed to mark job %s as failed", id)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", id))
+		return err
 	}
 
 	job.Fail(jobErr)
 
 	if err := q.store.UpdateJob(job); err != nil {
-		return errors.Wrap(err, "failed to mark job as failed")
+		err = errors.Wrap(err, "failed to mark job as failed")
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", job.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", job.HandlerName))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", job.Source))
+
+		// Preserve structured details from original job error
+		if details := errors.GetAllDetails(jobErr); len(details) > 0 {
+			for _, detail := range details {
+				err = errors.WithDetail(err, detail)
+			}
+		}
+		// Also include the error message itself
+		err = errors.WithDetail(err, fmt.Sprintf("Job error: %s", jobErr.Error()))
+		return err
 	}
 
 	// Notify subscribers of job update
@@ -210,7 +266,9 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 	// Get all child tasks for this parent job
 	children, err := q.store.ListTasksByParent(jobID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to list child tasks for job %s", jobID)
+		err = errors.Wrapf(err, "failed to list child tasks for job %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Parent job ID: %s", jobID))
+		return err
 	}
 
 	// Cancel each child task based on its current status
@@ -220,7 +278,11 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 			// Cancel queued tasks immediately (they haven't started yet)
 			child.Cancel("parent job deleted")
 			if err := q.store.UpdateJob(child); err != nil {
-				return errors.Wrapf(err, "failed to cancel child task %s", child.ID)
+				err = errors.Wrapf(err, "failed to cancel child task %s", child.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Child job ID: %s", child.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("Parent job ID: %s", jobID))
+				err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", child.HandlerName))
+				return err
 			}
 			q.notifySubscribers(child)
 
@@ -228,7 +290,11 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 			// Cancel running tasks (workers will detect parent deletion)
 			child.Cancel("parent job deleted")
 			if err := q.store.UpdateJob(child); err != nil {
-				return errors.Wrapf(err, "failed to cancel child task %s", child.ID)
+				err = errors.Wrapf(err, "failed to cancel child task %s", child.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Child job ID: %s", child.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("Parent job ID: %s", jobID))
+				err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", child.HandlerName))
+				return err
 			}
 			q.notifySubscribers(child)
 
@@ -236,7 +302,11 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 			// Cancel paused tasks
 			child.Cancel("parent job deleted")
 			if err := q.store.UpdateJob(child); err != nil {
-				return errors.Wrapf(err, "failed to cancel child task %s", child.ID)
+				err = errors.Wrapf(err, "failed to cancel child task %s", child.ID)
+				err = errors.WithDetail(err, fmt.Sprintf("Child job ID: %s", child.ID))
+				err = errors.WithDetail(err, fmt.Sprintf("Parent job ID: %s", jobID))
+				err = errors.WithDetail(err, fmt.Sprintf("Handler: %s", child.HandlerName))
+				return err
 			}
 			q.notifySubscribers(child)
 
@@ -246,7 +316,10 @@ func (q *Queue) DeleteJobWithChildren(jobID string) error {
 
 	// Now delete the parent job from database
 	if err := q.store.DeleteJob(jobID); err != nil {
-		return errors.Wrapf(err, "failed to delete parent job %s", jobID)
+		err = errors.Wrapf(err, "failed to delete parent job %s", jobID)
+		err = errors.WithDetail(err, fmt.Sprintf("Job ID: %s", jobID))
+		err = errors.WithDetail(err, fmt.Sprintf("Child tasks cancelled: %d", len(children)))
+		return err
 	}
 
 	return nil
@@ -347,7 +420,9 @@ func (q *Queue) GetStats() (*QueueStats, error) {
 	for _, status := range []JobStatus{JobStatusQueued, JobStatusRunning, JobStatusPaused, JobStatusCompleted, JobStatusFailed} {
 		jobs, err := q.store.ListJobs(&status, MaxJobsLimit) // High limit to count all
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to count %s jobs", status)
+			err = errors.Wrapf(err, "failed to count %s jobs", status)
+			err = errors.WithDetail(err, fmt.Sprintf("Status: %s", status))
+			return nil, err
 		}
 
 		count := len(jobs)
@@ -380,12 +455,16 @@ func (q *Queue) GetJobCounts() (queued int, running int, err error) {
 
 	queuedJobs, err := q.store.ListJobs(&queuedStatus, MaxJobsLimit)
 	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to count queued jobs")
+		err = errors.Wrap(err, "failed to count queued jobs")
+		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", queuedStatus))
+		return 0, 0, err
 	}
 
 	runningJobs, err := q.store.ListJobs(&runningStatus, MaxJobsLimit)
 	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to count running jobs")
+		err = errors.Wrap(err, "failed to count running jobs")
+		err = errors.WithDetail(err, fmt.Sprintf("Status: %s", runningStatus))
+		return 0, 0, err
 	}
 
 	return len(queuedJobs), len(runningJobs), nil
