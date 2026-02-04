@@ -198,28 +198,19 @@
             # Complete Rust toolchain
             pkgs.rustc # TODO: Remove - build-time only
             pkgs.cargo # TODO: Remove - build-time only
-            pkgs.rustfmt # TODO: Remove - build-time only
-            pkgs.clippy # TODO: Remove - build-time only
 
             # Python for qntx-python plugin builds
             pkgs.python313 # TODO: Remove unless plugins need Python runtime
 
             # System dependencies
             pkgs.openssl # Keep - runtime SSL/TLS
-            pkgs.patchelf # TODO: Remove - build-time only
-
-            # Build tools and utilities
-            pkgs.pkg-config # TODO: Remove - build-time only
             pkgs.sqlite # Keep - runtime database
-            pkgs.gcc # TODO: Remove - build-time only
+            pkgs.gcc # TODO: Remove - build-time only (but might be needed for CGO plugins)
             pkgs.gnumake # TODO: Remove - build-time only
             pkgs.coreutils # Keep - basic shell utilities
-            pkgs.diffutils # TODO: Remove - build-time only
-            pkgs.findutils # TODO: Remove - build-time only
+            pkgs.findutils # TODO: Remove - build-time only (but might be used in scripts)
             pkgs.bash # Keep - shell
             pkgs.curl # Keep - might be needed for runtime HTTP
-            pkgs.unzip # TODO: Remove - probably not needed at runtime
-            pkgs.protobuf # TODO: Remove - duplicate and build-time only
 
             # CA certificates for HTTPS
             pkgs.cacert
