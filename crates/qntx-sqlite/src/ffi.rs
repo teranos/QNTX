@@ -16,8 +16,8 @@ use std::ptr;
 use qntx_core::storage::AttestationStore;
 use qntx_core::Attestation;
 use qntx_ffi_common::{
-    cstr_to_str, cstring_new_or_empty, cstring_new_or_fallback, free_boxed, free_boxed_slice,
-    free_cstring, vec_into_raw,
+    cstr_to_str, cstring_new_or_empty, free_boxed, free_boxed_slice, free_cstring, vec_into_raw,
+    FfiResult,
 };
 
 use crate::SqliteStore;
@@ -65,11 +65,15 @@ impl StorageResultC {
             error_msg: ptr::null_mut(),
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for StorageResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, "error message contains null"),
+            error_msg,
         }
     }
 }
@@ -90,11 +94,15 @@ impl AttestationResultC {
             attestation_json: ptr::null_mut(),
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for AttestationResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, "error message contains null"),
+            error_msg,
             attestation_json: ptr::null_mut(),
         }
     }
@@ -116,11 +124,15 @@ impl StringArrayResultC {
             strings_len: len,
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for StringArrayResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, "error message contains null"),
+            error_msg,
             strings: ptr::null_mut(),
             strings_len: 0,
         }
@@ -135,11 +147,15 @@ impl CountResultC {
             count,
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for CountResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, "error message contains null"),
+            error_msg,
             count: 0,
         }
     }
