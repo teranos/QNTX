@@ -186,7 +186,19 @@ class UIState {
     private subscriberFailures: WeakMap<Function, number> = new WeakMap();
 
     constructor() {
-        this.state = this.loadFromStorage() || createDefaultState();
+        this.state = createDefaultState();
+    }
+
+    /**
+     * Load persisted state from storage (call after initStorage())
+     * Merges persisted values with current state
+     */
+    loadPersistedState(): void {
+        const loaded = this.loadFromStorage();
+        if (loaded) {
+            this.state = loaded;
+            log.debug(SEG.UI, '[UIState] Loaded persisted state from IndexedDB');
+        }
     }
 
     // ========================================================================
