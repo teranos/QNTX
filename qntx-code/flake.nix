@@ -17,16 +17,13 @@
         qntx-code = pkgs.buildGoModule {
           pname = "qntx-code-plugin";
           version = self.rev or "dev";
-          src = ../..; # Root of QNTX repo
+          src = ./..; # Root of QNTX repo
 
           # Same vendorHash as main QNTX
-          vendorHash = "sha256-tEJdJ/d8bcGVBzOqNupNJz4ueO4fAK/FD2CiqNvPR4s=";
+          vendorHash = "sha256-R2jgbtfobHgd9lkEKL9xEU+2rHOOnhcgVnGcG85KZiI=";
 
           buildInputs = with pkgs; [
             openssl
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.IOKit
-            darwin.apple_sdk.frameworks.Security
           ];
 
           subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
