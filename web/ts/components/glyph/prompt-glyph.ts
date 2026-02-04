@@ -19,39 +19,12 @@ import { GRID_SIZE } from './grid-constants';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { makeDraggable, makeResizable } from './glyph-interaction';
+import { saveGlyphStatus, loadGlyphStatus, type GlyphStatus } from './glyph-storage';
 
 /**
  * Prompt glyph execution status
  */
-interface PromptGlyphStatus {
-    state: 'idle' | 'running' | 'success' | 'error';
-    message?: string;
-    timestamp?: number;
-}
-
-/**
- * Save prompt glyph status to localStorage
- */
-function savePromptStatus(glyphId: string, status: PromptGlyphStatus): void {
-    const key = `prompt-status-${glyphId}`;
-    localStorage.setItem(key, JSON.stringify(status));
-}
-
-/**
- * Load prompt glyph status from localStorage
- */
-function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
-    const key = `prompt-status-${glyphId}`;
-    const stored = localStorage.getItem(key);
-    if (!stored) return null;
-
-    try {
-        return JSON.parse(stored);
-    } catch (e) {
-        log.error(SEG.UI, `[Prompt] Failed to parse stored status for ${glyphId}:`, e);
-        return null;
-    }
-}
+type PromptGlyphStatus = GlyphStatus;
 
 
 /**
@@ -64,7 +37,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const savedTemplate = await storage.load(glyph.id) ?? defaultTemplate;
 
     // Load saved status
-    const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
+    const savedStatus = loadGlyphStatus<PromptGlyphStatus>('prompt', glyph.id) ?? { state: 'idle' };
 
     const element = document.createElement('div');
     element.className = 'canvas-prompt-glyph';
@@ -175,7 +148,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             statusSection.style.display = 'none';
         }
 
-        savePromptStatus(glyph.id, status);
+        saveGlyphStatus('prompt', glyph.id, status);
         log.debug(SEG.UI, `[Prompt Glyph] Updated status for ${glyph.id}:`, status);
     }
 
