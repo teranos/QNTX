@@ -12,8 +12,8 @@
 //!
 //! This is part of the gradual migration from typegen to proto.
 
-use qntx_core::attestation::Attestation as CoreAttestation;
 use crate::Attestation as ProtoAttestation;
+use qntx_core::attestation::Attestation as CoreAttestation;
 
 /// Convert a proto Attestation to core Attestation
 ///
@@ -117,8 +117,7 @@ mod tests {
         let json = serde_json::to_string(&proto).expect("serialization should succeed");
 
         // Parse as JSON value to inspect structure
-        let parsed: serde_json::Value =
-            serde_json::from_str(&json).expect("should be valid JSON");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("should be valid JSON");
 
         // CRITICAL: Timestamps must be numbers (i64), NOT ISO strings
         assert!(
@@ -137,8 +136,8 @@ mod tests {
             "attributes must be a JSON string (proto schema requirement)"
         );
         let attributes_json = parsed["attributes"].as_str().unwrap();
-        let attributes_parsed: serde_json::Value = serde_json::from_str(attributes_json)
-            .expect("attributes should contain valid JSON");
+        let attributes_parsed: serde_json::Value =
+            serde_json::from_str(attributes_json).expect("attributes should contain valid JSON");
         assert_eq!(attributes_parsed["status"], "active");
         assert_eq!(attributes_parsed["count"], 42);
 
