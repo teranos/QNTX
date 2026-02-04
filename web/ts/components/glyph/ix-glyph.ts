@@ -39,7 +39,7 @@ import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedD
 import { saveGlyphStatus, loadGlyphStatus, type ExecutableGlyphStatus } from './glyph-storage';
 
 /**
- * IX glyph execution status (persisted in localStorage)
+ * IX glyph execution status (persisted in IndexedDB)
  */
 type IxGlyphStatus = ExecutableGlyphStatus;
 
@@ -167,7 +167,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             statusSection.style.display = 'none';
         }
 
-        // Save to localStorage
+        // Save to IndexedDB
         saveGlyphStatus('ix', glyph.id, status);
 
         log.debug(SEG.UI, `[IX Glyph] Updated status for ${glyph.id}:`, status);

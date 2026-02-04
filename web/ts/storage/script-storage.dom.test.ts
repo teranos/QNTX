@@ -1,49 +1,55 @@
 /**
- * Tests for script storage layer
+ * Tests for script storage layer (IndexedDB)
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { LocalStorageScriptStorage } from './script-storage';
+import { IndexedDBScriptStorage } from './script-storage';
+import { initStorage, isStorageInitialized } from '../indexeddb-storage';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Setup fake-indexeddb if enabled
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost' // Required for localStorage
-    });
-    const { window } = dom;
-    const { document } = window;
+    const fakeIndexedDB = await import('fake-indexeddb');
+    const FDBKeyRange = (await import('fake-indexeddb/lib/FDBKeyRange')).default;
 
-    // Replace global document/window with jsdom's
-    globalThis.document = document as any;
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage as any;
+    // Create a minimal window object with IndexedDB
+    const mockWindow = {
+        indexedDB: fakeIndexedDB.default,
+    };
+
+    globalThis.window = mockWindow as any;
+    globalThis.indexedDB = fakeIndexedDB.default as any;
+    globalThis.IDBKeyRange = FDBKeyRange as any;
 }
 
-describe('LocalStorageScriptStorage', () => {
+describe('IndexedDBScriptStorage', () => {
     if (!USE_JSDOM) {
         test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
         return;
     }
 
-    let storage: LocalStorageScriptStorage;
+    let storage: IndexedDBScriptStorage;
 
-    beforeEach(() => {
-        localStorage.clear();
-        storage = new LocalStorageScriptStorage();
+    beforeEach(async () => {
+        // Initialize storage once before tests
+        if (!isStorageInitialized()) {
+            await initStorage();
+        }
+        storage = new IndexedDBScriptStorage();
+
+        // Clear all scripts before each test
+        await storage.clear();
     });
 
     describe('save', () => {
-        test('persists script to localStorage with correct key', async () => {
+        test('persists script to IndexedDB', async () => {
             await storage.save('script-123', 'print("hello")');
 
-            const key = 'qntx-script:script-123';
-            const stored = localStorage.getItem(key);
-            expect(stored).not.toBeNull();
-            expect(stored).toBe('print("hello")');
+            const loaded = await storage.load('script-123');
+            expect(loaded).not.toBeNull();
+            expect(loaded).toBe('print("hello")');
         });
 
         test('overwrites existing script', async () => {
@@ -89,15 +95,6 @@ describe('LocalStorageScriptStorage', () => {
             const metadata = await storage.list();
             expect(metadata).toEqual([]);
         });
-
-        test('ignores non-script localStorage keys', async () => {
-            localStorage.setItem('other-key', 'value');
-            await storage.save('script-1', 'code');
-
-            const metadata = await storage.list();
-            expect(metadata.length).toBe(1);
-            expect(metadata[0].id).toBe('script-1');
-        });
     });
 
     describe('clear', () => {
@@ -109,15 +106,6 @@ describe('LocalStorageScriptStorage', () => {
 
             const metadata = await storage.list();
             expect(metadata).toEqual([]);
-        });
-
-        test('preserves non-script localStorage keys', async () => {
-            localStorage.setItem('other-key', 'preserve-me');
-            await storage.save('script-1', 'code');
-
-            await storage.clear();
-
-            expect(localStorage.getItem('other-key')).toBe('preserve-me');
         });
     });
 
