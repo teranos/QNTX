@@ -6,12 +6,14 @@ use ort::value::Value;
 use std::path::Path;
 use std::time::Instant;
 
+use crate::tokenizer::EmbeddingTokenizer;
 use crate::types::{BatchEmbeddingResult, EmbeddingResult, ModelInfo};
 
 /// ONNX-based embedding engine for sentence transformers
 pub struct EmbeddingEngine {
     session: Session,
     model_info: ModelInfo,
+    tokenizer: EmbeddingTokenizer,
 }
 
 impl EmbeddingEngine {
@@ -24,7 +26,7 @@ impl EmbeddingEngine {
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(4)?
-            .commit_from_file(model_path)?;
+            .commit_from_file(&model_path)?;
 
         // Get model metadata
         let inputs = session.inputs();
@@ -54,16 +56,26 @@ impl EmbeddingEngine {
 
         // Default dimensions for all-MiniLM-L6-v2
         let dimensions = 384;
+        let max_sequence_length = 512;
 
         let model_info = ModelInfo {
             name: model_name,
             dimensions,
-            max_sequence_length: 512,
+            max_sequence_length,
         };
+
+        // Load tokenizer from same directory as model
+        let model_dir = model_path.as_ref().parent()
+            .ok_or_else(|| anyhow::anyhow!("Invalid model path"))?;
+        let tokenizer_path = model_dir.join("tokenizer.json");
+
+        eprintln!("Loading tokenizer from: {:?}", tokenizer_path);
+        let tokenizer = EmbeddingTokenizer::from_file(tokenizer_path, max_sequence_length)?;
 
         Ok(Self {
             session,
             model_info,
+            tokenizer,
         })
     }
 
@@ -76,8 +88,8 @@ impl EmbeddingEngine {
     pub fn embed(&mut self, text: &str) -> Result<EmbeddingResult> {
         let start = Instant::now();
 
-        // Dummy tokenization (real implementation needs proper tokenizer)
-        let (input_ids, attention_mask) = self.tokenize(text)?;
+        // Use real tokenization
+        let (input_ids, attention_mask) = self.tokenizer.encode(text)?;
 
         // Get input names from the model
         let input_names: Vec<String> = self.session.inputs()
@@ -127,10 +139,13 @@ impl EmbeddingEngine {
 
         let inference_ms = start.elapsed().as_secs_f64() * 1000.0;
 
+        // Count actual tokens from attention mask (non-padding tokens)
+        let tokens = attention_mask.iter().filter(|&&x| x == 1).count();
+
         Ok(EmbeddingResult {
             text: text.to_string(),
             embedding: embeddings,
-            tokens: text.split_whitespace().count(),
+            tokens,
             inference_ms,
         })
     }
@@ -158,39 +173,6 @@ impl EmbeddingEngine {
         })
     }
 
-    /// Dummy tokenization - in production, use a proper tokenizer
-    fn tokenize(&self, text: &str) -> Result<(Array2<i64>, Array2<i64>)> {
-        // Simple whitespace tokenization for demonstration
-        // Real implementation would use HuggingFace tokenizers
-        let tokens: Vec<i64> = text
-            .split_whitespace()
-            .take(self.model_info.max_sequence_length)
-            .enumerate()
-            .map(|(i, _)| (i as i64) + 1) // Start from 1, 0 is usually padding
-            .collect();
-
-        let mut input_ids = Array2::<i64>::zeros((1, self.model_info.max_sequence_length));
-        let mut attention_mask = Array2::<i64>::zeros((1, self.model_info.max_sequence_length));
-
-        // Add CLS token at beginning (101 for BERT-like models)
-        input_ids[[0, 0]] = 101;
-        attention_mask[[0, 0]] = 1;
-
-        // Fill in the tokens
-        for (i, &token) in tokens.iter().enumerate() {
-            if i + 1 < self.model_info.max_sequence_length - 1 {
-                input_ids[[0, i + 1]] = token;
-                attention_mask[[0, i + 1]] = 1;
-            }
-        }
-
-        // Add SEP token at the end of actual tokens (102 for BERT-like models)
-        let end_pos = (tokens.len() + 1).min(self.model_info.max_sequence_length - 1);
-        input_ids[[0, end_pos]] = 102;
-        attention_mask[[0, end_pos]] = 1;
-
-        Ok((input_ids, attention_mask))
-    }
 
     /// Extract embeddings from model output with mean pooling
     fn extract_embeddings(outputs: &SessionOutputs, expected_dimensions: usize) -> Result<Vec<f32>> {

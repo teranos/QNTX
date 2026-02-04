@@ -1,5 +1,6 @@
 pub mod engine;
 pub mod engine_simple;
+pub mod tokenizer;
 pub mod types;
 
 #[cfg(feature = "ffi")]

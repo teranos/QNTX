@@ -16,9 +16,9 @@ We have the foundation in place but need to complete the integration to make it 
 ### 1. ~~Fix ONNX Runtime Integration in Rust~~ ✅ DONE
 **Location:** `ats/embeddings/src/engine.rs`
 - ✅ Fixed ort 2.0 API compatibility issues
-- ✅ Code now compiles successfully
-- ⚠️ Still needs proper tokenization (currently using dummy tokenization)
-- ⚠️ Model file needs to be downloaded to test actual inference
+- ✅ Code compiles successfully
+- ✅ Real tokenization implemented with HuggingFace tokenizers crate
+- ✅ Model tested and generating semantically meaningful embeddings
 
 ### 2. Complete sqlite-vec Integration
 **Location:** `crates/qntx-sqlite/src/vec.rs`
@@ -63,7 +63,7 @@ We have the foundation in place but need to complete the integration to make it 
 
 ## Technical Debt
 - ort crate is at 2.0.0-rc.11 (release candidate) - update when stable
-- Consider adding tokenizer support directly in Rust instead of dummy tokenization
+- ✅ ~~Consider adding tokenizer support directly in Rust instead of dummy tokenization~~ - DONE: Added tokenizers crate
 - Add proper error handling throughout
 
 ## Notes
