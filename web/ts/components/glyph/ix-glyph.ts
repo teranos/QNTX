@@ -36,41 +36,12 @@ import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
+import { saveGlyphStatus, loadGlyphStatus, type ExecutableGlyphStatus } from './glyph-storage';
 
 /**
- * IX glyph execution status (persisted in localStorage)
+ * IX glyph execution status (persisted in IndexedDB)
  */
-interface IxGlyphStatus {
-    state: 'idle' | 'running' | 'success' | 'error';
-    scheduledJobId?: string;
-    executionId?: string;
-    message?: string;
-    timestamp?: number;
-}
-
-/**
- * Save IX glyph status to localStorage
- */
-function saveIxStatus(glyphId: string, status: IxGlyphStatus): void {
-    const key = `ix-status-${glyphId}`;
-    localStorage.setItem(key, JSON.stringify(status));
-}
-
-/**
- * Load IX glyph status from localStorage
- */
-function loadIxStatus(glyphId: string): IxGlyphStatus | null {
-    const key = `ix-status-${glyphId}`;
-    const stored = localStorage.getItem(key);
-    if (!stored) return null;
-
-    try {
-        return JSON.parse(stored);
-    } catch (e) {
-        log.error(SEG.UI, `[IX] Failed to parse stored status for ${glyphId}:`, e);
-        return null;
-    }
-}
+type IxGlyphStatus = ExecutableGlyphStatus;
 
 /**
  * Create an IX glyph with input form on canvas
@@ -81,7 +52,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const savedInput = await storage.load(glyph.id) ?? '';
 
     // Load saved execution status
-    const savedStatus = loadIxStatus(glyph.id) ?? { state: 'idle' };
+    const savedStatus = loadGlyphStatus<IxGlyphStatus>('ix', glyph.id) ?? { state: 'idle' };
 
     const element = document.createElement('div');
     element.className = 'canvas-ix-glyph';
@@ -196,8 +167,8 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             statusSection.style.display = 'none';
         }
 
-        // Save to localStorage
-        saveIxStatus(glyph.id, status);
+        // Save to IndexedDB
+        saveGlyphStatus('ix', glyph.id, status);
 
         log.debug(SEG.UI, `[IX Glyph] Updated status for ${glyph.id}:`, status);
     }

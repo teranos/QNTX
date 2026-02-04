@@ -2,7 +2,7 @@
  * Script Storage - Abstraction for storing Python/code scripts
  *
  * Supports multiple storage backends:
- * - LocalStorage (browser-based, current implementation)
+ * - IndexedDB (browser-based, current implementation)
  * - Backend API (disk-based, future)
  * - Attestations (ATS-based, future)
  *
@@ -11,6 +11,7 @@
  */
 
 import { log, SEG } from '../logger';
+import { getItem, setItem, removeItem } from '../state/storage';
 
 /**
  * Metadata for a stored script
@@ -49,12 +50,13 @@ export interface ScriptStorage {
 }
 
 /**
- * LocalStorage implementation of ScriptStorage
+ * IndexedDB implementation of ScriptStorage
  *
- * Stores scripts in browser localStorage with metadata.
+ * Stores scripts in browser IndexedDB with metadata.
+ * Uses state/storage.ts (IndexedDB with in-memory cache) for synchronous access.
  * Storage key pattern: qntx-script:<id>
  */
-export class LocalStorageScriptStorage implements ScriptStorage {
+export class IndexedDBScriptStorage implements ScriptStorage {
     private readonly keyPrefix = 'qntx-script:';
     private readonly metadataKey = 'qntx-script-metadata';
 
@@ -76,12 +78,12 @@ export class LocalStorageScriptStorage implements ScriptStorage {
             };
 
             // Save code
-            localStorage.setItem(key, code);
+            setItem(key, code);
 
             // Update metadata index
             const updatedMetadata = allMetadata.filter(m => m.id !== id);
             updatedMetadata.push(scriptMetadata);
-            localStorage.setItem(this.metadataKey, JSON.stringify(updatedMetadata));
+            setItem(this.metadataKey, updatedMetadata);
 
             log.debug(SEG.UI, `[ScriptStorage] Saved script ${id} (${code.length} chars)`);
         } catch (error) {
@@ -93,7 +95,7 @@ export class LocalStorageScriptStorage implements ScriptStorage {
     async load(id: string): Promise<string | null> {
         try {
             const key = this.getKey(id);
-            const code = localStorage.getItem(key);
+            const code = getItem<string>(key);
 
             if (code) {
                 log.debug(SEG.UI, `[ScriptStorage] Loaded script ${id} (${code.length} chars)`);
@@ -111,12 +113,12 @@ export class LocalStorageScriptStorage implements ScriptStorage {
     async delete(id: string): Promise<void> {
         try {
             const key = this.getKey(id);
-            localStorage.removeItem(key);
+            removeItem(key);
 
             // Remove from metadata index
             const allMetadata = await this.loadAllMetadata();
             const updatedMetadata = allMetadata.filter(m => m.id !== id);
-            localStorage.setItem(this.metadataKey, JSON.stringify(updatedMetadata));
+            setItem(this.metadataKey, updatedMetadata);
 
             log.debug(SEG.UI, `[ScriptStorage] Deleted script ${id}`);
         } catch (error) {
@@ -141,11 +143,11 @@ export class LocalStorageScriptStorage implements ScriptStorage {
             // Remove all script data
             for (const metadata of allMetadata) {
                 const key = this.getKey(metadata.id);
-                localStorage.removeItem(key);
+                removeItem(key);
             }
 
             // Clear metadata index
-            localStorage.removeItem(this.metadataKey);
+            removeItem(this.metadataKey);
 
             log.debug(SEG.UI, `[ScriptStorage] Cleared all scripts (${allMetadata.length} removed)`);
         } catch (error) {
@@ -159,13 +161,13 @@ export class LocalStorageScriptStorage implements ScriptStorage {
     }
 
     private async loadAllMetadata(): Promise<ScriptMetadata[]> {
-        const stored = localStorage.getItem(this.metadataKey);
+        const stored = getItem<ScriptMetadata[]>(this.metadataKey);
         if (!stored) return [];
 
         try {
-            return JSON.parse(stored);
+            return stored;
         } catch (error) {
-            log.error(SEG.UI, `[ScriptStorage] Failed to parse metadata:`, error);
+            log.error(SEG.UI, `[ScriptStorage] Failed to load metadata:`, error);
             return [];
         }
     }
@@ -174,12 +176,12 @@ export class LocalStorageScriptStorage implements ScriptStorage {
 /**
  * Get the active script storage implementation
  *
- * Currently always returns LocalStorage.
+ * Currently always returns IndexedDB.
  * Future: Check feature flags, user preferences, or environment to select backend.
  */
 export function getScriptStorage(): ScriptStorage {
     // TODO: Add feature flag or preference to select storage backend
     // if (featureFlags.useAttestationStorage) return new AttestationScriptStorage();
     // if (featureFlags.useBackendStorage) return new BackendScriptStorage();
-    return new LocalStorageScriptStorage();
+    return new IndexedDBScriptStorage();
 }
