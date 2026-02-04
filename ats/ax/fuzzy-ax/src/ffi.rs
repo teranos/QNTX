@@ -342,6 +342,7 @@ pub extern "C" fn fuzzy_engine_find_matches(
         };
     }
 
+    #[allow(clippy::needless_borrow)]
     let c_matches: Vec<RustMatchC> = matches
         .into_iter()
         .map(|m| RustMatchC {
@@ -462,6 +463,7 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
         };
     }
 
+    #[allow(clippy::needless_borrow)]
     let c_matches: Vec<RustAttributeMatchC> = matches
         .into_iter()
         .map(|m| RustAttributeMatchC {

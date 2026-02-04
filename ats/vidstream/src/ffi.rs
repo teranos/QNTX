@@ -338,7 +338,8 @@ pub extern "C" fn video_result_free(result: VideoResultC) {
 
         // Free detections array and labels
         if !result.detections.is_null() && result.detections_len > 0 {
-            let detections_slice = slice::from_raw_parts_mut(result.detections, result.detections_len);
+            let detections_slice =
+                slice::from_raw_parts_mut(result.detections, result.detections_len);
 
             for d in detections_slice.iter() {
                 free_cstring(d.label);
