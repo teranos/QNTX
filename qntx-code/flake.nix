@@ -24,9 +24,6 @@
 
           buildInputs = with pkgs; [
             openssl
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.IOKit
-            darwin.apple_sdk.frameworks.Security
           ];
 
           subPackages = [ "qntx-code/cmd/qntx-code-plugin" ];
