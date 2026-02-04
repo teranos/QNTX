@@ -190,13 +190,13 @@ pub extern "C" fn video_engine_new_with_config(
     let config = unsafe { &*config };
 
     // Convert C config to Rust config
-    let model_path = match cstr_to_str(config.model_path) {
+    let model_path = match unsafe { cstr_to_str(config.model_path) } {
         Ok(s) if s.len() <= MAX_MODEL_PATH_LEN => s.to_string(),
         Ok(_) => return ptr::null_mut(), // too long
         Err(_) => String::new(),         // null pointer = empty
     };
 
-    let labels = match cstr_to_str(config.labels) {
+    let labels = match unsafe { cstr_to_str(config.labels) } {
         Ok(s) if s.len() <= MAX_LABELS_LEN => Some(s.to_string()),
         Ok(_) => return ptr::null_mut(), // too long
         Err(_) => None,                  // null pointer = no labels
@@ -333,18 +333,19 @@ pub extern "C" fn video_engine_process_frame(
 /// - `result` must not be used after this call
 #[no_mangle]
 pub extern "C" fn video_result_free(result: VideoResultC) {
-    free_cstring(result.error_msg);
+    unsafe {
+        free_cstring(result.error_msg);
 
-    // Free detections array and labels
-    if !result.detections.is_null() && result.detections_len > 0 {
-        let detections_slice =
-            unsafe { slice::from_raw_parts_mut(result.detections, result.detections_len) };
+        // Free detections array and labels
+        if !result.detections.is_null() && result.detections_len > 0 {
+            let detections_slice = slice::from_raw_parts_mut(result.detections, result.detections_len);
 
-        for d in detections_slice.iter() {
-            free_cstring(d.label);
+            for d in detections_slice.iter() {
+                free_cstring(d.label);
+            }
+
+            free_boxed_slice(result.detections, result.detections_len);
         }
-
-        free_boxed_slice(result.detections, result.detections_len);
     }
 }
 
