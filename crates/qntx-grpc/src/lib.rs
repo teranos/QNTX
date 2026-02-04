@@ -21,7 +21,6 @@ pub mod types;
 pub mod plugin;
 
 pub mod error;
-pub mod tracing;
 
 // Re-export commonly used items at crate root
 #[cfg(feature = "types")]

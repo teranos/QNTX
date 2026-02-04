@@ -8,11 +8,11 @@ export interface AxGraphBuilder {
 }
 
 export interface Claim {
-  Subject: string;
-  Predicate: string;
-  Context: string;
-  Actor: string;
-  Timestamp: string;
+  subject: string;
+  predicate: string;
+  context: string;
+  actor: string;
+  timestamp: string;
 }
 
 export interface Graph {
@@ -119,27 +119,27 @@ export interface RelationshipDefinition {
   /**
    * e.g., "is_child_of", "points_to"
    */
-  PredicateName: string;
+  predicate_name: string;
   /**
    * Human-readable label
    */
-  DisplayLabel: string;
+  display_label: string;
   /**
    * Optional link color override
    */
-  Color: string;
+  color?: string;
   /**
    * D3 force distance (nil = use default)
    */
-  LinkDistance?: number | null;
+  link_distance?: number | null;
   /**
    * D3 force strength (nil = use default)
    */
-  LinkStrength?: number | null;
+  link_strength?: number | null;
   /**
    * Whether this relationship type is deprecated
    */
-  Deprecated: boolean;
+  deprecated: boolean;
 }
 
 export interface RelationshipTypeInfo {

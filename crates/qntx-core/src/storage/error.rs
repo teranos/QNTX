@@ -1,29 +1,36 @@
 //! Storage error types
 
-use std::fmt;
+use thiserror::Error;
 
 /// Errors that can occur during storage operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
 pub enum StoreError {
     /// Attestation with this ID already exists
+    #[error("attestation already exists: {0}")]
     AlreadyExists(String),
 
     /// Attestation not found
+    #[error("attestation not found: {0}")]
     NotFound(String),
 
     /// Invalid attestation data
+    #[error("invalid attestation data: {0}")]
     InvalidData(String),
 
     /// Storage backend error (database, filesystem, etc.)
+    #[error("storage backend error: {0}")]
     Backend(String),
 
     /// Query error
+    #[error("query error: {0}")]
     Query(String),
 
     /// Serialization/deserialization error
+    #[error("serialization error: {0}")]
     Serialization(String),
 
     /// Storage quota exceeded
+    #[error("quota exceeded for actor '{actor}' in context '{context}': {current} >= {limit}")]
     QuotaExceeded {
         actor: String,
         context: String,
@@ -31,31 +38,6 @@ pub enum StoreError {
         limit: usize,
     },
 }
-
-impl fmt::Display for StoreError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StoreError::AlreadyExists(id) => write!(f, "attestation already exists: {}", id),
-            StoreError::NotFound(id) => write!(f, "attestation not found: {}", id),
-            StoreError::InvalidData(msg) => write!(f, "invalid attestation data: {}", msg),
-            StoreError::Backend(msg) => write!(f, "storage backend error: {}", msg),
-            StoreError::Query(msg) => write!(f, "query error: {}", msg),
-            StoreError::Serialization(msg) => write!(f, "serialization error: {}", msg),
-            StoreError::QuotaExceeded {
-                actor,
-                context,
-                current,
-                limit,
-            } => write!(
-                f,
-                "quota exceeded for actor '{}' in context '{}': {} >= {}",
-                actor, context, current, limit
-            ),
-        }
-    }
-}
-
-impl std::error::Error for StoreError {}
 
 /// Result type for storage operations
 pub type StoreResult<T> = Result<T, StoreError>;

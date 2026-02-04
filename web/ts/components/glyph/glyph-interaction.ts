@@ -10,6 +10,15 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import {
+    canInitiateMeld,
+    findMeldTarget,
+    applyMeldFeedback,
+    clearMeldFeedback,
+    performMeld,
+    PROXIMITY_THRESHOLD,
+    MELD_THRESHOLD
+} from './meld-system';
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -18,6 +27,8 @@ export interface MakeDraggableOptions {
     ignoreButtons?: boolean;
     /** Label used in log messages, e.g. "PyGlyph". */
     logLabel?: string;
+    /** The prompt glyph object (if this is a prompt being made draggable) */
+    promptGlyph?: Glyph;
 }
 
 export interface MakeResizableOptions {
@@ -42,10 +53,12 @@ export interface MakeResizableOptions {
  * @param handle - The handle that triggers dragging (typically a title bar)
  * @param glyph - The glyph model to update with position
  * @param opts - Optional configuration
+ * @returns Cleanup function to remove all event listeners
  *
  * @example
  * // Basic usage
- * makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
+ * const cleanup = makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
+ * // Later: cleanup();
  *
  * @example
  * // Ignore button clicks in the handle
@@ -59,15 +72,20 @@ export function makeDraggable(
     handle: HTMLElement,
     glyph: Glyph,
     opts: MakeDraggableOptions = {},
-): void {
+): () => void {
     const { ignoreButtons = false, logLabel = 'Glyph' } = opts;
+
+    // AbortController for all event listeners (including mousedown)
+    const setupController = new AbortController();
 
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
     let elementStartX = 0;
     let elementStartY = 0;
-    let abortController: AbortController | null = null;
+    let dragController: AbortController | null = null;
+    let currentMeldTarget: HTMLElement | null = null;
+    let rafId: number | null = null; // Track requestAnimationFrame for meld feedback
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
@@ -79,15 +97,88 @@ export function makeDraggable(
 
         element.style.left = `${newX}px`;
         element.style.top = `${newY}px`;
+
+        // Cancel any pending meld feedback update to prevent race conditions
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+        }
+
+        // Schedule meld feedback for next frame (prevents interleaving during fast drags)
+        if (canInitiateMeld(element)) {
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                const meldInfo = findMeldTarget(element);
+                if (meldInfo.target && meldInfo.distance < PROXIMITY_THRESHOLD) {
+                    applyMeldFeedback(element, meldInfo.target, meldInfo.distance);
+                    currentMeldTarget = meldInfo.target;
+                } else if (currentMeldTarget) {
+                    clearMeldFeedback(element);
+                    currentMeldTarget = null;
+                }
+            });
+        }
     };
 
     const handleMouseUp = () => {
         if (!isDragging) return;
         isDragging = false;
 
+        // Cancel any pending meld feedback animation
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
+
         element.classList.remove('is-dragging');
 
-        // Save position relative to canvas parent
+        // Check if we should meld (for ax-glyphs only)
+        if (canInitiateMeld(element)) {
+            const meldInfo = findMeldTarget(element);
+            if (meldInfo.target && meldInfo.distance < MELD_THRESHOLD) {
+                const targetElement = meldInfo.target; // Store for type safety
+
+                // Get the prompt glyph ID from the target element
+                const promptGlyphId = targetElement.dataset.glyphId || 'prompt-unknown';
+
+                // Create minimal glyph object for the target
+                const targetGlyph: Glyph = {
+                    id: promptGlyphId,
+                    title: 'Prompt',
+                    renderContent: () => targetElement
+                };
+
+                // Clean up event listeners and animations before melding
+                if (rafId !== null) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+                setupController.abort();
+                dragController?.abort();
+
+                // Perform the meld - this reparents the actual DOM elements
+                const composition = performMeld(element, targetElement, glyph, targetGlyph);
+
+                // Make the composition draggable as a unit
+                const compositionGlyph: Glyph = {
+                    id: `melded-${glyph.id}-${promptGlyphId}`,
+                    title: 'Melded Composition',
+                    renderContent: () => composition
+                };
+
+                makeDraggable(composition, composition, compositionGlyph, {
+                    logLabel: 'MeldedComposition'
+                });
+
+                log.info(SEG.UI, `[${logLabel}] Melded with prompt glyph`);
+                return;
+            }
+        }
+
+        // Clear any meld feedback
+        clearMeldFeedback(element);
+        currentMeldTarget = null;
+
+        // Normal position save
         const canvas = element.parentElement;
         const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const elementRect = element.getBoundingClientRect();
@@ -109,8 +200,8 @@ export function makeDraggable(
 
         log.debug(SEG.UI, `[${logLabel}] Finished dragging ${glyph.id}`);
 
-        abortController?.abort();
-        abortController = null;
+        dragController?.abort();
+        dragController = null;
     };
 
     handle.addEventListener('mousedown', (e) => {
@@ -130,12 +221,21 @@ export function makeDraggable(
 
         element.classList.add('is-dragging');
 
-        abortController = new AbortController();
-        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
-        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
+        dragController = new AbortController();
+        document.addEventListener('mousemove', handleMouseMove, { signal: dragController.signal });
+        document.addEventListener('mouseup', handleMouseUp, { signal: dragController.signal });
 
         log.debug(SEG.UI, `[${logLabel}] Started dragging ${glyph.id}`);
-    });
+    }, { signal: setupController.signal });
+
+    // Return cleanup function
+    return () => {
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+        }
+        setupController.abort();
+        dragController?.abort();
+    };
 }
 
 // ── makeResizable ───────────────────────────────────────────────────
