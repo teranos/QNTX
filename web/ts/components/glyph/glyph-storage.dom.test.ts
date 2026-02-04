@@ -1,23 +1,27 @@
 /**
- * Tests for generic glyph status storage
+ * Tests for generic glyph status storage (IndexedDB)
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { saveGlyphStatus, loadGlyphStatus, type GlyphStatus, type ExecutableGlyphStatus } from './glyph-storage';
+import { initStorage } from '../../indexeddb-storage';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Setup fake-indexeddb if enabled
 if (USE_JSDOM) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost'
-    });
-    const { window } = dom;
+    const fakeIndexedDB = await import('fake-indexeddb');
+    const FDBKeyRange = (await import('fake-indexeddb/lib/FDBKeyRange')).default;
 
-    globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage as any;
+    // Create a minimal window object with IndexedDB
+    const mockWindow = {
+        indexedDB: fakeIndexedDB.default,
+    };
+
+    globalThis.window = mockWindow as any;
+    globalThis.indexedDB = fakeIndexedDB.default as any;
+    globalThis.IDBKeyRange = FDBKeyRange as any;
 }
 
 describe('Generic Glyph Storage', () => {
@@ -26,8 +30,11 @@ describe('Generic Glyph Storage', () => {
         return;
     }
 
-    beforeEach(() => {
-        localStorage.clear();
+    beforeEach(async () => {
+        // Initialize storage once before tests
+        if (!(await import('../../indexeddb-storage')).isStorageInitialized()) {
+            await initStorage();
+        }
     });
 
     test('save and load basic glyph status', () => {

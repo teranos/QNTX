@@ -3,9 +3,11 @@
  *
  * Provides reusable status types and storage helpers for all glyph types.
  * Eliminates duplication across IX, Prompt, and future glyph components.
+ *
+ * Uses IndexedDB (via state/storage.ts) for persistence with in-memory cache.
  */
 
-import { log, SEG } from '../../logger';
+import { getItem, setItem } from '../../state/storage';
 
 /**
  * Base status interface shared by all glyph types
@@ -17,7 +19,7 @@ export interface GlyphStatus {
 }
 
 /**
- * Save glyph status to localStorage
+ * Save glyph status to IndexedDB
  *
  * @param type - Glyph type identifier (e.g., 'ix', 'prompt', 'ax')
  * @param glyphId - Unique glyph ID
@@ -29,11 +31,11 @@ export function saveGlyphStatus<T extends GlyphStatus>(
     status: T
 ): void {
     const key = `${type}-status-${glyphId}`;
-    localStorage.setItem(key, JSON.stringify(status));
+    setItem(key, status);
 }
 
 /**
- * Load glyph status from localStorage
+ * Load glyph status from IndexedDB
  *
  * @param type - Glyph type identifier (e.g., 'ix', 'prompt', 'ax')
  * @param glyphId - Unique glyph ID
@@ -44,15 +46,7 @@ export function loadGlyphStatus<T extends GlyphStatus>(
     glyphId: string
 ): T | null {
     const key = `${type}-status-${glyphId}`;
-    const stored = localStorage.getItem(key);
-    if (!stored) return null;
-
-    try {
-        return JSON.parse(stored) as T;
-    } catch (e) {
-        log.error(SEG.UI, `[${type}] Failed to parse stored status for ${glyphId}:`, e);
-        return null;
-    }
+    return getItem<T>(key);
 }
 
 /**
