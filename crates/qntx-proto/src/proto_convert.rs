@@ -12,8 +12,8 @@
 //!
 //! This is part of the gradual migration from typegen to proto.
 
+use crate::Attestation as ProtoAttestation;
 use qntx_core::attestation::Attestation as CoreAttestation;
-use qntx_proto::Attestation as ProtoAttestation;
 
 /// Convert a proto Attestation to core Attestation
 ///
@@ -90,5 +90,63 @@ mod tests {
         assert_eq!(back.predicates, core.predicates);
         assert_eq!(back.timestamp, core.timestamp);
         assert_eq!(back.created_at, core.created_at);
+    }
+
+    #[test]
+    fn test_proto_json_format_matches_typescript_expectations() {
+        // CRITICAL: This test validates the JSON format matches what TypeScript expects
+        // at the WASM→TypeScript boundary (web/ts/qntx-wasm.ts uses proto-generated types)
+        let mut attributes = HashMap::new();
+        attributes.insert("status".to_string(), serde_json::json!("active"));
+        attributes.insert("count".to_string(), serde_json::json!(42));
+
+        let core = CoreAttestation {
+            id: "AS-boundary-test".to_string(),
+            subjects: vec!["USER-123".to_string()],
+            predicates: vec!["logged_in".to_string()],
+            contexts: vec!["web_app".to_string()],
+            actors: vec!["auth_service".to_string()],
+            timestamp: 1704067200, // 2024-01-01 00:00:00 UTC
+            source: "wasm_boundary_test".to_string(),
+            attributes,
+            created_at: 1704067200,
+        };
+
+        // Convert to proto and serialize to JSON (what WASM does)
+        let proto = to_proto(core);
+        let json = serde_json::to_string(&proto).expect("serialization should succeed");
+
+        // Parse as JSON value to inspect structure
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("should be valid JSON");
+
+        // CRITICAL: Timestamps must be numbers (i64), NOT ISO strings
+        assert!(
+            parsed["timestamp"].is_i64(),
+            "timestamp must be a number for TypeScript compatibility"
+        );
+        assert_eq!(parsed["timestamp"].as_i64().unwrap(), 1704067200);
+        assert!(
+            parsed["created_at"].is_i64(),
+            "created_at must be a number for TypeScript compatibility"
+        );
+
+        // CRITICAL: Attributes must be a JSON string, NOT an object
+        assert!(
+            parsed["attributes"].is_string(),
+            "attributes must be a JSON string (proto schema requirement)"
+        );
+        let attributes_json = parsed["attributes"].as_str().unwrap();
+        let attributes_parsed: serde_json::Value =
+            serde_json::from_str(attributes_json).expect("attributes should contain valid JSON");
+        assert_eq!(attributes_parsed["status"], "active");
+        assert_eq!(attributes_parsed["count"], 42);
+
+        // Verify all required fields are present
+        assert_eq!(parsed["id"].as_str().unwrap(), "AS-boundary-test");
+        assert_eq!(parsed["subjects"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["predicates"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["contexts"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["actors"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["source"].as_str().unwrap(), "wasm_boundary_test");
     }
 }
