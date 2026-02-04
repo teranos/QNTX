@@ -25,8 +25,8 @@ use std::ptr;
 use std::slice;
 
 use qntx_ffi_common::{
-    convert_string_array, cstr_to_str, cstring_new_or_empty, cstring_new_or_fallback,
-    free_boxed_slice, free_cstring, vec_into_raw,
+    convert_string_array, cstr_to_str, cstring_new_or_empty, free_boxed_slice, free_cstring,
+    vec_into_raw, FfiResult,
 };
 
 use crate::engine::{FuzzyEngine, VocabularyType};
@@ -110,11 +110,13 @@ pub struct RustAttributeMatchResultC {
     pub search_time_us: u64,
 }
 
-impl RustMatchResultC {
-    fn error(msg: &str) -> Self {
+impl FfiResult for RustMatchResultC {
+    const ERROR_FALLBACK: &'static str = " ";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, " "),
+            error_msg,
             matches: ptr::null_mut(),
             matches_len: 0,
             search_time_us: 0,
@@ -122,11 +124,13 @@ impl RustMatchResultC {
     }
 }
 
-impl RustAttributeMatchResultC {
-    fn error(msg: &str) -> Self {
+impl FfiResult for RustAttributeMatchResultC {
+    const ERROR_FALLBACK: &'static str = " ";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, " "),
+            error_msg,
             matches: ptr::null_mut(),
             matches_len: 0,
             search_time_us: 0,
@@ -134,11 +138,13 @@ impl RustAttributeMatchResultC {
     }
 }
 
-impl RustRebuildResultC {
-    fn error(msg: &str) -> Self {
+impl FfiResult for RustRebuildResultC {
+    const ERROR_FALLBACK: &'static str = " ";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: cstring_new_or_fallback(msg, " "),
+            error_msg,
             predicate_count: 0,
             context_count: 0,
             build_time_ms: 0,
