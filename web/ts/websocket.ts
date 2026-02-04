@@ -18,7 +18,7 @@ import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotifica
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { log, SEG } from './logger';
-import { validateBackendUrl, getValidatedBackendUrl, getWebSocketUrl } from './backend-url.ts';
+import { getWebSocketUrl } from './backend-url.ts';
 
 // Re-export for backward compatibility
 export { validateBackendUrl as validateBackendURL } from './backend-url.ts';
