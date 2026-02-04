@@ -9,10 +9,11 @@
 
 use qntx_core::{attestation::Attestation, parser::Parser};
 use qntx_indexeddb::IndexedDbStore;
+use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
 /// Global store instance (initialized via init_store)
-static mut STORE: Option<IndexedDbStore> = None;
+static STORE: OnceLock<IndexedDbStore> = OnceLock::new();
 
 /// Default database name for browser IndexedDB storage
 const DEFAULT_DB_NAME: &str = "qntx";
@@ -27,20 +28,18 @@ pub async fn init_store(db_name: Option<String>) -> Result<(), JsValue> {
         .await
         .map_err(|e| JsValue::from_str(&format!("Failed to open IndexedDB: {:?}", e)))?;
 
-    unsafe {
-        STORE = Some(store);
-    }
+    STORE
+        .set(store)
+        .map_err(|_| JsValue::from_str("Store already initialized"))?;
 
     Ok(())
 }
 
 /// Get the store instance. Panics if not initialized.
 fn get_store() -> &'static IndexedDbStore {
-    unsafe {
-        STORE
-            .as_ref()
-            .expect("Store not initialized. Call init_store() first.")
-    }
+    STORE
+        .get()
+        .expect("Store not initialized. Call init_store() first.")
 }
 
 // ============================================================================
