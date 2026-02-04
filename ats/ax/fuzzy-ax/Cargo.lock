@@ -250,6 +250,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qntx-ffi-common"
+version = "0.1.0"
+
+[[package]]
 name = "qntx-fuzzy"
 version = "0.2.0"
 dependencies = [
@@ -257,6 +261,7 @@ dependencies = [
  "env_logger",
  "log",
  "parking_lot",
+ "qntx-ffi-common",
  "serde_json",
  "strsim",
 ]
