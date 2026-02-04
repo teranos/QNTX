@@ -4,6 +4,8 @@
 //! `wasm_bindgen_futures::JsFuture` and `js_sys::Promise`.
 
 use js_sys::Promise;
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{
@@ -41,14 +43,25 @@ fn request_to_promise(req: &IdbRequest) -> Promise {
     let req_error = req.clone();
 
     let promise = Promise::new(&mut move |resolve, reject| {
+        // Store closures in Rc<RefCell> to manage their lifetime without leaking
+        type ClosurePair = (
+            Closure<dyn FnMut(web_sys::Event)>,
+            Closure<dyn FnMut(web_sys::Event)>,
+        );
+        let closures: Rc<RefCell<Option<ClosurePair>>> = Rc::new(RefCell::new(None));
+
         let req_s = req_success.clone();
-        let on_success = Closure::once(move |_event: web_sys::Event| {
+        let closures_for_success = closures.clone();
+        let on_success = Closure::wrap(Box::new(move |_event: web_sys::Event| {
             let result = req_s.result().unwrap_or(JsValue::UNDEFINED);
             let _ = resolve.call1(&JsValue::UNDEFINED, &result);
-        });
+            // Clean up both closures after success
+            *closures_for_success.borrow_mut() = None;
+        }) as Box<dyn FnMut(web_sys::Event)>);
 
         let req_e = req_error.clone();
-        let on_error = Closure::once(move |_event: web_sys::Event| {
+        let closures_for_error = closures.clone();
+        let on_error = Closure::wrap(Box::new(move |_event: web_sys::Event| {
             let msg = req_e
                 .error()
                 .map(|opt| {
@@ -57,12 +70,15 @@ fn request_to_promise(req: &IdbRequest) -> Promise {
                 })
                 .unwrap_or_else(|_| JsValue::from_str("unknown IDB error"));
             let _ = reject.call1(&JsValue::UNDEFINED, &msg);
-        });
+            // Clean up both closures after error
+            *closures_for_error.borrow_mut() = None;
+        }) as Box<dyn FnMut(web_sys::Event)>);
 
         req_success.set_onsuccess(Some(on_success.as_ref().unchecked_ref()));
         req_error.set_onerror(Some(on_error.as_ref().unchecked_ref()));
-        on_success.forget();
-        on_error.forget();
+
+        // Store both closures to keep them alive until one fires
+        *closures.borrow_mut() = Some((on_success, on_error));
     });
 
     promise
@@ -74,23 +90,37 @@ fn transaction_to_promise(tx: &IdbTransaction) -> Promise {
     let tx_error = tx.clone();
 
     let promise = Promise::new(&mut move |resolve, reject| {
-        let on_complete = Closure::once(move |_event: web_sys::Event| {
+        // Store closures in Rc<RefCell> to manage their lifetime without leaking
+        type ClosurePair = (
+            Closure<dyn FnMut(web_sys::Event)>,
+            Closure<dyn FnMut(web_sys::Event)>,
+        );
+        let closures: Rc<RefCell<Option<ClosurePair>>> = Rc::new(RefCell::new(None));
+
+        let closures_for_complete = closures.clone();
+        let on_complete = Closure::wrap(Box::new(move |_event: web_sys::Event| {
             let _ = resolve.call0(&JsValue::UNDEFINED);
-        });
+            // Clean up both closures after completion
+            *closures_for_complete.borrow_mut() = None;
+        }) as Box<dyn FnMut(web_sys::Event)>);
 
         let tx_e = tx_error.clone();
-        let on_error = Closure::once(move |_event: web_sys::Event| {
+        let closures_for_error = closures.clone();
+        let on_error = Closure::wrap(Box::new(move |_event: web_sys::Event| {
             let msg = tx_e
                 .error()
                 .map(|e| JsValue::from(e.message()))
                 .unwrap_or_else(|| JsValue::from_str("transaction error"));
             let _ = reject.call1(&JsValue::UNDEFINED, &msg);
-        });
+            // Clean up both closures after error
+            *closures_for_error.borrow_mut() = None;
+        }) as Box<dyn FnMut(web_sys::Event)>);
 
         tx_complete.set_oncomplete(Some(on_complete.as_ref().unchecked_ref()));
         tx_error.set_onerror(Some(on_error.as_ref().unchecked_ref()));
-        on_complete.forget();
-        on_error.forget();
+
+        // Store both closures to keep them alive until one fires
+        *closures.borrow_mut() = Some((on_complete, on_error));
     });
 
     promise
@@ -104,8 +134,13 @@ pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
         .open_with_u32(db_name, DB_VERSION)
         .map_err(|e| IndexedDbError::Open(format!("{:?}", e)))?;
 
+    // Store upgrade closure to manage its lifetime without leaking
+    let upgrade_closure: Rc<RefCell<Option<Closure<dyn FnMut(web_sys::IdbVersionChangeEvent)>>>> =
+        Rc::new(RefCell::new(None));
+    let upgrade_closure_for_drop = upgrade_closure.clone();
+
     // Handle upgradeneeded: create object store and indexes
-    let on_upgrade = Closure::once(move |event: web_sys::IdbVersionChangeEvent| {
+    let on_upgrade = Closure::wrap(Box::new(move |event: web_sys::IdbVersionChangeEvent| {
         let target = event.target().expect("upgrade event has target");
         let req: IdbOpenDbRequest = target.unchecked_into();
         let db: IdbDatabase = req.result().expect("result on upgrade").unchecked_into();
@@ -166,8 +201,12 @@ pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
                 )
                 .expect("create created_at index");
         }
-    });
+    }) as Box<dyn FnMut(web_sys::IdbVersionChangeEvent)>);
+
     open_req.set_onupgradeneeded(Some(on_upgrade.as_ref().unchecked_ref()));
+
+    // Store closure to keep it alive during the open request
+    *upgrade_closure.borrow_mut() = Some(on_upgrade);
 
     // Await the open request via promise
     let open_promise = request_to_promise(open_req.unchecked_ref());
@@ -175,7 +214,8 @@ pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
         .await
         .map_err(|e| IndexedDbError::Open(format!("{:?}", e)))?;
 
-    on_upgrade.forget();
+    // Clean up upgrade closure now that open is complete
+    *upgrade_closure_for_drop.borrow_mut() = None;
 
     result
         .dyn_into::<IdbDatabase>()
