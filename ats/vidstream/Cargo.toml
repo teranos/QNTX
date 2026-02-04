@@ -10,6 +10,9 @@ authors = ["QNTX Contributors"]
 # QNTX gRPC - for common error types
 qntx-grpc = { path = "../../crates/qntx-grpc" }
 
+# Shared FFI utilities
+qntx-ffi-common = { path = "../../crates/qntx-ffi-common" }
+
 # Video decoding - using ffmpeg-next for safe bindings
 # Note: Requires ffmpeg development libraries installed on system
 ffmpeg-next = { version = "7", optional = true }
