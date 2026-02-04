@@ -3,7 +3,7 @@ use qntx_embeddings::EmbeddingEngine;
 fn main() -> anyhow::Result<()> {
     println!("Loading ONNX model...");
 
-    let model_path = "../models/all-MiniLM-L6-v2/model.onnx";
+    let model_path = "models/all-MiniLM-L6-v2/model.onnx";
     let mut engine = EmbeddingEngine::new(model_path, "all-MiniLM-L6-v2".to_string())?;
 
     println!("Model loaded successfully!");
