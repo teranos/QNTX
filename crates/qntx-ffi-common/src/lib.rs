@@ -345,4 +345,25 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test");
     }
+
+    #[test]
+    fn test_cstr_to_string_returns_owned() {
+        let s = CString::new("owned").unwrap();
+        let result = cstr_to_string(s.as_ptr());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "owned".to_string());
+    }
+
+    #[test]
+    fn test_free_cstring_array_valid() {
+        // Create array of CStrings via the same path as production code
+        let strings: Vec<*mut c_char> = vec!["one", "two", "three"]
+            .into_iter()
+            .map(|s| cstring_new_or_empty(s))
+            .collect();
+        let (ptr, len) = vec_into_raw(strings);
+
+        // Should not crash/leak - this exercises the full cleanup path
+        free_cstring_array(ptr, len);
+    }
 }
