@@ -50,6 +50,10 @@ interface StorageEnvelope<T> {
  */
 export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
     try {
+        // Guard against test environments where localStorage isn't available yet
+        if (typeof localStorage === 'undefined') {
+            return null;
+        }
         const raw = localStorage.getItem(key);
         if (!raw) return null;
 
@@ -102,6 +106,9 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
  */
 export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<T>, 'version'>): void {
     try {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
         const envelope: StorageEnvelope<T> = {
             data: value,
             timestamp: Date.now(),
@@ -120,6 +127,9 @@ export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<
  */
 export function removeItem(key: string): void {
     try {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
         localStorage.removeItem(key);
     } catch (error: unknown) {
         handleErrorSilent(error, `Failed to remove storage key "${key}"`, SEG.UI);
@@ -145,6 +155,9 @@ export function hasItem(key: string, options?: Pick<StorageOptions<unknown>, 'ma
  */
 export function getTimestamp(key: string): number | null {
     try {
+        if (typeof localStorage === 'undefined') {
+            return null;
+        }
         const raw = localStorage.getItem(key);
         if (!raw) return null;
 
