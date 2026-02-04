@@ -6,6 +6,7 @@
 
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
+import { getApiUrl } from "../backend-url.ts";
 import type {
   ScheduledJobResponse,
   CreateScheduledJobRequest,
@@ -14,20 +15,10 @@ import type {
 } from "./types.ts";
 
 /**
- * Get base URL for Pulse API - resolves at call time to ensure __BACKEND_URL__ is available
+ * Get base URL for Pulse Schedules API
  */
 function getBaseUrl(): string {
-    const backendUrl = (window as any).__BACKEND_URL__ || '';
-    const baseUrl = `${backendUrl}/api/pulse/schedules`;
-
-    if (backendUrl) {
-        log.debug(SEG.PULSE, 'Backend URL configured:', backendUrl);
-    } else {
-        log.debug(SEG.PULSE, 'Using same-origin backend');
-    }
-    log.debug(SEG.PULSE, 'Full URL:', baseUrl);
-
-    return baseUrl;
+    return getApiUrl('/api/pulse/schedules');
 }
 
 /**

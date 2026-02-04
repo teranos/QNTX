@@ -12,6 +12,7 @@ import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 import { handleError, SEG } from '../error-handler.ts';
+import { getBackendUrl, getTypedWebSocketUrl } from '../backend-url.ts';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -283,15 +284,12 @@ class GoEditorPanel extends BasePanel {
     }
 
     private async fetchGoplsConfig() {
-        const backendUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-        const wsProtocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-        const wsHost = backendUrl.replace(/^https?:\/\//, '');
-        const goplsUri = `${wsProtocol}//${wsHost}/gopls` as `ws://${string}` | `wss://${string}`;
+        const goplsUri = getTypedWebSocketUrl('/gopls');
 
         let workspaceRoot = 'file:///tmp/qntx-workspace';
 
         try {
-            const configResponse = await fetch(`${backendUrl}/api/config`);
+            const configResponse = await fetch(`${getBackendUrl()}/api/config`);
             if (configResponse.ok) {
                 const config = await configResponse.json();
                 const goplsEnabled = config.code?.gopls?.enabled ?? false;

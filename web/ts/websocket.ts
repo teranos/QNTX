@@ -18,6 +18,10 @@ import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotifica
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { log, SEG } from './logger';
+import { validateBackendUrl, getValidatedBackendUrl, getWebSocketUrl } from './backend-url.ts';
+
+// Re-export for backward compatibility
+export { validateBackendUrl as validateBackendURL } from './backend-url.ts';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -187,26 +191,6 @@ const MESSAGE_HANDLERS = {
     }
 } as const;
 
-/**
- * Validate and sanitize backend URL
- * Virtue #12: Graceful Degradation - Invalid URLs return null instead of throwing
- * @param url - URL to validate
- * @returns Validated URL origin or null if invalid
- */
-export function validateBackendURL(url: string): string | null {
-    try {
-        const parsed = new URL(url, window.location.origin);
-
-        // Only allow http/https protocols (will be converted to ws/wss)
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-            return null;
-        }
-
-        return parsed.origin;
-    } catch (error: unknown) {
-        return null;
-    }
-}
 
 /**
  * Route WebSocket message to appropriate handler
@@ -250,19 +234,8 @@ export function routeMessage(
 export function connectWebSocket(handlers: MessageHandlers): void {
     messageHandlers = handlers || {};
 
-    // Use backend URL from injected global with validation
-    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const validatedUrl = validateBackendURL(rawUrl);
-
-    if (!validatedUrl) {
-        log.error(SEG.WS, 'Invalid backend URL:', rawUrl);
-        log.info(SEG.WS, 'Falling back to same-origin');
-    }
-
-    const backendUrl = validatedUrl || window.location.origin;
-    const backendHost = backendUrl.replace(/^https?:\/\//, '');
-    const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${backendHost}/ws`;
+    // Use centralized URL utilities for WebSocket connection
+    const wsUrl = getWebSocketUrl('/ws');
 
     ws = new WebSocket(wsUrl);
 
