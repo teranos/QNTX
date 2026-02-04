@@ -61,18 +61,14 @@ impl From<IndexedDbError> for StoreError {
             IndexedDbError::NotAvailable(msg) => {
                 StoreError::Backend(format!("IndexedDB not available: {}", msg))
             }
-            IndexedDbError::Open(msg) => {
-                StoreError::Backend(format!("IndexedDB open: {}", msg))
-            }
+            IndexedDbError::Open(msg) => StoreError::Backend(format!("IndexedDB open: {}", msg)),
             IndexedDbError::Transaction(msg) => {
                 StoreError::Backend(format!("IndexedDB transaction: {}", msg))
             }
             IndexedDbError::Request(msg) => {
                 StoreError::Backend(format!("IndexedDB request: {}", msg))
             }
-            IndexedDbError::JsValue(msg) => {
-                StoreError::Backend(format!("IndexedDB JS: {}", msg))
-            }
+            IndexedDbError::JsValue(msg) => StoreError::Backend(format!("IndexedDB JS: {}", msg)),
         }
     }
 }

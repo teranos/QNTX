@@ -71,9 +71,7 @@ impl IndexedDbStore {
         let req = store
             .add(&js_val)
             .map_err(|e| StoreError::Backend(format!("IDB add: {:?}", e)))?;
-        idb::await_request(&req)
-            .await
-            .map_err(StoreError::from)?;
+        idb::await_request(&req).await.map_err(StoreError::from)?;
         idb::await_transaction(&tx)
             .await
             .map_err(StoreError::from)?;
@@ -140,9 +138,7 @@ impl IndexedDbStore {
             .delete(&key)
             .map_err(|e| StoreError::Backend(format!("IDB delete: {:?}", e)))?;
 
-        idb::await_request(&req)
-            .await
-            .map_err(StoreError::from)?;
+        idb::await_request(&req).await.map_err(StoreError::from)?;
         idb::await_transaction(&tx)
             .await
             .map_err(StoreError::from)?;
@@ -165,9 +161,7 @@ impl IndexedDbStore {
         let req = store
             .put(&js_val)
             .map_err(|e| StoreError::Backend(format!("IDB put: {:?}", e)))?;
-        idb::await_request(&req)
-            .await
-            .map_err(StoreError::from)?;
+        idb::await_request(&req).await.map_err(StoreError::from)?;
         idb::await_transaction(&tx)
             .await
             .map_err(StoreError::from)?;
@@ -225,9 +219,7 @@ impl IndexedDbStore {
             .clear()
             .map_err(|e| StoreError::Backend(format!("IDB clear: {:?}", e)))?;
 
-        idb::await_request(&req)
-            .await
-            .map_err(StoreError::from)?;
+        idb::await_request(&req).await.map_err(StoreError::from)?;
         idb::await_transaction(&tx)
             .await
             .map_err(StoreError::from)?;
@@ -369,13 +361,33 @@ fn attestation_to_js(attestation: &Attestation) -> StoreResult<JsValue> {
     let obj = js_sys::Object::new();
 
     set_prop(&obj, "id", &JsValue::from_str(&attestation.id))?;
-    set_prop(&obj, "subjects", &string_vec_to_js_array(&attestation.subjects))?;
-    set_prop(&obj, "predicates", &string_vec_to_js_array(&attestation.predicates))?;
-    set_prop(&obj, "contexts", &string_vec_to_js_array(&attestation.contexts))?;
+    set_prop(
+        &obj,
+        "subjects",
+        &string_vec_to_js_array(&attestation.subjects),
+    )?;
+    set_prop(
+        &obj,
+        "predicates",
+        &string_vec_to_js_array(&attestation.predicates),
+    )?;
+    set_prop(
+        &obj,
+        "contexts",
+        &string_vec_to_js_array(&attestation.contexts),
+    )?;
     set_prop(&obj, "actors", &string_vec_to_js_array(&attestation.actors))?;
-    set_prop(&obj, "timestamp", &JsValue::from_f64(attestation.timestamp as f64))?;
+    set_prop(
+        &obj,
+        "timestamp",
+        &JsValue::from_f64(attestation.timestamp as f64),
+    )?;
     set_prop(&obj, "source", &JsValue::from_str(&attestation.source))?;
-    set_prop(&obj, "created_at", &JsValue::from_f64(attestation.created_at as f64))?;
+    set_prop(
+        &obj,
+        "created_at",
+        &JsValue::from_f64(attestation.created_at as f64),
+    )?;
 
     // Attributes: store as JSON string if non-empty, null otherwise
     if attestation.attributes.is_empty() {

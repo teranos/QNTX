@@ -113,8 +113,7 @@ pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
         let store_name = String::from(STORE_NAME);
         if !db.object_store_names().contains(&store_name) {
             let params = web_sys::IdbObjectStoreParameters::new();
-            js_sys::Reflect::set(&params, &"keyPath".into(), &"id".into())
-                .expect("set keyPath");
+            js_sys::Reflect::set(&params, &"keyPath".into(), &"id".into()).expect("set keyPath");
 
             let store = db
                 .create_object_store_with_optional_parameters(STORE_NAME, &params)

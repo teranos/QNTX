@@ -1,0 +1,21 @@
+{
+  "name": "qntx-wasm",
+  "type": "module",
+  "description": "QNTX WASM bridge - exposes qntx-core functions for Go via wazero and browser",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/teranos/QNTX"
+  },
+  "files": [
+    "qntx_wasm_bg.wasm",
+    "qntx_wasm.js",
+    "qntx_wasm.d.ts"
+  ],
+  "main": "qntx_wasm.js",
+  "types": "qntx_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

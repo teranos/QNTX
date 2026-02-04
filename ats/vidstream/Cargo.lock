@@ -1201,7 +1201,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "qntx"
+name = "qntx-grpc"
 version = "0.1.0"
 dependencies = [
  "lazy_static",
@@ -1224,7 +1224,7 @@ dependencies = [
  "ndarray 0.16.1",
  "ort",
  "parking_lot",
- "qntx",
+ "qntx-grpc",
  "serde_json",
 ]
 
