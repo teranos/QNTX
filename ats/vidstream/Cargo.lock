@@ -1201,6 +1201,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qntx-ffi-common"
+version = "0.1.0"
+
+[[package]]
 name = "qntx-grpc"
 version = "0.1.0"
 dependencies = [
@@ -1224,6 +1228,7 @@ dependencies = [
  "ndarray 0.16.1",
  "ort",
  "parking_lot",
+ "qntx-ffi-common",
  "qntx-grpc",
  "serde_json",
 ]
