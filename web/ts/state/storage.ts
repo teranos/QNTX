@@ -1,16 +1,20 @@
 /**
- * Storage - localStorage utility layer
+ * Storage - IndexedDB utility layer
  *
  * Provides consistent error handling, expiry, versioning, and validation
- * for all localStorage operations across the application.
+ * for all storage operations across the application.
+ *
+ * Backend: IndexedDB (via indexeddb-storage.ts in-memory cache)
+ * Replaces: localStorage (migrated for multi-device sync foundation)
  *
  * Used by:
  * - state/ui.ts (high-level state management)
- * - Any module needing localStorage with robust handling
+ * - Any module needing persistent storage with robust handling
  */
 
 import { handleErrorSilent } from '../error-handler.ts';
 import { log, SEG } from '../logger.ts';
+import { getStorageItem, setStorageItem, removeStorageItem } from '../indexeddb-storage.ts';
 
 // ============================================================================
 // Types
@@ -42,7 +46,7 @@ interface StorageEnvelope<T> {
 // ============================================================================
 
 /**
- * Get an item from localStorage with error handling, expiry, and validation
+ * Get an item from IndexedDB with error handling, expiry, and validation
  *
  * @param key - Storage key
  * @param options - Optional expiry, version, and validation settings
@@ -50,11 +54,7 @@ interface StorageEnvelope<T> {
  */
 export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
     try {
-        // Guard against test environments where localStorage isn't available yet
-        if (typeof localStorage === 'undefined') {
-            return null;
-        }
-        const raw = localStorage.getItem(key);
+        const raw = getStorageItem(key);
         if (!raw) return null;
 
         const envelope = JSON.parse(raw) as StorageEnvelope<T>;
@@ -98,7 +98,7 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
 }
 
 /**
- * Set an item in localStorage with automatic timestamping
+ * Set an item in IndexedDB with automatic timestamping
  *
  * @param key - Storage key
  * @param value - Value to store
@@ -106,31 +106,25 @@ export function getItem<T>(key: string, options?: StorageOptions<T>): T | null {
  */
 export function setItem<T>(key: string, value: T, options?: Pick<StorageOptions<T>, 'version'>): void {
     try {
-        if (typeof localStorage === 'undefined') {
-            return;
-        }
         const envelope: StorageEnvelope<T> = {
             data: value,
             timestamp: Date.now(),
             version: options?.version,
         };
-        localStorage.setItem(key, JSON.stringify(envelope));
+        setStorageItem(key, JSON.stringify(envelope));
     } catch (error: unknown) {
         handleErrorSilent(error, `Failed to set storage key "${key}"`, SEG.UI);
     }
 }
 
 /**
- * Remove an item from localStorage
+ * Remove an item from IndexedDB
  *
  * @param key - Storage key to remove
  */
 export function removeItem(key: string): void {
     try {
-        if (typeof localStorage === 'undefined') {
-            return;
-        }
-        localStorage.removeItem(key);
+        removeStorageItem(key);
     } catch (error: unknown) {
         handleErrorSilent(error, `Failed to remove storage key "${key}"`, SEG.UI);
     }
@@ -155,10 +149,7 @@ export function hasItem(key: string, options?: Pick<StorageOptions<unknown>, 'ma
  */
 export function getTimestamp(key: string): number | null {
     try {
-        if (typeof localStorage === 'undefined') {
-            return null;
-        }
-        const raw = localStorage.getItem(key);
+        const raw = getStorageItem(key);
         if (!raw) return null;
 
         const envelope = JSON.parse(raw) as StorageEnvelope<unknown>;
