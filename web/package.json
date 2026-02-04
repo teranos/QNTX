@@ -41,7 +41,7 @@
     "prosemirror-state": "1.4.3",
     "prosemirror-tables": "1.6.1",
     "prosemirror-view": "1.38.1",
-    "typescript": "5.7.2"
+    "typescript": "5.9.3"
   },
   "resolutions": {
     "@codemirror/state": "6.5.2",
