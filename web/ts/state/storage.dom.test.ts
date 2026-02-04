@@ -4,6 +4,7 @@
 
 import { describe, test, expect, beforeEach, spyOn } from 'bun:test';
 import { getItem, setItem, removeItem, hasItem, getTimestamp, createStore } from './storage';
+import { initStorage } from '../indexeddb-storage';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -12,15 +13,19 @@ const USE_JSDOM = process.env.USE_JSDOM === '1';
 if (USE_JSDOM) {
     const { JSDOM } = await import('jsdom');
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-        url: 'http://localhost' // Required for localStorage
+        url: 'http://localhost'
     });
     const { window } = dom;
     const { document } = window;
 
+    // Add fake IndexedDB
+    const fakeIndexedDB = await import('fake-indexeddb');
+    window.indexedDB = fakeIndexedDB.default as any;
+
     // Replace global document/window with jsdom's
     globalThis.document = document as any;
     globalThis.window = window as any;
-    globalThis.localStorage = window.localStorage as any;
+    globalThis.indexedDB = window.indexedDB as any;
 }
 
 describe('Storage', () => {
@@ -29,8 +34,9 @@ describe('Storage', () => {
         return;
     }
 
-    beforeEach(() => {
-        localStorage.clear();
+    beforeEach(async () => {
+        // Initialize IndexedDB storage for each test
+        await initStorage();
     });
 
     describe('setItem / getItem', () => {
