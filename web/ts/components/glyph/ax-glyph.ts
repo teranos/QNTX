@@ -24,6 +24,7 @@ import { GRID_SIZE } from './grid-constants';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { getItem, setItem } from '../../state/storage';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -34,16 +35,16 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
  * @param gridY Optional grid Y position
  */
 /**
- * LocalStorage key prefix for ax query persistence
+ * IndexedDB key prefix for ax query persistence
  */
 const QUERY_STORAGE_KEY = 'qntx-ax-query:';
 
 /**
- * Load persisted query from localStorage
+ * Load persisted query from IndexedDB
  */
 function loadQuery(id: string): string {
     try {
-        return localStorage.getItem(QUERY_STORAGE_KEY + id) || '';
+        return getItem<string>(QUERY_STORAGE_KEY + id) || '';
     } catch (error) {
         log.error(SEG.UI, `[AxGlyph] Failed to load query for ${id}:`, error);
         return '';
@@ -51,11 +52,11 @@ function loadQuery(id: string): string {
 }
 
 /**
- * Save query to localStorage
+ * Save query to IndexedDB
  */
 function saveQuery(id: string, query: string): void {
     try {
-        localStorage.setItem(QUERY_STORAGE_KEY + id, query);
+        setItem(QUERY_STORAGE_KEY + id, query);
         log.debug(SEG.UI, `[AxGlyph] Saved query for ${id} (${query.length} chars)`);
     } catch (error) {
         log.error(SEG.UI, `[AxGlyph] Failed to save query for ${id}:`, error);
