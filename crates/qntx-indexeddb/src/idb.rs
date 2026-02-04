@@ -20,6 +20,9 @@ const DB_VERSION: u32 = 1;
 /// Object store name for attestations.
 pub const STORE_NAME: &str = "attestations";
 
+/// Type alias for upgrade closure to reduce complexity
+type UpgradeClosure = Rc<RefCell<Option<Closure<dyn FnMut(web_sys::IdbVersionChangeEvent)>>>>;
+
 /// Get the global IndexedDB factory.
 pub fn idb_factory() -> Result<IdbFactory> {
     let global = js_sys::global();
@@ -135,8 +138,7 @@ pub async fn open_database(db_name: &str) -> Result<IdbDatabase> {
         .map_err(|e| IndexedDbError::Open(format!("{:?}", e)))?;
 
     // Store upgrade closure to manage its lifetime without leaking
-    let upgrade_closure: Rc<RefCell<Option<Closure<dyn FnMut(web_sys::IdbVersionChangeEvent)>>>> =
-        Rc::new(RefCell::new(None));
+    let upgrade_closure: UpgradeClosure = Rc::new(RefCell::new(None));
     let upgrade_closure_for_drop = upgrade_closure.clone();
 
     // Handle upgradeneeded: create object store and indexes
