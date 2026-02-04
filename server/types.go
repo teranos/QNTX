@@ -80,6 +80,11 @@ type QueryMessage struct {
 	Width               int     `json:"width"`                // For vidstream_frame: frame width
 	Height              int     `json:"height"`               // For vidstream_frame: frame height
 	Format              string  `json:"format"`               // For vidstream_frame: "rgba8", "rgb8", etc.
+	// Watcher fields (for watcher_upsert messages)
+	WatcherID    string `json:"watcher_id"`     // For watcher_upsert: ID of watcher (generated if empty)
+	WatcherQuery string `json:"watcher_query"`  // For watcher_upsert: AX query string
+	WatcherName  string `json:"watcher_name"`   // For watcher_upsert: Human-readable watcher name
+	Enabled      bool   `json:"enabled"`        // For watcher_upsert: Whether watcher is enabled
 }
 
 // ProgressMessage represents an import progress message
@@ -163,13 +168,14 @@ type PulseExecutionStartedMessage struct {
 
 // PulseExecutionFailedMessage represents a Pulse execution that failed
 type PulseExecutionFailedMessage struct {
-	Type           string `json:"type"`             // "pulse_execution_failed"
-	ScheduledJobID string `json:"scheduled_job_id"` // Job that failed
-	ExecutionID    string `json:"execution_id"`     // Execution record ID
-	ATSCode        string `json:"ats_code"`         // ATS code that was executed
-	ErrorMessage   string `json:"error_message"`    // Error description
-	DurationMs     int    `json:"duration_ms"`      // How long before failure
-	Timestamp      int64  `json:"timestamp"`        // Unix timestamp
+	Type           string   `json:"type"`             // "pulse_execution_failed"
+	ScheduledJobID string   `json:"scheduled_job_id"` // Job that failed
+	ExecutionID    string   `json:"execution_id"`     // Execution record ID
+	ATSCode        string   `json:"ats_code"`         // ATS code that was executed
+	ErrorMessage   string   `json:"error_message"`    // Error description
+	ErrorDetails   []string `json:"error_details"`    // Structured error details from cockroachdb/errors
+	DurationMs     int      `json:"duration_ms"`      // How long before failure
+	Timestamp      int64    `json:"timestamp"`        // Unix timestamp
 }
 
 // PulseExecutionCompletedMessage represents a Pulse execution that completed successfully
@@ -214,5 +220,24 @@ type PluginHealthMessage struct {
 	State     string `json:"state"`     // "running", "paused", "stopped"
 	Message   string `json:"message"`   // Status message
 	Timestamp int64  `json:"timestamp"` // Unix timestamp
+}
+
+// WatcherMatchMessage represents a watcher match event
+// Sent when an attestation matches a watcher's filter
+type WatcherMatchMessage struct {
+	Type        string      `json:"type"`         // "watcher_match"
+	WatcherID   string      `json:"watcher_id"`   // ID of watcher that matched
+	Attestation interface{} `json:"attestation"`  // The matching attestation (types.As)
+	Timestamp   int64       `json:"timestamp"`    // Unix timestamp
+}
+
+// WatcherErrorMessage represents a watcher error (parsing failure, validation error, etc.)
+// Sent when watcher creation/update fails
+type WatcherErrorMessage struct {
+	Type      string `json:"type"`       // "watcher_error"
+	WatcherID string `json:"watcher_id"` // ID of watcher that failed
+	Error     string `json:"error"`      // Error message
+	Severity  string `json:"severity"`   // "error" or "warning"
+	Timestamp int64  `json:"timestamp"`  // Unix timestamp
 }
 

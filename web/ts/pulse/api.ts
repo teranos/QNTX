@@ -80,16 +80,22 @@ export async function createScheduledJob(
     log.error(SEG.PULSE, 'Error response body:', responseText);
 
     let errorMessage = response.statusText;
+    let errorDetails: string[] | undefined;
+
     try {
       const errorJson = JSON.parse(responseText);
       errorMessage = errorJson.error || errorJson.message || response.statusText;
+      errorDetails = errorJson.details; // Preserve structured error details
     } catch (error: unknown) {
       handleError(error, 'Failed to parse API error response', { context: SEG.PULSE, silent: true });
       // Response wasn't JSON, use raw text
       errorMessage = responseText || response.statusText;
     }
 
-    throw new Error(`Failed to create scheduled job: ${errorMessage}`);
+    // Create error with details attached
+    const err = new Error(`Failed to create scheduled job: ${errorMessage}`) as Error & { details?: string[] };
+    err.details = errorDetails;
+    throw err;
   }
 
   const job = await response.json();

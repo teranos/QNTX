@@ -30,8 +30,8 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
+import { makeDraggable, makeResizable } from './glyph-interaction';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
@@ -99,13 +99,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.left = `${gridX * GRID_SIZE}px`;
     element.style.top = `${gridY * GRID_SIZE}px`;
     element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
+    element.style.minHeight = `${height}px`;
     element.style.backgroundColor = 'var(--bg-secondary)';
     element.style.border = '1px solid var(--border-color)';
     element.style.borderRadius = '4px';
     element.style.display = 'flex';
     element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
+    element.style.overflow = 'visible';
 
     // Textarea (declared early so play button can reference it)
     const textarea = document.createElement('textarea');
@@ -148,6 +148,9 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     statusSection.style.borderRadius = '4px';
     statusSection.style.fontSize = '12px';
     statusSection.style.fontFamily = 'monospace';
+    statusSection.style.whiteSpace = 'pre-wrap';
+    statusSection.style.wordBreak = 'break-word';
+    statusSection.style.overflowWrap = 'break-word';
 
     // Track current scheduledJobId for event filtering
     let currentScheduledJobId: string | undefined = savedStatus.scheduledJobId;
@@ -306,7 +309,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     content.style.padding = '12px';
     content.style.display = 'flex';
     content.style.flexDirection = 'column';
-    content.style.overflow = 'auto';
+    content.style.overflow = 'visible';
 
     // Assemble
     content.appendChild(textarea);
@@ -386,159 +389,12 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     document.addEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
 
     // Make draggable via title bar
-    makeDraggable(element, titleBar, glyph);
+    makeDraggable(element, titleBar, glyph, { logLabel: 'IX Glyph' });
 
     // Make resizable via handle
-    makeResizable(element, resizeHandle, glyph);
+    makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
 
     return element;
 }
 
-/**
- * Make element draggable via handle
- *
- * Design decision: IX glyphs (and py glyphs) use free-form dragging without live grid snapping.
- * This provides smoother UX for larger content glyphs compared to grid-glyph.ts which snaps
- * during drag. Grid position is calculated only on mouseup for persistence.
- *
- * Rationale: Free-form placement is preferred over grid-snapped dragging for content glyphs.
- * Symbol-only glyphs (grid-glyph.ts) still use grid snapping for visual alignment.
- */
-function makeDraggable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let initialLeft = 0;
-    let initialTop = 0;
-
-    handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        isDragging = true;
-
-        startX = e.clientX;
-        startY = e.clientY;
-        initialLeft = element.offsetLeft;
-        initialTop = element.offsetTop;
-
-        element.style.opacity = '0.7';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-
-        element.style.left = `${initialLeft + deltaX}px`;
-        element.style.top = `${initialTop + deltaY}px`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (!isDragging) return;
-        isDragging = false;
-
-        element.style.opacity = '1';
-
-        // Calculate grid position and persist
-        const canvas = element.parentElement;
-        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const elementRect = element.getBoundingClientRect();
-        const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
-        const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
-
-        glyph.gridX = gridX;
-        glyph.gridY = gridY;
-
-        // Persist to uiState
-        if (glyph.symbol) {
-            uiState.addCanvasGlyph({
-                id: glyph.id,
-                symbol: glyph.symbol,
-                gridX,
-                gridY,
-                width: element.offsetWidth,
-                height: element.offsetHeight
-            });
-        }
-
-        log.debug(SEG.UI, `[IX Glyph] Moved to grid (${gridX}, ${gridY})`);
-    });
-}
-
-/**
- * Make an element resizable by a handle
- */
-function makeResizable(element: HTMLElement, handle: HTMLElement, glyph: Glyph): void {
-    let isResizing = false;
-    let startX = 0;
-    let startY = 0;
-    let startWidth = 0;
-    let startHeight = 0;
-    let abortController: AbortController | null = null;
-
-    const handleMouseMove = (e: MouseEvent) => {
-        if (!isResizing) return;
-
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-
-        const newWidth = Math.max(200, startWidth + deltaX);
-        const newHeight = Math.max(120, startHeight + deltaY);
-
-        element.style.width = `${newWidth}px`;
-        element.style.height = `${newHeight}px`;
-    };
-
-    const handleMouseUp = () => {
-        if (!isResizing) return;
-        isResizing = false;
-
-        element.classList.remove('is-resizing');
-
-        // Save final size
-        const rect = element.getBoundingClientRect();
-        const finalWidth = Math.round(rect.width);
-        const finalHeight = Math.round(rect.height);
-
-        glyph.width = finalWidth;
-        glyph.height = finalHeight;
-
-        // Persist to uiState
-        if (glyph.symbol && glyph.gridX !== undefined && glyph.gridY !== undefined) {
-            uiState.addCanvasGlyph({
-                id: glyph.id,
-                symbol: glyph.symbol,
-                gridX: glyph.gridX,
-                gridY: glyph.gridY,
-                width: finalWidth,
-                height: finalHeight
-            });
-        }
-
-        log.debug(SEG.UI, `[IX Glyph] Finished resizing to ${finalWidth}x${finalHeight}`);
-
-        abortController?.abort();
-        abortController = null;
-    };
-
-    handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        isResizing = true;
-
-        startX = e.clientX;
-        startY = e.clientY;
-        const rect = element.getBoundingClientRect();
-        startWidth = rect.width;
-        startHeight = rect.height;
-
-        element.classList.add('is-resizing');
-
-        abortController = new AbortController();
-        document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
-        document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
-
-        log.debug(SEG.UI, `[IX Glyph] Started resizing`);
-    });
-}
 

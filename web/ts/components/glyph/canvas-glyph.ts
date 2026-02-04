@@ -14,10 +14,12 @@
  */
 
 import type { Glyph } from './glyph';
-import { IX } from '@generated/sym.js';
+import { Pulse, IX, AX, SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createGridGlyph } from './grid-glyph';
 import { createIxGlyph } from './ix-glyph';
+import { createAxGlyph } from './ax-glyph';
+import { createPromptGlyph } from './prompt-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
@@ -174,6 +176,14 @@ export function createCanvasGlyph(): Glyph {
     log.debug(SEG.UI, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
+        // For ax glyphs, recreate using factory function to restore full functionality
+        if (saved.symbol === AX) {
+            const axGlyph = createAxGlyph(saved.id, '', saved.gridX, saved.gridY);
+            axGlyph.width = saved.width;
+            axGlyph.height = saved.height;
+            return axGlyph;
+        }
+
         if (saved.symbol === 'result') {
             log.debug(SEG.UI, `[Canvas] Restoring result glyph ${saved.id}`, {
                 hasResult: !!saved.result,
@@ -206,7 +216,7 @@ export function createCanvasGlyph(): Glyph {
         manifestationType: 'fullscreen', // Full-viewport, no chrome
         layoutStrategy: 'grid',
         children: glyphs,
-        onSpawnMenu: () => [IX], // IX and py available, can add go/rs/ts later
+        onSpawnMenu: () => [Pulse, IX, AX], // TODO: Remove Pulse when IX wired up
 
         renderContent: () => {
             const container = document.createElement('div');
@@ -340,6 +350,19 @@ function showSpawnMenu(
 
     menu.appendChild(ixBtn);
 
+    // Add AX symbol
+    const axBtn = document.createElement('button');
+    axBtn.className = 'canvas-spawn-button';
+    axBtn.textContent = AX;
+    axBtn.title = 'Spawn AX query glyph';
+
+    axBtn.addEventListener('click', () => {
+        spawnAxGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(axBtn);
+
     // TODO: Refactor spawn menu to be data-driven
     // Loop over available symbols (Pulse, py, go, rs, ts) instead of hardcoding buttons
     // This will make it easier to add new programmature types (go, rs, ts)
@@ -356,6 +379,20 @@ function showSpawnMenu(
     });
 
     menu.appendChild(pyBtn);
+
+    // Add prompt button
+    const promptBtn = document.createElement('button');
+    promptBtn.className = 'canvas-spawn-button';
+    promptBtn.textContent = SO;
+    promptBtn.title = 'Spawn Prompt glyph';
+
+    promptBtn.addEventListener('click', () => {
+        spawnPromptGlyph(gridX, gridY, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(promptBtn);
+
     document.body.appendChild(menu);
 
     // Close menu on click outside
@@ -422,6 +459,45 @@ async function spawnIxGlyph(
 }
 
 /**
+ * Spawn a new AX query glyph at grid position
+ */
+function spawnAxGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): void {
+    const axGlyph = createAxGlyph(undefined, '', gridX, gridY);
+
+    // Add to glyphs array
+    glyphs.push(axGlyph);
+
+    // Render glyph on canvas (ax glyphs now render themselves)
+    const glyphElement = axGlyph.renderContent();
+    canvas.appendChild(glyphElement);
+
+    // Get actual rendered size and persist (ensures default size is saved)
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    // Update glyph with actual dimensions
+    axGlyph.width = width;
+    axGlyph.height = height;
+
+    uiState.addCanvasGlyph({
+        id: axGlyph.id,
+        symbol: AX,
+        gridX,
+        gridY,
+        width,
+        height
+    });
+
+    log.debug(SEG.UI, `[Canvas] Spawned AX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+}
+
+/**
  * Spawn a new Python glyph at grid position
  */
 async function spawnPyGlyph(
@@ -468,6 +544,49 @@ async function spawnPyGlyph(
 }
 
 /**
+ * Spawn a new Prompt glyph at grid position
+ */
+async function spawnPromptGlyph(
+    gridX: number,
+    gridY: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const promptGlyph: Glyph = {
+        id: `prompt-${crypto.randomUUID()}`,
+        title: 'Prompt',
+        symbol: SO,
+        gridX,
+        gridY,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Prompt glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(promptGlyph);
+
+    const glyphElement = await createPromptGlyph(promptGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: promptGlyph.id,
+        symbol: SO,
+        gridX,
+        gridY,
+        width,
+        height
+    });
+
+    log.debug(SEG.UI, `[Canvas] Spawned Prompt glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+}
+
+/**
  * Render a glyph on the canvas
  * Checks symbol type and creates appropriate glyph element
  */
@@ -485,6 +604,16 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For IX glyphs, create full form
     if (glyph.symbol === IX) {
         return await createIxGlyph(glyph);
+    }
+
+    // For prompt glyphs, create template editor
+    if (glyph.symbol === SO) {
+        return await createPromptGlyph(glyph);
+    }
+
+    // For AX glyphs, render content directly (they handle their own rendering)
+    if (glyph.symbol === AX) {
+        return glyph.renderContent();
     }
 
     // For result glyphs, create result display

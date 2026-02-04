@@ -58,19 +58,24 @@ class JobListPanel extends BasePanel {
         });
     }
 
-    protected getTemplate(): string {
-        return `
-            <div class="job-list-header">
-                <h3 class="job-list-title">${IX} Hixtory <span class="hixtory-count">(<span id="hixtory-count">0</span>)</span></h3>
-                <button class="panel-close" aria-label="Close">✕</button>
-            </div>
-            <div class="job-list-content" id="job-list-content">
-                <div class="panel-empty job-list-empty">
-                    <p>No IX operations yet</p>
-                    <p class="job-list-hint">Run an IX command to start</p>
-                </div>
-            </div>
-        `;
+    protected override getTitle(): string {
+        return `${IX} Hixtory`;
+    }
+
+    protected override populateContent(): void {
+        // Add count badge to title
+        const title = this.$('.panel-title')!;
+        const countSpan = document.createElement('span');
+        countSpan.className = 'hixtory-count';
+        countSpan.innerHTML = ' (<span id="hixtory-count">0</span>)';
+        title.appendChild(countSpan);
+
+        // Set initial empty state
+        const content = this.$('.panel-content')!;
+        content.innerHTML = '';
+        content.appendChild(
+            this.createEmptyState('No IX operations yet', 'Run an IX command to start')
+        );
     }
 
     protected setupEventListeners(): void {
@@ -255,7 +260,7 @@ class JobListPanel extends BasePanel {
      * Render hixtory - compact list of job executions
      */
     private render(): void {
-        const content = this.$('#job-list-content');
+        const content = this.$('.panel-content');
         const countSpan = this.$('#hixtory-count');
 
         if (!content) return;
