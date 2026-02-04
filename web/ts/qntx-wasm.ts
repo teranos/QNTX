@@ -37,11 +37,14 @@ export type ParseResult =
 /** Promise that resolves when WASM is initialized */
 let initPromise: Promise<void> | null = null;
 
+/** Default database name for browser IndexedDB storage */
+const DEFAULT_DB_NAME = 'qntx';
+
 /**
  * Initialize the WASM module and IndexedDB store.
  * Called automatically on first use. Can be called explicitly for preloading.
  */
-export async function initialize(dbName: string = 'qntx'): Promise<void> {
+export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void> {
     if (initPromise) {
         return initPromise;
     }
