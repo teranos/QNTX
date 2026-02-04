@@ -13,7 +13,7 @@ import type { Glyph } from './glyph';
 import { MELDABILITY, getInitiatorClasses, getTargetClasses } from './meldability';
 
 // Configuration
-export const PROXIMITY_THRESHOLD = 100; // px - distance at which attraction starts
+export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
 export const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
 const UNMELD_OFFSET = 420; // px - horizontal spacing between glyphs when unmelding
 const MIN_VERTICAL_ALIGNMENT = 0.3; // fraction - minimum vertical overlap required (30%)
@@ -166,6 +166,15 @@ export function clearMeldFeedback(element: HTMLElement): void {
 /**
  * Perform meld operation
  * CRITICAL: This reparents the actual DOM elements, does NOT clone them
+ *
+ * TODO: Persist melded compositions to storage for session recovery.
+ * Currently melds are lost on page refresh.
+ * Tracked in: https://github.com/teranos/QNTX/issues/412
+ *
+ * TODO: Support multi-glyph chains (ax|python|prompt).
+ * Current implementation only supports binary melding (two glyphs).
+ * Will require: composition-to-glyph melding, recursive DOM structure.
+ * Tracked in: https://github.com/teranos/QNTX/issues/411
  */
 export function performMeld(
     axElement: HTMLElement,
@@ -228,22 +237,37 @@ export function isMeldedComposition(element: HTMLElement): boolean {
 /**
  * Unmeld a composition back to individual glyphs
  * Restores the original elements to canvas
+ *
+ * Returns the unmelded elements so caller can restore drag handlers.
+ *
+ * TODO: Implement pull-to-unmeld gesture (drag glyph away from composition).
+ * See vision doc: docs/vision/glyph-melding.md lines 63-66
+ * Tracked in: https://github.com/teranos/QNTX/issues/410
  */
-export function unmeldComposition(composition: HTMLElement): void {
+export function unmeldComposition(composition: HTMLElement): {
+    axElement: HTMLElement;
+    promptElement: HTMLElement;
+    axId: string;
+    promptId: string;
+} | null {
     if (!isMeldedComposition(composition)) {
         log.warn(SEG.UI, '[MeldSystem] Not a melded composition');
-        return;
+        return null;
     }
 
     const canvas = composition.parentElement;
-    if (!canvas) return;
+    if (!canvas) {
+        log.error(SEG.UI, '[MeldSystem] Composition has no parent canvas');
+        return null;
+    }
 
     const axElement = composition.querySelector('.canvas-ax-glyph') as HTMLElement;
     const promptElement = composition.querySelector('.canvas-prompt-glyph') as HTMLElement;
 
     if (!axElement || !promptElement) {
-        log.error(SEG.UI, '[MeldSystem] Missing glyphs in composition');
-        return;
+        log.error(SEG.UI, '[MeldSystem] Missing glyphs in composition - removing corrupted composition');
+        composition.remove();
+        return null;
     }
 
     // Restore absolute positioning
@@ -251,6 +275,12 @@ export function unmeldComposition(composition: HTMLElement): void {
     const compTop = parseInt(composition.style.top || '0', 10);
 
     // Validate parsed values - fallback to 0 if NaN
+    if (isNaN(compLeft)) {
+        log.warn(SEG.UI, `[MeldSystem] Invalid composition.style.left: "${composition.style.left}", using 0`);
+    }
+    if (isNaN(compTop)) {
+        log.warn(SEG.UI, `[MeldSystem] Invalid composition.style.top: "${composition.style.top}", using 0`);
+    }
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
 
@@ -266,8 +296,20 @@ export function unmeldComposition(composition: HTMLElement): void {
     canvas.insertBefore(axElement, composition);
     canvas.insertBefore(promptElement, composition);
 
+    // Get IDs before removing composition
+    const axId = composition.getAttribute('data-ax-id') || '';
+    const promptId = composition.getAttribute('data-prompt-id') || '';
+
     // Remove composition container
     composition.remove();
 
     log.info(SEG.UI, '[MeldSystem] Unmeld complete - elements restored');
+
+    // Return elements so caller can restore drag handlers
+    return {
+        axElement,
+        promptElement,
+        axId,
+        promptId
+    };
 }
