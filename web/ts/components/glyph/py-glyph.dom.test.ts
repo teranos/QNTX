@@ -6,11 +6,12 @@ import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { createPyGlyph } from './py-glyph';
 import type { Glyph } from './glyph';
 import { getScriptStorage } from '../../storage/script-storage';
+import { initStorage, isStorageInitialized } from '../../indexeddb-storage';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Setup jsdom and fake-indexeddb if enabled
 if (USE_JSDOM) {
     const { JSDOM } = await import('jsdom');
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
@@ -19,9 +20,18 @@ if (USE_JSDOM) {
     const { window } = dom;
     const { document } = window;
 
+    // Setup fake-indexeddb for script-storage
+    const fakeIndexedDB = await import('fake-indexeddb');
+    const FDBKeyRange = (await import('fake-indexeddb/lib/FDBKeyRange')).default;
+
+    // Add IndexedDB to the JSDOM window
+    (window as any).indexedDB = fakeIndexedDB.default;
+
     globalThis.document = document as any;
     globalThis.window = window as any;
     globalThis.localStorage = window.localStorage as any;
+    globalThis.indexedDB = fakeIndexedDB.default as any;
+    globalThis.IDBKeyRange = FDBKeyRange as any;
     globalThis.crypto = {
         randomUUID: () => 'test-uuid-' + Math.random()
     } as any;
@@ -64,7 +74,12 @@ describe('PyGlyph', () => {
 
     let glyph: Glyph;
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        // Initialize storage once before tests
+        if (!isStorageInitialized()) {
+            await initStorage();
+        }
+
         localStorage.clear();
         glyph = {
             id: 'py-test-123',
