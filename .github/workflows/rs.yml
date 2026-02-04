@@ -7,6 +7,9 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
+      - 'crates/qntx-core/Cargo.toml'
+      - 'crates/qntx-sqlite/Cargo.toml'
+      - 'crates/qntx-wasm/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
       - '.github/workflows/rs.yml'
@@ -18,6 +21,7 @@ on:
       - '**/*.rs'
       - 'web/src-tauri/Cargo.toml'
       - 'crates/qntx/Cargo.toml'
+      - 'crates/qntx-wasm/Cargo.toml'
       - 'ats/ax/fuzzy-ax/Cargo.toml'
       - 'qntx-python/Cargo.toml'
   workflow_dispatch:
@@ -27,7 +31,7 @@ jobs:
     name: Fuzzy Ax
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/teranos/qntx:latest
+      image: ghcr.io/teranos/qntx-ci:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -65,6 +69,79 @@ jobs:
           export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
           cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
 
+  qntx-sqlite:
+    name: SQLite Backend
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/teranos/qntx-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/QNTX/QNTX
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --check --package qntx-core --package qntx-sqlite
+
+      - name: Clippy
+        run: cargo clippy --package qntx-core --package qntx-sqlite --all-targets --all-features
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Test Rust libraries
+        run: cargo test --package qntx-core --package qntx-sqlite
+
+      - name: Build release with FFI
+        run: |
+          cargo build --release --package qntx-sqlite --features ffi --lib
+          ls -la target/release/libqntx_sqlite.* || echo "No library files found"
+
+      - name: Test CGO integration
+        run: |
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
+          go test -tags rustsqlite -v ./ats/storage/sqlitecgo/...
+
+  # TODO: Replace dtolnay/rust-toolchain with Nix derivation (nix build .#qntx-wasm)
+  qntx-wasm:
+    name: WASM Bridge
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: cargo fmt --check --package qntx-wasm
+
+      - name: Build WASM module
+        run: make rust-wasm
+
+      - name: Test Go integration
+        run: go test -v ./ats/wasm/...
+
   qntx-python:
     name: Python Plugin
     runs-on: ubuntu-latest
@@ -90,7 +167,7 @@ jobs:
         run: cd qntx-python && nix develop .. --command cargo fmt --check
 
       - name: Build via Nix (required for Python linking)
-        run: nix build .#qntx-python --print-build-logs
+        run: nix build ./qntx-python#qntx-python-plugin --print-build-logs
 
       - name: Verify binary works
         run: ./result/bin/qntx-python-plugin --version

@@ -10,7 +10,6 @@ package server
 // - Configuration API (HandleConfig, GET/PUT)
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -325,8 +324,6 @@ func (s *QNTXServer) HandleLogDownload(w http.ResponseWriter, r *http.Request) {
 
 // HandleHealth serves health check endpoint with version info
 func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	versionInfo := version.Get()
 	s.mu.RLock()
 	clientCount := len(s.clients)
@@ -342,16 +339,11 @@ func (s *QNTXServer) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		"owner":      "SBVH",
 	}
 
-	if err := json.NewEncoder(w).Encode(health); err != nil {
-		s.logger.Errorw("Failed to encode health response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, health)
 }
 
 // HandleUsageTimeSeries serves time-series usage data for charting
 func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	// Parse days parameter (default to 7)
 	daysStr := r.URL.Query().Get("days")
 	days := 7
@@ -371,13 +363,10 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 			"error", err,
 			"days", days,
 		)
-		http.Error(w, "Failed to fetch time-series data", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to fetch time-series data")
 		return
 	}
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		s.logger.Errorw("Failed to encode time-series response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, data)
 }
 
 // HandleConfig serves configuration endpoint
@@ -385,15 +374,15 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 // Query parameters:
 //   - ?introspection=true - Returns detailed config with sources
 func (s *QNTXServer) HandleConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	if !requireMethods(w, r, http.MethodGet, http.MethodPost, http.MethodPatch) {
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
 		s.handleGetConfig(w, r)
 	case http.MethodPost, http.MethodPatch:
 		s.handleUpdateConfig(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -404,14 +393,11 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		introspection, err := appcfg.GetConfigIntrospection()
 		if err != nil {
 			s.logger.Errorw("Failed to get config introspection", "error", err)
-			http.Error(w, "Failed to get config introspection", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "Failed to get config introspection")
 			return
 		}
 
-		if err := json.NewEncoder(w).Encode(introspection); err != nil {
-			s.logger.Errorw("Failed to encode introspection response", "error", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
+		writeJSON(w, http.StatusOK, introspection)
 		return
 	}
 
@@ -419,7 +405,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	status, err := s.budgetTracker.GetStatus()
 	if err != nil {
 		s.logger.Errorw("Failed to get budget status", "error", err)
-		http.Error(w, "Failed to get config", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to get config")
 		return
 	}
 
@@ -455,10 +441,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	if err := json.NewEncoder(w).Encode(config); err != nil {
-		s.logger.Errorw("Failed to encode config response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, config)
 }
 
 // handleUpdateConfig updates Pulse and Local Inference configuration
@@ -472,8 +455,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		Updates map[string]interface{} `json:"updates"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := readJSON(w, r, &req); err != nil {
 		return
 	}
 
@@ -484,7 +466,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 			case "local_inference.enabled":
 				enabled, ok := value.(bool)
 				if !ok {
-					http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
+					writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s", key))
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceEnabled(enabled); err != nil {
@@ -500,7 +482,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 			case "local_inference.model":
 				model, ok := value.(string)
 				if !ok {
-					http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
+					writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s", key))
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceModel(model); err != nil {
@@ -516,7 +498,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 			case "local_inference.onnx_model_path":
 				path, ok := value.(string)
 				if !ok {
-					http.Error(w, fmt.Sprintf("Invalid value type for %s", key), http.StatusBadRequest)
+					writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s", key))
 					return
 				}
 				if err := appcfg.UpdateLocalInferenceONNXModelPath(path); err != nil {
@@ -534,7 +516,7 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 					"key", key,
 					"client", r.RemoteAddr,
 				)
-				http.Error(w, fmt.Sprintf("Unsupported config key: %s", key), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("Unsupported config key: %s", key))
 				return
 			}
 		}
@@ -591,15 +573,12 @@ func asyncJobStatusPtr(status async.JobStatus) *async.JobStatus {
 // HandlePlugins serves plugin information endpoint
 // Returns list of installed plugins with their metadata and health status
 func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
 
 	if s.pluginRegistry == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"plugins": []interface{}{},
 		})
 		return
@@ -654,25 +633,19 @@ func (s *QNTXServer) HandlePlugins(w http.ResponseWriter, r *http.Request) {
 		"plugins": plugins,
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode plugins response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 // HandlePluginAction handles pause/resume actions for plugins
 // POST /api/plugins/{name}/pause - Pause a plugin
 // POST /api/plugins/{name}/resume - Resume a plugin
 func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
 	if s.pluginRegistry == nil {
-		http.Error(w, "Plugin registry not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "Plugin registry not available")
 		return
 	}
 
@@ -680,7 +653,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
 	parts := strings.Split(path, "/")
 	if len(parts) != 2 {
-		http.Error(w, "Invalid path: expected /api/plugins/{name}/{action}", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid path: expected /api/plugins/{name}/{action}")
 		return
 	}
 
@@ -695,7 +668,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		err = s.pluginRegistry.Pause(ctx, name)
 		if err != nil {
 			s.logger.Warnw("Failed to pause plugin", "plugin", name, "error", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		s.logger.Infow("Plugin paused", "plugin", name)
@@ -707,7 +680,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		err = s.pluginRegistry.Resume(ctx, name)
 		if err != nil {
 			s.logger.Warnw("Failed to resume plugin", "plugin", name, "error", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		s.logger.Infow("Plugin resumed", "plugin", name)
@@ -715,7 +688,7 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		s.BroadcastPluginHealth(name, true, string(plugin.StateRunning), "Plugin resumed")
 
 	default:
-		http.Error(w, fmt.Sprintf("Unknown action: %s (expected 'pause' or 'resume')", action), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unknown action: %s (expected 'pause' or 'resume')", action))
 		return
 	}
 
@@ -727,8 +700,5 @@ func (s *QNTXServer) HandlePluginAction(w http.ResponseWriter, r *http.Request) 
 		"action": action,
 	}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Errorw("Failed to encode plugin action response", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, response)
 }

@@ -12,12 +12,13 @@ gRPC interface for external QNTX domain plugins.
 | Method | Request | Response | Streaming |
 |--------|---------|----------|-----------|
 | Metadata | Empty | MetadataResponse | No |
-| Initialize | InitializeRequest | Empty | No |
+| Initialize | InitializeRequest | InitializeResponse | No |
 | Shutdown | Empty | Empty | No |
 | HandleHTTP | HTTPRequest | HTTPResponse | No |
 | HandleWebSocket | WebSocketMessage | WebSocketMessage | Bidirectional |
 | Health | Empty | HealthResponse | No |
 | ConfigSchema | Empty | ConfigSchemaResponse | No |
+| ExecuteJob | ExecuteJobRequest | ExecuteJobResponse | No |
 
 ### Metadata
 
@@ -33,7 +34,7 @@ Metadata returns plugin metadata
 Initialize initializes the plugin
 
 - **Request**: `InitializeRequest`
-- **Response**: `Empty`
+- **Response**: `InitializeResponse`
 
 ---
 
@@ -80,6 +81,15 @@ ConfigSchema returns the configuration schema for this plugin
 
 - **Request**: `Empty`
 - **Response**: `ConfigSchemaResponse`
+
+---
+
+### ExecuteJob
+
+ExecuteJob executes an async job Used by Pulse to route jobs to plugin-registered handlers
+
+- **Request**: `ExecuteJobRequest`
+- **Response**: `ExecuteJobResponse`
 
 ---
 
@@ -159,5 +169,37 @@ HTTPHeader represents an HTTP header with support for multiple values. HTTP head
 | max_value | string | For number types: maximum value (optional) |
 | pattern | string | For string types: validation pattern (regex, optional) |
 | element_type | string | For array types: element type (optional) |
+
+### InitializeResponse
+
+InitializeResponse is returned by Initialize RPC
+
+| Field | Type | Description |
+|-------|------|-------------|
+| handler_names | string | Handler names this plugin can execute Examples: ["python.script", "python.webhook", "ixgest.git"] Empty list means plugin provides no async handlers (backward compatible) |
+
+### ExecuteJobRequest
+
+ExecuteJobRequest is sent to plugins to execute an async job
+
+| Field | Type | Description |
+|-------|------|-------------|
+| job_id | string | - |
+| handler_name | string | - |
+| payload | bytes | - |
+| timeout_secs | int64 | - |
+
+### ExecuteJobResponse
+
+ExecuteJobResponse is returned after job execution
+
+| Field | Type | Description |
+|-------|------|-------------|
+| success | bool | - |
+| error | string | - |
+| result | bytes | - |
+| progress_current | int32 | Progress tracking (optional) - Pulse updates job.Progress |
+| progress_total | int32 | - |
+| cost_actual | double | Cost tracking (optional) - Pulse updates job.CostActual |
 
 [← Back to API Index](./README.md)

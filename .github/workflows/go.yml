@@ -40,8 +40,26 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Build WASM module
+        run: make rust-wasm
+
+      - name: Build Rust SQLite library
+        run: make rust-sqlite
+
       - name: Run tests
-        run: go test ./...
+        # Test with core tags to ensure we test what we ship
+        # TODO: Add rustfuzzy,rustvideo once those are stabilized
+        run: |
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          go test -tags "rustsqlite,qntxwasm" ./...
 
   integration:
     name: Go Integration Tests
@@ -66,8 +84,24 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Build WASM module
+        run: make rust-wasm
+
+      - name: Build Rust SQLite library
+        run: make rust-sqlite
+
       - name: Run integration tests
-        run: go test -tags=integration ./...
+        run: |
+          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
+          go test -tags=integration ./...
 
   build:
     name: Go Build
@@ -91,6 +125,20 @@ jobs:
 
       - name: Download dependencies
         run: go mod download
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Build WASM module
+        run: make rust-wasm
+
+      - name: Build Rust SQLite library
+        run: make rust-sqlite
 
       - name: Build
         run: go build ./...

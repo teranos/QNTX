@@ -118,35 +118,7 @@
     font-size: var(--font-size-sm);
 }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Header */
-.ai-provider-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--panel-padding-md);
-    background: var(--bg-almost-white);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.ai-provider-title {
-    margin: 0;
-    font-size: var(--font-size-md);
-    font-weight: 600;
-    color: #000;
-}
-
-
+/* Header - uses .panel-header and .panel-title from panel-base.css */
 
 /* Content */
 .ai-provider-content {
@@ -269,5 +241,5 @@
     border: var(--panel-border);
     border-radius: var(--border-radius);
     background: var(--panel-bg);
-    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-family: var(--font-mono);
 }

@@ -26,38 +26,10 @@
     animation: slideDown 0.2s ease;
 }
 
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Header */
-.job-list-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--panel-padding-md);
-    background: var(--panel-bg-secondary);
-    border-bottom: var(--panel-border);
-}
-
-.job-list-title {
-    margin: 0;
-    font-size: var(--font-size-md);
-    font-weight: 600;
-    color: #000;
-}
-
-
+/* Header - uses .panel-header and .panel-title from panel-base.css */
 
 /* Content */
-.job-list-content {
+#job-list-panel .panel-content {
     flex: 1;
     overflow-y: auto;
     padding: 8px;
@@ -110,16 +82,12 @@
     color: #000;
 }
 
-/* Status badges - use panel-badge from base */
+/* Status badges - use .panel-badge-* variants from panel-base.css */
 .job-status-badge {
     text-transform: uppercase;
 }
 
-/* Job-specific badge state colors */
-.job-status-badge.paused {
-    background: var(--status-pending-bg);
-    color: #f57c00;
-}
+/* Use .panel-badge-paused for paused state */
 
 /* Job Details */
 .job-details {
@@ -155,7 +123,7 @@
 .job-cost {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 /* Job Actions */
@@ -295,10 +263,10 @@
 .task-square.running {
     background: linear-gradient(to top, #4caf50 50%, #fff 50%);
     border-color: #4caf50;
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: pulseSubtle 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes pulseSubtle {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
@@ -360,7 +328,7 @@
     border-radius: var(--border-radius);
     margin-top: 8px;
     padding: 0;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     max-height: 300px;
     overflow-y: auto;
@@ -393,10 +361,6 @@
     color: #4ec9b0;
 }
 
-@keyframes blink {
-    50% { opacity: 0; }
-}
-
 /* Completed stream (green border) */
 .llm-stream-output.stream-complete {
     border-color: #4ec9b0;
@@ -415,23 +379,7 @@
     margin-top: 8px;
 }
 
-/* Scrollbar styling for stream content */
-.stream-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.stream-content::-webkit-scrollbar-track {
-    background: var(--bg-dark);
-}
-
-.stream-content::-webkit-scrollbar-thumb {
-    background: #3d3d3d;
-    border-radius: var(--border-radius);
-}
-
-.stream-content::-webkit-scrollbar-thumb:hover {
-    background: #4d4d4d;
-}
+/* Scrollbar styling moved to scrollbar.css */
 
 /* Job Expanded Details */
 .job-expanded-details {
@@ -457,10 +405,8 @@
     gap: var(--gap);
 }
 
+/* Metadata items use .panel-info-row, .panel-info-label-wide, .panel-info-value-mono from panel-base.css */
 .metadata-item {
-    display: flex;
-    gap: var(--gap);
-    font-size: var(--font-size-sm);
     line-height: 1.4;
 }
 
@@ -468,25 +414,18 @@
     background: var(--status-failed-bg);
     padding: 6px;
     border-radius: var(--border-radius);
-    border-left: 3px solid #f44336;
-}
-
-.metadata-key {
-    font-weight: 600;
-    color: var(--text-secondary);
-    min-width: 100px;
-    flex-shrink: 0;
-}
-
-.metadata-value {
-    color: var(--text-primary);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
-    word-break: break-word;
-    flex: 1;
+    /* Use .accent-border-error from panel-base.css */
+    border-left: 3px solid var(--status-failed-text);
 }
 
 .metadata-item.error .metadata-value {
     color: #d32f2f;
+}
+
+/* Override for word-break on values */
+.metadata-value {
+    word-break: break-word;
+    flex: 1;
 }
 
 .no-metadata {

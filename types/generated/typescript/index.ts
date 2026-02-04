@@ -103,6 +103,8 @@ export type {
   PluginInfo,
   PreviewSample,
   ProgressMessage,
+  PromptDirectRequest,
+  PromptDirectResponse,
   PromptExecuteRequest,
   PromptExecuteResponse,
   PromptPreviewRequest,
@@ -123,6 +125,10 @@ export type {
   TaskLogsResponse,
   UpdateScheduledJobRequest,
   UsageUpdateMessage,
+  WatcherCreateRequest,
+  WatcherErrorMessage,
+  WatcherMatchMessage,
+  WatcherResponse,
 } from './server';
 
 // Types from syscap

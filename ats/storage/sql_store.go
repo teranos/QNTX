@@ -5,6 +5,7 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"go.uber.org/zap"
 
@@ -34,27 +35,42 @@ func MarshalAttestationFields(as *types.As) (*AttestationFields, error) {
 
 	subjectsJSON, err := json.Marshal(as.Subjects)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal subjects")
+		err = errors.Wrap(err, "failed to marshal subjects")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", as.Subjects))
+		return nil, err
 	}
 
 	predicatesJSON, err := json.Marshal(as.Predicates)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal predicates")
+		err = errors.Wrap(err, "failed to marshal predicates")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", as.Predicates))
+		return nil, err
 	}
 
 	contextsJSON, err := json.Marshal(as.Contexts)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal contexts")
+		err = errors.Wrap(err, "failed to marshal contexts")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", as.Contexts))
+		return nil, err
 	}
 
 	actorsJSON, err := json.Marshal(as.Actors)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal actors")
+		err = errors.Wrap(err, "failed to marshal actors")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", as.Actors))
+		return nil, err
 	}
 
 	attributesJSON, err := json.Marshal(as.Attributes)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal attributes")
+		err = errors.Wrap(err, "failed to marshal attributes")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Attribute count: %d", len(as.Attributes)))
+		return nil, err
 	}
 
 	return &AttestationFields{
@@ -123,7 +139,11 @@ func NewSQLStore(db *sql.DB, logger *zap.SugaredLogger) *SQLStore {
 func (s *SQLStore) CreateAttestation(as *types.As) error {
 	fields, err := MarshalAttestationFields(as)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal attestation fields")
+		err = errors.Wrap(err, "failed to marshal attestation fields")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", as.Source))
+		err = errors.WithDetail(err, fmt.Sprintf("Timestamp: %s", as.Timestamp.Format("2006-01-02 15:04:05")))
+		return err
 	}
 
 	_, err = s.db.Exec(
@@ -140,8 +160,18 @@ func (s *SQLStore) CreateAttestation(as *types.As) error {
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "failed to insert attestation")
+		err = errors.Wrap(err, "failed to insert attestation")
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
+		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", as.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", as.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", as.Contexts))
+		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", as.Actors))
+		err = errors.WithDetail(err, fmt.Sprintf("Source: %s", as.Source))
+		return err
 	}
+
+	// Notify observers after successful creation
+	notifyObservers(as)
 
 	// Enforce bounded storage limits after insertion
 	bs := NewBoundedStore(s.db, s.logger)
@@ -182,7 +212,12 @@ func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As
 	// Generate ASID with empty actor seed for self-certification
 	asid, err := id.GenerateASIDWithVanityAndRetry(subject, predicate, context, "", checkExists)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate vanity ASID")
+		err = errors.Wrap(err, "failed to generate vanity ASID")
+		err = errors.WithDetail(err, fmt.Sprintf("Subject: %s", subject))
+		err = errors.WithDetail(err, fmt.Sprintf("Predicate: %s", predicate))
+		err = errors.WithDetail(err, fmt.Sprintf("Context: %s", context))
+		err = errors.WithDetail(err, "Actor: (self-certifying)")
+		return nil, err
 	}
 
 	// Convert to As struct
@@ -195,7 +230,12 @@ func (s *SQLStore) GenerateAndCreateAttestation(cmd *types.AsCommand) (*types.As
 	// Create in database
 	err = s.CreateAttestation(as)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create attestation")
+		err = errors.Wrap(err, "failed to create attestation")
+		err = errors.WithDetail(err, fmt.Sprintf("ASID: %s", asid))
+		err = errors.WithDetail(err, fmt.Sprintf("Command subjects: %v", cmd.Subjects))
+		err = errors.WithDetail(err, fmt.Sprintf("Command predicates: %v", cmd.Predicates))
+		err = errors.WithDetail(err, fmt.Sprintf("Command contexts: %v", cmd.Contexts))
+		return nil, err
 	}
 
 	return as, nil

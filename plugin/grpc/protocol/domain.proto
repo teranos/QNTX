@@ -10,7 +10,7 @@ service DomainPluginService {
   rpc Metadata(Empty) returns (MetadataResponse);
 
   // Initialize initializes the plugin
-  rpc Initialize(InitializeRequest) returns (Empty);
+  rpc Initialize(InitializeRequest) returns (InitializeResponse);
 
   // Shutdown shuts down the plugin
   rpc Shutdown(Empty) returns (Empty);
@@ -26,6 +26,10 @@ service DomainPluginService {
 
   // ConfigSchema returns the configuration schema for this plugin
   rpc ConfigSchema(Empty) returns (ConfigSchemaResponse);
+
+  // ExecuteJob executes an async job
+  // Used by Pulse to route jobs to plugin-registered handlers
+  rpc ExecuteJob(ExecuteJobRequest) returns (ExecuteJobResponse);
 }
 
 message Empty {}
@@ -136,4 +140,34 @@ message ConfigFieldSchema {
 
   // For array types: element type (optional)
   string element_type = 8;
+}
+
+// InitializeResponse is returned by Initialize RPC
+message InitializeResponse {
+  // Handler names this plugin can execute
+  // Examples: ["python.script", "python.webhook", "ixgest.git"]
+  // Empty list means plugin provides no async handlers (backward compatible)
+  repeated string handler_names = 1;
+}
+
+// ExecuteJobRequest is sent to plugins to execute an async job
+message ExecuteJobRequest {
+  string job_id = 1;           // For logging/tracking
+  string handler_name = 2;     // Which handler to invoke
+  bytes payload = 3;           // Job-specific data (JSON)
+  int64 timeout_secs = 4;      // Execution timeout (0 = no timeout)
+}
+
+// ExecuteJobResponse is returned after job execution
+message ExecuteJobResponse {
+  bool success = 1;
+  string error = 2;            // Error message if failed
+  bytes result = 3;            // Optional result data (JSON)
+
+  // Progress tracking (optional) - Pulse updates job.Progress
+  int32 progress_current = 4;
+  int32 progress_total = 5;
+
+  // Cost tracking (optional) - Pulse updates job.CostActual
+  double cost_actual = 6;
 }
