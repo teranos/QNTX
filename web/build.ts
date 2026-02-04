@@ -90,6 +90,23 @@ try {
   console.log(`${darkPeach}Copying static assets...${reset}`);
   await cp(join(sourceDir, "qntx.jpg"), join(outputDir, "qntx.jpg"));
 
+  // Copy WASM files for browser IndexedDB storage
+  // WASM binaries must be in /js/ alongside bundled JS (import.meta.url resolution)
+  console.log(`${darkPeach}Copying WASM modules...${reset}`);
+  try {
+    const wasmFiles = await readdir(join(sourceDir, "wasm"));
+    for (const file of wasmFiles) {
+      if (file.endsWith('.wasm')) {
+        await cp(
+          join(sourceDir, "wasm", file),
+          join(outputDir, "js", file)
+        );
+      }
+    }
+  } catch (error: unknown) {
+    console.warn(`${dim}WASM files not found (run: wasm-pack build --target web --features browser in crates/qntx-wasm)${reset}`);
+  }
+
   console.log(`${peach}Build complete!${reset}`);
   console.log(`${dim}   Output ready at: ${outputDir}${reset}`);
 
