@@ -45,6 +45,24 @@ Use Protocol Buffers (.proto files) as the single source of truth for shared typ
 - Need to maintain .proto files (but simpler than Go struct tags)
 
 ## Implementation Notes
-- Each language may use only what it needs from proto (e.g., TypeScript uses interfaces only)
+
+### Language-Specific Approaches
+
+**Go**: Maintains native structs with struct tags for internal consumption
+- Proto used only at gRPC and cross-language boundaries
+- Manual conversion to/from proto types where needed
+- Rationale: Go struct tags provide powerful JSON/DB mapping, generated proto code is verbose
+
+**Rust**: Uses proto-generated types from `qntx-proto` crate (prost)
+- Storage backends work with `qntx_core::Attestation` internally
+- Proto conversion at WASM/FFI boundaries via `qntx_proto::proto_convert`
+- Rationale: prost generates clean Rust structs with serde support
+
+**TypeScript**: Uses proto-generated interfaces only (see ADR-007)
+- No serialization code, just type definitions
+- Rationale: TypeScript communicates via JSON over WebSocket, not protobuf binary
+
+### General Notes
 - JSON serialization format remains unchanged for backward compatibility
 - Type conversion handled at application boundaries where needed
+- Proto defines the contract, languages choose how to consume it
