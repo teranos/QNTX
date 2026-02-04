@@ -15,10 +15,11 @@ import { languageServer } from 'codemirror-languageserver';
 
 // DISABLED: LSP WebSocket transport conflicts with main WebSocket
 // import { createLSPClient } from './lsp-websocket-transport.js';
-import { sendMessage, validateBackendURL } from './websocket.ts';
+import { sendMessage } from './websocket.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 import { FuzzySearchView } from './fuzzy-search-view.ts';
+import { getTypedWebSocketUrl } from './backend-url.ts';
 
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -172,19 +173,7 @@ export function initCodeMirrorEditor(): EditorView | null {
     createModeToggle();
 
     // LSP configuration (async connection, won't block page load)
-    // Use backend URL from injected global with validation
-    const rawUrl = (window as any).__BACKEND_URL__ || window.location.origin;
-    const validatedUrl = validateBackendURL(rawUrl);
-
-    if (!validatedUrl) {
-        console.error('[LSP] Invalid backend URL:', rawUrl);
-        console.log('[LSP] Falling back to same-origin');
-    }
-
-    const backendUrl = validatedUrl || window.location.origin;
-    const backendHost = backendUrl.replace(/^https?:\/\//, '');
-    const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
-    const serverUri = `${protocol}//${backendHost}/lsp` as `ws://${string}` | `wss://${string}`;
+    const serverUri = getTypedWebSocketUrl('/lsp');
 
     console.log('[LSP] Configuring connection to', serverUri);
 
