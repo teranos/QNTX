@@ -21,6 +21,12 @@ if (USE_JSDOM) {
     globalThis.document = document as any;
     globalThis.window = window as any;
     globalThis.localStorage = window.localStorage as any;
+
+    // Add AbortController polyfill
+    // jsdom has AbortController but it's not compatible with addEventListener signal option
+    // Use the window's native implementations
+    globalThis.AbortController = window.AbortController as any;
+    globalThis.AbortSignal = window.AbortSignal as any;
 }
 
 describe('ResultGlyph', () => {
