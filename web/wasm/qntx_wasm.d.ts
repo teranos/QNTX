@@ -16,6 +16,9 @@ export function exists_attestation(id: string): Promise<boolean>;
 /**
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
+ *
+ * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Converts from internal core::Attestation format before serialization.
  */
 export function get_attestation(id: string): Promise<string | undefined>;
 
@@ -47,6 +50,9 @@ export function parse_query(input: string): string;
 /**
  * Store an attestation in IndexedDB.
  * Returns a Promise that resolves to null on success or error message on failure.
+ *
+ * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Converts to internal core::Attestation format before storage.
  */
 export function put_attestation(json: string): Promise<void>;
 
@@ -68,10 +74,10 @@ export interface InitOutput {
     readonly parse_query: (a: number, b: number) => [number, number];
     readonly put_attestation: (a: number, b: number) => any;
     readonly version: () => [number, number];
-    readonly wasm_bindgen__closure__destroy__hd71dd998f6ad6b2e: (a: number, b: number) => void;
+    readonly wasm_bindgen__closure__destroy__h332095daeac88dbb: (a: number, b: number) => void;
     readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h2745a8c01784b9af: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
