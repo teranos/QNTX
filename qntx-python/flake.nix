@@ -98,17 +98,18 @@
         pythonImage = mkPythonImage dockerArch;
 
         # Clippy check derivation
-        qntx-python-clippy = pkgs.stdenv.mkDerivation {
+        qntx-python-clippy = pkgs.rustPlatform.buildRustPackage {
           pname = "qntx-python-clippy";
           version = self.rev or "dev";
           src = ../.;
 
+          cargoLock = {
+            lockFile = ./../Cargo.lock;
+          };
+
           nativeBuildInputs = with pkgs; [
-            rustPlatform.rust.cargo
-            rustPlatform.rust.rustc
             pkg-config
             protobuf
-            clippy
           ];
 
           buildInputs = with pkgs; [
@@ -119,15 +120,18 @@
 
           PYO3_PYTHON = "${pkgs.python313}/bin/python3";
 
+          # Override build phase to run clippy instead
           buildPhase = ''
-            cd qntx-python
-            cargo clippy --all-targets -- -D warnings
+            cargo clippy -p qntx-python-plugin --all-targets -- -D warnings
           '';
 
+          # Don't actually install anything, just verify clippy passed
           installPhase = ''
             mkdir -p $out
-            echo "Clippy passed" > $out/clippy-passed
+            echo "Clippy passed" > $out/result
           '';
+
+          doCheck = false;
         };
       in
       {
