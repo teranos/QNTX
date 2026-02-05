@@ -45,7 +45,7 @@ pub enum IndexedDbError {
 impl From<wasm_bindgen::JsValue> for IndexedDbError {
     fn from(val: wasm_bindgen::JsValue) -> Self {
         let msg = js_sys::JSON::stringify(&val)
-            .map(|s| String::from(s))
+            .map(String::from)
             .unwrap_or_else(|_| format!("{:?}", val));
         IndexedDbError::Request(msg)
     }
