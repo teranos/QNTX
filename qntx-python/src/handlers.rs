@@ -275,17 +275,13 @@ fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse,
     };
 
     let status_code = if result.success { 200 } else { 400 };
-    json_response(status_code, &response)
+    json_response(status_code, &response).map_err(Box::new)
 }
 
 /// Create a JSON HTTP response
-fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Box<Status>> {
-    let body = serde_json::to_vec(data).map_err(|e| {
-        Box::new(Status::internal(format!(
-            "Failed to serialize response: {}",
-            e
-        )))
-    })?;
+fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Status> {
+    let body = serde_json::to_vec(data)
+        .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;
 
     Ok(HttpResponse {
         status_code,
