@@ -260,7 +260,6 @@ interface ChartDataPoint {
 }
 
 // Render chart using D3
-// TODO(issue #17): Research better time-series charting and WebSocket streaming
 function renderChart(): void {
     const container = document.getElementById('usage-chart-container');
     if (!container || !timeSeriesData || timeSeriesData.length === 0) return;
