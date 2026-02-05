@@ -79,7 +79,7 @@ impl HandlerContext {
                 .execute_with_ats(&req.code, &config, Some(state.ats_client.clone()))
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle POST /evaluate - Evaluate a Python expression
@@ -103,7 +103,7 @@ impl HandlerContext {
                 .evaluate_with_ats(&req.expr, Some(state.ats_client.clone()))
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle POST /execute-file - Execute a Python file
@@ -140,7 +140,7 @@ impl HandlerContext {
                 .execute_file_with_ats(&req.path, &config, Some(state.ats_client.clone()))
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle POST /pip/install - Install a Python package
@@ -165,7 +165,7 @@ impl HandlerContext {
             state.engine.pip_install(&req.package)
         };
 
-        execution_result_to_response(result)
+        execution_result_to_response(result).map_err(|e| *e)
     }
 
     /// Handle GET /pip/check - Check if a module is available
@@ -251,7 +251,7 @@ impl HandlerContext {
 }
 
 /// Convert ExecutionResult to HttpResponse
-fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse, Status> {
+fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse, Box<Status>> {
     #[derive(Serialize)]
     struct ExecutionResponse {
         success: bool,
@@ -279,9 +279,13 @@ fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse,
 }
 
 /// Create a JSON HTTP response
-fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Status> {
-    let body = serde_json::to_vec(data)
-        .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;
+fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Box<Status>> {
+    let body = serde_json::to_vec(data).map_err(|e| {
+        Box::new(Status::internal(format!(
+            "Failed to serialize response: {}",
+            e
+        )))
+    })?;
 
     Ok(HttpResponse {
         status_code,

@@ -520,8 +520,6 @@ impl PythonPluginService {
         #[derive(serde::Deserialize)]
         struct PythonScriptPayload {
             script_code: String,
-            #[serde(default)]
-            script_type: Option<String>,
         }
 
         let payload: PythonScriptPayload = serde_json::from_slice(&req.payload)
