@@ -219,6 +219,16 @@ async function startServer() {
                 return new Response(file);
             }
 
+            const absolutePath = join(import.meta.dir, filePath);
+            console.error(`${darkPink}404: File not found${reset}`);
+            console.error(`${dim}  URL: ${url.pathname}${reset}`);
+            console.error(`${dim}  Path: ${absolutePath}${reset}`);
+
+            if (url.pathname.endsWith('.wasm')) {
+                console.error(`${darkPink}FATAL: WASM file is required${reset}`);
+                process.exit(1);
+            }
+
             return new Response("Not Found", { status: 404 });
         }
     });
