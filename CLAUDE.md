@@ -18,7 +18,7 @@
 
 The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server.
 
-**ASSUME** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
+**KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
 
 ## Testing
 
@@ -51,13 +51,12 @@ See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/
 
 ### Code Quality
 
-- **Deterministic operations**: Use sorted map keys, consistent error patterns, predictable behavior
-
-Use `github.com/teranos/QNTX/errors` (wraps cockroachdb/errors). Always wrap with context:
+- **CRITICAL**: Include available context in errors, logs, and messages. If variables exist in scope (URLs, paths, IDs, status codes), reference them. If critical information isn't in scope, bring it into scope. Generic messages like "operation failed" or "task completed" are FORBIDDEN.
+Use `github.com/teranos/QNTX/errors` for go (wraps cockroachdb/errors). Always wrap with context:
 
 ```go
-if err := doSomething(); err != nil {
-    return errors.Wrap(err, "failed to do something")
+if err := os.ReadFile(configPath); err != nil {
+    return errors.Wrapf(err, "failed to read config from %s", configPath)
 }
 ```
 

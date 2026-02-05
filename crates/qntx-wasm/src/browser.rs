@@ -14,14 +14,18 @@
 //! - JSON matches proto schema (timestamps as numbers, attributes as string)
 //! - Converted to qntx_core::Attestation for internal storage operations
 
-use qntx_core::{attestation::Attestation as CoreAttestation, parser::Parser};
+use qntx_core::parser::Parser;
 use qntx_indexeddb::IndexedDbStore;
 use qntx_proto::Attestation as ProtoAttestation;
-use std::sync::OnceLock;
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 /// Global store instance (initialized via init_store)
-static STORE: OnceLock<IndexedDbStore> = OnceLock::new();
+/// Using Rc<RefCell<>> because WASM is single-threaded and we need to share across async boundaries
+thread_local! {
+    static STORE: RefCell<Option<Rc<IndexedDbStore>>> = RefCell::new(None);
+}
 
 /// Default database name for browser IndexedDB storage
 const DEFAULT_DB_NAME: &str = "qntx";
@@ -36,18 +40,24 @@ pub async fn init_store(db_name: Option<String>) -> Result<(), JsValue> {
         .await
         .map_err(|e| JsValue::from_str(&format!("Failed to open IndexedDB: {:?}", e)))?;
 
-    STORE
-        .set(store)
-        .map_err(|_| JsValue::from_str("Store already initialized"))?;
-
-    Ok(())
+    STORE.with(|s| {
+        let mut s = s.borrow_mut();
+        if s.is_some() {
+            return Err(JsValue::from_str("Store already initialized"));
+        }
+        *s = Some(Rc::new(store));
+        Ok(())
+    })
 }
 
-/// Get the store instance. Panics if not initialized.
-fn get_store() -> &'static IndexedDbStore {
-    STORE
-        .get()
-        .expect("Store not initialized. Call init_store() first.")
+/// Get a clone of the store Rc. Panics if not initialized.
+fn get_store() -> Rc<IndexedDbStore> {
+    STORE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .expect("Store not initialized. Call init_store() first.")
+            .clone()
+    })
 }
 
 // ============================================================================
@@ -179,5 +189,5 @@ pub fn version() -> String {
 /// Check if the store is initialized.
 #[wasm_bindgen]
 pub fn is_store_initialized() -> bool {
-    STORE.get().is_some()
+    STORE.with(|s| s.borrow().is_some())
 }
