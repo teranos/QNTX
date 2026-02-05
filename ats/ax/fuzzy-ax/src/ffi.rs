@@ -235,12 +235,12 @@ pub extern "C" fn fuzzy_engine_rebuild_index(
     }
 
     // Convert C string arrays to Vec<String>
-    let predicates_vec = match convert_string_array(predicates, predicates_len) {
+    let predicates_vec = match unsafe { convert_string_array(predicates, predicates_len) } {
         Ok(v) => v,
         Err(e) => return RustRebuildResultC::error(&e),
     };
 
-    let contexts_vec = match convert_string_array(contexts, contexts_len) {
+    let contexts_vec = match unsafe { convert_string_array(contexts, contexts_len) } {
         Ok(v) => v,
         Err(e) => return RustRebuildResultC::error(&e),
     };
@@ -262,8 +262,10 @@ pub extern "C" fn fuzzy_engine_rebuild_index(
 /// Free a RustRebuildResultC.
 #[no_mangle]
 pub extern "C" fn fuzzy_rebuild_result_free(result: RustRebuildResultC) {
-    free_cstring(result.error_msg);
-    free_cstring(result.index_hash);
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.index_hash);
+    }
 }
 
 // ============================================================================
@@ -299,7 +301,7 @@ pub extern "C" fn fuzzy_engine_find_matches(
         return RustMatchResultC::error("null engine pointer");
     }
 
-    let query_str = match cstr_to_str(query) {
+    let query_str = match unsafe { cstr_to_str(query) } {
         Ok(s) => s,
         Err(e) => return RustMatchResultC::error(e),
     };
@@ -340,6 +342,7 @@ pub extern "C" fn fuzzy_engine_find_matches(
         };
     }
 
+    #[allow(clippy::needless_borrow)]
     let c_matches: Vec<RustMatchC> = matches
         .into_iter()
         .map(|m| RustMatchC {
@@ -368,19 +371,20 @@ pub extern "C" fn fuzzy_engine_find_matches(
 /// - `result` must not be used after this call
 #[no_mangle]
 pub extern "C" fn fuzzy_match_result_free(result: RustMatchResultC) {
-    free_cstring(result.error_msg);
+    unsafe {
+        free_cstring(result.error_msg);
 
-    // Free match array and strings
-    if !result.matches.is_null() && result.matches_len > 0 {
-        let matches_slice =
-            unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
+        // Free match array and strings
+        if !result.matches.is_null() && result.matches_len > 0 {
+            let matches_slice = slice::from_raw_parts_mut(result.matches, result.matches_len);
 
-        for m in matches_slice.iter() {
-            free_cstring(m.value);
-            free_cstring(m.strategy);
+            for m in matches_slice.iter() {
+                free_cstring(m.value);
+                free_cstring(m.strategy);
+            }
+
+            free_boxed_slice(result.matches, result.matches_len);
         }
-
-        free_boxed_slice(result.matches, result.matches_len);
     }
 }
 
@@ -414,7 +418,7 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
     }
 
     // Validate and convert query
-    let query_str = match cstr_to_str(query) {
+    let query_str = match unsafe { cstr_to_str(query) } {
         Ok(s) => s,
         Err(e) => return RustAttributeMatchResultC::error(e),
     };
@@ -424,19 +428,19 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
     }
 
     // Validate and convert attributes JSON
-    let attributes_str = match cstr_to_str(attributes_json) {
+    let attributes_str = match unsafe { cstr_to_str(attributes_json) } {
         Ok(s) => s,
         Err(e) => return RustAttributeMatchResultC::error(e),
     };
 
     // Validate and convert node_id
-    let node_id_str = match cstr_to_str(node_id) {
+    let node_id_str = match unsafe { cstr_to_str(node_id) } {
         Ok(s) => s,
         Err(e) => return RustAttributeMatchResultC::error(e),
     };
 
     // Convert rich_string_fields array
-    let fields = match convert_string_array(rich_string_fields, rich_string_fields_len) {
+    let fields = match unsafe { convert_string_array(rich_string_fields, rich_string_fields_len) } {
         Ok(f) => f,
         Err(e) => return RustAttributeMatchResultC::error(&e),
     };
@@ -459,6 +463,7 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
         };
     }
 
+    #[allow(clippy::needless_borrow)]
     let c_matches: Vec<RustAttributeMatchC> = matches
         .into_iter()
         .map(|m| RustAttributeMatchC {
@@ -489,22 +494,23 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
 /// - `result` must not be used after this call
 #[no_mangle]
 pub extern "C" fn fuzzy_attribute_result_free(result: RustAttributeMatchResultC) {
-    free_cstring(result.error_msg);
+    unsafe {
+        free_cstring(result.error_msg);
 
-    // Free match array and strings
-    if !result.matches.is_null() && result.matches_len > 0 {
-        let matches_slice =
-            unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
+        // Free match array and strings
+        if !result.matches.is_null() && result.matches_len > 0 {
+            let matches_slice = slice::from_raw_parts_mut(result.matches, result.matches_len);
 
-        for m in matches_slice.iter() {
-            free_cstring(m.node_id);
-            free_cstring(m.field_name);
-            free_cstring(m.field_value);
-            free_cstring(m.excerpt);
-            free_cstring(m.strategy);
+            for m in matches_slice.iter() {
+                free_cstring(m.node_id);
+                free_cstring(m.field_name);
+                free_cstring(m.field_value);
+                free_cstring(m.excerpt);
+                free_cstring(m.strategy);
+            }
+
+            free_boxed_slice(result.matches, result.matches_len);
         }
-
-        free_boxed_slice(result.matches, result.matches_len);
     }
 }
 

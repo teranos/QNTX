@@ -40,7 +40,7 @@ pub enum Error {
     /// gRPC status error
     #[cfg(feature = "plugin")]
     #[error("grpc error: {0}")]
-    Grpc(#[from] tonic::Status),
+    Grpc(Box<tonic::Status>),
 
     /// Configuration error
     #[error("configuration error: {0}")]
@@ -53,6 +53,13 @@ pub enum Error {
     /// Internal error with optional context chain
     #[error("{message}")]
     Internal { message: String },
+}
+
+#[cfg(feature = "plugin")]
+impl From<tonic::Status> for Error {
+    fn from(status: tonic::Status) -> Self {
+        Error::Grpc(Box::new(status))
+    }
 }
 
 impl Serialize for Error {
