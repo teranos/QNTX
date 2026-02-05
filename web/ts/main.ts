@@ -34,7 +34,6 @@ import './command-explorer-panel.ts';
 // while keyboard shortcuts in individual panels use the toggle functions directly.
 import './prose/panel.ts';
 import './plugin-panel.ts';
-import './webscraper-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
@@ -76,18 +75,6 @@ console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
-
-// Handle webscraper response from server
-async function handleWebscraperResponse(data: any): Promise<void> {
-    const { webscraperPanel } = await import('./webscraper-panel.js');
-    webscraperPanel.handleScraperResponse(data);
-}
-
-// Handle webscraper progress updates
-async function handleWebscraperProgress(data: any): Promise<void> {
-    const { webscraperPanel } = await import('./webscraper-panel.js');
-    webscraperPanel.handleScraperProgress(data);
-}
 
 // Handle version info from server
 function handleVersion(data: VersionMessage): void {
@@ -214,8 +201,6 @@ async function init(): Promise<void> {
         'pulse_execution_log_stream': handlePulseExecutionLogStream,
         'storage_warning': handleStorageWarning,
         'storage_eviction': handleStorageEviction,
-        'webscraper_response': handleWebscraperResponse,
-        'webscraper_progress': handleWebscraperProgress,
         '_default': handleDefaultMessage
     };
 

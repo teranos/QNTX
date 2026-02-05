@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python rust-python-test rust-python-check
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -259,17 +259,6 @@ rust-python: ## Build Rust Python plugin binary (via Nix)
 	@mkdir -p bin
 	@cp -L result/bin/qntx-python-plugin bin/
 	@echo "✓ qntx-python-plugin built in bin/"
-
-rust-python-test: ## Run Rust Python plugin tests (via Nix)
-	@echo "Running Rust Python plugin tests via Nix..."
-	@echo "Note: Use 'nix develop' shell and run 'cd qntx-python && cargo test' for iterative testing"
-	@nix develop --command bash -c "cd qntx-python && cargo test"
-	@echo "✓ All Rust Python tests passed"
-
-rust-python-check: ## Check Rust Python plugin code (fmt + clippy via Nix)
-	@echo "Checking Rust Python plugin code..."
-	@nix develop --command bash -c "cd qntx-python && cargo fmt --check && cargo clippy -- -D warnings"
-	@echo "✓ Rust Python code checks passed"
 
 rust-python-install: rust-python ## Install Rust Python plugin to ~/.qntx/plugins/
 	@echo "Installing qntx-python-plugin to $(PREFIX)/plugins..."
