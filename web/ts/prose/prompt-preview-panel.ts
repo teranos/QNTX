@@ -8,6 +8,7 @@
 
 import { BasePanel } from '../base-panel.ts';
 import { apiFetch } from '../api.ts';
+import { log, SEG } from '../logger.ts';
 
 interface PromptPreviewOptions {
     onClose?: () => void;
@@ -168,7 +169,7 @@ export class PromptPreviewPanel extends BasePanel {
             this.currentResults = this.transformApiResponse(data);
             this.renderComparisons();
         } catch (error) {
-            console.error('[Prompt Preview] Error running preview:', error);
+            log.error(SEG.ERROR, '[Prompt Preview] Error running preview:', error);
             this.updateStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }

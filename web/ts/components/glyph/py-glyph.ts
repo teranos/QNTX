@@ -163,7 +163,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             createAndDisplayResultGlyph(element, result);
         } catch (error) {
             log.error(SEG.UI, '[PyGlyph] Execution failed:', error);
-            console.error('[Python Execution Error]', error);
+            log.error(SEG.ERROR, '[Python Execution Error]', error);
 
             // Create error result glyph for network/parse failures
             const errorResult: ExecutionResult = {

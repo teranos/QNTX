@@ -15,6 +15,7 @@ import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
 import { handleError, SEG } from './error-handler.ts';
+import { log, SEG } from './logger.ts';
 
 interface ConfigSetting {
     key: string;
@@ -123,7 +124,7 @@ class ConfigPanel extends BasePanel {
     }
 
     private handleSourceClick(source: string, path: string): void {
-        console.log(`[Config Panel] Clicked source: ${source} (${path})`);
+        log.debug(SEG.UI, `[Config Panel] Clicked source: ${source} (${path})`);
 
         navigator.clipboard.writeText(path).then(() => {
             const toast = document.createElement('div');
@@ -132,7 +133,7 @@ class ConfigPanel extends BasePanel {
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
         }).catch((error: unknown) => {
-            console.error('[Config Panel] Failed to copy path:', error);
+            log.error(SEG.ERROR, '[Config Panel] Failed to copy path:', error);
             const toast = document.createElement('div');
             toast.className = 'config-toast config-toast-error';
             const message = error instanceof Error ? error.message : 'Clipboard access denied';
@@ -144,7 +145,7 @@ class ConfigPanel extends BasePanel {
 
     private async fetchConfig(): Promise<void> {
         try {
-            console.log('[Config Panel] Fetching config from /api/config?introspection=true...');
+            log.debug(SEG.UI, '[Config Panel] Fetching config from /api/config?introspection=true...');
             this.configError = null;
             const response = await apiFetch('/api/config?introspection=true');
 
@@ -160,7 +161,7 @@ class ConfigPanel extends BasePanel {
             }
 
             this.appConfig = data;
-            console.log('[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
+            log.debug(SEG.UI, '[Config Panel] Successfully loaded config with', data.settings.length, 'settings');
         } catch (error: unknown) {
             handleError(error, 'Failed to fetch config', { context: SEG.ERROR, silent: true });
 
