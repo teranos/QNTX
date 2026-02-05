@@ -15,7 +15,7 @@ import { AM } from '@generated/sym.js';
 import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
 import { handleError, SEG } from './error-handler.ts';
-import { log, SEG } from './logger.ts';
+import { log } from './logger.ts';
 
 interface ConfigSetting {
     key: string;

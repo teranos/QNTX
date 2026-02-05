@@ -8,7 +8,7 @@ import { apiFetch } from '../api.ts';
 import type { FixSuggestion, PRInfo } from '../../../types/generated/typescript/github.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { handleError, SEG } from '../error-handler.ts';
-import { log, SEG } from '../logger.ts';
+import { log } from '../logger.ts';
 
 export interface SuggestionsOptions {
     panel: HTMLElement;
