@@ -110,6 +110,7 @@
           nativeBuildInputs = with pkgs; [
             pkg-config
             protobuf
+            clippy
           ];
 
           buildInputs = with pkgs; [
