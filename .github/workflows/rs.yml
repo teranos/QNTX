@@ -167,7 +167,7 @@ jobs:
         run: nix develop --command bash -c "cd qntx-python && cargo fmt --check"
 
       - name: Clippy
-        run: nix develop --command bash -c "cd qntx-python && cargo clippy -- -D warnings"
+        run: nix develop --command bash -c "cd qntx-python && cargo clean && cargo clippy -- -D warnings"
 
       - name: Test
         run: nix develop --command bash -c "cd qntx-python && cargo test"
