@@ -16,8 +16,7 @@ use std::ptr;
 use qntx_core::storage::AttestationStore;
 use qntx_core::Attestation;
 use qntx_ffi_common::{
-    cstr_to_str, cstring_new_or_empty, free_boxed, free_boxed_slice, free_cstring, vec_into_raw,
-    FfiResult,
+    cstr_to_str, cstring_new_or_empty, free_boxed, free_cstring, vec_into_raw, FfiResult,
 };
 
 use crate::SqliteStore;
@@ -176,7 +175,7 @@ pub extern "C" fn storage_new_memory() -> *mut SqliteStore {
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
-    let path_str = match cstr_to_str(path) {
+    let path_str = match unsafe { cstr_to_str(path) } {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
@@ -190,7 +189,7 @@ pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn storage_free(store: *mut SqliteStore) {
-    free_boxed(store);
+    unsafe { free_boxed(store) };
 }
 
 // ============================================================================
@@ -207,7 +206,7 @@ pub extern "C" fn storage_put(
         return StorageResultC::error("null store pointer");
     }
 
-    let json_str = match cstr_to_str(attestation_json) {
+    let json_str = match unsafe { cstr_to_str(attestation_json) } {
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
@@ -236,7 +235,7 @@ pub extern "C" fn storage_get(store: *const SqliteStore, id: *const c_char) -> A
         return AttestationResultC::error("null store pointer");
     }
 
-    let id_str = match cstr_to_str(id) {
+    let id_str = match unsafe { cstr_to_str(id) } {
         Ok(s) => s,
         Err(e) => return AttestationResultC::error(e),
     };
@@ -264,7 +263,7 @@ pub extern "C" fn storage_exists(store: *const SqliteStore, id: *const c_char) -
         return StorageResultC::error("null store pointer");
     }
 
-    let id_str = match cstr_to_str(id) {
+    let id_str = match unsafe { cstr_to_str(id) } {
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
@@ -285,7 +284,7 @@ pub extern "C" fn storage_delete(store: *mut SqliteStore, id: *const c_char) -> 
         return StorageResultC::error("null store pointer");
     }
 
-    let id_str = match cstr_to_str(id) {
+    let id_str = match unsafe { cstr_to_str(id) } {
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
@@ -309,7 +308,7 @@ pub extern "C" fn storage_update(
         return StorageResultC::error("null store pointer");
     }
 
-    let json_str = match cstr_to_str(attestation_json) {
+    let json_str = match unsafe { cstr_to_str(attestation_json) } {
         Ok(s) => s,
         Err(e) => return StorageResultC::error(e),
     };
@@ -383,7 +382,7 @@ pub extern "C" fn storage_query(
         return AttestationResultC::error("null store pointer");
     }
 
-    let filter_str = match cstr_to_str(filter_json) {
+    let filter_str = match unsafe { cstr_to_str(filter_json) } {
         Ok(s) => s,
         Err(e) => return AttestationResultC::error(e),
     };
@@ -422,24 +421,28 @@ qntx_ffi_common::define_string_free!(storage_string_free);
 
 #[no_mangle]
 pub extern "C" fn storage_result_free(result: StorageResultC) {
-    free_cstring(result.error_msg);
+    unsafe { free_cstring(result.error_msg) };
 }
 
 #[no_mangle]
 pub extern "C" fn attestation_result_free(result: AttestationResultC) {
-    free_cstring(result.error_msg);
-    free_cstring(result.attestation_json);
+    unsafe {
+        free_cstring(result.error_msg);
+        free_cstring(result.attestation_json);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn string_array_result_free(result: StringArrayResultC) {
-    free_cstring(result.error_msg);
-    qntx_ffi_common::free_cstring_array(result.strings, result.strings_len);
+    unsafe {
+        free_cstring(result.error_msg);
+        qntx_ffi_common::free_cstring_array(result.strings, result.strings_len);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn count_result_free(result: CountResultC) {
-    free_cstring(result.error_msg);
+    unsafe { free_cstring(result.error_msg) };
 }
 
 // ============================================================================
@@ -451,6 +454,7 @@ qntx_ffi_common::define_version_fn!(storage_version);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::CString;
 
     #[test]
     fn test_lifecycle() {

@@ -148,23 +148,6 @@ func ParseAxCommandWithContext(args []string, verbosity int, ctx ErrorContext) (
 	return parseAxQueryDispatch(args, verbosity, ctx)
 }
 
-// ParseAskCommand parses natural language ask queries with flexible grammar
-// DEPRECATED: Use ParseAxCommand instead. Maintained for backward compatibility only.
-// Grammar: qntx ask [SUBJECTS] [is|are PREDICATES] [of|from CONTEXTS] [by|via ACTORS] [temporal] [flags]
-func ParseAskCommand(args []string) (*types.AxFilter, error) {
-	return ParseAskCommandWithVerbosity(args, 0)
-}
-
-// ParseAskCommandWithVerbosity delegates to ParseAxCommandWithVerbosity
-func ParseAskCommandWithVerbosity(args []string, verbosity int) (*types.AxFilter, error) {
-	return ParseAxCommandWithVerbosity(args, verbosity)
-}
-
-// ParseAskCommandWithContext delegates to ParseAxCommandWithContext
-func ParseAskCommandWithContext(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
-	return ParseAxCommandWithContext(args, verbosity, ctx)
-}
-
 // parseAxQueryGo contains the Go implementation for ax query parsing
 func parseAxQueryGo(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
 	filter := &types.AxFilter{
