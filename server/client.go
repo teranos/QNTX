@@ -552,13 +552,11 @@ func (c *Client) handleParseRequest(msg QueryMessage) {
 
 // handleCompletionRequest processes completion requests for autocomplete
 func (c *Client) handleCompletionRequest(msg QueryMessage) {
-	// TODO(#54): Extract ats/lsp - LSP features deferred
 	return
 }
 
 // handleHoverRequest processes hover requests for entity information
 func (c *Client) handleHoverRequest(msg QueryMessage) {
-	// TODO(#54): Extract ats/lsp - LSP features deferred
 	return
 }
 

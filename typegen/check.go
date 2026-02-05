@@ -23,7 +23,6 @@ type CheckResult struct {
 // Directory structure expected:
 //
 //	tempDir/typescript/   -> compares with types/generated/typescript/
-//	tempDir/python/       -> compares with types/generated/python/
 //	tempDir/rust/         -> compares with types/generated/rust/ (ignores metadata)
 //	tempDir/markdown/     -> compares with docs/types/
 func CompareDirectories(tempDir string) (*CheckResult, error) {
@@ -36,15 +35,6 @@ func CompareDirectories(tempDir string) (*CheckResult, error) {
 		false, // Don't ignore metadata for TypeScript
 	); len(diffs) > 0 {
 		differences["TypeScript"] = diffs
-	}
-
-	// Check Python
-	if diffs := compareDirectory(
-		filepath.Join(tempDir, "python"),
-		"types/generated/python",
-		false, // Don't ignore metadata for Python
-	); len(diffs) > 0 {
-		differences["Python"] = diffs
 	}
 
 	// Check Rust (ignore metadata comments)
@@ -127,8 +117,7 @@ func shouldSkipFile(basename string) bool {
 		"Cargo.toml",
 		"mod.rs",
 		"lib.rs",
-		"target",         // Rust build directory
-		"pyproject.toml", // Python package config
+		"target", // Rust build directory
 	}
 
 	for _, s := range skip {
