@@ -494,9 +494,9 @@ impl DomainPluginService for PythonPluginService {
         // Route to handler based on handler_name
         if handler_name == "python.script" {
             self.execute_python_script_job(req).await
-        } else if handler_name.starts_with("python.") {
+        } else if let Some(stripped) = handler_name.strip_prefix("python.") {
             // Strip python. prefix to get handler name
-            let handler_key = handler_name["python.".len()..].to_string();
+            let handler_key = stripped.to_string();
             self.execute_discovered_handler_job(req, &handler_key).await
         } else {
             Err(Status::not_found(format!(
@@ -520,8 +520,6 @@ impl PythonPluginService {
         #[derive(serde::Deserialize)]
         struct PythonScriptPayload {
             script_code: String,
-            #[serde(default)]
-            script_type: Option<String>,
         }
 
         let payload: PythonScriptPayload = serde_json::from_slice(&req.payload)

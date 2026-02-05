@@ -53,7 +53,7 @@ pub fn cstring_new_or_empty(s: &str) -> *mut c_char {
 /// # Safety
 /// The pointer must have been allocated by `CString::into_raw()` or be null.
 #[inline]
-pub fn free_cstring(ptr: *mut c_char) {
+pub unsafe fn free_cstring(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);
@@ -68,7 +68,7 @@ pub fn free_cstring(ptr: *mut c_char) {
 /// # Safety
 /// The pointer must have been allocated by `Box::into_raw()` or be null.
 #[inline]
-pub fn free_boxed<T>(ptr: *mut T) {
+pub unsafe fn free_boxed<T>(ptr: *mut T) {
     if !ptr.is_null() {
         unsafe {
             let _ = Box::from_raw(ptr);
@@ -83,7 +83,7 @@ pub fn free_boxed<T>(ptr: *mut T) {
 /// # Safety
 /// The pointer must have been allocated by `Box::into_raw(slice.into_boxed_slice())`.
 #[inline]
-pub fn free_boxed_slice<T>(ptr: *mut T, len: usize) {
+pub unsafe fn free_boxed_slice<T>(ptr: *mut T, len: usize) {
     if !ptr.is_null() && len > 0 {
         unsafe {
             let _ = Box::from_raw(ptr::slice_from_raw_parts_mut(ptr, len));
@@ -117,7 +117,10 @@ pub fn vec_into_raw<T>(vec: Vec<T>) -> (*mut T, usize) {
 /// # Safety
 /// - `arr` must point to `len` valid C string pointers, or be null (if len is 0)
 /// - Each string pointer must be valid and null-terminated
-pub fn convert_string_array(arr: *const *const c_char, len: usize) -> Result<Vec<String>, String> {
+pub unsafe fn convert_string_array(
+    arr: *const *const c_char,
+    len: usize,
+) -> Result<Vec<String>, String> {
     if arr.is_null() || len == 0 {
         return Ok(Vec::new());
     }
@@ -148,7 +151,7 @@ pub fn convert_string_array(arr: *const *const c_char, len: usize) -> Result<Vec
 ///
 /// # Safety
 /// The pointer must be valid and null-terminated, or null.
-pub fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static str> {
+pub unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static str> {
     if ptr.is_null() {
         return Err("null pointer");
     }
@@ -164,7 +167,10 @@ pub fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, &'static str> {
 ///
 /// # Returns
 /// `Ok(String)` on success, `Err(&'static str)` with error message on failure.
-pub fn cstr_to_string(ptr: *const c_char) -> Result<String, &'static str> {
+///
+/// # Safety
+/// The pointer must be valid and null-terminated, or null.
+pub unsafe fn cstr_to_string(ptr: *const c_char) -> Result<String, &'static str> {
     cstr_to_str(ptr).map(|s| s.to_string())
 }
 
@@ -175,7 +181,7 @@ pub fn cstr_to_string(ptr: *const c_char) -> Result<String, &'static str> {
 /// # Safety
 /// - `arr` must have been allocated by `Box::into_raw(vec.into_boxed_slice())`
 /// - Each string must have been allocated by `CString::into_raw()`
-pub fn free_cstring_array(arr: *mut *mut c_char, len: usize) {
+pub unsafe fn free_cstring_array(arr: *mut *mut c_char, len: usize) {
     if arr.is_null() || len == 0 {
         return;
     }
@@ -276,7 +282,7 @@ macro_rules! define_engine_free {
         #[no_mangle]
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn $fn_name(ptr: *mut $engine_type) {
-            $crate::free_boxed(ptr);
+            unsafe { $crate::free_boxed(ptr) };
         }
     };
 }
@@ -299,7 +305,7 @@ macro_rules! define_string_free {
         #[no_mangle]
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn $fn_name(s: *mut std::os::raw::c_char) {
-            $crate::free_cstring(s);
+            unsafe { $crate::free_cstring(s) };
         }
     };
 }
@@ -314,7 +320,7 @@ mod tests {
         assert!(!ptr.is_null());
         let s = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap();
         assert_eq!(s, "hello");
-        free_cstring(ptr);
+        unsafe { free_cstring(ptr) };
     }
 
     #[test]
@@ -323,17 +329,17 @@ mod tests {
         assert!(!ptr.is_null());
         let s = unsafe { CStr::from_ptr(ptr) }.to_str().unwrap();
         assert_eq!(s, "fallback");
-        free_cstring(ptr);
+        unsafe { free_cstring(ptr) };
     }
 
     #[test]
     fn test_free_cstring_null_is_safe() {
-        free_cstring(ptr::null_mut());
+        unsafe { free_cstring(ptr::null_mut()) };
     }
 
     #[test]
     fn test_free_boxed_null_is_safe() {
-        free_boxed::<i32>(ptr::null_mut());
+        unsafe { free_boxed::<i32>(ptr::null_mut()) };
     }
 
     #[test]
@@ -348,12 +354,12 @@ mod tests {
         let (ptr, len) = vec_into_raw(vec![1i32, 2, 3]);
         assert!(!ptr.is_null());
         assert_eq!(len, 3);
-        free_boxed_slice(ptr, len);
+        unsafe { free_boxed_slice(ptr, len) };
     }
 
     #[test]
     fn test_convert_string_array_empty() {
-        let result = convert_string_array(ptr::null(), 0);
+        let result = unsafe { convert_string_array(ptr::null(), 0) };
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
     }
@@ -366,7 +372,7 @@ mod tests {
         ];
         let ptrs: Vec<*const c_char> = strings.iter().map(|s| s.as_ptr()).collect();
 
-        let result = convert_string_array(ptrs.as_ptr(), ptrs.len());
+        let result = unsafe { convert_string_array(ptrs.as_ptr(), ptrs.len()) };
         assert!(result.is_ok());
         let vec = result.unwrap();
         assert_eq!(vec, vec!["hello", "world"]);
@@ -374,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_cstr_to_str_null() {
-        let result = cstr_to_str(ptr::null());
+        let result = unsafe { cstr_to_str(ptr::null()) };
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "null pointer");
     }
@@ -382,7 +388,7 @@ mod tests {
     #[test]
     fn test_cstr_to_str_valid() {
         let s = CString::new("test").unwrap();
-        let result = cstr_to_str(s.as_ptr());
+        let result = unsafe { cstr_to_str(s.as_ptr()) };
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test");
     }
@@ -390,7 +396,7 @@ mod tests {
     #[test]
     fn test_cstr_to_string_returns_owned() {
         let s = CString::new("owned").unwrap();
-        let result = cstr_to_string(s.as_ptr());
+        let result = unsafe { cstr_to_string(s.as_ptr()) };
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "owned".to_string());
     }
@@ -405,6 +411,6 @@ mod tests {
         let (ptr, len) = vec_into_raw(strings);
 
         // Should not crash/leak - this exercises the full cleanup path
-        free_cstring_array(ptr, len);
+        unsafe { free_cstring_array(ptr, len) };
     }
 }
