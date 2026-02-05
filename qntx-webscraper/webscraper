@@ -11,8 +11,9 @@ exec 2>&1
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Find the qntx-webscraper directory (assuming it's in the QNTX repo)
-PLUGIN_DIR="${QNTX_WEBSCRAPER_DIR:-$HOME/SBVH/teranos/tmp3/QNTX/qntx-webscraper}"
+# Find the qntx-webscraper directory
+# Override with QNTX_WEBSCRAPER_DIR env var if needed
+PLUGIN_DIR="${QNTX_WEBSCRAPER_DIR:-$SCRIPT_DIR}"
 
 echo "Starting webscraper plugin..." >&2
 echo "Plugin directory: $PLUGIN_DIR" >&2
