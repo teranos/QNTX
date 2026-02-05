@@ -101,8 +101,6 @@ The Rust implementation provides several advantages over the Go fallback:
 - **Word boundary detection**: Critical for predicates like `is_author_of`
 - **Consistent scoring**: Normalized 0.0-1.0 scores across all match types
 
-Formal benchmarks are tracked in [issue #XXX](https://github.com/teranos/QNTX/issues/XXX).
-
 ## Files
 
 | File | Purpose |
