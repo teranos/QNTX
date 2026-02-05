@@ -279,6 +279,7 @@ fn execution_result_to_response(result: ExecutionResult) -> Result<HttpResponse,
 }
 
 /// Create a JSON HTTP response
+#[allow(clippy::result_large_err)]
 fn json_response<T: Serialize>(status_code: i32, data: &T) -> Result<HttpResponse, Status> {
     let body = serde_json::to_vec(data)
         .map_err(|e| Status::internal(format!("Failed to serialize response: {}", e)))?;

@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::transport::Channel;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 // Thread-local storage for the ATSStore client during Python execution
 thread_local! {
