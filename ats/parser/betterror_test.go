@@ -38,7 +38,7 @@ func TestBETTERROR_StructuredErrorFields(t *testing.T) {
 func TestBETTERROR_TemporalErrorWithSuggestions(t *testing.T) {
 	query := []string{"ALICE", "is", "engineer", "since", "invalid_date"}
 
-	_, err := ParseAskCommandWithContext(query, 0, ErrorContextPlain)
+	_, err := ParseAxCommandWithContext(query, 0, ErrorContextPlain)
 	if err == nil {
 		t.Fatal("Expected error for invalid temporal expression")
 	}
@@ -123,7 +123,7 @@ func TestBETTERROR_BestEffortParsing(t *testing.T) {
 	// Query with invalid temporal expression
 	query := []string{"ALICE", "is", "engineer", "until", "bad_date"}
 
-	filter, err := ParseAskCommandWithContext(query, 0, ErrorContextPlain)
+	filter, err := ParseAxCommandWithContext(query, 0, ErrorContextPlain)
 	if err == nil {
 		t.Fatal("Expected warning for invalid temporal expression")
 	}

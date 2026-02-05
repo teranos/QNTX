@@ -11,13 +11,13 @@ func TestErrorContext_TerminalVsPlain(t *testing.T) {
 	query := []string{"ALICE", "is", "engineer", "since", "invalid_date_xyz"}
 
 	// Parse with Terminal context (should have ANSI codes)
-	_, errTerminal := ParseAskCommandWithContext(query, 0, ErrorContextTerminal)
+	_, errTerminal := ParseAxCommandWithContext(query, 0, ErrorContextTerminal)
 	if errTerminal == nil {
 		t.Fatal("Expected error for invalid temporal expression")
 	}
 
 	// Parse with Plain context (should NOT have ANSI codes)
-	_, errPlain := ParseAskCommandWithContext(query, 0, ErrorContextPlain)
+	_, errPlain := ParseAxCommandWithContext(query, 0, ErrorContextPlain)
 	if errPlain == nil {
 		t.Fatal("Expected error for invalid temporal expression")
 	}
@@ -47,18 +47,18 @@ func TestErrorContext_TerminalVsPlain(t *testing.T) {
 	t.Logf("✓ Plain error (%d chars): %s", len(plainMsg), plainMsg)
 }
 
-// TestErrorContext_BackwardCompatibility verifies that ParseAskCommandWithVerbosity defaults to terminal
+// TestErrorContext_BackwardCompatibility verifies that ParseAxCommandWithVerbosity defaults to terminal
 func TestErrorContext_BackwardCompatibility(t *testing.T) {
 	query := []string{"ALICE", "is", "engineer", "since", "invalid_date"}
 
 	// Old function should default to Terminal context for backward compatibility
-	_, err := ParseAskCommandWithVerbosity(query, 0)
+	_, err := ParseAxCommandWithVerbosity(query, 0)
 	if err == nil {
 		t.Fatal("Expected error for invalid temporal expression")
 	}
 
 	// Should contain ANSI codes (terminal context)
 	if !strings.Contains(err.Error(), "\x1b[") {
-		t.Error("ParseAskCommandWithVerbosity should default to Terminal context (with ANSI codes)")
+		t.Error("ParseAxCommandWithVerbosity should default to Terminal context (with ANSI codes)")
 	}
 }
