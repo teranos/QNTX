@@ -29,6 +29,19 @@ import { unmeldComposition, isMeldedComposition } from './meld-system';
 import { makeDraggable } from './glyph-interaction';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Duration multiplier for action bar animations (0.5 = half of minimize duration) */
+const ACTION_BAR_ANIMATION_SPEED = 0.5;
+
+/** Distance from top of canvas to action bar in pixels */
+const ACTION_BAR_TOP_OFFSET = 8;
+
+/** Duration multiplier for spawn menu animation */
+const SPAWN_MENU_ANIMATION_SPEED = 0.5;
+
+// ============================================================================
 // Selection State
 // ============================================================================
 
@@ -147,8 +160,8 @@ function showActionBar(container: HTMLElement): void {
     // Add unmeld button if glyphs are in a meld
     if (meldedComposition) {
         const unmeldBtn = document.createElement('button');
-        unmeldBtn.className = 'canvas-action-button canvas-action-unmeld';
-        unmeldBtn.title = 'Break meld';
+        unmeldBtn.className = 'canvas-action-button canvas-action-unmeld has-tooltip';
+        unmeldBtn.dataset.tooltip = 'Break meld';
         unmeldBtn.textContent = '⋈'; // Bowtie/join symbol
         unmeldBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -159,8 +172,8 @@ function showActionBar(container: HTMLElement): void {
 
     // Add delete button
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'canvas-action-button canvas-action-delete';
-    deleteBtn.title = `Delete ${selectedGlyphIds.length} glyph${selectedGlyphIds.length > 1 ? 's' : ''}`;
+    deleteBtn.className = 'canvas-action-button canvas-action-delete has-tooltip';
+    deleteBtn.dataset.tooltip = `Delete ${selectedGlyphIds.length} glyph${selectedGlyphIds.length > 1 ? 's' : ''}`;
     deleteBtn.textContent = '✕'; // Heavy multiplication X
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -174,7 +187,7 @@ function showActionBar(container: HTMLElement): void {
     actionBar = bar;
 
     // Slide in from top
-    const duration = getMinimizeDuration() * 0.5;
+    const duration = getMinimizeDuration() * ACTION_BAR_ANIMATION_SPEED;
     if (duration > 0) {
         bar.animate([
             { transform: 'translate(-50%, -100%)', opacity: 0 },
@@ -193,7 +206,7 @@ function showActionBar(container: HTMLElement): void {
 function positionActionBar(bar: HTMLElement, container: HTMLElement): void {
     bar.style.position = 'absolute';
     bar.style.left = '50%';
-    bar.style.top = '8px';
+    bar.style.top = `${ACTION_BAR_TOP_OFFSET}px`;
     bar.style.zIndex = '9999';
 }
 
@@ -369,6 +382,7 @@ export function createCanvasGlyph(): Glyph {
         renderContent: () => {
             const container = document.createElement('div');
             container.className = 'canvas-workspace';
+            container.tabIndex = 0; // Make focusable for keyboard events
 
             // Full-screen, no padding
             container.style.width = '100%';
@@ -376,6 +390,7 @@ export function createCanvasGlyph(): Glyph {
             container.style.position = 'relative';
             container.style.overflow = 'hidden';
             container.style.backgroundColor = '#2a2b2a'; // Mid-dark gray for night work
+            container.style.outline = 'none'; // Remove focus outline
 
             // Add subtle grid overlay
             const gridOverlay = document.createElement('div');
@@ -408,6 +423,9 @@ export function createCanvasGlyph(): Glyph {
                     return;
                 }
 
+                // Focus container to enable keyboard shortcuts
+                container.focus();
+
                 // Walk up from click target to find a glyph element
                 const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
 
@@ -425,7 +443,8 @@ export function createCanvasGlyph(): Glyph {
             }, true);
 
             // Keyboard support: DELETE/BACKSPACE to delete, ESC to deselect
-            document.addEventListener('keydown', (e) => {
+            // Scoped to this canvas container (not document-level)
+            container.addEventListener('keydown', (e) => {
                 // Ignore if user is typing in an input/textarea
                 const target = e.target as HTMLElement;
                 if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
@@ -609,7 +628,7 @@ function showSpawnMenu(
     document.body.appendChild(menu);
 
     // Expand from mouse position (small to large)
-    const duration = getMinimizeDuration() * 0.5;
+    const duration = getMinimizeDuration() * SPAWN_MENU_ANIMATION_SPEED;
     if (duration > 0) {
         menu.animate([
             { transform: 'scale(0.3)', opacity: 0 },
