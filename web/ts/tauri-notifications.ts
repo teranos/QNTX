@@ -74,7 +74,7 @@ class NotificationState {
 
         if (staleJobs.length > 0) {
             log.warn(
-                SEG.PULSE,
+                SEG.TAU,
                 `[tauri-notifications] Cleaning up ${staleJobs.length} stale job(s)`,
                 staleJobs
             );
@@ -132,7 +132,7 @@ async function invokeIfTauri<T>(command: string, args: Record<string, unknown>):
     try {
         return await invoke<T>(command, args);
     } catch (error: unknown) {
-        log.warn(SEG.ERROR, `[tauri-notifications] Failed to invoke ${command}:`, error);
+        log.warn(SEG.TAU, `[tauri-notifications] Failed to invoke ${command}:`, error);
         return undefined;
     }
 }
