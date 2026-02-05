@@ -11,12 +11,6 @@
     position: absolute;
     background: transparent;
     cursor: grab;
-    transition: outline 0.2s ease-out;
-}
-
-.melded-composition:hover {
-    outline: 2px solid rgba(0, 120, 0, 0.3);
-    outline-offset: 4px;
 }
 
 /* Visual feedback during approach */
