@@ -14,5 +14,8 @@ pub mod protocol {
 // Re-export commonly used types at crate root for convenience
 pub use protocol::*;
 
+// Proto conversion utilities for attestations
+pub mod proto_convert;
+
 #[cfg(test)]
 mod test;

@@ -13,6 +13,9 @@ qntx-proto = { path = "../qntx-proto" }
 # Core QNTX types
 qntx-core = { path = "../qntx-core" }
 
+# Shared FFI utilities
+qntx-ffi-common = { path = "../qntx-ffi-common" }
+
 # SQLite database
 rusqlite = { version = "0.32", features = ["bundled"] }
 
