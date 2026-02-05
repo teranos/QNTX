@@ -96,6 +96,39 @@
           else "amd64";
 
         pythonImage = mkPythonImage dockerArch;
+
+        # Clippy check derivation
+        qntx-python-clippy = pkgs.stdenv.mkDerivation {
+          pname = "qntx-python-clippy";
+          version = self.rev or "dev";
+          src = ../.;
+
+          nativeBuildInputs = with pkgs; [
+            rustPlatform.rust.cargo
+            rustPlatform.rust.rustc
+            pkg-config
+            protobuf
+            clippy
+          ];
+
+          buildInputs = with pkgs; [
+            protobuf
+            python313
+            openssl
+          ];
+
+          PYO3_PYTHON = "${pkgs.python313}/bin/python3";
+
+          buildPhase = ''
+            cd qntx-python
+            cargo clippy --all-targets -- -D warnings
+          '';
+
+          installPhase = ''
+            mkdir -p $out
+            echo "Clippy passed" > $out/clippy-passed
+          '';
+        };
       in
       {
         packages = {
@@ -106,6 +139,10 @@
           qntx-python-plugin-image = pythonImage;
           qntx-python-plugin-image-amd64 = mkPythonImage "amd64";
           qntx-python-plugin-image-arm64 = mkPythonImage "arm64";
+        };
+
+        checks = {
+          clippy = qntx-python-clippy;
         };
 
         apps.default = {
