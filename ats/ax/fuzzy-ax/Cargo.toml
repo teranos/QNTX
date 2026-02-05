@@ -7,6 +7,9 @@ license = "MIT"
 authors = ["QNTX Contributors"]
 
 [dependencies]
+# Shared FFI utilities
+qntx-ffi-common = { path = "../../../crates/qntx-ffi-common" }
+
 # String similarity algorithms
 strsim = "0.11"           # Levenshtein, Jaro-Winkler, etc.
 

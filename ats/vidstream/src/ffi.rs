@@ -20,10 +20,13 @@
 //! All public FFI functions handle null pointer checks internally.
 //! The caller is responsible for passing valid pointers as documented.
 
-use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
+
+use qntx_ffi_common::{
+    cstr_to_str, cstring_new_or_empty, free_boxed_slice, free_cstring, vec_into_raw, FfiResult,
+};
 
 use crate::engine::VideoEngine;
 use crate::types::{FrameFormat, VideoEngineConfig};
@@ -117,25 +120,8 @@ pub struct VideoEngineConfigC {
 }
 
 impl VideoResultC {
-    fn error(msg: &str) -> Self {
-        Self {
-            success: false,
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("unknown error").expect("static string"))
-                .into_raw(),
-            detections: ptr::null_mut(),
-            detections_len: 0,
-            stats: ProcessingStatsC::default(),
-        }
-    }
-
     fn success(detections: Vec<DetectionC>, stats: ProcessingStatsC) -> Self {
-        let detections_len = detections.len();
-        let detections_ptr = if detections.is_empty() {
-            ptr::null_mut()
-        } else {
-            Box::into_raw(detections.into_boxed_slice()) as *mut DetectionC
-        };
+        let (detections_ptr, detections_len) = vec_into_raw(detections);
 
         Self {
             success: true,
@@ -143,6 +129,20 @@ impl VideoResultC {
             detections: detections_ptr,
             detections_len,
             stats,
+        }
+    }
+}
+
+impl FfiResult for VideoResultC {
+    const ERROR_FALLBACK: &'static str = "unknown error";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
+        Self {
+            success: false,
+            error_msg,
+            detections: ptr::null_mut(),
+            detections_len: 0,
+            stats: ProcessingStatsC::default(),
         }
     }
 }
@@ -190,22 +190,16 @@ pub extern "C" fn video_engine_new_with_config(
     let config = unsafe { &*config };
 
     // Convert C config to Rust config
-    let model_path = if config.model_path.is_null() {
-        String::new()
-    } else {
-        match unsafe { CStr::from_ptr(config.model_path) }.to_str() {
-            Ok(s) if s.len() <= MAX_MODEL_PATH_LEN => s.to_string(),
-            _ => return ptr::null_mut(),
-        }
+    let model_path = match cstr_to_str(config.model_path) {
+        Ok(s) if s.len() <= MAX_MODEL_PATH_LEN => s.to_string(),
+        Ok(_) => return ptr::null_mut(), // too long
+        Err(_) => String::new(),         // null pointer = empty
     };
 
-    let labels = if config.labels.is_null() {
-        None
-    } else {
-        match unsafe { CStr::from_ptr(config.labels) }.to_str() {
-            Ok(s) if s.len() <= MAX_LABELS_LEN => Some(s.to_string()),
-            _ => return ptr::null_mut(),
-        }
+    let labels = match cstr_to_str(config.labels) {
+        Ok(s) if s.len() <= MAX_LABELS_LEN => Some(s.to_string()),
+        Ok(_) => return ptr::null_mut(), // too long
+        Err(_) => None,                  // null pointer = no labels
     };
 
     let rust_config = VideoEngineConfig {
@@ -228,21 +222,7 @@ pub extern "C" fn video_engine_new_with_config(
     }
 }
 
-/// Free a VideoEngine instance.
-///
-/// # Safety
-/// - `engine` must be a valid pointer from `video_engine_new`
-/// - `engine` must not be used after this call
-/// - Safe to call with NULL (no-op)
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn video_engine_free(engine: *mut VideoEngine) {
-    if !engine.is_null() {
-        unsafe {
-            let _ = Box::from_raw(engine);
-        }
-    }
-}
+qntx_ffi_common::define_engine_free!(video_engine_free, VideoEngine);
 
 // ============================================================================
 // Frame Processing
@@ -320,9 +300,7 @@ pub extern "C" fn video_engine_process_frame(
         .into_iter()
         .map(|d| DetectionC {
             class_id: d.class_id,
-            label: CString::new(d.label)
-                .unwrap_or_else(|_| CString::new("").expect("empty string"))
-                .into_raw(),
+            label: cstring_new_or_empty(&d.label),
             confidence: d.confidence,
             bbox: BoundingBoxC {
                 x: d.bbox.x,
@@ -355,12 +333,7 @@ pub extern "C" fn video_engine_process_frame(
 /// - `result` must not be used after this call
 #[no_mangle]
 pub extern "C" fn video_result_free(result: VideoResultC) {
-    // Free error message
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
+    free_cstring(result.error_msg);
 
     // Free detections array and labels
     if !result.detections.is_null() && result.detections_len > 0 {
@@ -368,20 +341,10 @@ pub extern "C" fn video_result_free(result: VideoResultC) {
             unsafe { slice::from_raw_parts_mut(result.detections, result.detections_len) };
 
         for d in detections_slice.iter() {
-            if !d.label.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(d.label);
-                }
-            }
+            free_cstring(d.label);
         }
 
-        // Free the array itself
-        unsafe {
-            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
-                result.detections,
-                result.detections_len,
-            ));
-        }
+        free_boxed_slice(result.detections, result.detections_len);
     }
 }
 
@@ -454,32 +417,9 @@ pub extern "C" fn video_expected_frame_size(width: u32, height: u32, format: i32
     VideoEngine::expected_frame_size(width, height, frame_format)
 }
 
-/// Free a string returned by FFI functions.
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn video_string_free(s: *mut c_char) {
-    if !s.is_null() {
-        unsafe {
-            let _ = CString::from_raw(s);
-        }
-    }
-}
+qntx_ffi_common::define_string_free!(video_string_free);
 
-/// Returns the library version string.
-///
-/// # Safety
-///
-/// The returned pointer is valid for the lifetime of the program.
-/// Do not free this pointer - it points to static memory.
-///
-/// # Returns
-///
-/// A null-terminated C string containing the version (e.g., "0.1.0")
-#[no_mangle]
-pub extern "C" fn video_engine_version() -> *const c_char {
-    // SAFETY: This is a compile-time constant string literal
-    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
-}
+qntx_ffi_common::define_version_fn!(video_engine_version);
 
 #[cfg(test)]
 mod tests {

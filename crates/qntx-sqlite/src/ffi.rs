@@ -9,13 +9,16 @@
 //! - String results are owned by caller and must be freed with `storage_string_free()`
 //! - JSON strings passed to functions are copied, caller retains ownership
 
-use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::path::Path;
 use std::ptr;
 
 use qntx_core::storage::AttestationStore;
 use qntx_core::Attestation;
+use qntx_ffi_common::{
+    cstr_to_str, cstring_new_or_empty, free_boxed, free_boxed_slice, free_cstring, vec_into_raw,
+    FfiResult,
+};
 
 use crate::SqliteStore;
 
@@ -62,13 +65,15 @@ impl StorageResultC {
             error_msg: ptr::null_mut(),
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for StorageResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("error message contains null").unwrap())
-                .into_raw(),
+            error_msg,
         }
     }
 }
@@ -78,7 +83,7 @@ impl AttestationResultC {
         Self {
             success: true,
             error_msg: ptr::null_mut(),
-            attestation_json: CString::new(json).unwrap_or_default().into_raw(),
+            attestation_json: cstring_new_or_empty(&json),
         }
     }
 
@@ -89,13 +94,15 @@ impl AttestationResultC {
             attestation_json: ptr::null_mut(),
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for AttestationResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("error message contains null").unwrap())
-                .into_raw(),
+            error_msg,
             attestation_json: ptr::null_mut(),
         }
     }
@@ -105,15 +112,10 @@ impl StringArrayResultC {
     fn ok(strings: Vec<String>) -> Self {
         let c_strings: Vec<*mut c_char> = strings
             .into_iter()
-            .map(|s| CString::new(s).unwrap_or_default().into_raw())
+            .map(|s| cstring_new_or_empty(&s))
             .collect();
 
-        let len = c_strings.len();
-        let ptr = if len > 0 {
-            Box::into_raw(c_strings.into_boxed_slice()) as *mut *mut c_char
-        } else {
-            ptr::null_mut()
-        };
+        let (ptr, len) = vec_into_raw(c_strings);
 
         Self {
             success: true,
@@ -122,13 +124,15 @@ impl StringArrayResultC {
             strings_len: len,
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for StringArrayResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("error message contains null").unwrap())
-                .into_raw(),
+            error_msg,
             strings: ptr::null_mut(),
             strings_len: 0,
         }
@@ -143,13 +147,15 @@ impl CountResultC {
             count,
         }
     }
+}
 
-    fn error(msg: &str) -> Self {
+impl FfiResult for CountResultC {
+    const ERROR_FALLBACK: &'static str = "error message contains null";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new("error message contains null").unwrap())
-                .into_raw(),
+            error_msg,
             count: 0,
         }
     }
@@ -170,11 +176,7 @@ pub extern "C" fn storage_new_memory() -> *mut SqliteStore {
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
-    if path.is_null() {
-        return ptr::null_mut();
-    }
-
-    let path_str = match unsafe { CStr::from_ptr(path) }.to_str() {
+    let path_str = match cstr_to_str(path) {
         Ok(s) => s,
         Err(_) => return ptr::null_mut(),
     };
@@ -188,11 +190,7 @@ pub extern "C" fn storage_new_file(path: *const c_char) -> *mut SqliteStore {
 #[no_mangle]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn storage_free(store: *mut SqliteStore) {
-    if !store.is_null() {
-        unsafe {
-            let _ = Box::from_raw(store);
-        }
-    }
+    free_boxed(store);
 }
 
 // ============================================================================
@@ -208,20 +206,17 @@ pub extern "C" fn storage_put(
     if store.is_null() {
         return StorageResultC::error("null store pointer");
     }
-    if attestation_json.is_null() {
-        return StorageResultC::error("null attestation JSON");
-    }
 
-    let store = unsafe { &mut *store };
-
-    let json_str = match unsafe { CStr::from_ptr(attestation_json) }.to_str() {
+    let json_str = match cstr_to_str(attestation_json) {
         Ok(s) => s,
-        Err(_) => return StorageResultC::error("invalid UTF-8 in attestation JSON"),
+        Err(e) => return StorageResultC::error(e),
     };
 
     if json_str.len() > MAX_JSON_LENGTH {
         return StorageResultC::error("attestation JSON exceeds maximum length");
     }
+
+    let store = unsafe { &mut *store };
 
     let attestation: Attestation = match serde_json::from_str(json_str) {
         Ok(a) => a,
@@ -240,20 +235,17 @@ pub extern "C" fn storage_get(store: *const SqliteStore, id: *const c_char) -> A
     if store.is_null() {
         return AttestationResultC::error("null store pointer");
     }
-    if id.is_null() {
-        return AttestationResultC::error("null ID");
-    }
 
-    let store = unsafe { &*store };
-
-    let id_str = match unsafe { CStr::from_ptr(id) }.to_str() {
+    let id_str = match cstr_to_str(id) {
         Ok(s) => s,
-        Err(_) => return AttestationResultC::error("invalid UTF-8 in ID"),
+        Err(e) => return AttestationResultC::error(e),
     };
 
     if id_str.len() > MAX_ID_LENGTH {
         return AttestationResultC::error("ID exceeds maximum length");
     }
+
+    let store = unsafe { &*store };
 
     match store.get(id_str) {
         Ok(Some(attestation)) => match serde_json::to_string(&attestation) {
@@ -271,16 +263,13 @@ pub extern "C" fn storage_exists(store: *const SqliteStore, id: *const c_char) -
     if store.is_null() {
         return StorageResultC::error("null store pointer");
     }
-    if id.is_null() {
-        return StorageResultC::error("null ID");
-    }
+
+    let id_str = match cstr_to_str(id) {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
 
     let store = unsafe { &*store };
-
-    let id_str = match unsafe { CStr::from_ptr(id) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return StorageResultC::error("invalid UTF-8 in ID"),
-    };
 
     match store.exists(id_str) {
         Ok(true) => StorageResultC::ok(),
@@ -295,16 +284,13 @@ pub extern "C" fn storage_delete(store: *mut SqliteStore, id: *const c_char) -> 
     if store.is_null() {
         return StorageResultC::error("null store pointer");
     }
-    if id.is_null() {
-        return StorageResultC::error("null ID");
-    }
+
+    let id_str = match cstr_to_str(id) {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
 
     let store = unsafe { &mut *store };
-
-    let id_str = match unsafe { CStr::from_ptr(id) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return StorageResultC::error("invalid UTF-8 in ID"),
-    };
 
     match store.delete(id_str) {
         Ok(true) => StorageResultC::ok(),
@@ -322,16 +308,13 @@ pub extern "C" fn storage_update(
     if store.is_null() {
         return StorageResultC::error("null store pointer");
     }
-    if attestation_json.is_null() {
-        return StorageResultC::error("null attestation JSON");
-    }
+
+    let json_str = match cstr_to_str(attestation_json) {
+        Ok(s) => s,
+        Err(e) => return StorageResultC::error(e),
+    };
 
     let store = unsafe { &mut *store };
-
-    let json_str = match unsafe { CStr::from_ptr(attestation_json) }.to_str() {
-        Ok(s) => s,
-        Err(_) => return StorageResultC::error("invalid UTF-8 in attestation JSON"),
-    };
 
     let attestation: Attestation = match serde_json::from_str(json_str) {
         Ok(a) => a,
@@ -399,13 +382,10 @@ pub extern "C" fn storage_query(
     if store.is_null() {
         return AttestationResultC::error("null store pointer");
     }
-    if filter_json.is_null() {
-        return AttestationResultC::error("null filter JSON");
-    }
 
-    let filter_str = match unsafe { CStr::from_ptr(filter_json) }.to_str() {
+    let filter_str = match cstr_to_str(filter_json) {
         Ok(s) => s,
-        Err(_) => return AttestationResultC::error("invalid UTF-8 in filter JSON"),
+        Err(e) => return AttestationResultC::error(e),
     };
 
     if filter_str.len() > MAX_JSON_LENGTH {
@@ -438,83 +418,35 @@ pub extern "C" fn storage_query(
 // Memory Management
 // ============================================================================
 
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn storage_string_free(s: *mut c_char) {
-    if !s.is_null() {
-        unsafe {
-            let _ = CString::from_raw(s);
-        }
-    }
-}
+qntx_ffi_common::define_string_free!(storage_string_free);
 
 #[no_mangle]
 pub extern "C" fn storage_result_free(result: StorageResultC) {
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
+    free_cstring(result.error_msg);
 }
 
 #[no_mangle]
 pub extern "C" fn attestation_result_free(result: AttestationResultC) {
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
-    if !result.attestation_json.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.attestation_json);
-        }
-    }
+    free_cstring(result.error_msg);
+    free_cstring(result.attestation_json);
 }
 
 #[no_mangle]
 pub extern "C" fn string_array_result_free(result: StringArrayResultC) {
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
-
-    if !result.strings.is_null() && result.strings_len > 0 {
-        let strings_slice =
-            unsafe { std::slice::from_raw_parts_mut(result.strings, result.strings_len) };
-        for s in strings_slice.iter() {
-            if !s.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(*s);
-                }
-            }
-        }
-        unsafe {
-            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
-                result.strings,
-                result.strings_len,
-            ));
-        }
-    }
+    free_cstring(result.error_msg);
+    qntx_ffi_common::free_cstring_array(result.strings, result.strings_len);
 }
 
 #[no_mangle]
 pub extern "C" fn count_result_free(result: CountResultC) {
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
+    free_cstring(result.error_msg);
 }
 
 // ============================================================================
 // Utilities
 // ============================================================================
 
-#[no_mangle]
-pub extern "C" fn storage_version() -> *const c_char {
-    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
-}
+qntx_ffi_common::define_version_fn!(storage_version);
 
 #[cfg(test)]
 mod tests {

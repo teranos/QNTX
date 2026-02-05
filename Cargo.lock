@@ -3676,6 +3676,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qntx-ffi-common"
+version = "0.1.0"
+
+[[package]]
 name = "qntx-grpc"
 version = "0.1.0"
 dependencies = [
@@ -3717,6 +3721,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "protoc-bin-vendored",
+ "qntx-core",
  "serde",
  "serde_json",
 ]
@@ -3747,6 +3752,7 @@ dependencies = [
  "chrono",
  "pretty_assertions",
  "qntx-core",
+ "qntx-ffi-common",
  "qntx-proto",
  "rusqlite",
  "serde",

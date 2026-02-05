@@ -10,9 +10,10 @@ description = "Protocol Buffer types for QNTX"
 prost = "0.13"
 prost-types = "0.13"
 serde = { workspace = true }
+serde_json = { workspace = true }
+qntx-core = { path = "../qntx-core" }
 
 [dev-dependencies]
-serde_json = { workspace = true }
 
 [build-dependencies]
 prost-build = "0.13"

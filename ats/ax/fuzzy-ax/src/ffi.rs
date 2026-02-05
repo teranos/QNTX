@@ -20,10 +20,14 @@
 //! All public FFI functions handle null pointer checks internally.
 //! The caller is responsible for passing valid pointers as documented.
 
-use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
+
+use qntx_ffi_common::{
+    convert_string_array, cstr_to_str, cstring_new_or_empty, free_boxed_slice, free_cstring,
+    vec_into_raw, FfiResult,
+};
 
 use crate::engine::{FuzzyEngine, VocabularyType};
 
@@ -106,14 +110,13 @@ pub struct RustAttributeMatchResultC {
     pub search_time_us: u64,
 }
 
-impl RustMatchResultC {
-    fn error(msg: &str) -> Self {
+impl FfiResult for RustMatchResultC {
+    const ERROR_FALLBACK: &'static str = " ";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            // Safe fallback: single space cannot contain null bytes
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new(" ").expect("space is valid CString"))
-                .into_raw(),
+            error_msg,
             matches: ptr::null_mut(),
             matches_len: 0,
             search_time_us: 0,
@@ -121,13 +124,13 @@ impl RustMatchResultC {
     }
 }
 
-impl RustAttributeMatchResultC {
-    fn error(msg: &str) -> Self {
+impl FfiResult for RustAttributeMatchResultC {
+    const ERROR_FALLBACK: &'static str = " ";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new(" ").expect("space is valid CString"))
-                .into_raw(),
+            error_msg,
             matches: ptr::null_mut(),
             matches_len: 0,
             search_time_us: 0,
@@ -135,14 +138,13 @@ impl RustAttributeMatchResultC {
     }
 }
 
-impl RustRebuildResultC {
-    fn error(msg: &str) -> Self {
+impl FfiResult for RustRebuildResultC {
+    const ERROR_FALLBACK: &'static str = " ";
+
+    fn error_fields(error_msg: *mut c_char) -> Self {
         Self {
             success: false,
-            // Safe fallback: single space cannot contain null bytes
-            error_msg: CString::new(msg)
-                .unwrap_or_else(|_| CString::new(" ").expect("space is valid CString"))
-                .into_raw(),
+            error_msg,
             predicate_count: 0,
             context_count: 0,
             build_time_ms: 0,
@@ -186,21 +188,7 @@ pub extern "C" fn fuzzy_engine_new() -> *mut FuzzyEngine {
     Box::into_raw(engine)
 }
 
-/// Free a FuzzyEngine instance.
-///
-/// # Safety
-/// - `engine` must be a valid pointer from `fuzzy_engine_new`
-/// - `engine` must not be used after this call
-/// - Safe to call with NULL (no-op)
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn fuzzy_engine_free(engine: *mut FuzzyEngine) {
-    if !engine.is_null() {
-        unsafe {
-            let _ = Box::from_raw(engine);
-        }
-    }
-}
+qntx_ffi_common::define_engine_free!(fuzzy_engine_free, FuzzyEngine);
 
 // ============================================================================
 // Index Management
@@ -247,22 +235,14 @@ pub extern "C" fn fuzzy_engine_rebuild_index(
     }
 
     // Convert C string arrays to Vec<String>
-    let predicates_vec = if predicates.is_null() || predicates_len == 0 {
-        Vec::new()
-    } else {
-        match convert_string_array(predicates, predicates_len) {
-            Ok(v) => v,
-            Err(e) => return RustRebuildResultC::error(&e),
-        }
+    let predicates_vec = match convert_string_array(predicates, predicates_len) {
+        Ok(v) => v,
+        Err(e) => return RustRebuildResultC::error(&e),
     };
 
-    let contexts_vec = if contexts.is_null() || contexts_len == 0 {
-        Vec::new()
-    } else {
-        match convert_string_array(contexts, contexts_len) {
-            Ok(v) => v,
-            Err(e) => return RustRebuildResultC::error(&e),
-        }
+    let contexts_vec = match convert_string_array(contexts, contexts_len) {
+        Ok(v) => v,
+        Err(e) => return RustRebuildResultC::error(&e),
     };
 
     // Rebuild index
@@ -275,23 +255,15 @@ pub extern "C" fn fuzzy_engine_rebuild_index(
         predicate_count: pred_count,
         context_count: ctx_count,
         build_time_ms: build_time,
-        index_hash: CString::new(hash).unwrap_or_default().into_raw(),
+        index_hash: cstring_new_or_empty(&hash),
     }
 }
 
 /// Free a RustRebuildResultC.
 #[no_mangle]
 pub extern "C" fn fuzzy_rebuild_result_free(result: RustRebuildResultC) {
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
-    if !result.index_hash.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.index_hash);
-        }
-    }
+    free_cstring(result.error_msg);
+    free_cstring(result.index_hash);
 }
 
 // ============================================================================
@@ -326,22 +298,18 @@ pub extern "C" fn fuzzy_engine_find_matches(
     if engine.is_null() {
         return RustMatchResultC::error("null engine pointer");
     }
-    if query.is_null() {
-        return RustMatchResultC::error("null query pointer");
-    }
 
-    let engine = unsafe { &*engine };
-
-    // Convert query to Rust string
-    let query_str = match unsafe { CStr::from_ptr(query) }.to_str() {
+    let query_str = match cstr_to_str(query) {
         Ok(s) => s,
-        Err(_) => return RustMatchResultC::error("invalid UTF-8 in query"),
+        Err(e) => return RustMatchResultC::error(e),
     };
 
     // Validate query length to prevent DoS
     if query_str.len() > MAX_QUERY_LENGTH {
         return RustMatchResultC::error("query exceeds maximum length");
     }
+
+    let engine = unsafe { &*engine };
 
     // Convert vocabulary type
     let vocab_type = if vocabulary_type == 1 {
@@ -372,23 +340,17 @@ pub extern "C" fn fuzzy_engine_find_matches(
         };
     }
 
-    let mut c_matches: Vec<RustMatchC> = Vec::with_capacity(matches.len());
-    for m in matches {
-        c_matches.push(RustMatchC {
+    let c_matches: Vec<RustMatchC> = matches
+        .into_iter()
+        .map(|m| RustMatchC {
             // Safe: value and strategy come from Rust engine (not user input)
-            // Panic here indicates a bug in the engine
-            value: CString::new(m.value)
-                .expect("match value should not contain null bytes")
-                .into_raw(),
+            value: cstring_new_or_empty(&m.value),
             score: m.score,
-            strategy: CString::new(m.strategy)
-                .expect("strategy name should not contain null bytes")
-                .into_raw(),
-        });
-    }
+            strategy: cstring_new_or_empty(&m.strategy),
+        })
+        .collect();
 
-    let matches_len = c_matches.len();
-    let matches_ptr = Box::into_raw(c_matches.into_boxed_slice()) as *mut RustMatchC;
+    let (matches_ptr, matches_len) = vec_into_raw(c_matches);
 
     RustMatchResultC {
         success: true,
@@ -406,12 +368,7 @@ pub extern "C" fn fuzzy_engine_find_matches(
 /// - `result` must not be used after this call
 #[no_mangle]
 pub extern "C" fn fuzzy_match_result_free(result: RustMatchResultC) {
-    // Free error message
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
+    free_cstring(result.error_msg);
 
     // Free match array and strings
     if !result.matches.is_null() && result.matches_len > 0 {
@@ -419,25 +376,11 @@ pub extern "C" fn fuzzy_match_result_free(result: RustMatchResultC) {
             unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
 
         for m in matches_slice.iter() {
-            if !m.value.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.value);
-                }
-            }
-            if !m.strategy.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.strategy);
-                }
-            }
+            free_cstring(m.value);
+            free_cstring(m.strategy);
         }
 
-        // Free the array itself
-        unsafe {
-            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
-                result.matches,
-                result.matches_len,
-            ));
-        }
+        free_boxed_slice(result.matches, result.matches_len);
     }
 }
 
@@ -469,15 +412,11 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
     if engine.is_null() {
         return RustAttributeMatchResultC::error("null engine");
     }
-    let engine = unsafe { &*engine };
 
     // Validate and convert query
-    if query.is_null() {
-        return RustAttributeMatchResultC::error("null query");
-    }
-    let query_str = match unsafe { CStr::from_ptr(query) }.to_str() {
+    let query_str = match cstr_to_str(query) {
         Ok(s) => s,
-        Err(_) => return RustAttributeMatchResultC::error("invalid UTF-8 in query"),
+        Err(e) => return RustAttributeMatchResultC::error(e),
     };
 
     if query_str.len() > MAX_QUERY_LENGTH {
@@ -485,32 +424,24 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
     }
 
     // Validate and convert attributes JSON
-    if attributes_json.is_null() {
-        return RustAttributeMatchResultC::error("null attributes_json");
-    }
-    let attributes_str = match unsafe { CStr::from_ptr(attributes_json) }.to_str() {
+    let attributes_str = match cstr_to_str(attributes_json) {
         Ok(s) => s,
-        Err(_) => return RustAttributeMatchResultC::error("invalid UTF-8 in attributes_json"),
+        Err(e) => return RustAttributeMatchResultC::error(e),
     };
 
     // Validate and convert node_id
-    if node_id.is_null() {
-        return RustAttributeMatchResultC::error("null node_id");
-    }
-    let node_id_str = match unsafe { CStr::from_ptr(node_id) }.to_str() {
+    let node_id_str = match cstr_to_str(node_id) {
         Ok(s) => s,
-        Err(_) => return RustAttributeMatchResultC::error("invalid UTF-8 in node_id"),
+        Err(e) => return RustAttributeMatchResultC::error(e),
     };
 
     // Convert rich_string_fields array
-    let fields = if rich_string_fields_len > 0 && !rich_string_fields.is_null() {
-        match convert_string_array(rich_string_fields, rich_string_fields_len) {
-            Ok(f) => f,
-            Err(e) => return RustAttributeMatchResultC::error(&e),
-        }
-    } else {
-        Vec::new()
+    let fields = match convert_string_array(rich_string_fields, rich_string_fields_len) {
+        Ok(f) => f,
+        Err(e) => return RustAttributeMatchResultC::error(&e),
     };
+
+    let engine = unsafe { &*engine };
 
     // Perform search
     let start = std::time::Instant::now();
@@ -528,30 +459,19 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
         };
     }
 
-    let mut c_matches: Vec<RustAttributeMatchC> = Vec::with_capacity(matches.len());
-    for m in matches {
-        c_matches.push(RustAttributeMatchC {
-            node_id: CString::new(m.node_id)
-                .expect("node_id should not contain null bytes")
-                .into_raw(),
-            field_name: CString::new(m.field_name)
-                .expect("field_name should not contain null bytes")
-                .into_raw(),
-            field_value: CString::new(m.field_value)
-                .expect("field_value should not contain null bytes")
-                .into_raw(),
-            excerpt: CString::new(m.excerpt)
-                .expect("excerpt should not contain null bytes")
-                .into_raw(),
+    let c_matches: Vec<RustAttributeMatchC> = matches
+        .into_iter()
+        .map(|m| RustAttributeMatchC {
+            node_id: cstring_new_or_empty(&m.node_id),
+            field_name: cstring_new_or_empty(&m.field_name),
+            field_value: cstring_new_or_empty(&m.field_value),
+            excerpt: cstring_new_or_empty(&m.excerpt),
             score: m.score,
-            strategy: CString::new(m.strategy)
-                .expect("strategy name should not contain null bytes")
-                .into_raw(),
-        });
-    }
+            strategy: cstring_new_or_empty(&m.strategy),
+        })
+        .collect();
 
-    let matches_len = c_matches.len();
-    let matches_ptr = Box::into_raw(c_matches.into_boxed_slice()) as *mut RustAttributeMatchC;
+    let (matches_ptr, matches_len) = vec_into_raw(c_matches);
 
     RustAttributeMatchResultC {
         success: true,
@@ -569,12 +489,7 @@ pub extern "C" fn fuzzy_engine_find_attribute_matches(
 /// - `result` must not be used after this call
 #[no_mangle]
 pub extern "C" fn fuzzy_attribute_result_free(result: RustAttributeMatchResultC) {
-    // Free error message
-    if !result.error_msg.is_null() {
-        unsafe {
-            let _ = CString::from_raw(result.error_msg);
-        }
-    }
+    free_cstring(result.error_msg);
 
     // Free match array and strings
     if !result.matches.is_null() && result.matches_len > 0 {
@@ -582,40 +497,14 @@ pub extern "C" fn fuzzy_attribute_result_free(result: RustAttributeMatchResultC)
             unsafe { slice::from_raw_parts_mut(result.matches, result.matches_len) };
 
         for m in matches_slice.iter() {
-            if !m.node_id.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.node_id);
-                }
-            }
-            if !m.field_name.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.field_name);
-                }
-            }
-            if !m.field_value.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.field_value);
-                }
-            }
-            if !m.excerpt.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.excerpt);
-                }
-            }
-            if !m.strategy.is_null() {
-                unsafe {
-                    let _ = CString::from_raw(m.strategy);
-                }
-            }
+            free_cstring(m.node_id);
+            free_cstring(m.field_name);
+            free_cstring(m.field_value);
+            free_cstring(m.excerpt);
+            free_cstring(m.strategy);
         }
 
-        // Free the array itself
-        unsafe {
-            let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
-                result.matches,
-                result.matches_len,
-            ));
-        }
+        free_boxed_slice(result.matches, result.matches_len);
     }
 }
 
@@ -635,9 +524,7 @@ pub extern "C" fn fuzzy_engine_get_hash(engine: *const FuzzyEngine) -> *mut c_ch
     }
 
     let engine = unsafe { &*engine };
-    CString::new(engine.get_index_hash())
-        .unwrap_or_default()
-        .into_raw()
+    cstring_new_or_empty(&engine.get_index_hash())
 }
 
 /// Check if the engine index is ready (has vocabulary).
@@ -651,58 +538,18 @@ pub extern "C" fn fuzzy_engine_is_ready(engine: *const FuzzyEngine) -> bool {
     engine.is_ready()
 }
 
-/// Free a string returned by FFI functions.
-#[no_mangle]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn fuzzy_string_free(s: *mut c_char) {
-    if !s.is_null() {
-        unsafe {
-            let _ = CString::from_raw(s);
-        }
-    }
-}
+qntx_ffi_common::define_string_free!(fuzzy_string_free);
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
-/// Convert a C string array to Vec<String>
-fn convert_string_array(arr: *const *const c_char, len: usize) -> Result<Vec<String>, String> {
-    let slice = unsafe { slice::from_raw_parts(arr, len) };
-    let mut result = Vec::with_capacity(len);
-
-    for (i, &ptr) in slice.iter().enumerate() {
-        if ptr.is_null() {
-            return Err(format!("null string at index {}", i));
-        }
-        match unsafe { CStr::from_ptr(ptr) }.to_str() {
-            Ok(s) => result.push(s.to_string()),
-            Err(_) => return Err(format!("invalid UTF-8 at index {}", i)),
-        }
-    }
-
-    Ok(result)
-}
-
-/// Returns the library version string.
-///
-/// # Safety
-///
-/// The returned pointer is valid for the lifetime of the program.
-/// Do not free this pointer - it points to static memory.
-///
-/// # Returns
-///
-/// A null-terminated C string containing the version (e.g., "0.1.0")
-#[no_mangle]
-pub extern "C" fn fuzzy_engine_version() -> *const c_char {
-    // SAFETY: This is a compile-time constant string literal
-    concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char
-}
+qntx_ffi_common::define_version_fn!(fuzzy_engine_version);
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::CString;
 
     #[test]
     fn test_engine_lifecycle() {
