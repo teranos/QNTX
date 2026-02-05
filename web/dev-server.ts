@@ -224,11 +224,6 @@ async function startServer() {
             console.error(`${dim}  URL: ${url.pathname}${reset}`);
             console.error(`${dim}  Path: ${absolutePath}${reset}`);
 
-            if (url.pathname.endsWith('.wasm')) {
-                console.error(`${darkPink}FATAL: WASM file is required${reset}`);
-                process.exit(1);
-            }
-
             return new Response("Not Found", { status: 404 });
         }
     });
