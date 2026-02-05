@@ -376,7 +376,7 @@ func TestParseAxCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseAskCommand(tt.query)
+			result, err := ParseAxCommand(tt.query)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -440,7 +440,7 @@ func TestParseAxCommandWarnings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseAskCommand(tt.query)
+			result, err := ParseAxCommand(tt.query)
 
 			if tt.shouldParse {
 				assert.NotNil(t, result, "Should have parsed successfully")
@@ -501,7 +501,7 @@ func TestQuotedKeywordDisambiguation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseAskCommand(tt.query)
+			result, err := ParseAxCommand(tt.query)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expected.Subjects, result.Subjects, "Subjects mismatch")
@@ -549,7 +549,7 @@ func TestCaseSensitivityHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseAskCommand(tt.query)
+			result, err := ParseAxCommand(tt.query)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expected.Subjects, result.Subjects, "Subjects mismatch")

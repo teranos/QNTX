@@ -16,6 +16,10 @@ import type {
 } from "./execution-types.ts";
 import { formatRelativeTime as formatRelativeTimeUtil } from "../html-utils.ts";
 
+// Time conversion constants
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+
 /**
  * Get base URL for Pulse API endpoints
  */
@@ -154,17 +158,17 @@ export async function getExecutionLogs(
  * @returns Human-readable duration string
  */
 export function formatDuration(durationMs: number): string {
-  if (durationMs < 1000) {
+  if (durationMs < MS_PER_SECOND) {
     return `${durationMs}ms`;
   }
 
-  const seconds = Math.floor(durationMs / 1000);
-  if (seconds < 60) {
+  const seconds = Math.floor(durationMs / MS_PER_SECOND);
+  if (seconds < SECONDS_PER_MINUTE) {
     return `${seconds}s`;
   }
 
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
+  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  const remainingSeconds = seconds % SECONDS_PER_MINUTE;
   return `${minutes}m ${remainingSeconds}s`;
 }
 

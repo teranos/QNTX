@@ -164,9 +164,12 @@ jobs:
           skipPush: true
 
       - name: Check formatting
-        run: cd qntx-python && nix develop .. --command cargo fmt --check
+        run: nix develop ./qntx-python --command cargo fmt --check
 
-      - name: Build via Nix (required for Python linking)
+      - name: Clippy (via Nix)
+        run: nix flake check ./qntx-python --print-build-logs
+
+      - name: Build and test via Nix (required for Python linking)
         run: nix build ./qntx-python#qntx-python-plugin --print-build-logs
 
       - name: Verify binary works

@@ -41,12 +41,11 @@ import { toggleProsePanel } from './prose/panel.js';
 import { toggleGoEditor } from './code/panel.js';
 import { togglePythonEditor } from './python/panel.js';
 import { togglePluginPanel } from './plugin-panel.js';
-import { webscraperPanel } from './webscraper-panel.js';
 import { VidStreamWindow } from './vidstream-window.js';
 import { toggleJobList } from './hixtory-panel.js';
 
 // Valid palette commands (derived from generated mappings + UI-only commands)
-type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'scraper' | 'vidstream' | 'db' | 'ctp2';
+type PaletteCommand = keyof typeof CommandToSymbol | 'pulse' | 'prose' | 'go' | 'py' | 'plugins' | 'vidstream' | 'db' | 'ctp2';
 
 /**
  * Get symbol for a command, with fallback for UI-only commands
@@ -202,7 +201,6 @@ function getInitialTooltip(cmd: string): string {
         'go': 'Go - code editor',
         'py': 'py - Python editor',
         'plugins': '⚙ Plugins - domain extensions',
-        'scraper': '⛶ Scraper - web extraction',
         'vidstream': '⮀ VidStream - video inference\n(version info loading...)',
         'ctp2': 'CTP2',
     };
@@ -323,10 +321,6 @@ function handleSymbolClick(e: Event): void {
             // Plugins - show installed domain plugins
             showPluginPanel();
             break;
-        case 'scraper':
-            // Web Scraper - show scraping panel
-            showWebscraperPanel();
-            break;
         case 'vidstream':
             // VidStream - show video inference window
             log(SEG.VID, 'VidStream button clicked');
@@ -424,13 +418,6 @@ function showPythonEditor(): void {
  */
 function showPluginPanel(): void {
     togglePluginPanel();
-}
-
-/**
- * Show webscraper panel - UI for web scraping operations
- */
-function showWebscraperPanel(): void {
-    webscraperPanel.toggle();
 }
 
 /**
