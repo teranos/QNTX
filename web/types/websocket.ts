@@ -518,9 +518,6 @@ export type WebSocketMessage =
   | StorageEvictionMessage
   | PluginHealthMessage
   | SystemCapabilitiesMessage
-  | WebscraperRequestMessage
-  | WebscraperResponseMessage
-  | WebscraperProgressMessage
   | WatcherMatchMessage
   | WatcherErrorMessage;
 
