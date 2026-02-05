@@ -25,146 +25,294 @@ import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 import { getMinimizeDuration } from './glyph';
+import { unmeldComposition, isMeldedComposition } from './meld-system';
+import { makeDraggable } from './glyph-interaction';
 
 // ============================================================================
 // Selection State
 // ============================================================================
 
-/** Currently selected glyph ID (null = nothing selected) */
-let selectedGlyphId: string | null = null;
+/** Currently selected glyph IDs (empty = nothing selected) */
+let selectedGlyphIds: string[] = [];
 
 /** Reference to the action bar element */
 let actionBar: HTMLElement | null = null;
 
 /**
- * Select a glyph on the canvas. Deselects any previous selection.
+ * Check if a glyph is currently selected
  */
-function selectGlyph(glyphId: string, container: HTMLElement): void {
-    deselectAll(container);
+export function isGlyphSelected(glyphId: string): boolean {
+    return selectedGlyphIds.includes(glyphId);
+}
 
-    selectedGlyphId = glyphId;
+/**
+ * Get all currently selected glyph IDs
+ */
+export function getSelectedGlyphIds(): string[] {
+    return [...selectedGlyphIds];
+}
 
-    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
-    if (el) {
-        el.classList.add('canvas-glyph-selected');
-        showActionBar(el, container);
+/**
+ * Get all selected glyph elements from the canvas
+ */
+export function getSelectedGlyphElements(container: HTMLElement): HTMLElement[] {
+    return selectedGlyphIds
+        .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null)
+        .filter((el): el is HTMLElement => el !== null);
+}
+
+/**
+ * Select a glyph on the canvas.
+ * - Normal click: Replace selection with this glyph
+ * - Shift+click: Add/remove glyph from selection (toggle)
+ */
+function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean): void {
+    if (shiftKey) {
+        // Toggle glyph in selection
+        const idx = selectedGlyphIds.indexOf(glyphId);
+        if (idx !== -1) {
+            // Already selected — deselect it
+            selectedGlyphIds.splice(idx, 1);
+            const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+            if (el) {
+                el.classList.remove('canvas-glyph-selected');
+            }
+        } else {
+            // Not selected — add to selection
+            selectedGlyphIds.push(glyphId);
+            const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+            if (el) {
+                el.classList.add('canvas-glyph-selected');
+            }
+        }
+    } else {
+        // Replace selection
+        deselectAll(container);
+        selectedGlyphIds = [glyphId];
+        const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        if (el) {
+            el.classList.add('canvas-glyph-selected');
+        }
     }
 
-    log.debug(SEG.UI, `[Canvas] Selected glyph ${glyphId}`);
+    // Show/hide action bar based on selection
+    if (selectedGlyphIds.length > 0) {
+        showActionBar(container);
+    } else {
+        hideActionBar();
+    }
+
+    log.debug(SEG.UI, `[Canvas] Selected ${selectedGlyphIds.length} glyphs`, { selectedGlyphIds });
 }
 
 /**
  * Deselect all glyphs and hide action bar
  */
 function deselectAll(container: HTMLElement): void {
-    if (!selectedGlyphId) return;
+    if (selectedGlyphIds.length === 0) return;
 
-    const prev = container.querySelector('.canvas-glyph-selected');
-    if (prev) {
-        prev.classList.remove('canvas-glyph-selected');
-    }
+    const selected = container.querySelectorAll('.canvas-glyph-selected');
+    selected.forEach(el => el.classList.remove('canvas-glyph-selected'));
 
     hideActionBar();
-    selectedGlyphId = null;
+    selectedGlyphIds = [];
 }
 
 /**
- * Show the action bar positioned above the selected glyph
+ * Show the action bar at top middle of canvas with slide-in animation
  */
-function showActionBar(glyphEl: HTMLElement, container: HTMLElement): void {
+function showActionBar(container: HTMLElement): void {
+    if (selectedGlyphIds.length === 0) {
+        return;
+    }
+
     hideActionBar();
+
+    // Defensive cleanup: remove any orphaned action bars
+    container.querySelectorAll('.canvas-action-bar').forEach(el => el.remove());
 
     const bar = document.createElement('div');
     bar.className = 'canvas-action-bar';
 
+    // Check if any selected glyphs are in a meld
+    let meldedComposition: HTMLElement | null = null;
+    for (const glyphId of selectedGlyphIds) {
+        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        if (glyphEl?.parentElement && isMeldedComposition(glyphEl.parentElement)) {
+            meldedComposition = glyphEl.parentElement;
+            break;
+        }
+    }
+
+    // Add unmeld button if glyphs are in a meld
+    if (meldedComposition) {
+        const unmeldBtn = document.createElement('button');
+        unmeldBtn.className = 'canvas-action-button canvas-action-unmeld';
+        unmeldBtn.title = 'Break meld';
+        unmeldBtn.textContent = '⋈'; // Bowtie/join symbol
+        unmeldBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            unmeldSelectedGlyphs(container, meldedComposition!);
+        });
+        bar.appendChild(unmeldBtn);
+    }
+
+    // Add delete button
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'canvas-action-button canvas-action-delete';
-    deleteBtn.title = 'Delete glyph';
-    deleteBtn.textContent = '\u{1F5D1}';
+    deleteBtn.title = `Delete ${selectedGlyphIds.length} glyph${selectedGlyphIds.length > 1 ? 's' : ''}`;
+    deleteBtn.textContent = '✕'; // Heavy multiplication X
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        deleteSelectedGlyph(container);
+        deleteSelectedGlyphs(container);
     });
 
     bar.appendChild(deleteBtn);
     container.appendChild(bar);
 
-    positionActionBar(bar, glyphEl, container);
+    positionActionBar(bar, container);
     actionBar = bar;
+
+    // Slide in from top
+    const duration = getMinimizeDuration() * 0.5;
+    if (duration > 0) {
+        bar.animate([
+            { transform: 'translate(-50%, -100%)', opacity: 0 },
+            { transform: 'translateX(-50%)', opacity: 1 }
+        ], {
+            duration,
+            easing: 'ease',
+            fill: 'both'
+        });
+    }
 }
 
 /**
- * Position action bar centered above the glyph element
+ * Position action bar at top middle of the canvas
  */
-function positionActionBar(bar: HTMLElement, glyphEl: HTMLElement, container: HTMLElement): void {
-    const canvasRect = container.getBoundingClientRect();
-    const glyphRect = glyphEl.getBoundingClientRect();
-
-    const glyphLeft = glyphRect.left - canvasRect.left;
-    const glyphTop = glyphRect.top - canvasRect.top;
-    const glyphCenterX = glyphLeft + glyphRect.width / 2;
-
+function positionActionBar(bar: HTMLElement, container: HTMLElement): void {
     bar.style.position = 'absolute';
-    bar.style.left = `${glyphCenterX}px`;
-    bar.style.top = `${glyphTop - 8}px`;
-    bar.style.transform = 'translate(-50%, -100%)';
+    bar.style.left = '50%';
+    bar.style.top = '8px';
     bar.style.zIndex = '9999';
 }
 
 /**
- * Hide the action bar
+ * Hide the action bar with slide-up animation
  */
 function hideActionBar(): void {
-    if (actionBar) {
-        actionBar.remove();
-        actionBar = null;
-    }
-}
+    if (!actionBar) return;
 
-/**
- * Delete the currently selected glyph from the canvas
- * Animates scale-down + fade-out before removal (respects reduced motion)
- */
-function deleteSelectedGlyph(container: HTMLElement): void {
-    if (!selectedGlyphId) return;
+    const bar = actionBar;
+    actionBar = null;
 
-    const glyphId = selectedGlyphId;
-    const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    // Cancel any running animations
+    bar.getAnimations().forEach(anim => anim.cancel());
 
-    // Clear selection immediately (prevent double-delete)
-    hideActionBar();
-    selectedGlyphId = null;
-
-    // Remove from persisted state and local array immediately
-    uiState.removeCanvasGlyph(glyphId);
-    container.dispatchEvent(new CustomEvent('glyph-deleted', {
-        detail: { glyphId }
-    }));
-
-    if (!el) return;
-
-    const duration = getMinimizeDuration();
-
+    const duration = getMinimizeDuration() * 0.5;
     if (duration === 0) {
-        el.remove();
-        log.debug(SEG.UI, `[Canvas] Deleted glyph ${glyphId}`);
+        bar.remove();
         return;
     }
 
-    // Animate out, then remove
-    const animation = el.animate([
-        { opacity: 1, transform: 'scale(1)' },
-        { opacity: 0, transform: 'scale(0.85)' }
+    // Slide up and fade out
+    const animation = bar.animate([
+        { transform: 'translateX(-50%)', opacity: 1 },
+        { transform: 'translate(-50%, -100%)', opacity: 0 }
     ], {
         duration,
-        easing: 'ease-in',
+        easing: 'ease',
         fill: 'forwards'
     });
 
     animation.onfinish = () => {
-        el.remove();
-        log.debug(SEG.UI, `[Canvas] Deleted glyph ${glyphId}`);
+        bar.remove();
     };
+}
+
+/**
+ * Unmeld selected glyphs that are in a melded composition
+ */
+function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement): void {
+    const result = unmeldComposition(composition);
+    if (!result) {
+        log.error(SEG.UI, '[Canvas] Failed to unmeld composition');
+        return;
+    }
+
+    const { axElement, promptElement, axId, promptId } = result;
+
+    // Restore drag handlers on the unmelded glyphs
+    const axGlyph: Glyph = {
+        id: axId,
+        title: 'AX Query',
+        renderContent: () => axElement
+    };
+
+    const promptGlyph: Glyph = {
+        id: promptId,
+        title: 'Prompt',
+        symbol: SO,
+        renderContent: () => promptElement
+    };
+
+    makeDraggable(axElement, axElement, axGlyph, { logLabel: 'AX' });
+    makeDraggable(promptElement, promptElement, promptGlyph, { logLabel: 'Prompt' });
+
+    // Clear selection and hide action bar
+    deselectAll(container);
+
+    log.debug(SEG.UI, '[Canvas] Unmelded composition', { axId, promptId });
+}
+
+/**
+ * Delete all currently selected glyphs from the canvas
+ * Animates scale-down + fade-out before removal (respects reduced motion)
+ */
+function deleteSelectedGlyphs(container: HTMLElement): void {
+    if (selectedGlyphIds.length === 0) return;
+
+    const glyphIdsToDelete = [...selectedGlyphIds];
+
+    // Clear selection immediately (prevent double-delete)
+    hideActionBar();
+    selectedGlyphIds = [];
+
+    const duration = getMinimizeDuration();
+
+    // Delete each selected glyph
+    for (const glyphId of glyphIdsToDelete) {
+        const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+
+        // Remove from persisted state and local array immediately
+        uiState.removeCanvasGlyph(glyphId);
+        container.dispatchEvent(new CustomEvent('glyph-deleted', {
+            detail: { glyphId }
+        }));
+
+        if (!el) continue;
+
+        if (duration === 0) {
+            el.remove();
+            continue;
+        }
+
+        // Animate out, then remove
+        const animation = el.animate([
+            { opacity: 1, transform: 'scale(1)' },
+            { opacity: 0, transform: 'scale(0.85)' }
+        ], {
+            duration,
+            easing: 'ease-in',
+            fill: 'forwards'
+        });
+
+        animation.onfinish = () => {
+            el.remove();
+        };
+    }
+
+    log.debug(SEG.UI, `[Canvas] Deleted ${glyphIdsToDelete.length} glyphs`, { glyphIdsToDelete });
 }
 
 /**
@@ -240,21 +388,67 @@ export function createCanvasGlyph(): Glyph {
                 showSpawnMenu(e.clientX, e.clientY, container, glyphs);
             });
 
-            // Selection: click on a glyph to select, click background to deselect
+            // Selection: click on a glyph to select, Shift+click for multi-select, click background to deselect
             container.addEventListener('click', (e) => {
                 const target = e.target as HTMLElement;
+
+                // Close spawn menu if it exists
+                const spawnMenu = document.querySelector('.canvas-spawn-menu');
+                if (spawnMenu && !spawnMenu.contains(target)) {
+                    spawnMenu.remove();
+                }
+
+                // Ignore clicks on action bar
+                if (target.closest('.canvas-action-bar')) {
+                    return;
+                }
+
+                // Ignore clicks on buttons, inputs, and textareas (allow interactive elements to work)
+                if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                    return;
+                }
 
                 // Walk up from click target to find a glyph element
                 const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
 
-                if (glyphEl) {
+                // Exclude canvas-workspace itself from being selectable
+                if (glyphEl && glyphEl.dataset.glyphId !== 'canvas-workspace') {
                     const glyphId = glyphEl.dataset.glyphId;
                     if (glyphId) {
-                        selectGlyph(glyphId, container);
+                        e.stopPropagation();
+                        selectGlyph(glyphId, container, e.shiftKey);
                     }
                 } else {
                     // Clicked on background (not a glyph) — deselect
                     deselectAll(container);
+                }
+            }, true);
+
+            // Keyboard support: DELETE/BACKSPACE to delete, ESC to deselect
+            document.addEventListener('keydown', (e) => {
+                // Ignore if user is typing in an input/textarea
+                const target = e.target as HTMLElement;
+                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+                    return;
+                }
+
+                // ESC to deselect
+                if (e.key === 'Escape') {
+                    if (selectedGlyphIds.length > 0) {
+                        e.preventDefault();
+                        deselectAll(container);
+                    }
+                    return;
+                }
+
+                // DELETE/BACKSPACE to delete selected glyphs
+                if (selectedGlyphIds.length === 0) {
+                    return;
+                }
+
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    deleteSelectedGlyphs(container);
                 }
             });
 
@@ -333,8 +527,27 @@ function showSpawnMenu(
     // Close menu on click outside (with cleanup flag to prevent memory leak)
     let menuRemoved = false;
     const removeMenu = () => {
-        menu.remove();
-        menuRemoved = true;
+        const duration = getMinimizeDuration() * 0.4;
+        if (duration === 0) {
+            menu.remove();
+            menuRemoved = true;
+            return;
+        }
+
+        // Fade out before removing
+        const animation = menu.animate([
+            { opacity: 1 },
+            { opacity: 0 }
+        ], {
+            duration,
+            easing: 'ease',
+            fill: 'forwards'
+        });
+
+        animation.onfinish = () => {
+            menu.remove();
+            menuRemoved = true;
+        };
     };
 
     // Add IX symbol
@@ -394,6 +607,19 @@ function showSpawnMenu(
     menu.appendChild(promptBtn);
 
     document.body.appendChild(menu);
+
+    // Expand from mouse position (small to large)
+    const duration = getMinimizeDuration() * 0.5;
+    if (duration > 0) {
+        menu.animate([
+            { transform: 'scale(0.3)', opacity: 0 },
+            { transform: 'scale(1)', opacity: 1 }
+        ], {
+            duration,
+            easing: 'ease-out',
+            fill: 'both'
+        });
+    }
 
     // Close menu on click outside
     const closeMenu = (e: MouseEvent) => {

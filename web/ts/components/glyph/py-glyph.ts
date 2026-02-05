@@ -38,6 +38,9 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
     element.className = 'canvas-py-glyph';
     element.dataset.glyphId = glyph.id;
+    if (glyph.symbol) {
+        element.dataset.glyphSymbol = glyph.symbol;
+    }
 
     const gridX = glyph.gridX ?? 5;
     const gridY = glyph.gridY ?? 5;

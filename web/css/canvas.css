@@ -57,7 +57,7 @@
     height: 40px;
     border: none;
     background: var(--bg-tertiary);
-    color: var(--text-primary);
+    color: rgba(255, 255, 255, 0.85);
     font-size: 20px;
     border-radius: var(--border-radius);
     cursor: pointer;
@@ -68,7 +68,8 @@
 }
 
 .canvas-spawn-button:hover {
-    background: var(--bg-hover);
+    background: #3a3b3a;
+    color: rgba(255, 255, 255, 1);
     transform: scale(1.1);
 }
 
@@ -125,39 +126,42 @@
 
 /* Selected state - highlighted border on any glyph type */
 .canvas-glyph-selected {
-    outline: 2px solid #c47a2a;
+    outline: 2px solid rgba(122, 202, 122, 0.4);
     outline-offset: 2px;
 }
 
 /* Action bar - floating toolbar above selected glyph */
 .canvas-action-bar {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     pointer-events: auto;
+    transform: translateX(-50%);
 }
 
 .canvas-action-button {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     border: none;
     background: var(--bg-tertiary);
     color: var(--text-primary);
-    font-size: 14px;
-    border-radius: 4px;
+    opacity: 0.7;
+    font-size: 12px;
+    border-radius: 3px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s ease;
+    transition: all 0.15s ease;
 }
 
 .canvas-action-button:hover {
     background: var(--bg-hover);
+    opacity: 1;
 }
 
 .canvas-action-delete:hover {

@@ -90,6 +90,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
             const container = document.createElement('div');
             container.className = 'canvas-ax-glyph';
             container.dataset.glyphId = glyphId;
+            container.dataset.glyphSymbol = AX;
 
             // Style element - resizable
             container.style.position = 'absolute';

@@ -19,6 +19,7 @@ import {
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
 } from './meld-system';
+import { isGlyphSelected, getSelectedGlyphIds } from './canvas-glyph';
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -87,16 +88,31 @@ export function makeDraggable(
     let currentMeldTarget: HTMLElement | null = null;
     let rafId: number | null = null; // Track requestAnimationFrame for meld feedback
 
+    // Multi-selection drag support
+    let isMultiDrag = false;
+    let multiDragElements: Array<{ element: HTMLElement; startX: number; startY: number; glyph: Glyph }> = [];
+
     const handleMouseMove = (e: MouseEvent) => {
         if (!isDragging) return;
 
         const deltaX = e.clientX - dragStartX;
         const deltaY = e.clientY - dragStartY;
-        const newX = elementStartX + deltaX;
-        const newY = elementStartY + deltaY;
 
-        element.style.left = `${newX}px`;
-        element.style.top = `${newY}px`;
+        if (isMultiDrag) {
+            // Move all selected glyphs together
+            for (const { element: el, startX, startY } of multiDragElements) {
+                const newX = startX + deltaX;
+                const newY = startY + deltaY;
+                el.style.left = `${newX}px`;
+                el.style.top = `${newY}px`;
+            }
+        } else {
+            // Single glyph drag
+            const newX = elementStartX + deltaX;
+            const newY = elementStartY + deltaY;
+            element.style.left = `${newX}px`;
+            element.style.top = `${newY}px`;
+        }
 
         // Cancel any pending meld feedback update to prevent race conditions
         if (rafId !== null) {
@@ -129,7 +145,13 @@ export function makeDraggable(
             rafId = null;
         }
 
+        // Remove dragging class from all elements
         element.classList.remove('is-dragging');
+        if (isMultiDrag) {
+            for (const { element: el } of multiDragElements) {
+                el.classList.remove('is-dragging');
+            }
+        }
 
         // Check if we should meld (for ax-glyphs only)
         if (canInitiateMeld(element)) {
@@ -178,27 +200,53 @@ export function makeDraggable(
         clearMeldFeedback(element);
         currentMeldTarget = null;
 
-        // Normal position save
+        // Save positions for all dragged glyphs
         const canvas = element.parentElement;
         const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const elementRect = element.getBoundingClientRect();
-        const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
-        const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
-        glyph.gridX = gridX;
-        glyph.gridY = gridY;
 
-        if (glyph.symbol) {
-            uiState.addCanvasGlyph({
-                id: glyph.id,
-                symbol: glyph.symbol,
-                gridX,
-                gridY,
-                width: glyph.width,
-                height: glyph.height,
-            });
+        if (isMultiDrag) {
+            // Save positions for all selected glyphs
+            for (const { element: el, glyph: g } of multiDragElements) {
+                const rect = el.getBoundingClientRect();
+                const gridX = Math.round((rect.left - canvasRect.left) / GRID_SIZE);
+                const gridY = Math.round((rect.top - canvasRect.top) / GRID_SIZE);
+                g.gridX = gridX;
+                g.gridY = gridY;
+
+                if (g.symbol) {
+                    uiState.addCanvasGlyph({
+                        id: g.id,
+                        symbol: g.symbol,
+                        gridX,
+                        gridY,
+                        width: g.width,
+                        height: g.height,
+                    });
+                }
+            }
+            log.debug(SEG.UI, `[${logLabel}] Finished multi-dragging ${multiDragElements.length} glyphs`);
+            multiDragElements = [];
+            isMultiDrag = false;
+        } else {
+            // Single glyph position save
+            const elementRect = element.getBoundingClientRect();
+            const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
+            const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
+            glyph.gridX = gridX;
+            glyph.gridY = gridY;
+
+            if (glyph.symbol) {
+                uiState.addCanvasGlyph({
+                    id: glyph.id,
+                    symbol: glyph.symbol,
+                    gridX,
+                    gridY,
+                    width: glyph.width,
+                    height: glyph.height,
+                });
+            }
+            log.debug(SEG.UI, `[${logLabel}] Finished dragging ${glyph.id}`);
         }
-
-        log.debug(SEG.UI, `[${logLabel}] Finished dragging ${glyph.id}`);
 
         dragController?.abort();
         dragController = null;
@@ -221,11 +269,43 @@ export function makeDraggable(
 
         element.classList.add('is-dragging');
 
+        // Check if this glyph is part of a multi-selection
+        const selectedIds = getSelectedGlyphIds();
+        if (selectedIds.length > 1 && isGlyphSelected(glyph.id)) {
+            isMultiDrag = true;
+            const canvas = element.parentElement;
+            if (canvas) {
+                // Gather all selected glyphs with their initial positions
+                for (const id of selectedIds) {
+                    const el = canvas.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null;
+                    if (el) {
+                        const elRect = el.getBoundingClientRect();
+                        // Create a glyph object for tracking with current dimensions
+                        const glyphData: Glyph = {
+                            id,
+                            title: el.dataset.glyphTitle || 'Glyph',
+                            symbol: el.dataset.glyphSymbol,
+                            width: Math.round(elRect.width),
+                            height: Math.round(elRect.height),
+                            renderContent: () => el
+                        };
+                        multiDragElements.push({
+                            element: el,
+                            startX: elRect.left,
+                            startY: elRect.top,
+                            glyph: glyphData
+                        });
+                        el.classList.add('is-dragging');
+                    }
+                }
+            }
+        }
+
         dragController = new AbortController();
         document.addEventListener('mousemove', handleMouseMove, { signal: dragController.signal });
         document.addEventListener('mouseup', handleMouseUp, { signal: dragController.signal });
 
-        log.debug(SEG.UI, `[${logLabel}] Started dragging ${glyph.id}`);
+        log.debug(SEG.UI, `[${logLabel}] Started dragging ${isMultiDrag ? `${selectedIds.length} glyphs` : glyph.id}`);
     }, { signal: setupController.signal });
 
     // Return cleanup function

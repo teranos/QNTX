@@ -86,6 +86,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
     element.className = 'canvas-ix-glyph';
     element.dataset.glyphId = glyph.id;
+    element.dataset.glyphSymbol = IX;
 
     const gridX = glyph.gridX ?? 5;
     const gridY = glyph.gridY ?? 5;

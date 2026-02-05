@@ -33,6 +33,9 @@ export function createResultGlyph(
     const element = document.createElement('div');
     element.className = 'canvas-result-glyph';
     element.dataset.glyphId = glyph.id;
+    if (glyph.symbol) {
+        element.dataset.glyphSymbol = glyph.symbol;
+    }
 
     const gridX = glyph.gridX ?? 5;
     const gridY = glyph.gridY ?? 5;
