@@ -40,7 +40,6 @@ import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
-import { showToast } from './toast.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
