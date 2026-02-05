@@ -63,7 +63,7 @@ export const SEG = {
     GRAPH: '◇' as const,    // Graph visualization
     ERROR: '⚠' as const,    // Errors/warnings
     VID: '⮀' as const,      // VidStream
-    WASM: '⚡' as const,     // WebAssembly/WASM module
+    WASM: '⧩' as const,     // WebAssembly/WASM module
     TAU: 'τ' as const,      // Tauri native integration
 } as const;
 
