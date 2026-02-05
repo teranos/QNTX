@@ -79,7 +79,7 @@ dev-mobile: web cli ## Start dev servers and run iOS app in simulator
 	cd web/src-tauri && SKIP_DEV_SERVER=1 cargo tauri ios dev "iPhone 17 Pro"; \
 	wait
 
-web: ## Build web assets with Bun
+web: rust-wasm ## Build web assets with Bun (requires WASM)
 	@echo "Building web assets..."
 	@cd web && bun install && bun run build
 
@@ -216,12 +216,22 @@ rust-sqlite: ## Build Rust SQLite storage library with FFI support (for CGO inte
 	@echo "  Static:  libqntx_sqlite.a"
 	@echo "  Shared:  libqntx_sqlite.so (Linux) / libqntx_sqlite.dylib (macOS)"
 
-rust-wasm: ## Build qntx-core as WASM module (for wazero integration, no CGO needed)
-	@echo "Building qntx-core WASM module..."
+rust-wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
+	@echo "Building qntx-core WASM modules..."
+	@echo "  [1/2] Building Go/wazero WASM..."
 	@cargo build --release --target wasm32-unknown-unknown --package qntx-wasm
 	@cp target/wasm32-unknown-unknown/release/qntx_wasm.wasm ats/wasm/qntx_core.wasm
-	@echo "✓ qntx_core.wasm built and copied to ats/wasm/"
-	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "  Size: " $$5}'
+	@echo "  ✓ qntx_core.wasm built and copied to ats/wasm/"
+	@ls -lh ats/wasm/qntx_core.wasm | awk '{print "    Size: " $$5}'
+	@echo "  [2/2] Building browser WASM with wasm-bindgen..."
+	@if ! command -v wasm-pack >/dev/null 2>&1; then \
+		echo "  ⚠️  wasm-pack not found. Install with: cargo install wasm-pack"; \
+		exit 1; \
+	fi
+	@cd crates/qntx-wasm && wasm-pack build --target web --features browser
+	@cp -r crates/qntx-wasm/pkg/* web/wasm/
+	@echo "  ✓ Browser WASM built and copied to web/wasm/"
+	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
 
 rust-fuzzy-test: ## Run Rust fuzzy matching tests
 	@echo "Running Rust fuzzy matching tests..."

@@ -39,7 +39,6 @@ import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
-import { showToast } from './toast.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -159,17 +158,8 @@ async function init(): Promise<void> {
     uiState.loadPersistedState();
 
     // Initialize QNTX WASM module with IndexedDB storage
-    try {
-        if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
-        await initQntxWasm();
-    } catch (error: unknown) {
-        console.error('[Init] Failed to initialize QNTX WASM:', error);
-        showToast('WASM storage unavailable - local attestation caching disabled', {
-            type: 'warning',
-            duration: 6000
-        });
-        // Continue anyway - WASM storage is not critical for basic graph viewing
-    }
+    if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
+    await initQntxWasm();
 
     // Restore previous session if exists
     const graphSession = uiState.getGraphSession();
