@@ -3,6 +3,7 @@
 
 import { appState } from '../state/app.ts';
 import { GRAPH_PHYSICS } from '../config.ts';
+import { log, SEG } from '../logger.ts';
 import { uiState } from '../state/ui.ts';
 import { hiddenNodeTypes, initTypeAttestations } from '../components/type-attestations.ts';
 import { getLinkDistance, getLinkStrength } from './physics.ts';
@@ -49,7 +50,7 @@ export function updateGraph(data: GraphData): void {
 function renderGraph(data: GraphData): void {
     // Virtue #1: Error Handling - Guard against invalid data
     if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
-        console.error('Invalid graph data:', data);
+        log.error(SEG.GRAPH, 'Invalid graph data:', data);
         return;
     }
 
@@ -61,7 +62,7 @@ function renderGraph(data: GraphData): void {
     const domCache = getDomCache();
     const container = domCache.get('graphContainer', '#graph-container');
     if (!container) {
-        console.error('Graph container not found');
+        log.error(SEG.GRAPH, 'Graph container not found');
         return;
     }
 
@@ -168,7 +169,7 @@ function renderGraph(data: GraphData): void {
         .attr("aria-label", `Graph visualization with ${visibleNodes.length} nodes and ${visibleLinks.length} connections`);
 
     if (!svg) {
-        console.error('[Graph] Failed to create SVG element');
+        log.error(SEG.GRAPH, 'Failed to create SVG element');
         return;
     }
     setSvg(svg);

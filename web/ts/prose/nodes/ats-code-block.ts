@@ -10,6 +10,7 @@ import type { EditorView as PMEditorView } from 'prosemirror-view';
 import { createSchedulingControls } from '../../pulse/scheduling-controls';
 import type { ScheduledJobResponse } from '../../pulse/types';
 import { getScheduledJob } from '../../pulse/api';
+import { log, SEG } from '../../logger.ts';
 
 export class ATSCodeBlockNodeView {
     dom: HTMLElement;
@@ -90,7 +91,7 @@ export class ATSCodeBlockNodeView {
         // Get ATS code from CodeMirror editor (more reliable than node.textContent)
         const atsCode = this.cmView.state.doc.toString();
 
-        console.log('[ATS Block] Rendering scheduling controls:', {
+        log.debug(SEG.PULSE, '[ATS Block] Rendering scheduling controls:', {
             atsCode,
             atsCodeLength: atsCode.length,
             firstLine: atsCode.split('\n')[0],
@@ -111,7 +112,7 @@ export class ATSCodeBlockNodeView {
                     this.updateSchedulingControls(existingJob);
                 })
                 .catch((error: unknown) => {
-                    console.warn('Failed to load scheduled job:', error);
+                    log.warn(SEG.PULSE, 'Failed to load scheduled job:', error);
                     // Clear invalid job ID from node
                     this.updateNodeAttributes({ scheduledJobId: null });
                 });
@@ -134,7 +135,7 @@ export class ATSCodeBlockNodeView {
                 this.renderSchedulingControls();
             },
             onError: (error: Error) => {
-                console.error('Scheduling error:', error);
+                log.error(SEG.ERROR, 'Scheduling error:', error);
                 // Show error inline in the scheduling controls
                 this.showSchedulingError(error.message);
             },
@@ -166,7 +167,7 @@ export class ATSCodeBlockNodeView {
                 this.renderSchedulingControls();
             },
             onError: (error: Error) => {
-                console.error('Scheduling error:', error);
+                log.error(SEG.ERROR, 'Scheduling error:', error);
                 this.showSchedulingError(error.message);
             },
         });

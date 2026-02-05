@@ -11,6 +11,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { log, SEG } from './logger.ts';
 
 // Threshold for "long-running" job notifications (30 seconds)
 const LONG_JOB_THRESHOLD_MS = 30000;
@@ -72,7 +73,8 @@ class NotificationState {
         }
 
         if (staleJobs.length > 0) {
-            console.warn(
+            log.warn(
+                SEG.PULSE,
                 `[tauri-notifications] Cleaning up ${staleJobs.length} stale job(s)`,
                 staleJobs
             );
@@ -130,7 +132,7 @@ async function invokeIfTauri<T>(command: string, args: Record<string, unknown>):
     try {
         return await invoke<T>(command, args);
     } catch (error: unknown) {
-        console.warn(`[tauri-notifications] Failed to invoke ${command}:`, error);
+        log.warn(SEG.ERROR, `[tauri-notifications] Failed to invoke ${command}:`, error);
         return undefined;
     }
 }

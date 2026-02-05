@@ -41,6 +41,7 @@ import { registerTestGlyphs } from './test-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
 import { showToast } from './toast.ts';
+import { log, SEG } from './logger.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -57,7 +58,7 @@ function handleDefaultMessage(data: GraphData | BaseMessage): void {
     if (isGraphData(data)) {
         updateGraph(data);
     } else {
-        console.warn('Received non-graph message without handler:', data);
+        log.warn(SEG.WS, 'Received non-graph message without handler:', data);
     }
 }
 
@@ -73,7 +74,7 @@ declare global {
 
 // TIMING: Track when main.js module starts executing
 const navStart = performance.timeOrigin || Date.now();
-console.log('[TIMING] main.js module start:', Date.now() - navStart, 'ms');
+log.debug(SEG.SELF, '[TIMING] main.js module start:', Date.now() - navStart, 'ms');
 if (window.logLoaderStep) window.logLoaderStep('Loading core modules...');
 
 if (window.logLoaderStep) window.logLoaderStep('Core modules loaded');
@@ -136,7 +137,7 @@ function handleVersion(data: VersionMessage): void {
         selfWindow.updateVersion(data);
     });
 
-    console.log('Server version:', data);
+    log.info(SEG.SELF, 'Server version:', data);
 }
 
 
@@ -144,7 +145,7 @@ function handleVersion(data: VersionMessage): void {
 // Avoid Sin #4: Callback Hell - Use async/await for sequential async operations
 async function init(): Promise<void> {
     // TIMING: Track when init() is called
-    console.log('[TIMING] init() called:', Date.now() - navStart, 'ms');
+    log.debug(SEG.SELF, '[TIMING] init() called:', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Initializing application...');
 
     // Initialize debug interceptor (dev mode only)
@@ -152,7 +153,7 @@ async function init(): Promise<void> {
     try {
         await initDebugInterceptor();
     } catch (error: unknown) {
-        console.error('[Init] Failed to initialize debug interceptor:', error);
+        log.error(SEG.ERROR, '[Init] Failed to initialize debug interceptor:', error);
         // Continue anyway - debug interception is not critical to app function
     }
 
@@ -162,7 +163,7 @@ async function init(): Promise<void> {
         if (window.logLoaderStep) window.logLoaderStep('Initializing storage...', false, true);
         await initStorage();
     } catch (error: unknown) {
-        console.error('[Init] Failed to initialize IndexedDB storage:', error);
+        log.error(SEG.DB, '[Init] Failed to initialize IndexedDB storage:', error);
         // BLOCK: Canvas state persistence unavailable
         // TODO: Show user notification that canvas state won't persist
         throw error; // Stop initialization - storage is critical
@@ -176,7 +177,7 @@ async function init(): Promise<void> {
         if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
         await initQntxWasm();
     } catch (error: unknown) {
-        console.error('[Init] Failed to initialize QNTX WASM:', error);
+        log.error(SEG.DB, '[Init] Failed to initialize QNTX WASM:', error);
         showToast('WASM storage unavailable - local attestation caching disabled', {
             type: 'warning',
             duration: 6000
@@ -204,7 +205,7 @@ async function init(): Promise<void> {
     }
 
     // Set up WebSocket with message handlers
-    console.log('[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
+    log.debug(SEG.SELF, '[TIMING] Calling connectWebSocket():', Date.now() - navStart, 'ms');
     if (window.logLoaderStep) window.logLoaderStep('Connecting to server...');
 
     // Message handlers are now properly typed to match their WebSocket message types

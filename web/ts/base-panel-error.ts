@@ -10,6 +10,7 @@
 
 import { CSS, DATA, setLoading } from './css-classes.ts';
 import { Button } from './components/button.ts';
+import { log, SEG } from './logger.ts';
 
 /**
  * Error state for a panel
@@ -286,7 +287,7 @@ export function showErrorState(ctx: ErrorHandlingContext, error: Error): void {
 
     const content = ctx.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
     if (!content) {
-        console.warn(`[${ctx.panelId}] No .${CSS.PANEL.CONTENT} element found for error display`);
+        log.warn(SEG.UI, `[${ctx.panelId}] No .${CSS.PANEL.CONTENT} element found for error display`);
         return;
     }
 
@@ -312,7 +313,7 @@ export function showRichError(ctx: ErrorHandlingContext, error: RichError, onRet
 
     const content = ctx.$<HTMLElement>(`.${CSS.PANEL.CONTENT}`);
     if (!content) {
-        console.warn(`[${ctx.panelId}] No .${CSS.PANEL.CONTENT} element found for error display`);
+        log.warn(SEG.UI, `[${ctx.panelId}] No .${CSS.PANEL.CONTENT} element found for error display`);
         return;
     }
 
@@ -356,7 +357,7 @@ export async function retryShow(ctx: ErrorHandlingContext): Promise<void> {
         await ctx.onShow();
     } catch (error: unknown) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`[${ctx.panelId}] Error in retryShow():`, err);
+        log.error(SEG.ERROR, `[${ctx.panelId}] Error in retryShow():`, err);
         showErrorState(ctx, err);
     }
 }

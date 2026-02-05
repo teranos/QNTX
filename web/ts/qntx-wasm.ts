@@ -9,6 +9,7 @@
  */
 
 import init, * as wasm from '../wasm/qntx_wasm.js';
+import { log, SEG } from './logger.ts';
 import type { Attestation } from './generated/proto/plugin/grpc/protocol/atsstore';
 
 // Re-export proto-generated Attestation type for convenience
@@ -51,7 +52,7 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
         // Initialize IndexedDB store
         await wasm.init_store(dbName);
 
-        console.log(`[qntx-wasm] Initialized (v${wasm.version()})`);
+        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()})`);
     })();
 
     return initPromise;
