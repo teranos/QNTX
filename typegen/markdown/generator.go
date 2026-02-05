@@ -115,7 +115,6 @@ func (g *Generator) GenerateFile(result *typegen.Result) string {
 		sb.WriteString("**Generated types**:\n")
 		sb.WriteString(fmt.Sprintf("- TypeScript: [`%s/typescript/%s.ts`](%s/%s/typescript/%s.ts)\n", g.generatedTypesDir, result.PackageName, result.GitHubBaseURL, g.generatedTypesDir, result.PackageName))
 		sb.WriteString(fmt.Sprintf("- Rust: [`%s/rust/%s.rs`](%s/%s/rust/%s.rs)\n", g.generatedTypesDir, result.PackageName, result.GitHubBaseURL, g.generatedTypesDir, result.PackageName))
-		sb.WriteString(fmt.Sprintf("- Python: [`%s/python/%s.py`](%s/%s/python/%s.py)\n", g.generatedTypesDir, result.PackageName, result.GitHubBaseURL, g.generatedTypesDir, result.PackageName))
 		sb.WriteString("\n")
 	}
 

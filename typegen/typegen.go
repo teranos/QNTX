@@ -2,7 +2,7 @@
 //
 // This is QNTX's own type generator, designed to work with the attestation
 // type system and maintain consistency between Go and multiple target languages
-// (TypeScript, Python, Rust, Dart).
+// (TypeScript, Rust).
 //
 // # Struct Tag Support
 //
