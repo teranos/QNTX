@@ -39,8 +39,7 @@ const (
 
 // GitIxProcessor handles git repository processing for attestation generation
 //
-// TODO(#108): Add GitHub PR node support with API integration
-// See: https://github.com/sbvh-nl/qntx/issues/108
+// TODO: Add GitHub PR node support with API integration
 // Capture: PR metadata, status, reviews, CI/CD pipeline results
 // Actor strategy: Use per-PR actors like "pr-{number}@github"
 type GitIxProcessor struct {
