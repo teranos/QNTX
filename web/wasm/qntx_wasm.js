@@ -29,6 +29,9 @@ export function exists_attestation(id) {
 /**
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
+ *
+ * Returns JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Converts from internal core::Attestation format before serialization.
  * @param {string} id
  * @returns {Promise<string | undefined>}
  */
@@ -97,6 +100,9 @@ export function parse_query(input) {
 /**
  * Store an attestation in IndexedDB.
  * Returns a Promise that resolves to null on success or error message on failure.
+ *
+ * Expects JSON matching proto schema (timestamps as numbers, attributes as JSON string).
+ * Converts to internal core::Attestation format before storage.
  * @param {string} json
  * @returns {Promise<void>}
  */
@@ -370,12 +376,12 @@ function __wbg_get_imports() {
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
             // Cast intrinsic for `Closure(Closure { dtor_idx: 68, function: Function { arguments: [NamedExternref("Event")], shim_idx: 69, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__hd71dd998f6ad6b2e, wasm_bindgen__convert__closures_____invoke__h2745a8c01784b9af);
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h332095daeac88dbb, wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
             // Cast intrinsic for `Closure(Closure { dtor_idx: 68, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 69, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__hd71dd998f6ad6b2e, wasm_bindgen__convert__closures_____invoke__h2745a8c01784b9af);
+            const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h332095daeac88dbb, wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
@@ -409,8 +415,8 @@ function __wbg_get_imports() {
     };
 }
 
-function wasm_bindgen__convert__closures_____invoke__h2745a8c01784b9af(arg0, arg1, arg2) {
-    wasm.wasm_bindgen__convert__closures_____invoke__h2745a8c01784b9af(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2(arg0, arg1, arg2) {
+    wasm.wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2(arg0, arg1, arg2);
 }
 
 function wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea(arg0, arg1, arg2) {
