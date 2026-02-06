@@ -128,12 +128,14 @@ func (e *Engine) loadWatchers() error {
 				parser.ErrorContextPlain,
 			)
 			if err != nil {
+				// Wrap error with watcher context before storing
+				enrichedErr := errors.Wrapf(err, "failed to parse AX query for watcher %s: %q", w.ID, w.AxQuery)
 				e.logger.Warnw("Failed to parse AX query for watcher, skipping",
 					"watcher_id", w.ID,
 					"ax_query", w.AxQuery,
-					"error", err)
-				// Store parse error for retrieval
-				e.parseErrors[w.ID] = err
+					"error", enrichedErr)
+				// Store enriched error for retrieval
+				e.parseErrors[w.ID] = enrichedErr
 				continue
 			}
 			// Merge parsed filter into watcher's filter
