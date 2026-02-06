@@ -54,7 +54,7 @@
     background: transparent;
     border: 1px solid transparent;
     font-size: 18px;
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.85);
     cursor: pointer;
     padding: 0;
     width: 24px;
@@ -70,7 +70,7 @@
 
 .panel-minimize:hover {
     background: var(--bg-hover);
-    color: var(--text-primary);
+    color: rgba(255, 255, 255, 1);
 }
 
 .panel-minimize:active {
