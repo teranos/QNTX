@@ -23,6 +23,7 @@ import { log, SEG } from '../../logger';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { tooltip } from '../tooltip';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -99,7 +100,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.style.height = `${height}px`;
             container.style.minWidth = '200px';
             container.style.minHeight = '120px';
-            container.style.backgroundColor = 'var(--bg-secondary)'; // Will be updated based on watcher state
+            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)'; // Darker with transparency
             container.style.borderRadius = '4px';
             container.style.border = '1px solid var(--border-color)';
             container.style.display = 'flex';
@@ -107,50 +108,44 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.style.overflow = 'hidden';
             container.style.zIndex = '1';
 
-            // Title bar for dragging
+            // Title bar with inline query input
             const titleBar = document.createElement('div');
             titleBar.className = 'ax-glyph-title-bar';
-            titleBar.style.padding = '8px';
+            titleBar.style.padding = '4px 4px 4px 8px'; // Reduced top/bottom/right, keep left for symbol
             titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-            titleBar.style.cursor = 'move';
             titleBar.style.userSelect = 'none';
-            titleBar.style.fontWeight = 'bold';
             titleBar.style.fontSize = '14px';
             titleBar.style.display = 'flex';
             titleBar.style.alignItems = 'center';
-            titleBar.style.justifyContent = 'space-between';
+            titleBar.style.gap = '8px';
 
-            // Label
+            // Symbol (draggable area)
             const label = document.createElement('span');
             label.textContent = AX;
+            label.style.cursor = 'move';
+            label.style.fontWeight = 'bold';
+            label.style.flexShrink = '0';
+            label.style.color = '#6b9bd1'; // Azure-ish blue
             titleBar.appendChild(label);
 
-            container.appendChild(titleBar);
-
-            // Editor container
-            const editorContainer = document.createElement('div');
-            editorContainer.className = 'ax-glyph-editor';
-            editorContainer.style.flex = '1';
-            editorContainer.style.overflow = 'hidden';
-            editorContainer.style.display = 'flex';
-            editorContainer.style.flexDirection = 'column';
-
-            // Text editor for the ax query
-            const editor = document.createElement('textarea');
-            editor.className = 'ax-query-textarea';
+            // Single-line query input (takes remaining space)
+            const editor = document.createElement('input');
+            editor.type = 'text';
+            editor.className = 'ax-query-input';
             editor.value = currentQuery;
-            editor.placeholder = 'Enter ax query (e.g., is git, has certification)';
+            editor.placeholder = 'Enter ax query (e.g., ALICE, is git)';
             editor.style.flex = '1';
-            editor.style.width = '100%';
-            editor.style.padding = '8px';
+            editor.style.padding = '4px 8px';
             editor.style.fontSize = '13px';
             editor.style.fontFamily = 'monospace';
             editor.style.border = 'none';
             editor.style.outline = 'none';
-            editor.style.resize = 'none';
-            editor.style.backgroundColor = 'var(--bg-primary)';
-            editor.style.color = 'var(--text-primary)';
-            editor.style.overflow = 'auto';
+            editor.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+            editor.style.color = '#d4f0d4'; // 20% greener and whiter
+            editor.style.borderRadius = '2px';
+
+            titleBar.appendChild(editor);
+            container.appendChild(titleBar);
 
             // Auto-save and watcher update with debouncing (500ms delay)
             let saveTimeout: number | undefined;
@@ -163,7 +158,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 }
 
                 // Update background to indicate pending state
-                container.style.backgroundColor = '#2a2b3d'; // Slight blue tint for "updating"
+                container.style.backgroundColor = 'rgba(42, 43, 61, 0.92)'; // Slight blue tint for "updating"
 
                 // Clear results immediately when query changes
                 resultsContainer.innerHTML = '';
@@ -190,26 +185,23 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                         });
 
                         // Update background to indicate active watcher
-                        container.style.backgroundColor = '#1f3d3d'; // Teal/cyan tint for "watching"
+                        container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
 
                         log.debug(SEG.UI, `[AxGlyph] Sent watcher upsert for ${glyphId}: "${currentQuery}"`);
                     } else {
                         // Empty query - revert to default
-                        container.style.backgroundColor = 'var(--bg-secondary)';
+                        container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
                     }
                 }, 500);
             });
 
-            editorContainer.appendChild(editor);
-            container.appendChild(editorContainer);
-
-            // Results container - scrollable list of matched attestations
+            // Results container - scrollable list of matched attestations (gets all remaining space)
             const resultsContainer = document.createElement('div');
             resultsContainer.className = 'ax-glyph-results';
             resultsContainer.style.flex = '1';
             resultsContainer.style.overflow = 'auto';
             resultsContainer.style.padding = '8px';
-            resultsContainer.style.backgroundColor = 'var(--bg-primary)';
+            resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
             resultsContainer.style.borderTop = '1px solid var(--border-color)';
             resultsContainer.style.fontSize = '12px';
             resultsContainer.style.fontFamily = 'monospace';
@@ -229,6 +221,9 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             (glyph as any).resultsContainer = resultsContainer;
             (glyph as any).matchedAttestations = matchedAttestations;
 
+            // Attach tooltip support for attestation results
+            tooltip.attach(resultsContainer, '.ax-glyph-result-item');
+
             // If we loaded a persisted query, send watcher_upsert to activate it
             if (currentQuery.trim()) {
                 sendMessage({
@@ -240,7 +235,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 });
 
                 // Update background to show active watcher state
-                container.style.backgroundColor = '#1f3d3d'; // Teal/cyan tint for "watching"
+                container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
 
                 log.debug(SEG.UI, `[AxGlyph] Restored and activated watcher for ${glyphId}: "${currentQuery}"`);
             }
@@ -258,8 +253,8 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             resizeHandle.style.borderTopLeftRadius = '4px';
             container.appendChild(resizeHandle);
 
-            // Make draggable and resizable
-            makeDraggable(container, titleBar, glyph, { logLabel: 'AxGlyph' });
+            // Make draggable and resizable (drag via symbol only)
+            makeDraggable(container, label, glyph, { logLabel: 'AxGlyph' });
             makeResizable(container, resizeHandle, glyph, { logLabel: 'AxGlyph' });
 
             return container;
@@ -274,26 +269,33 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
  */
 function renderAttestation(attestation: Attestation): HTMLElement {
     const item = document.createElement('div');
-    item.className = 'ax-glyph-result-item';
+    item.className = 'ax-glyph-result-item has-tooltip';
     item.style.padding = '8px';
     item.style.marginBottom = '4px';
-    item.style.backgroundColor = 'var(--bg-secondary)';
+    item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)'; // 20% greener tint
     item.style.borderRadius = '2px';
-    item.style.borderLeft = '3px solid var(--accent-color)';
+    item.style.cursor = 'default';
 
-    // Format attestation data (show key fields)
+    // Format attestation data as natural language: "SUBJECTS is PREDICATES of CONTEXTS"
     const subjects = attestation.subjects?.join(', ') || 'N/A';
     const predicates = attestation.predicates?.join(', ') || 'N/A';
     const contexts = attestation.contexts?.join(', ') || 'N/A';
 
-    item.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 4px;">${attestation.id?.substring(0, 8) || 'unknown'}</div>
-        <div style="font-size: 11px; color: var(--text-secondary);">
-            <div>Subjects: ${subjects}</div>
-            <div>Predicates: ${predicates}</div>
-            <div>Contexts: ${contexts}</div>
-        </div>
-    `;
+    // Create single-line natural language format with darker keywords
+    const text = document.createElement('div');
+    text.style.fontSize = '11px';
+    text.style.color = '#d4f0d4'; // 20% greener and whiter
+    text.style.fontFamily = 'monospace';
+    text.style.whiteSpace = 'nowrap';
+    text.style.overflow = 'hidden';
+    text.style.textOverflow = 'ellipsis';
+
+    // Build formatted text with darker keywords
+    text.innerHTML = `<span style="color: #d4f0d4;">${subjects}</span> <span style="color: #6b7b6b;">is</span> <span style="color: #d4f0d4;">${predicates}</span> <span style="color: #6b7b6b;">of</span> <span style="color: #d4f0d4;">${contexts}</span>`;
+
+    // Add attestation ID as tooltip using tooltip infrastructure
+    item.dataset.tooltip = attestation.id || 'unknown';
+    item.appendChild(text);
 
     return item;
 }
@@ -334,10 +336,10 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
 }
 
 /**
- * Update AX glyph with error message
+ * Update AX glyph with error message and optional structured details
  * Called by WebSocket handler when watcher_error message arrives
  */
-export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: string): void {
+export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: string, details?: string[]): void {
     // Find the glyph element by data attribute
     const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement;
     if (!glyph) {
@@ -363,30 +365,26 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
         existingError.remove();
     }
 
-    // Create error display
+    // Create compact error display (like prompt glyph)
     const errorDisplay = document.createElement('div');
     errorDisplay.className = 'ax-glyph-error';
-    errorDisplay.style.padding = '12px';
-    errorDisplay.style.marginBottom = '8px';
-    errorDisplay.style.backgroundColor = severity === 'error' ? '#3d1f1f' : '#3d3d1f'; // Red for error, yellow for warning
-    errorDisplay.style.borderLeft = `3px solid ${severity === 'error' ? '#ff4444' : '#ffaa00'}`;
-    errorDisplay.style.borderRadius = '2px';
-    errorDisplay.style.fontSize = '12px';
+    errorDisplay.style.padding = '6px 8px';
+    errorDisplay.style.fontSize = '11px'; // Smaller font
     errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.color = 'var(--text-primary)';
+    errorDisplay.style.backgroundColor = severity === 'error' ? '#2b1a1a' : '#2b2b1a';
+    errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
+    errorDisplay.style.whiteSpace = 'pre-wrap';
+    errorDisplay.style.wordBreak = 'break-word';
+    errorDisplay.style.overflowWrap = 'anywhere';
+    errorDisplay.style.maxWidth = '100%';
 
-    const severityLabel = document.createElement('div');
-    severityLabel.textContent = severity.toUpperCase();
-    severityLabel.style.fontWeight = 'bold';
-    severityLabel.style.marginBottom = '4px';
-    severityLabel.style.color = severity === 'error' ? '#ff4444' : '#ffaa00';
+    // Inline severity label + message (more compact)
+    errorDisplay.textContent = `${severity.toUpperCase()}: ${errorMsg}`;
 
-    const errorText = document.createElement('div');
-    errorText.textContent = errorMsg;
-    errorText.style.color = 'var(--text-secondary)';
-
-    errorDisplay.appendChild(severityLabel);
-    errorDisplay.appendChild(errorText);
+    // Add structured details if present (more compact)
+    if (details && details.length > 0) {
+        errorDisplay.textContent += '\n\n' + details.map(d => `  ${d}`).join('\n');
+    }
 
     // Add error display at top of results
     resultsContainer.insertBefore(errorDisplay, resultsContainer.firstChild);
@@ -394,7 +392,7 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     // Update glyph background to indicate error state
     const container = glyph.closest('.canvas-ax-glyph') as HTMLElement;
     if (container) {
-        container.style.backgroundColor = severity === 'error' ? '#3d1f1f' : '#3d3d1f'; // Red tint for error, yellow for warning
+        container.style.backgroundColor = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)'; // Red tint for error, yellow for warning
     }
 
     log.debug(SEG.UI, `[AxGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);

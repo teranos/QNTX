@@ -39,19 +39,19 @@ func (m *mockQueryStore) ExecuteAxQuery(ctx context.Context, filter types.AxFilt
 // mockAliasStore implements ats.AliasResolver for testing
 type mockAliasStore struct{}
 
-func (m *mockAliasStore) ResolveAlias(identifier string) ([]string, error) {
+func (m *mockAliasStore) ResolveAlias(ctx context.Context, identifier string) ([]string, error) {
 	return []string{identifier}, nil
 }
 
-func (m *mockAliasStore) CreateAlias(alias, target, createdBy string) error {
+func (m *mockAliasStore) CreateAlias(ctx context.Context, alias, target, createdBy string) error {
 	return nil
 }
 
-func (m *mockAliasStore) RemoveAlias(alias, target string) error {
+func (m *mockAliasStore) RemoveAlias(ctx context.Context, alias, target string) error {
 	return nil
 }
 
-func (m *mockAliasStore) GetAllAliases() (map[string][]string, error) {
+func (m *mockAliasStore) GetAllAliases(ctx context.Context) (map[string][]string, error) {
 	return make(map[string][]string), nil
 }
 

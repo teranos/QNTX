@@ -106,7 +106,7 @@ func TestOpen(t *testing.T) {
 		assert.Contains(t, detailed, "db.Open", "stack should show db.Open function")
 
 		// Verify we wrapped the error - it fails at WAL mode setup
-		assert.Contains(t, detailed, "failed to enable WAL mode", "error should include our wrapped context")
+		assert.Contains(t, detailed, "failed to enable WAL journal mode", "error should include our wrapped context")
 	})
 
 }
