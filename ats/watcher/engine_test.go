@@ -697,6 +697,45 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 	}
 }
 
+func TestEngine_GetParseError_SuccessfulWatcher(t *testing.T) {
+	db := qntxtest.CreateTestDB(t)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+
+	// Create watcher with valid AX query
+	store := storage.NewWatcherStore(db)
+	validWatcher := &storage.Watcher{
+		ID:                "valid-query-watcher",
+		Name:              "Valid Query Watcher",
+		ActionType:        storage.ActionTypePython,
+		ActionData:        "print('ok')",
+		MaxFiresPerMinute: 105,
+		Enabled:           true,
+		AxQuery:           "ANNA is author",
+	}
+
+	if err := store.Create(context.Background(), validWatcher); err != nil {
+		t.Fatalf("Create watcher failed: %v", err)
+	}
+
+	// Start engine (loads watchers and parses queries)
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	defer engine.Stop()
+
+	// Verify watcher was loaded successfully
+	if _, exists := engine.GetWatcher("valid-query-watcher"); !exists {
+		t.Fatal("Valid watcher not loaded")
+	}
+
+	// GetParseError should return nil for successful watcher
+	parseErr := engine.GetParseError("valid-query-watcher")
+	if parseErr != nil {
+		t.Errorf("Expected nil parse error for successful watcher, got: %v", parseErr)
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && (s == substr || (len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || contains(s[1:], substr))))
