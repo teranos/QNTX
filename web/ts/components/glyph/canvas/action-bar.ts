@@ -6,9 +6,7 @@
  */
 
 import { getMinimizeDuration } from '../glyph';
-import { isMeldedComposition, unmeldComposition } from '../meld-system';
-import { log, SEG } from '../../../logger';
-import { uiState } from '../../../state/ui';
+import { isMeldedComposition } from '../meld-system';
 
 // Action bar animation constants
 const ACTION_BAR_ANIMATION_SPEED = 0.5;
