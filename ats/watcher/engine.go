@@ -111,7 +111,7 @@ func (e *Engine) Stop() {
 func (e *Engine) loadWatchers() error {
 	watchers, err := e.store.List(true) // enabled only
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to list enabled watchers from store")
 	}
 
 	e.mu.Lock()
