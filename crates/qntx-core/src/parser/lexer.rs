@@ -141,7 +141,11 @@ impl<'a> Lexer<'a> {
                 // Wildcards/special characters are not supported in ax queries
                 let start = self.position;
                 self.advance(c.len_utf8());
-                Token::new(TokenKind::Wildcard, &self.input[start..self.position], start)
+                Token::new(
+                    TokenKind::Wildcard,
+                    &self.input[start..self.position],
+                    start,
+                )
             }
             _ if c.is_alphanumeric() || c == '_' || !c.is_ascii() => self.read_identifier(),
             _ => {

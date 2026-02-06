@@ -59,7 +59,9 @@ pub enum ParseError {
     #[error("empty query")]
     EmptyQuery,
 
-    #[error("wildcard/special character is not supported in ax queries - use specific {field} names")]
+    #[error(
+        "wildcard/special character is not supported in ax queries - use specific {field} names"
+    )]
     WildcardNotSupported { field: String },
 }
 
@@ -696,70 +698,96 @@ mod tests {
     fn test_reject_wildcard_asterisk() {
         let result = Parser::parse("*");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::WildcardNotSupported { .. }
+        ));
     }
 
     #[test]
     fn test_reject_wildcard_caret() {
         let result = Parser::parse("^");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::WildcardNotSupported { .. }
+        ));
     }
 
     #[test]
     fn test_reject_wildcard_percent() {
         let result = Parser::parse("%");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::WildcardNotSupported { .. }
+        ));
     }
 
     #[test]
     fn test_reject_wildcard_dollar() {
         let result = Parser::parse("$");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::WildcardNotSupported { .. }
+        ));
     }
 
     #[test]
     fn test_reject_wildcard_hash() {
         let result = Parser::parse("#");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::WildcardNotSupported { .. }
+        ));
     }
 
     #[test]
     fn test_reject_wildcard_in_subject() {
         let result = Parser::parse("* is author");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "query"));
+        assert!(
+            matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "query")
+        );
     }
 
     #[test]
     fn test_reject_wildcard_in_predicate() {
         let result = Parser::parse("ALICE is *");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "predicate"));
+        assert!(
+            matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "predicate")
+        );
     }
 
     #[test]
     fn test_reject_wildcard_in_context() {
         let result = Parser::parse("ALICE is author of *");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "context"));
+        assert!(
+            matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "context")
+        );
     }
 
     #[test]
     fn test_reject_wildcard_in_actor() {
         let result = Parser::parse("ALICE is author by *");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "actor"));
+        assert!(
+            matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "actor")
+        );
     }
 
     #[test]
     fn test_reject_multiple_wildcards() {
         let result = Parser::parse("is * * *");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::WildcardNotSupported { .. }
+        ));
     }
 
     #[test]
