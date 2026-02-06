@@ -20,13 +20,17 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse, IX, AX } from '@generated/sym.js';
+import { Pulse, IX, AX, SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { createGridGlyph } from './grid-glyph';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { createAxGlyph } from './ax-glyph';
+import { createIxGlyph } from './ix-glyph';
+import { createPyGlyph } from './py-glyph';
+import { createPromptGlyph } from './prompt-glyph';
 import { uiState } from '../../state/ui';
 import { getMinimizeDuration } from './glyph';
 import { unmeldComposition } from './meld-system';
+import { makeDraggable } from './glyph-interaction';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
@@ -387,6 +391,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         return createResultGlyph(glyph, glyph.result as ExecutionResult);
     }
 
-    // Otherwise create simple grid glyph
-    return createGridGlyph(glyph);
+    // Unsupported glyph type - log error and return placeholder
+    log.error(SEG.UI, `[Canvas] Unsupported glyph type: ${glyph.symbol}`);
+    const placeholder = document.createElement('div');
+    placeholder.textContent = `Unknown glyph type: ${glyph.symbol}`;
+    placeholder.style.padding = '8px';
+    placeholder.style.color = 'red';
+    return placeholder;
 }

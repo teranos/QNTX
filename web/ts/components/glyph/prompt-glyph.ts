@@ -15,7 +15,6 @@
 import type { Glyph } from './glyph';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { GRID_SIZE } from './grid-constants';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { makeDraggable, makeResizable } from './glyph-interaction';
