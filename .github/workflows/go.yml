@@ -48,6 +48,9 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build WASM module
         run: make rust-wasm
 
@@ -92,6 +95,9 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
 
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
       - name: Build WASM module
         run: make rust-wasm
 
@@ -133,6 +139,9 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
 
       - name: Build WASM module
         run: make rust-wasm
