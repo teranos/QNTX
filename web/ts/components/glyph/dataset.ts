@@ -71,3 +71,21 @@ export function getGlyphId(element: HTMLElement): string | null {
 export function setGlyphId(element: HTMLElement, id: string): void {
     element.setAttribute('data-glyph-id', id);
 }
+
+/**
+ * Get glyph symbol from element
+ */
+export function getGlyphSymbol(element: HTMLElement): string | undefined {
+    return element.dataset.glyphSymbol;
+}
+
+/**
+ * Set glyph symbol on element
+ */
+export function setGlyphSymbol(element: HTMLElement, symbol: string | undefined): void {
+    if (symbol !== undefined) {
+        element.dataset.glyphSymbol = symbol;
+    } else {
+        delete element.dataset.glyphSymbol;
+    }
+}

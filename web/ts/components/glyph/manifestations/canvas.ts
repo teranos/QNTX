@@ -84,23 +84,9 @@ export function morphToCanvas(
         glyphElement.style.flexDirection = 'column';
 
         // Add minimize button (floating, top-right corner)
-        // TODO: Unify button sizing (32px here vs 24px in window)
         const minimizeBtn = document.createElement('button');
         minimizeBtn.textContent = '−';
         minimizeBtn.className = 'canvas-minimize-btn';
-        minimizeBtn.style.position = 'fixed';
-        minimizeBtn.style.top = '16px';
-        minimizeBtn.style.right = '16px';
-        minimizeBtn.style.width = '32px';
-        minimizeBtn.style.height = '32px';
-        minimizeBtn.style.border = 'none';
-        minimizeBtn.style.borderRadius = '4px';
-        // TODO: Extract color to CSS variable or class
-        minimizeBtn.style.backgroundColor = 'var(--bg-secondary)';
-        minimizeBtn.style.color = 'var(--text-primary)';
-        minimizeBtn.style.cursor = 'pointer';
-        minimizeBtn.style.zIndex = '10001';
-        minimizeBtn.style.fontSize = '20px';
         minimizeBtn.onclick = () => morphFromCanvas(
             glyphElement,
             glyph,
