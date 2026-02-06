@@ -1,4 +1,5 @@
-//go:build !qntxwasm
+//go:build ignore
+// TODO: Remove this file - Go parser tests are obsolete now that WASM parser is exclusive
 
 package parser
 
