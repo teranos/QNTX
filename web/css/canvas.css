@@ -77,6 +77,40 @@
     transform: scale(0.95);
 }
 
+/* Canvas fullscreen minimize button - matches action bar styling */
+.canvas-minimize-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.85);
+    opacity: 0.95;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 16px;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s ease;
+}
+
+.canvas-minimize-btn:hover {
+    background: #3a3b3a;
+    border-color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 1);
+    opacity: 1;
+}
+
+.canvas-minimize-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(0.95);
+}
+
 /* Grid glyphs on canvas */
 .canvas-grid-glyph {
     position: absolute;
@@ -135,7 +169,7 @@
     display: flex;
     gap: 3px;
     background: var(--bg-secondary);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 4px;
     padding: 3px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -149,7 +183,7 @@
     border: none;
     background: var(--bg-tertiary);
     color: var(--text-primary);
-    opacity: 0.7;
+    opacity: 0.6;
     font-size: 12px;
     border-radius: 3px;
     cursor: pointer;
@@ -161,7 +195,7 @@
 
 .canvas-action-button:hover {
     background: var(--bg-hover);
-    opacity: 1;
+    opacity: 0.9;
 }
 
 .canvas-action-delete:hover {
