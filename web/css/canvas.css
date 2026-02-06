@@ -110,41 +110,13 @@
     transform: scale(0.95);
 }
 
-/* Grid glyphs on canvas */
-.canvas-grid-glyph {
-    position: absolute;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    cursor: move;
-    user-select: none;
-    background-color: var(--bg-secondary);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);
-    transition: opacity 0.15s ease;
-    z-index: 1;
-}
-
-.canvas-grid-glyph:hover {
-    background-color: var(--bg-hover);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.canvas-grid-glyph:active {
-    cursor: grabbing;
-}
-
 /* Python editor glyphs on canvas */
 .canvas-py-glyph {
     /* Base styles are set inline in py-glyph.ts */
 }
 
 /* Interaction states for glyphs */
-.canvas-py-glyph.is-dragging,
-.canvas-grid-glyph.is-dragging {
+.canvas-py-glyph.is-dragging {
     opacity: 0.8;
     z-index: 1000;
 }
