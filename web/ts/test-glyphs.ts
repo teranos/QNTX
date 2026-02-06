@@ -53,6 +53,7 @@
 
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas-glyph';
+import { log, SEG } from './logger.ts';
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {
@@ -142,7 +143,7 @@ export function registerTestGlyphs(): void {
     });
 
     // TODO: Replace console.log with proper logger (log.debug)
-    console.log('Test glyphs registered:', {
+    log.debug(SEG.UI, 'Test glyphs registered:', {
         vidstream: 'VidStream monitoring',
         database: 'Database Statistics',
         self: 'Self diagnostics'

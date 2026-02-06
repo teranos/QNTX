@@ -18,6 +18,7 @@ import type { Job as BackendJob } from '../../types/generated/typescript';
 import { toast } from './toast';
 import { IX } from '@generated/sym.js';
 import { formatRelativeTime } from './html-utils.ts';
+import { log, SEG } from './logger.ts';
 
 // Extended Job type with frontend-specific fields
 interface Job extends BackendJob {
@@ -111,7 +112,7 @@ class JobListPanel extends BasePanel {
         try {
             const response = await fetch('/api/pulse/jobs?limit=100');
             if (!response.ok) {
-                console.error('Failed to fetch jobs:', response.statusText);
+                log.error(SEG.ERROR, 'Failed to fetch jobs:', response.statusText);
                 return;
             }
 
@@ -122,9 +123,9 @@ class JobListPanel extends BasePanel {
                 this.jobs.set(job.id, job);
             });
 
-            console.log(`Loaded ${jobs.length} async jobs from API`);
+            log.debug(SEG.UI, `Loaded ${jobs.length} async jobs from API`);
         } catch (error: unknown) {
-            console.error('Error fetching jobs:', error);
+            log.error(SEG.ERROR, 'Error fetching jobs:', error);
         }
     }
 
@@ -195,7 +196,7 @@ class JobListPanel extends BasePanel {
         // Find job element
         const jobElement = document.querySelector(`[data-job-id="${job_id}"]`);
         if (!jobElement) {
-            console.warn('Job element not found for streaming:', job_id);
+            log.warn(SEG.UI, 'Job element not found for streaming:', job_id);
             return;
         }
 

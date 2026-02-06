@@ -8,6 +8,7 @@ import { EditorState } from '@codemirror/state';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView as PMEditorView } from 'prosemirror-view';
+import { log, SEG } from '../../logger.ts';
 
 export class GoCodeBlockNodeView {
     dom: HTMLElement;
@@ -35,7 +36,7 @@ export class GoCodeBlockNodeView {
             const goModule = await import('@codemirror/lang-go');
             goExtension = goModule.go();
         } catch (error: unknown) {
-            console.error('[Go Block] Go language support unavailable:', error);
+            log.error(SEG.ERROR, '[Go Block] Go language support unavailable:', error);
             goExtension = [];  // Editor works without syntax highlighting
         }
 
@@ -89,7 +90,7 @@ export class GoCodeBlockNodeView {
             parent: this.dom
         });
 
-        console.log('[Go Block] CodeMirror initialized with Go syntax highlighting');
+        log.debug(SEG.UI, '[Go Block] CodeMirror initialized with Go syntax highlighting');
     }
 
     private syncToProseMirror(content: string): void {
