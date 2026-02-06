@@ -60,7 +60,7 @@ func NewWatcherStore(db *sql.DB) *WatcherStore {
 }
 
 // Create creates a new watcher
-func (ws *WatcherStore) Create(w *Watcher) error {
+func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 	if w.ID == "" {
 		return errors.New("watcher ID cannot be empty")
 	}
@@ -107,7 +107,6 @@ func (ws *WatcherStore) Create(w *Watcher) error {
 		timeEnd = &s
 	}
 
-	ctx := context.Background()
 	_, err = ws.db.ExecContext(ctx, `
 		INSERT INTO watchers (
 			id, name,
@@ -129,8 +128,7 @@ func (ws *WatcherStore) Create(w *Watcher) error {
 }
 
 // Get retrieves a watcher by ID
-func (ws *WatcherStore) Get(id string) (*Watcher, error) {
-	ctx := context.Background()
+func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 	row := ws.db.QueryRowContext(ctx, `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -143,9 +141,7 @@ func (ws *WatcherStore) Get(id string) (*Watcher, error) {
 }
 
 // List returns all watchers, optionally filtered by enabled status
-func (ws *WatcherStore) List(enabledOnly bool) ([]*Watcher, error) {
-	ctx := context.Background()
-
+func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher, error) {
 	query := `
 		SELECT id, name,
 			subjects, predicates, contexts, actors, time_start, time_end, ax_query,
@@ -176,7 +172,7 @@ func (ws *WatcherStore) List(enabledOnly bool) ([]*Watcher, error) {
 }
 
 // Update updates a watcher
-func (ws *WatcherStore) Update(w *Watcher) error {
+func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 	// Validate MaxFiresPerMinute
 	if w.MaxFiresPerMinute < 0 {
 		return errors.Newf("max_fires_per_minute must be >= 0, got %d", w.MaxFiresPerMinute)
@@ -217,7 +213,6 @@ func (ws *WatcherStore) Update(w *Watcher) error {
 		lastFiredAt = &s
 	}
 
-	ctx := context.Background()
 	_, err = ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
 			name = ?,
@@ -242,8 +237,7 @@ func (ws *WatcherStore) Update(w *Watcher) error {
 }
 
 // Delete removes a watcher
-func (ws *WatcherStore) Delete(id string) error {
-	ctx := context.Background()
+func (ws *WatcherStore) Delete(ctx context.Context, id string) error {
 	_, err := ws.db.ExecContext(ctx, "DELETE FROM watchers WHERE id = ?", id)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete watcher")
@@ -252,8 +246,7 @@ func (ws *WatcherStore) Delete(id string) error {
 }
 
 // RecordFire updates the watcher stats after a successful fire
-func (ws *WatcherStore) RecordFire(id string) error {
-	ctx := context.Background()
+func (ws *WatcherStore) RecordFire(ctx context.Context, id string) error {
 	now := time.Now().Format(time.RFC3339Nano)
 	_, err := ws.db.ExecContext(ctx, `
 		UPDATE watchers SET
@@ -268,8 +261,7 @@ func (ws *WatcherStore) RecordFire(id string) error {
 }
 
 // RecordError updates the watcher stats after a failed execution
-func (ws *WatcherStore) RecordError(id string, errMsg string) error {
-	ctx := context.Background()
+func (ws *WatcherStore) RecordError(ctx context.Context, id string, errMsg string) error {
 	now := time.Now().Format(time.RFC3339Nano)
 	_, err := ws.db.ExecContext(ctx, `
 		UPDATE watchers SET

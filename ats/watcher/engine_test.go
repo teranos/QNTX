@@ -70,13 +70,13 @@ func TestEngine_LoadWatchers(t *testing.T) {
 		AxQuery:           "subjects=user:456 predicates=login",
 	}
 
-	if err := store.Create(enabledWatcher); err != nil {
+	if err := store.Create(context.Background(),enabledWatcher); err != nil {
 		t.Fatalf("Create enabled watcher failed: %v", err)
 	}
-	if err := store.Create(disabledWatcher); err != nil {
+	if err := store.Create(context.Background(),disabledWatcher); err != nil {
 		t.Fatalf("Create disabled watcher failed: %v", err)
 	}
-	if err := store.Create(axQueryWatcher); err != nil {
+	if err := store.Create(context.Background(),axQueryWatcher); err != nil {
 		t.Fatalf("Create ax query watcher failed: %v", err)
 	}
 
@@ -129,7 +129,7 @@ func TestEngine_MatchesFilter(t *testing.T) {
 			Contexts:   []string{"web"},
 		},
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -245,7 +245,7 @@ func TestEngine_RateLimiting(t *testing.T) {
 		Enabled:           true,
 		Filter: types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -315,7 +315,7 @@ func TestEngine_ExecutePython(t *testing.T) {
 		Enabled:           true,
 		Filter: types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -372,7 +372,7 @@ func TestEngine_ExecuteWebhook(t *testing.T) {
 		Enabled:           true,
 		Filter: types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -448,7 +448,7 @@ func TestEngine_QueryHistoricalMatches(t *testing.T) {
 			Predicates: []string{"login"},
 		},
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -498,7 +498,7 @@ func TestEngine_TimeFilters(t *testing.T) {
 			TimeEnd:   &future,
 		},
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -572,7 +572,7 @@ func TestEngine_ZeroMaxFiresPerMinute(t *testing.T) {
 		Enabled:           true,
 		Filter: types.AxFilter{}, // Match all
 	}
-	if err := store.Create(w); err != nil {
+	if err := store.Create(context.Background(),w); err != nil {
 		t.Fatalf("Create watcher failed: %v", err)
 	}
 
@@ -642,7 +642,7 @@ func TestEngine_NoSharedMutation(t *testing.T) {
 			Enabled:           true,
 			Filter:            types.AxFilter{}, // Match all
 		}
-		if err := store.Create(w); err != nil {
+		if err := store.Create(context.Background(),w); err != nil {
 			t.Fatalf("Create watcher %d failed: %v", i, err)
 		}
 	}

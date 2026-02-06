@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -26,7 +27,8 @@ func TestWatcherStore_Create(t *testing.T) {
 		Enabled:           true,
 	}
 
-	err := store.Create(watcher)
+	ctx := context.Background()
+	err := store.Create(ctx, watcher)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -40,7 +42,7 @@ func TestWatcherStore_Create(t *testing.T) {
 	}
 
 	// Verify we can retrieve it
-	retrieved, err := store.Get(watcher.ID)
+	retrieved, err := store.Get(ctx, watcher.ID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -68,13 +70,14 @@ func TestWatcherStore_CreateDuplicate(t *testing.T) {
 		Enabled:    true,
 	}
 
-	err := store.Create(watcher)
+	ctx := context.Background()
+	err := store.Create(ctx, watcher)
 	if err != nil {
 		t.Fatalf("First Create failed: %v", err)
 	}
 
 	// Try to create again with same ID
-	err = store.Create(watcher)
+	err = store.Create(ctx, watcher)
 	if err == nil {
 		t.Error("Expected error creating duplicate watcher, got nil")
 	}
@@ -84,8 +87,10 @@ func TestWatcherStore_Get(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
 
+	ctx := context.Background()
+
 	// Test getting non-existent watcher
-	_, err := store.Get("nonexistent")
+	_, err := store.Get(ctx, "nonexistent")
 	if err == nil {
 		t.Error("Expected error getting non-existent watcher, got nil")
 	}
@@ -99,11 +104,11 @@ func TestWatcherStore_Get(t *testing.T) {
 		Enabled:    false,
 	}
 
-	if err := store.Create(watcher); err != nil {
+	if err := store.Create(ctx, watcher); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	retrieved, err := store.Get("get-test")
+	retrieved, err := store.Get(ctx, "get-test")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -119,6 +124,7 @@ func TestWatcherStore_Get(t *testing.T) {
 func TestWatcherStore_Update(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
 
 	// Create initial watcher
 	watcher := &storage.Watcher{
@@ -132,7 +138,7 @@ func TestWatcherStore_Update(t *testing.T) {
 		},
 	}
 
-	if err := store.Create(watcher); err != nil {
+	if err := store.Create(ctx, watcher); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
@@ -147,7 +153,7 @@ func TestWatcherStore_Update(t *testing.T) {
 	watcher.Filter.Subjects = []string{"updated"}
 	watcher.Enabled = false
 
-	if err := store.Update(watcher); err != nil {
+	if err := store.Update(ctx, watcher); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
@@ -157,7 +163,7 @@ func TestWatcherStore_Update(t *testing.T) {
 	}
 
 	// Retrieve and verify changes
-	retrieved, err := store.Get("update-test")
+	retrieved, err := store.Get(ctx, "update-test")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -179,6 +185,7 @@ func TestWatcherStore_Update(t *testing.T) {
 func TestWatcherStore_Delete(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
 
 	watcher := &storage.Watcher{
 		ID:         "delete-test",
@@ -188,29 +195,29 @@ func TestWatcherStore_Delete(t *testing.T) {
 		Enabled:    true,
 	}
 
-	if err := store.Create(watcher); err != nil {
+	if err := store.Create(ctx, watcher); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	// Verify it exists
-	_, err := store.Get("delete-test")
+	_, err := store.Get(ctx, "delete-test")
 	if err != nil {
 		t.Fatalf("Get failed before delete: %v", err)
 	}
 
 	// Delete it
-	if err := store.Delete("delete-test"); err != nil {
+	if err := store.Delete(ctx, "delete-test"); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
 	// Verify it's gone
-	_, err = store.Get("delete-test")
+	_, err = store.Get(ctx, "delete-test")
 	if err == nil {
 		t.Error("Expected error getting deleted watcher, got nil")
 	}
 
 	// Delete non-existent should not error
-	err = store.Delete("nonexistent")
+	err = store.Delete(ctx, "nonexistent")
 	if err != nil {
 		t.Errorf("Delete non-existent returned error: %v", err)
 	}
@@ -219,6 +226,7 @@ func TestWatcherStore_Delete(t *testing.T) {
 func TestWatcherStore_List(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
 
 	// Create mix of enabled/disabled watchers
 	watchers := []*storage.Watcher{
@@ -246,13 +254,13 @@ func TestWatcherStore_List(t *testing.T) {
 	}
 
 	for _, w := range watchers {
-		if err := store.Create(w); err != nil {
+		if err := store.Create(ctx, w); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
 	// List all watchers
-	all, err := store.List(false)
+	all, err := store.List(ctx, false)
 	if err != nil {
 		t.Fatalf("List(false) failed: %v", err)
 	}
@@ -262,7 +270,7 @@ func TestWatcherStore_List(t *testing.T) {
 	}
 
 	// List only enabled
-	enabled, err := store.List(true)
+	enabled, err := store.List(ctx, true)
 	if err != nil {
 		t.Fatalf("List(true) failed: %v", err)
 	}
@@ -282,6 +290,7 @@ func TestWatcherStore_List(t *testing.T) {
 func TestWatcherStore_TimeFilters(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
 
 	now := time.Now()
 	future := now.Add(24 * time.Hour)
@@ -298,11 +307,11 @@ func TestWatcherStore_TimeFilters(t *testing.T) {
 		},
 	}
 
-	if err := store.Create(watcher); err != nil {
+	if err := store.Create(ctx, watcher); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	retrieved, err := store.Get("time-test")
+	retrieved, err := store.Get(ctx, "time-test")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -323,6 +332,7 @@ func TestWatcherStore_TimeFilters(t *testing.T) {
 func TestWatcherStore_ComplexFilter(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
 
 	watcher := &storage.Watcher{
 		ID:         "complex-filter",
@@ -338,11 +348,11 @@ func TestWatcherStore_ComplexFilter(t *testing.T) {
 		},
 	}
 
-	if err := store.Create(watcher); err != nil {
+	if err := store.Create(ctx, watcher); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	retrieved, err := store.Get("complex-filter")
+	retrieved, err := store.Get(ctx, "complex-filter")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -365,6 +375,7 @@ func TestWatcherStore_ComplexFilter(t *testing.T) {
 func TestWatcherStore_UpdateStats(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
 	store := storage.NewWatcherStore(db)
+	ctx := context.Background()
 
 	watcher := &storage.Watcher{
 		ID:         "stats-test",
@@ -374,7 +385,7 @@ func TestWatcherStore_UpdateStats(t *testing.T) {
 		Enabled:    true,
 	}
 
-	if err := store.Create(watcher); err != nil {
+	if err := store.Create(ctx, watcher); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
@@ -393,12 +404,12 @@ func TestWatcherStore_UpdateStats(t *testing.T) {
 	watcher.LastFiredAt = &now
 	watcher.LastError = "test error"
 
-	if err := store.Update(watcher); err != nil {
+	if err := store.Update(ctx, watcher); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
 	// Verify stats persisted
-	retrieved, err := store.Get("stats-test")
+	retrieved, err := store.Get(ctx, "stats-test")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}

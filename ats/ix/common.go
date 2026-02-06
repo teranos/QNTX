@@ -1,6 +1,7 @@
 package ix
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -59,7 +60,7 @@ func (h *ExecutionHelper) ExecuteAttestations(store ats.AttestationStore, attest
 }
 
 // ExecuteAliases processes a list of alias pairs
-func (h *ExecutionHelper) ExecuteAliases(aliasResolver *alias.Resolver, aliases [][]string, showDetails bool) error {
+func (h *ExecutionHelper) ExecuteAliases(ctx context.Context, aliasResolver *alias.Resolver, aliases [][]string, showDetails bool) error {
 	for _, aliasPair := range aliases {
 		if len(aliasPair) != 2 {
 			continue
@@ -80,7 +81,7 @@ func (h *ExecutionHelper) ExecuteAliases(aliasResolver *alias.Resolver, aliases 
 			continue
 		}
 
-		err := aliasResolver.CreateAlias(aliasName, targetID)
+		err := aliasResolver.CreateAlias(ctx, aliasName, targetID)
 		if err != nil {
 			return fmt.Errorf("failed to create alias '%s' -> '%s': %w", aliasName, targetID, err)
 		}
