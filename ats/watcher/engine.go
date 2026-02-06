@@ -40,6 +40,7 @@ type Engine struct {
 	mu           sync.RWMutex
 	watchers     map[string]*storage.Watcher
 	rateLimiters map[string]*rate.Limiter
+	parseErrors  map[string]error // Stores parse errors for watchers that failed to load
 
 	// Retry queue
 	retryMu    sync.Mutex
@@ -80,6 +81,7 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		},
 		watchers:     make(map[string]*storage.Watcher),
 		rateLimiters: make(map[string]*rate.Limiter),
+		parseErrors:  make(map[string]error),
 		retryQueue:   make([]*PendingExecution, 0),
 		ctx:          ctx,
 		cancel:       cancel,
@@ -130,10 +132,14 @@ func (e *Engine) loadWatchers() error {
 					"watcher_id", w.ID,
 					"ax_query", w.AxQuery,
 					"error", err)
+				// Store parse error for retrieval
+				e.parseErrors[w.ID] = err
 				continue
 			}
 			// Merge parsed filter into watcher's filter
 			w.Filter = *filter
+			// Clear any previous parse error for this watcher
+			delete(e.parseErrors, w.ID)
 		}
 
 		e.watchers[w.ID] = w
@@ -162,6 +168,14 @@ func (e *Engine) GetWatcher(watcherID string) (*storage.Watcher, bool) {
 	defer e.mu.RUnlock()
 	watcher, exists := e.watchers[watcherID]
 	return watcher, exists
+}
+
+// GetParseError returns the parse error for a watcher that failed to load
+// Returns nil if the watcher loaded successfully or doesn't exist
+func (e *Engine) GetParseError(watcherID string) error {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.parseErrors[watcherID]
 }
 
 // QueryHistoricalMatches queries all historical attestations and broadcasts matches for a watcher

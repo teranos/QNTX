@@ -126,6 +126,9 @@ export interface DaemonStatusMessage {
 
 export interface ErrorResponse {
   error: string;
+  /**
+   * Structured error context from errors.GetAllDetails()
+   */
   details?: string[];
 }
 
@@ -857,6 +860,10 @@ export interface WatcherErrorMessage {
    * Error message
    */
   error: string;
+  /**
+   * Structured error context from errors.GetAllDetails()
+   */
+  details?: string[];
   /**
    * "error" or "warning"
    */
