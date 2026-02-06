@@ -108,50 +108,43 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.style.overflow = 'hidden';
             container.style.zIndex = '1';
 
-            // Title bar for dragging
+            // Title bar with inline query input
             const titleBar = document.createElement('div');
             titleBar.className = 'ax-glyph-title-bar';
             titleBar.style.padding = '8px';
             titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-            titleBar.style.cursor = 'move';
             titleBar.style.userSelect = 'none';
-            titleBar.style.fontWeight = 'bold';
             titleBar.style.fontSize = '14px';
             titleBar.style.display = 'flex';
             titleBar.style.alignItems = 'center';
-            titleBar.style.justifyContent = 'space-between';
+            titleBar.style.gap = '8px';
 
-            // Label
+            // Symbol (draggable area)
             const label = document.createElement('span');
             label.textContent = AX;
+            label.style.cursor = 'move';
+            label.style.fontWeight = 'bold';
+            label.style.flexShrink = '0';
             titleBar.appendChild(label);
 
-            container.appendChild(titleBar);
-
-            // Editor container
-            const editorContainer = document.createElement('div');
-            editorContainer.className = 'ax-glyph-editor';
-            editorContainer.style.flex = '1';
-            editorContainer.style.overflow = 'hidden';
-            editorContainer.style.display = 'flex';
-            editorContainer.style.flexDirection = 'column';
-
-            // Text editor for the ax query
-            const editor = document.createElement('textarea');
-            editor.className = 'ax-query-textarea';
+            // Single-line query input (takes remaining space)
+            const editor = document.createElement('input');
+            editor.type = 'text';
+            editor.className = 'ax-query-input';
             editor.value = currentQuery;
-            editor.placeholder = 'Enter ax query (e.g., is git, has certification)';
+            editor.placeholder = 'Enter ax query (e.g., ALICE, is git)';
             editor.style.flex = '1';
-            editor.style.width = '100%';
-            editor.style.padding = '8px';
+            editor.style.padding = '4px 8px';
             editor.style.fontSize = '13px';
             editor.style.fontFamily = 'monospace';
             editor.style.border = 'none';
             editor.style.outline = 'none';
-            editor.style.resize = 'none';
             editor.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
             editor.style.color = '#d4f0d4'; // 20% greener and whiter
-            editor.style.overflow = 'auto';
+            editor.style.borderRadius = '2px';
+
+            titleBar.appendChild(editor);
+            container.appendChild(titleBar);
 
             // Auto-save and watcher update with debouncing (500ms delay)
             let saveTimeout: number | undefined;
@@ -201,10 +194,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 }, 500);
             });
 
-            editorContainer.appendChild(editor);
-            container.appendChild(editorContainer);
-
-            // Results container - scrollable list of matched attestations
+            // Results container - scrollable list of matched attestations (gets all remaining space)
             const resultsContainer = document.createElement('div');
             resultsContainer.className = 'ax-glyph-results';
             resultsContainer.style.flex = '1';
@@ -262,8 +252,8 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             resizeHandle.style.borderTopLeftRadius = '4px';
             container.appendChild(resizeHandle);
 
-            // Make draggable and resizable
-            makeDraggable(container, titleBar, glyph, { logLabel: 'AxGlyph' });
+            // Make draggable and resizable (drag via symbol only)
+            makeDraggable(container, label, glyph, { logLabel: 'AxGlyph' });
             makeResizable(container, resizeHandle, glyph, { logLabel: 'AxGlyph' });
 
             return container;
