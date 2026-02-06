@@ -59,7 +59,7 @@ pub enum ParseError {
     #[error("empty query")]
     EmptyQuery,
 
-    #[error("wildcard '*' is not supported in ax queries - use specific {field} names")]
+    #[error("wildcard/special character is not supported in ax queries - use specific {field} names")]
     WildcardNotSupported { field: String },
 }
 
@@ -111,35 +111,8 @@ impl<'a> Parser<'a> {
 
     /// Validate the parsed query
     fn validate(&self) -> Result<(), ParseError> {
-        // Block wildcard '*' - not part of ax specification
-        for subject in &self.query.subjects {
-            if *subject == "*" {
-                return Err(ParseError::WildcardNotSupported {
-                    field: "subject".to_string(),
-                });
-            }
-        }
-        for predicate in &self.query.predicates {
-            if *predicate == "*" {
-                return Err(ParseError::WildcardNotSupported {
-                    field: "predicate".to_string(),
-                });
-            }
-        }
-        for context in &self.query.contexts {
-            if *context == "*" {
-                return Err(ParseError::WildcardNotSupported {
-                    field: "context".to_string(),
-                });
-            }
-        }
-        for actor in &self.query.actors {
-            if *actor == "*" {
-                return Err(ParseError::WildcardNotSupported {
-                    field: "actor".to_string(),
-                });
-            }
-        }
+        // Validation now happens at lexer/parser level via Wildcard token rejection.
+        // This method is kept for future semantic validation if needed.
         Ok(())
     }
 
@@ -199,6 +172,12 @@ impl<'a> Parser<'a> {
             | TokenKind::Between
             | TokenKind::Over => self.state = ParserState::Temporal,
             TokenKind::So | TokenKind::Therefore => self.state = ParserState::Actions,
+            TokenKind::Wildcard => {
+                // Reject wildcard immediately
+                return Err(ParseError::WildcardNotSupported {
+                    field: "query".to_string(),
+                });
+            }
             // NOTE: User dissatisfaction - this is terrible design. We're routing tokens to
             // different states based on fragile string patterns. A bare word like "has_experience"
             // becomes a predicate just because it has an underscore, while "ALICE" is a subject.
@@ -233,6 +212,11 @@ impl<'a> Parser<'a> {
             };
 
             match token.kind {
+                TokenKind::Wildcard => {
+                    return Err(ParseError::WildcardNotSupported {
+                        field: "subject".to_string(),
+                    });
+                }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
                     self.query.subjects.push(t.text);
@@ -300,6 +284,11 @@ impl<'a> Parser<'a> {
             };
 
             match token.kind {
+                TokenKind::Wildcard => {
+                    return Err(ParseError::WildcardNotSupported {
+                        field: "predicate".to_string(),
+                    });
+                }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
                     self.query.predicates.push(t.text);
@@ -368,6 +357,11 @@ impl<'a> Parser<'a> {
             };
 
             match token.kind {
+                TokenKind::Wildcard => {
+                    return Err(ParseError::WildcardNotSupported {
+                        field: "context".to_string(),
+                    });
+                }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
                     self.query.contexts.push(t.text);
@@ -435,6 +429,11 @@ impl<'a> Parser<'a> {
             };
 
             match token.kind {
+                TokenKind::Wildcard => {
+                    return Err(ParseError::WildcardNotSupported {
+                        field: "actor".to_string(),
+                    });
+                }
                 TokenKind::Identifier | TokenKind::QuotedString | TokenKind::NaturalPredicate => {
                     let t = self.next().unwrap();
                     self.query.actors.push(t.text);
@@ -683,5 +682,75 @@ mod tests {
         assert_eq!(query.subjects, vec!["John Doe"]);
         assert_eq!(query.predicates, vec!["senior developer"]);
         assert_eq!(query.contexts, vec!["ACME Corp"]);
+    }
+
+    #[test]
+    fn test_reject_wildcard_asterisk() {
+        let result = Parser::parse("*");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+    }
+
+    #[test]
+    fn test_reject_wildcard_caret() {
+        let result = Parser::parse("^");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+    }
+
+    #[test]
+    fn test_reject_wildcard_percent() {
+        let result = Parser::parse("%");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+    }
+
+    #[test]
+    fn test_reject_wildcard_dollar() {
+        let result = Parser::parse("$");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+    }
+
+    #[test]
+    fn test_reject_wildcard_hash() {
+        let result = Parser::parse("#");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+    }
+
+    #[test]
+    fn test_reject_wildcard_in_subject() {
+        let result = Parser::parse("* is author");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "query"));
+    }
+
+    #[test]
+    fn test_reject_wildcard_in_predicate() {
+        let result = Parser::parse("ALICE is *");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "predicate"));
+    }
+
+    #[test]
+    fn test_reject_wildcard_in_context() {
+        let result = Parser::parse("ALICE is author of *");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "context"));
+    }
+
+    #[test]
+    fn test_reject_wildcard_in_actor() {
+        let result = Parser::parse("ALICE is author by *");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "actor"));
+    }
+
+    #[test]
+    fn test_reject_multiple_wildcards() {
+        let result = Parser::parse("is * * *");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
     }
 }
