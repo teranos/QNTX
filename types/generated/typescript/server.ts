@@ -126,6 +126,7 @@ export interface DaemonStatusMessage {
 
 export interface ErrorResponse {
   error: string;
+  details?: string[];
 }
 
 export interface JobChildrenResponse {

@@ -234,10 +234,11 @@ type WatcherMatchMessage struct {
 // WatcherErrorMessage represents a watcher error (parsing failure, validation error, etc.)
 // Sent when watcher creation/update fails
 type WatcherErrorMessage struct {
-	Type      string `json:"type"`       // "watcher_error"
-	WatcherID string `json:"watcher_id"` // ID of watcher that failed
-	Error     string `json:"error"`      // Error message
-	Severity  string `json:"severity"`   // "error" or "warning"
-	Timestamp int64  `json:"timestamp"`  // Unix timestamp
+	Type      string   `json:"type"`              // "watcher_error"
+	WatcherID string   `json:"watcher_id"`        // ID of watcher that failed
+	Error     string   `json:"error"`             // Error message
+	Details   []string `json:"details,omitempty"` // Structured error context from errors.GetAllDetails()
+	Severity  string   `json:"severity"`          // "error" or "warning"
+	Timestamp int64    `json:"timestamp"`         // Unix timestamp
 }
 

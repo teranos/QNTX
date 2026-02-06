@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -28,8 +29,7 @@ func (s *QNTXServer) HandleProse(w http.ResponseWriter, r *http.Request) {
 	// Build prose content tree
 	tree, err := s.buildProseTree()
 	if err != nil {
-		s.logger.Errorw("Failed to build prose tree", "error", err)
-		writeError(w, http.StatusInternalServerError, "Failed to load prose content")
+		writeWrappedError(w, s.logger, err, "failed to load prose content", http.StatusInternalServerError)
 		return
 	}
 
@@ -95,10 +95,9 @@ func (s *QNTXServer) serveProseContent(w http.ResponseWriter, prosePath string) 
 	content, err := s.readProseFile(prosePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			http.Error(w, "Content not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, fmt.Sprintf("Content not found: %s", prosePath))
 		} else {
-			s.logger.Errorw("Failed to read prose file", "path", prosePath, "error", err)
-			http.Error(w, "Failed to read content", http.StatusInternalServerError)
+			writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to read prose file %s", prosePath), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -111,13 +110,12 @@ func (s *QNTXServer) serveProseContent(w http.ResponseWriter, prosePath string) 
 func (s *QNTXServer) saveProseContent(w http.ResponseWriter, r *http.Request, prosePath string) {
 	content, err := s.readRequestBody(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeWrappedError(w, s.logger, err, "failed to read request body", http.StatusBadRequest)
 		return
 	}
 
 	if err := s.writeProseFile(prosePath, content); err != nil {
-		s.logger.Errorw("Failed to write prose file", "path", prosePath, "error", err)
-		http.Error(w, "Failed to save content", http.StatusInternalServerError)
+		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to save prose file %s", prosePath), http.StatusInternalServerError)
 		return
 	}
 

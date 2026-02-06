@@ -1082,8 +1082,8 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 			"error", err,
 			"client_id", c.id,
 		)
-		// Broadcast error to frontend
-		c.server.broadcastWatcherError(watcherID, err.Error(), "error")
+		// Broadcast error to frontend with structured details
+		c.server.broadcastWatcherError(watcherID, err.Error(), "error", errors.GetAllDetails(err)...)
 		return
 	}
 
@@ -1097,7 +1097,9 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 			"watcher_id", watcherID,
 			"query", msg.WatcherQuery,
 		)
-		c.server.broadcastWatcherError(watcherID, errMsg, "error")
+		c.server.broadcastWatcherError(watcherID, errMsg, "error",
+			fmt.Sprintf("Query: %s", msg.WatcherQuery),
+		)
 		return
 	}
 
