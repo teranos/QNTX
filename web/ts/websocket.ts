@@ -168,15 +168,18 @@ const MESSAGE_HANDLERS = {
 
     watcher_error: (data: any) => {
         log.warn(SEG.WS, 'Watcher error:', data.watcher_id, data.error, `(${data.severity})`);
+        if (data.details?.length) {
+            log.warn(SEG.WS, 'Watcher error details:', ...data.details);
+        }
 
         // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
         const watcherIdPrefix = 'ax-glyph-';
         if (data.watcher_id && data.watcher_id.startsWith(watcherIdPrefix)) {
             const glyphId = data.watcher_id.substring(watcherIdPrefix.length);
 
-            // Update AX glyph with error message
+            // Update AX glyph with error message and details
             import('./components/glyph/ax-glyph.js').then(({ updateAxGlyphError }) => {
-                updateAxGlyphError(glyphId, data.error, data.severity);
+                updateAxGlyphError(glyphId, data.error, data.severity, data.details);
             });
         } else {
             log.warn(SEG.WS, 'Received watcher_error with unexpected watcher_id format:', data.watcher_id);

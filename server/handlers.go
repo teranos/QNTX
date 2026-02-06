@@ -359,11 +359,7 @@ func (s *QNTXServer) HandleUsageTimeSeries(w http.ResponseWriter, r *http.Reques
 
 	data, err := s.usageTracker.GetTimeSeriesData(days)
 	if err != nil {
-		s.logger.Errorw("Failed to get time-series data",
-			"error", err,
-			"days", days,
-		)
-		writeError(w, http.StatusInternalServerError, "Failed to fetch time-series data")
+		writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch time-series data (days=%d)", days), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, data)
@@ -392,8 +388,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("introspection") == "true" {
 		introspection, err := appcfg.GetConfigIntrospection()
 		if err != nil {
-			s.logger.Errorw("Failed to get config introspection", "error", err)
-			writeError(w, http.StatusInternalServerError, "Failed to get config introspection")
+			writeWrappedError(w, s.logger, err, "failed to get config introspection", http.StatusInternalServerError)
 			return
 		}
 
@@ -404,8 +399,7 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	// Default: Return Pulse config with budget status
 	status, err := s.budgetTracker.GetStatus()
 	if err != nil {
-		s.logger.Errorw("Failed to get budget status", "error", err)
-		writeError(w, http.StatusInternalServerError, "Failed to get config")
+		writeWrappedError(w, s.logger, err, "failed to get budget status", http.StatusInternalServerError)
 		return
 	}
 

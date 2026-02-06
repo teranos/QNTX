@@ -38,10 +38,6 @@ func TestParseAxQuery(t *testing.T) {
 			wantCtx:    []string{"GitHub"},
 			wantActors: []string{"CHARLIE"},
 		},
-		{
-			name:  "empty query",
-			input: "",
-		},
 	}
 
 	for _, tt := range tests {

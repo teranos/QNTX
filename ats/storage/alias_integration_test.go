@@ -12,15 +12,16 @@ func TestResolver_CreateAlias(t *testing.T) {
 	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
+	ctx := context.Background()
 
 	// Test creating a basic alias
-	err := resolver.CreateAlias("BILL", "WILLIAM SMITH")
+	err := resolver.CreateAlias(ctx, "BILL", "WILLIAM SMITH")
 	if err != nil {
 		t.Errorf("Expected no error creating alias, got: %v", err)
 	}
 
 	// Test creating another alias for the same person
-	err = resolver.CreateAlias("BILL", "W.SMITH")
+	err = resolver.CreateAlias(ctx, "BILL", "W.SMITH")
 	if err != nil {
 		t.Errorf("Expected no error creating second alias, got: %v", err)
 	}
@@ -30,10 +31,11 @@ func TestResolver_ResolveIdentifier(t *testing.T) {
 	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
+	ctx := context.Background()
 
 	// Create aliases
-	_ = resolver.CreateAlias("BILL", "WILLIAM SMITH")
-	_ = resolver.CreateAlias("BILL", "W.SMITH")
+	_ = resolver.CreateAlias(ctx, "BILL", "WILLIAM SMITH")
+	_ = resolver.CreateAlias(ctx, "BILL", "W.SMITH")
 
 	tests := []struct {
 		identifier string
@@ -46,7 +48,7 @@ func TestResolver_ResolveIdentifier(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		resolved, err := resolver.ResolveIdentifier(context.Background(), test.identifier)
+		resolved, err := resolver.ResolveIdentifier(ctx, test.identifier)
 		if err != nil {
 			t.Errorf("Error resolving %s: %v", test.identifier, err)
 			continue
@@ -75,12 +77,13 @@ func TestResolver_GetAliasesFor(t *testing.T) {
 	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
+	ctx := context.Background()
 
 	// Create aliases
-	_ = resolver.CreateAlias("ALICE", "ALICE SMITH")
-	_ = resolver.CreateAlias("ALICE", "A.SMITH")
+	_ = resolver.CreateAlias(ctx, "ALICE", "ALICE SMITH")
+	_ = resolver.CreateAlias(ctx, "ALICE", "A.SMITH")
 
-	aliases, err := resolver.GetAliasesFor(context.Background(), "ALICE")
+	aliases, err := resolver.GetAliasesFor(ctx, "ALICE")
 	if err != nil {
 		t.Errorf("Error getting aliases: %v", err)
 	}
@@ -98,7 +101,7 @@ func TestResolver_GetAliasesFor(t *testing.T) {
 	}
 
 	// Test with non-existent identifier
-	aliases, err = resolver.GetAliasesFor(context.Background(), "NONEXISTENT")
+	aliases, err = resolver.GetAliasesFor(ctx, "NONEXISTENT")
 	if err != nil {
 		t.Errorf("Error getting aliases for nonexistent: %v", err)
 	}
@@ -111,25 +114,26 @@ func TestResolver_RemoveAlias(t *testing.T) {
 	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
+	ctx := context.Background()
 
 	// Create and then remove an alias
-	_ = resolver.CreateAlias("BOB", "ROBERT JONES")
-	_ = resolver.CreateAlias("BOB", "R.JONES")
+	_ = resolver.CreateAlias(ctx, "BOB", "ROBERT JONES")
+	_ = resolver.CreateAlias(ctx, "BOB", "R.JONES")
 
 	// Verify it was created
-	resolved, _ := resolver.ResolveIdentifier(context.Background(), "BOB")
+	resolved, _ := resolver.ResolveIdentifier(ctx, "BOB")
 	if len(resolved) != 3 {
 		t.Errorf("Expected 3 resolved identifiers before removal, got %d", len(resolved))
 	}
 
 	// Remove one alias
-	err := resolver.RemoveAlias("BOB", "ROBERT JONES")
+	err := resolver.RemoveAlias(ctx, "BOB", "ROBERT JONES")
 	if err != nil {
 		t.Errorf("Error removing alias: %v", err)
 	}
 
 	// Verify it was removed
-	resolved, _ = resolver.ResolveIdentifier(context.Background(), "BOB")
+	resolved, _ = resolver.ResolveIdentifier(ctx, "BOB")
 	if len(resolved) != 2 {
 		t.Errorf("Expected 2 resolved identifiers after removal, got %d", len(resolved))
 	}
@@ -147,12 +151,13 @@ func TestResolver_GetAllAliases(t *testing.T) {
 	testDB := qntxtest.CreateTestDB(t)
 
 	resolver := alias.NewResolver(NewAliasStore(testDB))
+	ctx := context.Background()
 
 	// Create several aliases
-	_ = resolver.CreateAlias("CHARLIE", "CHARLES BROWN")
-	_ = resolver.CreateAlias("DAVE", "DAVID GREEN")
+	_ = resolver.CreateAlias(ctx, "CHARLIE", "CHARLES BROWN")
+	_ = resolver.CreateAlias(ctx, "DAVE", "DAVID GREEN")
 
-	allAliases, err := resolver.GetAllAliases()
+	allAliases, err := resolver.GetAllAliases(ctx)
 	if err != nil {
 		t.Errorf("Error getting all aliases: %v", err)
 	}
