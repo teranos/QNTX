@@ -170,7 +170,7 @@ async function injectCTP2Glyph(): Promise<void> {
             cell.innerHTML = generateCTP2Glyph();
         }
     } catch (error: unknown) {
-        console.warn('[Symbol Palette] Failed to load CTP2 glyph:', error);
+        log.warn(SEG.UI, '[Symbol Palette] Failed to load CTP2 glyph:', error);
         // Fallback to text
         const cell = document.getElementById('ctp2-palette-cell');
         if (cell) {
@@ -331,7 +331,7 @@ function handleSymbolClick(e: Event): void {
             showCTP2Window();
             break;
         default:
-            console.warn(`[Symbol Palette] Unknown command: ${cmd}`);
+            log.warn(SEG.UI, `[Symbol Palette] Unknown command: ${cmd}`);
     }
 }
 
@@ -426,7 +426,7 @@ function showPluginPanel(): void {
 async function showCTP2Window(): Promise<void> {
     // CTP2 is an optional/private module that may not exist in all environments
     // Comment out the import to prevent build failures when the module is missing
-    console.log('CTP2 module not available in this environment (optional/private feature)');
+    log.info(SEG.UI, 'CTP2 module not available in this environment (optional/private feature)');
     const statusEl = document.getElementById('status-message');
     if (statusEl) {
         statusEl.textContent = 'CTP2 module not available';

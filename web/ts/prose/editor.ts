@@ -17,6 +17,7 @@ import { GoCodeBlockNodeView } from './nodes/go-code-block.ts';
 import { FrontmatterNodeView } from './nodes/frontmatter-block.ts';
 import { proseInputRules } from './input-rules.ts';
 import { handleError, SEG } from '../error-handler.ts';
+import { log } from '../logger.ts';
 
 export interface ProseEditorCallbacks {
     onDocumentLoad?: (path: string) => void;
@@ -78,7 +79,7 @@ export class ProseEditor {
 
     initializeEditor(markdownContent: string): void {
         if (!this.editorContainer) {
-            console.error('Editor container not bound');
+            log.error(SEG.UI, 'Editor container not bound');
             return;
         }
 

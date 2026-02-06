@@ -19,6 +19,7 @@ import { sendMessage, validateBackendURL } from './websocket.ts';
 import { requestParse } from './ats-semantic-tokens-client.ts';
 import type { Diagnostic, SemanticToken } from '../types/lsp';
 import { FuzzySearchView } from './fuzzy-search-view.ts';
+import { log, SEG } from './logger.ts';
 
 let editorView: EditorView | null = null;
 let queryTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -164,7 +165,7 @@ function toggleMode(): void {
 export function initCodeMirrorEditor(): EditorView | null {
     const container = document.getElementById('codemirror-container');
     if (!container) {
-        console.error('CodeMirror container not found');
+        log.error(SEG.ERROR, 'CodeMirror container not found');
         return null;
     }
 
@@ -177,8 +178,8 @@ export function initCodeMirrorEditor(): EditorView | null {
     const validatedUrl = validateBackendURL(rawUrl);
 
     if (!validatedUrl) {
-        console.error('[LSP] Invalid backend URL:', rawUrl);
-        console.log('[LSP] Falling back to same-origin');
+        log.error(SEG.ERROR, '[LSP] Invalid backend URL:', rawUrl);
+        log.debug(SEG.UI, '[LSP] Falling back to same-origin');
     }
 
     const backendUrl = validatedUrl || window.location.origin;
@@ -186,7 +187,7 @@ export function initCodeMirrorEditor(): EditorView | null {
     const protocol = backendUrl.startsWith('https') ? 'wss:' : 'ws:';
     const serverUri = `${protocol}//${backendHost}/lsp` as `ws://${string}` | `wss://${string}`;
 
-    console.log('[LSP] Configuring connection to', serverUri);
+    log.debug(SEG.UI, '[LSP] Configuring connection to', serverUri);
 
     // Create editor state with LSP extension
     const startState = EditorState.create({
@@ -234,7 +235,7 @@ export function initCodeMirrorEditor(): EditorView | null {
         parent: container
     });
 
-    console.log('CodeMirror 6 editor initialized with LSP support');
+    log.debug(SEG.UI, 'CodeMirror 6 editor initialized with LSP support');
     return editorView;
 }
 

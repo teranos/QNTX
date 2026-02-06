@@ -6,13 +6,14 @@
  */
 
 import { showToast } from '../toast';
+import { log, SEG } from '../logger';
 import type { StorageEvictionMessage } from '../../types/websocket';
 
 /**
  * Handle storage eviction message - display as toast
  */
 export function handleStorageEviction(data: StorageEvictionMessage): void {
-    console.warn('⊔ Storage eviction:', data.message, 'Event type:', data.event_type);
+    log.warn(SEG.DB, 'Storage eviction:', data.message, 'Event type:', data.event_type);
 
     // Show toast notification with longer duration (8s) since it's important data loss info
     showToast(data.message, { type: 'warning', duration: 8000 });

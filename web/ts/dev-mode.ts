@@ -6,6 +6,7 @@
  */
 
 import { apiFetch } from './api.ts';
+import { log, SEG } from './logger.ts';
 
 let devMode: boolean | null = null;
 
@@ -20,7 +21,7 @@ export async function fetchDevMode(): Promise<boolean> {
     try {
         const response = await apiFetch('/api/dev');
         if (!response.ok) {
-            console.warn('Failed to fetch dev mode status, defaulting to false');
+            log.warn(SEG.SELF, 'Failed to fetch dev mode status, defaulting to false');
             devMode = false;
             return devMode;
         }
@@ -28,7 +29,7 @@ export async function fetchDevMode(): Promise<boolean> {
         devMode = text.trim() === 'true';
         return devMode;
     } catch (error: unknown) {
-        console.error('Failed to fetch dev mode:', error);
+        log.error(SEG.SELF, 'Failed to fetch dev mode:', error);
         devMode = false;
         return devMode;
     }
