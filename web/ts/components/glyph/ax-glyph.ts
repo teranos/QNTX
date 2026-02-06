@@ -279,7 +279,6 @@ function renderAttestation(attestation: Attestation): HTMLElement {
     item.style.marginBottom = '4px';
     item.style.backgroundColor = 'var(--bg-secondary)';
     item.style.borderRadius = '2px';
-    item.style.borderLeft = '3px solid var(--accent-color)';
 
     // Format attestation data (show key fields)
     const subjects = attestation.subjects?.join(', ') || 'N/A';
@@ -363,56 +362,25 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
         existingError.remove();
     }
 
-    // Create error display
+    // Create compact error display (like prompt glyph)
     const errorDisplay = document.createElement('div');
     errorDisplay.className = 'ax-glyph-error';
-    errorDisplay.style.padding = '12px';
-    errorDisplay.style.marginBottom = '8px';
-    errorDisplay.style.backgroundColor = severity === 'error' ? '#3d1f1f' : '#3d3d1f'; // Red for error, yellow for warning
-    errorDisplay.style.borderLeft = `3px solid ${severity === 'error' ? '#ff4444' : '#ffaa00'}`;
-    errorDisplay.style.borderRadius = '2px';
-    errorDisplay.style.fontSize = '12px';
+    errorDisplay.style.padding = '6px 8px';
+    errorDisplay.style.fontSize = '11px'; // Smaller font
     errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.color = 'var(--text-primary)';
+    errorDisplay.style.backgroundColor = severity === 'error' ? '#2b1a1a' : '#2b2b1a';
+    errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
+    errorDisplay.style.whiteSpace = 'pre-wrap';
+    errorDisplay.style.wordBreak = 'break-word';
+    errorDisplay.style.overflowWrap = 'anywhere';
     errorDisplay.style.maxWidth = '100%';
-    errorDisplay.style.overflowX = 'auto'; // Allow horizontal scroll for very long single lines
 
-    const severityLabel = document.createElement('div');
-    severityLabel.textContent = severity.toUpperCase();
-    severityLabel.style.fontWeight = 'bold';
-    severityLabel.style.marginBottom = '4px';
-    severityLabel.style.color = severity === 'error' ? '#ff4444' : '#ffaa00';
+    // Inline severity label + message (more compact)
+    errorDisplay.textContent = `${severity.toUpperCase()}: ${errorMsg}`;
 
-    const errorText = document.createElement('div');
-    errorText.textContent = errorMsg;
-    errorText.style.color = severity === 'error' ? '#ff9999' : '#ffcc66'; // Brighter red/yellow for readability
-    errorText.style.whiteSpace = 'pre-wrap'; // Preserve formatting, allow wrapping
-    errorText.style.wordBreak = 'break-word'; // Break long words if needed
-    errorText.style.overflowWrap = 'anywhere'; // Allow breaking anywhere to prevent overflow
-
-    errorDisplay.appendChild(severityLabel);
-    errorDisplay.appendChild(errorText);
-
-    // Add structured details if present
+    // Add structured details if present (more compact)
     if (details && details.length > 0) {
-        const detailsContainer = document.createElement('div');
-        detailsContainer.style.marginTop = '6px';
-        detailsContainer.style.paddingTop = '6px';
-        detailsContainer.style.borderTop = '1px solid rgba(255,255,255,0.1)';
-        detailsContainer.style.fontSize = '11px';
-        detailsContainer.style.color = 'var(--text-secondary)';
-
-        for (const detail of details) {
-            const line = document.createElement('div');
-            line.textContent = detail;
-            line.style.paddingLeft = '8px';
-            line.style.marginBottom = '2px';
-            line.style.whiteSpace = 'pre-wrap'; // Show complete detail lines
-            line.style.wordBreak = 'break-word';
-            detailsContainer.appendChild(line);
-        }
-
-        errorDisplay.appendChild(detailsContainer);
+        errorDisplay.textContent += '\n\n' + details.map(d => `  ${d}`).join('\n');
     }
 
     // Add error display at top of results
