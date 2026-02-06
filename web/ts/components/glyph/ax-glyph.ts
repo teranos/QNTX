@@ -277,7 +277,7 @@ function renderAttestation(attestation: Attestation): HTMLElement {
     item.className = 'ax-glyph-result-item';
     item.style.padding = '8px';
     item.style.marginBottom = '4px';
-    item.style.backgroundColor = 'var(--bg-secondary)';
+    item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)'; // 20% greener tint
     item.style.borderRadius = '2px';
 
     // Format attestation data (show key fields)
