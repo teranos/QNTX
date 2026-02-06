@@ -22,7 +22,6 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { GRID_SIZE } from './grid-constants';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';

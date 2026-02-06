@@ -30,7 +30,6 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { GRID_SIZE } from './grid-constants';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
