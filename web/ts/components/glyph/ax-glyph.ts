@@ -111,7 +111,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             // Title bar with inline query input
             const titleBar = document.createElement('div');
             titleBar.className = 'ax-glyph-title-bar';
-            titleBar.style.padding = '8px';
+            titleBar.style.padding = '4px 4px 4px 8px'; // Reduced top/bottom/right, keep left for symbol
             titleBar.style.backgroundColor = 'var(--bg-tertiary)';
             titleBar.style.userSelect = 'none';
             titleBar.style.fontSize = '14px';
@@ -125,6 +125,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             label.style.cursor = 'move';
             label.style.fontWeight = 'bold';
             label.style.flexShrink = '0';
+            label.style.color = '#6b9bd1'; // Azure-ish blue
             titleBar.appendChild(label);
 
             // Single-line query input (takes remaining space)
