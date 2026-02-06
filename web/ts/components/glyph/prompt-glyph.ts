@@ -15,10 +15,10 @@
 import type { Glyph } from './glyph';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { GRID_SIZE } from './grid-constants';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { makeDraggable, makeResizable } from './glyph-interaction';
+import { tooltip } from '../tooltip';
 
 /**
  * Prompt glyph execution status
@@ -69,16 +69,17 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
     element.className = 'canvas-prompt-glyph';
     element.dataset.glyphId = glyph.id;
+    element.dataset.glyphSymbol = SO;
 
-    const gridX = glyph.gridX ?? 5;
-    const gridY = glyph.gridY ?? 5;
+    const x = glyph.x ?? 200;
+    const y = glyph.y ?? 200;
 
     const width = glyph.width ?? 420;
     const height = glyph.height ?? 340;
 
     element.style.position = 'absolute';
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
     element.style.width = `${width}px`;
     element.style.height = `${height}px`;
     element.style.backgroundColor = 'var(--bg-secondary)';
@@ -127,8 +128,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     resultsSection.style.borderRadius = '4px';
     resultsSection.style.fontSize = '12px';
     resultsSection.style.fontFamily = 'monospace';
-    resultsSection.style.maxHeight = '200px';
-    resultsSection.style.overflowY = 'auto';
+    resultsSection.style.flex = '1';
+    resultsSection.style.overflow = 'auto';
 
     // Status display
     const statusSection = document.createElement('div');
@@ -211,19 +212,31 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
+    playBtn.className = 'has-tooltip';
+    playBtn.dataset.tooltip = 'Execute prompt';
     playBtn.style.width = '24px';
     playBtn.style.height = '24px';
     playBtn.style.padding = '0';
     playBtn.style.fontSize = '12px';
-    playBtn.style.backgroundColor = 'var(--bg-secondary)';
-    playBtn.style.color = 'var(--text-primary)';
-    playBtn.style.border = '1px solid var(--border-color)';
+    playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
+    playBtn.style.color = '#a8e6a1';
+    playBtn.style.border = '1px solid rgba(90, 200, 90, 0.3)';
     playBtn.style.borderRadius = '4px';
     playBtn.style.cursor = 'pointer';
     playBtn.style.display = 'flex';
     playBtn.style.alignItems = 'center';
     playBtn.style.justifyContent = 'center';
-    playBtn.title = 'Execute prompt preview';
+    playBtn.style.transition = 'all 0.15s ease';
+
+    playBtn.addEventListener('mouseenter', () => {
+        playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.25)';
+        playBtn.style.borderColor = 'rgba(90, 200, 90, 0.5)';
+    });
+
+    playBtn.addEventListener('mouseleave', () => {
+        playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
+        playBtn.style.borderColor = 'rgba(90, 200, 90, 0.3)';
+    });
 
     playBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -249,10 +262,12 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         log.debug(SEG.UI, `[Prompt] Executing direct (no variables)`);
 
+        const startTime = Date.now();
+
         updateStatus({
             state: 'running',
             message: 'Running...',
-            timestamp: Date.now(),
+            timestamp: startTime,
         });
 
         // Clear previous results
@@ -274,6 +289,9 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             }
 
             const data = await response.json() as any;
+            const endTime = Date.now();
+            const elapsedMs = endTime - startTime;
+            const elapsedSeconds = (elapsedMs / 1000).toFixed(2);
 
             // Render result
             resultsSection.style.display = 'block';
@@ -305,8 +323,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
             updateStatus({
                 state: data.error ? 'error' : 'success',
-                message: data.error ? 'Failed' : `${data.total_tokens} tokens`,
-                timestamp: Date.now(),
+                message: data.error ? 'Failed' : `${elapsedSeconds}s`,
+                timestamp: endTime,
             });
 
         } catch (error) {
@@ -364,6 +382,9 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
         minWidth: 280,
         minHeight: 200
     });
+
+    // Attach tooltip support
+    tooltip.attach(element);
 
     return element;
 }
