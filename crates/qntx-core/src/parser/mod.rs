@@ -111,8 +111,16 @@ impl<'a> Parser<'a> {
 
     /// Validate the parsed query
     fn validate(&self) -> Result<(), ParseError> {
-        // Validation now happens at lexer/parser level via Wildcard token rejection.
-        // This method is kept for future semantic validation if needed.
+        // Reject empty queries - they would match everything
+        if self.query.subjects.is_empty()
+            && self.query.predicates.is_empty()
+            && self.query.contexts.is_empty()
+            && self.query.actors.is_empty()
+            && self.query.temporal.is_none()
+            && self.query.actions.is_empty()
+        {
+            return Err(ParseError::EmptyQuery);
+        }
         Ok(())
     }
 
@@ -752,5 +760,27 @@ mod tests {
         let result = Parser::parse("is * * *");
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ParseError::WildcardNotSupported { .. }));
+    }
+
+    #[test]
+    fn test_reject_empty_query() {
+        let result = Parser::parse("");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::EmptyQuery));
+    }
+
+    #[test]
+    fn test_reject_whitespace_only_query() {
+        let result = Parser::parse("   ");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::EmptyQuery));
+    }
+
+    #[test]
+    fn test_reject_unknown_tokens_only() {
+        // Unknown tokens get skipped, resulting in empty query
+        let result = Parser::parse("@ @ @");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ParseError::EmptyQuery));
     }
 }
