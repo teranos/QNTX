@@ -334,10 +334,10 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
 }
 
 /**
- * Update AX glyph with error message
+ * Update AX glyph with error message and optional structured details
  * Called by WebSocket handler when watcher_error message arrives
  */
-export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: string): void {
+export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: string, details?: string[]): void {
     // Find the glyph element by data attribute
     const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement;
     if (!glyph) {
@@ -387,6 +387,26 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
 
     errorDisplay.appendChild(severityLabel);
     errorDisplay.appendChild(errorText);
+
+    // Add structured details if present
+    if (details && details.length > 0) {
+        const detailsContainer = document.createElement('div');
+        detailsContainer.style.marginTop = '6px';
+        detailsContainer.style.paddingTop = '6px';
+        detailsContainer.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+        detailsContainer.style.fontSize = '11px';
+        detailsContainer.style.color = 'var(--text-secondary)';
+
+        for (const detail of details) {
+            const line = document.createElement('div');
+            line.textContent = detail;
+            line.style.paddingLeft = '8px';
+            line.style.marginBottom = '2px';
+            detailsContainer.appendChild(line);
+        }
+
+        errorDisplay.appendChild(detailsContainer);
+    }
 
     // Add error display at top of results
     resultsContainer.insertBefore(errorDisplay, resultsContainer.firstChild);

@@ -378,13 +378,15 @@ func (s *QNTXServer) broadcastWatcherMatch(watcherID string, attestation *types.
 	}
 }
 
-// broadcastWatcherError broadcasts a watcher error to all connected clients
-// Used to send parsing errors, validation errors, etc. to the UI for immediate feedback
-func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, severity string) {
+// broadcastWatcherError broadcasts a watcher error to all connected clients.
+// Used to send parsing errors, validation errors, etc. to the UI for immediate feedback.
+// Accepts an optional details slice for structured error context (from errors.GetAllDetails).
+func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, severity string, details ...string) {
 	msg := WatcherErrorMessage{
 		Type:      "watcher_error",
 		WatcherID: watcherID,
 		Error:     errorMsg,
+		Details:   details,
 		Severity:  severity,
 		Timestamp: time.Now().Unix(),
 	}
@@ -400,6 +402,7 @@ func (s *QNTXServer) broadcastWatcherError(watcherID string, errorMsg string, se
 		s.logger.Debugw("Broadcast watcher error",
 			"watcher_id", watcherID,
 			"error", errorMsg,
+			"details", details,
 			"severity", severity)
 	case <-s.ctx.Done():
 		// Server shutting down
