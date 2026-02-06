@@ -4,11 +4,17 @@
  * The canvas is a glyph that morphs to full-screen and contains other glyphs
  * arranged on a spatial grid. Right-click spawns new glyphs.
  *
- * Selection:
- * - Click a glyph to select it (highlighted border, action bar appears)
+ * Selection & Interaction:
+ * - Click a glyph to select it (green outline, action bar appears at top)
+ * - Shift+click to add/remove glyphs from selection (multi-select)
  * - Click canvas background to deselect
- * - Single selection only
- * - Action bar provides delete (and future actions)
+ * - Drag selected glyph(s) - all selected glyphs move together maintaining relative positions
+ * - Action bar provides delete and unmeld (for melded compositions)
+ *
+ * Keyboard Shortcuts:
+ * - ESC: deselect all glyphs
+ * - DELETE or BACKSPACE: remove selected glyphs
+ * - Shortcuts scoped to focused canvas (click to focus)
  *
  * This demonstrates the fractal principle: all glyphs are containers.
  */
@@ -183,7 +189,7 @@ function showActionBar(container: HTMLElement): void {
     bar.appendChild(deleteBtn);
     container.appendChild(bar);
 
-    positionActionBar(bar, container);
+    positionActionBar(bar);
     actionBar = bar;
 
     // Slide in from top
@@ -203,7 +209,7 @@ function showActionBar(container: HTMLElement): void {
 /**
  * Position action bar at top middle of the canvas
  */
-function positionActionBar(bar: HTMLElement, container: HTMLElement): void {
+function positionActionBar(bar: HTMLElement): void {
     bar.style.position = 'absolute';
     bar.style.left = '50%';
     bar.style.top = `${ACTION_BAR_TOP_OFFSET}px`;
