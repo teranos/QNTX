@@ -1,3 +1,5 @@
+//go:build qntxwasm
+
 package watcher_test
 
 import (
