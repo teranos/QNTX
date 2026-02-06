@@ -47,7 +47,30 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
 
     initPromise = (async () => {
         // Initialize WASM module
-        await init();
+        try {
+            await init();
+        } catch (error: unknown) {
+            // Construct expected WASM URL for debugging
+            const wasmUrl = new URL('qntx_wasm_bg.wasm', import.meta.url).href;
+
+            // Try to fetch manually to get HTTP status
+            let httpStatus = 'unknown';
+            try {
+                const response = await fetch(wasmUrl);
+                httpStatus = `${response.status} ${response.statusText}`;
+            } catch (fetchError: unknown) {
+                httpStatus = fetchError instanceof Error ? fetchError.message : 'fetch failed';
+            }
+
+            const errorMsg = [
+                'Failed to initialize WASM module',
+                `  Attempted URL: ${wasmUrl}`,
+                `  HTTP Status: ${httpStatus}`,
+                `  Original error: ${error instanceof Error ? error.message : String(error)}`
+            ].join('\n');
+
+            throw new Error(errorMsg);
+        }
 
         // Initialize IndexedDB store
         await wasm.init_store(dbName);
