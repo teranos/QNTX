@@ -201,7 +201,10 @@ export class FuzzySearchView {
      * Handle clicking on a result
      */
     private handleResultClick(match: FuzzySearchMatch): void {
-        console.log('Focusing on node:', match.node_id);
+        // Import log dynamically to avoid circular dependency
+        import('./logger.ts').then(({ log, SEG }) => {
+            log.debug(SEG.QUERY, 'Focusing on node:', match.node_id);
+        });
 
         // Hide the fuzzy search view
         this.hide();

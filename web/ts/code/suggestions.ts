@@ -8,6 +8,7 @@ import { apiFetch } from '../api.ts';
 import type { FixSuggestion, PRInfo } from '../../../types/generated/typescript/github.ts';
 import { escapeHtml } from '../html-utils.ts';
 import { handleError, SEG } from '../error-handler.ts';
+import { log } from '../logger.ts';
 
 export interface SuggestionsOptions {
     panel: HTMLElement;
@@ -136,7 +137,7 @@ export class CodeSuggestions {
     renderSuggestions(suggestions: FixSuggestion[]): void {
         const listElement = this.$('#suggestions-list');
         if (!listElement) {
-            console.error('[Go Editor] suggestions-list element not found');
+            log.error(SEG.ERROR, '[Go Editor] suggestions-list element not found');
             return;
         }
 

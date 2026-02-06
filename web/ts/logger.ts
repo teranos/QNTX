@@ -17,52 +17,20 @@
  *   log.warn('⚠', 'Rate limit approaching');
  *   log.error('⊔', 'Database connection failed', error);
  *
- * TODO: Migrate remaining 42 files from console.* to log.*:
- *   - system-drawer.ts (3)
- *   - codemirror-editor.ts (5)
- *   - ai-provider-window.ts (9)
- *   - plugin-panel.ts (17)
- *   - debug.ts (5)
- *   - type-attestations.ts (1)
- *   - pulse-panel.ts (1)
- *   - hixtory-panel.ts (4)
- *   - webscraper-panel.ts (1)
- *   - base-panel-error.ts (3)
- *   - usage-badge.ts (1)
- *   - config-panel.ts (6)
- *   - code/suggestions.ts (3)
- *   - dev-mode.ts (2)
- *   - tauri-notifications.ts (2)
- *   - console-reporter.ts (10)
- *   - main.ts (6)
- *   - code/panel.ts (8)
- *   - pulse/active-queue.ts (2)
- *   - command-explorer-panel.ts (1)
- *   - symbol-palette.ts (1)
- *   - filetree/navigator.ts (3)
- *   - python/panel.ts (9)
- *   - pulse/realtime-handlers.ts (1)
- *   - pulse/job-detail-panel.ts (5)
- *   - prose/panel.ts (1)
- *   - websocket-handlers/storage-eviction.ts (1)
- *   - prose/nodes/ats-code-block.ts (4)
- *   - pulse/panel-state.ts (2)
- *   - prose/editor.ts (4)
- *   - pulse/job-actions.ts (3)
- *   - websocket-handlers/storage-warning.ts (1)
- *   - pulse/system-status.ts (2)
- *   - prose/nodes/go-code-block.ts (2)
- *   - pulse/ats-node-view.ts (3)
- *   - websocket-handlers/system-capabilities.ts (1)
- *   - graph/renderer.ts (3)
- *   - storage.ts (6)
- *   - graph/focus.ts (9)
- *   - graph/focus/dimensions.ts (1)
- *   - graph/focus/physics.ts (2)
- *   - graph/tile/controls.ts (3)
+ * ✅ Migration Complete: All console.* calls migrated to log.*
  *
- * Migrated:
- *   - storage.ts ✓
+ * Migrated files:
+ *   - Core infrastructure: main.ts, qntx-wasm.ts, dev-mode.ts
+ *   - WebSocket handlers: storage-warning.ts, storage-eviction.ts, system-capabilities.ts
+ *   - Graph visualization: renderer.ts, focus.ts, focus/dimensions.ts, focus/physics.ts, tile/controls.ts
+ *   - Panels: pulse-panel.ts, prose/panel.ts, config-panel.ts, hixtory-panel.ts, command-explorer-panel.ts
+ *   - Editors: prose/editor.ts, code/panel.ts, code/suggestions.ts, codemirror-editor.ts
+ *   - Components: type-attestations.ts, base-panel-error.ts, glyph/py-glyph.ts
+ *   - Prose nodes: ats-code-block.ts, go-code-block.ts, frontmatter-block.ts
+ *   - Utilities: tauri-notifications.ts, symbol-palette.ts, fuzzy-search-view.ts
+ *   - And more...
+ *
+ * Note: dev-debug-interceptor.ts and test files intentionally use console.* directly
  */
 
 // Import core QNTX symbols from generated types
@@ -94,7 +62,9 @@ export const SEG = {
     UI: '▦' as const,       // UI components
     GRAPH: '◇' as const,    // Graph visualization
     ERROR: '⚠' as const,    // Errors/warnings
-    VID: '⮀' as const,     // VidStream
+    VID: '⮀' as const,      // VidStream
+    WASM: '⧩' as const,     // WebAssembly/WASM module
+    TAU: 'τ' as const,      // Tauri native integration
 } as const;
 
 /**
