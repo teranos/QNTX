@@ -345,7 +345,7 @@ export function createCanvasGlyph(): Glyph {
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
         // For ax glyphs, recreate using factory function to restore full functionality
         if (saved.symbol === AX) {
-            const axGlyph = createAxGlyph(saved.id, '', saved.gridX, saved.gridY);
+            const axGlyph = createAxGlyph(saved.id, '', saved.x, saved.y);
             axGlyph.width = saved.width;
             axGlyph.height = saved.height;
             return axGlyph;
@@ -354,8 +354,8 @@ export function createCanvasGlyph(): Glyph {
         if (saved.symbol === 'result') {
             log.debug(SEG.UI, `[Canvas] Restoring result glyph ${saved.id}`, {
                 hasResult: !!saved.result,
-                gridX: saved.gridX,
-                gridY: saved.gridY
+                x: saved.x,
+                y: saved.y
             });
         }
 
@@ -363,8 +363,8 @@ export function createCanvasGlyph(): Glyph {
             id: saved.id,
             title: saved.symbol === 'result' ? 'Python Result' : 'Pulse Schedule',
             symbol: saved.symbol,
-            gridX: saved.gridX,
-            gridY: saved.gridY,
+            x: saved.x,
+            y: saved.y,
             width: saved.width,   // Restore custom size if saved
             height: saved.height,
             result: saved.result, // For result glyphs
@@ -535,11 +535,10 @@ function showSpawnMenu(
         existingMenu.remove();
     }
 
-    // Snap menu position to grid with bounds checking
-    const maxGridX = Math.floor(window.innerWidth / GRID_SIZE) - 1;
-    const maxGridY = Math.floor(window.innerHeight / GRID_SIZE) - 1;
-    const gridX = Math.max(0, Math.min(maxGridX, Math.round(mouseX / GRID_SIZE)));
-    const gridY = Math.max(0, Math.min(maxGridY, Math.round(mouseY / GRID_SIZE)));
+    // Calculate pixel position relative to canvas
+    const canvasRect = canvas.getBoundingClientRect();
+    const x = mouseX - canvasRect.left;
+    const y = mouseY - canvasRect.top;
 
     // Create spawn menu
     const menu = document.createElement('div');
@@ -582,7 +581,7 @@ function showSpawnMenu(
     ixBtn.title = 'Spawn IX glyph';
 
     ixBtn.addEventListener('click', () => {
-        spawnIxGlyph(gridX, gridY, canvas, glyphs);
+        spawnIxGlyph(x, y, canvas, glyphs);
         removeMenu();
     });
 
@@ -595,7 +594,7 @@ function showSpawnMenu(
     axBtn.title = 'Spawn AX query glyph';
 
     axBtn.addEventListener('click', () => {
-        spawnAxGlyph(gridX, gridY, canvas, glyphs);
+        spawnAxGlyph(x, y, canvas, glyphs);
         removeMenu();
     });
 
@@ -612,7 +611,7 @@ function showSpawnMenu(
     pyBtn.title = 'Spawn Python glyph';
 
     pyBtn.addEventListener('click', () => {
-        spawnPyGlyph(gridX, gridY, canvas, glyphs);
+        spawnPyGlyph(x, y, canvas, glyphs);
         removeMenu();
     });
 
@@ -625,7 +624,7 @@ function showSpawnMenu(
     promptBtn.title = 'Spawn Prompt glyph';
 
     promptBtn.addEventListener('click', () => {
-        spawnPromptGlyph(gridX, gridY, canvas, glyphs);
+        spawnPromptGlyph(x, y, canvas, glyphs);
         removeMenu();
     });
 
@@ -660,15 +659,15 @@ function showSpawnMenu(
         }
     }, 0);
 
-    log.debug(SEG.UI, `[Canvas] Spawn menu opened at grid (${gridX}, ${gridY})`);
+    log.debug(SEG.UI, `[Canvas] Spawn menu opened at (${x}, ${y})`);
 }
 
 /**
- * Spawn a new IX glyph at grid position
+ * Spawn a new IX glyph at pixel position
  */
 async function spawnIxGlyph(
-    gridX: number,
-    gridY: number,
+    x: number,
+    y: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): Promise<void> {
@@ -676,8 +675,8 @@ async function spawnIxGlyph(
         id: `ix-${crypto.randomUUID()}`,
         title: 'Ingest',
         symbol: IX,
-        gridX,
-        gridY,
+        x,
+        y,
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = 'IX glyph';
@@ -700,25 +699,25 @@ async function spawnIxGlyph(
     uiState.addCanvasGlyph({
         id: ixGlyph.id,
         symbol: IX,
-        gridX,
-        gridY,
+        x,
+        y,
         width,
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**
- * Spawn a new AX query glyph at grid position
+ * Spawn a new AX query glyph at pixel position
  */
 function spawnAxGlyph(
-    gridX: number,
-    gridY: number,
+    x: number,
+    y: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): void {
-    const axGlyph = createAxGlyph(undefined, '', gridX, gridY);
+    const axGlyph = createAxGlyph(undefined, '', x, y);
 
     // Add to glyphs array
     glyphs.push(axGlyph);
@@ -739,21 +738,21 @@ function spawnAxGlyph(
     uiState.addCanvasGlyph({
         id: axGlyph.id,
         symbol: AX,
-        gridX,
-        gridY,
+        x,
+        y,
         width,
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned AX glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+    log.debug(SEG.UI, `[Canvas] Spawned AX glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**
- * Spawn a new Python glyph at grid position
+ * Spawn a new Python glyph at pixel position
  */
 async function spawnPyGlyph(
-    gridX: number,
-    gridY: number,
+    x: number,
+    y: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): Promise<void> {
@@ -761,8 +760,8 @@ async function spawnPyGlyph(
         id: `py-${crypto.randomUUID()}`,
         title: 'Python',
         symbol: 'py',
-        gridX,
-        gridY,
+        x,
+        y,
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = 'Python glyph (TBD)';
@@ -785,21 +784,21 @@ async function spawnPyGlyph(
     uiState.addCanvasGlyph({
         id: pyGlyph.id,
         symbol: 'py',
-        gridX,
-        gridY,
+        x,
+        y,
         width,
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**
- * Spawn a new Prompt glyph at grid position
+ * Spawn a new Prompt glyph at pixel position
  */
 async function spawnPromptGlyph(
-    gridX: number,
-    gridY: number,
+    x: number,
+    y: number,
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): Promise<void> {
@@ -807,8 +806,8 @@ async function spawnPromptGlyph(
         id: `prompt-${crypto.randomUUID()}`,
         title: 'Prompt',
         symbol: SO,
-        gridX,
-        gridY,
+        x,
+        y,
         renderContent: () => {
             const content = document.createElement('div');
             content.textContent = 'Prompt glyph';
@@ -828,13 +827,13 @@ async function spawnPromptGlyph(
     uiState.addCanvasGlyph({
         id: promptGlyph.id,
         symbol: SO,
-        gridX,
-        gridY,
+        x,
+        y,
         width,
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned Prompt glyph at grid (${gridX}, ${gridY}) with size ${width}x${height}`);
+    log.debug(SEG.UI, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**

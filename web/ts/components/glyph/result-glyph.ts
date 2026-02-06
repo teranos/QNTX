@@ -37,8 +37,8 @@ export function createResultGlyph(
         element.dataset.glyphSymbol = glyph.symbol;
     }
 
-    const gridX = glyph.gridX ?? 5;
-    const gridY = glyph.gridY ?? 5;
+    const x = glyph.x ?? 200;
+    const y = glyph.y ?? 200;
     const width = glyph.width ?? 400;
 
     // Calculate height based on content
@@ -51,8 +51,8 @@ export function createResultGlyph(
 
     // Style - integrated look with py glyph
     element.style.position = 'absolute';
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
     element.style.width = `${width}px`;
     element.style.height = `${height}px`;
     element.style.minHeight = '80px';
