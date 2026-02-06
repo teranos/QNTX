@@ -785,6 +785,15 @@ mod tests {
     }
 
     #[test]
+    fn test_reject_mixed_wildcard_with_valid_tokens() {
+        let result = Parser::parse("ANNA * is author");
+        assert!(result.is_err());
+        assert!(
+            matches!(result.unwrap_err(), ParseError::WildcardNotSupported { field } if field == "subject")
+        );
+    }
+
+    #[test]
     fn test_reject_empty_query() {
         let result = Parser::parse("");
         assert!(result.is_err());
