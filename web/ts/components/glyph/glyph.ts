@@ -35,10 +35,10 @@ export interface Glyph {
     layoutStrategy?: 'flow' | 'grid' | 'custom';  // How to layout children (default: flow)
     onSpawnMenu?: () => string[];        // Symbols that can be spawned inside (right-click)
 
-    // Grid position metadata (for grid-layout children)
-    gridX?: number;                      // Grid cell X position
-    gridY?: number;                      // Grid cell Y position
-    symbol?: string;                     // Symbol to display (for grid children)
+    // Position metadata (pixel coordinates)
+    x?: number;                          // X position in pixels
+    y?: number;                          // Y position in pixels
+    symbol?: string;                     // Symbol to display
 
     // Size metadata (for resizable glyphs)
     width?: number;                      // Custom width in pixels
