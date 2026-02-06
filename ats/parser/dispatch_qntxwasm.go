@@ -41,7 +41,7 @@ type rustDurationExpr struct {
 }
 
 // parseAxQueryDispatch uses the WASM-compiled qntx-core parser exclusively.
-// The Go parser fallback has been removed.
+// The Go parser fallback has been disabled and is being phased out.
 func parseAxQueryDispatch(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
 	return parseAxQueryWasm(args)
 }
