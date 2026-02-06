@@ -20,7 +20,6 @@
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { GRID_SIZE } from './grid-constants';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';

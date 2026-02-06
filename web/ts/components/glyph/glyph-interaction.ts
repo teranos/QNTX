@@ -9,7 +9,6 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { GRID_SIZE } from './grid-constants';
 import {
     canInitiateMeld,
     findMeldTarget,
@@ -208,17 +207,17 @@ export function makeDraggable(
             // Save positions for all selected glyphs
             for (const { element: el, glyph: g } of multiDragElements) {
                 const rect = el.getBoundingClientRect();
-                const gridX = Math.round((rect.left - canvasRect.left) / GRID_SIZE);
-                const gridY = Math.round((rect.top - canvasRect.top) / GRID_SIZE);
-                g.gridX = gridX;
-                g.gridY = gridY;
+                const x = Math.round(rect.left - canvasRect.left);
+                const y = Math.round(rect.top - canvasRect.top);
+                g.x = x;
+                g.y = y;
 
                 if (g.symbol) {
                     uiState.addCanvasGlyph({
                         id: g.id,
                         symbol: g.symbol,
-                        gridX,
-                        gridY,
+                        x,
+                        y,
                         width: g.width,
                         height: g.height,
                     });
@@ -230,17 +229,17 @@ export function makeDraggable(
         } else {
             // Single glyph position save
             const elementRect = element.getBoundingClientRect();
-            const gridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
-            const gridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
-            glyph.gridX = gridX;
-            glyph.gridY = gridY;
+            const x = Math.round(elementRect.left - canvasRect.left);
+            const y = Math.round(elementRect.top - canvasRect.top);
+            glyph.x = x;
+            glyph.y = y;
 
             if (glyph.symbol) {
                 uiState.addCanvasGlyph({
                     id: glyph.id,
                     symbol: glyph.symbol,
-                    gridX,
-                    gridY,
+                    x,
+                    y,
                     width: glyph.width,
                     height: glyph.height,
                 });
@@ -386,12 +385,12 @@ export function makeResizable(
         glyph.height = finalHeight;
 
         // Persist to uiState
-        if (glyph.symbol && glyph.gridX !== undefined && glyph.gridY !== undefined) {
+        if (glyph.symbol && glyph.x !== undefined && glyph.y !== undefined) {
             uiState.addCanvasGlyph({
                 id: glyph.id,
                 symbol: glyph.symbol,
-                gridX: glyph.gridX,
-                gridY: glyph.gridY,
+                x: glyph.x,
+                y: glyph.y,
                 width: finalWidth,
                 height: finalHeight,
             });
