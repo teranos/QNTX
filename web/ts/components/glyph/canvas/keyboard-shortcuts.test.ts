@@ -1,35 +1,50 @@
 /**
  * Tests for canvas keyboard shortcuts
- * Focus: callback invocation and cleanup behavior
+ * Focus: AbortController pattern and callback invocation
  */
 
 import { describe, test, expect } from 'bun:test';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 
 describe('Canvas Keyboard Shortcuts', () => {
-    test('returns cleanup function', () => {
+    test('returns AbortController for cleanup', () => {
         const container = document.createElement('div');
-        const cleanup = setupKeyboardShortcuts(
+        const controller = setupKeyboardShortcuts(
             container,
             () => true,
             () => { },
             () => { }
         );
 
-        expect(typeof cleanup).toBe('function');
+        expect(controller).toBeInstanceOf(AbortController);
+        expect(controller.signal).toBeDefined();
     });
 
     test('accepts all required callbacks without errors', () => {
         const container = document.createElement('div');
-        let hasSelectionCalled = false;
 
         expect(() => {
             setupKeyboardShortcuts(
                 container,
-                () => { hasSelectionCalled = true; return true; },
+                () => true,
                 () => { },
                 () => { }
             );
         }).not.toThrow();
+    });
+
+    test('abort() method is available for cleanup', () => {
+        const container = document.createElement('div');
+
+        const controller = setupKeyboardShortcuts(
+            container,
+            () => true,
+            () => { },
+            () => { }
+        );
+
+        // Verify abort method exists and can be called
+        expect(typeof controller.abort).toBe('function');
+        expect(() => controller.abort()).not.toThrow();
     });
 });
