@@ -152,6 +152,30 @@ export function showSpawnMenu(
 
     document.body.appendChild(menu);
 
+    // Adjust position to keep menu within viewport bounds
+    const menuRect = menu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let adjustedX = mouseX;
+    let adjustedY = mouseY;
+
+    // Check right edge
+    if (mouseX + menuRect.width > viewportWidth) {
+        adjustedX = viewportWidth - menuRect.width - 8; // 8px padding from edge
+    }
+
+    // Check bottom edge
+    if (mouseY + menuRect.height > viewportHeight) {
+        adjustedY = viewportHeight - menuRect.height - 8;
+    }
+
+    // Apply adjusted position if needed
+    if (adjustedX !== mouseX || adjustedY !== mouseY) {
+        menu.style.left = `${adjustedX}px`;
+        menu.style.top = `${adjustedY}px`;
+    }
+
     // Expand from mouse position (small to large)
     const duration = getMinimizeDuration() * SPAWN_MENU_ANIMATION_SPEED;
     if (duration > 0) {
