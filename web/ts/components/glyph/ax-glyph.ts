@@ -23,6 +23,7 @@ import { log, SEG } from '../../logger';
 import { makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { tooltip } from '../tooltip';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -149,7 +150,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             editor.style.outline = 'none';
             editor.style.resize = 'none';
             editor.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
-            editor.style.color = 'var(--text-primary)';
+            editor.style.color = '#d4f0d4'; // 20% greener and whiter
             editor.style.overflow = 'auto';
 
             // Auto-save and watcher update with debouncing (500ms delay)
@@ -229,6 +230,9 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             (glyph as any).resultsContainer = resultsContainer;
             (glyph as any).matchedAttestations = matchedAttestations;
 
+            // Attach tooltip support for attestation results
+            tooltip.attach(resultsContainer, '.ax-glyph-result-item');
+
             // If we loaded a persisted query, send watcher_upsert to activate it
             if (currentQuery.trim()) {
                 sendMessage({
@@ -274,25 +278,33 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
  */
 function renderAttestation(attestation: Attestation): HTMLElement {
     const item = document.createElement('div');
-    item.className = 'ax-glyph-result-item';
+    item.className = 'ax-glyph-result-item has-tooltip';
     item.style.padding = '8px';
     item.style.marginBottom = '4px';
     item.style.backgroundColor = 'rgba(31, 61, 31, 0.35)'; // 20% greener tint
     item.style.borderRadius = '2px';
+    item.style.cursor = 'default';
 
-    // Format attestation data (show key fields)
+    // Format attestation data as natural language: "SUBJECTS is PREDICATES of CONTEXTS"
     const subjects = attestation.subjects?.join(', ') || 'N/A';
     const predicates = attestation.predicates?.join(', ') || 'N/A';
     const contexts = attestation.contexts?.join(', ') || 'N/A';
 
-    item.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 4px;">${attestation.id?.substring(0, 8) || 'unknown'}</div>
-        <div style="font-size: 11px; color: var(--text-secondary);">
-            <div>Subjects: ${subjects}</div>
-            <div>Predicates: ${predicates}</div>
-            <div>Contexts: ${contexts}</div>
-        </div>
-    `;
+    // Create single-line natural language format with darker keywords
+    const text = document.createElement('div');
+    text.style.fontSize = '11px';
+    text.style.color = '#d4f0d4'; // 20% greener and whiter
+    text.style.fontFamily = 'monospace';
+    text.style.whiteSpace = 'nowrap';
+    text.style.overflow = 'hidden';
+    text.style.textOverflow = 'ellipsis';
+
+    // Build formatted text with darker keywords
+    text.innerHTML = `<span style="color: #d4f0d4;">${subjects}</span> <span style="color: #6b7b6b;">is</span> <span style="color: #d4f0d4;">${predicates}</span> <span style="color: #6b7b6b;">of</span> <span style="color: #d4f0d4;">${contexts}</span>`;
+
+    // Add attestation ID as tooltip using tooltip infrastructure
+    item.dataset.tooltip = attestation.id || 'unknown';
+    item.appendChild(text);
 
     return item;
 }
