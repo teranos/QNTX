@@ -591,6 +591,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     max-width: 400px;
     border: 1px solid var(--border-on-dark);
+    opacity: 0.8; /* 20% more transparent */
 }
 
 /* Mobile/tablet: constrain tooltip to viewport */
