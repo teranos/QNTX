@@ -55,8 +55,7 @@ func (s *QNTXServer) handleGetTypes(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := s.db.Query(query)
 	if err != nil {
-		s.logger.Errorw("Failed to query type attestations", "error", err)
-		writeError(w, http.StatusInternalServerError, "Failed to fetch type attestations")
+		writeWrappedError(w, s.logger, err, "failed to query type attestations", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -113,10 +112,9 @@ func (s *QNTXServer) handleGetType(w http.ResponseWriter, r *http.Request, typeN
 	err := s.db.QueryRow(query, typeName).Scan(&attributesJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			writeError(w, http.StatusNotFound, "Type not found")
+			writeError(w, http.StatusNotFound, fmt.Sprintf("Type %q not found", typeName))
 		} else {
-			s.logger.Errorw("Failed to query type attestation", "error", err, "type", typeName)
-			writeError(w, http.StatusInternalServerError, "Failed to fetch type attestation")
+			writeWrappedError(w, s.logger, err, fmt.Sprintf("failed to fetch type attestation %q", typeName), http.StatusInternalServerError)
 		}
 		return
 	}

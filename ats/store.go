@@ -52,16 +52,16 @@ type BoundedStore interface {
 // AliasResolver defines alias resolution operations
 type AliasResolver interface {
 	// ResolveAlias returns all identifiers that should be included when searching for the given identifier
-	ResolveAlias(identifier string) ([]string, error)
+	ResolveAlias(ctx context.Context, identifier string) ([]string, error)
 
 	// CreateAlias creates a bidirectional alias between two identifiers
-	CreateAlias(alias, target, createdBy string) error
+	CreateAlias(ctx context.Context, alias, target, createdBy string) error
 
 	// RemoveAlias removes an alias mapping
-	RemoveAlias(alias, target string) error
+	RemoveAlias(ctx context.Context, alias, target string) error
 
 	// GetAllAliases returns all alias mappings
-	GetAllAliases() (map[string][]string, error)
+	GetAllAliases(ctx context.Context) (map[string][]string, error)
 }
 
 // AttestationFilter represents filters for querying attestations

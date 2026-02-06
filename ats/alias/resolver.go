@@ -19,24 +19,24 @@ func NewResolver(aliasStore ats.AliasResolver) *Resolver {
 }
 
 // CreateAlias creates a new bidirectional alias
-func (r *Resolver) CreateAlias(identifier1, identifier2 string) error {
+func (r *Resolver) CreateAlias(ctx context.Context, identifier1, identifier2 string) error {
 	// Use system as default creator for now
-	return r.store.CreateAlias(identifier1, identifier2, "system")
+	return r.store.CreateAlias(ctx, identifier1, identifier2, "system")
 }
 
 // ResolveIdentifier returns all identifiers that should be searched when looking for the given identifier
 func (r *Resolver) ResolveIdentifier(ctx context.Context, identifier string) ([]string, error) {
-	return r.store.ResolveAlias(identifier)
+	return r.store.ResolveAlias(ctx, identifier)
 }
 
 // GetAllAliases returns all alias mappings
-func (r *Resolver) GetAllAliases() (map[string][]string, error) {
-	return r.store.GetAllAliases()
+func (r *Resolver) GetAllAliases(ctx context.Context) (map[string][]string, error) {
+	return r.store.GetAllAliases(ctx)
 }
 
 // GetAliasesFor returns all aliases for a specific identifier
 func (r *Resolver) GetAliasesFor(ctx context.Context, identifier string) ([]string, error) {
-	resolved, err := r.store.ResolveAlias(identifier)
+	resolved, err := r.store.ResolveAlias(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +53,6 @@ func (r *Resolver) GetAliasesFor(ctx context.Context, identifier string) ([]stri
 }
 
 // RemoveAlias removes an alias mapping
-func (r *Resolver) RemoveAlias(identifier1, identifier2 string) error {
-	return r.store.RemoveAlias(identifier1, identifier2)
+func (r *Resolver) RemoveAlias(ctx context.Context, identifier1, identifier2 string) error {
+	return r.store.RemoveAlias(ctx, identifier1, identifier2)
 }

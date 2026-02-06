@@ -40,15 +40,10 @@ type rustDurationExpr struct {
 	Unit  *string  `json:"unit"`
 }
 
-// parseAxQueryDispatch uses the WASM-compiled qntx-core parser, falling back
-// to the Go implementation on any WASM error.
+// parseAxQueryDispatch uses the WASM-compiled qntx-core parser exclusively.
+// The Go parser fallback has been disabled and is being phased out.
 func parseAxQueryDispatch(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
-	filter, err := parseAxQueryWasm(args)
-	if err != nil {
-		// WASM failed — fall back to Go parser transparently
-		return parseAxQueryGo(args, verbosity, ctx)
-	}
-	return filter, nil
+	return parseAxQueryWasm(args)
 }
 
 func parseAxQueryWasm(args []string) (*types.AxFilter, error) {
