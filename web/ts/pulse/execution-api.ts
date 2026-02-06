@@ -6,6 +6,7 @@
 
 import { log, SEG } from "../logger";
 import { handleError } from "../error-handler";
+import { getApiUrl } from "../backend-url.ts";
 import type {
   Execution,
   ListExecutionsResponse,
@@ -24,8 +25,7 @@ const SECONDS_PER_MINUTE = 60;
  * Get base URL for Pulse API endpoints
  */
 function getBaseUrl(): string {
-  const backendUrl = (window as any).__BACKEND_URL__ || "";
-  return `${backendUrl}/api/pulse`;
+  return getApiUrl('/api/pulse');
 }
 
 /**
