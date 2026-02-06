@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/graph"
@@ -1005,6 +1006,21 @@ func (c *Client) close() {
 	})
 }
 
+// extractErrorSeverity determines the appropriate severity level for broadcasting
+// a watcher error based on the error type. Uses parser error metadata when available.
+func extractErrorSeverity(err error) string {
+	// Check for ParseError with Severity field
+	if parseErr, ok := err.(*parser.ParseError); ok {
+		return string(parseErr.Severity) // "error", "warning", "info", "hint"
+	}
+	// Check for ParseWarning (best-effort parsing with warnings)
+	if _, ok := err.(*parser.ParseWarning); ok {
+		return "warning"
+	}
+	// Default to error for all other errors
+	return "error"
+}
+
 // handleWatcherUpsert creates or updates a watcher based on AX glyph query
 func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	c.server.logger.Debugw("Watcher upsert request",
@@ -1082,8 +1098,9 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 			"error", err,
 			"client_id", c.id,
 		)
-		// Broadcast error to frontend with structured details
-		c.server.broadcastWatcherError(watcherID, err.Error(), "error", errors.GetAllDetails(err)...)
+		// Broadcast error to frontend with severity based on error type
+		severity := extractErrorSeverity(err)
+		c.server.broadcastWatcherError(watcherID, err.Error(), severity, errors.GetAllDetails(err)...)
 		return
 	}
 
@@ -1101,7 +1118,8 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 				"query", msg.WatcherQuery,
 				"error", parseErr,
 			)
-			c.server.broadcastWatcherError(watcherID, parseErr.Error(), "error", errors.GetAllDetails(parseErr)...)
+			severity := extractErrorSeverity(parseErr)
+			c.server.broadcastWatcherError(watcherID, parseErr.Error(), severity, errors.GetAllDetails(parseErr)...)
 		} else {
 			// Fallback if no parse error was stored (shouldn't happen)
 			errMsg := "Failed to parse AX query - watcher not activated"
