@@ -107,7 +107,7 @@ jobs:
       - name: Run integration tests
         run: |
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-          go test -tags=integration ./...
+          go test -tags="rustsqlite,qntxwasm,integration" ./...
 
   build:
     name: Go Build
