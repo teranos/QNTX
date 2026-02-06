@@ -3,7 +3,7 @@
 // TODO: Migrate to proto generation
 // Source package: sym
 // Source last modified: 2026-01-05T23:56:33+01:00
-// Source version: af91d28
+// Source version: af91d283
 
 //! # sym module
 //!
