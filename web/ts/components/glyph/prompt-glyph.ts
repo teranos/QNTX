@@ -138,6 +138,10 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     statusSection.style.padding = '4px 8px';
     statusSection.style.fontSize = '11px';
     statusSection.style.fontFamily = 'monospace';
+    statusSection.style.whiteSpace = 'pre-wrap'; // Allow wrapping, preserve formatting
+    statusSection.style.wordBreak = 'break-word'; // Break long words if needed
+    statusSection.style.overflowWrap = 'anywhere'; // Allow breaking anywhere to prevent overflow
+    statusSection.style.maxWidth = '100%';
 
     function updateStatus(status: PromptGlyphStatus): void {
         switch (status.state) {

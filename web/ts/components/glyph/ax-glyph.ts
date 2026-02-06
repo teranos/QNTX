@@ -99,7 +99,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.style.height = `${height}px`;
             container.style.minWidth = '200px';
             container.style.minHeight = '120px';
-            container.style.backgroundColor = 'var(--bg-secondary)'; // Will be updated based on watcher state
+            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)'; // Darker with transparency
             container.style.borderRadius = '4px';
             container.style.border = '1px solid var(--border-color)';
             container.style.display = 'flex';
@@ -148,7 +148,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             editor.style.border = 'none';
             editor.style.outline = 'none';
             editor.style.resize = 'none';
-            editor.style.backgroundColor = 'var(--bg-primary)';
+            editor.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
             editor.style.color = 'var(--text-primary)';
             editor.style.overflow = 'auto';
 
@@ -163,7 +163,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 }
 
                 // Update background to indicate pending state
-                container.style.backgroundColor = '#2a2b3d'; // Slight blue tint for "updating"
+                container.style.backgroundColor = 'rgba(42, 43, 61, 0.92)'; // Slight blue tint for "updating"
 
                 // Clear results immediately when query changes
                 resultsContainer.innerHTML = '';
@@ -190,12 +190,12 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                         });
 
                         // Update background to indicate active watcher
-                        container.style.backgroundColor = '#1f3d3d'; // Teal/cyan tint for "watching"
+                        container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
 
                         log.debug(SEG.UI, `[AxGlyph] Sent watcher upsert for ${glyphId}: "${currentQuery}"`);
                     } else {
                         // Empty query - revert to default
-                        container.style.backgroundColor = 'var(--bg-secondary)';
+                        container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
                     }
                 }, 500);
             });
@@ -209,7 +209,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             resultsContainer.style.flex = '1';
             resultsContainer.style.overflow = 'auto';
             resultsContainer.style.padding = '8px';
-            resultsContainer.style.backgroundColor = 'var(--bg-primary)';
+            resultsContainer.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
             resultsContainer.style.borderTop = '1px solid var(--border-color)';
             resultsContainer.style.fontSize = '12px';
             resultsContainer.style.fontFamily = 'monospace';
@@ -240,7 +240,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 });
 
                 // Update background to show active watcher state
-                container.style.backgroundColor = '#1f3d3d'; // Teal/cyan tint for "watching"
+                container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
 
                 log.debug(SEG.UI, `[AxGlyph] Restored and activated watcher for ${glyphId}: "${currentQuery}"`);
             }
@@ -374,6 +374,8 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     errorDisplay.style.fontSize = '12px';
     errorDisplay.style.fontFamily = 'monospace';
     errorDisplay.style.color = 'var(--text-primary)';
+    errorDisplay.style.maxWidth = '100%';
+    errorDisplay.style.overflowX = 'auto'; // Allow horizontal scroll for very long single lines
 
     const severityLabel = document.createElement('div');
     severityLabel.textContent = severity.toUpperCase();
@@ -383,7 +385,10 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
 
     const errorText = document.createElement('div');
     errorText.textContent = errorMsg;
-    errorText.style.color = 'var(--text-secondary)';
+    errorText.style.color = severity === 'error' ? '#ff9999' : '#ffcc66'; // Brighter red/yellow for readability
+    errorText.style.whiteSpace = 'pre-wrap'; // Preserve formatting, allow wrapping
+    errorText.style.wordBreak = 'break-word'; // Break long words if needed
+    errorText.style.overflowWrap = 'anywhere'; // Allow breaking anywhere to prevent overflow
 
     errorDisplay.appendChild(severityLabel);
     errorDisplay.appendChild(errorText);
@@ -402,6 +407,8 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
             line.textContent = detail;
             line.style.paddingLeft = '8px';
             line.style.marginBottom = '2px';
+            line.style.whiteSpace = 'pre-wrap'; // Show complete detail lines
+            line.style.wordBreak = 'break-word';
             detailsContainer.appendChild(line);
         }
 
@@ -414,7 +421,7 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     // Update glyph background to indicate error state
     const container = glyph.closest('.canvas-ax-glyph') as HTMLElement;
     if (container) {
-        container.style.backgroundColor = severity === 'error' ? '#3d1f1f' : '#3d3d1f'; // Red tint for error, yellow for warning
+        container.style.backgroundColor = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)'; // Red tint for error, yellow for warning
     }
 
     log.debug(SEG.UI, `[AxGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
