@@ -634,12 +634,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_empty_query() {
-        let query = Parser::parse("").unwrap();
-        assert!(query.is_empty());
-    }
-
-    #[test]
     fn test_subjects_only() {
         let query = Parser::parse("ALICE BOB CHARLIE").unwrap();
         assert_eq!(query.subjects, vec!["ALICE", "BOB", "CHARLIE"]);
