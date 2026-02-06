@@ -1,7 +1,7 @@
 /**
- * Grid Glyph - Visual representation of a glyph on canvas grid
+ * Grid Glyph - Visual representation of a glyph on canvas
  *
- * Renders a symbol at a grid position, draggable with grid snapping.
+ * Renders a symbol at a pixel position, freely draggable.
  */
 
 import type { Glyph } from './glyph';
@@ -10,7 +10,7 @@ import { uiState } from '../../state/ui';
 import { GRID_SIZE } from './grid-constants';
 
 /**
- * Create a grid-positioned glyph element
+ * Create a canvas glyph element
  * Canvas glyphs are lightweight references (symbols only)
  * Clicking them morphs to their full manifestation
  *
@@ -27,11 +27,13 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
 
     // Get position and symbol from glyph metadata
     const symbol = glyph.symbol || '?';
-    let currentGridX = glyph.gridX ?? 5;
-    let currentGridY = glyph.gridY ?? 5;
+    let currentX = glyph.x ?? 200;
+    let currentY = glyph.y ?? 200;
 
     // Style element - all canvas glyphs are symbol-only (40px squares)
     element.style.position = 'absolute';
+    element.style.left = `${currentX}px`;
+    element.style.top = `${currentY}px`;
     element.style.width = `${GRID_SIZE}px`;
     element.style.height = `${GRID_SIZE}px`;
     element.style.display = 'flex';
@@ -47,11 +49,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     // Set symbol content
     element.textContent = symbol;
 
-    // Set initial position
-    updatePosition(element, currentGridX, currentGridY);
-
-    // Make draggable with free-form positioning (no live grid snapping)
-    // Design decision: Free-form dragging provides better UX than grid-snapped dragging
+    // Make draggable with free-form positioning
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -71,7 +69,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         // Track drag distance to distinguish clicks from drags
         dragDistance = Math.abs(deltaX) + Math.abs(deltaY);
 
-        // Update position directly (free-form, no grid snapping during drag)
+        // Update position directly
         element.style.left = `${newX}px`;
         element.style.top = `${newY}px`;
     };
@@ -84,29 +82,28 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
 
         element.classList.remove('is-dragging');
 
-        // Get final grid position (calculate relative to canvas parent)
+        // Get final pixel position (relative to canvas parent)
         const canvas = element.parentElement;
         const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const elementRect = element.getBoundingClientRect();
-        currentGridX = Math.round((elementRect.left - canvasRect.left) / GRID_SIZE);
-        currentGridY = Math.round((elementRect.top - canvasRect.top) / GRID_SIZE);
+        currentX = elementRect.left - canvasRect.left;
+        currentY = elementRect.top - canvasRect.top;
 
         // Save position to glyph metadata
-        glyph.gridX = currentGridX;
-        glyph.gridY = currentGridY;
+        glyph.x = currentX;
+        glyph.y = currentY;
 
         // Persist to uiState
-        // TODO: Add error handling for state persistence failures
         if (glyph.symbol) {
             uiState.addCanvasGlyph({
                 id: glyph.id,
                 symbol: glyph.symbol,
-                gridX: currentGridX,
-                gridY: currentGridY
+                x: currentX,
+                y: currentY
             });
         }
 
-        log.debug(SEG.UI, `[GridGlyph] Finished dragging ${glyph.id} to grid (${currentGridX}, ${currentGridY})`);
+        log.debug(SEG.UI, `[GridGlyph] Finished dragging ${glyph.id} to (${currentX}, ${currentY})`);
 
         abortController?.abort();
         abortController = null;
@@ -133,7 +130,7 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
         document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
         document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
-        log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from grid (${currentGridX}, ${currentGridY})`);
+        log.debug(SEG.UI, `[GridGlyph] Started dragging ${glyph.id} from (${currentX}, ${currentY})`);
     });
 
     // Detect clicks vs drags - if mouse hasn't moved much, it's a click
@@ -153,12 +150,4 @@ export function createGridGlyph(glyph: Glyph): HTMLElement {
     });
 
     return element;
-}
-
-/**
- * Update element position from grid coordinates
- */
-function updatePosition(element: HTMLElement, gridX: number, gridY: number): void {
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
 }

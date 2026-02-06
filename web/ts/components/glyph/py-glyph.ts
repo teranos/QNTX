@@ -42,8 +42,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         element.dataset.glyphSymbol = glyph.symbol;
     }
 
-    const gridX = glyph.gridX ?? 5;
-    const gridY = glyph.gridY ?? 5;
+    const x = glyph.x ?? 200;
+    const y = glyph.y ?? 200;
 
     // Load code from storage or use default
     const storage = getScriptStorage();
@@ -65,8 +65,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Style element - auto-sized based on content or restored from saved size
     element.style.position = 'absolute';
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
     element.style.width = `${width}px`;
     element.style.height = `${height}px`;
     element.style.minWidth = '200px';
@@ -284,17 +284,16 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     const canvas = pyElement.parentElement;
     const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
 
-    const pyGridX = Math.round((pyRect.left - canvasRect.left) / GRID_SIZE);
-    const pyBottomY = pyRect.bottom - canvasRect.top;
-    const resultGridY = Math.round(pyBottomY / GRID_SIZE);
+    const x = pyRect.left - canvasRect.left;
+    const y = pyRect.bottom - canvasRect.top;
 
     // Create result glyph metadata
-    const resultGlyph: Partial<Glyph> & { id: string; symbol: string; gridX: number; gridY: number } = {
+    const resultGlyph: Partial<Glyph> & { id: string; symbol: string; x: number; y: number } = {
         id: `result-${crypto.randomUUID()}`,
         title: 'Python Result',
         symbol: 'result',
-        gridX: pyGridX,
-        gridY: resultGridY,
+        x,
+        y,
         width: Math.round(pyRect.width)
     };
 
@@ -307,13 +306,13 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     uiState.addCanvasGlyph({
         id: resultGlyph.id,
         symbol: 'result',
-        gridX: resultGlyph.gridX,
-        gridY: resultGlyph.gridY,
+        x,
+        y,
         width: Math.round(resultRect.width),
         height: Math.round(resultRect.height),
         result: result
     });
 
-    log.debug(SEG.UI, `[PyGlyph] Spawned result glyph at grid (${pyGridX}, ${resultGridY}), duration ${result.duration_ms}ms`);
+    log.debug(SEG.UI, `[PyGlyph] Spawned result glyph at (${x}, ${y}), duration ${result.duration_ms}ms`);
 }
 

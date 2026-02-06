@@ -30,8 +30,8 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
  *
  * @param id Optional glyph ID
  * @param initialQuery Optional initial query text
- * @param gridX Optional grid X position
- * @param gridY Optional grid Y position
+ * @param x Optional X position in pixels
+ * @param y Optional Y position in pixels
  */
 /**
  * LocalStorage key prefix for ax query persistence
@@ -62,7 +62,7 @@ function saveQuery(id: string, query: string): void {
     }
 }
 
-export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: number, gridY?: number): Glyph {
+export function createAxGlyph(id?: string, initialQuery: string = '', x?: number, y?: number): Glyph {
     const glyphId = id || `ax-${crypto.randomUUID()}`;
 
     // Load persisted query if available, otherwise use initialQuery
@@ -77,8 +77,8 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
         title: 'Ax Query',
         symbol: AX,
         manifestationType: 'ax',
-        gridX,
-        gridY,
+        x,
+        y,
         renderContent: () => {
             // Calculate default size
             const defaultWidth = 400;
@@ -94,8 +94,8 @@ export function createAxGlyph(id?: string, initialQuery: string = '', gridX?: nu
 
             // Style element - resizable
             container.style.position = 'absolute';
-            container.style.left = `${(glyph.gridX ?? gridX ?? 5) * GRID_SIZE}px`;
-            container.style.top = `${(glyph.gridY ?? gridY ?? 5) * GRID_SIZE}px`;
+            container.style.left = `${glyph.x ?? x ?? 200}px`;
+            container.style.top = `${glyph.y ?? y ?? 200}px`;
             container.style.width = `${width}px`;
             container.style.height = `${height}px`;
             container.style.minWidth = '200px';
