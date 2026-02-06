@@ -6,6 +6,7 @@
  * - DELETE/BACKSPACE: remove selected glyphs
  *
  * Shortcuts are scoped to the focused canvas container
+ * Uses AbortController for automatic cleanup when container is removed
  */
 
 import { log, SEG } from '../../../logger';
@@ -17,14 +18,16 @@ export type HasSelectionCallback = () => boolean;
 
 /**
  * Setup keyboard shortcuts for canvas container
- * Returns cleanup function to remove event listener
+ * Uses AbortController for automatic cleanup - signal will abort when container is removed
  */
 export function setupKeyboardShortcuts(
     container: HTMLElement,
     hasSelection: HasSelectionCallback,
     onDeselect: () => void,
     onDelete: () => void
-): () => void {
+): AbortController {
+    const controller = new AbortController();
+
     const handleKeydown = (e: KeyboardEvent) => {
         // Ignore if user is typing in an input/textarea
         const target = e.target as HTMLElement;
@@ -54,10 +57,7 @@ export function setupKeyboardShortcuts(
         }
     };
 
-    container.addEventListener('keydown', handleKeydown);
+    container.addEventListener('keydown', handleKeydown, { signal: controller.signal });
 
-    // Return cleanup function
-    return () => {
-        container.removeEventListener('keydown', handleKeydown);
-    };
+    return controller;
 }
