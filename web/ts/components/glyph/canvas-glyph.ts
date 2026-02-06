@@ -133,7 +133,8 @@ function deselectAll(container: HTMLElement): void {
 function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement): void {
     const result = unmeldComposition(composition);
     if (!result) {
-        log.error(SEG.UI, '[Canvas] Failed to unmeld composition');
+        const compId = composition.dataset.glyphId || 'unknown';
+        log.error(SEG.UI, `[Canvas] Failed to unmeld composition ${compId}`);
         return;
     }
 
@@ -188,6 +189,9 @@ function deleteSelectedGlyphs(container: HTMLElement): void {
         }));
 
         if (!el) continue;
+
+        // Explicitly remove selection class for clean visual transition
+        el.classList.remove('canvas-glyph-selected');
 
         if (duration === 0) {
             el.remove();
@@ -327,12 +331,15 @@ export function createCanvasGlyph(): Glyph {
             }, true);
 
             // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete)
-            setupKeyboardShortcuts(
+            // AbortController signal auto-cleans up when container is removed from DOM
+            void setupKeyboardShortcuts(
                 container,
                 () => selectedGlyphIds.length > 0,
                 () => deselectAll(container),
                 () => deleteSelectedGlyphs(container)
             );
+            // Note: AbortController returned but not stored - signal handles cleanup automatically
+            // Future: if we add explicit canvas.destroy(), store and call .abort()
 
             // Clean up local glyphs array when a glyph is deleted
             container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
