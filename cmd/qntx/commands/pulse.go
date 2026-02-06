@@ -62,13 +62,13 @@ The daemon will:
 		// Load configuration
 		cfg, err := am.Load()
 		if err != nil {
-			return errors.Wrap(err, "failed to load config")
+			return errors.Wrap(err, "failed to load am configuration for pulse")
 		}
 
 		// Open and migrate database
 		database, err := openDatabase("")
 		if err != nil {
-			return errors.Wrap(err, "failed to open database")
+			return errors.Wrap(err, "failed to open pulse database")
 		}
 		defer database.Close()
 

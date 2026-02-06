@@ -54,7 +54,7 @@ func Initialize(jsonOutput bool) error {
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "failed to build logger")
+		return errors.Wrapf(err, "failed to build logger (json_output=%t)", jsonOutput)
 	}
 
 	Logger = zapLogger.Sugar()
@@ -99,7 +99,7 @@ func InitializeForLambda() error {
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "failed to build lambda logger")
+		return errors.Wrapf(err, "failed to build lambda logger (production=%t, level=%s)", isProduction, getLogLevel())
 	}
 
 	Logger = zapLogger.Sugar()

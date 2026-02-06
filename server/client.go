@@ -1102,7 +1102,9 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	}
 
 	// Query historical matches for the watcher (in goroutine to avoid blocking)
+	c.server.wg.Add(1)
 	go func() {
+		defer c.server.wg.Done()
 		if err := c.server.watcherEngine.QueryHistoricalMatches(watcherID); err != nil {
 			c.server.logger.Errorw("Failed to query historical matches",
 				"watcher_id", watcherID,

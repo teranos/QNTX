@@ -143,12 +143,12 @@ func (s *QNTXServer) writeProseFile(prosePath string, content []byte) error {
 
 	// Create parent directories if needed
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return errors.Wrap(err, "failed to create directory")
+		return errors.Wrapf(err, "failed to create directory for %s", fullPath)
 	}
 
 	// Write file
 	if err := os.WriteFile(fullPath, content, 0644); err != nil {
-		return errors.Wrap(err, "failed to write file")
+		return errors.Wrapf(err, "failed to write prose file %s (%d bytes)", fullPath, len(content))
 	}
 
 	return nil

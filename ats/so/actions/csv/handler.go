@@ -46,7 +46,10 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 		err = errors.WithDetail(err, fmt.Sprintf("Delimiter: %s", payload.Delimiter))
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		// Best-effort close on error paths; explicit close below for success path
+		file.Close()
+	}()
 
 	writer := csv.NewWriter(file)
 	if payload.Delimiter != "" && payload.Delimiter != "," {
@@ -59,7 +62,6 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 		}
 		writer.Comma = rune(payload.Delimiter[0])
 	}
-	defer writer.Flush()
 
 	// Determine headers
 	headers := payload.Headers
@@ -89,6 +91,17 @@ func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", attest.ID))
 			return err
 		}
+	}
+
+	// Flush buffered data and check for write errors
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return errors.Wrapf(err, "failed to flush CSV data to %s (%d rows)", payload.Filename, len(result.Attestations))
+	}
+
+	// Explicitly close file to catch write errors (e.g., disk full)
+	if err := file.Close(); err != nil {
+		return errors.Wrapf(err, "failed to close CSV file %s after writing %d rows", payload.Filename, len(result.Attestations))
 	}
 
 	return nil
