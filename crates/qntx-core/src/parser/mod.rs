@@ -58,6 +58,9 @@ pub enum ParseError {
 
     #[error("empty query")]
     EmptyQuery,
+
+    #[error("wildcard '*' is not supported in ax queries - use specific {field} names")]
+    WildcardNotSupported { field: String },
 }
 
 /// Parser state machine states
@@ -102,7 +105,42 @@ impl<'a> Parser<'a> {
         while self.state != ParserState::Done {
             self.step()?;
         }
+        self.validate()?;
         Ok(self.query)
+    }
+
+    /// Validate the parsed query
+    fn validate(&self) -> Result<(), ParseError> {
+        // Block wildcard '*' - not part of ax specification
+        for subject in &self.query.subjects {
+            if *subject == "*" {
+                return Err(ParseError::WildcardNotSupported {
+                    field: "subject".to_string(),
+                });
+            }
+        }
+        for predicate in &self.query.predicates {
+            if *predicate == "*" {
+                return Err(ParseError::WildcardNotSupported {
+                    field: "predicate".to_string(),
+                });
+            }
+        }
+        for context in &self.query.contexts {
+            if *context == "*" {
+                return Err(ParseError::WildcardNotSupported {
+                    field: "context".to_string(),
+                });
+            }
+        }
+        for actor in &self.query.actors {
+            if *actor == "*" {
+                return Err(ParseError::WildcardNotSupported {
+                    field: "actor".to_string(),
+                });
+            }
+        }
+        Ok(())
     }
 
     fn peek(&mut self) -> Option<&Token<'a>> {
