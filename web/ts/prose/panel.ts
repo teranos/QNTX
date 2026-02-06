@@ -12,6 +12,7 @@ import { ProseEditor } from './editor.ts';
 import { ProseNavigation } from './navigation.ts';
 import { PromptPreviewPanel } from './prompt-preview-panel.ts';
 import { fetchDevMode } from '../dev-mode.ts';
+import { log, SEG } from '../logger.ts';
 
 class ProsePanel extends BasePanel {
     // Component modules
@@ -230,5 +231,5 @@ export function toggleProsePanel(): void {
 export async function showProseDocument(docId: string): Promise<void> {
     await prosePanel.show();
     // TODO: Navigate to specific document once we have document ID resolution
-    console.log('[Prose Panel] Request to show document:', docId);
+    log.debug(SEG.UI, '[Prose Panel] Request to show document:', docId);
 }

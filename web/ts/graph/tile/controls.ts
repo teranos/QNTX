@@ -4,6 +4,7 @@
 
 import { appState } from '../../state/app.ts';
 import { GRAPH_PHYSICS } from '../../config.ts';
+import { log, SEG } from '../../logger.ts';
 import { AX, BY, AS, CommandDescriptions } from '../../../../types/generated/typescript/sym.ts';
 import type { D3Node } from '../../../types/d3-graph';
 import type { Node } from '../../../types/core';
@@ -35,7 +36,7 @@ const HEADER_SYMBOLS: HeaderSymbol[] = [
         command: 'ax',
         description: CommandDescriptions['ax'],
         action: (node: D3Node) => {
-            console.log(`[⋈ ax] Expand context for: ${node.label}`);
+            log.debug(SEG.QUERY, `[⋈ ax] Expand context for: ${node.label}`);
             // TODO: Implement expand related nodes
         }
     },
@@ -44,7 +45,7 @@ const HEADER_SYMBOLS: HeaderSymbol[] = [
         command: 'by',
         description: CommandDescriptions['by'],
         action: (node: D3Node) => {
-            console.log(`[⌬ by] Show provenance for: ${node.label}`);
+            log.debug(SEG.ACTOR, `[⌬ by] Show provenance for: ${node.label}`);
             // TODO: Implement show provenance
         }
     },
@@ -53,7 +54,7 @@ const HEADER_SYMBOLS: HeaderSymbol[] = [
         command: 'as',
         description: CommandDescriptions['as'],
         action: (node: D3Node) => {
-            console.log(`[+ as] Add attestation to: ${node.label}`);
+            log.debug(SEG.INGEST, `[+ as] Add attestation to: ${node.label}`);
             // TODO: Implement add attestation
         }
     }
@@ -267,7 +268,7 @@ export function removeFocusFooter(nodeGroup: any): void {
  * Tags are rendered as interactive badges that can be clicked for navigation
  */
 export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: { width: number; height: number }): void {
-    console.log('[array-tags] createArrayFieldTags called', {
+    log.debug(SEG.GRAPH, '[array-tags] createArrayFieldTags called', {
         nodeId: node.id,
         nodeType: node.type,
         hasGraphData: !!appState.currentGraphData,
@@ -280,10 +281,10 @@ export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: {
 
     // Get array fields from node type metadata
     const nodeType = appState.currentGraphData?.meta?.node_types?.find(nt => nt.type === node.type);
-    console.log('[array-tags] nodeType lookup', { nodeType, searchingFor: node.type });
+    log.debug(SEG.GRAPH, '[array-tags] nodeType lookup', { nodeType, searchingFor: node.type });
 
     if (!nodeType || !nodeType.array_fields || nodeType.array_fields.length === 0) {
-        console.log('[array-tags] early return - no array fields', {
+        log.debug(SEG.GRAPH, '[array-tags] early return - no array fields', {
             hasNodeType: !!nodeType,
             arrayFields: nodeType?.array_fields
         });
@@ -367,7 +368,7 @@ export function createArrayFieldTags(nodeGroup: any, node: D3Node, dimensions: {
         // Click handler for future navigation
         tagGroup.on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            console.log(`[Tag clicked] ${tag.field}: ${tag.value}`);
+            log.debug(SEG.GRAPH, `[Tag clicked] ${tag.field}: ${tag.value}`);
             // TODO: Implement filtering/navigation
             // - Filter graph to show only nodes with this tag value
             // - Or jump to another node with the same tag

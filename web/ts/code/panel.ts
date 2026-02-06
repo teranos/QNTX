@@ -12,6 +12,7 @@ import { apiFetch } from '../api.ts';
 import { fetchDevMode } from '../dev-mode.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 import { handleError, SEG } from '../error-handler.ts';
+import { log } from '../logger.ts';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -420,7 +421,7 @@ class GoEditorPanel extends BasePanel {
     }
 
     private log(message: string): void {
-        console.log('[Go Editor]', message);
+        log.debug(SEG.UI, '[Go Editor]', message);
     }
 
     showStatus(message: string): void {
