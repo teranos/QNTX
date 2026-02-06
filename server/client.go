@@ -1092,14 +1092,27 @@ func (c *Client) handleWatcherUpsert(msg QueryMessage) {
 	reloadedWatcher, exists := c.server.watcherEngine.GetWatcher(watcherID)
 	if !exists || reloadedWatcher == nil {
 		// Watcher exists in DB but failed to load (likely parse error)
-		errMsg := "Failed to parse AX query - watcher not activated"
-		c.server.logger.Warnw("Watcher parse failed",
-			"watcher_id", watcherID,
-			"query", msg.WatcherQuery,
-		)
-		c.server.broadcastWatcherError(watcherID, errMsg, "error",
-			fmt.Sprintf("Query: %s", msg.WatcherQuery),
-		)
+		// Get the actual parse error from the engine
+		parseErr := c.server.watcherEngine.GetParseError(watcherID)
+		if parseErr != nil {
+			// Broadcast with full error details
+			c.server.logger.Warnw("Watcher parse failed",
+				"watcher_id", watcherID,
+				"query", msg.WatcherQuery,
+				"error", parseErr,
+			)
+			c.server.broadcastWatcherError(watcherID, parseErr.Error(), "error", errors.GetAllDetails(parseErr)...)
+		} else {
+			// Fallback if no parse error was stored (shouldn't happen)
+			errMsg := "Failed to parse AX query - watcher not activated"
+			c.server.logger.Warnw("Watcher parse failed (no error details)",
+				"watcher_id", watcherID,
+				"query", msg.WatcherQuery,
+			)
+			c.server.broadcastWatcherError(watcherID, errMsg, "error",
+				fmt.Sprintf("Query: %s", msg.WatcherQuery),
+			)
+		}
 		return
 	}
 
