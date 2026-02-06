@@ -63,6 +63,8 @@ export interface ErrorHandlerOptions {
     silent?: boolean;
     /** If true, show build info in toast (default: false for errors) */
     showBuildInfo?: boolean;
+    /** Structured error details from the backend */
+    details?: string[];
 }
 
 /**
@@ -117,12 +119,16 @@ export function handleError(
         context = SEG.ERROR,
         silent = false,
         showBuildInfo = false,
+        details,
     } = options;
 
     const err = normalizeError(error);
 
     // Always log to console with full details
     log.error(context, userMessage, err.message, err);
+    if (details && details.length > 0) {
+        log.error(context, 'Error details:', ...details);
+    }
 
     // Show toast unless silent mode
     if (!silent) {
@@ -132,7 +138,7 @@ export function handleError(
             ? `${userMessage}: ${errorDetail}`
             : userMessage;
 
-        toast.error(toastMessage, showBuildInfo);
+        toast.error(toastMessage, showBuildInfo, details);
     }
 
     return err;

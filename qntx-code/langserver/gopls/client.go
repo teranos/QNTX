@@ -499,16 +499,18 @@ func (c *StdioClient) call(ctx context.Context, method string, params, result in
 	}
 
 	if err := c.writeMessage(req); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to write JSON-RPC request for method %s", method)
 	}
 
 	select {
 	case resp := <-responseChan:
 		if resp.Error != nil {
-			return fmt.Errorf("JSON-RPC error %d: %s", resp.Error.Code, resp.Error.Message)
+			return errors.Newf("JSON-RPC error %d on method %s: %s", resp.Error.Code, method, resp.Error.Message)
 		}
 		if result != nil && resp.Result != nil {
-			return json.Unmarshal(resp.Result, result)
+			if err := json.Unmarshal(resp.Result, result); err != nil {
+				return errors.Wrapf(err, "failed to unmarshal JSON-RPC response for method %s", method)
+			}
 		}
 		return nil
 	case <-ctx.Done():

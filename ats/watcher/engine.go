@@ -40,6 +40,7 @@ type Engine struct {
 	mu           sync.RWMutex
 	watchers     map[string]*storage.Watcher
 	rateLimiters map[string]*rate.Limiter
+	parseErrors  map[string]error // Stores parse errors for watchers that failed to load
 
 	// Retry queue
 	retryMu    sync.Mutex
@@ -80,6 +81,7 @@ func NewEngine(db *sql.DB, apiBaseURL string, logger *zap.SugaredLogger) *Engine
 		},
 		watchers:     make(map[string]*storage.Watcher),
 		rateLimiters: make(map[string]*rate.Limiter),
+		parseErrors:  make(map[string]error),
 		retryQueue:   make([]*PendingExecution, 0),
 		ctx:          ctx,
 		cancel:       cancel,
@@ -109,9 +111,9 @@ func (e *Engine) Stop() {
 
 // loadWatchers loads all enabled watchers from the database and parses AX queries
 func (e *Engine) loadWatchers() error {
-	watchers, err := e.store.List(true) // enabled only
+	watchers, err := e.store.List(e.ctx, true) // enabled only
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to list enabled watchers from store")
 	}
 
 	e.mu.Lock()
@@ -126,14 +128,20 @@ func (e *Engine) loadWatchers() error {
 				parser.ErrorContextPlain,
 			)
 			if err != nil {
+				// Wrap error with watcher context before storing
+				enrichedErr := errors.Wrapf(err, "failed to parse AX query for watcher %s: %q", w.ID, w.AxQuery)
 				e.logger.Warnw("Failed to parse AX query for watcher, skipping",
 					"watcher_id", w.ID,
 					"ax_query", w.AxQuery,
-					"error", err)
+					"error", enrichedErr)
+				// Store enriched error for retrieval
+				e.parseErrors[w.ID] = enrichedErr
 				continue
 			}
 			// Merge parsed filter into watcher's filter
 			w.Filter = *filter
+			// Clear any previous parse error for this watcher
+			delete(e.parseErrors, w.ID)
 		}
 
 		e.watchers[w.ID] = w
@@ -162,6 +170,14 @@ func (e *Engine) GetWatcher(watcherID string) (*storage.Watcher, bool) {
 	defer e.mu.RUnlock()
 	watcher, exists := e.watchers[watcherID]
 	return watcher, exists
+}
+
+// GetParseError returns the parse error for a watcher that failed to load
+// Returns nil if the watcher loaded successfully or doesn't exist
+func (e *Engine) GetParseError(watcherID string) error {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.parseErrors[watcherID]
 }
 
 // QueryHistoricalMatches queries all historical attestations and broadcasts matches for a watcher
@@ -383,7 +399,7 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 			"error", err)
 
 		// Record error
-		e.store.RecordError(watcher.ID, err.Error())
+		e.store.RecordError(e.ctx, watcher.ID, err.Error())
 
 		// Queue for retry
 		e.queueRetry(watcher.ID, as, 1, err.Error())
@@ -393,7 +409,7 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 			"attestation_id", as.ID)
 
 		// Record success
-		e.store.RecordFire(watcher.ID)
+		e.store.RecordFire(e.ctx, watcher.ID)
 	}
 }
 
@@ -571,7 +587,7 @@ func (e *Engine) processRetryQueue() {
 					"attempt", pe.Attempt,
 					"error", err)
 
-				e.store.RecordError(w.ID, err.Error())
+				e.store.RecordError(e.ctx, w.ID, err.Error())
 				e.queueRetry(w.ID, pe.Attestation, pe.Attempt+1, err.Error())
 			} else {
 				e.logger.Infow("Retry succeeded",
@@ -579,7 +595,7 @@ func (e *Engine) processRetryQueue() {
 					"attestation_id", pe.Attestation.ID,
 					"attempt", pe.Attempt)
 
-				e.store.RecordFire(w.ID)
+				e.store.RecordFire(e.ctx, w.ID)
 			}
 		}(pe, watcher)
 	}

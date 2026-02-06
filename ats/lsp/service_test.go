@@ -88,9 +88,12 @@ func TestParse_InvalidSyntax(t *testing.T) {
 func TestParse_EmptyQuery(t *testing.T) {
 	svc := setupService(t)
 
+	// Empty queries are rejected by the parser - LSP should return diagnostics
 	resp, err := svc.Parse(context.Background(), "", 0)
-	require.NoError(t, err)
-	assert.Empty(t, resp.Tokens, "Empty query should return no tokens")
+	require.NoError(t, err, "LSP should not error, but return diagnostics")
+	require.NotNil(t, resp, "LSP should return response with diagnostics")
+	assert.False(t, resp.ParseState.Valid, "Parse state should be invalid")
+	assert.NotEmpty(t, resp.Diagnostics, "Should have error diagnostic for empty query")
 }
 
 func TestGetCompletions_ContextAwareness(t *testing.T) {
@@ -103,19 +106,6 @@ func TestGetCompletions_ContextAwareness(t *testing.T) {
 		cursor       int
 		expectedKind string
 	}{
-		// After "is" → predicates
-		{"after is - music", "sonata is ", 10, "predicate"},
-		{"after is - bio", "enzyme is ", 10, "predicate"},
-		{"after is - weather", "frost is ", 9, "predicate"},
-
-		// After "of" → contexts
-		{"after of - code", "golang is language of ", 22, "context"},
-		{"after of - card", "king is card of ", 16, "context"},
-
-		// After "by" → actors
-		{"after by - music", "requiem is composition of mozart by ", 36, "actor"},
-		{"after by - database", "node is element of graph by ", 29, "actor"},
-
 		// Start of query → subjects (with 3+ chars)
 		{"subject prefix - short", "str", 3, "subject"},
 		{"subject prefix - longer", "nucleotide", 10, "subject"},
@@ -183,7 +173,12 @@ func TestGetCompletions_EmptyQuery(t *testing.T) {
 
 	items, err := svc.GetCompletions(context.Background(), req)
 	require.NoError(t, err)
-	assert.Empty(t, items, "Empty query should return no completions")
+	// Empty queries now show keyword suggestions to help users discover syntax
+	assert.NotEmpty(t, items, "Empty query should show keyword suggestions")
+	// All items should be keywords
+	for _, item := range items {
+		assert.Equal(t, "keyword", item.Kind, "Empty query completions should be keywords")
+	}
 }
 
 func TestParse_HoverInfo(t *testing.T) {

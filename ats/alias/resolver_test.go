@@ -19,7 +19,7 @@ func TestResolver_BasicAliasResolution(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a bidirectional alias: "USA" <-> "United States"
-	err := resolver.CreateAlias("USA", "United States")
+	err := resolver.CreateAlias(ctx, "USA", "United States")
 	require.NoError(t, err, "Should create alias")
 
 	// Resolve from alias to target

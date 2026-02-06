@@ -149,6 +149,11 @@ func ParseAxCommandWithContext(args []string, verbosity int, ctx ErrorContext) (
 }
 
 // parseAxQueryGo contains the Go implementation for ax query parsing
+//
+// DEPRECATION NOTICE: This Go parser is scheduled for removal. The Rust parser
+// (qntx-core) is the preferred implementation and is used when building with the
+// qntxwasm tag. This Go implementation serves as a fallback when WASM is unavailable
+// or errors occur. New features should be implemented in the Rust parser first.
 func parseAxQueryGo(args []string, verbosity int, ctx ErrorContext) (*types.AxFilter, error) {
 	filter := &types.AxFilter{
 		Limit:  100,
@@ -687,7 +692,9 @@ func (p *axParser) parse(filter *types.AxFilter) (*types.AxFilter, error) {
 	}
 
 	// Validation with warnings for potential issues
-	p.validateFilter(filter)
+	if err := p.validateFilter(filter); err != nil {
+		return nil, err
+	}
 
 	// If we have warnings, include them in a special error type (best-effort parsing)
 	if len(p.warnings) > 0 {
@@ -874,7 +881,29 @@ func (p *axParser) parseTemporalSegment(tokens []string, filter *types.AxFilter)
 	return nil
 }
 
-func (p *axParser) validateFilter(filter *types.AxFilter) {
+func (p *axParser) validateFilter(filter *types.AxFilter) error {
+	// Block wildcard '*' - not part of ax specification
+	for _, subject := range filter.Subjects {
+		if subject == "*" {
+			return p.contextualError("wildcard '*' is not supported in ax queries - use specific subject names")
+		}
+	}
+	for _, predicate := range filter.Predicates {
+		if predicate == "*" {
+			return p.contextualError("wildcard '*' is not supported in ax queries - use specific predicate names")
+		}
+	}
+	for _, context := range filter.Contexts {
+		if context == "*" {
+			return p.contextualError("wildcard '*' is not supported in ax queries - use specific context names")
+		}
+	}
+	for _, actor := range filter.Actors {
+		if actor == "*" {
+			return p.contextualError("wildcard '*' is not supported in ax queries - use specific actor names")
+		}
+	}
+
 	// Validation with warnings for potential issues
 	if len(filter.Subjects) == 0 && len(filter.Predicates) == 0 &&
 		len(filter.Contexts) == 0 && len(filter.Actors) == 0 &&
@@ -889,6 +918,8 @@ func (p *axParser) validateFilter(filter *types.AxFilter) {
 	if filter.Limit > 1000 {
 		p.addWarning(fmt.Sprintf("Large limit (%d) may impact performance", filter.Limit))
 	}
+
+	return nil
 }
 
 func (p *axParser) addWarning(warning string) {

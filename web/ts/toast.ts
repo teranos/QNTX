@@ -22,6 +22,8 @@ export interface ToastOptions {
     type?: ToastType;
     duration?: number;
     showBuildInfo?: boolean;
+    /** Structured error details from the backend (displayed in expandable section) */
+    details?: string[];
 }
 
 /**
@@ -31,7 +33,8 @@ export function showToast(message: string, options: ToastOptions = {}): void {
     const {
         type = 'info',
         duration = 5000,
-        showBuildInfo = false
+        showBuildInfo = false,
+        details
     } = options;
 
     // Get or create toast container
@@ -100,6 +103,50 @@ export function showToast(message: string, options: ToastOptions = {}): void {
         toast.appendChild(buildInfo);
     }
 
+    // Add expandable details section if present
+    if (details && details.length > 0) {
+        const detailsContainer = document.createElement('div');
+        detailsContainer.className = 'toast-details';
+        detailsContainer.style.display = 'none';
+        detailsContainer.style.marginTop = '6px';
+        detailsContainer.style.paddingTop = '6px';
+        detailsContainer.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+        detailsContainer.style.fontSize = '11px';
+        detailsContainer.style.fontFamily = 'monospace';
+        detailsContainer.style.color = 'var(--text-secondary, #999)';
+        detailsContainer.style.maxHeight = '120px';
+        detailsContainer.style.overflowY = 'auto';
+
+        for (const detail of details) {
+            const line = document.createElement('div');
+            line.textContent = detail;
+            line.style.paddingLeft = '8px';
+            line.style.marginBottom = '2px';
+            detailsContainer.appendChild(line);
+        }
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'toast-details-toggle';
+        toggleBtn.textContent = 'Show details';
+        toggleBtn.style.background = 'none';
+        toggleBtn.style.border = 'none';
+        toggleBtn.style.color = 'var(--text-secondary, #999)';
+        toggleBtn.style.cursor = 'pointer';
+        toggleBtn.style.fontSize = '11px';
+        toggleBtn.style.padding = '4px 0 0 0';
+        toggleBtn.style.textDecoration = 'underline';
+
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = detailsContainer.style.display === 'none';
+            detailsContainer.style.display = isHidden ? 'block' : 'none';
+            toggleBtn.textContent = isHidden ? 'Hide details' : 'Show details';
+        });
+
+        toast.appendChild(toggleBtn);
+        toast.appendChild(detailsContainer);
+    }
+
     // Add close button
     const closeBtn = document.createElement('button');
     closeBtn.className = 'toast-close';
@@ -131,8 +178,8 @@ export function showToast(message: string, options: ToastOptions = {}): void {
  * Convenience methods for common toast types
  */
 export const toast = {
-    error: (message: string, showBuildInfo = false) =>
-        showToast(message, { type: 'error', showBuildInfo }),
+    error: (message: string, showBuildInfo = false, details?: string[]) =>
+        showToast(message, { type: 'error', showBuildInfo, details }),
 
     warning: (message: string) =>
         showToast(message, { type: 'warning' }),

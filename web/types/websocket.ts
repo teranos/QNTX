@@ -426,6 +426,7 @@ export interface WatcherErrorMessage extends BaseMessage {
   type: 'watcher_error';
   watcher_id: string;
   error: string;
+  details?: string[];
   severity: string;
   timestamp: number;
 }

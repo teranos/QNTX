@@ -46,9 +46,10 @@ type ListScheduledJobsResponse struct {
 	Count int                    `json:"count,omitempty"`
 }
 
-// ErrorResponse represents an API error
+// ErrorResponse represents an API error with optional structured details
 type ErrorResponse struct {
-	Error string `json:"error"`
+	Error   string   `json:"error"`
+	Details []string `json:"details,omitempty"` // Structured error context from errors.GetAllDetails()
 }
 
 // TaskInfo represents a task within a stage

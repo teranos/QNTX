@@ -42,11 +42,11 @@ dev: web cli ## Build frontend and CLI, then start development servers (backend 
 	lsof -ti:$$BACKEND_PORT | xargs kill -9 2>/dev/null || true; \
 	lsof -ti:$$FRONTEND_PORT | xargs kill -9 2>/dev/null || true; \
 	trap "echo ''; echo 'Shutting down dev servers...'; \
-		test -n \"\$$BACKEND_PID\" && kill -TERM \$$BACKEND_PID 2>/dev/null || true; \
-		test -n \"\$$FRONTEND_PID\" && kill -TERM \$$FRONTEND_PID 2>/dev/null || true; \
+		test -n \"\$$BACKEND_PID\" && kill -TERM -\$$BACKEND_PID 2>/dev/null || true; \
+		test -n \"\$$FRONTEND_PID\" && kill -TERM -\$$FRONTEND_PID 2>/dev/null || true; \
 		sleep 1; \
-		test -n \"\$$BACKEND_PID\" && kill -9 \$$BACKEND_PID 2>/dev/null || true; \
-		test -n \"\$$FRONTEND_PID\" && kill -9 \$$FRONTEND_PID 2>/dev/null || true; \
+		test -n \"\$$BACKEND_PID\" && kill -9 -\$$BACKEND_PID 2>/dev/null || true; \
+		test -n \"\$$FRONTEND_PID\" && kill -9 -\$$FRONTEND_PID 2>/dev/null || true; \
 		echo '✓ Servers stopped'" EXIT INT TERM; \
 	set -m; \
 	./bin/qntx server --dev --no-browser -vvv & \
