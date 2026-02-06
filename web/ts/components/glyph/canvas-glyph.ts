@@ -29,6 +29,7 @@ import { getMinimizeDuration } from './glyph';
 import { unmeldComposition } from './meld-system';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
+import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
 
 // ============================================================================
 // Selection State
@@ -321,34 +322,13 @@ export function createCanvasGlyph(): Glyph {
                 }
             }, true);
 
-            // Keyboard support: DELETE/BACKSPACE to delete, ESC to deselect
-            // Scoped to this canvas container (not document-level)
-            container.addEventListener('keydown', (e) => {
-                // Ignore if user is typing in an input/textarea
-                const target = e.target as HTMLElement;
-                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-                    return;
-                }
-
-                // ESC to deselect
-                if (e.key === 'Escape') {
-                    if (selectedGlyphIds.length > 0) {
-                        e.preventDefault();
-                        deselectAll(container);
-                    }
-                    return;
-                }
-
-                // DELETE/BACKSPACE to delete selected glyphs
-                if (selectedGlyphIds.length === 0) {
-                    return;
-                }
-
-                if (e.key === 'Delete' || e.key === 'Backspace') {
-                    e.preventDefault();
-                    deleteSelectedGlyphs(container);
-                }
-            });
+            // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete)
+            setupKeyboardShortcuts(
+                container,
+                () => selectedGlyphIds.length > 0,
+                () => deselectAll(container),
+                () => deleteSelectedGlyphs(container)
+            );
 
             // Clean up local glyphs array when a glyph is deleted
             container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
