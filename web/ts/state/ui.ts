@@ -62,8 +62,8 @@ export interface GraphSessionState {
 export interface CanvasGlyphState {
     id: string;
     symbol: string;
-    gridX: number;
-    gridY: number;
+    x: number;       // X position in pixels
+    y: number;       // Y position in pixels
     width?: number;  // Optional: custom width in pixels (for resizable glyphs)
     height?: number; // Optional: custom height in pixels (for resizable glyphs)
     code?: string;   // Optional: editor content (for programmature glyphs)
