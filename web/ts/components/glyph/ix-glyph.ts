@@ -88,8 +88,8 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.dataset.glyphId = glyph.id;
     element.dataset.glyphSymbol = IX;
 
-    const gridX = glyph.gridX ?? 5;
-    const gridY = glyph.gridY ?? 5;
+    const x = glyph.x ?? 200;
+    const y = glyph.y ?? 200;
 
     // Default size for IX glyph
     const width = glyph.width ?? 360;
@@ -97,8 +97,8 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Style element
     element.style.position = 'absolute';
-    element.style.left = `${gridX * GRID_SIZE}px`;
-    element.style.top = `${gridY * GRID_SIZE}px`;
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
     element.style.width = `${width}px`;
     element.style.minHeight = `${height}px`;
     element.style.backgroundColor = 'var(--bg-secondary)';
