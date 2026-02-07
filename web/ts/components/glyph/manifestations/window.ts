@@ -397,7 +397,7 @@ function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): v
 
 /**
  * Set up ResizeObserver to auto-size window to match content height
- * Watches content element and adjusts window height = content height + title bar height
+ * Observes the inner .glyph-content element which has intrinsic size
  */
 function setupWindowResizeObserver(
     windowElement: HTMLElement,
@@ -407,6 +407,15 @@ function setupWindowResizeObserver(
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
     const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
     const minHeight = 100; // Minimum window height
+
+    // Find the inner .glyph-content element which has intrinsic size
+    // The contentElement itself has flex: 1 and doesn't report natural height
+    const innerContent = contentElement.querySelector('.glyph-content, .glyph-loading') as HTMLElement;
+
+    if (!innerContent) {
+        log.warn(SEG.GLYPH, `[Window ${glyphId}] No .glyph-content element found for ResizeObserver`);
+        return;
+    }
 
     const resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {
@@ -426,7 +435,7 @@ function setupWindowResizeObserver(
         }
     });
 
-    resizeObserver.observe(contentElement);
+    resizeObserver.observe(innerContent);
 
     // Store observer for cleanup on minimize/close
     (windowElement as any).__resizeObserver = resizeObserver;
