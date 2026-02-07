@@ -282,6 +282,10 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 	server.canvasHandler = handlers.NewCanvasHandler(canvasStore)
 	serverLogger.Infow("Canvas state handlers initialized")
 
+	// TODO(#432): Add minimized window state persistence
+	// Create handler and storage for minimized glyph run state
+	// (currently only persists to localStorage, doesn't sync across devices)
+
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
 

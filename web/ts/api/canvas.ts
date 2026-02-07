@@ -72,6 +72,10 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
         // Mark as failed on error
         syncStateManager.setState(glyph.id, 'failed');
 
+        // TODO(#431): Queue operation for retry when offline
+        // Instead of just throwing, enqueue to offline queue (IndexedDB)
+        // Queue will automatically process when connectivity returns
+
         throw error;
     }
 }
@@ -96,6 +100,7 @@ export async function deleteCanvasGlyph(id: string): Promise<void> {
         syncStateManager.clearState(id);
     } catch (error) {
         log.error(SEG.GLYPH, `[CanvasAPI] Failed to delete glyph ${id}:`, error);
+        // TODO(#431): Queue deletion for retry when offline
         throw error;
     }
 }
@@ -158,6 +163,7 @@ export async function upsertComposition(composition: CompositionState): Promise<
         // Mark as failed on error
         syncStateManager.setState(composition.id, 'failed');
 
+        // TODO(#431): Queue operation for retry when offline
         throw error;
     }
 }
@@ -182,6 +188,7 @@ export async function deleteComposition(id: string): Promise<void> {
         syncStateManager.clearState(id);
     } catch (error) {
         log.error(SEG.GLYPH, `[CanvasAPI] Failed to delete composition ${id}:`, error);
+        // TODO(#431): Queue deletion for retry when offline
         throw error;
     }
 }

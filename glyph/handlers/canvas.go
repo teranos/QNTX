@@ -119,6 +119,9 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := h.store.UpsertGlyph(r.Context(), &glyph); err != nil {
+		// TODO(#431): Implement offline queue support for failed canvas operations
+		// When storage fails (network issues, database locked), queue operation
+		// for retry instead of immediately failing the request
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -131,6 +134,7 @@ func (h *CanvasHandler) handleDeleteGlyph(w http.ResponseWriter, r *http.Request
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
+			// TODO(#431): Queue deletion for retry when offline
 			h.writeError(w, err, http.StatusInternalServerError)
 		}
 		return
@@ -173,6 +177,7 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 	}
 
 	if err := h.store.UpsertComposition(r.Context(), &comp); err != nil {
+		// TODO(#431): Queue operation for retry when offline
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -185,6 +190,7 @@ func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.R
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
+			// TODO(#431): Queue deletion for retry when offline
 			h.writeError(w, err, http.StatusInternalServerError)
 		}
 		return
