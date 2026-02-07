@@ -72,23 +72,40 @@ function renderDbStats(): void {
     if (!dbStatsElement) return;
 
     if (!dbStats) {
-        dbStatsElement.innerHTML = '<div style="padding: 20px;">Loading...</div>';
+        dbStatsElement.innerHTML = '<div class="db-stats-loading">Loading database statistics...</div>';
         return;
     }
 
-    const storage = dbStats.storage_optimized
-        ? `rust v${dbStats.storage_version}`
-        : 'go';
+    const storageBackend = dbStats.storage_optimized
+        ? `rust (optimized) v${dbStats.storage_version}`
+        : 'go (fallback)';
 
     dbStatsElement.innerHTML = `
-        <div style="padding: 20px;">
-            <h2 style="margin: 0 0 16px 0;">${DB} Database Statistics</h2>
-            <div style="margin-bottom: 12px;"><strong>Path:</strong> <span style="font-size: 11px; opacity: 0.8;">${dbStats.path}</span></div>
-            <div style="margin-bottom: 12px;"><strong>Storage:</strong> ${storage}</div>
-            <div style="margin-bottom: 12px;"><strong>Total Attestations:</strong> ${dbStats.total_attestations.toLocaleString()}</div>
-            <div style="margin-bottom: 12px;"><strong>Unique Actors:</strong> ${dbStats.unique_actors.toLocaleString()}</div>
-            <div style="margin-bottom: 12px;"><strong>Unique Subjects:</strong> ${dbStats.unique_subjects.toLocaleString()}</div>
-            <div style="margin-bottom: 12px;"><strong>Unique Contexts:</strong> ${dbStats.unique_contexts.toLocaleString()}</div>
+        <div class="db-stats">
+            <div class="db-stat-row">
+                <span class="db-stat-label">Database Path:</span>
+                <span class="db-stat-value">${dbStats.path}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Storage Backend:</span>
+                <span class="db-stat-value">${storageBackend}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Total Attestations:</span>
+                <span class="db-stat-value">${dbStats.total_attestations.toLocaleString()}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Unique Actors:</span>
+                <span class="db-stat-value">${dbStats.unique_actors.toLocaleString()}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Unique Subjects:</span>
+                <span class="db-stat-value">${dbStats.unique_subjects.toLocaleString()}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Unique Contexts:</span>
+                <span class="db-stat-value">${dbStats.unique_contexts.toLocaleString()}</span>
+            </div>
         </div>
     `;
 }
