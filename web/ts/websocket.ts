@@ -12,7 +12,11 @@ import type {
     LLMStreamMessage,
     StorageWarningMessage,
     PluginHealthMessage,
-    SystemCapabilitiesMessage
+    SystemCapabilitiesMessage,
+    DatabaseStatsMessage,
+    RichSearchResultsMessage,
+    WatcherMatchMessage,
+    WatcherErrorMessage,
 } from '../types/websocket';
 import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotification } from './tauri-notifications';
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
@@ -110,7 +114,7 @@ const MESSAGE_HANDLERS = {
         messageHandlers['system_capabilities']?.(data);
     },
 
-    database_stats: (data: any) => {
+    database_stats: (data: DatabaseStatsMessage) => {
         log.info(SEG.DB, 'Database stats:', {
             total_attestations: data.total_attestations,
             path: data.path
@@ -127,7 +131,7 @@ const MESSAGE_HANDLERS = {
                 unique_actors: data.unique_actors,
                 unique_subjects: data.unique_subjects,
                 unique_contexts: data.unique_contexts,
-                rich_fields: data.rich_fields
+                rich_fields: data.rich_fields as (string[] | undefined)
             });
         });
 
@@ -137,7 +141,7 @@ const MESSAGE_HANDLERS = {
         });
     },
 
-    rich_search_results: (data: any) => {
+    rich_search_results: (data: RichSearchResultsMessage) => {
         log.info(SEG.QUERY, 'Rich search results:', data.total, 'matches');
 
         // Pass results to the CodeMirror editor's fuzzy search view
@@ -146,7 +150,7 @@ const MESSAGE_HANDLERS = {
         });
     },
 
-    watcher_match: (data: any) => {
+    watcher_match: (data: WatcherMatchMessage) => {
         log.debug(SEG.WS, 'Watcher match:', data.watcher_id, data.attestation?.id);
 
         // Extract glyph ID from watcher ID (format: "ax-glyph-{glyphId}")
@@ -166,7 +170,7 @@ const MESSAGE_HANDLERS = {
         messageHandlers['watcher_match']?.(data);
     },
 
-    watcher_error: (data: any) => {
+    watcher_error: (data: WatcherErrorMessage) => {
         log.warn(SEG.WS, 'Watcher error:', data.watcher_id, data.error, `(${data.severity})`);
         if (data.details?.length) {
             log.warn(SEG.WS, 'Watcher error details:', ...data.details);
@@ -363,11 +367,23 @@ export function isConnected(): boolean {
 /**
  * Register a message handler dynamically
  * Useful for components that initialize after WebSocket connection
- * @param type - Message type to handle
- * @param handler - Handler function
+ * @param type - Message type to handle (type-safe: must be a known message type)
+ * @param handler - Handler function matching the message type
  */
-export function registerHandler(type: string, handler: MessageHandler): void {
-    (messageHandlers as Record<string, MessageHandler>)[type] = handler;
+export function registerHandler<K extends keyof MessageHandlers>(
+    type: K,
+    handler: NonNullable<MessageHandlers[K]>
+): void {
+    (messageHandlers as Record<string, MessageHandler>)[type] = handler as MessageHandler;
+}
+
+/**
+ * Unregister a message handler
+ * Should be called when components are destroyed/hidden to prevent handler leaks
+ * @param type - Message type to unregister
+ */
+export function unregisterHandler<K extends keyof MessageHandlers>(type: K): void {
+    delete (messageHandlers as Record<string, MessageHandler>)[type];
 }
 
 /**
