@@ -330,8 +330,9 @@ export function createCanvasGlyph(): Glyph {
                 // Walk up from click target to find a glyph element
                 const glyphEl = target.closest('[data-glyph-id]') as HTMLElement | null;
 
-                // Exclude canvas-workspace itself from being selectable
-                if (glyphEl && glyphEl.dataset.glyphId !== 'canvas-workspace') {
+                // Exclude canvas-workspace itself and glyphs inside compositions from being selectable
+                const isInsideComposition = glyphEl?.closest('.melded-composition') !== null;
+                if (glyphEl && glyphEl.dataset.glyphId !== 'canvas-workspace' && !isInsideComposition) {
                     const glyphId = glyphEl.dataset.glyphId;
                     if (glyphId) {
                         e.stopPropagation();

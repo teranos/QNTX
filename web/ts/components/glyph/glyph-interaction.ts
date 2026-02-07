@@ -285,6 +285,11 @@ export function makeDraggable(
             return;
         }
 
+        // Don't allow dragging child glyphs inside compositions - only drag the composition itself
+        if (element.closest('.melded-composition') && !element.classList.contains('melded-composition')) {
+            return;
+        }
+
         e.preventDefault();
         e.stopPropagation();
         isDragging = true;
