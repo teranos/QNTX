@@ -29,11 +29,12 @@ import { createPyGlyph } from './py-glyph';
 import { createPromptGlyph } from './prompt-glyph';
 import { uiState } from '../../state/ui';
 import { getMinimizeDuration } from './glyph';
-import { unmeldComposition } from './meld-system';
+import { unmeldComposition, reconstructMeld } from './meld-system';
 import { makeDraggable } from './glyph-interaction';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
+import { getAllCompositions } from '../../state/compositions';
 
 // ============================================================================
 // Selection State
@@ -351,9 +352,40 @@ export function createCanvasGlyph(): Glyph {
 
             // Render existing glyphs asynchronously (to support py and ix glyphs)
             (async () => {
+                // Step 1: Render all individual glyphs
                 for (const glyph of glyphs) {
                     const glyphElement = await renderGlyph(glyph);
                     container.appendChild(glyphElement);
+                }
+
+                // Step 2: Restore melded compositions after all glyphs are rendered
+                const savedCompositions = getAllCompositions();
+                log.debug(SEG.UI, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
+
+                for (const comp of savedCompositions) {
+                    // Find the initiator and target elements in the DOM
+                    const initiatorEl = container.querySelector(`[data-glyph-id="${comp.initiatorId}"]`) as HTMLElement;
+                    const targetEl = container.querySelector(`[data-glyph-id="${comp.targetId}"]`) as HTMLElement;
+
+                    if (!initiatorEl || !targetEl) {
+                        log.warn(SEG.UI, `[Canvas] Cannot restore composition ${comp.id} - missing glyphs`, {
+                            initiatorId: comp.initiatorId,
+                            targetId: comp.targetId,
+                            foundInitiator: !!initiatorEl,
+                            foundTarget: !!targetEl
+                        });
+                        continue;
+                    }
+
+                    // Reconstruct the composition DOM (without persisting)
+                    try {
+                        reconstructMeld(initiatorEl, targetEl, comp.id, comp.type, comp.x, comp.y);
+                        log.debug(SEG.UI, `[Canvas] Restored composition ${comp.id}`, {
+                            type: comp.type
+                        });
+                    } catch (err) {
+                        log.error(SEG.UI, `[Canvas] Failed to restore composition ${comp.id}`, { error: err });
+                    }
                 }
             })();
 
