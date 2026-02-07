@@ -1,14 +1,21 @@
 /* Shared Scrollbar Styles
-   Canonical webkit scrollbar definitions for all scrollable containers.
+   Custom scrollbar for all scrollable containers.
 
    Two variants:
-   - Light theme (light gray colors) - for panels with light backgrounds
-   - Dark theme (dark gray colors) - for panels with dark backgrounds
+   - Light theme (light gray) - for panels with light backgrounds
+   - Dark theme (dark gray) - for panels with dark backgrounds
+
+   Standard properties (scrollbar-width, scrollbar-color) provide
+   cross-browser support (Firefox, Safari 16+, Chrome 121+).
+   WebKit pseudo-elements provide fine-grained width control on Chromium.
+
+   Colors defined as CSS variables in core.css:
+   --scrollbar-light-thumb, --scrollbar-light-thumb-hover
+   --scrollbar-dark-thumb, --scrollbar-dark-thumb-hover
 
    To add a new scrollable element:
    1. Identify if it uses light or dark background theme
    2. Add the selector to the appropriate group below
-   3. Follow the existing pattern (width, track, thumb, thumb:hover)
 
    Note: Horizontal scrollbars (overflow-x) and utility classes are intentionally
    not styled to preserve default browser behavior. */
@@ -17,7 +24,19 @@
    Light Theme Scrollbar (for light-background panels)
    ============================================================================ */
 
-/* Standard light scrollbar - minimal 5px width */
+/* Standard scrollbar (Firefox, Safari 16+, Chrome 121+) */
+.config-panel-content,
+.plugin-panel-content,
+.command-explorer-content,
+.completion-menu,
+.panel-content,
+.job-list-content,
+.job-detail-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-light-thumb) transparent;
+}
+
+/* WebKit fine-tuning (Chromium) */
 .config-panel-content::-webkit-scrollbar,
 .plugin-panel-content::-webkit-scrollbar,
 .command-explorer-content::-webkit-scrollbar,
@@ -31,10 +50,10 @@
 .config-panel-content::-webkit-scrollbar-track,
 .plugin-panel-content::-webkit-scrollbar-track,
 .command-explorer-content::-webkit-scrollbar-track,
+.completion-menu::-webkit-scrollbar-track,
 .panel-content::-webkit-scrollbar-track,
 .job-list-content::-webkit-scrollbar-track,
-.job-detail-content::-webkit-scrollbar-track,
-.completion-menu::-webkit-scrollbar-track {
+.job-detail-content::-webkit-scrollbar-track {
     background: transparent;
 }
 
@@ -45,7 +64,7 @@
 .panel-content::-webkit-scrollbar-thumb,
 .job-list-content::-webkit-scrollbar-thumb,
 .job-detail-content::-webkit-scrollbar-thumb {
-    background: #ddd;
+    background: var(--scrollbar-light-thumb);
 }
 
 .config-panel-content::-webkit-scrollbar-thumb:hover,
@@ -55,19 +74,33 @@
 .panel-content::-webkit-scrollbar-thumb:hover,
 .job-list-content::-webkit-scrollbar-thumb:hover,
 .job-detail-content::-webkit-scrollbar-thumb:hover {
-    background: #bbb;
+    background: var(--scrollbar-light-thumb-hover);
 }
 
 /* ============================================================================
    Dark Theme Scrollbar (for dark-background panels)
    ============================================================================ */
 
-/* Standard dark scrollbar - minimal 5px width */
+/* Standard scrollbar (Firefox, Safari 16+, Chrome 121+) */
+.prompt-preview-body,
+.prose-tree,
+.prose-editor-container,
+.prose-recent,
+.log-column-content,
+.stream-content,
+#log-content,
+#progress-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
+}
+
+/* WebKit fine-tuning (Chromium) */
 .prompt-preview-body::-webkit-scrollbar,
 .prose-tree::-webkit-scrollbar,
 .prose-editor-container::-webkit-scrollbar,
 .prose-recent::-webkit-scrollbar,
 .log-column-content::-webkit-scrollbar,
+.stream-content::-webkit-scrollbar,
 #log-content::-webkit-scrollbar,
 #progress-content::-webkit-scrollbar {
     width: 5px;
@@ -78,6 +111,7 @@
 .prose-editor-container::-webkit-scrollbar-track,
 .prose-recent::-webkit-scrollbar-track,
 .log-column-content::-webkit-scrollbar-track,
+.stream-content::-webkit-scrollbar-track,
 #log-content::-webkit-scrollbar-track,
 #progress-content::-webkit-scrollbar-track {
     background: transparent;
@@ -88,9 +122,10 @@
 .prose-editor-container::-webkit-scrollbar-thumb,
 .prose-recent::-webkit-scrollbar-thumb,
 .log-column-content::-webkit-scrollbar-thumb,
+.stream-content::-webkit-scrollbar-thumb,
 #log-content::-webkit-scrollbar-thumb,
 #progress-content::-webkit-scrollbar-thumb {
-    background: #3a3a3a;
+    background: var(--scrollbar-dark-thumb);
 }
 
 .prompt-preview-body::-webkit-scrollbar-thumb:hover,
@@ -98,29 +133,18 @@
 .prose-editor-container::-webkit-scrollbar-thumb:hover,
 .prose-recent::-webkit-scrollbar-thumb:hover,
 .log-column-content::-webkit-scrollbar-thumb:hover,
+.stream-content::-webkit-scrollbar-thumb:hover,
 #log-content::-webkit-scrollbar-thumb:hover,
 #progress-content::-webkit-scrollbar-thumb:hover {
-    background: #4a4a4a;
+    background: var(--scrollbar-dark-thumb-hover);
 }
 
-/* Dark scrollbar variant for stream content */
-.stream-content::-webkit-scrollbar {
-    width: 5px;
+/* Loader logs - narrower 4px variant (dark) */
+#loader-logs {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
 
-.stream-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.stream-content::-webkit-scrollbar-thumb {
-    background: #3a3a3a;
-}
-
-.stream-content::-webkit-scrollbar-thumb:hover {
-    background: #4a4a4a;
-}
-
-/* Dark scrollbar variant for loader logs - minimal width */
 #loader-logs::-webkit-scrollbar {
     width: 4px;
 }
@@ -130,9 +154,9 @@
 }
 
 #loader-logs::-webkit-scrollbar-thumb {
-    background: #3a3a3a;
+    background: var(--scrollbar-dark-thumb);
 }
 
 #loader-logs::-webkit-scrollbar-thumb:hover {
-    background: #4a4a4a;
+    background: var(--scrollbar-dark-thumb-hover);
 }
