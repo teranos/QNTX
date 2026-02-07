@@ -32,6 +32,11 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
         selfWindow.updateCapabilities(data);
     });
 
+    // Update Self diagnostic glyph
+    import('../test-glyphs.js').then(({ updateSelfCapabilities }) => {
+        updateSelfCapabilities(data);
+    });
+
     // Handle ax button (fuzzy matching)
     const axButton = document.querySelector('.palette-cell[data-cmd="ax"]') as HTMLElement;
     if (!axButton) {
