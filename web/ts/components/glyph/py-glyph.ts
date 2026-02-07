@@ -117,7 +117,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.addEventListener('click', async () => {
         const editor = (element as any).editor;
         if (!editor) {
-            log.error(SEG.UI, '[PyGlyph] Editor not initialized');
+            log.error(SEG.GLYPH, '[PyGlyph] Editor not initialized');
             return;
         }
 
@@ -164,7 +164,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
             // Create result glyph for successful execution
             createAndDisplayResultGlyph(element, result);
         } catch (error) {
-            log.error(SEG.UI, '[PyGlyph] Execution failed:', error);
+            log.error(SEG.GLYPH, '[PyGlyph] Execution failed:', error);
             log.error(SEG.ERROR, '[Python Execution Error]', error);
 
             // Create error result glyph for network/parse failures
@@ -230,7 +230,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                 saveTimeout = window.setTimeout(async () => {
                     const currentCode = update.state.doc.toString();
                     await storage.save(glyph.id, currentCode);
-                    log.debug(SEG.UI, `[PyGlyph] Auto-saved code for ${glyph.id}`);
+                    log.debug(SEG.GLYPH, `[PyGlyph] Auto-saved code for ${glyph.id}`);
                 }, 500);
             }
         });
@@ -256,12 +256,12 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         // Save initial code if this is a new glyph (no saved code)
         if (!savedCode) {
             await storage.save(glyph.id, code);
-            log.debug(SEG.UI, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
         }
 
-        log.debug(SEG.UI, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
     } catch (error) {
-        log.error(SEG.UI, `[PyGlyph] Failed to initialize CodeMirror:`, error);
+        log.error(SEG.GLYPH, `[PyGlyph] Failed to initialize CodeMirror:`, error);
         editorContainer.textContent = 'Error loading editor';
     }
 
@@ -312,6 +312,6 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
         result: result
     });
 
-    log.debug(SEG.UI, `[PyGlyph] Spawned result glyph at (${x}, ${y}), duration ${result.duration_ms}ms`);
+    log.debug(SEG.GLYPH, `[PyGlyph] Spawned result glyph at (${x}, ${y}), duration ${result.duration_ms}ms`);
 }
 

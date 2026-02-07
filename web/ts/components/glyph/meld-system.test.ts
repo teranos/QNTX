@@ -6,7 +6,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
-import { performMeld, isMeldedComposition, MELD_THRESHOLD } from './meld-system';
+import { performMeld, unmeldComposition, isMeldedComposition, MELD_THRESHOLD } from './meld-system';
 import type { Glyph } from './glyph';
 
 // Setup happy-dom
@@ -76,6 +76,73 @@ describe('Meld System - Critical Behavior', () => {
         // Assert: Composition positioned at ax location
         expect(composition.style.left).toBe('100px');
         expect(composition.style.top).toBe('100px');
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+
+    test('unmeld restores elements to canvas preserving identity', () => {
+        // Setup: Create canvas and melded composition
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax-test');
+        axElement.style.position = 'absolute';
+        axElement.style.left = '100px';
+        axElement.style.top = '100px';
+        canvas.appendChild(axElement);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt-test');
+        promptElement.style.position = 'absolute';
+        promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
+        promptElement.style.top = '100px';
+        canvas.appendChild(promptElement);
+
+        const axGlyph: Glyph = {
+            id: 'ax-test',
+            title: 'AX',
+            renderContent: () => axElement
+        };
+
+        const promptGlyph: Glyph = {
+            id: 'prompt-test',
+            title: 'Prompt',
+            renderContent: () => promptElement
+        };
+
+        // Store references to verify identity preservation
+        const originalAxElement = axElement;
+        const originalPromptElement = promptElement;
+
+        // Create meld first
+        const composition = performMeld(axElement, promptElement, axGlyph, promptGlyph);
+        expect(composition.parentElement).toBe(canvas);
+
+        // Action: Unmeld the composition
+        const result = unmeldComposition(composition);
+
+        // Assert: Result contains original elements
+        expect(result).not.toBe(null);
+        expect(result?.initiatorElement).toBe(originalAxElement);
+        expect(result?.targetElement).toBe(originalPromptElement);
+        expect(result?.initiatorId).toBe('ax-test');
+        expect(result?.targetId).toBe('prompt-test');
+
+        // Assert: Elements restored to canvas
+        expect(originalAxElement.parentElement).toBe(canvas);
+        expect(originalPromptElement.parentElement).toBe(canvas);
+
+        // Assert: Elements have absolute positioning
+        expect(originalAxElement.style.position).toBe('absolute');
+        expect(originalPromptElement.style.position).toBe('absolute');
+
+        // Assert: Composition removed from DOM
+        expect(composition.parentElement).toBe(null);
 
         // Cleanup
         document.body.innerHTML = '';

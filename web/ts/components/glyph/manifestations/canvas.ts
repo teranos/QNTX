@@ -65,7 +65,7 @@ export function morphToCanvas(
         getMaximizeDuration()
     ).then(() => {
         // COMMIT PHASE: Animation completed successfully
-        log.debug(SEG.UI, `[Canvas] Animation committed for ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[Canvas] Animation committed for ${glyph.id}`);
 
         // Apply final fullscreen state - NO CHROME
         glyphElement.style.position = 'fixed';
@@ -102,7 +102,7 @@ export function morphToCanvas(
             content.style.overflow = 'hidden';
             glyphElement.appendChild(content);
         } catch (error) {
-            log.error(SEG.UI, `[Canvas ${glyph.id}] Error rendering content:`, error);
+            log.error(SEG.GLYPH, `[Canvas ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
             errorContent.style.padding = '16px';
             errorContent.style.flex = '1';
@@ -115,7 +115,7 @@ export function morphToCanvas(
         }
     }).catch(error => {
         // ROLLBACK: Animation failed
-        log.warn(SEG.UI, `[Canvas] Animation failed for ${glyph.id}:`, error);
+        log.warn(SEG.GLYPH, `[Canvas] Animation failed for ${glyph.id}:`, error);
     });
 }
 
@@ -130,7 +130,7 @@ export function morphFromCanvas(
 ): void {
     // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, canvasElement);
-    log.debug(SEG.UI, `[Canvas] Minimizing ${glyph.id}`);
+    log.debug(SEG.GLYPH, `[Canvas] Minimizing ${glyph.id}`);
 
     // Get current canvas state
     const currentRect = canvasElement.getBoundingClientRect();
@@ -153,7 +153,7 @@ export function morphFromCanvas(
     // Begin minimize animation
     beginMinimizeMorph(canvasElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
-            log.debug(SEG.UI, `[Canvas] Animation complete for ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[Canvas] Animation complete for ${glyph.id}`);
 
             // Clear state
             setWindowState(canvasElement, false);
@@ -172,6 +172,6 @@ export function morphFromCanvas(
             onMorphComplete(canvasElement, glyph);
         })
         .catch(error => {
-            log.warn(SEG.UI, `[Canvas] Animation failed for ${glyph.id}:`, error);
+            log.warn(SEG.GLYPH, `[Canvas] Animation failed for ${glyph.id}:`, error);
         });
 }

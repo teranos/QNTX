@@ -100,7 +100,7 @@ export function createResultGlyph(
 
     toWindowBtn.addEventListener('click', () => {
         // TODO: Implement window manifestation morphing
-        log.debug(SEG.UI, '[ResultGlyph] To window clicked (not implemented)');
+        log.debug(SEG.GLYPH, '[ResultGlyph] To window clicked (not implemented)');
     });
 
     buttonContainer.appendChild(toWindowBtn);
@@ -121,7 +121,7 @@ export function createResultGlyph(
     closeBtn.addEventListener('click', () => {
         element.remove();
         uiState.removeCanvasGlyph(glyph.id);
-        log.debug(SEG.UI, `[ResultGlyph] Closed ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[ResultGlyph] Closed ${glyph.id}`);
     });
 
     buttonContainer.appendChild(closeBtn);

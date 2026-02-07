@@ -112,7 +112,25 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
         hideActionBar();
     }
 
-    log.debug(SEG.UI, `[Canvas] Selected ${selectedGlyphIds.length} glyphs`, { selectedGlyphIds });
+    log.debug(SEG.GLYPH, `[Canvas] Selected ${selectedGlyphIds.length} glyphs`, { selectedGlyphIds });
+}
+
+/**
+ * Create a Glyph object from a DOM element by detecting its type
+ * Used when restoring glyphs after unmeld
+ */
+function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
+    if (element.classList.contains('canvas-ax-glyph')) {
+        return { id, title: 'AX Query', symbol: AX, renderContent: () => element };
+    }
+    if (element.classList.contains('canvas-py-glyph')) {
+        return { id, title: 'Python', symbol: 'py', renderContent: () => element };
+    }
+    if (element.classList.contains('canvas-prompt-glyph')) {
+        return { id, title: 'Prompt', symbol: SO, renderContent: () => element };
+    }
+    // Fallback
+    return { id, title: 'Glyph', renderContent: () => element };
 }
 
 /**
@@ -135,33 +153,27 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
     const result = unmeldComposition(composition);
     if (!result) {
         const compId = composition.dataset.glyphId || 'unknown';
-        log.error(SEG.UI, `[Canvas] Failed to unmeld composition ${compId}`);
+        log.error(SEG.GLYPH, `[Canvas] Failed to unmeld composition ${compId}`);
         return;
     }
 
-    const { axElement, promptElement, axId, promptId } = result;
+    const { initiatorElement, targetElement, initiatorId, targetId } = result;
 
     // Restore drag handlers on the unmelded glyphs
-    const axGlyph: Glyph = {
-        id: axId,
-        title: 'AX Query',
-        renderContent: () => axElement
-    };
+    const initiatorGlyph = createGlyphFromElement(initiatorElement, initiatorId);
+    const targetGlyph = createGlyphFromElement(targetElement, targetId);
 
-    const promptGlyph: Glyph = {
-        id: promptId,
-        title: 'Prompt',
-        symbol: SO,
-        renderContent: () => promptElement
-    };
+    // Determine log label from glyph symbol
+    const initiatorLabel = initiatorGlyph.symbol === AX ? 'AX' : 'Py';
+    const targetLabel = targetGlyph.symbol === SO ? 'Prompt' : 'Py';
 
-    makeDraggable(axElement, axElement, axGlyph, { logLabel: 'AX' });
-    makeDraggable(promptElement, promptElement, promptGlyph, { logLabel: 'Prompt' });
+    makeDraggable(initiatorElement, initiatorElement, initiatorGlyph, { logLabel: initiatorLabel });
+    makeDraggable(targetElement, targetElement, targetGlyph, { logLabel: targetLabel });
 
     // Clear selection and hide action bar
     deselectAll(container);
 
-    log.debug(SEG.UI, '[Canvas] Unmelded composition', { axId, promptId });
+    log.debug(SEG.GLYPH, '[Canvas] Unmelded composition', { initiatorId, targetId });
 }
 
 /**
@@ -214,7 +226,7 @@ function deleteSelectedGlyphs(container: HTMLElement): void {
         };
     }
 
-    log.debug(SEG.UI, `[Canvas] Deleted ${glyphIdsToDelete.length} glyphs`, { glyphIdsToDelete });
+    log.debug(SEG.GLYPH, `[Canvas] Deleted ${glyphIdsToDelete.length} glyphs`, { glyphIdsToDelete });
 }
 
 /**
@@ -223,7 +235,7 @@ function deleteSelectedGlyphs(container: HTMLElement): void {
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
     const savedGlyphs = uiState.getCanvasGlyphs();
-    log.debug(SEG.UI, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
+    log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
         // For ax glyphs, recreate using factory function to restore full functionality
@@ -235,7 +247,7 @@ export function createCanvasGlyph(): Glyph {
         }
 
         if (saved.symbol === 'result') {
-            log.debug(SEG.UI, `[Canvas] Restoring result glyph ${saved.id}`, {
+            log.debug(SEG.GLYPH, `[Canvas] Restoring result glyph ${saved.id}`, {
                 hasResult: !!saved.result,
                 x: saved.x,
                 y: saved.y
@@ -360,7 +372,7 @@ export function createCanvasGlyph(): Glyph {
 
                 // Step 2: Restore melded compositions after all glyphs are rendered
                 const savedCompositions = getAllCompositions();
-                log.debug(SEG.UI, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
+                log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
 
                 for (const comp of savedCompositions) {
                     // Find the initiator and target elements in the DOM
@@ -368,7 +380,7 @@ export function createCanvasGlyph(): Glyph {
                     const targetEl = container.querySelector(`[data-glyph-id="${comp.targetId}"]`) as HTMLElement;
 
                     if (!initiatorEl || !targetEl) {
-                        log.warn(SEG.UI, `[Canvas] Cannot restore composition ${comp.id} - missing glyphs`, {
+                        log.warn(SEG.GLYPH, `[Canvas] Cannot restore composition ${comp.id} - missing glyphs`, {
                             initiatorId: comp.initiatorId,
                             targetId: comp.targetId,
                             foundInitiator: !!initiatorEl,
@@ -379,12 +391,23 @@ export function createCanvasGlyph(): Glyph {
 
                     // Reconstruct the composition DOM (without persisting)
                     try {
-                        reconstructMeld(initiatorEl, targetEl, comp.id, comp.type, comp.x, comp.y);
-                        log.debug(SEG.UI, `[Canvas] Restored composition ${comp.id}`, {
+                        const composition = reconstructMeld(initiatorEl, targetEl, comp.id, comp.type, comp.x, comp.y);
+
+                        // Make the restored composition draggable
+                        const compositionGlyph: Glyph = {
+                            id: comp.id,
+                            title: 'Melded Composition',
+                            renderContent: () => composition
+                        };
+                        makeDraggable(composition, composition, compositionGlyph, {
+                            logLabel: 'MeldedComposition'
+                        });
+
+                        log.debug(SEG.GLYPH, `[Canvas] Restored composition ${comp.id}`, {
                             type: comp.type
                         });
                     } catch (err) {
-                        log.error(SEG.UI, `[Canvas] Failed to restore composition ${comp.id}`, { error: err });
+                        log.error(SEG.GLYPH, `[Canvas] Failed to restore composition ${comp.id}`, { error: err });
                     }
                 }
             })();
@@ -399,7 +422,7 @@ export function createCanvasGlyph(): Glyph {
  * Checks symbol type and creates appropriate glyph element
  */
 async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
-    log.debug(SEG.UI, `[Canvas] Rendering glyph ${glyph.id}`, {
+    log.debug(SEG.GLYPH, `[Canvas] Rendering glyph ${glyph.id}`, {
         symbol: glyph.symbol,
         hasResult: !!glyph.result
     });
@@ -426,12 +449,12 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // For result glyphs, create result display
     if (glyph.symbol === 'result' && glyph.result) {
-        log.debug(SEG.UI, `[Canvas] Creating result glyph for ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
         return createResultGlyph(glyph, glyph.result as ExecutionResult);
     }
 
     // Unsupported glyph type - log error and return placeholder
-    log.error(SEG.UI, `[Canvas] Unsupported glyph type: ${glyph.symbol}`);
+    log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`);
     const placeholder = document.createElement('div');
     placeholder.textContent = `Unknown glyph type: ${glyph.symbol}`;
     placeholder.style.padding = '8px';
