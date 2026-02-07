@@ -279,7 +279,7 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 
 	// Initialize canvas state handlers
 	canvasStore := glyphstorage.NewCanvasStore(db)
-	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, ctx)
+	server.canvasHandler = handlers.NewCanvasHandler(canvasStore)
 	serverLogger.Infow("Canvas state handlers initialized")
 
 	// Set up config file watcher for auto-reload
