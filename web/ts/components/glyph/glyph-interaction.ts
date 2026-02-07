@@ -214,7 +214,6 @@ export function makeDraggable(
             // Get composition data from DOM
             const compositionId = element.getAttribute('data-glyph-id') || '';
             const initiatorId = element.getAttribute('data-initiator-id') || '';
-            const targetId = element.getAttribute('data-target-id') || '';
 
             // Find existing composition in storage to get type
             const existingComp = findCompositionByGlyph(initiatorId);
