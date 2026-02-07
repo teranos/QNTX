@@ -35,6 +35,7 @@ import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
+import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 
 /**
  * IX glyph execution status (persisted in localStorage)
@@ -418,7 +419,7 @@ function setupCanvasGlyphResizeObserver(
         log.debug(SEG.GLYPH, `[${glyphType} ${glyphId}] Disconnected existing ResizeObserver`);
     }
 
-    const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
 
     const resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {

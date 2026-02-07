@@ -26,6 +26,10 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { tooltip } from '../tooltip';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
+import {
+    CANVAS_GLYPH_TITLE_BAR_HEIGHT,
+    MAX_VIEWPORT_HEIGHT_RATIO
+} from './glyph';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -297,8 +301,8 @@ function setupAxGlyphResizeObserver(
         log.debug(SEG.GLYPH, `[AX ${glyphId}] Disconnected existing ResizeObserver`);
     }
 
-    const titleBarHeight = 32; // Approximate title bar height
-    const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
+    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
 
     const resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {

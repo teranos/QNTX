@@ -30,7 +30,13 @@ import {
     TITLE_BAR_HEIGHT,
     TITLE_BAR_PADDING,
     WINDOW_BUTTON_SIZE,
-    CONTENT_PADDING
+    CONTENT_PADDING,
+    CANVAS_GLYPH_CONTENT_PADDING,
+    GLYPH_CONTENT_INNER_PADDING,
+    MAX_VIEWPORT_HEIGHT_RATIO,
+    MAX_VIEWPORT_WIDTH_RATIO,
+    MIN_WINDOW_HEIGHT,
+    MIN_WINDOW_WIDTH
 } from '../glyph';
 
 /**
@@ -186,7 +192,7 @@ export function morphToWindow(
         let contentElement: HTMLElement;
         try {
             const content = glyph.renderContent();
-            content.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
+            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
             content.style.flex = '1'; // Take remaining space in flex container
             content.style.overflow = 'auto';
             glyphElement.appendChild(content);
@@ -405,8 +411,8 @@ function setupWindowResizeObserver(
     glyphId: string
 ): void {
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
-    const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
-    const minHeight = 100; // Minimum window height
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+    const minHeight = MIN_WINDOW_HEIGHT;
 
     // Find the inner .glyph-content element which has intrinsic size
     // The contentElement itself has flex: 1 and doesn't report natural height
@@ -417,8 +423,8 @@ function setupWindowResizeObserver(
         return;
     }
 
-    const maxWidth = window.innerWidth * 0.8; // Don't exceed 80% of viewport width
-    const minWidth = 200; // Minimum window width
+    const maxWidth = window.innerWidth * MAX_VIEWPORT_WIDTH_RATIO;
+    const minWidth = MIN_WINDOW_WIDTH;
 
     const resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {
@@ -432,11 +438,11 @@ function setupWindowResizeObserver(
             }
 
             // Add padding for both layers:
-            // - contentElement padding: 8px (reduced from CONTENT_PADDING)
-            // - .glyph-content padding: 4px (CSS)
+            // - contentElement padding: CANVAS_GLYPH_CONTENT_PADDING
+            // - .glyph-content padding: GLYPH_CONTENT_INNER_PADDING (CSS)
             // Total: (8 + 4) * 2 = 24px per dimension
-            const contentElementPadding = 16; // 8px * 2 (top + bottom OR left + right)
-            const glyphContentPadding = 8; // 4px * 2 (top + bottom OR left + right)
+            const contentElementPadding = CANVAS_GLYPH_CONTENT_PADDING * 2; // top + bottom OR left + right
+            const glyphContentPadding = GLYPH_CONTENT_INNER_PADDING * 2; // top + bottom OR left + right
             const totalPadding = contentElementPadding + glyphContentPadding;
 
             const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + totalPadding, maxHeight));
