@@ -417,9 +417,13 @@ function setupWindowResizeObserver(
         return;
     }
 
+    const maxWidth = window.innerWidth * 0.8; // Don't exceed 80% of viewport width
+    const minWidth = 200; // Minimum window width
+
     const resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {
             const contentHeight = entry.contentRect.height;
+            const contentWidth = entry.contentRect.width;
 
             // Skip if content hasn't rendered yet (height is 0)
             if (contentHeight === 0) {
@@ -427,13 +431,15 @@ function setupWindowResizeObserver(
                 return;
             }
 
-            // Add padding to account for .glyph-content padding (8px top/bottom from CSS)
-            const contentPadding = 16; // 8px top + 8px bottom
+            // Add padding to account for .glyph-content padding (8px all around from CSS)
+            const contentPadding = 16; // 8px left + 8px right OR 8px top + 8px bottom
             const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + contentPadding, maxHeight));
+            const totalWidth = Math.max(minWidth, Math.min(contentWidth + contentPadding, maxWidth));
 
             windowElement.style.height = `${totalHeight}px`;
+            windowElement.style.width = `${totalWidth}px`;
 
-            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px + padding: ${contentPadding}px)`);
+            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalWidth}x${totalHeight}px (content: ${contentWidth}x${contentHeight}px + padding: ${contentPadding}px)`);
         }
     });
 
