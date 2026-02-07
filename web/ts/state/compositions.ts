@@ -34,6 +34,10 @@ export function getCompositionType(
         }
     }
 
+    log.debug(SEG.GLYPH, '[Compositions] No composition type match', {
+        initiatorClass,
+        targetClass
+    });
     return null;
 }
 
@@ -50,11 +54,11 @@ export function addComposition(composition: CompositionState): void {
             c.id === composition.id ? composition : c
         );
         uiState.setCanvasCompositions(updated);
-        log.debug(SEG.UI, '[Compositions] Updated composition', { id: composition.id });
+        log.debug(SEG.GLYPH, '[Compositions] Updated composition', { id: composition.id });
     } else {
         // Add new
         uiState.setCanvasCompositions([...compositions, composition]);
-        log.debug(SEG.UI, '[Compositions] Added composition', {
+        log.debug(SEG.GLYPH, '[Compositions] Added composition', {
             id: composition.id,
             type: composition.type,
             initiatorId: composition.initiatorId,
@@ -70,7 +74,7 @@ export function removeComposition(id: string): void {
     const compositions = uiState.getCanvasCompositions();
     const updated = compositions.filter(c => c.id !== id);
     uiState.setCanvasCompositions(updated);
-    log.debug(SEG.UI, '[Compositions] Removed composition', { id });
+    log.debug(SEG.GLYPH, '[Compositions] Removed composition', { id });
 }
 
 /**

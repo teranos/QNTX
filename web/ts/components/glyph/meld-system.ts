@@ -186,7 +186,7 @@ export function performMeld(
         throw new Error('Cannot meld: no canvas parent');
     }
 
-    log.info(SEG.UI, '[MeldSystem] Performing meld - reparenting elements');
+    log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements');
 
     // Determine composition type from element classes
     const compositionType = getCompositionType(initiatorElement, targetElement);
@@ -215,6 +215,15 @@ export function performMeld(
     // Parse position for storage
     const x = parseInt(initiatorElement.style.left || '0', 10);
     const y = parseInt(initiatorElement.style.top || '0', 10);
+
+    if (isNaN(x) || isNaN(y)) {
+        log.warn(SEG.GLYPH, '[MeldSystem] Invalid position during meld', {
+            rawLeft: initiatorElement.style.left,
+            rawTop: initiatorElement.style.top,
+            parsedX: x,
+            parsedY: y
+        });
+    }
 
     // Clear positioning from glyphs (they're now relative to composition)
     initiatorElement.style.position = 'relative';
@@ -245,7 +254,7 @@ export function performMeld(
         y: isNaN(y) ? 0 : y
     });
 
-    log.info(SEG.UI, '[MeldSystem] Meld complete - elements reparented and persisted', {
+    log.info(SEG.GLYPH, '[MeldSystem] Meld complete - elements reparented and persisted', {
         compositionId,
         type: compositionType
     });
@@ -270,7 +279,7 @@ export function reconstructMeld(
         throw new Error('Cannot reconstruct meld: no canvas parent');
     }
 
-    log.info(SEG.UI, '[MeldSystem] Reconstructing meld from storage');
+    log.info(SEG.GLYPH, '[MeldSystem] Reconstructing meld from storage');
 
     // Create composition container
     const composition = document.createElement('div');
@@ -302,7 +311,7 @@ export function reconstructMeld(
     // Add to canvas
     canvas.appendChild(composition);
 
-    log.info(SEG.UI, '[MeldSystem] Meld reconstructed', {
+    log.info(SEG.GLYPH, '[MeldSystem] Meld reconstructed', {
         compositionId,
         type: compositionType
     });
@@ -328,19 +337,19 @@ export function isMeldedComposition(element: HTMLElement): boolean {
  * Tracked in: https://github.com/teranos/QNTX/issues/410
  */
 export function unmeldComposition(composition: HTMLElement): {
-    axElement: HTMLElement;
-    promptElement: HTMLElement;
-    axId: string;
-    promptId: string;
+    initiatorElement: HTMLElement;
+    targetElement: HTMLElement;
+    initiatorId: string;
+    targetId: string;
 } | null {
     if (!isMeldedComposition(composition)) {
-        log.warn(SEG.UI, '[MeldSystem] Not a melded composition');
+        log.warn(SEG.GLYPH, '[MeldSystem] Not a melded composition');
         return null;
     }
 
     const canvas = composition.parentElement;
     if (!canvas) {
-        log.error(SEG.UI, '[MeldSystem] Composition has no parent canvas');
+        log.error(SEG.GLYPH, '[MeldSystem] Composition has no parent canvas');
         return null;
     }
 
@@ -352,7 +361,7 @@ export function unmeldComposition(composition: HTMLElement): {
     const targetElement = composition.querySelector('[data-glyph-id]:last-child') as HTMLElement;
 
     if (!initiatorElement || !targetElement) {
-        log.error(SEG.UI, '[MeldSystem] Missing glyphs in composition - removing corrupted composition');
+        log.error(SEG.GLYPH, '[MeldSystem] Missing glyphs in composition - removing corrupted composition');
         if (compositionId) {
             removeComposition(compositionId);
         }
@@ -366,10 +375,10 @@ export function unmeldComposition(composition: HTMLElement): {
 
     // Validate parsed values - fallback to 0 if NaN
     if (isNaN(compLeft)) {
-        log.warn(SEG.UI, `[MeldSystem] Invalid composition.style.left: "${composition.style.left}", using 0`);
+        log.warn(SEG.GLYPH, `[MeldSystem] Invalid composition.style.left: "${composition.style.left}", using 0`);
     }
     if (isNaN(compTop)) {
-        log.warn(SEG.UI, `[MeldSystem] Invalid composition.style.top: "${composition.style.top}", using 0`);
+        log.warn(SEG.GLYPH, `[MeldSystem] Invalid composition.style.top: "${composition.style.top}", using 0`);
     }
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
@@ -398,16 +407,15 @@ export function unmeldComposition(composition: HTMLElement): {
     // Remove composition container
     composition.remove();
 
-    log.info(SEG.UI, '[MeldSystem] Unmeld complete - elements restored and removed from storage', {
+    log.info(SEG.GLYPH, '[MeldSystem] Unmeld complete - elements restored and removed from storage', {
         compositionId
     });
 
     // Return elements so caller can restore drag handlers
-    // Keep old naming for backward compatibility with canvas-glyph.ts
     return {
-        axElement: initiatorElement,
-        promptElement: targetElement,
-        axId: initiatorId,
-        promptId: targetId
+        initiatorElement,
+        targetElement,
+        initiatorId,
+        targetId
     };
 }

@@ -203,7 +203,7 @@ export function showSpawnMenu(
         }
     }, 0);
 
-    log.debug(SEG.UI, `[Canvas] Spawn menu opened at (${x}, ${y})`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawn menu opened at (${x}, ${y})`);
 }
 
 /**
@@ -249,7 +249,7 @@ async function spawnIxGlyph(
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned IX glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned IX glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**
@@ -288,7 +288,7 @@ function spawnAxGlyph(
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned AX glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned AX glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**
@@ -334,7 +334,7 @@ async function spawnPyGlyph(
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned Python glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Python glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
 
 /**
@@ -377,5 +377,5 @@ async function spawnPromptGlyph(
         height
     });
 
-    log.debug(SEG.UI, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
