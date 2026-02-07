@@ -16,9 +16,11 @@ Sentence transformer embeddings for semantic search in QNTX using ONNX Runtime.
 - Mean pooling for sentence-level embeddings
 - ~78ms inference time per sentence (including tokenization)
 - Verified semantic similarity (cat/kitten: 0.94, cat/car: 0.87)
+- sqlite-vec extension fully integrated (v0.1.6)
+- vec0 virtual tables and FLOAT32_BLOB types working
+- Vector distance functions (L2) tested and working
 
 ⚠️ **Still Needs Work:**
-- sqlite-vec initialization broken
 - No Go service layer
 - No API endpoints
 
