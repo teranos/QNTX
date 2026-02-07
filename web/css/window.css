@@ -260,12 +260,12 @@
 
 .db-stat-label {
     font-weight: normal;
-    color: var(--panel-text-secondary, #666);
+    color: #c0c0c0;
 }
 
 .db-stat-value {
     font-weight: normal;
-    color: var(--panel-text-primary, #333);
+    color: #e8e8e8;
 }
 
 .db-path {
