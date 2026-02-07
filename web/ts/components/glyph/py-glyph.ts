@@ -26,6 +26,8 @@ import { makeDraggable, makeResizable } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { syncStateManager } from '../../state/sync-state';
+import { connectivityManager } from '../../connectivity';
 
 /**
  * Create a Python editor glyph with CodeMirror
@@ -35,7 +37,7 @@ import { createResultGlyph, type ExecutionResult } from './result-glyph';
  */
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const element = document.createElement('div');
-    element.className = 'canvas-py-glyph';
+    element.className = 'canvas-py-glyph canvas-glyph';
     element.dataset.glyphId = glyph.id;
     if (glyph.symbol) {
         element.dataset.glyphSymbol = glyph.symbol;
@@ -270,6 +272,16 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Make resizable by handle
     makeResizable(element, resizeHandle, glyph, { logLabel: 'PyGlyph' });
+
+    // Subscribe to sync state changes for visual feedback
+    syncStateManager.subscribe(glyph.id, (state) => {
+        element.dataset.syncState = state;
+    });
+
+    // Subscribe to connectivity state changes
+    connectivityManager.subscribe((state) => {
+        element.dataset.connectivityMode = state;
+    });
 
     return element;
 }

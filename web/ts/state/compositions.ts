@@ -8,6 +8,7 @@
 
 import { uiState, type CompositionState } from './ui';
 import { log, SEG } from '../logger';
+import { upsertComposition as apiUpsertComposition, deleteComposition as apiDeleteComposition } from '../api/canvas';
 
 /**
  * Determine composition type from glyph CSS classes
@@ -65,6 +66,11 @@ export function addComposition(composition: CompositionState): void {
             targetId: composition.targetId
         });
     }
+
+    // Sync with backend (fire-and-forget)
+    apiUpsertComposition(composition).catch(err => {
+        log.error(SEG.GLYPH, '[Compositions] Failed to sync composition to backend:', err);
+    });
 }
 
 /**
@@ -75,6 +81,11 @@ export function removeComposition(id: string): void {
     const updated = compositions.filter(c => c.id !== id);
     uiState.setCanvasCompositions(updated);
     log.debug(SEG.GLYPH, '[Compositions] Removed composition', { id });
+
+    // Sync with backend (fire-and-forget)
+    apiDeleteComposition(id).catch(err => {
+        log.error(SEG.GLYPH, '[Compositions] Failed to delete composition from backend:', err);
+    });
 }
 
 /**
