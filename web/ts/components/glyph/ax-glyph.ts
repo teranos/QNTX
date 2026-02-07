@@ -277,8 +277,8 @@ function setupAxGlyphResizeObserver(
     glyphId: string
 ): void {
     // Cleanup any existing observer to prevent memory leaks on re-render
-    const existingObserver = (glyphElement as any).__resizeObserver as ResizeObserver | undefined;
-    if (existingObserver) {
+    const existingObserver = (glyphElement as any).__resizeObserver;
+    if (existingObserver && typeof existingObserver.disconnect === 'function') {
         existingObserver.disconnect();
         delete (glyphElement as any).__resizeObserver;
         log.debug(SEG.GLYPH, `[AX ${glyphId}] Disconnected existing ResizeObserver`);
