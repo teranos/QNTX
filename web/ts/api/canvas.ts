@@ -207,6 +207,24 @@ export async function listCompositions(): Promise<CompositionResponse[]> {
 }
 
 /**
+ * Safely parse result_data JSON with validation
+ */
+function parseResultData(json: string, glyphId: string): CanvasGlyphState['result'] {
+    try {
+        const parsed = JSON.parse(json);
+        // Basic validation - result must have success boolean
+        if (typeof parsed.success !== 'boolean') {
+            log.error(SEG.GLYPH, `[CanvasAPI] Invalid result_data format for glyph ${glyphId}: missing success field`);
+            return undefined;
+        }
+        return parsed;
+    } catch (err) {
+        log.error(SEG.GLYPH, `[CanvasAPI] Failed to parse result_data for glyph ${glyphId}:`, err);
+        return undefined;
+    }
+}
+
+/**
  * Load all canvas state from backend (glyphs + compositions)
  * Converts backend format to frontend state format
  */
@@ -228,7 +246,7 @@ export async function loadCanvasState(): Promise<{
             y: g.y,
             width: g.width,
             height: g.height,
-            result: g.result_data ? JSON.parse(g.result_data) : undefined,
+            result: g.result_data ? parseResultData(g.result_data, g.id) : undefined,
         }));
 
         const compositions: CompositionState[] = compositionsResponse.map(c => ({
