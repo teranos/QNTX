@@ -242,12 +242,13 @@
     padding: 8px;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
     font-size: var(--font-size-sm);
+    line-height: 1.4;
 }
 
 .db-stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 4px 8px;
+    padding: 3px 8px;
     border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
 }
 
