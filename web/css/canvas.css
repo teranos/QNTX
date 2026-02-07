@@ -126,6 +126,37 @@
 }
 
 /* ============================================================================
+ * Glyph Sync State Visual Feedback
+ * ============================================================================ */
+
+/* Base glyph - applies saturation and hue shift based on connectivity mode */
+.canvas-glyph {
+    filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
+    transition: filter var(--mode-transition-duration) var(--mode-transition-timing),
+                border-color var(--mode-transition-duration) var(--mode-transition-timing);
+    border-color: rgba(220, 222, 221, var(--mode-glyph-border-opacity)) !important;
+}
+
+/* Totally monochrome while dragging offline (indicates unsaved local change) */
+.canvas-glyph.is-dragging[data-connectivity-mode="offline"] {
+    filter: grayscale(100%);
+    border-color: rgba(220, 222, 221, 0.15) !important; /* Almost invisible border */
+}
+
+/* Ghostly appearance for unsynced/failed glyphs while offline (persists after drag) */
+.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="unsynced"],
+.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="failed"] {
+    filter: grayscale(100%);
+    border-color: rgba(220, 222, 221, 0.15) !important; /* Almost invisible border */
+}
+
+/* Server-side results: grayscale when offline (indicates stale/cached data) */
+.ax-glyph-results[data-connectivity-mode="offline"] {
+    filter: grayscale(100%);
+    transition: filter var(--mode-transition-duration) var(--mode-transition-timing);
+}
+
+/* ============================================================================
  * Glyph Selection
  * ============================================================================ */
 

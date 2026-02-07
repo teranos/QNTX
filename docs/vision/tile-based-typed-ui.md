@@ -2,7 +2,7 @@
 
 **Status:** Aspirational - Core concepts for future UI evolution
 
-**Implementation Path:** Tiles are [glyph](./glyphs.md) manifestations. New tile features use the glyph infrastructure (morphing, state persistence, attestable UI). D3 remains for focused graph visualization (e.g., Prose document relationships).
+**Implementation Path:** Tiles are [glyph](./glyphs.md) manifestations with [persistence and sync](../plans/glyph-persistence-visual-sync.md). New tile features use the glyph infrastructure (morphing, state persistence, attestable UI). D3 remains for focused graph visualization (e.g., Prose document relationships).
 
 ## Core Concept
 
@@ -107,17 +107,19 @@ Core QNTX symbols appear progressively:
 
 ## Use Cases
 
-### Mobile Exploratory Session (30 min)
-**Scenario:** Biology researcher on morning commute, analyzing gene clusters from overnight metagenomic pipeline run
+### Mobile Exploratory Session (35 min)
+**Scenario:** Biology researcher on morning commute (Morden → Old Street, London Tube), analyzing gene clusters from overnight metagenomic pipeline run with intermittent connectivity ([test](https://github.com/teranos/QNTX/blob/main/web/ts/state/tube-journey.test.ts))
 
 1. **Overview mode:** Pinch out - see full gene network, identify novel cluster
-2. **Focus mode:** Tap target gene tile - see full sequence annotations, expression data
+2. **Focus mode:** Tap target gene glyph - see full sequence annotations, expression data
 3. **Relational mode:** Pinch out slightly - view connected genes (homologs, co-expressed partners)
 4. **Navigate:** Drag candidate protein-coding gene to center - examine function predictions
 5. **Discovery:** Pinch to relational mode - see this gene's regulatory network
 6. **Backtrack:** Swipe back gesture - return to original cluster for comparison
 
-**Key insight:** Discovers potential novel protein function before arriving at lab - gestural exploration enables hypothesis formation during commute.
+**Key insight:** Discovers potential novel protein function before arriving at lab - gestural exploration enables hypothesis formation during commute despite intermittent connectivity.
+
+**Productivity requirement:** All work persists locally and syncs opportunistically when connectivity returns. Visual feedback (azure tint when offline, ghostly appearance for unsynced glyphs) maintains researcher's mental model of data state without disrupting flow.
 
 ### Desktop Deep Dive (Zoom levels emerge organically)
 **Working context:** See key fields without interaction

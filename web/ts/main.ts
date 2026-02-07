@@ -39,6 +39,8 @@ import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
+import { initVisualMode } from './visual-mode.ts';
+import { log, SEG } from './logger.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -162,6 +164,50 @@ async function init(): Promise<void> {
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
 
+    // Sync local glyphs to backend (ensures backend has all existing glyphs)
+    // This is a one-way sync: local → backend, to preserve any glyphs created before backend persistence
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
+        const { upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+        const localGlyphs = uiState.getCanvasGlyphs();
+        const localCompositions = uiState.getCanvasCompositions();
+
+        // Sync all local glyphs to backend (parallel for speed)
+        const glyphSyncPromises = localGlyphs.map(glyph =>
+            upsertCanvasGlyph(glyph).catch(err => {
+                log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id}:`, err);
+                return null; // Mark as failed but don't block other syncs
+            })
+        );
+
+        // Sync all local compositions to backend (parallel for speed)
+        const compSyncPromises = localCompositions.map(comp =>
+            upsertComposition(comp).catch(err => {
+                log.error(SEG.GLYPH, `Failed to sync composition ${comp.id}:`, err);
+                return null; // Mark as failed but don't block other syncs
+            })
+        );
+
+        const [glyphResults, compResults] = await Promise.all([
+            Promise.allSettled(glyphSyncPromises),
+            Promise.allSettled(compSyncPromises)
+        ]);
+
+        const failedGlyphs = glyphResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
+        const failedComps = compResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
+
+        if (failedGlyphs.length > 0 || failedComps.length > 0) {
+            log.warn(SEG.GLYPH, `Failed to sync ${failedGlyphs.length} glyphs and ${failedComps.length} compositions to backend`);
+        }
+
+        if (localGlyphs.length > 0 || localCompositions.length > 0) {
+            console.log(`[Init] Synced ${localGlyphs.length} glyphs and ${localCompositions.length} compositions to backend`);
+        }
+    } catch (error: unknown) {
+        console.error('[Init] Failed to sync canvas state to backend:', error);
+        // Non-fatal: Continue without backend sync
+    }
+
     // Initialize QNTX WASM module with IndexedDB storage
     if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
     await initQntxWasm();
@@ -210,6 +256,9 @@ async function init(): Promise<void> {
     };
 
     connectWebSocket(handlers);
+
+    // Initialize visual mode system (connectivity-based styling)
+    initVisualMode();
 
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');

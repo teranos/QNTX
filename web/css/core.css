@@ -52,6 +52,20 @@
     --scrollbar-light-thumb-hover: #bbb;
     --scrollbar-dark-thumb: #3a3a3a;
     --scrollbar-dark-thumb-hover: #4a4a4a;
+
+    /* Connectivity Mode Switching - Online mode (default) */
+    --mode-glyph-saturation: 100%;
+    --mode-glyph-hue: 0deg;
+    --mode-glyph-border-opacity: 1.0;
+    --mode-transition-duration: 1.5s;
+    --mode-transition-timing: cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* Offline Mode - Less saturated with azure-ish (blue/green) tint */
+:root[data-connectivity-mode="offline"] {
+    --mode-glyph-saturation: 65%;
+    --mode-glyph-hue: 10deg;
+    --mode-glyph-border-opacity: 0.35;
 }
 
 /* Base */

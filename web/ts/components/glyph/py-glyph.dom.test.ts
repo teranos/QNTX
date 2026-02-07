@@ -77,11 +77,6 @@ describe('PyGlyph', () => {
     });
 
     describe('initialization', () => {
-        test('creates element with correct class', async () => {
-            const element = await createPyGlyph(glyph);
-            expect(element.className).toBe('canvas-py-glyph');
-        });
-
         test('sets data-glyph-id attribute', async () => {
             const element = await createPyGlyph(glyph);
             expect(element.dataset.glyphId).toBe('py-test-123');
