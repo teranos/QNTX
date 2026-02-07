@@ -138,6 +138,11 @@ const MESSAGE_HANDLERS = {
             });
         });
 
+        // Update database stats glyph
+        import('./test-glyphs.js').then(({ updateDatabaseStats }) => {
+            updateDatabaseStats(data);
+        });
+
         // Update status indicator with total count
         import('./status-indicators.js').then(({ statusIndicators }) => {
             statusIndicators.handleDatabaseStats(data.total_attestations);
