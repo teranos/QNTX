@@ -62,7 +62,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     const editorContainer = document.createElement('div');
     editorContainer.className = 'note-editor-container';
     editorContainer.style.flex = '1';
-    editorContainer.style.padding = '10px';
+    editorContainer.style.padding = '4px';
     editorContainer.style.overflow = 'auto';
     editorContainer.style.fontSize = '14px';
     editorContainer.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
