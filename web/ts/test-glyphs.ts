@@ -265,8 +265,8 @@ export function registerTestGlyphs(): void {
             renderSelf();
             return content;
         },
-        initialWidth: '500px',
-        initialHeight: '300px'
+        initialWidth: '450px',
+        initialHeight: '320px'
     });
 
     // TODO: Replace console.log with proper logger (log.debug)
