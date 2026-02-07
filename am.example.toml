@@ -68,20 +68,6 @@ workers = 1
 # Default: 1
 ticker_interval_seconds = 1
 
-# HTTP rate limiting (prevents bot detection like LinkedIn HTTP 999)
-# Maximum HTTP requests per minute (default rate limit)
-# Default: 10
-http_max_requests_per_minute = 10
-
-# Delay between HTTP requests in milliseconds (polite crawling)
-# Default: 2000 (2 seconds)
-http_delay_between_requests_ms = 2000
-
-# Per-domain rate limit overrides
-# [pulse.http_domain_limits.linkedin.com]
-# max_requests_per_minute = 5
-# delay_between_requests_ms = 5000
-
 # ════════════════════════════════════════════════════════════════
 # Code Configuration (GitHub & LSP Integration)
 # ════════════════════════════════════════════════════════════════

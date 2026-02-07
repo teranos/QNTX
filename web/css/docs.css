@@ -25,15 +25,20 @@ body {
 /* Typography - Code blocks */
 pre {
     background: var(--bg-dark);
-    padding: var(--panel-padding-sm);
-    overflow-x: auto;
+    padding: 6px 8px;
+    overflow: auto;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
+    font-family: var(--font-mono, monospace);
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
 
 code {
     background: var(--bg-dark);
-    padding: 2px 6px;
+    padding: 1px 4px;
     border-radius: var(--border-radius);
     font-family: var(--font-mono, monospace);
     font-size: 0.9em;
@@ -77,14 +82,14 @@ a:hover {
 
 /* Navigation */
 nav.doc-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--gap);
     margin-bottom: 0.75em;
     padding: var(--panel-padding-sm);
     background: var(--bg-dark);
     border-radius: var(--border-radius);
-}
-
-nav.doc-nav a {
-    margin-right: 16px;
 }
 
 .site-logo {
@@ -118,7 +123,7 @@ nav.doc-nav a {
 }
 
 .breadcrumb-sep {
-    margin: 0 6px;
+    margin: 0 var(--gap);
     color: var(--text-on-dark-tertiary);
 }
 
@@ -165,7 +170,7 @@ nav.doc-nav a {
 
 .toc-title {
     font-weight: 600;
-    margin: 0 0 6px 0;
+    margin: 0 0 var(--gap) 0;
     font-size: 0.85em;
     color: var(--text-on-dark-secondary);
 }
@@ -476,6 +481,8 @@ nav.doc-nav a {
     font-size: 0.85em;
     overflow-x: auto;
     margin: 0.5em 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
 
 .platform-list {
@@ -511,7 +518,7 @@ nav.doc-nav a {
     border: 1px solid var(--border-on-dark);
     border-radius: var(--border-radius);
     padding: var(--panel-padding-sm);
-    margin-bottom: 6px;
+    margin-bottom: var(--gap);
 }
 
 .release-version.latest {
@@ -795,6 +802,7 @@ th {
     pre {
         background: var(--bg-code);
         border-color: var(--border-light);
+        scrollbar-color: var(--scrollbar-light-thumb) transparent;
     }
 
     code {

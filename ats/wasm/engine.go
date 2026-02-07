@@ -17,9 +17,9 @@ package wasm
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"sync"
 
+	"github.com/teranos/QNTX/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -60,14 +60,14 @@ func newEngine() (*Engine, error) {
 	compiled, err := r.CompileModule(ctx, wasmBytes)
 	if err != nil {
 		r.Close(ctx)
-		return nil, fmt.Errorf("wasm compile: %w", err)
+		return nil, errors.Wrap(err, "wasm compile")
 	}
 
 	mod, err := r.InstantiateModule(ctx, compiled,
 		wazero.NewModuleConfig().WithName("qntx-core"))
 	if err != nil {
 		r.Close(ctx)
-		return nil, fmt.Errorf("wasm instantiate: %w", err)
+		return nil, errors.Wrap(err, "wasm instantiate")
 	}
 
 	return &Engine{
@@ -113,7 +113,7 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 	targetFn := mod.ExportedFunction(fnName)
 
 	if allocFn == nil || freeFn == nil || targetFn == nil {
-		return "", fmt.Errorf("wasm: missing export %q", fnName)
+		return "", errors.Newf("wasm: missing export %q", fnName)
 	}
 
 	inputBytes := []byte(input)
@@ -124,11 +124,11 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 		// Allocate space in WASM memory for the input
 		results, err := allocFn.Call(ctx, inputSize)
 		if err != nil {
-			return "", fmt.Errorf("wasm alloc: %w", err)
+			return "", errors.Wrapf(err, "wasm alloc for %s (size=%d)", fnName, inputSize)
 		}
 		inputPtr = results[0]
 		if inputPtr == 0 {
-			return "", fmt.Errorf("wasm alloc returned null")
+			return "", errors.Newf("wasm alloc returned null for %s (size=%d)", fnName, inputSize)
 		}
 
 		// Write input bytes into WASM memory
@@ -136,9 +136,9 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 			// Best effort to free memory, but prioritize returning the write error
 			if _, freeErr := freeFn.Call(ctx, inputPtr, inputSize); freeErr != nil {
 				// Wrap both errors for debugging
-				return "", fmt.Errorf("wasm memory write out of range (also failed to free: %w)", freeErr)
+				return "", errors.Wrapf(freeErr, "wasm %s memory write out of range at ptr=%d size=%d (also failed to free)", fnName, inputPtr, inputSize)
 			}
-			return "", fmt.Errorf("wasm memory write out of range")
+			return "", errors.Newf("wasm %s memory write out of range at ptr=%d size=%d", fnName, inputPtr, inputSize)
 		}
 	}
 
@@ -148,17 +148,17 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 		if inputSize > 0 {
 			// Best effort to free memory on error path
 			if _, freeErr := freeFn.Call(ctx, inputPtr, inputSize); freeErr != nil {
-				return "", fmt.Errorf("wasm call %s failed: %w (also failed to free memory: %v)", fnName, err, freeErr)
+				return "", errors.Wrapf(err, "wasm call %s failed (also failed to free input at ptr=%d size=%d: %v)", fnName, inputPtr, inputSize, freeErr)
 			}
 		}
-		return "", fmt.Errorf("wasm call %s: %w", fnName, err)
+		return "", errors.Wrapf(err, "wasm call %s", fnName)
 	}
 
 	// Free the input buffer
 	if inputSize > 0 {
 		if _, err := freeFn.Call(ctx, inputPtr, inputSize); err != nil {
 			// Input was processed but we failed to free memory - this is a leak
-			return "", fmt.Errorf("wasm memory leak: failed to free input buffer: %w", err)
+			return "", errors.Wrapf(err, "wasm %s memory leak: failed to free input buffer at ptr=%d size=%d", fnName, inputPtr, inputSize)
 		}
 	}
 
@@ -168,13 +168,13 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 	resultLen := uint32(packed & 0xFFFFFFFF)
 
 	if resultPtr == 0 || resultLen == 0 {
-		return "", fmt.Errorf("wasm %s returned null result", fnName)
+		return "", errors.Newf("wasm %s returned null result (ptr=%d, len=%d)", fnName, resultPtr, resultLen)
 	}
 
 	// Read result from WASM memory
 	resultBytes, ok := mod.Memory().Read(resultPtr, resultLen)
 	if !ok {
-		return "", fmt.Errorf("wasm memory read out of range")
+		return "", errors.Newf("wasm %s memory read out of range at ptr=%d len=%d", fnName, resultPtr, resultLen)
 	}
 
 	// Copy before freeing (memory invalidated after free)
@@ -186,7 +186,7 @@ func callStringFn(ctx context.Context, mod api.Module, fnName string, input stri
 		// Critical: failed to free WASM memory - this is a resource leak
 		// We have the data, but leaking memory in WASM is unacceptable for a dev platform
 		// that will be called repeatedly. Return error to force addressing the issue.
-		return "", fmt.Errorf("wasm memory leak detected - failed to free result buffer (size=%d): %w", resultLen, err)
+		return "", errors.Wrapf(err, "wasm %s memory leak: failed to free result buffer at ptr=%d size=%d", fnName, resultPtr, resultLen)
 	}
 
 	return string(output), nil
@@ -199,13 +199,13 @@ func callNoArgsFn(ctx context.Context, mod api.Module, fnName string) (string, e
 	targetFn := mod.ExportedFunction(fnName)
 
 	if freeFn == nil || targetFn == nil {
-		return "", fmt.Errorf("wasm: missing export %q", fnName)
+		return "", errors.Newf("wasm: missing export %q", fnName)
 	}
 
 	// Call the function with no arguments
 	results, err := targetFn.Call(ctx)
 	if err != nil {
-		return "", fmt.Errorf("wasm call %s: %w", fnName, err)
+		return "", errors.Wrapf(err, "wasm call %s", fnName)
 	}
 
 	// Unpack result: (ptr << 32) | len
@@ -214,13 +214,13 @@ func callNoArgsFn(ctx context.Context, mod api.Module, fnName string) (string, e
 	resultLen := uint32(packed & 0xFFFFFFFF)
 
 	if resultPtr == 0 || resultLen == 0 {
-		return "", fmt.Errorf("wasm %s returned null result", fnName)
+		return "", errors.Newf("wasm %s returned null result (ptr=%d, len=%d)", fnName, resultPtr, resultLen)
 	}
 
 	// Read result from WASM memory
 	resultBytes, ok := mod.Memory().Read(resultPtr, resultLen)
 	if !ok {
-		return "", fmt.Errorf("wasm memory read out of range")
+		return "", errors.Newf("wasm %s memory read out of range at ptr=%d len=%d", fnName, resultPtr, resultLen)
 	}
 
 	// Copy before freeing (memory invalidated after free)
@@ -232,7 +232,7 @@ func callNoArgsFn(ctx context.Context, mod api.Module, fnName string) (string, e
 		// Critical: failed to free WASM memory - this is a resource leak
 		// We have the data, but leaking memory in WASM is unacceptable for a dev platform
 		// that will be called repeatedly. Return error to force addressing the issue.
-		return "", fmt.Errorf("wasm memory leak detected - failed to free result buffer (size=%d): %w", resultLen, err)
+		return "", errors.Wrapf(err, "wasm %s memory leak: failed to free result buffer at ptr=%d size=%d", fnName, resultPtr, resultLen)
 	}
 
 	return string(output), nil
