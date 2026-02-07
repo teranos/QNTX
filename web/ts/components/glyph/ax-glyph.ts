@@ -276,6 +276,14 @@ function setupAxGlyphResizeObserver(
     resultsContainer: HTMLElement,
     glyphId: string
 ): void {
+    // Cleanup any existing observer to prevent memory leaks on re-render
+    const existingObserver = (glyphElement as any).__resizeObserver as ResizeObserver | undefined;
+    if (existingObserver) {
+        existingObserver.disconnect();
+        delete (glyphElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[AX ${glyphId}] Disconnected existing ResizeObserver`);
+    }
+
     const titleBarHeight = 32; // Approximate title bar height
     const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
 
