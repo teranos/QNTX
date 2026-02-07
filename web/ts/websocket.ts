@@ -35,7 +35,9 @@ let messageHandlers: MessageHandlers = {};
 const MESSAGE_HANDLERS = {
     reload: (data: ReloadMessage) => {
         log.info(SEG.WS, 'Dev server triggered reload', data.reason);
-        window.location.reload();
+        if (typeof window !== 'undefined') {
+            window.location.reload();
+        }
     },
 
     backend_status: (data: BackendStatusMessage) => {
