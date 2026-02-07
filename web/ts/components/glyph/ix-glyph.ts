@@ -35,6 +35,7 @@ import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
+import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 
 /**
  * IX glyph execution status (persisted in localStorage)
@@ -394,7 +395,48 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Make resizable via handle
     makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
 
+    // Set up ResizeObserver for auto-sizing glyph to content
+    setupCanvasGlyphResizeObserver(element, content, glyph.id, 'IX');
+
     return element;
+}
+
+/**
+ * Set up ResizeObserver to auto-size canvas glyph to match content height
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupCanvasGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    contentElement: HTMLElement,
+    glyphId: string,
+    glyphType: string
+): void {
+    // Cleanup any existing observer to prevent memory leaks on re-render
+    const existingObserver = (glyphElement as any).__resizeObserver;
+    if (existingObserver && typeof existingObserver.disconnect === 'function') {
+        existingObserver.disconnect();
+        delete (glyphElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[${glyphType} ${glyphId}] Disconnected existing ResizeObserver`);
+    }
+
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight, maxHeight);
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[${glyphType} ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(contentElement);
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 
