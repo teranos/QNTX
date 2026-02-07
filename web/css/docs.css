@@ -29,6 +29,8 @@ pre {
     overflow: auto;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
 
 code {
@@ -476,6 +478,8 @@ nav.doc-nav {
     font-size: 0.85em;
     overflow-x: auto;
     margin: 0.5em 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
 
 .platform-list {
@@ -795,6 +799,7 @@ th {
     pre {
         background: var(--bg-code);
         border-color: var(--border-light);
+        scrollbar-color: var(--scrollbar-light-thumb) transparent;
     }
 
     code {
