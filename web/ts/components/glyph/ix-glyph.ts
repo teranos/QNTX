@@ -66,7 +66,7 @@ function loadIxStatus(glyphId: string): IxGlyphStatus | null {
     try {
         return JSON.parse(stored);
     } catch (e) {
-        log.error(SEG.UI, `[IX] Failed to parse stored status for ${glyphId}:`, e);
+        log.error(SEG.GLYPH, `[IX] Failed to parse stored status for ${glyphId}:`, e);
         return null;
     }
 }
@@ -130,7 +130,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         saveTimeout = window.setTimeout(async () => {
             const currentInput = textarea.value;
             await storage.save(glyph.id, currentInput);
-            log.debug(SEG.UI, `[IX Glyph] Auto-saved input for ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
         }, 500);
     });
 
@@ -199,7 +199,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         // Save to localStorage
         saveIxStatus(glyph.id, status);
 
-        log.debug(SEG.UI, `[IX Glyph] Updated status for ${glyph.id}:`, status);
+        log.debug(SEG.GLYPH, `[IX Glyph] Updated status for ${glyph.id}:`, status);
     }
 
     // Apply saved status on load
@@ -252,11 +252,11 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         e.stopPropagation();
         const input = textarea.value.trim();
         if (!input) {
-            log.debug(SEG.UI, '[IX] No input provided');
+            log.debug(SEG.GLYPH, '[IX] No input provided');
             return;
         }
 
-        log.debug(SEG.UI, `[IX] Executing: ${input}`);
+        log.debug(SEG.GLYPH, `[IX] Executing: ${input}`);
 
         // Set to running state immediately
         updateStatus({
@@ -281,13 +281,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
                 timestamp: Date.now(),
             });
 
-            log.debug(SEG.UI, `[IX] Job created successfully`, {
+            log.debug(SEG.GLYPH, `[IX] Job created successfully`, {
                 jobId: job.id,
                 atsCode: atsCode
             });
 
         } catch (error) {
-            log.error(SEG.UI, '[IX] Failed to create job:', error);
+            log.error(SEG.GLYPH, '[IX] Failed to create job:', error);
             const errorMsg = error instanceof Error ? error.message : String(error);
 
             // Show error state
@@ -334,7 +334,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Wire up Pulse execution event listeners
     const handleExecutionStarted = (e: Event) => {
         const detail = (e as CustomEvent<ExecutionStartedDetail>).detail;
-        log.debug(SEG.UI, `[IX Glyph ${glyph.id}] Got execution started event:`, {
+        log.debug(SEG.GLYPH, `[IX Glyph ${glyph.id}] Got execution started event:`, {
             eventScheduledJobId: detail.scheduledJobId,
             currentScheduledJobId,
             matches: detail.scheduledJobId === currentScheduledJobId
@@ -366,7 +366,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     const handleExecutionFailed = (e: Event) => {
         const detail = (e as CustomEvent<ExecutionFailedDetail>).detail;
-        log.debug(SEG.UI, `[IX Glyph ${glyph.id}] Got execution failed event:`, {
+        log.debug(SEG.GLYPH, `[IX Glyph ${glyph.id}] Got execution failed event:`, {
             eventScheduledJobId: detail.scheduledJobId,
             currentScheduledJobId,
             matches: detail.scheduledJobId === currentScheduledJobId,

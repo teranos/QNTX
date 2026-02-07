@@ -99,7 +99,7 @@ export function morphToWindow(
         getMaximizeDuration()
     ).then(() => {
         // COMMIT PHASE: Animation completed successfully
-        log.debug(SEG.UI, `[Window] Animation committed for ${glyph.id}`);
+        log.debug(SEG.GLYPH, `[Window] Animation committed for ${glyph.id}`);
 
         // Apply final window state
         glyphElement.style.position = 'fixed';
@@ -167,7 +167,7 @@ export function morphToWindow(
                 try {
                     glyph.onClose!();
                 } catch (error) {
-                    log.error(SEG.UI, `[Window ${glyph.id}] Error in onClose callback:`, error);
+                    log.error(SEG.GLYPH, `[Window ${glyph.id}] Error in onClose callback:`, error);
                 }
             };
             titleBar.appendChild(closeBtn);
@@ -184,7 +184,7 @@ export function morphToWindow(
             glyphElement.appendChild(content);
         } catch (error) {
             // Show error UI if renderContent fails
-            log.error(SEG.UI, `[Window ${glyph.id}] Error rendering content:`, error);
+            log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
             errorContent.style.padding = CONTENT_PADDING;
             errorContent.style.flex = '1';
@@ -202,7 +202,7 @@ export function morphToWindow(
         makeWindowDraggable(glyphElement, titleBar);
     }).catch(error => {
         // ROLLBACK: Animation was cancelled or failed
-        log.warn(SEG.UI, `[Window] Animation failed for ${glyph.id}:`, error);
+        log.warn(SEG.GLYPH, `[Window] Animation failed for ${glyph.id}:`, error);
         // Element stays in glyph state, can retry
     });
 }
@@ -219,7 +219,7 @@ export function morphFromWindow(
 ): void {
     // AXIOM CHECK: Verify this is the correct element
     verifyElement(glyph.id, windowElement);
-    log.debug(SEG.UI, `[Window] Minimizing ${glyph.id}`);
+    log.debug(SEG.GLYPH, `[Window] Minimizing ${glyph.id}`);
 
     // Get current window state before clearing anything
     const currentRect = windowElement.getBoundingClientRect();
@@ -249,7 +249,7 @@ export function morphFromWindow(
     beginMinimizeMorph(windowElement, currentRect, { x: targetX, y: targetY }, getMinimizeDuration())
         .then(() => {
             // Animation completed successfully
-            log.debug(SEG.UI, `[Window] Animation complete for ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[Window] Animation complete for ${glyph.id}`);
 
             // Now reparent the element to the indicator container
             // Clear state flags
@@ -269,12 +269,12 @@ export function morphFromWindow(
             setGlyphId(windowElement, glyph.id);
 
             // Re-attach to indicator container
-            log.debug(SEG.UI, `[Window] Re-attaching to indicator container`);
+            log.debug(SEG.GLYPH, `[Window] Re-attaching to indicator container`);
             onMorphComplete(windowElement, glyph);
         })
         .catch(error => {
             // Animation was cancelled or failed
-            log.warn(SEG.UI, `[Window] Animation failed for ${glyph.id}:`, error);
+            log.warn(SEG.GLYPH, `[Window] Animation failed for ${glyph.id}:`, error);
             // Element stays in window state, can retry
         });
 }

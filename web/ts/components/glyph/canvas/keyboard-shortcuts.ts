@@ -40,7 +40,7 @@ export function setupKeyboardShortcuts(
             if (hasSelection()) {
                 e.preventDefault();
                 onDeselect();
-                log.debug(SEG.UI, '[Canvas] ESC pressed - deselecting all glyphs');
+                log.debug(SEG.GLYPH, '[Canvas] ESC pressed - deselecting all glyphs');
             }
             return;
         }
@@ -53,7 +53,7 @@ export function setupKeyboardShortcuts(
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             onDelete();
-            log.debug(SEG.UI, '[Canvas] DELETE/BACKSPACE pressed - deleting selected glyphs');
+            log.debug(SEG.GLYPH, '[Canvas] DELETE/BACKSPACE pressed - deleting selected glyphs');
         }
     };
 

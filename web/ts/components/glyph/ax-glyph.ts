@@ -45,7 +45,7 @@ function loadQuery(id: string): string {
     try {
         return localStorage.getItem(QUERY_STORAGE_KEY + id) || '';
     } catch (error) {
-        log.error(SEG.UI, `[AxGlyph] Failed to load query for ${id}:`, error);
+        log.error(SEG.GLYPH, `[AxGlyph] Failed to load query for ${id}:`, error);
         return '';
     }
 }
@@ -56,9 +56,9 @@ function loadQuery(id: string): string {
 function saveQuery(id: string, query: string): void {
     try {
         localStorage.setItem(QUERY_STORAGE_KEY + id, query);
-        log.debug(SEG.UI, `[AxGlyph] Saved query for ${id} (${query.length} chars)`);
+        log.debug(SEG.GLYPH, `[AxGlyph] Saved query for ${id} (${query.length} chars)`);
     } catch (error) {
-        log.error(SEG.UI, `[AxGlyph] Failed to save query for ${id}:`, error);
+        log.error(SEG.GLYPH, `[AxGlyph] Failed to save query for ${id}:`, error);
     }
 }
 
@@ -187,7 +187,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                         // Update background to indicate active watcher
                         container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
 
-                        log.debug(SEG.UI, `[AxGlyph] Sent watcher upsert for ${glyphId}: "${currentQuery}"`);
+                        log.debug(SEG.GLYPH, `[AxGlyph] Sent watcher upsert for ${glyphId}: "${currentQuery}"`);
                     } else {
                         // Empty query - revert to default
                         container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
@@ -237,7 +237,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 // Update background to show active watcher state
                 container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
 
-                log.debug(SEG.UI, `[AxGlyph] Restored and activated watcher for ${glyphId}: "${currentQuery}"`);
+                log.debug(SEG.GLYPH, `[AxGlyph] Restored and activated watcher for ${glyphId}: "${currentQuery}"`);
             }
 
             // Resize handle
@@ -306,13 +306,13 @@ function renderAttestation(attestation: Attestation): HTMLElement {
 export function updateAxGlyphResults(glyphId: string, attestation: Attestation): void {
     const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`);
     if (!glyph) {
-        log.warn(SEG.UI, `[AxGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
+        log.warn(SEG.GLYPH, `[AxGlyph] Cannot update results: glyph ${glyphId} not found in DOM`);
         return;
     }
 
     const resultsContainer = glyph.querySelector('.ax-glyph-results') as HTMLElement;
     if (!resultsContainer) {
-        log.warn(SEG.UI, `[AxGlyph] Cannot update results: results container not found for ${glyphId}`);
+        log.warn(SEG.GLYPH, `[AxGlyph] Cannot update results: results container not found for ${glyphId}`);
         return;
     }
 
@@ -332,7 +332,7 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
     const resultItem = renderAttestation(attestation);
     resultsContainer.insertBefore(resultItem, resultsContainer.firstChild);
 
-    log.debug(SEG.UI, `[AxGlyph] Added result to ${glyphId}:`, attestation.id);
+    log.debug(SEG.GLYPH, `[AxGlyph] Added result to ${glyphId}:`, attestation.id);
 }
 
 /**
@@ -343,13 +343,13 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     // Find the glyph element by data attribute
     const glyph = document.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement;
     if (!glyph) {
-        log.warn(SEG.UI, `[AxGlyph] Cannot update error: glyph ${glyphId} not found in DOM`);
+        log.warn(SEG.GLYPH, `[AxGlyph] Cannot update error: glyph ${glyphId} not found in DOM`);
         return;
     }
 
     const resultsContainer = glyph.querySelector('.ax-glyph-results') as HTMLElement;
     if (!resultsContainer) {
-        log.warn(SEG.UI, `[AxGlyph] Cannot update error: results container not found for ${glyphId}`);
+        log.warn(SEG.GLYPH, `[AxGlyph] Cannot update error: results container not found for ${glyphId}`);
         return;
     }
 
@@ -395,6 +395,6 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
         container.style.backgroundColor = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)'; // Red tint for error, yellow for warning
     }
 
-    log.debug(SEG.UI, `[AxGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
+    log.debug(SEG.GLYPH, `[AxGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
 }
 
