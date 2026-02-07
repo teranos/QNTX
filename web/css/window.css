@@ -240,12 +240,17 @@
 /* Database Stats Window Styles */
 .db-stats {
     padding: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .db-stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 6px 8px;
+    padding: 3px 8px;
     border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
 }
 
@@ -254,13 +259,13 @@
 }
 
 .db-stat-label {
-    font-weight: 500;
-    color: var(--panel-text-secondary, #666);
+    font-weight: normal;
+    color: #c0c0c0;
 }
 
 .db-stat-value {
-    font-weight: 600;
-    color: var(--panel-text-primary, #333);
+    font-weight: normal;
+    color: #e8e8e8;
 }
 
 .db-path {
