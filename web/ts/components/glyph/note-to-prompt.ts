@@ -17,12 +17,16 @@ import { createPromptGlyph } from './prompt-glyph';
  *
  * @param container - Canvas container element
  * @param glyphId - ID of the note glyph to convert
+ * @returns true if conversion succeeded, false if note element not found
  */
-export async function convertNoteToPrompt(container: HTMLElement, glyphId: string): Promise<void> {
+export async function convertNoteToPrompt(container: HTMLElement, glyphId: string): Promise<boolean> {
     const noteElement = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (!noteElement) {
-        log.error(SEG.GLYPH, `[Note→Prompt] Note glyph ${glyphId} not found`);
-        return;
+        log.error(SEG.GLYPH, `[Note→Prompt] Note glyph ${glyphId} not found in container`, {
+            glyphId,
+            availableGlyphs: Array.from(container.querySelectorAll('[data-glyph-id]')).map(el => el.getAttribute('data-glyph-id'))
+        });
+        return false;
     }
 
     // Get note position and size
@@ -63,6 +67,10 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     // Transfer note content to prompt template
     await storage.save(promptGlyph.id, noteContent);
 
+    // Clean up old note storage to prevent localStorage leak
+    await storage.delete(glyphId);
+    log.debug(SEG.GLYPH, `[Note→Prompt] Cleaned up localStorage for ${glyphId}`);
+
     // Update prompt textarea to show transferred content
     const textarea = promptElement.querySelector('textarea');
     if (textarea) {
@@ -80,4 +88,5 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     });
 
     log.info(SEG.GLYPH, `[Note→Prompt] Converted note ${glyphId} to prompt ${promptGlyph.id}`);
+    return true;
 }

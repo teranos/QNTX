@@ -112,10 +112,19 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     try {
         doc = noteMarkdownParser.parse(contentToUse);
     } catch (error: unknown) {
-        log.error(SEG.GLYPH, `[Note Glyph] Failed to parse markdown for ${glyph.id}:`, error);
+        // Log error with context: glyph ID, content length, and snippet of problematic content
+        const contentSnippet = contentToUse.length > 100
+            ? contentToUse.substring(0, 100) + '...'
+            : contentToUse;
+        log.error(SEG.GLYPH, `[Note Glyph] Failed to parse markdown for ${glyph.id}`, {
+            error,
+            contentLength: contentToUse.length,
+            contentSnippet
+        });
+        // Fallback to error message in editor
         doc = noteSchema.node('doc', null, [
             noteSchema.node('paragraph', null, [
-                noteSchema.text('Error loading note')
+                noteSchema.text('Error loading note - check console for details')
             ])
         ]);
     }
