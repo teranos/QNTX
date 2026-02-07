@@ -132,6 +132,9 @@ function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
     if (element.classList.contains('canvas-prompt-glyph')) {
         return { id, title: 'Prompt', symbol: SO, renderContent: () => element };
     }
+    if (element.classList.contains('canvas-note-glyph')) {
+        return { id, title: 'Note', symbol: Prose, renderContent: () => element };
+    }
     // Fallback
     return { id, title: 'Glyph', renderContent: () => element };
 }

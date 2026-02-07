@@ -7,6 +7,7 @@
 
 import { getMinimizeDuration } from '../glyph';
 import { isMeldedComposition } from '../meld-system';
+import { Prose } from '@generated/sym.js';
 
 // Action bar animation constants
 const ACTION_BAR_ANIMATION_SPEED = 0.5;
@@ -51,7 +52,7 @@ export function showActionBar(
     let isNoteSelected = false;
     if (selectedGlyphIds.length === 1) {
         const glyphEl = container.querySelector(`[data-glyph-id="${selectedGlyphIds[0]}"]`) as HTMLElement | null;
-        isNoteSelected = glyphEl?.dataset.glyphSymbol === '▣'; // Prose symbol
+        isNoteSelected = glyphEl?.dataset.glyphSymbol === Prose;
     }
 
     // Add convert-to-prompt button if single note selected
