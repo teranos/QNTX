@@ -93,7 +93,7 @@ function renderDbStats(): void {
     if (!dbStatsElement) return;
 
     if (!dbStats) {
-        dbStatsElement.innerHTML = '<div class="db-stats-loading">Loading database statistics...</div>';
+        dbStatsElement.innerHTML = '<div class="glyph-loading">Loading database statistics...</div>';
         return;
     }
 
@@ -102,30 +102,30 @@ function renderDbStats(): void {
         : 'go (fallback)';
 
     dbStatsElement.innerHTML = `
-        <div class="db-stats">
-            <div class="db-stat-row">
-                <span class="db-stat-label">Database Path:</span>
-                <span class="db-stat-value">${dbStats.path}</span>
+        <div class="glyph-content">
+            <div class="glyph-row">
+                <span class="glyph-label">Database Path:</span>
+                <span class="glyph-value">${dbStats.path}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Storage Backend:</span>
-                <span class="db-stat-value">${storageBackend}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Storage Backend:</span>
+                <span class="glyph-value">${storageBackend}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Total Attestations:</span>
-                <span class="db-stat-value">${dbStats.total_attestations.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Total Attestations:</span>
+                <span class="glyph-value">${dbStats.total_attestations.toLocaleString()}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Unique Actors:</span>
-                <span class="db-stat-value">${dbStats.unique_actors.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Unique Actors:</span>
+                <span class="glyph-value">${dbStats.unique_actors.toLocaleString()}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Unique Subjects:</span>
-                <span class="db-stat-value">${dbStats.unique_subjects.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Unique Subjects:</span>
+                <span class="glyph-value">${dbStats.unique_subjects.toLocaleString()}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Unique Contexts:</span>
-                <span class="db-stat-value">${dbStats.unique_contexts.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Unique Contexts:</span>
+                <span class="glyph-value">${dbStats.unique_contexts.toLocaleString()}</span>
             </div>
         </div>
     `;
@@ -135,7 +135,7 @@ function renderSelf(): void {
     if (!selfElement) return;
 
     if (!selfVersion && !selfCapabilities) {
-        selfElement.innerHTML = '<div class="db-stats-loading">Waiting for system info...</div>';
+        selfElement.innerHTML = '<div class="glyph-loading">Waiting for system info...</div>';
         return;
     }
 
@@ -147,24 +147,24 @@ function renderSelf(): void {
         const commitShort = selfVersion.commit?.substring(0, 7) || 'unknown';
 
         sections.push(`
-            <div style="margin-bottom: 16px;">
-                <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #e8e8e8;">QNTX Server</h3>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">Version:</span>
-                    <span class="db-stat-value">${selfVersion.version || 'unknown'}</span>
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">QNTX Server</h3>
+                <div class="glyph-row">
+                    <span class="glyph-label">Version:</span>
+                    <span class="glyph-value">${selfVersion.version || 'unknown'}</span>
                 </div>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">Commit:</span>
-                    <span class="db-stat-value">${commitShort}</span>
+                <div class="glyph-row">
+                    <span class="glyph-label">Commit:</span>
+                    <span class="glyph-value">${commitShort}</span>
                 </div>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">Built:</span>
-                    <span class="db-stat-value">${buildTimeFormatted}</span>
+                <div class="glyph-row">
+                    <span class="glyph-label">Built:</span>
+                    <span class="glyph-value">${buildTimeFormatted}</span>
                 </div>
                 ${selfVersion.go_version ? `
-                <div class="db-stat-row">
-                    <span class="db-stat-label">Go:</span>
-                    <span class="db-stat-value">${selfVersion.go_version}</span>
+                <div class="glyph-row">
+                    <span class="glyph-label">Go:</span>
+                    <span class="glyph-value">${selfVersion.go_version}</span>
                 </div>
                 ` : ''}
             </div>
@@ -192,32 +192,32 @@ function renderSelf(): void {
             `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
 
         sections.push(`
-            <div>
-                <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #e8e8e8;">System Capabilities</h3>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">parser:</span>
-                    <span class="db-stat-value">
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">System Capabilities</h3>
+                <div class="glyph-row">
+                    <span class="glyph-label">parser:</span>
+                    <span class="glyph-value">
                         ${caps.parser_version ? `v${caps.parser_version}` : ''}
                         ${parserStatus}
                     </span>
                 </div>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">fuzzy-ax:</span>
-                    <span class="db-stat-value">
+                <div class="glyph-row">
+                    <span class="glyph-label">fuzzy-ax:</span>
+                    <span class="glyph-value">
                         ${caps.fuzzy_version ? `v${caps.fuzzy_version}` : 'unknown'}
                         ${fuzzyStatus}
                     </span>
                 </div>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">vidstream:</span>
-                    <span class="db-stat-value">
+                <div class="glyph-row">
+                    <span class="glyph-label">vidstream:</span>
+                    <span class="glyph-value">
                         ${caps.vidstream_version ? `v${caps.vidstream_version}` : 'unknown'}
                         ${vidstreamStatus}
                     </span>
                 </div>
-                <div class="db-stat-row">
-                    <span class="db-stat-label">storage:</span>
-                    <span class="db-stat-value">
+                <div class="glyph-row">
+                    <span class="glyph-label">storage:</span>
+                    <span class="glyph-value">
                         ${caps.storage_version ? `v${caps.storage_version}` : 'unknown'}
                         ${storageStatus}
                     </span>
@@ -227,7 +227,7 @@ function renderSelf(): void {
     }
 
     selfElement.innerHTML = `
-        <div class="db-stats">
+        <div class="glyph-content">
             ${sections.join('\n')}
         </div>
     `;
