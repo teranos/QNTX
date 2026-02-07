@@ -87,3 +87,14 @@ export const TITLE_BAR_HEIGHT = '32px';
 export const TITLE_BAR_PADDING = '0 12px';
 export const WINDOW_BUTTON_SIZE = '24px';
 export const CONTENT_PADDING = '16px';
+
+// Canvas glyph dimensions
+export const CANVAS_GLYPH_TITLE_BAR_HEIGHT = 32; // Height in pixels for AX/IX glyphs
+export const CANVAS_GLYPH_CONTENT_PADDING = 8; // Content element padding (reduced from CONTENT_PADDING)
+export const GLYPH_CONTENT_INNER_PADDING = 4; // .glyph-content CSS padding
+
+// ResizeObserver constraints
+export const MAX_VIEWPORT_HEIGHT_RATIO = 0.8; // Don't exceed 80% of viewport height
+export const MAX_VIEWPORT_WIDTH_RATIO = 0.8; // Don't exceed 80% of viewport width
+export const MIN_WINDOW_HEIGHT = 100; // Minimum window height in pixels
+export const MIN_WINDOW_WIDTH = 200; // Minimum window width in pixels
