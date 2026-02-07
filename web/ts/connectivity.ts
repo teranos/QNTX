@@ -24,7 +24,7 @@ class ConnectivityManagerImpl implements ConnectivityManager {
     private pendingState: ConnectivityState | null = null;
 
     // Track both browser and WebSocket state
-    private browserOnline: boolean = navigator.onLine;
+    private browserOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
     private wsConnected: boolean = false;
 
     // Debounce duration in milliseconds (equal for both directions)
@@ -39,6 +39,11 @@ class ConnectivityManagerImpl implements ConnectivityManager {
     }
 
     private init(): void {
+        // Guard against non-browser environments (e.g., test runners)
+        if (typeof window === 'undefined') {
+            return;
+        }
+
         // Monitor browser online/offline events
         window.addEventListener('online', () => {
             log.debug(SEG.UI, '[Connectivity] Browser reports online');
