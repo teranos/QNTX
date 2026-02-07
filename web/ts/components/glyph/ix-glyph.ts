@@ -394,7 +394,40 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Make resizable via handle
     makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
 
+    // Set up ResizeObserver for auto-sizing glyph to content
+    setupCanvasGlyphResizeObserver(element, content, glyph.id, 'IX');
+
     return element;
+}
+
+/**
+ * Set up ResizeObserver to auto-size canvas glyph to match content height
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupCanvasGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    contentElement: HTMLElement,
+    glyphId: string,
+    glyphType: string
+): void {
+    const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight, maxHeight);
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[${glyphType} ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(contentElement);
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 
