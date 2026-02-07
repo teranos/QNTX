@@ -11,6 +11,7 @@
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 import { MELDABILITY, getInitiatorClasses, getTargetClasses } from './meldability';
+import { addComposition, removeComposition, getCompositionType } from '../../state/compositions';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
@@ -167,9 +168,7 @@ export function clearMeldFeedback(element: HTMLElement): void {
  * Perform meld operation
  * CRITICAL: This reparents the actual DOM elements, does NOT clone them
  *
- * TODO: Persist melded compositions to storage for session recovery.
- * Currently melds are lost on page refresh.
- * Tracked in: https://github.com/teranos/QNTX/issues/412
+ * Compositions are now persisted to storage and survive page refresh.
  *
  * TODO: Support multi-glyph chains (ax|python|prompt).
  * Current implementation only supports binary melding (two glyphs).
@@ -177,52 +176,136 @@ export function clearMeldFeedback(element: HTMLElement): void {
  * Tracked in: https://github.com/teranos/QNTX/issues/411
  */
 export function performMeld(
-    axElement: HTMLElement,
-    promptElement: HTMLElement,
-    axGlyph: Glyph,
-    promptGlyph: Glyph
+    initiatorElement: HTMLElement,
+    targetElement: HTMLElement,
+    initiatorGlyph: Glyph,
+    targetGlyph: Glyph
 ): HTMLElement {
-    const canvas = axElement.parentElement;
+    const canvas = initiatorElement.parentElement;
     if (!canvas) {
         throw new Error('Cannot meld: no canvas parent');
     }
 
     log.info(SEG.UI, '[MeldSystem] Performing meld - reparenting elements');
 
+    // Determine composition type from element classes
+    const compositionType = getCompositionType(initiatorElement, targetElement);
+    if (!compositionType) {
+        throw new Error('Cannot determine composition type - incompatible glyphs');
+    }
+
+    // Generate composition ID
+    const compositionId = `melded-${initiatorGlyph.id}-${targetGlyph.id}`;
+
     // Create composition container
     const composition = document.createElement('div');
     composition.className = 'melded-composition';
     composition.setAttribute('data-melded', 'true');
-    composition.setAttribute('data-ax-id', axGlyph.id);
-    composition.setAttribute('data-prompt-id', promptGlyph.id);
+    composition.setAttribute('data-glyph-id', compositionId);
+    composition.setAttribute('data-initiator-id', initiatorGlyph.id);
+    composition.setAttribute('data-target-id', targetGlyph.id);
 
-    // Position at ax location
+    // Position at initiator location
     composition.style.position = 'absolute';
-    composition.style.left = axElement.style.left;
-    composition.style.top = axElement.style.top;
+    composition.style.left = initiatorElement.style.left;
+    composition.style.top = initiatorElement.style.top;
     composition.style.display = 'flex';
     composition.style.alignItems = 'center';
 
+    // Parse position for storage
+    const x = parseInt(initiatorElement.style.left || '0', 10);
+    const y = parseInt(initiatorElement.style.top || '0', 10);
+
     // Clear positioning from glyphs (they're now relative to composition)
-    axElement.style.position = 'relative';
-    axElement.style.left = '0';
-    axElement.style.top = '0';
-    promptElement.style.position = 'relative';
-    promptElement.style.left = '0';
-    promptElement.style.top = '0';
+    initiatorElement.style.position = 'relative';
+    initiatorElement.style.left = '0';
+    initiatorElement.style.top = '0';
+    targetElement.style.position = 'relative';
+    targetElement.style.left = '0';
+    targetElement.style.top = '0';
 
     // Clear meld feedback
-    clearMeldFeedback(axElement);
-    clearMeldFeedback(promptElement);
+    clearMeldFeedback(initiatorElement);
+    clearMeldFeedback(targetElement);
 
     // REPARENT the actual elements (NOT clones!)
-    composition.appendChild(axElement);
-    composition.appendChild(promptElement);
+    composition.appendChild(initiatorElement);
+    composition.appendChild(targetElement);
 
     // Add to canvas
     canvas.appendChild(composition);
 
-    log.info(SEG.UI, '[MeldSystem] Meld complete - elements reparented');
+    // Persist composition to storage
+    addComposition({
+        id: compositionId,
+        type: compositionType,
+        initiatorId: initiatorGlyph.id,
+        targetId: targetGlyph.id,
+        x: isNaN(x) ? 0 : x,
+        y: isNaN(y) ? 0 : y
+    });
+
+    log.info(SEG.UI, '[MeldSystem] Meld complete - elements reparented and persisted', {
+        compositionId,
+        type: compositionType
+    });
+
+    return composition;
+}
+
+/**
+ * Reconstruct a melded composition from storage (without persisting)
+ * Used when restoring compositions on page load
+ */
+export function reconstructMeld(
+    initiatorElement: HTMLElement,
+    targetElement: HTMLElement,
+    compositionId: string,
+    compositionType: string,
+    x: number,
+    y: number
+): HTMLElement {
+    const canvas = initiatorElement.parentElement;
+    if (!canvas) {
+        throw new Error('Cannot reconstruct meld: no canvas parent');
+    }
+
+    log.info(SEG.UI, '[MeldSystem] Reconstructing meld from storage');
+
+    // Create composition container
+    const composition = document.createElement('div');
+    composition.className = 'melded-composition';
+    composition.setAttribute('data-melded', 'true');
+    composition.setAttribute('data-glyph-id', compositionId);
+    composition.setAttribute('data-initiator-id', initiatorElement.getAttribute('data-glyph-id') || '');
+    composition.setAttribute('data-target-id', targetElement.getAttribute('data-glyph-id') || '');
+
+    // Position at saved location
+    composition.style.position = 'absolute';
+    composition.style.left = `${x}px`;
+    composition.style.top = `${y}px`;
+    composition.style.display = 'flex';
+    composition.style.alignItems = 'center';
+
+    // Clear positioning from glyphs (they're now relative to composition)
+    initiatorElement.style.position = 'relative';
+    initiatorElement.style.left = '0';
+    initiatorElement.style.top = '0';
+    targetElement.style.position = 'relative';
+    targetElement.style.left = '0';
+    targetElement.style.top = '0';
+
+    // REPARENT the actual elements (NOT clones!)
+    composition.appendChild(initiatorElement);
+    composition.appendChild(targetElement);
+
+    // Add to canvas
+    canvas.appendChild(composition);
+
+    log.info(SEG.UI, '[MeldSystem] Meld reconstructed', {
+        compositionId,
+        type: compositionType
+    });
 
     return composition;
 }
@@ -236,7 +319,7 @@ export function isMeldedComposition(element: HTMLElement): boolean {
 
 /**
  * Unmeld a composition back to individual glyphs
- * Restores the original elements to canvas
+ * Restores the original elements to canvas and removes from storage
  *
  * Returns the unmelded elements so caller can restore drag handlers.
  *
@@ -261,11 +344,18 @@ export function unmeldComposition(composition: HTMLElement): {
         return null;
     }
 
-    const axElement = composition.querySelector('.canvas-ax-glyph') as HTMLElement;
-    const promptElement = composition.querySelector('.canvas-prompt-glyph') as HTMLElement;
+    // Get composition ID for storage removal
+    const compositionId = composition.getAttribute('data-glyph-id') || '';
 
-    if (!axElement || !promptElement) {
+    // Find child glyphs - composition can contain any meldable glyph types
+    const initiatorElement = composition.querySelector('[data-glyph-id]:first-child') as HTMLElement;
+    const targetElement = composition.querySelector('[data-glyph-id]:last-child') as HTMLElement;
+
+    if (!initiatorElement || !targetElement) {
         log.error(SEG.UI, '[MeldSystem] Missing glyphs in composition - removing corrupted composition');
+        if (compositionId) {
+            removeComposition(compositionId);
+        }
         composition.remove();
         return null;
     }
@@ -284,32 +374,40 @@ export function unmeldComposition(composition: HTMLElement): {
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
 
-    axElement.style.position = 'absolute';
-    axElement.style.left = `${left}px`;
-    axElement.style.top = `${top}px`;
+    initiatorElement.style.position = 'absolute';
+    initiatorElement.style.left = `${left}px`;
+    initiatorElement.style.top = `${top}px`;
 
-    promptElement.style.position = 'absolute';
-    promptElement.style.left = `${left + UNMELD_OFFSET}px`;
-    promptElement.style.top = `${top}px`;
+    targetElement.style.position = 'absolute';
+    targetElement.style.left = `${left + UNMELD_OFFSET}px`;
+    targetElement.style.top = `${top}px`;
 
     // Reparent back to canvas
-    canvas.insertBefore(axElement, composition);
-    canvas.insertBefore(promptElement, composition);
+    canvas.insertBefore(initiatorElement, composition);
+    canvas.insertBefore(targetElement, composition);
 
-    // Get IDs before removing composition
-    const axId = composition.getAttribute('data-ax-id') || '';
-    const promptId = composition.getAttribute('data-prompt-id') || '';
+    // Get IDs from data attributes
+    const initiatorId = composition.getAttribute('data-initiator-id') || '';
+    const targetId = composition.getAttribute('data-target-id') || '';
+
+    // Remove composition from storage
+    if (compositionId) {
+        removeComposition(compositionId);
+    }
 
     // Remove composition container
     composition.remove();
 
-    log.info(SEG.UI, '[MeldSystem] Unmeld complete - elements restored');
+    log.info(SEG.UI, '[MeldSystem] Unmeld complete - elements restored and removed from storage', {
+        compositionId
+    });
 
     // Return elements so caller can restore drag handlers
+    // Keep old naming for backward compatibility with canvas-glyph.ts
     return {
-        axElement,
-        promptElement,
-        axId,
-        promptId
+        axElement: initiatorElement,
+        promptElement: targetElement,
+        axId: initiatorId,
+        promptId: targetId
     };
 }

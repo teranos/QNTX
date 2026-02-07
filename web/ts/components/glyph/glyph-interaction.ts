@@ -15,10 +15,12 @@ import {
     applyMeldFeedback,
     clearMeldFeedback,
     performMeld,
+    isMeldedComposition,
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
 } from './meld-system';
 import { isGlyphSelected, getSelectedGlyphIds } from './canvas-glyph';
+import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
 // ── Options ─────────────────────────────────────────────────────────
 
@@ -203,7 +205,35 @@ export function makeDraggable(
         const canvas = element.parentElement;
         const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
 
-        if (isMultiDrag) {
+        // Check if we're dragging a melded composition
+        if (isMeldedComposition(element)) {
+            const elementRect = element.getBoundingClientRect();
+            const x = Math.round(elementRect.left - canvasRect.left);
+            const y = Math.round(elementRect.top - canvasRect.top);
+
+            // Get composition data from DOM
+            const compositionId = element.getAttribute('data-glyph-id') || '';
+            const initiatorId = element.getAttribute('data-initiator-id') || '';
+            const targetId = element.getAttribute('data-target-id') || '';
+
+            // Find existing composition in storage to get type
+            const existingComp = findCompositionByGlyph(initiatorId);
+            if (existingComp) {
+                // Update composition position
+                addComposition({
+                    ...existingComp,
+                    x,
+                    y
+                });
+                log.debug(SEG.UI, `[${logLabel}] Updated composition position`, {
+                    compositionId,
+                    x,
+                    y
+                });
+            } else {
+                log.warn(SEG.UI, `[${logLabel}] Composition ${compositionId} not found in storage`);
+            }
+        } else if (isMultiDrag) {
             // Save positions for all selected glyphs
             for (const { element: el, glyph: g } of multiDragElements) {
                 const rect = el.getBoundingClientRect();
