@@ -30,7 +30,15 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load saved content from storage
     const storage = getScriptStorage();
     const defaultContent = '# Note\n\nStart typing...';
-    const savedContent = await storage.load(glyph.id) ?? defaultContent;
+    const savedContent = await storage.load(glyph.id);
+
+    // Save initial content immediately if this is a new glyph
+    // This prevents race condition with auto-save if user starts typing quickly
+    const contentToUse = savedContent ?? defaultContent;
+    if (!savedContent) {
+        await storage.save(glyph.id, defaultContent);
+        log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
+    }
 
     const element = document.createElement('div');
     element.className = 'canvas-note-glyph';
@@ -102,7 +110,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Parse markdown to ProseMirror document
     let doc;
     try {
-        doc = noteMarkdownParser.parse(savedContent);
+        doc = noteMarkdownParser.parse(contentToUse);
     } catch (error: unknown) {
         log.error(SEG.GLYPH, `[Note Glyph] Failed to parse markdown for ${glyph.id}:`, error);
         doc = noteSchema.node('doc', null, [
@@ -181,11 +189,6 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     resizeHandle.style.cursor = 'nwse-resize';
     resizeHandle.style.borderBottomRightRadius = '2px';
     element.appendChild(resizeHandle);
-
-    // Save initial content if new glyph
-    if (!(await storage.load(glyph.id))) {
-        await storage.save(glyph.id, defaultContent);
-    }
 
     // Make entire note draggable (no title bar) and resizable
     makeDraggable(element, element, glyph, { logLabel: 'NoteGlyph' });
