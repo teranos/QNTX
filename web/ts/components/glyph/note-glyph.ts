@@ -67,7 +67,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     editorContainer.style.fontSize = '14px';
     editorContainer.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     editorContainer.style.color = '#2a2a2a'; // Almost black text
-    editorContainer.style.lineHeight = '1.6';
+    editorContainer.style.lineHeight = '1.4'; // Tighter line spacing for note aesthetic
     editorContainer.style.boxSizing = 'border-box';
     editorContainer.style.cursor = 'move'; // Default cursor for dragging on padding
 
@@ -88,13 +88,13 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
             cursor: text;
         }
         .note-editor-container .ProseMirror p {
-            margin: 0 0 0.5em 0;
+            margin: 0 0 0.25em 0;
         }
         .note-editor-container .ProseMirror p:last-child {
             margin-bottom: 0;
         }
         .note-editor-container .ProseMirror h1 {
-            margin: 0 0 0.5em 0;
+            margin: 0 0 0.35em 0;
         }
     `;
     editorContainer.appendChild(style);
