@@ -148,7 +148,7 @@ export function registerTestGlyphs(): void {
             renderDbStats();
             return content;
         },
-        initialWidth: '600px',
+        initialWidth: '500px',
         initialHeight: '240px'
     });
 
