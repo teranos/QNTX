@@ -25,17 +25,20 @@ body {
 /* Typography - Code blocks */
 pre {
     background: var(--bg-dark);
-    padding: var(--panel-padding-sm);
+    padding: 6px 8px;
     overflow: auto;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-on-dark);
+    font-family: var(--font-mono, monospace);
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-dark-thumb) transparent;
 }
 
 code {
     background: var(--bg-dark);
-    padding: 2px 6px;
+    padding: 1px 4px;
     border-radius: var(--border-radius);
     font-family: var(--font-mono, monospace);
     font-size: 0.9em;
