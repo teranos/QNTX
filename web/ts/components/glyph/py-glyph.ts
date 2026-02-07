@@ -271,7 +271,52 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Make resizable by handle
     makeResizable(element, resizeHandle, glyph, { logLabel: 'PyGlyph' });
 
+    // Set up ResizeObserver for auto-sizing glyph to editor content
+    setupPyGlyphResizeObserver(element, editorContainer, glyph.id);
+
     return element;
+}
+
+/**
+ * Set up ResizeObserver to auto-size Python glyph to match editor content
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupPyGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    editorContainer: HTMLElement,
+    glyphId: string
+): void {
+    // Cleanup any existing observer to prevent memory leaks on re-render
+    const existingObserver = (glyphElement as any).__resizeObserver as ResizeObserver | undefined;
+    if (existingObserver) {
+        existingObserver.disconnect();
+        delete (glyphElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[PY ${glyphId}] Disconnected existing ResizeObserver`);
+    }
+
+    const titleBarHeight = 36; // Title bar height
+    const maxHeight = window.innerHeight * 0.8;
+    const minHeight = 120;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+
+            if (contentHeight === 0) return; // Skip if not rendered yet
+
+            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight, maxHeight));
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[PY ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(editorContainer);
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 /**
