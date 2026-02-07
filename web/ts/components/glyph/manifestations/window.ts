@@ -186,7 +186,7 @@ export function morphToWindow(
         let contentElement: HTMLElement;
         try {
             const content = glyph.renderContent();
-            content.style.padding = CONTENT_PADDING;
+            content.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
             content.style.flex = '1'; // Take remaining space in flex container
             content.style.overflow = 'auto';
             glyphElement.appendChild(content);
@@ -195,7 +195,7 @@ export function morphToWindow(
             // Show error UI if renderContent fails
             log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
-            errorContent.style.padding = CONTENT_PADDING;
+            errorContent.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
             errorContent.style.flex = '1';
             errorContent.style.overflow = 'auto';
             errorContent.style.color = '#ef4444'; // Red error text
@@ -432,11 +432,11 @@ function setupWindowResizeObserver(
             }
 
             // Add padding for both layers:
-            // - contentElement padding: 16px (CONTENT_PADDING)
-            // - .glyph-content padding: 8px (CSS)
-            // Total: (16 + 8) * 2 = 48px per dimension
-            const contentElementPadding = 32; // 16px * 2 (top + bottom OR left + right)
-            const glyphContentPadding = 16; // 8px * 2 (top + bottom OR left + right)
+            // - contentElement padding: 8px (reduced from CONTENT_PADDING)
+            // - .glyph-content padding: 4px (CSS)
+            // Total: (8 + 4) * 2 = 24px per dimension
+            const contentElementPadding = 16; // 8px * 2 (top + bottom OR left + right)
+            const glyphContentPadding = 8; // 4px * 2 (top + bottom OR left + right)
             const totalPadding = contentElementPadding + glyphContentPadding;
 
             const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + totalPadding, maxHeight));
