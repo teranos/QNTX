@@ -11,6 +11,8 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
+	"github.com/teranos/QNTX/glyph/handlers"
+	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/logger"
 	"github.com/teranos/QNTX/plugin"
@@ -274,6 +276,11 @@ func NewQNTXServer(db *sql.DB, dbPath string, verbosity int, initialQuery ...str
 		serverLogger.Warnw("Failed to initialize watcher engine", "error", err)
 		// Non-fatal: server can still run without watchers
 	}
+
+	// Initialize canvas state handlers
+	canvasStore := glyphstorage.NewCanvasStore(db)
+	server.canvasHandler = handlers.NewCanvasHandler(canvasStore, ctx)
+	serverLogger.Infow("Canvas state handlers initialized")
 
 	// Set up config file watcher for auto-reload
 	setupConfigWatcher(server, db, serverLogger)
