@@ -247,7 +247,7 @@
 .db-stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 6px 8px;
+    padding: 4px 8px;
     border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
 }
 
@@ -256,12 +256,12 @@
 }
 
 .db-stat-label {
-    font-weight: 500;
+    font-weight: normal;
     color: var(--panel-text-secondary, #666);
 }
 
 .db-stat-value {
-    font-weight: 600;
+    font-weight: normal;
     color: var(--panel-text-primary, #333);
 }
 
