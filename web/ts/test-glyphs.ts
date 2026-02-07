@@ -56,10 +56,17 @@ import { createCanvasGlyph } from './components/glyph/canvas-glyph';
 import { sendMessage } from './websocket';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
+import { formatBuildTime } from './components/tooltip.ts';
+import type { VersionMessage, SystemCapabilitiesMessage } from '../types/websocket';
 
 // Database stats state
 let dbStatsElement: HTMLElement | null = null;
 let dbStats: any = null;
+
+// Self diagnostics state
+let selfElement: HTMLElement | null = null;
+let selfVersion: VersionMessage | null = null;
+let selfCapabilities: SystemCapabilitiesMessage | null = null;
 
 export function updateDatabaseStats(stats: any): void {
     dbStats = stats;
@@ -68,11 +75,25 @@ export function updateDatabaseStats(stats: any): void {
     }
 }
 
+export function updateSelfVersion(data: VersionMessage): void {
+    selfVersion = data;
+    if (selfElement) {
+        renderSelf();
+    }
+}
+
+export function updateSelfCapabilities(data: SystemCapabilitiesMessage): void {
+    selfCapabilities = data;
+    if (selfElement) {
+        renderSelf();
+    }
+}
+
 function renderDbStats(): void {
     if (!dbStatsElement) return;
 
     if (!dbStats) {
-        dbStatsElement.innerHTML = '<div class="db-stats-loading">Loading database statistics...</div>';
+        dbStatsElement.innerHTML = '<div class="glyph-loading">Loading database statistics...</div>';
         return;
     }
 
@@ -81,31 +102,133 @@ function renderDbStats(): void {
         : 'go (fallback)';
 
     dbStatsElement.innerHTML = `
-        <div class="db-stats">
-            <div class="db-stat-row">
-                <span class="db-stat-label">Database Path:</span>
-                <span class="db-stat-value">${dbStats.path}</span>
+        <div class="glyph-content">
+            <div class="glyph-row">
+                <span class="glyph-label">Database Path:</span>
+                <span class="glyph-value">${dbStats.path}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Storage Backend:</span>
-                <span class="db-stat-value">${storageBackend}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Storage Backend:</span>
+                <span class="glyph-value">${storageBackend}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Total Attestations:</span>
-                <span class="db-stat-value">${dbStats.total_attestations.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Total Attestations:</span>
+                <span class="glyph-value">${dbStats.total_attestations.toLocaleString()}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Unique Actors:</span>
-                <span class="db-stat-value">${dbStats.unique_actors.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Unique Actors:</span>
+                <span class="glyph-value">${dbStats.unique_actors.toLocaleString()}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Unique Subjects:</span>
-                <span class="db-stat-value">${dbStats.unique_subjects.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Unique Subjects:</span>
+                <span class="glyph-value">${dbStats.unique_subjects.toLocaleString()}</span>
             </div>
-            <div class="db-stat-row">
-                <span class="db-stat-label">Unique Contexts:</span>
-                <span class="db-stat-value">${dbStats.unique_contexts.toLocaleString()}</span>
+            <div class="glyph-row">
+                <span class="glyph-label">Unique Contexts:</span>
+                <span class="glyph-value">${dbStats.unique_contexts.toLocaleString()}</span>
             </div>
+        </div>
+    `;
+}
+
+function renderSelf(): void {
+    if (!selfElement) return;
+
+    if (!selfVersion && !selfCapabilities) {
+        selfElement.innerHTML = '<div class="glyph-loading">Waiting for system info...</div>';
+        return;
+    }
+
+    const sections: string[] = [];
+
+    // QNTX Server version section
+    if (selfVersion) {
+        const buildTimeFormatted = formatBuildTime(selfVersion.build_time) || selfVersion.build_time || 'unknown';
+        const commitShort = selfVersion.commit?.substring(0, 7) || 'unknown';
+
+        sections.push(`
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">QNTX Server</h3>
+                <div class="glyph-row">
+                    <span class="glyph-label">Version:</span>
+                    <span class="glyph-value">${selfVersion.version || 'unknown'}</span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">Commit:</span>
+                    <span class="glyph-value">${commitShort}</span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">Built:</span>
+                    <span class="glyph-value">${buildTimeFormatted}</span>
+                </div>
+                ${selfVersion.go_version ? `
+                <div class="glyph-row">
+                    <span class="glyph-label">Go:</span>
+                    <span class="glyph-value">${selfVersion.go_version}</span>
+                </div>
+                ` : ''}
+            </div>
+        `);
+    }
+
+    // System Capabilities section
+    if (selfCapabilities) {
+        const caps = selfCapabilities;
+
+        const parserStatus = caps.parser_optimized ?
+            `<span style="color: #4ade80;">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
+            `<span style="color: #fbbf24;">⚠ Go native parser</span>`;
+
+        const fuzzyStatus = caps.fuzzy_optimized ?
+            `<span style="color: #4ade80;">✓ Optimized (Rust)</span>` :
+            `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
+
+        const vidstreamStatus = caps.vidstream_optimized ?
+            `<span style="color: #4ade80;">✓ Available (ONNX)</span>` :
+            `<span style="color: #fbbf24;">⚠ Unavailable</span>`;
+
+        const storageStatus = caps.storage_optimized ?
+            `<span style="color: #4ade80;">✓ Optimized (Rust)</span>` :
+            `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
+
+        sections.push(`
+            <div class="glyph-section">
+                <h3 class="glyph-section-title">System Capabilities</h3>
+                <div class="glyph-row">
+                    <span class="glyph-label">parser:</span>
+                    <span class="glyph-value">
+                        ${caps.parser_version ? `v${caps.parser_version}` : ''}
+                        ${parserStatus}
+                    </span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">fuzzy-ax:</span>
+                    <span class="glyph-value">
+                        ${caps.fuzzy_version ? `v${caps.fuzzy_version}` : 'unknown'}
+                        ${fuzzyStatus}
+                    </span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">vidstream:</span>
+                    <span class="glyph-value">
+                        ${caps.vidstream_version ? `v${caps.vidstream_version}` : 'unknown'}
+                        ${vidstreamStatus}
+                    </span>
+                </div>
+                <div class="glyph-row">
+                    <span class="glyph-label">storage:</span>
+                    <span class="glyph-value">
+                        ${caps.storage_version ? `v${caps.storage_version}` : 'unknown'}
+                        ${storageStatus}
+                    </span>
+                </div>
+            </div>
+        `);
+    }
+
+    selfElement.innerHTML = `
+        <div class="glyph-content">
+            ${sections.join('\n')}
         </div>
     `;
 }
@@ -114,28 +237,6 @@ function renderDbStats(): void {
 export function registerTestGlyphs(): void {
     // Canvas Glyph - Fractal container with spatial grid
     glyphRun.add(createCanvasGlyph());
-
-    // VidStream Glyph
-    glyphRun.add({
-        id: 'vidstream-glyph',
-        title: 'VidStream',
-        renderContent: () => {
-            const content = document.createElement('div');
-            content.style.padding = '20px';
-            content.innerHTML = `
-                <h2 style="margin: 0 0 16px 0;">VidStream</h2>
-                <p>Video streaming analytics and monitoring.</p>
-                <div style="margin-top: 20px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 4px;">
-                    <div>Active Streams: 42</div>
-                    <div>Bandwidth: 1.2 GB/s</div>
-                    <div>Viewers: 12,483</div>
-                </div>
-            `;
-            return content;
-        },
-        initialWidth: '400px',
-        initialHeight: '300px'
-    });
 
     // Database Statistics Glyph
     glyphRun.add({
@@ -157,29 +258,14 @@ export function registerTestGlyphs(): void {
     // Self Diagnostics Glyph
     glyphRun.add({
         id: 'self-glyph',
-        title: 'Self',
+        title: '⍟ Self',
         renderContent: () => {
             const content = document.createElement('div');
-            content.style.padding = '20px';
-            content.innerHTML = `
-                <h2 style="margin: 0 0 16px 0;">Self Diagnostics</h2>
-                <p>QNTX system health and performance.</p>
-                <div style="margin-top: 20px;">
-                    <div style="margin-bottom: 8px; color: #4ade80;">
-                        ✓ All systems operational
-                    </div>
-                    <hr style="margin: 16px 0; opacity: 0.2;">
-                    <div style="font-size: 12px; opacity: 0.8;">
-                        <div>Memory: 234 MB</div>
-                        <div>CPU: 12%</div>
-                        <div>Uptime: 3d 14h 22m</div>
-                        <div>Version: ${window.location.hostname}</div>
-                    </div>
-                </div>
-            `;
+            selfElement = content;
+            renderSelf();
             return content;
         },
-        initialWidth: '380px',
+        initialWidth: '450px',
         initialHeight: '320px'
     });
 
