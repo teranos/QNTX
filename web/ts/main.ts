@@ -39,6 +39,7 @@ import { glyphRun } from './components/glyph/run.ts';
 import { registerTestGlyphs } from './test-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
+import { initVisualMode } from './visual-mode.ts';
 
 import type { MessageHandlers, VersionMessage, BaseMessage } from '../types/websocket';
 import type { GraphData } from '../types/core';
@@ -235,6 +236,9 @@ async function init(): Promise<void> {
     };
 
     connectWebSocket(handlers);
+
+    // Initialize visual mode system (connectivity-based styling)
+    initVisualMode();
 
     // Initialize UI components
     if (window.logLoaderStep) window.logLoaderStep('Initializing system drawer...');

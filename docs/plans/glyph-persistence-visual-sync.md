@@ -238,15 +238,15 @@ export interface OfflineQueue {
 - [x] Backend persistence API
 - [x] Frontend API client
 - [x] Basic sync on drag/drop
-- [ ] Connectivity detection system
-- [ ] Sync state tracking infrastructure
+- [x] Connectivity detection system
+- [x] Sync state tracking infrastructure
 
 ### Phase 2: Visual System
-- [ ] CSS custom properties for mode switching
-- [ ] Visual mode manager
-- [ ] Glyph component integration (apply classes)
-- [ ] Server-side result hiding (offline mode)
-- [ ] Transition animations
+- [x] CSS custom properties for mode switching
+- [x] Visual mode manager
+- [x] Glyph component integration (apply classes)
+- [x] Server-side result hiding (offline mode)
+- [x] Transition animations
 
 ### Phase 3: Offline Support
 - [ ] Offline queue implementation

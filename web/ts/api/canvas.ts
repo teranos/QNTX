@@ -8,6 +8,7 @@
 import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
+import { syncStateManager } from '../state/sync-state';
 
 export interface CanvasGlyphResponse {
     id: string;
@@ -36,6 +37,9 @@ export interface CompositionResponse {
  * Upsert a canvas glyph (create or update)
  */
 export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> {
+    // Mark as syncing
+    syncStateManager.setState(glyph.id, 'syncing');
+
     try {
         const payload = {
             id: glyph.id,
@@ -59,8 +63,15 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
         }
 
         log.debug(SEG.GLYPH, `[CanvasAPI] Upserted glyph ${glyph.id}`);
+
+        // Mark as synced on success
+        syncStateManager.setState(glyph.id, 'synced');
     } catch (error) {
         log.error(SEG.GLYPH, `[CanvasAPI] Failed to upsert glyph ${glyph.id}:`, error);
+
+        // Mark as failed on error
+        syncStateManager.setState(glyph.id, 'failed');
+
         throw error;
     }
 }
@@ -80,6 +91,9 @@ export async function deleteCanvasGlyph(id: string): Promise<void> {
         }
 
         log.debug(SEG.GLYPH, `[CanvasAPI] Deleted glyph ${id}`);
+
+        // Clear sync state on successful deletion
+        syncStateManager.clearState(id);
     } catch (error) {
         log.error(SEG.GLYPH, `[CanvasAPI] Failed to delete glyph ${id}:`, error);
         throw error;
@@ -110,6 +124,9 @@ export async function listCanvasGlyphs(): Promise<CanvasGlyphResponse[]> {
  * Upsert a canvas composition (create or update)
  */
 export async function upsertComposition(composition: CompositionState): Promise<void> {
+    // Mark as syncing
+    syncStateManager.setState(composition.id, 'syncing');
+
     try {
         const payload = {
             id: composition.id,
@@ -132,8 +149,15 @@ export async function upsertComposition(composition: CompositionState): Promise<
         }
 
         log.debug(SEG.GLYPH, `[CanvasAPI] Upserted composition ${composition.id}`);
+
+        // Mark as synced on success
+        syncStateManager.setState(composition.id, 'synced');
     } catch (error) {
         log.error(SEG.GLYPH, `[CanvasAPI] Failed to upsert composition ${composition.id}:`, error);
+
+        // Mark as failed on error
+        syncStateManager.setState(composition.id, 'failed');
+
         throw error;
     }
 }
@@ -153,6 +177,9 @@ export async function deleteComposition(id: string): Promise<void> {
         }
 
         log.debug(SEG.GLYPH, `[CanvasAPI] Deleted composition ${id}`);
+
+        // Clear sync state on successful deletion
+        syncStateManager.clearState(id);
     } catch (error) {
         log.error(SEG.GLYPH, `[CanvasAPI] Failed to delete composition ${id}:`, error);
         throw error;
