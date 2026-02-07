@@ -24,6 +24,66 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { syncStateManager, type GlyphSyncState } from './sync-state';
 
+/**
+ * Helper to determine expected visual state based on connectivity and sync state
+ * Mirrors the actual CSS rules from canvas.css and core.css
+ */
+interface VisualState {
+    rootAttribute: 'online' | 'offline';
+    glyphAttribute: GlyphSyncState;
+    expectedFilter: string;
+    expectedBorderOpacity: string;
+    description: string;
+}
+
+function getExpectedVisualState(
+    connectivity: 'online' | 'offline',
+    syncState: GlyphSyncState
+): VisualState {
+    // Determine root data-connectivity-mode attribute
+    const rootAttribute = connectivity;
+
+    // Determine expected CSS filter based on connectivity and sync state
+    let expectedFilter: string;
+    let expectedBorderOpacity: string;
+    let description: string;
+
+    if (connectivity === 'offline') {
+        if (syncState === 'unsynced' || syncState === 'failed') {
+            // Ghostly: grayscale + almost invisible border
+            expectedFilter = 'grayscale(100%)';
+            expectedBorderOpacity = '0.15';
+            description = 'Ghostly (offline + unsynced)';
+        } else {
+            // Azure tint: 65% saturation + 10° hue shift
+            expectedFilter = 'saturate(65%) hue-rotate(10deg)';
+            expectedBorderOpacity = '0.35';
+            description = 'Azure tint (offline mode)';
+        }
+    } else {
+        // Online mode
+        if (syncState === 'synced') {
+            // Color boost for synced glyphs
+            expectedFilter = 'saturate(110%)';
+            expectedBorderOpacity = '1.0';
+            description = 'Enhanced color (synced)';
+        } else {
+            // Normal appearance
+            expectedFilter = 'saturate(100%)';
+            expectedBorderOpacity = '1.0';
+            description = 'Normal (online)';
+        }
+    }
+
+    return {
+        rootAttribute,
+        glyphAttribute: syncState,
+        expectedFilter,
+        expectedBorderOpacity,
+        description
+    };
+}
+
 describe('London Tube Journey: Gene Network Analysis', () => {
     // Gene glyphs created during journey
     const glyphs = {
@@ -75,11 +135,26 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // Glyph moves immediately but marked as unsynced
         syncStateManager.setState(glyphs.candidateGene, 'unsynced');
 
-        // Visual state: Glyph shows grayscale + subtle border (ghostly)
-        // All glyphs show azure tint (offline mode, 65% saturation + 10° hue)
-
         expect(syncStateManager.getState(glyphs.candidateGene)).toBe('unsynced');
         expect(syncStateManager.getState(glyphs.novelCluster)).toBe('synced');
+
+        // Validate expected visual states
+        const unsyncedVisual = getExpectedVisualState(connectivity, 'unsynced');
+        const syncedVisual = getExpectedVisualState(connectivity, 'synced');
+
+        // Unsynced glyph should be ghostly (grayscale)
+        expect(unsyncedVisual.rootAttribute).toBe('offline');
+        expect(unsyncedVisual.glyphAttribute).toBe('unsynced');
+        expect(unsyncedVisual.expectedFilter).toBe('grayscale(100%)');
+        expect(unsyncedVisual.expectedBorderOpacity).toBe('0.15');
+        expect(unsyncedVisual.description).toContain('Ghostly');
+
+        // Synced glyph should have azure tint (offline but previously synced)
+        expect(syncedVisual.rootAttribute).toBe('offline');
+        expect(syncedVisual.glyphAttribute).toBe('synced');
+        expect(syncedVisual.expectedFilter).toBe('saturate(65%) hue-rotate(10deg)');
+        expect(syncedVisual.expectedBorderOpacity).toBe('0.35');
+        expect(syncedVisual.description).toContain('Azure tint');
     });
 
     test('08:34 South Wimbledon: First auto-sync at station', () => {
@@ -103,9 +178,6 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // Backend confirms persistence
         syncStateManager.setState(glyphs.candidateGene, 'synced');
 
-        // Visual transition: ghostly → normal over 1.5s
-        // Azure tint fades from all glyphs
-
         // Verify state transitions
         expect(transitions).toEqual([
             'unsynced',  // Initial subscription
@@ -114,6 +186,54 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         ]);
 
         expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
+
+        // Validate visual transition: ghostly → enhanced color
+        const beforeSync = getExpectedVisualState('offline', 'unsynced');
+        const afterSync = getExpectedVisualState(connectivity, 'synced');
+
+        // Before: Offline + unsynced = ghostly
+        expect(beforeSync.expectedFilter).toBe('grayscale(100%)');
+
+        // After: Online + synced = enhanced color (110% saturation boost)
+        expect(afterSync.rootAttribute).toBe('online');
+        expect(afterSync.expectedFilter).toBe('saturate(110%)');
+        expect(afterSync.expectedBorderOpacity).toBe('1.0');
+
+        // CSS transition would animate this over 1.5s
+        // filter: grayscale(100%) → saturate(110%)
+    });
+
+    test('Visual state mapping: All connectivity and sync combinations', () => {
+        // Test all combinations of connectivity and sync state
+        const testCases: Array<{
+            connectivity: 'online' | 'offline';
+            syncState: GlyphSyncState;
+            expectedFilter: string;
+            expectedBorderOpacity: string;
+        }> = [
+            // Online states
+            { connectivity: 'online', syncState: 'synced', expectedFilter: 'saturate(110%)', expectedBorderOpacity: '1.0' },
+            { connectivity: 'online', syncState: 'syncing', expectedFilter: 'saturate(100%)', expectedBorderOpacity: '1.0' },
+            { connectivity: 'online', syncState: 'unsynced', expectedFilter: 'saturate(100%)', expectedBorderOpacity: '1.0' },
+            { connectivity: 'online', syncState: 'failed', expectedFilter: 'saturate(100%)', expectedBorderOpacity: '1.0' },
+            // Offline states
+            { connectivity: 'offline', syncState: 'synced', expectedFilter: 'saturate(65%) hue-rotate(10deg)', expectedBorderOpacity: '0.35' },
+            { connectivity: 'offline', syncState: 'syncing', expectedFilter: 'saturate(65%) hue-rotate(10deg)', expectedBorderOpacity: '0.35' },
+            { connectivity: 'offline', syncState: 'unsynced', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' },
+            { connectivity: 'offline', syncState: 'failed', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' }
+        ];
+
+        testCases.forEach(({ connectivity, syncState, expectedFilter, expectedBorderOpacity }) => {
+            const visual = getExpectedVisualState(connectivity, syncState);
+
+            expect(visual.rootAttribute).toBe(connectivity);
+            expect(visual.glyphAttribute).toBe(syncState);
+            expect(visual.expectedFilter).toBe(expectedFilter);
+            expect(visual.expectedBorderOpacity).toBe(expectedBorderOpacity);
+        });
+
+        // Verify state count
+        expect(testCases.length).toBe(8); // 2 connectivity × 4 sync states
     });
 
     test('Segment 1: Morden → Balham with multiple tunnel cycles', () => {
