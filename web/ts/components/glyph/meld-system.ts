@@ -331,10 +331,6 @@ export function isMeldedComposition(element: HTMLElement): boolean {
  * Restores the original elements to canvas and removes from storage
  *
  * Returns the unmelded elements so caller can restore drag handlers.
- *
- * TODO: Implement pull-to-unmeld gesture (drag glyph away from composition).
- * See vision doc: docs/vision/glyph-melding.md lines 63-66
- * Tracked in: https://github.com/teranos/QNTX/issues/410
  */
 export function unmeldComposition(composition: HTMLElement): {
     initiatorElement: HTMLElement;
