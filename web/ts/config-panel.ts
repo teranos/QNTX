@@ -16,6 +16,7 @@ import { formatValue } from './html-utils.ts';
 import { createRichErrorState, type RichError } from './base-panel-error.ts';
 import { handleError, SEG } from './error-handler.ts';
 import { log } from './logger.ts';
+import { toast } from './toast.ts';
 
 interface ConfigSetting {
     key: string;
@@ -127,19 +128,11 @@ class ConfigPanel extends BasePanel {
         log.debug(SEG.UI, `[Config Panel] Clicked source: ${source} (${path})`);
 
         navigator.clipboard.writeText(path).then(() => {
-            const toast = document.createElement('div');
-            toast.className = 'config-toast';
-            toast.textContent = `Copied to clipboard: ${path}`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2000);
+            toast.success(`Copied to clipboard: ${path}`);
         }).catch((error: unknown) => {
             log.error(SEG.ERROR, '[Config Panel] Failed to copy path:', error);
-            const toast = document.createElement('div');
-            toast.className = 'config-toast config-toast-error';
             const message = error instanceof Error ? error.message : 'Clipboard access denied';
-            toast.textContent = `Failed to copy: ${message}`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+            toast.error(`Failed to copy: ${message}`);
         });
     }
 
@@ -594,7 +587,7 @@ class ConfigPanel extends BasePanel {
         } else if (dataType === 'number') {
             newValue = parseFloat(input.value);
             if (isNaN(newValue as number)) {
-                this.showToast('Invalid number value', 'error');
+                toast.error('Invalid number value');
                 return;
             }
         } else {
@@ -610,7 +603,7 @@ class ConfigPanel extends BasePanel {
 
         try {
             await this.updateConfig({ [key]: newValue });
-            this.showToast(`Updated ${key}`, 'success');
+            toast.success(`Updated ${key}`);
 
             // Refresh the config
             this.editingKey = null;
@@ -618,7 +611,7 @@ class ConfigPanel extends BasePanel {
             this.render();
         } catch (error: unknown) {
             handleError(error, 'Failed to save config', { context: SEG.ERROR, silent: true });
-            this.showToast(`Failed to save: ${(error as Error).message}`, 'error');
+            toast.error(`Failed to save: ${(error as Error).message}`);
 
             // Reset button state
             if (saveBtn) {
@@ -626,17 +619,6 @@ class ConfigPanel extends BasePanel {
                 saveBtn.classList.remove('config-save-saving');
             }
         }
-    }
-
-    /**
-     * Show a toast notification
-     */
-    private showToast(message: string, type: 'success' | 'error'): void {
-        const toast = document.createElement('div');
-        toast.className = `config-toast config-toast-${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
     }
 
     private filterSettings(searchText: string): void {
