@@ -108,10 +108,11 @@ export function morphToWindow(
         glyphElement.style.width = `${windowWidth}px`;
         glyphElement.style.height = `${windowHeight}px`;
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-        glyphElement.style.backgroundColor = 'var(--bg-primary)';
+        glyphElement.style.backgroundColor = '#1a1a1a';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
+        glyphElement.style.color = '#e0e0e0';
 
         // Set up window as flex container
         glyphElement.style.display = 'flex';
@@ -121,17 +122,21 @@ export function morphToWindow(
         const titleBar = document.createElement('div');
         titleBar.className = 'window-title-bar';
         titleBar.style.height = TITLE_BAR_HEIGHT;
-        titleBar.style.backgroundColor = 'var(--bg-secondary)';
-        titleBar.style.borderBottom = '1px solid var(--border-color)';
+        titleBar.style.width = '100%';
+        titleBar.style.backgroundColor = '#0d0d0d';
+        titleBar.style.borderBottom = '1px solid #333';
+        titleBar.style.borderRadius = '8px 8px 0 0';
         titleBar.style.display = 'flex';
         titleBar.style.alignItems = 'center';
         titleBar.style.padding = TITLE_BAR_PADDING;
         titleBar.style.flexShrink = '0'; // Prevent title bar from shrinking
+        titleBar.style.boxSizing = 'border-box'; // Include padding in width calculation
 
         // Add title
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
         titleText.style.flex = '1';
+        titleText.style.color = '#e0e0e0';
         titleBar.appendChild(titleText);
 
         // Add minimize button
@@ -142,6 +147,7 @@ export function morphToWindow(
         minimizeBtn.style.border = 'none';
         minimizeBtn.style.background = 'transparent';
         minimizeBtn.style.cursor = 'pointer';
+        minimizeBtn.style.color = '#e0e0e0';
         minimizeBtn.onclick = () => morphFromWindow(
             glyphElement,
             glyph,
@@ -159,6 +165,7 @@ export function morphToWindow(
             closeBtn.style.border = 'none';
             closeBtn.style.background = 'transparent';
             closeBtn.style.cursor = 'pointer';
+            closeBtn.style.color = '#e0e0e0';
             closeBtn.onclick = () => {
                 // Remove from tray data AND remove element
                 onRemove(glyph.id);

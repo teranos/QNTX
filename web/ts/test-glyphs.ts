@@ -148,8 +148,10 @@ export function registerTestGlyphs(): void {
             renderDbStats();
             return content;
         },
-        initialWidth: '500px',
-        initialHeight: '240px'
+        initialWidth: '400px',
+        initialHeight: '240px',
+        defaultX: 100,
+        defaultY: 100
     });
 
     // Self Diagnostics Glyph
