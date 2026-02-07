@@ -57,6 +57,19 @@ export interface GraphSessionState {
 }
 
 /**
+ * Melded composition state (for persistence)
+ * Tracks spatial composition of glyphs that have been melded together
+ */
+export interface CompositionState {
+    id: string;                          // Unique composition ID
+    type: 'ax-prompt' | 'ax-py' | 'py-prompt';  // Meld relationship type
+    initiatorId: string;                 // ID of glyph that initiated meld
+    targetId: string;                    // ID of glyph that received meld
+    x: number;                           // Composition X position in pixels
+    y: number;                           // Composition Y position in pixels
+}
+
+/**
  * Canvas glyph state (for persistence)
  */
 export interface CanvasGlyphState {
@@ -102,6 +115,9 @@ export interface UIStateData {
     // Canvas workspace glyphs (for canvas glyph)
     canvasGlyphs: CanvasGlyphState[];
 
+    // Canvas melded compositions (for composition persistence)
+    canvasCompositions: CompositionState[];
+
     // Timestamp for state versioning
     lastUpdated: number;
 }
@@ -128,6 +144,7 @@ interface PersistedUIState {
     graphSession: GraphSessionState;
     minimizedWindows: string[];
     canvasGlyphs: CanvasGlyphState[];
+    canvasCompositions: CompositionState[];
 }
 
 // ============================================================================
@@ -161,6 +178,7 @@ function createDefaultState(): UIStateData {
         graphSession: {},
         minimizedWindows: [],
         canvasGlyphs: [],
+        canvasCompositions: [],
         lastUpdated: Date.now(),
     };
 }
@@ -462,6 +480,25 @@ class UIState {
     }
 
     // ========================================================================
+    // Canvas Compositions Management
+    // (Composition logic in state/compositions.ts - these are low-level accessors)
+    // ========================================================================
+
+    /**
+     * Get canvas compositions
+     */
+    getCanvasCompositions(): CompositionState[] {
+        return this.state.canvasCompositions;
+    }
+
+    /**
+     * Set canvas compositions (full replace)
+     */
+    setCanvasCompositions(compositions: CompositionState[]): void {
+        this.update('canvasCompositions', compositions);
+    }
+
+    // ========================================================================
     // Subscription (Pub/Sub)
     // ========================================================================
 
@@ -570,6 +607,7 @@ class UIState {
             graphSession: this.state.graphSession,
             minimizedWindows: this.state.minimizedWindows,
             canvasGlyphs: this.state.canvasGlyphs,
+            canvasCompositions: this.state.canvasCompositions,
             // Don't persist: panels (should start closed), budgetWarnings (session-only)
         };
     }
@@ -601,6 +639,7 @@ class UIState {
             graphSession: persisted.graphSession ?? defaultState.graphSession,
             minimizedWindows: persisted.minimizedWindows ?? defaultState.minimizedWindows,
             canvasGlyphs: persisted.canvasGlyphs ?? defaultState.canvasGlyphs,
+            canvasCompositions: persisted.canvasCompositions ?? defaultState.canvasCompositions,
         };
     }
 
