@@ -60,12 +60,15 @@ export interface GraphSessionState {
 /**
  * Melded composition state (for persistence)
  * Tracks spatial composition of glyphs that have been melded together
+ *
+ * Supports multi-glyph chains: glyphIds is an ordered array of glyph IDs
+ * representing the left-to-right flow through the composition.
+ * Example: ['ax-1', 'py-2', 'prompt-3'] = [ax|py|prompt]
  */
 export interface CompositionState {
     id: string;                          // Unique composition ID
-    type: 'ax-prompt' | 'ax-py' | 'py-prompt';  // Meld relationship type
-    initiatorId: string;                 // ID of glyph that initiated meld
-    targetId: string;                    // ID of glyph that received meld
+    type: 'ax-prompt' | 'ax-py' | 'py-prompt' | 'ax-py-prompt';  // Meld relationship type
+    glyphIds: string[];                  // Ordered array of glyph IDs (left to right)
     x: number;                           // Composition X position in pixels
     y: number;                           // Composition Y position in pixels
 }
