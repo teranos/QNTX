@@ -12,13 +12,12 @@
  */
 
 import { log, SEG } from './logger.ts';
-import { sendMessage, registerHandler } from './websocket.ts';
+import { sendMessage, registerHandler, unregisterHandler } from './websocket.ts';
 import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
 import { tooltip } from './components/tooltip.ts';
 import type { QueryMessage } from '@generated/server.js';
 import type {
-    MessageHandler,
     VidStreamInitSuccessMessage,
     VidStreamInitErrorMessage,
     VidStreamDetectionsMessage,
@@ -76,7 +75,7 @@ export class VidStreamWindow {
             id: 'vidstream-window',
             title: 'VidStream',
             width: '664px', // 640px viewport + padding
-            onClose: () => this.stopCamera(),
+            onClose: () => { this.stopCamera(); this.cleanupMessageHandlers(); },
             onShow: () => this.loadModelPathFromConfig(),
         });
 
@@ -143,27 +142,34 @@ export class VidStreamWindow {
 
     private setupMessageHandlers(): void {
         // Handle engine initialization response
-        registerHandler('vidstream_init_success', ((data: VidStreamInitSuccessMessage) => {
+        registerHandler('vidstream_init_success', (data: VidStreamInitSuccessMessage) => {
             this.engineReady = true;
             log.debug(SEG.VID, 'Engine ready:', data);
-        }) as MessageHandler);
+        });
 
-        registerHandler('vidstream_init_error', ((data: VidStreamInitErrorMessage) => {
+        registerHandler('vidstream_init_error', (data: VidStreamInitErrorMessage) => {
             log.error(SEG.VID, 'Engine init error:', data.error);
             this.showError(data.error);
-        }) as MessageHandler);
+        });
 
         // Handle frame processing response
-        registerHandler('vidstream_detections', ((data: VidStreamDetectionsMessage) => {
+        registerHandler('vidstream_detections', (data: VidStreamDetectionsMessage) => {
             // Store detections to be drawn on next animation frame
             this.latestDetections = data.detections || [];
             const totalMs = data.stats.total_us / 1000;
             this.updateStatsFromServer(data.detections.length, totalMs);
-        }) as MessageHandler);
+        });
 
-        registerHandler('vidstream_frame_error', ((data: VidStreamFrameErrorMessage) => {
+        registerHandler('vidstream_frame_error', (data: VidStreamFrameErrorMessage) => {
             log.error(SEG.VID, 'Frame processing error:', data.error);
-        }) as MessageHandler);
+        });
+    }
+
+    private cleanupMessageHandlers(): void {
+        unregisterHandler('vidstream_init_success');
+        unregisterHandler('vidstream_init_error');
+        unregisterHandler('vidstream_detections');
+        unregisterHandler('vidstream_frame_error');
     }
 
     private setupEventListeners(): void {
@@ -430,11 +436,13 @@ export class VidStreamWindow {
 
     public show(): void {
         log.debug(SEG.VID, 'show() called');
+        this.setupMessageHandlers();
         this.window.show();
     }
 
     public hide(): void {
         this.stopCamera();
+        this.cleanupMessageHandlers();
         this.window.hide();
     }
 

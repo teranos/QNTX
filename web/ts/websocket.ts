@@ -367,11 +367,23 @@ export function isConnected(): boolean {
 /**
  * Register a message handler dynamically
  * Useful for components that initialize after WebSocket connection
- * @param type - Message type to handle
- * @param handler - Handler function
+ * @param type - Message type to handle (type-safe: must be a known message type)
+ * @param handler - Handler function matching the message type
  */
-export function registerHandler(type: string, handler: MessageHandler): void {
-    (messageHandlers as Record<string, MessageHandler>)[type] = handler;
+export function registerHandler<K extends keyof MessageHandlers>(
+    type: K,
+    handler: NonNullable<MessageHandlers[K]>
+): void {
+    (messageHandlers as Record<string, MessageHandler>)[type] = handler as MessageHandler;
+}
+
+/**
+ * Unregister a message handler
+ * Should be called when components are destroyed/hidden to prevent handler leaks
+ * @param type - Message type to unregister
+ */
+export function unregisterHandler<K extends keyof MessageHandlers>(type: K): void {
+    delete (messageHandlers as Record<string, MessageHandler>)[type];
 }
 
 /**
