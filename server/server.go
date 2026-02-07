@@ -12,6 +12,7 @@ import (
 	"github.com/teranos/QNTX/ats/lsp"
 	"github.com/teranos/QNTX/ats/vidstream/vidstream"
 	"github.com/teranos/QNTX/ats/watcher"
+	"github.com/teranos/QNTX/glyph/handlers"
 	"github.com/teranos/QNTX/graph"
 	"github.com/teranos/QNTX/internal/version"
 	"github.com/teranos/QNTX/plugin"
@@ -75,6 +76,9 @@ type QNTXServer struct {
 
 	// Watcher engine for reactive attestation triggers
 	watcherEngine *watcher.Engine
+
+	// Canvas state handlers
+	canvasHandler *handlers.CanvasHandler
 }
 
 // handleClientRegister handles a new client connection

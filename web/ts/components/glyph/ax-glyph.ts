@@ -24,6 +24,8 @@ import { makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
+import { syncStateManager } from '../../state/sync-state';
+import { connectivityManager } from '../../connectivity';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -88,7 +90,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
 
             // Main container
             const container = document.createElement('div');
-            container.className = 'canvas-ax-glyph';
+            container.className = 'canvas-ax-glyph canvas-glyph';
             container.dataset.glyphId = glyphId;
             container.dataset.glyphSymbol = AX;
 
@@ -256,6 +258,17 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             // Make draggable and resizable (drag via symbol only)
             makeDraggable(container, label, glyph, { logLabel: 'AxGlyph' });
             makeResizable(container, resizeHandle, glyph, { logLabel: 'AxGlyph' });
+
+            // Subscribe to sync state changes for visual feedback
+            syncStateManager.subscribe(glyphId, (state) => {
+                container.dataset.syncState = state;
+            });
+
+            // Subscribe to connectivity state changes
+            connectivityManager.subscribe((state) => {
+                container.dataset.connectivityMode = state;
+                resultsContainer.dataset.connectivityMode = state;
+            });
 
             return container;
         }
