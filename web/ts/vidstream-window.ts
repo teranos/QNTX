@@ -17,6 +17,13 @@ import { Window } from './components/window.ts';
 import { apiFetch } from './api.ts';
 import { tooltip } from './components/tooltip.ts';
 import type { QueryMessage } from '@generated/server.js';
+import type {
+    MessageHandler,
+    VidStreamInitSuccessMessage,
+    VidStreamInitErrorMessage,
+    VidStreamDetectionsMessage,
+    VidStreamFrameErrorMessage,
+} from '../types/websocket';
 
 // VidStream configuration (subset of QueryMessage fields for vidstream_init)
 // All fields optional since we provide defaults
@@ -136,27 +143,27 @@ export class VidStreamWindow {
 
     private setupMessageHandlers(): void {
         // Handle engine initialization response
-        registerHandler('vidstream_init_success', (data: any) => {
+        registerHandler('vidstream_init_success', ((data: VidStreamInitSuccessMessage) => {
             this.engineReady = true;
             log.debug(SEG.VID, 'Engine ready:', data);
-        });
+        }) as MessageHandler);
 
-        registerHandler('vidstream_init_error', (data: any) => {
+        registerHandler('vidstream_init_error', ((data: VidStreamInitErrorMessage) => {
             log.error(SEG.VID, 'Engine init error:', data.error);
             this.showError(data.error);
-        });
+        }) as MessageHandler);
 
         // Handle frame processing response
-        registerHandler('vidstream_detections', (data: any) => {
+        registerHandler('vidstream_detections', ((data: VidStreamDetectionsMessage) => {
             // Store detections to be drawn on next animation frame
             this.latestDetections = data.detections || [];
             const totalMs = data.stats.total_us / 1000;
             this.updateStatsFromServer(data.detections.length, totalMs);
-        });
+        }) as MessageHandler);
 
-        registerHandler('vidstream_frame_error', (data: any) => {
+        registerHandler('vidstream_frame_error', ((data: VidStreamFrameErrorMessage) => {
             log.error(SEG.VID, 'Frame processing error:', data.error);
-        });
+        }) as MessageHandler);
     }
 
     private setupEventListeners(): void {
