@@ -24,9 +24,8 @@ export interface CanvasGlyphResponse {
 
 export interface CompositionResponse {
     id: string;
-    type: 'ax-prompt' | 'ax-py' | 'py-prompt';
-    initiator_id: string;
-    target_id: string;
+    type: 'ax-prompt' | 'ax-py' | 'py-prompt' | 'ax-py-prompt';
+    glyph_ids: string[];
     x: number;
     y: number;
     created_at: string;
@@ -136,8 +135,7 @@ export async function upsertComposition(composition: CompositionState): Promise<
         const payload = {
             id: composition.id,
             type: composition.type,
-            initiator_id: composition.initiatorId,
-            target_id: composition.targetId,
+            glyph_ids: composition.glyphIds,
             x: composition.x,
             y: composition.y,
         };
@@ -259,8 +257,7 @@ export async function loadCanvasState(): Promise<{
         const compositions: CompositionState[] = compositionsResponse.map(c => ({
             id: c.id,
             type: c.type,
-            initiatorId: c.initiator_id,
-            targetId: c.target_id,
+            glyphIds: c.glyph_ids,
             x: c.x,
             y: c.y,
         }));
