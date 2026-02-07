@@ -13,6 +13,7 @@ import { fetchDevMode } from '../dev-mode.ts';
 import { createRichErrorState, type RichError } from '../base-panel-error.ts';
 import { handleError, SEG } from '../error-handler.ts';
 import { log } from '../logger.ts';
+import type { EditorView } from '@codemirror/view';
 
 // Status type for gopls connection
 type GoplsStatus = 'connecting' | 'ready' | 'error' | 'unavailable';
@@ -26,7 +27,7 @@ const STATUS_CONFIG: Record<GoplsStatus, { message: string; className: string }>
 };
 
 class GoEditorPanel extends BasePanel {
-    private editor: any | null = null; // CodeMirror editor instance
+    private editor: EditorView | null = null;
     private currentPath: string = '';
     private hasUnsavedChanges: boolean = false;
     private isDevMode: boolean = false;
@@ -660,16 +661,17 @@ class GoEditorPanel extends BasePanel {
         // Then load the file
         this.loadFile(filePath).then(() => {
             // Scroll to line after file loads (CodeMirror 6 API)
-            if (this.editor && line > 0) {
+            const editor = this.editor;
+            if (editor && line > 0) {
                 setTimeout(() => {
                     try {
                         // CodeMirror 6: Use dispatch to scroll to position
-                        const pos = this.editor.state.doc.line(line).from;
-                        this.editor.dispatch({
+                        const pos = editor.state.doc.line(line).from;
+                        editor.dispatch({
                             selection: { anchor: pos, head: pos },
                             scrollIntoView: true
                         });
-                        this.editor.focus();
+                        editor.focus();
                     } catch (error: unknown) {
                         handleError(error, 'Failed to scroll to line', { context: SEG.ERROR, silent: true });
                     }
