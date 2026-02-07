@@ -406,11 +406,19 @@ function setupWindowResizeObserver(
 ): void {
     const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
     const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
+    const minHeight = 100; // Minimum window height
 
     const resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {
             const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
+
+            // Skip if content hasn't rendered yet (height is 0)
+            if (contentHeight === 0) {
+                log.debug(SEG.GLYPH, `[Window ${glyphId}] Skipping resize - content height is 0`);
+                return;
+            }
+
+            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight, maxHeight));
 
             windowElement.style.height = `${totalHeight}px`;
 
