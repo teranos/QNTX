@@ -431,15 +431,21 @@ function setupWindowResizeObserver(
                 return;
             }
 
-            // Add padding to account for .glyph-content padding (8px all around from CSS)
-            const contentPadding = 16; // 8px left + 8px right OR 8px top + 8px bottom
-            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + contentPadding, maxHeight));
-            const totalWidth = Math.max(minWidth, Math.min(contentWidth + contentPadding, maxWidth));
+            // Add padding for both layers:
+            // - contentElement padding: 16px (CONTENT_PADDING)
+            // - .glyph-content padding: 8px (CSS)
+            // Total: (16 + 8) * 2 = 48px per dimension
+            const contentElementPadding = 32; // 16px * 2 (top + bottom OR left + right)
+            const glyphContentPadding = 16; // 8px * 2 (top + bottom OR left + right)
+            const totalPadding = contentElementPadding + glyphContentPadding;
+
+            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + totalPadding, maxHeight));
+            const totalWidth = Math.max(minWidth, Math.min(contentWidth + totalPadding, maxWidth));
 
             windowElement.style.height = `${totalHeight}px`;
             windowElement.style.width = `${totalWidth}px`;
 
-            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalWidth}x${totalHeight}px (content: ${contentWidth}x${contentHeight}px + padding: ${contentPadding}px)`);
+            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalWidth}x${totalHeight}px (content: ${contentWidth}x${contentHeight}px + padding: ${totalPadding}px)`);
         }
     });
 
