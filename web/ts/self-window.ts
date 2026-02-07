@@ -10,6 +10,8 @@
  * - fuzzy-ax version + backend (rust/go optimization status)
  * - vidstream version + backend (ONNX availability)
  * - System capabilities snapshot
+ *
+ * TODO: This will be removed in favor of the self-glyph in test-glyphs.ts
  */
 
 import { Window } from './components/window.ts';
