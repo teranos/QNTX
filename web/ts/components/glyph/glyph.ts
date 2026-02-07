@@ -80,7 +80,7 @@ export function getMinimizeDuration(): number {
 export const DEFAULT_WINDOW_WIDTH = '800px';
 export const DEFAULT_WINDOW_HEIGHT = '600px';
 export const WINDOW_BORDER_RADIUS = '8px';
-export const WINDOW_BOX_SHADOW = '0 8px 32px rgba(0, 0, 0, 0.3)';
+export const WINDOW_BOX_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.15)';
 
 // Window chrome dimensions
 export const TITLE_BAR_HEIGHT = '32px';

@@ -53,7 +53,62 @@
 
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas-glyph';
+import { sendMessage } from './websocket';
+import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
+
+// Database stats state
+let dbStatsElement: HTMLElement | null = null;
+let dbStats: any = null;
+
+export function updateDatabaseStats(stats: any): void {
+    dbStats = stats;
+    if (dbStatsElement) {
+        renderDbStats();
+    }
+}
+
+function renderDbStats(): void {
+    if (!dbStatsElement) return;
+
+    if (!dbStats) {
+        dbStatsElement.innerHTML = '<div class="db-stats-loading">Loading database statistics...</div>';
+        return;
+    }
+
+    const storageBackend = dbStats.storage_optimized
+        ? `rust (optimized) v${dbStats.storage_version}`
+        : 'go (fallback)';
+
+    dbStatsElement.innerHTML = `
+        <div class="db-stats">
+            <div class="db-stat-row">
+                <span class="db-stat-label">Database Path:</span>
+                <span class="db-stat-value">${dbStats.path}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Storage Backend:</span>
+                <span class="db-stat-value">${storageBackend}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Total Attestations:</span>
+                <span class="db-stat-value">${dbStats.total_attestations.toLocaleString()}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Unique Actors:</span>
+                <span class="db-stat-value">${dbStats.unique_actors.toLocaleString()}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Unique Subjects:</span>
+                <span class="db-stat-value">${dbStats.unique_subjects.toLocaleString()}</span>
+            </div>
+            <div class="db-stat-row">
+                <span class="db-stat-label">Unique Contexts:</span>
+                <span class="db-stat-value">${dbStats.unique_contexts.toLocaleString()}</span>
+            </div>
+        </div>
+    `;
+}
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {
@@ -85,32 +140,18 @@ export function registerTestGlyphs(): void {
     // Database Statistics Glyph
     glyphRun.add({
         id: 'database-glyph',
-        title: 'Database Statistics',
+        title: `${DB} Database Statistics`,
         renderContent: () => {
             const content = document.createElement('div');
-            content.style.padding = '20px';
-            content.innerHTML = `
-                <h2 style="margin: 0 0 16px 0;">Database Statistics</h2>
-                <p>Real-time database performance metrics.</p>
-                <div style="margin-top: 20px;">
-                    <div style="margin-bottom: 12px;">
-                        <strong>Queries/sec:</strong> 1,247
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Avg Response:</strong> 23ms
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Active Connections:</strong> 89
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Cache Hit Rate:</strong> 94.2%
-                    </div>
-                </div>
-            `;
+            dbStatsElement = content;
+            sendMessage({ type: 'get_database_stats' });
+            renderDbStats();
             return content;
         },
-        initialWidth: '450px',
-        initialHeight: '350px'
+        initialWidth: '400px',
+        initialHeight: '240px',
+        defaultX: 100,
+        defaultY: 100
     });
 
     // Self Diagnostics Glyph
