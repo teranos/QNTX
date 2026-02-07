@@ -22,6 +22,7 @@ import { handleJobNotification, notifyStorageWarning, handleDaemonStatusNotifica
 import { handlePluginHealth } from './websocket-handlers/plugin-health';
 import { handleSystemCapabilities } from './websocket-handlers/system-capabilities';
 import { log, SEG } from './logger';
+import { connectivityManager } from './connectivity';
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -34,7 +35,9 @@ let messageHandlers: MessageHandlers = {};
 const MESSAGE_HANDLERS = {
     reload: (data: ReloadMessage) => {
         log.info(SEG.WS, 'Dev server triggered reload', data.reason);
-        window.location.reload();
+        if (typeof window !== 'undefined') {
+            window.location.reload();
+        }
     },
 
     backend_status: (data: BackendStatusMessage) => {
@@ -328,6 +331,9 @@ export function connectWebSocket(handlers: MessageHandlers): void {
  * @param connected - Whether the WebSocket is connected
  */
 function updateConnectionStatus(connected: boolean): void {
+    // Notify connectivity manager of WebSocket state change
+    connectivityManager.setWebSocketConnected(connected);
+
     // Update status indicator using the new system
     import('./status-indicators.ts').then(({ statusIndicators }) => {
         statusIndicators.handleConnectionStatus(connected);

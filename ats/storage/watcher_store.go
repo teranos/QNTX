@@ -14,8 +14,9 @@ import (
 type ActionType string
 
 const (
-	ActionTypePython  ActionType = "python"
-	ActionTypeWebhook ActionType = "webhook"
+	ActionTypePython    ActionType = "python"
+	ActionTypeWebhook   ActionType = "webhook"
+	ActionTypeLLMPrompt ActionType = "llm_prompt"
 )
 
 // Watcher represents a reactive trigger that executes actions when attestations match a filter

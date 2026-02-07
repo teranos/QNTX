@@ -20,6 +20,7 @@
 import type { PanelState, Transform } from '../../types/core';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
+import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph } from '../api/canvas';
 
 // ============================================================================
 // State Types
@@ -462,6 +463,11 @@ class UIState {
             const updated = [...this.state.canvasGlyphs, glyph];
             this.update('canvasGlyphs', updated);
         }
+
+        // Sync with backend (fire-and-forget)
+        apiUpsertGlyph(glyph).catch(err => {
+            log.error(SEG.UI, '[UIState] Failed to sync glyph to backend:', err);
+        });
     }
 
     /**
@@ -470,6 +476,11 @@ class UIState {
     removeCanvasGlyph(id: string): void {
         const updated = this.state.canvasGlyphs.filter(g => g.id !== id);
         this.update('canvasGlyphs', updated);
+
+        // Sync with backend (fire-and-forget)
+        apiDeleteGlyph(id).catch(err => {
+            log.error(SEG.UI, '[UIState] Failed to delete glyph from backend:', err);
+        });
     }
 
     /**
