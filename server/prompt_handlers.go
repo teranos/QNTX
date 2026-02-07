@@ -417,55 +417,7 @@ func (s *QNTXServer) HandlePromptExecute(w http.ResponseWriter, r *http.Request)
 
 // createPromptAIClient creates an AI client for prompt execution
 func (s *QNTXServer) createPromptAIClient(providerName, model string) provider.AIClient {
-	// Read config values using am package
-	localEnabled := appcfg.GetBool("local_inference.enabled")
-	localBaseURL := appcfg.GetString("local_inference.base_url")
-	localModel := appcfg.GetString("local_inference.model")
-	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")
-	openrouterAPIKey := appcfg.GetString("openrouter.api_key")
-	openrouterModel := appcfg.GetString("openrouter.model")
-
-	// Determine provider
-	useLocal := false
-	if providerName == "local" {
-		useLocal = true
-	} else if providerName == "" && localEnabled {
-		useLocal = true
-	}
-
-	if useLocal {
-		effectiveModel := model
-		if effectiveModel == "" {
-			effectiveModel = localModel
-		}
-		if effectiveModel == "" {
-			effectiveModel = defaultLocalModel
-		}
-
-		return provider.NewLocalClient(provider.LocalClientConfig{
-			BaseURL:        localBaseURL,
-			Model:          effectiveModel,
-			TimeoutSeconds: localTimeout,
-			DB:             s.db,
-			OperationType:  "prompt-execute",
-		})
-	}
-
-	// OpenRouter
-	effectiveModel := model
-	if effectiveModel == "" {
-		effectiveModel = openrouterModel
-	}
-	if effectiveModel == "" {
-		effectiveModel = defaultOpenRouterModel
-	}
-
-	return openrouter.NewClient(openrouter.Config{
-		APIKey:        openrouterAPIKey,
-		Model:         effectiveModel,
-		DB:            s.db,
-		OperationType: "prompt-execute",
-	})
+	return s.createAIClient(providerName, model, "prompt-execute")
 }
 
 // HandlePromptDirect handles POST /api/prompt/direct
@@ -497,23 +449,6 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	// Use body directly (no template interpolation needed)
 	promptText := doc.Body
 
-	// Read config values using am package
-	localEnabled := appcfg.GetBool("local_inference.enabled")
-	localBaseURL := appcfg.GetString("local_inference.base_url")
-	localModel := appcfg.GetString("local_inference.model")
-	localTimeout := appcfg.GetInt("local_inference.timeout_seconds")
-	openRouterAPIKey := appcfg.GetString("openrouter.api_key")
-	openRouterModel := appcfg.GetString("openrouter.model")
-
-	// Determine provider (request > default)
-	providerName := req.Provider
-	if providerName == "" && localEnabled {
-		providerName = "local"
-	}
-	if providerName == "" {
-		providerName = "openrouter"
-	}
-
 	// Determine model (request > frontmatter > config default)
 	modelName := req.Model
 	if modelName == "" && doc.Metadata.Model != "" {
@@ -521,36 +456,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Create AI client
-	var client provider.AIClient
-	if providerName == "local" {
-		if modelName == "" {
-			modelName = localModel
-		}
-		if modelName == "" {
-			modelName = defaultLocalModel
-		}
-		client = provider.NewLocalClient(provider.LocalClientConfig{
-			BaseURL:        localBaseURL,
-			Model:          modelName,
-			TimeoutSeconds: localTimeout,
-			DB:             s.db,
-			OperationType:  "prompt-direct",
-		})
-	} else {
-		// OpenRouter
-		if modelName == "" {
-			modelName = openRouterModel
-		}
-		if modelName == "" {
-			modelName = defaultOpenRouterModel
-		}
-		client = openrouter.NewClient(openrouter.Config{
-			APIKey:        openRouterAPIKey,
-			Model:         modelName,
-			DB:            s.db,
-			OperationType: "prompt-direct",
-		})
-	}
+	client := s.createAIClient(req.Provider, modelName, "prompt-direct")
 
 	// Call LLM using Chat method
 	chatReq := openrouter.ChatRequest{
@@ -573,7 +479,7 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		s.logger.Errorw("Prompt direct execution failed",
 			"error", err,
-			"provider", providerName,
+			"provider", req.Provider,
 		)
 		writeWrappedError(w, s.logger, err, "Prompt execution failed", http.StatusInternalServerError)
 		return
@@ -775,7 +681,19 @@ func sampleAttestations(attestations []types.As, n int) []types.As {
 
 // createPromptAIClientForPreview creates an AI client based on the request and frontmatter configuration
 func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, doc *prompt.PromptDocument) provider.AIClient {
-	// Read config values using am package
+	// Determine model (request > frontmatter > config default)
+	model := req.Model
+	if model == "" && doc.Metadata.Model != "" {
+		model = doc.Metadata.Model
+	}
+	return s.createAIClient(req.Provider, model, "prompt-preview")
+}
+
+// createAIClient creates an AI client using config defaults with optional overrides.
+// providerName selects "local" or "openrouter" (empty = auto-detect from config).
+// model overrides the configured model (empty = use config default).
+// operationType is used for usage tracking (e.g., "prompt-execute", "prompt-preview").
+func (s *QNTXServer) createAIClient(providerName, model, operationType string) provider.AIClient {
 	localEnabled := appcfg.GetBool("local_inference.enabled")
 	localBaseURL := appcfg.GetString("local_inference.base_url")
 	localModel := appcfg.GetString("local_inference.model")
@@ -783,44 +701,37 @@ func (s *QNTXServer) createPromptAIClientForPreview(req PromptPreviewRequest, do
 	openRouterAPIKey := appcfg.GetString("openrouter.api_key")
 	openRouterModel := appcfg.GetString("openrouter.model")
 
-	// Determine provider (request > config default)
-	providerName := req.Provider
+	useLocal := providerName == "local" || (providerName == "" && localEnabled)
 
-	// Determine model (request > frontmatter > config default)
-	model := req.Model
-	if model == "" && doc.Metadata.Model != "" {
-		model = doc.Metadata.Model
-	}
-
-	// Use provider factory to create the appropriate client
-	if providerName == "local" || (providerName == "" && localEnabled) {
-		if model == "" {
-			model = localModel
+	if useLocal {
+		effectiveModel := model
+		if effectiveModel == "" {
+			effectiveModel = localModel
 		}
-		if model == "" {
-			model = "llama3.2:3b" // default fallback
+		if effectiveModel == "" {
+			effectiveModel = defaultLocalModel
 		}
 		return provider.NewLocalClient(provider.LocalClientConfig{
 			BaseURL:        localBaseURL,
-			Model:          model,
+			Model:          effectiveModel,
 			TimeoutSeconds: localTimeout,
 			DB:             s.db,
-			OperationType:  "prompt-preview",
+			OperationType:  operationType,
 		})
 	}
 
-	// Default to OpenRouter
-	if model == "" {
-		model = openRouterModel
+	effectiveModel := model
+	if effectiveModel == "" {
+		effectiveModel = openRouterModel
 	}
-	if model == "" {
-		model = "openai/gpt-4o-mini" // default fallback
+	if effectiveModel == "" {
+		effectiveModel = defaultOpenRouterModel
 	}
 	return openrouter.NewClient(openrouter.Config{
 		APIKey:        openRouterAPIKey,
-		Model:         model,
+		Model:         effectiveModel,
 		DB:            s.db,
-		OperationType: "prompt-preview",
+		OperationType: operationType,
 	})
 }
 
