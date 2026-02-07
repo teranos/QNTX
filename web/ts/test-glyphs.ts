@@ -53,7 +53,45 @@
 
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas-glyph';
+import { sendMessage } from './websocket';
+import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
+
+// Database stats state
+let dbStatsElement: HTMLElement | null = null;
+let dbStats: any = null;
+
+export function updateDatabaseStats(stats: any): void {
+    dbStats = stats;
+    if (dbStatsElement) {
+        renderDbStats();
+    }
+}
+
+function renderDbStats(): void {
+    if (!dbStatsElement) return;
+
+    if (!dbStats) {
+        dbStatsElement.innerHTML = '<div style="padding: 20px;">Loading...</div>';
+        return;
+    }
+
+    const storage = dbStats.storage_optimized
+        ? `rust v${dbStats.storage_version}`
+        : 'go';
+
+    dbStatsElement.innerHTML = `
+        <div style="padding: 20px;">
+            <h2 style="margin: 0 0 16px 0;">${DB} Database Statistics</h2>
+            <div style="margin-bottom: 12px;"><strong>Path:</strong> <span style="font-size: 11px; opacity: 0.8;">${dbStats.path}</span></div>
+            <div style="margin-bottom: 12px;"><strong>Storage:</strong> ${storage}</div>
+            <div style="margin-bottom: 12px;"><strong>Total Attestations:</strong> ${dbStats.total_attestations.toLocaleString()}</div>
+            <div style="margin-bottom: 12px;"><strong>Unique Actors:</strong> ${dbStats.unique_actors.toLocaleString()}</div>
+            <div style="margin-bottom: 12px;"><strong>Unique Subjects:</strong> ${dbStats.unique_subjects.toLocaleString()}</div>
+            <div style="margin-bottom: 12px;"><strong>Unique Contexts:</strong> ${dbStats.unique_contexts.toLocaleString()}</div>
+        </div>
+    `;
+}
 
 // Register test glyphs once DOM is ready
 export function registerTestGlyphs(): void {
@@ -85,32 +123,16 @@ export function registerTestGlyphs(): void {
     // Database Statistics Glyph
     glyphRun.add({
         id: 'database-glyph',
-        title: 'Database Statistics',
+        title: `${DB} Database Statistics`,
         renderContent: () => {
             const content = document.createElement('div');
-            content.style.padding = '20px';
-            content.innerHTML = `
-                <h2 style="margin: 0 0 16px 0;">Database Statistics</h2>
-                <p>Real-time database performance metrics.</p>
-                <div style="margin-top: 20px;">
-                    <div style="margin-bottom: 12px;">
-                        <strong>Queries/sec:</strong> 1,247
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Avg Response:</strong> 23ms
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Active Connections:</strong> 89
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong>Cache Hit Rate:</strong> 94.2%
-                    </div>
-                </div>
-            `;
+            dbStatsElement = content;
+            sendMessage({ type: 'get_database_stats' });
+            renderDbStats();
             return content;
         },
-        initialWidth: '450px',
-        initialHeight: '350px'
+        initialWidth: '600px',
+        initialHeight: '400px'
     });
 
     // Self Diagnostics Glyph
