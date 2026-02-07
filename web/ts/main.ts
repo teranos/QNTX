@@ -157,6 +157,19 @@ async function init(): Promise<void> {
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
 
+    // Load canvas state from backend (glyphs and compositions)
+    // This syncs IndexedDB with the authoritative backend database
+    try {
+        if (window.logLoaderStep) window.logLoaderStep('Loading canvas state...', false, true);
+        const { loadCanvasState } = await import('./api/canvas.ts');
+        const { glyphs, compositions } = await loadCanvasState();
+        uiState.setCanvasGlyphs(glyphs);
+        uiState.setCanvasCompositions(compositions);
+    } catch (error: unknown) {
+        console.error('[Init] Failed to load canvas state from backend:', error);
+        // Non-fatal: Continue with local state from IndexedDB
+    }
+
     // Initialize QNTX WASM module with IndexedDB storage
     if (window.logLoaderStep) window.logLoaderStep('Initializing WASM + IndexedDB...', false, true);
     await initQntxWasm();
