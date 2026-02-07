@@ -239,7 +239,7 @@
 
 /* Glyph Content Styles - Used by database, self, and other glyphs */
 .glyph-content {
-    padding: 8px;
+    padding: 4px;
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
     font-size: var(--font-size-sm);
     line-height: 1.4;
