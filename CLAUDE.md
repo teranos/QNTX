@@ -34,7 +34,7 @@ The developer always uses `make dev` to start the development environment with h
 
 ## Type Generation
 
-**NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
+**NEVER manually edit files in `types/generated/`.** Fix the generator in `typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
 ## Glyphs
 
