@@ -30,7 +30,12 @@ import {
     TITLE_BAR_HEIGHT,
     TITLE_BAR_PADDING,
     WINDOW_BUTTON_SIZE,
-    CONTENT_PADDING
+    CANVAS_GLYPH_CONTENT_PADDING,
+    GLYPH_CONTENT_INNER_PADDING,
+    MAX_VIEWPORT_HEIGHT_RATIO,
+    MAX_VIEWPORT_WIDTH_RATIO,
+    MIN_WINDOW_HEIGHT,
+    MIN_WINDOW_WIDTH
 } from '../glyph';
 
 /**
@@ -183,17 +188,19 @@ export function morphToWindow(
         glyphElement.appendChild(titleBar);
 
         // Add content area with error boundary
+        let contentElement: HTMLElement;
         try {
             const content = glyph.renderContent();
-            content.style.padding = CONTENT_PADDING;
+            content.style.padding = `${CANVAS_GLYPH_CONTENT_PADDING}px`;
             content.style.flex = '1'; // Take remaining space in flex container
             content.style.overflow = 'auto';
             glyphElement.appendChild(content);
+            contentElement = content;
         } catch (error) {
             // Show error UI if renderContent fails
             log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
             const errorContent = document.createElement('div');
-            errorContent.style.padding = CONTENT_PADDING;
+            errorContent.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
             errorContent.style.flex = '1';
             errorContent.style.overflow = 'auto';
             errorContent.style.color = '#ef4444'; // Red error text
@@ -203,7 +210,11 @@ export function morphToWindow(
                     <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
                 `;
             glyphElement.appendChild(errorContent);
+            contentElement = errorContent;
         }
+
+        // Set up ResizeObserver for auto-sizing window to content
+        setupWindowResizeObserver(glyphElement, contentElement, glyph.id);
 
         // Make window draggable
         makeWindowDraggable(glyphElement, titleBar);
@@ -233,6 +244,14 @@ export function morphFromWindow(
 
     // Remember window position for next time it opens
     setLastPosition(windowElement, currentRect.left, currentRect.top);
+
+    // Cleanup ResizeObserver
+    const resizeObserver = (windowElement as any).__resizeObserver;
+    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
+        resizeObserver.disconnect();
+        delete (windowElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[Window] ResizeObserver cleaned up for ${glyph.id}`);
+    }
 
     // Clear window content immediately for visual feedback
     windowElement.innerHTML = '';
@@ -379,4 +398,64 @@ function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): v
     // Add both mouse and touch/pen event handlers
     handle.addEventListener('mousedown', startDrag);
     handle.addEventListener('touchstart', startDrag, { passive: false });
+}
+
+/**
+ * Set up ResizeObserver to auto-size window to match content height
+ * Observes the inner .glyph-content element which has intrinsic size
+ */
+function setupWindowResizeObserver(
+    windowElement: HTMLElement,
+    contentElement: HTMLElement,
+    glyphId: string
+): void {
+    const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+    const minHeight = MIN_WINDOW_HEIGHT;
+
+    // Find the inner .glyph-content element which has intrinsic size
+    // The contentElement itself has flex: 1 and doesn't report natural height
+    const innerContent = contentElement.querySelector('.glyph-content, .glyph-loading') as HTMLElement;
+
+    if (!innerContent) {
+        log.warn(SEG.GLYPH, `[Window ${glyphId}] No .glyph-content element found for ResizeObserver`);
+        return;
+    }
+
+    const maxWidth = window.innerWidth * MAX_VIEWPORT_WIDTH_RATIO;
+    const minWidth = MIN_WINDOW_WIDTH;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const contentWidth = entry.contentRect.width;
+
+            // Skip if content hasn't rendered yet (height is 0)
+            if (contentHeight === 0) {
+                log.debug(SEG.GLYPH, `[Window ${glyphId}] Skipping resize - content height is 0`);
+                return;
+            }
+
+            // Add padding for both layers:
+            // - contentElement padding: CANVAS_GLYPH_CONTENT_PADDING
+            // - .glyph-content padding: GLYPH_CONTENT_INNER_PADDING (CSS)
+            // Total: (8 + 4) * 2 = 24px per dimension
+            const contentElementPadding = CANVAS_GLYPH_CONTENT_PADDING * 2; // top + bottom OR left + right
+            const glyphContentPadding = GLYPH_CONTENT_INNER_PADDING * 2; // top + bottom OR left + right
+            const totalPadding = contentElementPadding + glyphContentPadding;
+
+            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + totalPadding, maxHeight));
+            const totalWidth = Math.max(minWidth, Math.min(contentWidth + totalPadding, maxWidth));
+
+            windowElement.style.height = `${totalHeight}px`;
+            windowElement.style.width = `${totalWidth}px`;
+
+            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalWidth}x${totalHeight}px (content: ${contentWidth}x${contentHeight}px + padding: ${totalPadding}px)`);
+        }
+    });
+
+    resizeObserver.observe(innerContent);
+
+    // Store observer for cleanup on minimize/close
+    (windowElement as any).__resizeObserver = resizeObserver;
 }

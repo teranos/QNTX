@@ -26,6 +26,10 @@ import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/ats
 import { tooltip } from '../tooltip';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
+import {
+    CANVAS_GLYPH_TITLE_BAR_HEIGHT,
+    MAX_VIEWPORT_HEIGHT_RATIO
+} from './glyph';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -259,6 +263,9 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             makeDraggable(container, label, glyph, { logLabel: 'AxGlyph' });
             makeResizable(container, resizeHandle, glyph, { logLabel: 'AxGlyph' });
 
+            // Set up ResizeObserver for auto-sizing glyph to content
+            setupAxGlyphResizeObserver(container, resultsContainer, glyphId);
+
             // Subscribe to sync state changes for visual feedback
             syncStateManager.subscribe(glyphId, (state) => {
                 container.dataset.syncState = state;
@@ -275,6 +282,44 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
     };
 
     return glyph;
+}
+
+/**
+ * Set up ResizeObserver to auto-size AX glyph to match results content height
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupAxGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    resultsContainer: HTMLElement,
+    glyphId: string
+): void {
+    // Cleanup any existing observer to prevent memory leaks on re-render
+    const existingObserver = (glyphElement as any).__resizeObserver;
+    if (existingObserver && typeof existingObserver.disconnect === 'function') {
+        existingObserver.disconnect();
+        delete (glyphElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[AX ${glyphId}] Disconnected existing ResizeObserver`);
+    }
+
+    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[AX ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(resultsContainer);
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 /**
