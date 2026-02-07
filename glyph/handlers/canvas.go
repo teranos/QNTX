@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -13,14 +12,12 @@ import (
 // CanvasHandler handles HTTP requests for canvas state
 type CanvasHandler struct {
 	store *glyphstorage.CanvasStore
-	ctx   context.Context
 }
 
 // NewCanvasHandler creates a new canvas handler
-func NewCanvasHandler(store *glyphstorage.CanvasStore, ctx context.Context) *CanvasHandler {
+func NewCanvasHandler(store *glyphstorage.CanvasStore) *CanvasHandler {
 	return &CanvasHandler{
 		store: store,
-		ctx:   ctx,
 	}
 }
 
@@ -91,7 +88,7 @@ func (h *CanvasHandler) HandleCompositions(w http.ResponseWriter, r *http.Reques
 // === Glyph handlers ===
 
 func (h *CanvasHandler) handleListGlyphs(w http.ResponseWriter, r *http.Request) {
-	glyphs, err := h.store.ListGlyphs(h.ctx)
+	glyphs, err := h.store.ListGlyphs(r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
@@ -101,7 +98,7 @@ func (h *CanvasHandler) handleListGlyphs(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *CanvasHandler) handleGetGlyph(w http.ResponseWriter, r *http.Request, id string) {
-	glyph, err := h.store.GetGlyph(h.ctx, id)
+	glyph, err := h.store.GetGlyph(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
@@ -121,7 +118,7 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.store.UpsertGlyph(h.ctx, &glyph); err != nil {
+	if err := h.store.UpsertGlyph(r.Context(), &glyph); err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -130,7 +127,7 @@ func (h *CanvasHandler) handleUpsertGlyph(w http.ResponseWriter, r *http.Request
 }
 
 func (h *CanvasHandler) handleDeleteGlyph(w http.ResponseWriter, r *http.Request, id string) {
-	if err := h.store.DeleteGlyph(h.ctx, id); err != nil {
+	if err := h.store.DeleteGlyph(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {
@@ -145,7 +142,7 @@ func (h *CanvasHandler) handleDeleteGlyph(w http.ResponseWriter, r *http.Request
 // === Composition handlers ===
 
 func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Request) {
-	comps, err := h.store.ListCompositions(h.ctx)
+	comps, err := h.store.ListCompositions(r.Context())
 	if err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
@@ -155,7 +152,7 @@ func (h *CanvasHandler) handleListCompositions(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CanvasHandler) handleGetComposition(w http.ResponseWriter, r *http.Request, id string) {
-	comp, err := h.store.GetComposition(h.ctx, id)
+	comp, err := h.store.GetComposition(r.Context(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
@@ -175,7 +172,7 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := h.store.UpsertComposition(h.ctx, &comp); err != nil {
+	if err := h.store.UpsertComposition(r.Context(), &comp); err != nil {
 		h.writeError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -184,7 +181,7 @@ func (h *CanvasHandler) handleUpsertComposition(w http.ResponseWriter, r *http.R
 }
 
 func (h *CanvasHandler) handleDeleteComposition(w http.ResponseWriter, r *http.Request, id string) {
-	if err := h.store.DeleteComposition(h.ctx, id); err != nil {
+	if err := h.store.DeleteComposition(r.Context(), id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			h.writeError(w, err, http.StatusNotFound)
 		} else {

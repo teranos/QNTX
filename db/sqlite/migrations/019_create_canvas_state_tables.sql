@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS canvas_compositions (
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     -- Ensure a glyph can only be in one composition
     UNIQUE(initiator_id),
-    UNIQUE(target_id)
+    UNIQUE(target_id),
+    -- Foreign key constraints: cascade delete when glyphs are removed
+    FOREIGN KEY (initiator_id) REFERENCES canvas_glyphs(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_id) REFERENCES canvas_glyphs(id) ON DELETE CASCADE
 );
 
 -- Index for looking up compositions by glyph ID

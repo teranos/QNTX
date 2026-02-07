@@ -99,8 +99,15 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 		return nil, errors.Wrapf(err, "failed to get canvas glyph %s", id)
 	}
 
-	glyph.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	glyph.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
+	var parseErr error
+	glyph.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+	if parseErr != nil {
+		return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for glyph %s: %s", glyph.ID, createdAt)
+	}
+	glyph.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
+	if parseErr != nil {
+		return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for glyph %s: %s", glyph.ID, updatedAt)
+	}
 
 	return &glyph, nil
 }
@@ -129,8 +136,15 @@ func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
 			return nil, errors.Wrap(err, "failed to scan canvas glyph")
 		}
 
-		glyph.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-		glyph.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
+		var parseErr error
+		glyph.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+		if parseErr != nil {
+			return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for glyph %s: %s", glyph.ID, createdAt)
+		}
+		glyph.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
+		if parseErr != nil {
+			return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for glyph %s: %s", glyph.ID, updatedAt)
+		}
 
 		glyphs = append(glyphs, &glyph)
 	}
@@ -206,8 +220,15 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 		return nil, errors.Wrapf(err, "failed to get canvas composition %s", id)
 	}
 
-	comp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-	comp.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
+	var parseErr error
+	comp.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+	if parseErr != nil {
+		return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for composition %s: %s", comp.ID, createdAt)
+	}
+	comp.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
+	if parseErr != nil {
+		return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for composition %s: %s", comp.ID, updatedAt)
+	}
 
 	return &comp, nil
 }
@@ -235,8 +256,15 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 			return nil, errors.Wrap(err, "failed to scan canvas composition")
 		}
 
-		comp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
-		comp.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
+		var parseErr error
+		comp.CreatedAt, parseErr = time.Parse(time.RFC3339Nano, createdAt)
+		if parseErr != nil {
+			return nil, errors.Wrapf(parseErr, "invalid created_at timestamp for composition %s: %s", comp.ID, createdAt)
+		}
+		comp.UpdatedAt, parseErr = time.Parse(time.RFC3339Nano, updatedAt)
+		if parseErr != nil {
+			return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for composition %s: %s", comp.ID, updatedAt)
+		}
 
 		comps = append(comps, &comp)
 	}

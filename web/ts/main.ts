@@ -166,18 +166,32 @@ async function init(): Promise<void> {
         const localGlyphs = uiState.getCanvasGlyphs();
         const localCompositions = uiState.getCanvasCompositions();
 
-        // Sync all local glyphs to backend
-        for (const glyph of localGlyphs) {
-            await upsertCanvasGlyph(glyph).catch(err => {
-                console.warn(`Failed to sync glyph ${glyph.id}:`, err);
-            });
-        }
+        // Sync all local glyphs to backend (parallel for speed)
+        const glyphSyncPromises = localGlyphs.map(glyph =>
+            upsertCanvasGlyph(glyph).catch(err => {
+                log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id}:`, err);
+                return null; // Mark as failed but don't block other syncs
+            })
+        );
 
-        // Sync all local compositions to backend
-        for (const comp of localCompositions) {
-            await upsertComposition(comp).catch(err => {
-                console.warn(`Failed to sync composition ${comp.id}:`, err);
-            });
+        // Sync all local compositions to backend (parallel for speed)
+        const compSyncPromises = localCompositions.map(comp =>
+            upsertComposition(comp).catch(err => {
+                log.error(SEG.GLYPH, `Failed to sync composition ${comp.id}:`, err);
+                return null; // Mark as failed but don't block other syncs
+            })
+        );
+
+        const [glyphResults, compResults] = await Promise.all([
+            Promise.allSettled(glyphSyncPromises),
+            Promise.allSettled(compSyncPromises)
+        ]);
+
+        const failedGlyphs = glyphResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
+        const failedComps = compResults.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
+
+        if (failedGlyphs.length > 0 || failedComps.length > 0) {
+            log.warn(SEG.GLYPH, `Failed to sync ${failedGlyphs.length} glyphs and ${failedComps.length} compositions to backend`);
         }
 
         if (localGlyphs.length > 0 || localCompositions.length > 0) {
