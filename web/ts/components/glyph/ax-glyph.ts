@@ -257,11 +257,44 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             makeDraggable(container, label, glyph, { logLabel: 'AxGlyph' });
             makeResizable(container, resizeHandle, glyph, { logLabel: 'AxGlyph' });
 
+            // Set up ResizeObserver for auto-sizing glyph to content
+            setupAxGlyphResizeObserver(container, resultsContainer, glyphId);
+
             return container;
         }
     };
 
     return glyph;
+}
+
+/**
+ * Set up ResizeObserver to auto-size AX glyph to match results content height
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupAxGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    resultsContainer: HTMLElement,
+    glyphId: string
+): void {
+    const titleBarHeight = 32; // Approximate title bar height
+    const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[AX ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(resultsContainer);
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 /**

@@ -183,12 +183,14 @@ export function morphToWindow(
         glyphElement.appendChild(titleBar);
 
         // Add content area with error boundary
+        let contentElement: HTMLElement;
         try {
             const content = glyph.renderContent();
             content.style.padding = CONTENT_PADDING;
             content.style.flex = '1'; // Take remaining space in flex container
             content.style.overflow = 'auto';
             glyphElement.appendChild(content);
+            contentElement = content;
         } catch (error) {
             // Show error UI if renderContent fails
             log.error(SEG.GLYPH, `[Window ${glyph.id}] Error rendering content:`, error);
@@ -203,7 +205,11 @@ export function morphToWindow(
                     <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
                 `;
             glyphElement.appendChild(errorContent);
+            contentElement = errorContent;
         }
+
+        // Set up ResizeObserver for auto-sizing window to content
+        setupWindowResizeObserver(glyphElement, contentElement, glyph.id);
 
         // Make window draggable
         makeWindowDraggable(glyphElement, titleBar);
@@ -233,6 +239,14 @@ export function morphFromWindow(
 
     // Remember window position for next time it opens
     setLastPosition(windowElement, currentRect.left, currentRect.top);
+
+    // Cleanup ResizeObserver
+    const resizeObserver = (windowElement as any).__resizeObserver as ResizeObserver | undefined;
+    if (resizeObserver) {
+        resizeObserver.disconnect();
+        delete (windowElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[Window] ResizeObserver cleaned up for ${glyph.id}`);
+    }
 
     // Clear window content immediately for visual feedback
     windowElement.innerHTML = '';
@@ -379,4 +393,33 @@ function makeWindowDraggable(windowElement: HTMLElement, handle: HTMLElement): v
     // Add both mouse and touch/pen event handlers
     handle.addEventListener('mousedown', startDrag);
     handle.addEventListener('touchstart', startDrag, { passive: false });
+}
+
+/**
+ * Set up ResizeObserver to auto-size window to match content height
+ * Watches content element and adjusts window height = content height + title bar height
+ */
+function setupWindowResizeObserver(
+    windowElement: HTMLElement,
+    contentElement: HTMLElement,
+    glyphId: string
+): void {
+    const titleBarHeight = parseInt(TITLE_BAR_HEIGHT);
+    const maxHeight = window.innerHeight * 0.8; // Don't exceed 80% of viewport height
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
+
+            windowElement.style.height = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(contentElement);
+
+    // Store observer for cleanup on minimize/close
+    (windowElement as any).__resizeObserver = resizeObserver;
 }
