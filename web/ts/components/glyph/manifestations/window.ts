@@ -427,11 +427,13 @@ function setupWindowResizeObserver(
                 return;
             }
 
-            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight, maxHeight));
+            // Add padding to account for .glyph-content padding (8px top/bottom from CSS)
+            const contentPadding = 16; // 8px top + 8px bottom
+            const totalHeight = Math.max(minHeight, Math.min(contentHeight + titleBarHeight + contentPadding, maxHeight));
 
             windowElement.style.height = `${totalHeight}px`;
 
-            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+            log.debug(SEG.GLYPH, `[Window ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px + padding: ${contentPadding}px)`);
         }
     });
 
