@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,7 +135,7 @@ func TestCanvasStore_GetGlyph_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for nonexistent glyph, got nil")
 	}
-	if err != nil && !contains(err.Error(), "not found") {
+	if err != nil && !strings.Contains(err.Error(), "not found") {
 		t.Errorf("Expected 'not found' error, got: %v", err)
 	}
 }
@@ -224,7 +225,7 @@ func TestCanvasStore_DeleteGlyph_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when deleting nonexistent glyph, got nil")
 	}
-	if err != nil && !contains(err.Error(), "not found") {
+	if err != nil && !strings.Contains(err.Error(), "not found") {
 		t.Errorf("Expected 'not found' error, got: %v", err)
 	}
 }
@@ -342,7 +343,7 @@ func TestCanvasStore_GetComposition_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for nonexistent composition, got nil")
 	}
-	if err != nil && !contains(err.Error(), "not found") {
+	if err != nil && !strings.Contains(err.Error(), "not found") {
 		t.Errorf("Expected 'not found' error, got: %v", err)
 	}
 }
@@ -452,7 +453,7 @@ func TestCanvasStore_DeleteComposition_NotFound(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when deleting nonexistent composition, got nil")
 	}
-	if err != nil && !contains(err.Error(), "not found") {
+	if err != nil && !strings.Contains(err.Error(), "not found") {
 		t.Errorf("Expected 'not found' error, got: %v", err)
 	}
 }
@@ -571,14 +572,4 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 	if len(glyphs) == 1 && glyphs[0].ID != "glyph-2" {
 		t.Errorf("Expected remaining glyph to be glyph-2, got %s", glyphs[0].ID)
 	}
-}
-
-// Helper function
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

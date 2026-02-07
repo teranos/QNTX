@@ -248,7 +248,7 @@ export interface OfflineQueue {
 - [x] Server-side result hiding (offline mode)
 - [x] Transition animations
 
-### Phase 3: Offline Support
+### Phase 3: Offline Support ([#431](https://github.com/teranos/QNTX/issues/431))
 - [ ] Offline queue implementation
 - [ ] Queue persistence (IndexedDB)
 - [ ] Automatic queue processing on reconnect
