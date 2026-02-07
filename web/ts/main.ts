@@ -157,17 +157,34 @@ async function init(): Promise<void> {
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
 
-    // Load canvas state from backend (glyphs and compositions)
-    // This syncs IndexedDB with the authoritative backend database
+    // Sync local glyphs to backend (ensures backend has all existing glyphs)
+    // This is a one-way sync: local → backend, to preserve any glyphs created before backend persistence
     try {
-        if (window.logLoaderStep) window.logLoaderStep('Loading canvas state...', false, true);
-        const { loadCanvasState } = await import('./api/canvas.ts');
-        const { glyphs, compositions } = await loadCanvasState();
-        uiState.setCanvasGlyphs(glyphs);
-        uiState.setCanvasCompositions(compositions);
+        if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
+        const { upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+        const localGlyphs = uiState.getCanvasGlyphs();
+        const localCompositions = uiState.getCanvasCompositions();
+
+        // Sync all local glyphs to backend
+        for (const glyph of localGlyphs) {
+            await upsertCanvasGlyph(glyph).catch(err => {
+                console.warn(`Failed to sync glyph ${glyph.id}:`, err);
+            });
+        }
+
+        // Sync all local compositions to backend
+        for (const comp of localCompositions) {
+            await upsertComposition(comp).catch(err => {
+                console.warn(`Failed to sync composition ${comp.id}:`, err);
+            });
+        }
+
+        if (localGlyphs.length > 0 || localCompositions.length > 0) {
+            console.log(`[Init] Synced ${localGlyphs.length} glyphs and ${localCompositions.length} compositions to backend`);
+        }
     } catch (error: unknown) {
-        console.error('[Init] Failed to load canvas state from backend:', error);
-        // Non-fatal: Continue with local state from IndexedDB
+        console.error('[Init] Failed to sync canvas state to backend:', error);
+        // Non-fatal: Continue without backend sync
     }
 
     // Initialize QNTX WASM module with IndexedDB storage
