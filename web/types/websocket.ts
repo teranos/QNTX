@@ -6,6 +6,7 @@
  */
 
 import { GraphData } from './core';
+import type { Attestation } from '../ts/generated/proto/plugin/grpc/protocol/atsstore';
 // Import LSP types for parse-related messages to ensure consistency
 import type {
   SemanticToken as LSPSemanticToken,
@@ -73,7 +74,13 @@ export type MessageType =
   | 'plugin_health'
   | 'system_capabilities'
   | 'watcher_match'
-  | 'watcher_error';
+  | 'watcher_error'
+  | 'database_stats'
+  | 'rich_search_results'
+  | 'vidstream_init_success'
+  | 'vidstream_init_error'
+  | 'vidstream_detections'
+  | 'vidstream_frame_error';
 
 // ============================================================================
 // Base Message Interface
@@ -262,7 +269,7 @@ export interface IXProgressMessage extends BaseMessage {
   event: {
     type: string;
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   };
 }
 
@@ -277,7 +284,7 @@ export interface IXErrorMessage extends BaseMessage {
   event: {
     type: string;
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   };
 }
 
@@ -292,7 +299,7 @@ export interface IXCompleteMessage extends BaseMessage {
   event: {
     type: string;
     timestamp: string;
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   };
 }
 
@@ -415,7 +422,7 @@ export interface SystemCapabilitiesMessage extends Omit<GeneratedSystemCapabilit
 export interface WatcherMatchMessage extends BaseMessage {
   type: 'watcher_match';
   watcher_id: string;
-  attestation: any; // TODO: import As type
+  attestation: Attestation;
   timestamp: number;
 }
 
@@ -429,6 +436,75 @@ export interface WatcherErrorMessage extends BaseMessage {
   details?: string[];
   severity: string;
   timestamp: number;
+}
+
+/**
+ * Database statistics response
+ */
+export interface DatabaseStatsMessage extends BaseMessage {
+  type: 'database_stats';
+  path: string;
+  storage_backend?: string;
+  storage_optimized?: boolean;
+  storage_version?: string;
+  total_attestations: number;
+  unique_actors: number;
+  unique_subjects: number;
+  unique_contexts: number;
+  rich_fields?: unknown[];
+}
+
+/**
+ * Rich search results response
+ */
+export interface RichSearchResultsMessage extends BaseMessage {
+  type: 'rich_search_results';
+  total: number;
+  results?: unknown[];
+}
+
+/**
+ * VidStream engine initialization success
+ */
+export interface VidStreamInitSuccessMessage extends BaseMessage {
+  type: 'vidstream_init_success';
+}
+
+/**
+ * VidStream engine initialization error
+ */
+export interface VidStreamInitErrorMessage extends BaseMessage {
+  type: 'vidstream_init_error';
+  error: string;
+}
+
+/**
+ * VidStream detection results for a processed frame
+ */
+export interface VidStreamDetectionsMessage extends BaseMessage {
+  type: 'vidstream_detections';
+  detections: Array<{
+    ClassID: number;
+    Label: string;
+    Confidence: number;
+    BBox: {
+      X: number;
+      Y: number;
+      Width: number;
+      Height: number;
+    };
+  }>;
+  stats: {
+    total_us: number;
+  };
+}
+
+/**
+ * VidStream frame processing error
+ */
+export interface VidStreamFrameErrorMessage extends BaseMessage {
+  type: 'vidstream_frame_error';
+  error: string;
 }
 
 // ============================================================================
@@ -520,7 +596,13 @@ export type WebSocketMessage =
   | PluginHealthMessage
   | SystemCapabilitiesMessage
   | WatcherMatchMessage
-  | WatcherErrorMessage;
+  | WatcherErrorMessage
+  | DatabaseStatsMessage
+  | RichSearchResultsMessage
+  | VidStreamInitSuccessMessage
+  | VidStreamInitErrorMessage
+  | VidStreamDetectionsMessage
+  | VidStreamFrameErrorMessage;
 
 // ============================================================================
 // Message Handler Types
@@ -564,6 +646,12 @@ export interface MessageHandlers {
   system_capabilities?: MessageHandler<SystemCapabilitiesMessage>;
   watcher_match?: MessageHandler<WatcherMatchMessage>;
   watcher_error?: MessageHandler<WatcherErrorMessage>;
+  database_stats?: MessageHandler<DatabaseStatsMessage>;
+  rich_search_results?: MessageHandler<RichSearchResultsMessage>;
+  vidstream_init_success?: MessageHandler<VidStreamInitSuccessMessage>;
+  vidstream_init_error?: MessageHandler<VidStreamInitErrorMessage>;
+  vidstream_detections?: MessageHandler<VidStreamDetectionsMessage>;
+  vidstream_frame_error?: MessageHandler<VidStreamFrameErrorMessage>;
   /**
    * Default handler for messages without explicit handlers.
    * Currently receives raw GraphData from the server (no type field).

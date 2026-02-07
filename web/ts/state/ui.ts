@@ -85,7 +85,7 @@ export interface CanvasGlyphState {
         success: boolean;
         stdout: string;
         stderr: string;
-        result: any;
+        result: unknown;
         error: string | null;
         duration_ms: number;
     };

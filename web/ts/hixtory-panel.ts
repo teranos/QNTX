@@ -33,7 +33,7 @@ interface Job extends BackendJob {
         tasks?: Task[];
         command?: string;
         query?: string;
-        [key: string]: any;
+        [key: string]: unknown;
     };
 }
 
@@ -161,7 +161,7 @@ class JobListPanel extends BasePanel {
 
         // Job just paused - show reason
         if (current.status === 'paused' && previous?.status !== 'paused') {
-            const pulseState = (current as any).pulse_state;
+            const pulseState = current.pulse_state;
             const reason = pulseState?.pause_reason || 'unknown';
 
             if (reason === 'rate_limited') {
@@ -181,7 +181,7 @@ class JobListPanel extends BasePanel {
 
         // Job completed - show success (only for top-level jobs, not tasks)
         if (current.status === 'completed' && previous?.status !== 'completed') {
-            if (!(current as any).parent_job_id) {
+            if (!current.parent_job_id) {
                 toast.success(`Job ${jobName} completed`);
             }
         }
@@ -383,7 +383,7 @@ class JobListPanel extends BasePanel {
             case 'queued':
                 return 'Job is queued and waiting to run';
             case 'paused':
-                const pulseState = (job as any).pulse_state;
+                const pulseState = job.pulse_state;
                 const reason = pulseState?.pause_reason;
                 if (reason === 'rate_limited') return 'Paused: Rate limit reached';
                 if (reason === 'budget_exceeded') return 'Paused: Budget limit exceeded';

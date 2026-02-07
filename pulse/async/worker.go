@@ -552,12 +552,12 @@ func (wp *WorkerPool) processNextJob() error {
 		if err != nil {
 			// Parent was deleted - cancel this child task
 			job.Cancel("parent job deleted")
-			return wp.queue.UpdateJob(job)
+			return errors.Wrapf(wp.queue.UpdateJob(job), "failed to update cancelled child job %s (parent deleted)", job.ID)
 		}
 		if parent.Status == JobStatusFailed || parent.Status == JobStatusCancelled {
 			// Parent failed or was cancelled - cancel this child task
 			job.Cancel(fmt.Sprintf("parent job %s", parent.Status))
-			return wp.queue.UpdateJob(job)
+			return errors.Wrapf(wp.queue.UpdateJob(job), "failed to update child job %s (parent %s %s)", job.ID, job.ParentJobID, parent.Status)
 		}
 	}
 
@@ -585,12 +585,12 @@ func (wp *WorkerPool) processNextJob() error {
 			return nil // Return nil to avoid logging as error
 		default:
 			// Real error - fail the job
-			return wp.queue.FailJob(job.ID, err)
+			return errors.Wrapf(wp.queue.FailJob(job.ID, err), "failed to mark job %s as failed (handler: %s)", job.ID, job.HandlerName)
 		}
 	}
 
 	// Mark job as completed
-	return wp.queue.CompleteJob(job.ID)
+	return errors.Wrapf(wp.queue.CompleteJob(job.ID), "failed to mark job %s as completed (handler: %s)", job.ID, job.HandlerName)
 }
 
 // checkRateLimit verifies the rate limit and pauses the job if exceeded.

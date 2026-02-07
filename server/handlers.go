@@ -25,6 +25,7 @@ import (
 	"github.com/teranos/QNTX/plugin"
 	"github.com/teranos/QNTX/pulse/async"
 	"github.com/teranos/QNTX/server/wslogs"
+	"go.uber.org/zap"
 )
 
 func (s *QNTXServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -438,6 +439,75 @@ func (s *QNTXServer) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, config)
 }
 
+// configUpdateEntry maps a config key to its typed update function.
+type configUpdateEntry struct {
+	typ      string // "bool" or "string"
+	updateFn interface{}
+}
+
+// configUpdateRegistry defines supported config keys and their update functions.
+var configUpdateRegistry = map[string]configUpdateEntry{
+	"local_inference.enabled":        {typ: "bool", updateFn: appcfg.UpdateLocalInferenceEnabled},
+	"local_inference.model":          {typ: "string", updateFn: appcfg.UpdateLocalInferenceModel},
+	"local_inference.onnx_model_path": {typ: "string", updateFn: appcfg.UpdateLocalInferenceONNXModelPath},
+}
+
+// applyConfigKeyUpdate validates the value type and applies a single config key update.
+// Returns true if the update was applied, false if a response was already written.
+func applyConfigKeyUpdate(w http.ResponseWriter, log *zap.SugaredLogger, key string, value interface{}, clientAddr string) bool {
+	entry, ok := configUpdateRegistry[key]
+	if !ok {
+		log.Warnw("Unsupported config key in updates", "key", key, "client", clientAddr)
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Unsupported config key: %s", key))
+		return false
+	}
+
+	switch entry.typ {
+	case "bool":
+		v, ok := value.(bool)
+		if !ok {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected bool", key))
+			return false
+		}
+		if err := entry.updateFn.(func(bool) error)(v); err != nil {
+			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
+			return false
+		}
+		log.Infow("Config updated via REST API", "key", key, "value", v, "client", clientAddr)
+
+	case "string":
+		v, ok := value.(string)
+		if !ok {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s: expected string", key))
+			return false
+		}
+		if err := entry.updateFn.(func(string) error)(v); err != nil {
+			writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s", key), http.StatusInternalServerError)
+			return false
+		}
+		log.Infow("Config updated via REST API", "key", key, "value", v, "client", clientAddr)
+	}
+
+	return true
+}
+
+// applyBudgetUpdate validates and applies a single budget update if the value is non-nil.
+// Returns true if OK to continue, false if a response was already written.
+func applyBudgetUpdate(w http.ResponseWriter, log *zap.SugaredLogger, value *float64, name string, updateFn func(float64) error, clientAddr string) bool {
+	if value == nil {
+		return true
+	}
+	if err := updateFn(*value); err != nil {
+		writeWrappedError(w, log, err, fmt.Sprintf("failed to update %s budget", name), http.StatusBadRequest)
+		return false
+	}
+	log.Infow(fmt.Sprintf("%s budget updated via REST API", name),
+		name+"_budget", *value,
+		"client", clientAddr,
+	)
+	return true
+}
+
 // handleUpdateConfig updates Pulse and Local Inference configuration
 func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -453,105 +523,23 @@ func (s *QNTXServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Handle key-value updates from UI (new format)
-	if len(req.Updates) > 0 {
-		for key, value := range req.Updates {
-			switch key {
-			case "local_inference.enabled":
-				enabled, ok := value.(bool)
-				if !ok {
-					writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s", key))
-					return
-				}
-				if err := appcfg.UpdateLocalInferenceEnabled(enabled); err != nil {
-					writeWrappedError(w, s.logger, err, "failed to update local_inference.enabled", http.StatusInternalServerError)
-					return
-				}
-				s.logger.Infow("Config updated via REST API",
-					"key", "local_inference.enabled",
-					"value", enabled,
-					"client", r.RemoteAddr,
-				)
-
-			case "local_inference.model":
-				model, ok := value.(string)
-				if !ok {
-					writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s", key))
-					return
-				}
-				if err := appcfg.UpdateLocalInferenceModel(model); err != nil {
-					writeWrappedError(w, s.logger, err, "failed to update local_inference.model", http.StatusInternalServerError)
-					return
-				}
-				s.logger.Infow("Config updated via REST API",
-					"key", "local_inference.model",
-					"value", model,
-					"client", r.RemoteAddr,
-				)
-
-			case "local_inference.onnx_model_path":
-				path, ok := value.(string)
-				if !ok {
-					writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid value type for %s", key))
-					return
-				}
-				if err := appcfg.UpdateLocalInferenceONNXModelPath(path); err != nil {
-					writeWrappedError(w, s.logger, err, "failed to update local_inference.onnx_model_path", http.StatusInternalServerError)
-					return
-				}
-				s.logger.Infow("Config updated via REST API",
-					"key", "local_inference.onnx_model_path",
-					"value", path,
-					"client", r.RemoteAddr,
-				)
-
-			default:
-				s.logger.Warnw("Unsupported config key in updates",
-					"key", key,
-					"client", r.RemoteAddr,
-				)
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("Unsupported config key: %s", key))
-				return
-			}
+	// Handle key-value updates from UI
+	for key, value := range req.Updates {
+		if !applyConfigKeyUpdate(w, s.logger, key, value, r.RemoteAddr) {
+			return
 		}
 	}
 
 	// Handle Pulse budget updates
 	pulseLog := logger.AddPulseSymbol(s.logger)
-	if req.Pulse.DailyBudgetUSD != nil {
-		if err := s.budgetTracker.UpdateDailyBudget(*req.Pulse.DailyBudgetUSD); err != nil {
-			writeWrappedError(w, s.logger, err, "failed to update daily budget", http.StatusBadRequest)
-			return
-		}
-
-		pulseLog.Infow("Daily budget updated via REST API",
-			"daily_budget", *req.Pulse.DailyBudgetUSD,
-			"client", r.RemoteAddr,
-		)
+	if !applyBudgetUpdate(w, pulseLog, req.Pulse.DailyBudgetUSD, "daily", s.budgetTracker.UpdateDailyBudget, r.RemoteAddr) {
+		return
 	}
-
-	if req.Pulse.WeeklyBudgetUSD != nil {
-		if err := s.budgetTracker.UpdateWeeklyBudget(*req.Pulse.WeeklyBudgetUSD); err != nil {
-			writeWrappedError(w, s.logger, err, "failed to update weekly budget", http.StatusBadRequest)
-			return
-		}
-
-		pulseLog.Infow("Weekly budget updated via REST API",
-			"weekly_budget", *req.Pulse.WeeklyBudgetUSD,
-			"client", r.RemoteAddr,
-		)
+	if !applyBudgetUpdate(w, pulseLog, req.Pulse.WeeklyBudgetUSD, "weekly", s.budgetTracker.UpdateWeeklyBudget, r.RemoteAddr) {
+		return
 	}
-
-	if req.Pulse.MonthlyBudgetUSD != nil {
-		if err := s.budgetTracker.UpdateMonthlyBudget(*req.Pulse.MonthlyBudgetUSD); err != nil {
-			writeWrappedError(w, s.logger, err, "failed to update monthly budget", http.StatusBadRequest)
-			return
-		}
-
-		pulseLog.Infow("Monthly budget updated via REST API",
-			"monthly_budget", *req.Pulse.MonthlyBudgetUSD,
-			"client", r.RemoteAddr,
-		)
+	if !applyBudgetUpdate(w, pulseLog, req.Pulse.MonthlyBudgetUSD, "monthly", s.budgetTracker.UpdateMonthlyBudget, r.RemoteAddr) {
+		return
 	}
 
 	// Return updated config
