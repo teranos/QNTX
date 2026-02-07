@@ -241,8 +241,8 @@ export function morphFromWindow(
     setLastPosition(windowElement, currentRect.left, currentRect.top);
 
     // Cleanup ResizeObserver
-    const resizeObserver = (windowElement as any).__resizeObserver as ResizeObserver | undefined;
-    if (resizeObserver) {
+    const resizeObserver = (windowElement as any).__resizeObserver;
+    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
         resizeObserver.disconnect();
         delete (windowElement as any).__resizeObserver;
         log.debug(SEG.GLYPH, `[Window] ResizeObserver cleaned up for ${glyph.id}`);
