@@ -69,6 +69,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     editorContainer.style.color = '#2a2a2a'; // Almost black text
     editorContainer.style.lineHeight = '1.6';
     editorContainer.style.boxSizing = 'border-box';
+    editorContainer.style.cursor = 'move'; // Default cursor for dragging on padding
 
     // ProseMirror editor styling
     editorContainer.style.setProperty('--note-strong-color', '#1a1a1a');
@@ -77,13 +78,14 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     editorContainer.style.setProperty('--note-code-color', '#5a4a3a');
     editorContainer.style.setProperty('--note-heading-color', '#4a3a2a');
 
-    // Remove default ProseMirror margins
+    // Remove default ProseMirror margins and set cursor
     const style = document.createElement('style');
     style.textContent = `
         .note-editor-container .ProseMirror {
             padding: 0;
             margin: 0;
             outline: none;
+            cursor: text;
         }
         .note-editor-container .ProseMirror p {
             margin: 0 0 0.5em 0;
@@ -152,9 +154,14 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
     });
 
-    // Prevent drag when clicking in editor
+    // Prevent drag only when clicking on actual editor content, not padding
     editorContainer.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
+        const target = e.target as HTMLElement;
+        // Only stop propagation if clicking on ProseMirror content
+        if (target.closest('.ProseMirror') || target.classList.contains('ProseMirror')) {
+            e.stopPropagation();
+        }
+        // Clicking on padding area allows drag to work
     });
 
     // Assemble glyph (no title bar)
