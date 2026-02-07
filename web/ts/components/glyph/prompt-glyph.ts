@@ -48,7 +48,7 @@ function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
     try {
         return JSON.parse(stored);
     } catch (e) {
-        log.error(SEG.UI, `[Prompt] Failed to parse stored status for ${glyphId}:`, e);
+        log.error(SEG.GLYPH, `[Prompt] Failed to parse stored status for ${glyphId}:`, e);
         return null;
     }
 }
@@ -111,7 +111,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
         saveTimeout = window.setTimeout(async () => {
             await storage.save(glyph.id, textarea.value);
-            log.debug(SEG.UI, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
         }, 500);
     });
 
@@ -181,7 +181,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
 
         savePromptStatus(glyph.id, status);
-        log.debug(SEG.UI, `[Prompt Glyph] Updated status for ${glyph.id}:`, status);
+        log.debug(SEG.GLYPH, `[Prompt Glyph] Updated status for ${glyph.id}:`, status);
     }
 
     // Apply saved status on load
@@ -247,7 +247,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
         const template = textarea.value.trim();
 
         if (!template) {
-            log.debug(SEG.UI, '[Prompt] No template provided');
+            log.debug(SEG.GLYPH, '[Prompt] No template provided');
             return;
         }
 
@@ -264,7 +264,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             return;
         }
 
-        log.debug(SEG.UI, `[Prompt] Executing direct (no variables)`);
+        log.debug(SEG.GLYPH, `[Prompt] Executing direct (no variables)`);
 
         const startTime = Date.now();
 
@@ -332,7 +332,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             });
 
         } catch (error) {
-            log.error(SEG.UI, '[Prompt] Execution failed:', error);
+            log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
             const errorMsg = error instanceof Error ? error.message : String(error);
             updateStatus({
                 state: 'error',

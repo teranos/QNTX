@@ -88,7 +88,7 @@ class GlyphRunImpl {
         // Attach click handler that will persist with the element forever
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            log.debug(SEG.UI, `[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(glyph));
+            log.debug(SEG.GLYPH, `[Glyph ${item.id}] Click detected, windowState:`, isInWindowState(glyph));
 
             // Only morph if in collapsed state (not already a window)
             if (!isInWindowState(glyph)) {
@@ -146,7 +146,7 @@ class GlyphRunImpl {
 
         const graphContainer = document.getElementById('graph-container');
         if (!graphContainer) {
-            log.warn(SEG.UI, 'GlyphRun: #graph-container not found, deferring init');
+            log.warn(SEG.GLYPH, 'GlyphRun: #graph-container not found, deferring init');
             return;
         }
 
@@ -225,7 +225,7 @@ class GlyphRunImpl {
         if (!this.element) {
             // Tray not ready yet, defer this item (with safeguards)
             if (this.deferredItems.length >= this.MAX_DEFERRED_ITEMS) {
-                log.warn(SEG.UI, `GlyphRun: Deferred items limit reached (${this.MAX_DEFERRED_ITEMS}), dropping oldest`);
+                log.warn(SEG.GLYPH, `GlyphRun: Deferred items limit reached (${this.MAX_DEFERRED_ITEMS}), dropping oldest`);
                 this.deferredItems.shift(); // Remove oldest to make room
             }
 
@@ -234,7 +234,7 @@ class GlyphRunImpl {
             // Set a timeout to clear deferred items if init never happens
             if (!this.deferredItemsTimeout) {
                 this.deferredItemsTimeout = setTimeout(() => {
-                    log.warn(SEG.UI, `GlyphRun: Clearing ${this.deferredItems.length} deferred items after 30s timeout`);
+                    log.warn(SEG.GLYPH, `GlyphRun: Clearing ${this.deferredItems.length} deferred items after 30s timeout`);
                     this.deferredItems = [];
                     this.deferredItemsTimeout = null;
                 }, 30000); // Clear after 30 seconds
@@ -374,7 +374,7 @@ class GlyphRunImpl {
         // (Event listeners can be lost during certain DOM manipulations)
         const clickHandler = (e: MouseEvent) => {
             e.stopPropagation();
-            log.debug(SEG.UI, `[Glyph ${glyph.id}] Click detected, windowState:`, isInWindowState(glyphElement));
+            log.debug(SEG.GLYPH, `[Glyph ${glyph.id}] Click detected, windowState:`, isInWindowState(glyphElement));
 
             if (!isInWindowState(glyphElement)) {
                 this.isRestoring = true;
@@ -476,7 +476,7 @@ class GlyphRunImpl {
             }
         });
 
-        log.info(SEG.UI, `✓ Invariant verified: ${this.glyphElements.size} glyphs maintain single-element axiom`);
+        log.info(SEG.GLYPH, `✓ Invariant verified: ${this.glyphElements.size} glyphs maintain single-element axiom`);
     }
 }
 

@@ -192,7 +192,7 @@ export function makeDraggable(
                     logLabel: 'MeldedComposition'
                 });
 
-                log.info(SEG.UI, `[${logLabel}] Melded with prompt glyph`);
+                log.info(SEG.GLYPH, `[${logLabel}] Melded with prompt glyph`);
                 return;
             }
         }
@@ -224,13 +224,13 @@ export function makeDraggable(
                     x,
                     y
                 });
-                log.debug(SEG.UI, `[${logLabel}] Updated composition position`, {
+                log.debug(SEG.GLYPH, `[${logLabel}] Updated composition position`, {
                     compositionId,
                     x,
                     y
                 });
             } else {
-                log.warn(SEG.UI, `[${logLabel}] Composition ${compositionId} not found in storage`);
+                log.warn(SEG.GLYPH, `[${logLabel}] Composition ${compositionId} not found in storage`);
             }
         } else if (isMultiDrag) {
             // Save positions for all selected glyphs
@@ -252,7 +252,7 @@ export function makeDraggable(
                     });
                 }
             }
-            log.debug(SEG.UI, `[${logLabel}] Finished multi-dragging ${multiDragElements.length} glyphs`);
+            log.debug(SEG.GLYPH, `[${logLabel}] Finished multi-dragging ${multiDragElements.length} glyphs`);
             multiDragElements = [];
             isMultiDrag = false;
         } else {
@@ -273,7 +273,7 @@ export function makeDraggable(
                     height: glyph.height,
                 });
             }
-            log.debug(SEG.UI, `[${logLabel}] Finished dragging ${glyph.id}`);
+            log.debug(SEG.GLYPH, `[${logLabel}] Finished dragging ${glyph.id}`);
         }
 
         dragController?.abort();
@@ -333,7 +333,7 @@ export function makeDraggable(
         document.addEventListener('mousemove', handleMouseMove, { signal: dragController.signal });
         document.addEventListener('mouseup', handleMouseUp, { signal: dragController.signal });
 
-        log.debug(SEG.UI, `[${logLabel}] Started dragging ${isMultiDrag ? `${selectedIds.length} glyphs` : glyph.id}`);
+        log.debug(SEG.GLYPH, `[${logLabel}] Started dragging ${isMultiDrag ? `${selectedIds.length} glyphs` : glyph.id}`);
     }, { signal: setupController.signal });
 
     // Return cleanup function
@@ -425,7 +425,7 @@ export function makeResizable(
             });
         }
 
-        log.debug(SEG.UI, `[${logLabel}] Finished resizing to ${finalWidth}x${finalHeight}`);
+        log.debug(SEG.GLYPH, `[${logLabel}] Finished resizing to ${finalWidth}x${finalHeight}`);
 
         abortController?.abort();
         abortController = null;
@@ -448,6 +448,6 @@ export function makeResizable(
         document.addEventListener('mousemove', handleMouseMove, { signal: abortController.signal });
         document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
-        log.debug(SEG.UI, `[${logLabel}] Started resizing`);
+        log.debug(SEG.GLYPH, `[${logLabel}] Started resizing`);
     });
 }
