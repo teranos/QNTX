@@ -22,7 +22,8 @@ export function showActionBar(
     selectedGlyphIds: string[],
     container: HTMLElement,
     onDelete: () => void,
-    onUnmeld: (composition: HTMLElement) => void
+    onUnmeld: (composition: HTMLElement) => void,
+    onConvertToPrompt?: () => void
 ): void {
     if (selectedGlyphIds.length === 0) {
         return;
@@ -44,6 +45,26 @@ export function showActionBar(
             meldedComposition = glyphEl.parentElement;
             break;
         }
+    }
+
+    // Check if exactly one note glyph is selected (for convert-to-prompt button)
+    let isNoteSelected = false;
+    if (selectedGlyphIds.length === 1) {
+        const glyphEl = container.querySelector(`[data-glyph-id="${selectedGlyphIds[0]}"]`) as HTMLElement | null;
+        isNoteSelected = glyphEl?.dataset.glyphSymbol === '▣'; // Prose symbol
+    }
+
+    // Add convert-to-prompt button if single note selected
+    if (isNoteSelected && onConvertToPrompt) {
+        const convertBtn = document.createElement('button');
+        convertBtn.className = 'canvas-action-button canvas-action-convert has-tooltip';
+        convertBtn.dataset.tooltip = 'Convert to prompt glyph';
+        convertBtn.textContent = '⟶'; // SO symbol (prompt)
+        convertBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onConvertToPrompt();
+        });
+        bar.appendChild(convertBtn);
     }
 
     // Add unmeld button if glyphs are in a meld
