@@ -7,6 +7,7 @@
 
 import type { CanvasGlyphState, CompositionState } from '../state/ui';
 import { log, SEG } from '../logger';
+import { apiFetch } from '../api';
 
 export interface CanvasGlyphResponse {
     id: string;
@@ -46,7 +47,7 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
             result_data: glyph.result ? JSON.stringify(glyph.result) : undefined,
         };
 
-        const response = await fetch('/api/canvas/glyphs', {
+        const response = await apiFetch('/api/canvas/glyphs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -69,7 +70,7 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
  */
 export async function deleteCanvasGlyph(id: string): Promise<void> {
     try {
-        const response = await fetch(`/api/canvas/glyphs/${id}`, {
+        const response = await apiFetch(`/api/canvas/glyphs/${id}`, {
             method: 'DELETE',
         });
 
@@ -90,7 +91,7 @@ export async function deleteCanvasGlyph(id: string): Promise<void> {
  */
 export async function listCanvasGlyphs(): Promise<CanvasGlyphResponse[]> {
     try {
-        const response = await fetch('/api/canvas/glyphs');
+        const response = await apiFetch('/api/canvas/glyphs');
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Failed to list canvas glyphs');
@@ -119,7 +120,7 @@ export async function upsertComposition(composition: CompositionState): Promise<
             y: composition.y,
         };
 
-        const response = await fetch('/api/canvas/compositions', {
+        const response = await apiFetch('/api/canvas/compositions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -142,7 +143,7 @@ export async function upsertComposition(composition: CompositionState): Promise<
  */
 export async function deleteComposition(id: string): Promise<void> {
     try {
-        const response = await fetch(`/api/canvas/compositions/${id}`, {
+        const response = await apiFetch(`/api/canvas/compositions/${id}`, {
             method: 'DELETE',
         });
 
@@ -163,7 +164,7 @@ export async function deleteComposition(id: string): Promise<void> {
  */
 export async function listCompositions(): Promise<CompositionResponse[]> {
     try {
-        const response = await fetch('/api/canvas/compositions');
+        const response = await apiFetch('/api/canvas/compositions');
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Failed to list compositions');
