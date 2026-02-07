@@ -240,6 +240,8 @@
 /* Database Stats Window Styles */
 .db-stats {
     padding: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: var(--font-size-sm);
 }
 
 .db-stat-row {
