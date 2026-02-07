@@ -149,7 +149,7 @@ export function registerTestGlyphs(): void {
             return content;
         },
         initialWidth: '600px',
-        initialHeight: '400px'
+        initialHeight: '240px'
     });
 
     // Self Diagnostics Glyph
