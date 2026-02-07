@@ -237,32 +237,55 @@
     color: var(--panel-text-primary, #333);
 }
 
-/* Database Stats Window Styles */
-.db-stats {
+/* Glyph Content Styles - Used by database, self, and other glyphs */
+.glyph-content {
     padding: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    max-height: 400px;
+    overflow-y: auto;
 }
 
-.db-stat-row {
+.glyph-row {
     display: flex;
     justify-content: space-between;
-    padding: 6px 8px;
+    padding: 3px 8px;
     border-bottom: 1px solid var(--panel-border-color, #e0e0e0);
 }
 
-.db-stat-row:last-child {
+.glyph-row:last-child {
     border-bottom: none;
 }
 
-.db-stat-label {
-    font-weight: 500;
-    color: var(--panel-text-secondary, #666);
+.glyph-label {
+    font-weight: normal;
+    color: #c0c0c0;
 }
 
-.db-stat-value {
+.glyph-value {
+    font-weight: normal;
+    color: #e8e8e8;
+}
+
+.glyph-section {
+    margin-bottom: 16px;
+}
+
+.glyph-section-title {
+    margin: 0 0 8px 0;
+    font-size: 14px;
     font-weight: 600;
-    color: var(--panel-text-primary, #333);
+    color: #e8e8e8;
 }
 
+.glyph-loading {
+    padding: 20px;
+    text-align: center;
+    color: #c0c0c0;
+}
+
+/* Database-specific styles */
 .db-path {
     cursor: pointer;
     text-decoration: underline;
@@ -308,10 +331,4 @@
 
 .rich-field-item:hover {
     background: var(--panel-bg-hover, #e8e8e8);
-}
-
-.db-stats-loading {
-    padding: 20px;
-    text-align: center;
-    color: var(--panel-text-secondary, #666);
 }

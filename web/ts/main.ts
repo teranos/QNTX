@@ -124,6 +124,11 @@ function handleVersion(data: VersionMessage): void {
         selfWindow.updateVersion(data);
     });
 
+    // Update Self diagnostic glyph
+    import('./test-glyphs.js').then(({ updateSelfVersion }) => {
+        updateSelfVersion(data);
+    });
+
     console.log('Server version:', data);
 }
 
