@@ -359,7 +359,7 @@ export class ChartGlyphState {
         toggle.style.background = 'transparent';
         toggle.style.border = '1px solid transparent';
         toggle.style.fontSize = '14px';
-        toggle.style.color = 'rgba(255, 255, 255, 0.85)';
+        toggle.style.color = 'rgba(255, 255, 255, 0.4)'; // Dimmer by default
         toggle.style.cursor = 'pointer';
         toggle.style.padding = '0';
         toggle.style.width = '24px';
@@ -372,15 +372,15 @@ export class ChartGlyphState {
         toggle.style.fontFamily = 'monospace';
         toggle.style.fontWeight = 'bold';
 
-        // Hover effect
+        // Hover effect (subtle)
         toggle.addEventListener('mouseenter', () => {
-            toggle.style.background = 'var(--bg-hover)';
-            toggle.style.color = 'rgba(255, 255, 255, 1)';
+            toggle.style.background = 'rgba(255, 255, 255, 0.08)'; // Very subtle background
+            toggle.style.color = 'rgba(255, 255, 255, 0.9)';
         });
 
         toggle.addEventListener('mouseleave', () => {
             toggle.style.background = 'transparent';
-            toggle.style.color = 'rgba(255, 255, 255, 0.85)';
+            toggle.style.color = 'rgba(255, 255, 255, 0.4)'; // Match default dimmer state
         });
 
         toggle.addEventListener('click', () => this.toggleRange());
