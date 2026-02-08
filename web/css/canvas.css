@@ -130,11 +130,11 @@
  * ============================================================================ */
 
 /* Base glyph - applies saturation and hue shift based on connectivity mode */
-.canvas-glyph {
+.canvas-glyph:not(.canvas-error-glyph) {
     filter: saturate(var(--mode-glyph-saturation)) hue-rotate(var(--mode-glyph-hue));
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing),
                 border-color var(--mode-transition-duration) var(--mode-transition-timing);
-    border-color: rgba(220, 222, 221, var(--mode-glyph-border-opacity)) !important;
+    border-color: rgba(220, 222, 221, var(--mode-glyph-border-opacity));
 }
 
 /* Totally monochrome while dragging offline (indicates unsaved local change) */
@@ -198,6 +198,10 @@
 .canvas-action-button:hover {
     background: var(--bg-hover);
     opacity: 0.9;
+}
+
+.canvas-action-button:active {
+    border: 1px solid var(--border-light);
 }
 
 .canvas-action-delete:hover {

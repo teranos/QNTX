@@ -17,7 +17,9 @@ import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag, storeCleanup } from './glyph-interaction';
+import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
 
 /**
@@ -58,6 +60,17 @@ function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
  * Create a prompt glyph with template editor on canvas
  */
 export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
+    const element = document.createElement('div');
+    await setupPromptGlyph(element, glyph);
+    return element;
+}
+
+/**
+ * Populate an element as a prompt glyph.
+ * Can be called on a fresh element (createPromptGlyph) or an existing one (conversion).
+ * Caller must runCleanup() and clear children before calling on an existing element.
+ */
+export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved template from storage
     const storage = getScriptStorage();
     const defaultTemplate = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
@@ -66,7 +79,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load saved status
     const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
 
-    const element = document.createElement('div');
+    // Reset inline styles (important when repopulating after conversion)
+    element.style.cssText = '';
     element.className = 'canvas-prompt-glyph';
     element.dataset.glyphId = glyph.id;
     element.dataset.glyphSymbol = SO;
@@ -77,17 +91,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const width = glyph.width ?? 420;
     const height = glyph.height ?? 340;
 
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
-    element.style.backgroundColor = 'var(--bg-secondary)';
-    element.style.border = '1px solid var(--border-color)';
-    element.style.borderRadius = '4px';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
+    element.className += ' canvas-glyph';
+    applyCanvasGlyphLayout(element, { x, y, width, height });
 
     // Template textarea (declared early for play button reference)
     const textarea = document.createElement('textarea');
@@ -97,8 +102,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.padding = '8px';
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = '#1a1b1a';
-    textarea.style.color = '#d4b8ff'; // Purple tint for prompt templates
+    textarea.style.backgroundColor = 'var(--bg-almost-black)';
+    textarea.style.color = 'var(--accent-lavender)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
@@ -115,21 +120,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
         }, 500);
     });
 
-    textarea.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
-
-    // Results section
-    const resultsSection = document.createElement('div');
-    resultsSection.className = 'prompt-results-section';
-    resultsSection.style.display = 'none';
-    resultsSection.style.marginTop = '4px';
-    resultsSection.style.padding = '8px';
-    resultsSection.style.borderRadius = '4px';
-    resultsSection.style.fontSize = '12px';
-    resultsSection.style.fontFamily = 'monospace';
-    resultsSection.style.flex = '1';
-    resultsSection.style.overflow = 'auto';
+    preventDrag(textarea);
 
     // Status display
     const statusSection = document.createElement('div');
@@ -146,13 +137,13 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     function updateStatus(status: PromptGlyphStatus): void {
         switch (status.state) {
             case 'running':
-                element.style.backgroundColor = '#1f2a3d';
+                element.style.backgroundColor = 'var(--glyph-status-running-bg)';
                 break;
             case 'success':
-                element.style.backgroundColor = '#1f3d1f';
+                element.style.backgroundColor = 'var(--glyph-status-success-bg)';
                 break;
             case 'error':
-                element.style.backgroundColor = '#3d1f1f';
+                element.style.backgroundColor = 'var(--glyph-status-error-bg)';
                 break;
             default:
                 element.style.backgroundColor = 'var(--bg-secondary)';
@@ -164,16 +155,16 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
             switch (status.state) {
                 case 'running':
-                    statusSection.style.color = '#6b9bd1';
-                    statusSection.style.backgroundColor = '#1a2332';
+                    statusSection.style.color = 'var(--glyph-status-running-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-running-section-bg)';
                     break;
                 case 'success':
-                    statusSection.style.color = '#a8e6a1';
-                    statusSection.style.backgroundColor = '#1a2b1a';
+                    statusSection.style.color = 'var(--glyph-status-success-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-success-section-bg)';
                     break;
                 case 'error':
-                    statusSection.style.color = '#ff6b6b';
-                    statusSection.style.backgroundColor = '#2b1a1a';
+                    statusSection.style.color = 'var(--glyph-status-error-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-error-section-bg)';
                     break;
             }
         } else {
@@ -190,57 +181,25 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Title bar
     const titleBar = document.createElement('div');
     titleBar.className = 'canvas-glyph-title-bar';
-    titleBar.style.height = '32px';
-    titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-    titleBar.style.borderBottom = '1px solid var(--border-color)';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'center';
-    titleBar.style.padding = '0 8px';
-    titleBar.style.gap = '8px';
-    titleBar.style.cursor = 'move';
-    titleBar.style.flexShrink = '0';
 
     const symbol = document.createElement('span');
     symbol.textContent = SO;
     symbol.style.fontSize = '16px';
-    symbol.style.color = '#d4b8ff'; // Purple for prompt/SO
+    symbol.style.color = 'var(--accent-lavender)';
     symbol.style.fontWeight = 'bold';
 
     const title = document.createElement('span');
     title.textContent = 'Prompt';
     title.style.fontSize = '13px';
     title.style.flex = '1';
-    title.style.color = '#ffffff';
+    title.style.color = 'var(--text-on-dark-emphasis)';
     title.style.fontWeight = 'bold';
 
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.className = 'has-tooltip';
+    playBtn.className = 'glyph-play-btn has-tooltip';
     playBtn.dataset.tooltip = 'Execute prompt';
-    playBtn.style.width = '24px';
-    playBtn.style.height = '24px';
-    playBtn.style.padding = '0';
-    playBtn.style.fontSize = '12px';
-    playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
-    playBtn.style.color = '#a8e6a1';
-    playBtn.style.border = '1px solid rgba(90, 200, 90, 0.3)';
-    playBtn.style.borderRadius = '4px';
-    playBtn.style.cursor = 'pointer';
-    playBtn.style.display = 'flex';
-    playBtn.style.alignItems = 'center';
-    playBtn.style.justifyContent = 'center';
-    playBtn.style.transition = 'all 0.15s ease';
-
-    playBtn.addEventListener('mouseenter', () => {
-        playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.25)';
-        playBtn.style.borderColor = 'rgba(90, 200, 90, 0.5)';
-    });
-
-    playBtn.addEventListener('mouseleave', () => {
-        playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
-        playBtn.style.borderColor = 'rgba(90, 200, 90, 0.3)';
-    });
 
     playBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -274,10 +233,6 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             timestamp: startTime,
         });
 
-        // Clear previous results
-        resultsSection.style.display = 'none';
-        resultsSection.innerHTML = '';
-
         try {
             const response = await apiFetch('/api/prompt/direct', {
                 method: 'POST',
@@ -293,43 +248,25 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             }
 
             const data = await response.json() as any;
-            const endTime = Date.now();
-            const elapsedMs = endTime - startTime;
+            const elapsedMs = Date.now() - startTime;
             const elapsedSeconds = (elapsedMs / 1000).toFixed(2);
-
-            // Render result
-            resultsSection.style.display = 'block';
-            resultsSection.innerHTML = '';
-
-            const resultEl = document.createElement('div');
-            resultEl.style.padding = '6px';
-            resultEl.style.backgroundColor = '#1a1b1a';
-            resultEl.style.borderRadius = '3px';
-            resultEl.style.borderLeft = data.error
-                ? '3px solid #ff6b6b'
-                : '3px solid #a8e6a1';
-
-            const header = document.createElement('div');
-            header.style.color = '#888';
-            header.style.fontSize = '10px';
-            header.style.marginBottom = '4px';
-            header.textContent = data.total_tokens ? `${data.total_tokens} tokens` : '';
-
-            const content = document.createElement('div');
-            content.style.color = data.error ? '#ff6b6b' : '#e0e0e0';
-            content.style.whiteSpace = 'pre-wrap';
-            content.style.wordBreak = 'break-word';
-            content.textContent = data.error || data.response || 'No response';
-
-            resultEl.appendChild(header);
-            resultEl.appendChild(content);
-            resultsSection.appendChild(resultEl);
 
             updateStatus({
                 state: data.error ? 'error' : 'success',
                 message: data.error ? 'Failed' : `${elapsedSeconds}s`,
-                timestamp: endTime,
+                timestamp: Date.now(),
             });
+
+            // Spawn result glyph below the prompt
+            const result: ExecutionResult = {
+                success: !data.error,
+                stdout: data.response ?? '',
+                stderr: '',
+                result: null,
+                error: data.error ?? null,
+                duration_ms: elapsedMs,
+            };
+            spawnResultGlyph(element, result);
 
         } catch (error) {
             log.error(SEG.GLYPH, '[Prompt] Execution failed:', error);
@@ -355,7 +292,6 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     content.style.overflow = 'hidden';
 
     content.appendChild(textarea);
-    content.appendChild(resultsSection);
     content.appendChild(statusSection);
 
     element.appendChild(titleBar);
@@ -363,15 +299,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Resize handle
     const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'prompt-glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.width = '16px';
-    resizeHandle.style.height = '16px';
-    resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-    resizeHandle.style.borderTopLeftRadius = '4px';
+    resizeHandle.className = 'prompt-glyph-resize-handle glyph-resize-handle';
     element.appendChild(resizeHandle);
 
     // Save initial template if new glyph
@@ -380,15 +308,61 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     // Make draggable and resizable
-    makeDraggable(element, titleBar, glyph, { logLabel: 'PromptGlyph' });
+    const cleanupDrag = makeDraggable(element, titleBar, glyph, { logLabel: 'PromptGlyph' });
     makeResizable(element, resizeHandle, glyph, {
         logLabel: 'PromptGlyph',
         minWidth: 280,
         minHeight: 200
     });
 
+    // Register cleanup for conversions
+    storeCleanup(element, cleanupDrag);
+    storeCleanup(element, () => {
+        if (saveTimeout !== undefined) clearTimeout(saveTimeout);
+    });
+
     // Attach tooltip support
     tooltip.attach(element);
 
-    return element;
+    /**
+     * Spawn a result glyph directly below this prompt glyph
+     */
+    function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult): void {
+        const promptRect = promptEl.getBoundingClientRect();
+        const canvas = promptEl.parentElement;
+        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+
+        const rx = promptRect.left - canvasRect.left;
+        const ry = promptRect.bottom - canvasRect.top;
+
+        const resultGlyph: Glyph = {
+            id: `result-${crypto.randomUUID()}`,
+            title: 'Prompt Result',
+            symbol: 'result',
+            x: rx,
+            y: ry,
+            width: Math.round(promptRect.width),
+            renderContent: () => {
+                const el = document.createElement('div');
+                el.textContent = 'Result glyph';
+                return el;
+            }
+        };
+
+        const resultElement = createResultGlyph(resultGlyph, result);
+        canvas?.appendChild(resultElement);
+
+        const resultRect = resultElement.getBoundingClientRect();
+        uiState.addCanvasGlyph({
+            id: resultGlyph.id,
+            symbol: 'result',
+            x: rx,
+            y: ry,
+            width: Math.round(resultRect.width),
+            height: Math.round(resultRect.height),
+            result,
+        });
+
+        log.debug(SEG.GLYPH, `[Prompt] Spawned result glyph ${resultGlyph.id} at (${rx}, ${ry})`);
+    }
 }

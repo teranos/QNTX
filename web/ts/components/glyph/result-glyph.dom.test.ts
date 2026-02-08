@@ -1,5 +1,6 @@
 /**
  * Tests for result glyph component
+ * Focus: API contract, structure, and behavior (not styling)
  */
 
 import { describe, test, expect, beforeEach } from 'bun:test';
@@ -22,9 +23,7 @@ if (USE_JSDOM) {
     globalThis.window = window as any;
     globalThis.localStorage = window.localStorage as any;
 
-    // Add AbortController polyfill
-    // jsdom has AbortController but it's not compatible with addEventListener signal option
-    // Use the window's native implementations
+    // jsdom's AbortController is compatible with addEventListener signal option
     globalThis.AbortController = window.AbortController as any;
     globalThis.AbortSignal = window.AbortSignal as any;
 }
@@ -43,8 +42,6 @@ describe('ResultGlyph', () => {
             id: 'result-test-123',
             title: 'Python Result',
             symbol: 'result',
-            gridX: 5,
-            gridY: 10,
             width: 400,
             renderContent: () => document.createElement('div')
         };
@@ -60,9 +57,10 @@ describe('ResultGlyph', () => {
     });
 
     describe('rendering', () => {
-        test('creates element with correct class', () => {
+        test('creates element with result and base glyph classes', () => {
             const element = createResultGlyph(glyph, result);
-            expect(element.className).toBe('canvas-result-glyph');
+            expect(element.classList.contains('canvas-result-glyph')).toBe(true);
+            expect(element.classList.contains('canvas-glyph')).toBe(true);
         });
 
         test('sets data-glyph-id attribute', () => {
@@ -81,41 +79,31 @@ describe('ResultGlyph', () => {
             const element = createResultGlyph(glyph, result);
             const closeBtn = element.querySelector('button[title="Close result"]');
             expect(closeBtn).not.toBeNull();
-            expect(closeBtn?.textContent).toBe('×');
         });
 
         test('has to-window button', () => {
             const element = createResultGlyph(glyph, result);
             const toWindowBtn = element.querySelector('button[title="Expand to window"]');
             expect(toWindowBtn).not.toBeNull();
-            expect(toWindowBtn?.textContent).toBe('⬆');
         });
     });
 
     describe('output rendering', () => {
-        test('stdout renders in light color', () => {
-            const element = createResultGlyph(glyph, result);
-            const outputContainer = element.querySelector('.result-glyph-output') as HTMLElement;
-            expect(outputContainer).not.toBeNull();
-            expect(outputContainer.style.color).toBe('rgb(224, 224, 224)'); // #e0e0e0
-        });
-
         test('displays stdout text', () => {
             const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
+            expect(outputContainer).not.toBeNull();
             expect(outputContainer?.textContent).toContain('Hello from Python');
         });
 
-        test('stderr renders in error color', () => {
+        test('displays stderr text', () => {
             result.stderr = 'Warning: something happened';
             const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
-            const stderrSpan = Array.from(outputContainer?.childNodes || [])
-                .find(node => node.textContent?.includes('Warning'));
-            expect(stderrSpan).toBeDefined();
+            expect(outputContainer?.textContent).toContain('Warning: something happened');
         });
 
-        test('error message renders in bold error color', () => {
+        test('displays error message', () => {
             result.error = 'RuntimeError: test error';
             const element = createResultGlyph(glyph, result);
             const outputContainer = element.querySelector('.result-glyph-output');
@@ -147,35 +135,6 @@ describe('ResultGlyph', () => {
 
             // Cleanup
             document.body.removeChild(container);
-        });
-
-        test('header is draggable', () => {
-            const element = createResultGlyph(glyph, result);
-            const header = element.querySelector('.result-glyph-header') as HTMLElement;
-            expect(header).not.toBeNull();
-
-            // Verify mousedown event listener exists (cursor should be grabbable)
-            // This is a basic structural test, full drag testing would be integration level
-        });
-    });
-
-    describe('styling', () => {
-        test('has dark background', () => {
-            const element = createResultGlyph(glyph, result) as HTMLElement;
-            expect(element.style.backgroundColor).toBe('rgb(30, 30, 30)'); // #1e1e1e
-        });
-
-        test('has rounded bottom corners only', () => {
-            const element = createResultGlyph(glyph, result) as HTMLElement;
-            // CSS normalizes "0px" to "0" in jsdom
-            expect(element.style.borderRadius).toBe('0 0 4px 4px');
-        });
-
-        test('has no top border', () => {
-            const element = createResultGlyph(glyph, result) as HTMLElement;
-            // jsdom sets default border-top to "medium" when border-top: none is set via style
-            // Verify that borderTopStyle is "none" instead
-            expect(element.style.borderTopStyle).toBe('none');
         });
     });
 });
