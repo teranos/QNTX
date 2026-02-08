@@ -11,6 +11,7 @@
 
 import type { Glyph } from './glyph';
 import { Prose } from '@generated/sym.js';
+import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { makeDraggable, makeResizable } from './glyph-interaction';
@@ -56,15 +57,28 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.width = `${width}px`;
     element.style.height = `${height}px`;
 
-    // Post-it note styling: light beige/yellow background
-    element.style.backgroundColor = '#fffacd'; // Lemon chiffon
-    element.style.border = '1px solid #e6daa6'; // Darker beige border
+    // Post-it note styling: light beige/yellow background with torn top edge
+    element.style.backgroundColor = '#f5edb8'; // Slightly darker beige/yellow
+    element.style.border = '1px solid #d4c59a'; // Darker beige border
     element.style.borderRadius = '2px';
     element.style.boxShadow = '2px 2px 8px rgba(0, 0, 0, 0.15)';
     element.style.display = 'flex';
     element.style.flexDirection = 'column';
     element.style.overflow = 'hidden';
     element.style.cursor = 'move'; // Entire note is draggable
+
+    // Torn edge pattern using clip-path (percentage-based, scales with width)
+    // Only tear the top edge, keep sides and bottom straight (except corner cutout)
+    // Subtle tear effect - small amplitude for natural look
+    const tearPoints: string[] = ['0% 0.5%'];
+    for (let i = 1; i < 100; i++) {
+        const y = 0.3 + Math.sin(i * 0.5) * 0.15 + (Math.sin(i * 1.3) * 0.1);
+        tearPoints.push(`${i}% ${y}%`);
+    }
+    tearPoints.push('100% 0.5%');
+
+    // Complete the shape: straight right side, corner cutout at bottom, straight left side
+    element.style.clipPath = `polygon(${tearPoints.join(', ')}, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0% 100%)`;
 
     // Editor container
     const editorContainer = document.createElement('div');
@@ -94,6 +108,9 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
             margin: 0;
             outline: none;
             cursor: text;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
         .note-editor-container .ProseMirror p {
             margin: 0 0 0.1em 0;
@@ -103,6 +120,29 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
         .note-editor-container .ProseMirror h1 {
             margin: 0 0 0.2em 0;
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        .note-editor-container .ProseMirror strong {
+            font-weight: bold;
+        }
+        .note-editor-container .ProseMirror em {
+            font-style: italic;
+        }
+        .note-editor-container .ProseMirror code {
+            font-family: monospace;
+            background-color: var(--note-code-bg);
+            color: var(--note-code-color);
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .note-editor-container .ProseMirror ul,
+        .note-editor-container .ProseMirror ol {
+            margin: 0.1em 0;
+            padding-left: 1.5em;
+        }
+        .note-editor-container .ProseMirror li {
+            margin: 0;
         }
     `;
     editorContainer.appendChild(style);
@@ -130,6 +170,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     // Create editor state
+    // NOTE: Markdown formatting not rendering for user input - see #435
     const state = EditorState.create({
         doc,
         plugins: [
@@ -184,31 +225,74 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Assemble glyph (no title bar)
     element.appendChild(editorContainer);
 
-    // Resize handle - triangular paper fold corner (like real post-it note)
+    // Resize handle for bottom-right corner (over the folded corner cutout)
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'note-glyph-resize-handle';
     resizeHandle.style.position = 'absolute';
     resizeHandle.style.bottom = '0';
     resizeHandle.style.right = '0';
-    resizeHandle.style.width = '0';
-    resizeHandle.style.height = '0';
-    resizeHandle.style.borderStyle = 'solid';
-    resizeHandle.style.borderWidth = '0 0 20px 20px';
-    resizeHandle.style.borderColor = 'transparent transparent #d4c59a transparent'; // Darker corner for fold
+    resizeHandle.style.width = '10px';
+    resizeHandle.style.height = '10px';
     resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.style.borderBottomRightRadius = '2px';
     element.appendChild(resizeHandle);
 
     // Make entire note draggable (no title bar) and resizable
     makeDraggable(element, element, glyph, { logLabel: 'NoteGlyph' });
     makeResizable(element, resizeHandle, glyph, {
         logLabel: 'NoteGlyph',
-        minWidth: 200,
-        minHeight: 150
+        minWidth: 120,
+        minHeight: 100
     });
+
+    // Set up ResizeObserver for auto-sizing glyph to content
+    setupNoteGlyphResizeObserver(element, editorContainer, glyph.id);
 
     // Attach tooltip support
     tooltip.attach(element);
 
     return element;
+}
+
+/**
+ * Set up ResizeObserver to auto-size note glyph to match editor content height
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupNoteGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    editorContainer: HTMLElement,
+    glyphId: string
+): void {
+    // Cleanup any existing observer to prevent memory leaks on re-render
+    const existingObserver = (glyphElement as any).__resizeObserver;
+    if (existingObserver && typeof existingObserver.disconnect === 'function') {
+        existingObserver.disconnect();
+        delete (glyphElement as any).__resizeObserver;
+        log.debug(SEG.GLYPH, `[Note ${glyphId}] Disconnected existing ResizeObserver`);
+    }
+
+    const padding = 8; // 4px padding on top and bottom
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight + padding, maxHeight);
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[Note ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    // Observe the ProseMirror editor element for content changes
+    const proseMirrorElement = editorContainer.querySelector('.ProseMirror');
+    if (proseMirrorElement) {
+        resizeObserver.observe(proseMirrorElement);
+    } else {
+        log.warn(SEG.GLYPH, `[Note ${glyphId}] ProseMirror element not found for ResizeObserver`);
+    }
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
