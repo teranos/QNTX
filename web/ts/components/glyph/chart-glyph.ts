@@ -114,12 +114,15 @@ export class ChartGlyphState {
 
         // Show loading state
         this.element.innerHTML = `
-            <div class="glyph-content">
+            <div class="glyph-content" style="position: relative;">
                 <div class="chart-container" id="chart-${this.id}">
                     <div class="glyph-loading">Loading chart data...</div>
                 </div>
             </div>
         `;
+
+        // Add view toggle control
+        this.addViewToggle();
 
         try {
             // Fetch data
@@ -324,23 +327,65 @@ export class ChartGlyphState {
                 .text(this.config.secondaryLabel);
         }
 
-        // Add range toggle button
-        const button = document.createElement('button');
-        button.textContent = this.currentRange === 'week' ? 'Switch to Month' : 'Switch to Week';
-        button.style.position = 'absolute';
-        button.style.bottom = '10px';
-        button.style.right = '10px';
-        button.style.padding = '4px 8px';
-        button.style.fontSize = '11px';
-        button.style.backgroundColor = 'var(--bg-tertiary)';
-        button.style.color = 'var(--text-primary)';
-        button.style.border = '1px solid var(--border-color)';
-        button.style.borderRadius = '4px';
-        button.style.cursor = 'pointer';
-        button.addEventListener('click', () => this.toggleRange());
+        // Add view toggle control after rendering
+        this.addViewToggle();
+    }
 
-        container.style.position = 'relative';
-        container.appendChild(button);
+    /**
+     * Add view toggle control (styled like window title bar controls)
+     */
+    private addViewToggle(): void {
+        if (!this.element) return;
+
+        const glyphContent = this.element.querySelector('.glyph-content');
+        if (!glyphContent) return;
+
+        // Remove existing toggle if present
+        const existing = glyphContent.querySelector('.chart-view-toggle');
+        if (existing) {
+            existing.remove();
+        }
+
+        // Create toggle button styled like panel-minimize
+        const toggle = document.createElement('button');
+        toggle.textContent = this.currentRange === 'month' ? 'w' : 'm';
+        toggle.title = this.currentRange === 'month' ? 'Switch to week view' : 'Switch to month view';
+        toggle.className = 'chart-view-toggle';
+
+        // Style to match window controls (.panel-minimize from window.css)
+        toggle.style.position = 'absolute';
+        toggle.style.top = '8px';
+        toggle.style.right = '8px';
+        toggle.style.background = 'transparent';
+        toggle.style.border = '1px solid transparent';
+        toggle.style.fontSize = '14px';
+        toggle.style.color = 'rgba(255, 255, 255, 0.85)';
+        toggle.style.cursor = 'pointer';
+        toggle.style.padding = '0';
+        toggle.style.width = '24px';
+        toggle.style.height = '24px';
+        toggle.style.display = 'flex';
+        toggle.style.alignItems = 'center';
+        toggle.style.justifyContent = 'center';
+        toggle.style.borderRadius = '0';
+        toggle.style.transition = 'background-color 0.15s ease, color 0.15s ease';
+        toggle.style.fontFamily = 'monospace';
+        toggle.style.fontWeight = 'bold';
+
+        // Hover effect
+        toggle.addEventListener('mouseenter', () => {
+            toggle.style.background = 'var(--bg-hover)';
+            toggle.style.color = 'rgba(255, 255, 255, 1)';
+        });
+
+        toggle.addEventListener('mouseleave', () => {
+            toggle.style.background = 'transparent';
+            toggle.style.color = 'rgba(255, 255, 255, 0.85)';
+        });
+
+        toggle.addEventListener('click', () => this.toggleRange());
+
+        glyphContent.appendChild(toggle);
     }
 
     /**
