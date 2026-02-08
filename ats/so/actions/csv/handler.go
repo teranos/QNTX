@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/setup"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 )
@@ -16,7 +16,7 @@ import (
 // Execute generates a CSV file from attestations matching the filter
 func Execute(ctx context.Context, db *sql.DB, payload Payload) error {
 	// Execute the query
-	executor := storage.NewExecutor(db)
+	executor := setup.NewExecutor(db)
 	result, err := executor.ExecuteAsk(ctx, payload.AxFilter)
 	if err != nil {
 		err = errors.Wrap(err, "failed to execute query")
