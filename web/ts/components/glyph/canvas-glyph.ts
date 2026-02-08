@@ -127,6 +127,9 @@ function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
     if (element.classList.contains('canvas-ax-glyph')) {
         return { id, title: 'AX Query', symbol: AX, renderContent: () => element };
     }
+    if (element.classList.contains('canvas-ix-glyph')) {
+        return { id, title: 'Ingest', symbol: IX, renderContent: () => element };
+    }
     if (element.classList.contains('canvas-py-glyph')) {
         return { id, title: 'Python', symbol: 'py', renderContent: () => element };
     }
@@ -135,6 +138,9 @@ function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
     }
     if (element.classList.contains('canvas-note-glyph')) {
         return { id, title: 'Note', symbol: Prose, renderContent: () => element };
+    }
+    if (element.classList.contains('canvas-result-glyph')) {
+        return { id, title: 'Result', symbol: 'result', renderContent: () => element };
     }
     // Fallback
     return { id, title: 'Glyph', renderContent: () => element };
@@ -242,7 +248,14 @@ function deleteSelectedGlyphs(container: HTMLElement): void {
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
     const savedGlyphs = uiState.getCanvasGlyphs();
-    log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
+    const resultCount = savedGlyphs.filter(g => g.symbol === 'result').length;
+    log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state (${resultCount} result glyphs)`, {
+        symbols: savedGlyphs.map(g => g.symbol),
+        resultGlyphs: savedGlyphs.filter(g => g.symbol === 'result').map(g => ({
+            id: g.id,
+            hasResult: !!g.result
+        }))
+    });
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
         // For ax glyphs, recreate using factory function to restore full functionality
@@ -467,16 +480,74 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     // For result glyphs, create result display
-    if (glyph.symbol === 'result' && glyph.result) {
-        log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
-        return createResultGlyph(glyph, glyph.result as ExecutionResult);
+    if (glyph.symbol === 'result') {
+        if (glyph.result) {
+            log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
+            return createResultGlyph(glyph, glyph.result as ExecutionResult);
+        }
+
+        // Result glyph without execution data - show detailed error
+        log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing execution data`, {
+            glyphId: glyph.id,
+            hasResult: !!glyph.result,
+            position: { x: glyph.x, y: glyph.y },
+            size: { width: glyph.width, height: glyph.height }
+        });
+
+        const placeholder = document.createElement('div');
+        placeholder.style.padding = '16px';
+        placeholder.style.backgroundColor = 'rgba(60, 20, 20, 0.8)';
+        placeholder.style.border = '1px solid #aa4444';
+        placeholder.style.borderRadius = '4px';
+        placeholder.style.color = '#ffaaaa';
+        placeholder.style.fontFamily = 'monospace';
+        placeholder.style.fontSize = '12px';
+        placeholder.style.whiteSpace = 'pre-wrap';
+
+        placeholder.textContent = [
+            '⚠️  Result Glyph Error',
+            '',
+            `Glyph ID: ${glyph.id}`,
+            `Symbol: ${glyph.symbol}`,
+            `Position: (${glyph.x}, ${glyph.y})`,
+            `Has result data: ${!!glyph.result}`,
+            '',
+            'Cause: Execution result data missing',
+            'Result glyphs are ephemeral execution outputs.',
+            'This can happen if the glyph was persisted without',
+            'its execution data, or if restoration failed.',
+        ].join('\n');
+
+        return placeholder;
     }
 
     // Unsupported glyph type - log error and return placeholder
-    log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`);
+    log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
+        glyphId: glyph.id,
+        symbol: glyph.symbol,
+        position: { x: glyph.x, y: glyph.y }
+    });
+
     const placeholder = document.createElement('div');
-    placeholder.textContent = `Unknown glyph type: ${glyph.symbol}`;
-    placeholder.style.padding = '8px';
-    placeholder.style.color = 'red';
+    placeholder.style.padding = '16px';
+    placeholder.style.backgroundColor = 'rgba(60, 20, 20, 0.8)';
+    placeholder.style.border = '1px solid #aa4444';
+    placeholder.style.borderRadius = '4px';
+    placeholder.style.color = '#ffaaaa';
+    placeholder.style.fontFamily = 'monospace';
+    placeholder.style.fontSize = '12px';
+    placeholder.style.whiteSpace = 'pre-wrap';
+
+    placeholder.textContent = [
+        '⚠️  Unknown Glyph Type',
+        '',
+        `Glyph ID: ${glyph.id}`,
+        `Symbol: ${glyph.symbol}`,
+        `Position: (${glyph.x}, ${glyph.y})`,
+        '',
+        'This glyph type is not supported in renderGlyph().',
+        'Check canvas-glyph.ts for supported types.',
+    ].join('\n');
+
     return placeholder;
 }
