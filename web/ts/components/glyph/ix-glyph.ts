@@ -30,7 +30,7 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
@@ -135,10 +135,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         }, 500);
     });
 
-    // Prevent drag from starting on textarea
-    textarea.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
+    preventDrag(textarea);
 
     // Status display section (declared early so helpers can reference it)
     const statusSection = document.createElement('div');

@@ -22,7 +22,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
@@ -110,10 +110,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.style.fontSize = '12px';
     runButton.style.color = 'var(--text-primary)';
 
-    // Prevent drag when clicking button
-    runButton.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
+    preventDrag(runButton);
 
     // Execute Python code on click
     runButton.addEventListener('click', async () => {

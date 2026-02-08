@@ -17,7 +17,7 @@ import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 
 /**
@@ -115,9 +115,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
         }, 500);
     });
 
-    textarea.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
+    preventDrag(textarea);
 
     // Results section
     const resultsSection = document.createElement('div');
