@@ -284,7 +284,7 @@ export function registerDefaultGlyphs(): void {
             secondaryColor: '#60a5fa',
             chartType: 'area',
             formatValue: (v) => `$${v.toFixed(2)}`,
-            defaultRange: 'week'
+            defaultRange: 'month'
         }
     ));
 
