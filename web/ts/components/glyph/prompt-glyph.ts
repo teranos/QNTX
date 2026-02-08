@@ -97,8 +97,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.padding = '8px';
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = '#1a1b1a';
-    textarea.style.color = '#d4b8ff'; // Purple tint for prompt templates
+    textarea.style.backgroundColor = 'var(--bg-almost-black)';
+    textarea.style.color = 'var(--glyph-prompt-accent)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
@@ -146,13 +146,13 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     function updateStatus(status: PromptGlyphStatus): void {
         switch (status.state) {
             case 'running':
-                element.style.backgroundColor = '#1f2a3d';
+                element.style.backgroundColor = 'var(--glyph-status-running-bg)';
                 break;
             case 'success':
-                element.style.backgroundColor = '#1f3d1f';
+                element.style.backgroundColor = 'var(--glyph-status-success-bg)';
                 break;
             case 'error':
-                element.style.backgroundColor = '#3d1f1f';
+                element.style.backgroundColor = 'var(--glyph-status-error-bg)';
                 break;
             default:
                 element.style.backgroundColor = 'var(--bg-secondary)';
@@ -164,16 +164,16 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
             switch (status.state) {
                 case 'running':
-                    statusSection.style.color = '#6b9bd1';
-                    statusSection.style.backgroundColor = '#1a2332';
+                    statusSection.style.color = 'var(--glyph-status-running-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-running-section-bg)';
                     break;
                 case 'success':
-                    statusSection.style.color = '#a8e6a1';
-                    statusSection.style.backgroundColor = '#1a2b1a';
+                    statusSection.style.color = 'var(--glyph-status-success-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-success-section-bg)';
                     break;
                 case 'error':
-                    statusSection.style.color = '#ff6b6b';
-                    statusSection.style.backgroundColor = '#2b1a1a';
+                    statusSection.style.color = 'var(--glyph-status-error-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-error-section-bg)';
                     break;
             }
         } else {
@@ -203,14 +203,14 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const symbol = document.createElement('span');
     symbol.textContent = SO;
     symbol.style.fontSize = '16px';
-    symbol.style.color = '#d4b8ff'; // Purple for prompt/SO
+    symbol.style.color = 'var(--glyph-prompt-accent)';
     symbol.style.fontWeight = 'bold';
 
     const title = document.createElement('span');
     title.textContent = 'Prompt';
     title.style.fontSize = '13px';
     title.style.flex = '1';
-    title.style.color = '#ffffff';
+    title.style.color = 'var(--text-on-dark-emphasis)';
     title.style.fontWeight = 'bold';
 
     // Play button
@@ -223,7 +223,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     playBtn.style.padding = '0';
     playBtn.style.fontSize = '12px';
     playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
-    playBtn.style.color = '#a8e6a1';
+    playBtn.style.color = 'var(--glyph-status-success-text)';
     playBtn.style.border = '1px solid rgba(90, 200, 90, 0.3)';
     playBtn.style.borderRadius = '4px';
     playBtn.style.cursor = 'pointer';
@@ -303,11 +303,11 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
             const resultEl = document.createElement('div');
             resultEl.style.padding = '6px';
-            resultEl.style.backgroundColor = '#1a1b1a';
+            resultEl.style.backgroundColor = 'var(--bg-almost-black)';
             resultEl.style.borderRadius = '3px';
             resultEl.style.borderLeft = data.error
-                ? '3px solid #ff6b6b'
-                : '3px solid #a8e6a1';
+                ? '3px solid var(--glyph-status-error-text)'
+                : '3px solid var(--glyph-status-success-text)';
 
             const header = document.createElement('div');
             header.style.color = '#888';
@@ -316,7 +316,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
             header.textContent = data.total_tokens ? `${data.total_tokens} tokens` : '';
 
             const content = document.createElement('div');
-            content.style.color = data.error ? '#ff6b6b' : '#e0e0e0';
+            content.style.color = data.error ? 'var(--glyph-status-error-text)' : 'var(--text-on-dark)';
             content.style.whiteSpace = 'pre-wrap';
             content.style.wordBreak = 'break-word';
             content.textContent = data.error || data.response || 'No response';

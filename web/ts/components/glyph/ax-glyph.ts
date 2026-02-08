@@ -131,7 +131,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             label.style.cursor = 'move';
             label.style.fontWeight = 'bold';
             label.style.flexShrink = '0';
-            label.style.color = '#6b9bd1'; // Azure-ish blue
+            label.style.color = 'var(--glyph-status-running-text)';
             titleBar.appendChild(label);
 
             // Single-line query input (takes remaining space)
@@ -429,7 +429,7 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     errorDisplay.style.padding = '6px 8px';
     errorDisplay.style.fontSize = '11px'; // Smaller font
     errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.backgroundColor = severity === 'error' ? '#2b1a1a' : '#2b2b1a';
+    errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : '#2b2b1a';
     errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
     errorDisplay.style.whiteSpace = 'pre-wrap';
     errorDisplay.style.wordBreak = 'break-word';

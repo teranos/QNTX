@@ -296,7 +296,7 @@ export function createCanvasGlyph(): Glyph {
             container.style.height = '100%';
             container.style.position = 'relative';
             container.style.overflow = 'hidden';
-            container.style.backgroundColor = '#2a2b2a'; // Mid-dark gray for night work
+            container.style.backgroundColor = 'var(--bg-dark-hover)';
             container.style.outline = 'none'; // Remove focus outline
 
             // Add subtle grid overlay
