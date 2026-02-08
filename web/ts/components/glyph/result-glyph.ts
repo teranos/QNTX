@@ -92,7 +92,7 @@ export function createResultGlyph(
     toWindowBtn.style.color = 'var(--text-primary)';
 
     toWindowBtn.addEventListener('click', () => {
-        // TODO: Implement window manifestation morphing
+        // TODO: Implement window manifestation morphing (tracked in #440)
         log.debug(SEG.GLYPH, '[ResultGlyph] To window clicked (not implemented)');
     });
 

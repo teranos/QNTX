@@ -40,13 +40,19 @@ function captureLayout(container: HTMLElement, element: HTMLElement) {
 export async function convertNoteToPrompt(container: HTMLElement, glyphId: string): Promise<boolean> {
     const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (!element) {
-        log.error(SEG.GLYPH, `[Note→Prompt] Note glyph ${glyphId} not found in container`);
+        const existingGlyphs = Array.from(container.querySelectorAll('[data-glyph-id]'))
+            .map(el => (el as HTMLElement).dataset.glyphId)
+            .filter(Boolean);
+        log.error(SEG.GLYPH,
+            `[Note→Prompt] Note glyph ${glyphId} not found in container.${container.className} ` +
+            `(${container.children.length} children, existing glyphs: ${existingGlyphs.join(', ') || 'none'})`
+        );
         return false;
     }
 
     // Block conversion if glyph is inside a composition
     if (element.parentElement?.classList.contains('glyph-composition')) {
-        log.info(SEG.GLYPH, `[Note→Prompt] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
+        log.warn(SEG.GLYPH, `[Note→Prompt] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
         return false;
     }
 
@@ -71,7 +77,13 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
 
     // Transfer content to new storage key before setup (setupPromptGlyph loads from storage)
     await storage.save(promptGlyph.id, noteContent);
-    await storage.delete(glyphId);
+
+    try {
+        await storage.delete(glyphId);
+    } catch (err) {
+        log.warn(SEG.GLYPH, `[Note→Prompt] Failed to delete old note storage for ${glyphId}:`, err);
+        // Continue with conversion even if delete fails - orphaned data is non-critical
+    }
 
     // Tear down old glyph internals, repopulate as prompt
     runCleanup(element);
@@ -98,13 +110,19 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
 export async function convertResultToNote(container: HTMLElement, glyphId: string): Promise<boolean> {
     const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (!element) {
-        log.error(SEG.GLYPH, `[Result→Note] Result glyph ${glyphId} not found in container`);
+        const existingGlyphs = Array.from(container.querySelectorAll('[data-glyph-id]'))
+            .map(el => (el as HTMLElement).dataset.glyphId)
+            .filter(Boolean);
+        log.error(SEG.GLYPH,
+            `[Result→Note] Result glyph ${glyphId} not found in container.${container.className} ` +
+            `(${container.children.length} children, existing glyphs: ${existingGlyphs.join(', ') || 'none'})`
+        );
         return false;
     }
 
     // Block conversion if glyph is inside a composition
     if (element.parentElement?.classList.contains('glyph-composition')) {
-        log.info(SEG.GLYPH, `[Result→Note] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
+        log.warn(SEG.GLYPH, `[Result→Note] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
         return false;
     }
 

@@ -20,7 +20,7 @@
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, cleanupResizeObserver } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
@@ -277,12 +277,7 @@ function setupAxGlyphResizeObserver(
     glyphId: string
 ): void {
     // Cleanup any existing observer to prevent memory leaks on re-render
-    const existingObserver = (glyphElement as any).__resizeObserver;
-    if (existingObserver && typeof existingObserver.disconnect === 'function') {
-        existingObserver.disconnect();
-        delete (glyphElement as any).__resizeObserver;
-        log.debug(SEG.GLYPH, `[AX ${glyphId}] Disconnected existing ResizeObserver`);
-    }
+    cleanupResizeObserver(glyphElement, `AX ${glyphId}`);
 
     const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
     const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;

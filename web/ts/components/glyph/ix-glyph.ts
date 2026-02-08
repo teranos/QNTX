@@ -93,7 +93,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Initial width will be set by resizeToFitText()
     const width = glyph.width ?? 360;
 
-    applyCanvasGlyphLayout(element, { x, y, width, height: undefined, useMinHeight: false });
+    applyCanvasGlyphLayout(element, { x, y, width, height: 120, useMinHeight: false });
     element.style.height = 'auto'; // Auto height based on content
     element.style.overflow = 'visible';
 
