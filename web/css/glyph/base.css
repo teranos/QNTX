@@ -96,6 +96,10 @@
     background-color: var(--bg-dark-light);
 }
 
+.glyph-play-btn:active {
+    border-color: var(--border-light);
+}
+
 
 .canvas-glyph-title-bar {
     height: 32px;
