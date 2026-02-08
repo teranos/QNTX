@@ -64,7 +64,17 @@
 #### Frontend Tests ✅
 - ✅ Update `web/ts/state/compositions.test.ts` for `glyphIds` array
 - ✅ Update `web/ts/components/glyph/meld-system.test.ts` for new unmeld return format
-- ✅ All tests passing: 325 pass, 0 fail
+- ✅ Add skipped TDD tests in `web/ts/state/compositions.test.ts`:
+  - ✅ 3-glyph composition stores correctly
+  - ✅ `isGlyphInComposition` works with 3-glyph chains
+  - ✅ `findCompositionByGlyph` finds 3-glyph chains
+  - ✅ Extending composition adds glyph to array
+- ✅ Add skipped TDD tests in `web/ts/components/glyph/meld-system.test.ts`:
+  - ✅ Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition
+  - ✅ Tim sees proximity feedback when dragging glyph toward composition
+  - ✅ Tim extends ax|py composition by dragging prompt onto it
+  - ✅ Tim extends 3-glyph chain into 4-glyph chain
+- ✅ All active tests passing: 352 pass, 0 fail (8 skipped)
 
 ### Phase 2: Meldability Logic
 
@@ -105,17 +115,26 @@
 
 ### Phase 4: Tests
 
-- [ ] Update `web/ts/components/glyph/meld-system.test.ts`
-  - [ ] Test: `ax + py → [ax|py]` (existing)
-  - [ ] Test: `[ax|py] + prompt → [ax|py|prompt]` (NEW)
-  - [ ] Test: `unmeld [ax|py|prompt] → ax, py, prompt` (NEW)
-  - [ ] Test: `composition appears in meldability registry` (NEW)
-  - [ ] Test: `findMeldTarget() detects compositions` (NEW)
-  - [ ] Test: `restore 3-glyph composition from storage` (NEW)
+**TDD tests already written (skipped until implementation):**
+- [ ] Unskip `web/ts/components/glyph/meld-system.test.ts`:
+  - [ ] "Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition"
+  - [ ] "Tim sees proximity feedback when dragging glyph toward composition"
+  - [ ] "Tim extends ax|py composition by dragging prompt onto it"
+  - [ ] "Tim extends 3-glyph chain into 4-glyph chain"
+- [ ] Unskip `web/ts/state/compositions.test.ts`:
+  - [ ] "3-glyph composition stores correctly"
+  - [ ] "isGlyphInComposition works with 3-glyph chains"
+  - [ ] "findCompositionByGlyph finds 3-glyph chains"
+  - [ ] "extending composition adds glyph to array"
 
+**Additional tests needed:**
 - [ ] Update handler tests in `glyph/handlers/canvas_test.go`
   - [ ] Test POST with 3 glyph IDs
   - [ ] Test GET returns correct glyph order
+- [ ] Add visual layout tests
+  - [ ] Test: glyphs horizontally aligned in 3-glyph chain
+  - [ ] Test: no overlap between adjacent glyphs
+  - [ ] Test: proper spacing maintained
 
 ### Phase 5: Integration & Polish
 
