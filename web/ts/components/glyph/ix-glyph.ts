@@ -116,8 +116,8 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.padding = '8px';
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = '#1a1b1a';
-    textarea.style.color = '#a8e6a1';
+    textarea.style.backgroundColor = 'var(--bg-almost-black)';
+    textarea.style.color = 'var(--glyph-status-success-text)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
@@ -161,16 +161,16 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         // Update background color
         switch (status.state) {
             case 'running':
-                element.style.backgroundColor = '#1f2a3d'; // Blue tint
+                element.style.backgroundColor = 'var(--glyph-status-running-bg)';
                 break;
             case 'success':
-                element.style.backgroundColor = '#1f3d1f'; // Green tint
+                element.style.backgroundColor = 'var(--glyph-status-success-bg)';
                 break;
             case 'error':
-                element.style.backgroundColor = '#3d1f1f'; // Red tint
+                element.style.backgroundColor = 'var(--glyph-status-error-bg)';
                 break;
             default:
-                element.style.backgroundColor = 'var(--bg-secondary)'; // Default
+                element.style.backgroundColor = 'var(--bg-secondary)';
         }
 
         // Update status section
@@ -178,19 +178,18 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
             statusSection.style.display = 'block';
             statusSection.textContent = status.message;
 
-            // Color the status section text
             switch (status.state) {
                 case 'running':
-                    statusSection.style.color = '#6b9bd1';
-                    statusSection.style.backgroundColor = '#1a2332';
+                    statusSection.style.color = 'var(--glyph-status-running-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-running-section-bg)';
                     break;
                 case 'success':
-                    statusSection.style.color = '#a8e6a1';
-                    statusSection.style.backgroundColor = '#1a2b1a';
+                    statusSection.style.color = 'var(--glyph-status-success-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-success-section-bg)';
                     break;
                 case 'error':
-                    statusSection.style.color = '#ff6b6b';
-                    statusSection.style.backgroundColor = '#2b1a1a';
+                    statusSection.style.color = 'var(--glyph-status-error-text)';
+                    statusSection.style.backgroundColor = 'var(--glyph-status-error-section-bg)';
                     break;
             }
         } else {
@@ -222,14 +221,14 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const symbol = document.createElement('span');
     symbol.textContent = IX;
     symbol.style.fontSize = '16px';
-    symbol.style.color = '#ffffff';
+    symbol.style.color = 'var(--text-on-dark-emphasis)';
     symbol.style.fontWeight = 'bold';
 
     const title = document.createElement('span');
     title.textContent = 'Ingest';
     title.style.fontSize = '13px';
     title.style.flex = '1';
-    title.style.color = '#ffffff';
+    title.style.color = 'var(--text-on-dark-emphasis)';
     title.style.fontWeight = 'bold';
 
     // Play button
