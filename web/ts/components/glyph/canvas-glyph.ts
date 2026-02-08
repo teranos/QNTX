@@ -36,7 +36,8 @@ import { makeDraggable } from './glyph-interaction';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
-import { getAllCompositions, removeComposition } from '../../state/compositions';
+import { setupRectangleSelection, didRectangleSelectionJustComplete } from './canvas/rectangle-selection';
+import { getAllCompositions, removeComposition, extractGlyphIds } from '../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
 
 // ============================================================================
@@ -89,8 +90,15 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
             // Not selected — add to selection
             selectedGlyphIds.push(glyphId);
             const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+            log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Adding to selection', {
+                glyphId,
+                foundElement: !!el,
+                elementClass: el?.className
+            });
             if (el) {
                 el.classList.add('canvas-glyph-selected');
+            } else {
+                log.warn(SEG.GLYPH, '[Canvas] selectGlyph: Element not found', { glyphId });
             }
         }
     } else {
@@ -98,13 +106,25 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
         deselectAll(container);
         selectedGlyphIds = [glyphId];
         const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Replace mode', {
+            glyphId,
+            foundElement: !!el,
+            elementClass: el?.className
+        });
         if (el) {
             el.classList.add('canvas-glyph-selected');
+        } else {
+            log.warn(SEG.GLYPH, '[Canvas] selectGlyph: Element not found in replace mode', { glyphId });
         }
     }
 
     // Show/hide action bar based on selection
+    log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Checking action bar', {
+        selectedCount: selectedGlyphIds.length,
+        selectedIds: selectedGlyphIds
+    });
     if (selectedGlyphIds.length > 0) {
+        log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Showing action bar');
         showActionBar(
             selectedGlyphIds,
             container,
@@ -161,6 +181,30 @@ function deselectAll(container: HTMLElement): void {
 }
 
 /**
+ * Unmeld composition containing currently selected glyphs
+ * Called by keyboard shortcut 'u'
+ */
+function unmeldFromSelection(container: HTMLElement): void {
+    if (selectedGlyphIds.length === 0) {
+        return;
+    }
+
+    // Find if any selected glyph is in a composition
+    for (const glyphId of selectedGlyphIds) {
+        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        if (!glyphEl) continue;
+
+        const composition = glyphEl.closest('.melded-composition') as HTMLElement | null;
+        if (composition) {
+            unmeldSelectedGlyphs(container, composition);
+            return;  // Only unmeld one composition at a time
+        }
+    }
+
+    log.debug(SEG.GLYPH, '[Canvas] No composition found for selected glyphs');
+}
+
+/**
  * Unmeld selected glyphs that are in a melded composition
  */
 function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement): void {
@@ -171,11 +215,11 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
         return;
     }
 
-    const { glyphElements, glyphIds } = result;
+    const { glyphElements } = result;
 
     // Restore drag handlers on each unmelded glyph
-    glyphElements.forEach((element, index) => {
-        const glyphId = glyphIds[index];
+    glyphElements.forEach((element) => {
+        const glyphId = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
         const glyph = createGlyphFromElement(element, glyphId);
 
         // Determine log label from glyph symbol
@@ -187,7 +231,10 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
     // Clear selection and hide action bar
     deselectAll(container);
 
-    log.debug(SEG.GLYPH, '[Canvas] Unmelded composition', { glyphIds, count: glyphElements.length });
+    log.debug(SEG.GLYPH, '[Canvas] Unmelded composition', {
+        count: glyphElements.length,
+        glyphIds: glyphElements.map(el => el.dataset.glyphId).filter(Boolean)
+    });
 }
 
 /**
@@ -381,20 +428,31 @@ export function createCanvasGlyph(): Glyph {
                     }
                 } else {
                     // Clicked on background (not a glyph) — deselect
-                    deselectAll(container);
+                    // But skip if rectangle selection just completed (to avoid immediate deselection)
+                    if (!didRectangleSelectionJustComplete()) {
+                        deselectAll(container);
+                    }
                 }
             }, true);
 
-            // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete)
+            // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete, U to unmeld)
             // AbortController signal auto-cleans up when container is removed from DOM
             void setupKeyboardShortcuts(
                 container,
                 () => selectedGlyphIds.length > 0,
                 () => deselectAll(container),
-                () => deleteSelectedGlyphs(container)
+                () => deleteSelectedGlyphs(container),
+                () => unmeldFromSelection(container)
             );
             // Note: AbortController returned but not stored - signal handles cleanup automatically
             // Future: if we add explicit canvas.destroy(), store and call .abort()
+
+            // Setup rectangle selection (drag on canvas background to select glyphs)
+            void setupRectangleSelection(
+                container,
+                selectGlyph,
+                deselectAll
+            );
 
             // Clean up local glyphs array when a glyph is deleted
             container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
@@ -417,32 +475,35 @@ export function createCanvasGlyph(): Glyph {
                 log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
 
                 for (const comp of savedCompositions) {
-                    // TODO: Remove this guard after Feb 2026 (migration from initiatorId/targetId to glyphIds)
-                    // Skip and clean up invalid compositions (old format without glyphIds array)
-                    // This handles stale IndexedDB data from before PR #436 schema change
-                    if (!comp.glyphIds || !Array.isArray(comp.glyphIds)) {
-                        log.warn(SEG.GLYPH, `[Canvas] Removing invalid composition ${comp.id} - old format (missing glyphIds array)`);
+                    // TODO: Remove this guard after Feb 2026 (migration to edge-based DAG structure)
+                    // Skip and clean up invalid compositions (old format without edges)
+                    // This handles stale IndexedDB data from before PR #443 schema change
+                    if (!comp.edges || !Array.isArray(comp.edges)) {
+                        log.warn(SEG.GLYPH, `[Canvas] Removing invalid composition ${comp.id} - old format (missing edges array)`);
                         removeComposition(comp.id);
                         continue;
                     }
 
+                    // Extract glyph IDs from edges (DAG-native)
+                    const glyphIds = extractGlyphIds(comp.edges);
+
                     // Find all glyph elements in the DOM
-                    const glyphElements = comp.glyphIds
+                    const glyphElements = glyphIds
                         .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement)
                         .filter(el => el !== null);
 
-                    if (glyphElements.length !== comp.glyphIds.length) {
+                    if (glyphElements.length !== glyphIds.length) {
                         log.warn(SEG.GLYPH, `[Canvas] Cannot restore composition ${comp.id} - missing glyphs`, {
-                            glyphIds: comp.glyphIds,
+                            glyphIds,
                             foundCount: glyphElements.length,
-                            expectedCount: comp.glyphIds.length
+                            expectedCount: glyphIds.length
                         });
                         continue;
                     }
 
                     // Reconstruct the composition DOM (without persisting)
                     try {
-                        const composition = reconstructMeld(glyphElements, comp.id, comp.type, comp.x, comp.y);
+                        const composition = reconstructMeld(glyphElements, comp.id, comp.x, comp.y);
 
                         // Make the restored composition draggable
                         const compositionGlyph: Glyph = {
@@ -455,7 +516,8 @@ export function createCanvasGlyph(): Glyph {
                         });
 
                         log.debug(SEG.GLYPH, `[Canvas] Restored composition ${comp.id}`, {
-                            type: comp.type
+                            edgeCount: comp.edges.length,
+                            glyphCount: glyphIds.length
                         });
                     } catch (err) {
                         log.error(SEG.GLYPH, `[Canvas] Failed to restore composition ${comp.id}`, { error: err });

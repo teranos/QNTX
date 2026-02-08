@@ -7,7 +7,18 @@ import (
 	"time"
 
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	pb "github.com/teranos/QNTX/glyph/proto"
 )
+
+// Helper function to create edges for testing
+func makeEdge(from, to, direction string, position int32) *pb.CompositionEdge {
+	return &pb.CompositionEdge{
+		From:      from,
+		To:        to,
+		Direction: direction,
+		Position:  position,
+	}
+}
 
 func TestCanvasStore_UpsertGlyph(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
@@ -244,11 +255,12 @@ func TestCanvasStore_UpsertComposition(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:       "comp-1",
-		Type:     "ax-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        150,
-		Y:        150,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 150,
+		Y: 150,
 	}
 
 	err := store.UpsertComposition(ctx, comp)
@@ -264,15 +276,18 @@ func TestCanvasStore_UpsertComposition(t *testing.T) {
 	if retrieved.ID != comp.ID {
 		t.Errorf("ID mismatch: got %s, want %s", retrieved.ID, comp.ID)
 	}
-	if retrieved.Type != comp.Type {
-		t.Errorf("Type mismatch: got %s, want %s", retrieved.Type, comp.Type)
+	if len(retrieved.Edges) != len(comp.Edges) {
+		t.Errorf("Edges length mismatch: got %d, want %d", len(retrieved.Edges), len(comp.Edges))
 	}
-	if len(retrieved.GlyphIDs) != len(comp.GlyphIDs) {
-		t.Errorf("GlyphIDs length mismatch: got %d, want %d", len(retrieved.GlyphIDs), len(comp.GlyphIDs))
-	}
-	for i, id := range comp.GlyphIDs {
-		if retrieved.GlyphIDs[i] != id {
-			t.Errorf("GlyphID[%d] mismatch: got %s, want %s", i, retrieved.GlyphIDs[i], id)
+	for i, edge := range comp.Edges {
+		if retrieved.Edges[i].From != edge.From {
+			t.Errorf("Edge[%d].From mismatch: got %s, want %s", i, retrieved.Edges[i].From, edge.From)
+		}
+		if retrieved.Edges[i].To != edge.To {
+			t.Errorf("Edge[%d].To mismatch: got %s, want %s", i, retrieved.Edges[i].To, edge.To)
+		}
+		if retrieved.Edges[i].Direction != edge.Direction {
+			t.Errorf("Edge[%d].Direction mismatch: got %s, want %s", i, retrieved.Edges[i].Direction, edge.Direction)
 		}
 	}
 }
@@ -291,20 +306,24 @@ func TestCanvasStore_UpsertComposition_Update(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:       "comp-1",
-		Type:     "ax-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        150,
-		Y:        150,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 150,
+		Y: 150,
 	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
 		t.Fatalf("UpsertComposition (create) failed: %v", err)
 	}
 
+	// Update position and edges
 	comp.X = 250
 	comp.Y = 350
-	comp.Type = "ax-py"
+	comp.Edges = []*pb.CompositionEdge{
+		makeEdge("glyph-2", "glyph-1", "right", 0), // reversed direction
+	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
 		t.Fatalf("UpsertComposition (update) failed: %v", err)
@@ -321,8 +340,11 @@ func TestCanvasStore_UpsertComposition_Update(t *testing.T) {
 	if retrieved.Y != 350 {
 		t.Errorf("Y not updated: got %d, want 350", retrieved.Y)
 	}
-	if retrieved.Type != "ax-py" {
-		t.Errorf("Type not updated: got %s, want ax-py", retrieved.Type)
+	if len(retrieved.Edges) != 1 {
+		t.Errorf("Edges not updated: got %d edges, want 1", len(retrieved.Edges))
+	}
+	if retrieved.Edges[0].From != "glyph-2" {
+		t.Errorf("Edge.From not updated: got %s, want glyph-2", retrieved.Edges[0].From)
 	}
 
 	comps, err := store.ListCompositions(ctx)
@@ -365,8 +387,18 @@ func TestCanvasStore_ListCompositions(t *testing.T) {
 	}
 
 	comps := []*CanvasComposition{
-		{ID: "comp-1", Type: "ax-prompt", GlyphIDs: []string{"g1", "g2"}, X: 100, Y: 100},
-		{ID: "comp-2", Type: "ax-py", GlyphIDs: []string{"g2", "g3"}, X: 200, Y: 200},
+		{
+			ID:    "comp-1",
+			Edges: []*pb.CompositionEdge{makeEdge("g1", "g2", "right", 0)},
+			X:     100,
+			Y:     100,
+		},
+		{
+			ID:    "comp-2",
+			Edges: []*pb.CompositionEdge{makeEdge("g2", "g3", "right", 0)},
+			X:     200,
+			Y:     200,
+		},
 	}
 
 	for _, c := range comps {
@@ -414,10 +446,11 @@ func TestCanvasStore_DeleteComposition(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:       "comp-1",
-		Type:     "py-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        100,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 100,
 		Y:        200,
 	}
 
@@ -496,11 +529,12 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 
 	// Test 1: Cannot create composition with non-existent glyph IDs
 	orphanedComp := &CanvasComposition{
-		ID:       "comp-orphaned",
-		Type:     "ax-prompt",
-		GlyphIDs: []string{"nonexistent-glyph-1", "nonexistent-glyph-2"},
-		X:        100,
-		Y:        100,
+		ID: "comp-orphaned",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("nonexistent-glyph-1", "nonexistent-glyph-2", "right", 0),
+		},
+		X: 100,
+		Y: 100,
 	}
 
 	err := store.UpsertComposition(ctx, orphanedComp)
@@ -530,11 +564,12 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:       "comp-1",
-		Type:     "ax-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        150,
-		Y:        150,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 150,
+		Y: 150,
 	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
@@ -552,13 +587,12 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 		t.Fatalf("DeleteGlyph failed: %v", err)
 	}
 
-	// Verify composition still exists with only glyph-2
-	comp, err = store.GetComposition(ctx, "comp-1")
-	if err != nil {
-		t.Fatalf("GetComposition failed after deleting one glyph: %v", err)
-	}
-	if len(comp.GlyphIDs) != 1 || comp.GlyphIDs[0] != "glyph-2" {
-		t.Errorf("Expected composition with [glyph-2], got %v", comp.GlyphIDs)
+	// Verify composition no longer exists (cascade delete removes edges referencing deleted glyph)
+	// Note: With edge-based structure, deleting glyph-1 removes the edge glyph-1→glyph-2
+	// This leaves the composition with no edges, making it orphaned
+	_, err = store.GetComposition(ctx, "comp-1")
+	if err == nil {
+		t.Error("Expected composition to be orphaned after cascade delete, but it still exists")
 	}
 
 	// Delete remaining glyph - composition becomes orphaned
