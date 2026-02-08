@@ -31,7 +31,7 @@ The developer always uses `make dev` to start the development environment with h
 
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
-**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries.
+**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
 ## Type Generation
 
