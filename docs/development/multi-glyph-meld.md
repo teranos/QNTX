@@ -16,6 +16,7 @@
 - ❌ UI doesn't support melding composition + glyph yet (still binary only)
 - ❌ Meldability logic doesn't recognize compositions as targets
 - ❌ No 3+ glyph chain creation in browser yet
+- ❌ py → py chaining not yet enabled (planned extension for sequential pipelines)
 
 ## Architecture Decision
 
@@ -82,9 +83,14 @@
   - [ ] Add `'melded-composition'` to `MELDABILITY` registry
   - [ ] Define what glyphs can meld with compositions
   - [ ] Add `getCompositionGlyphIds(composition: HTMLElement): string[]` helper
+  - [ ] **Extension:** Enable py → py chaining
+    - [ ] Add `'canvas-py-glyph'` to py's compatible targets: `['canvas-prompt-glyph', 'canvas-py-glyph']`
+    - [ ] Enables sequential Python pipelines: `py|py`, `py|py|prompt`, `ax|py|py`
+    - [ ] Semantic: output of first py script feeds into second py script
 
 - [ ] Update `web/ts/state/compositions.ts`
   - [ ] Add `getCompositionType()` support for 3-glyph chains
+  - [ ] Add support for new composition types: `'py-py'`, `'py-py-prompt'`, `'ax-py-py'`
   - [ ] Add helper: `isCompositionMeldable(comp: CompositionState, glyphType: string): boolean`
   - [ ] Update `addComposition()` to handle N glyphs
 
@@ -140,6 +146,11 @@
   - [ ] Test: glyphs horizontally aligned in 3-glyph chain
   - [ ] Test: no overlap between adjacent glyphs
   - [ ] Test: proper spacing maintained
+- [ ] Add py-py chaining tests
+  - [ ] Test: `py + py → [py|py]` creates 2-glyph py chain
+  - [ ] Test: `[py|py] + prompt → [py|py|prompt]` extends py chain
+  - [ ] Test: `ax + py → [ax|py]` then `[ax|py] + py → [ax|py|py]`
+  - [ ] Test: meldability registry allows py → py melding
 
 ### Phase 5: Integration & Polish
 
@@ -148,9 +159,15 @@
   - [ ] Drag `prompt` to meld → verify `[ax|py|prompt]` forms
   - [ ] Refresh page → verify chain persists
   - [ ] Unmeld → verify all 3 glyphs separate correctly
+  - [ ] **py-py chaining:**
+    - [ ] Create `[py|py]` by dragging py onto py
+    - [ ] Extend to `[py|py|prompt]` by dragging prompt
+    - [ ] Verify `[ax|py|py]` works (ax followed by 2 py scripts)
+    - [ ] Test data flows correctly through sequential py scripts
 
 - [ ] Update documentation
   - [ ] Add example to `docs/vision/glyph-melding.md`
+  - [ ] Document py-py chain semantics (sequential pipeline)
   - [ ] Note limitations (linear only, no branching)
 
 ## Open Questions
@@ -159,6 +176,15 @@
 2. **Chain validation?** Should we enforce valid orderings (e.g., prevent `[prompt|ax]`)?
 3. **Data flow semantics?** How does data pass through 3-glyph chains?
 4. **Unmeld granularity?** Should pulling middle glyph split chain in two?
+
+## Design Decisions
+
+**py → py chaining (Phase 2 extension):**
+- **Decision:** Enable py glyphs to chain with other py glyphs
+- **Rationale:** Sequential Python pipelines are a common pattern (ETL, data transformation chains)
+- **Semantic:** Output of first py script feeds as input to second py script
+- **New composition types:** `py-py`, `py-py-prompt`, `ax-py-py`, `py-py-py`, etc.
+- **Implementation:** Update `MELDABILITY` to include `'canvas-py-glyph': ['canvas-prompt-glyph', 'canvas-py-glyph']`
 
 ## Migration Strategy
 
