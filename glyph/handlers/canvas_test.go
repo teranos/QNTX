@@ -225,12 +225,11 @@ func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
 	}
 
 	comp := glyphstorage.CanvasComposition{
-		ID:          "comp-1",
-		Type:        "ax-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           150,
-		Y:           150,
+		ID:       "comp-1",
+		Type:     "ax-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        150,
+		Y:        150,
 	}
 
 	body, _ := json.Marshal(comp)
@@ -274,8 +273,8 @@ func TestCanvasHandler_HandleCompositions_GET_List(t *testing.T) {
 	}
 
 	comps := []*glyphstorage.CanvasComposition{
-		{ID: "comp-1", Type: "ax-prompt", InitiatorID: "g1", TargetID: "g2", X: 100, Y: 100},
-		{ID: "comp-2", Type: "ax-py", InitiatorID: "g2", TargetID: "g3", X: 200, Y: 200},
+		{ID: "comp-1", Type: "ax-prompt", GlyphIDs: []string{"g1", "g2"}, X: 100, Y: 100},
+		{ID: "comp-2", Type: "ax-py", GlyphIDs: []string{"g2", "g3"}, X: 200, Y: 200},
 	}
 
 	for _, c := range comps {
@@ -317,12 +316,11 @@ func TestCanvasHandler_HandleCompositions_GET_Single(t *testing.T) {
 	}
 
 	comp := &glyphstorage.CanvasComposition{
-		ID:          "comp-1",
-		Type:        "py-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           100,
-		Y:           200,
+		ID:       "comp-1",
+		Type:     "py-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertComposition(context.Background(), comp); err != nil {
@@ -377,12 +375,11 @@ func TestCanvasHandler_HandleCompositions_DELETE(t *testing.T) {
 	}
 
 	comp := &glyphstorage.CanvasComposition{
-		ID:          "comp-1",
-		Type:        "ax-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           100,
-		Y:           200,
+		ID:       "comp-1",
+		Type:     "ax-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertComposition(context.Background(), comp); err != nil {
