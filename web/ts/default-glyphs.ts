@@ -276,6 +276,8 @@ export function registerDefaultGlyphs(): void {
         '$ Usage & Costs',
         '/api/timeseries/usage',
         {
+            primaryField: 'cost',
+            secondaryField: 'requests',
             primaryLabel: 'Cost',
             secondaryLabel: 'Requests',
             primaryColor: '#4ade80',

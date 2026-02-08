@@ -16,18 +16,23 @@ import * as d3 from 'd3';
 import { log, SEG } from '../../logger';
 
 /**
- * Time-series data point structure
+ * Time-series data point structure (flexible - maps to backend format)
  */
 export interface TimeSeriesDataPoint {
     date: string; // ISO date string (YYYY-MM-DD)
-    value: number; // Primary metric
-    secondary?: number; // Optional secondary metric
+    [key: string]: any; // Allow any fields from backend
 }
 
 /**
  * Chart configuration
  */
 export interface ChartConfig {
+    /** Field name for primary metric in API response (e.g., "cost", "cpu_percent") */
+    primaryField: string;
+
+    /** Field name for secondary metric in API response (e.g., "requests", "memory_mb") */
+    secondaryField?: string;
+
     /** Primary metric label (e.g., "Cost", "CPU %") */
     primaryLabel: string;
 
@@ -66,6 +71,8 @@ export class ChartGlyphState {
     ) {
         // Apply defaults
         this.config = {
+            primaryField: config.primaryField,
+            secondaryField: config.secondaryField || '',
             primaryLabel: config.primaryLabel,
             secondaryLabel: config.secondaryLabel || '',
             primaryColor: config.primaryColor || '#4ade80',
@@ -176,12 +183,12 @@ export class ChartGlyphState {
         const parseTime = d3.timeParse('%Y-%m-%d');
         const chartData = this.data.map(d => ({
             date: parseTime(d.date)!,
-            value: d.value,
-            secondary: d.secondary
+            value: d[this.config.primaryField],
+            secondary: this.config.secondaryField ? d[this.config.secondaryField] : undefined
         })).filter(d => d.date !== null);
 
         // Calculate total
-        const total = this.data.reduce((sum, d) => sum + d.value, 0);
+        const total = this.data.reduce((sum, d) => sum + d[this.config.primaryField], 0);
 
         // Scales
         const x = d3.scaleTime()
