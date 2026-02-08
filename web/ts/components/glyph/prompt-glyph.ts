@@ -17,7 +17,7 @@ import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag, storeCleanup } from './glyph-interaction';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
@@ -60,6 +60,17 @@ function loadPromptStatus(glyphId: string): PromptGlyphStatus | null {
  * Create a prompt glyph with template editor on canvas
  */
 export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
+    const element = document.createElement('div');
+    await setupPromptGlyph(element, glyph);
+    return element;
+}
+
+/**
+ * Populate an element as a prompt glyph.
+ * Can be called on a fresh element (createPromptGlyph) or an existing one (conversion).
+ * Caller must runCleanup() and clear children before calling on an existing element.
+ */
+export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved template from storage
     const storage = getScriptStorage();
     const defaultTemplate = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
@@ -68,7 +79,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load saved status
     const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
 
-    const element = document.createElement('div');
+    // Reset inline styles (important when repopulating after conversion)
+    element.style.cssText = '';
     element.className = 'canvas-prompt-glyph';
     element.dataset.glyphId = glyph.id;
     element.dataset.glyphSymbol = SO;
@@ -296,17 +308,21 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     // Make draggable and resizable
-    makeDraggable(element, titleBar, glyph, { logLabel: 'PromptGlyph' });
+    const cleanupDrag = makeDraggable(element, titleBar, glyph, { logLabel: 'PromptGlyph' });
     makeResizable(element, resizeHandle, glyph, {
         logLabel: 'PromptGlyph',
         minWidth: 280,
         minHeight: 200
     });
 
+    // Register cleanup for conversions
+    storeCleanup(element, cleanupDrag);
+    storeCleanup(element, () => {
+        if (saveTimeout !== undefined) clearTimeout(saveTimeout);
+    });
+
     // Attach tooltip support
     tooltip.attach(element);
-
-    return element;
 
     /**
      * Spawn a result glyph directly below this prompt glyph

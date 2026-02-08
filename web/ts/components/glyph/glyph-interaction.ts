@@ -71,6 +71,33 @@ export function applyCanvasGlyphLayout(el: HTMLElement, opts: CanvasGlyphLayoutO
     }
 }
 
+// ── Cleanup registry ────────────────────────────────────────────────
+
+const CLEANUP_KEY = '__glyphCleanup';
+
+/**
+ * Store a cleanup function on a glyph element.
+ * Called by glyph setup code so conversions can tear down handlers
+ * before repopulating the same element as a different glyph type.
+ */
+export function storeCleanup(element: HTMLElement, fn: () => void): void {
+    const list: Array<() => void> = (element as any)[CLEANUP_KEY] ??= [];
+    list.push(fn);
+}
+
+/**
+ * Run all stored cleanup functions and clear the list.
+ * Tears down drag, resize, editor, and observer handlers
+ * so the element can be repopulated as a different glyph type.
+ */
+export function runCleanup(element: HTMLElement): void {
+    const list: Array<() => void> | undefined = (element as any)[CLEANUP_KEY];
+    if (list) {
+        for (const fn of list) fn();
+        (element as any)[CLEANUP_KEY] = [];
+    }
+}
+
 // ── preventDrag ─────────────────────────────────────────────────────
 
 /**

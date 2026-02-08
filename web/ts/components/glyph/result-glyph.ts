@@ -8,7 +8,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, makeDraggable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, storeCleanup } from './glyph-interaction';
 
 /**
  * Python execution result data
@@ -173,7 +173,10 @@ export function createResultGlyph(
     element.appendChild(outputContainer);
 
     // Make draggable by header
-    makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
+    const cleanupDrag = makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
+
+    // Register cleanup for conversions
+    storeCleanup(element, cleanupDrag);
 
     return element;
 }
