@@ -92,14 +92,13 @@ func (x *CompositionEdge) GetPosition() int32 {
 }
 
 // Composition represents a DAG of melded glyphs
-// Replaces flat glyphIds array to support arbitrary graph topologies
+// Edges define the graph structure - no derived fields
 type Composition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Edges         []*CompositionEdge     `protobuf:"bytes,2,rep,name=edges,proto3" json:"edges,omitempty"`
-	GlyphIds      []string               `protobuf:"bytes,3,rep,name=glyph_ids,json=glyphIds,proto3" json:"glyph_ids,omitempty"` // computed field: all unique glyph IDs in composition
-	X             float64                `protobuf:"fixed64,4,opt,name=x,proto3" json:"x,omitempty"`                             // anchor X position in pixels
-	Y             float64                `protobuf:"fixed64,5,opt,name=y,proto3" json:"y,omitempty"`                             // anchor Y position in pixels
+	X             float64                `protobuf:"fixed64,4,opt,name=x,proto3" json:"x,omitempty"` // anchor X position in pixels
+	Y             float64                `protobuf:"fixed64,5,opt,name=y,proto3" json:"y,omitempty"` // anchor Y position in pixels
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,13 +147,6 @@ func (x *Composition) GetEdges() []*CompositionEdge {
 	return nil
 }
 
-func (x *Composition) GetGlyphIds() []string {
-	if x != nil {
-		return x.GlyphIds
-	}
-	return nil
-}
-
 func (x *Composition) GetX() float64 {
 	if x != nil {
 		return x.X
@@ -178,13 +170,12 @@ const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x1c\n" +
 	"\tdirection\x18\x03 \x01(\tR\tdirection\x12\x1a\n" +
-	"\bposition\x18\x04 \x01(\x05R\bposition\"\x84\x01\n" +
+	"\bposition\x18\x04 \x01(\x05R\bposition\"m\n" +
 	"\vComposition\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
-	"\x05edges\x18\x02 \x03(\v2\x16.glyph.CompositionEdgeR\x05edges\x12\x1b\n" +
-	"\tglyph_ids\x18\x03 \x03(\tR\bglyphIds\x12\f\n" +
+	"\x05edges\x18\x02 \x03(\v2\x16.glyph.CompositionEdgeR\x05edges\x12\f\n" +
 	"\x01x\x18\x04 \x01(\x01R\x01x\x12\f\n" +
-	"\x01y\x18\x05 \x01(\x01R\x01yB%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
+	"\x01y\x18\x05 \x01(\x01R\x01yJ\x04\b\x03\x10\x04B%Z#github.com/teranos/QNTX/glyph/protob\x06proto3"
 
 var (
 	file_glyph_proto_canvas_proto_rawDescOnce sync.Once
