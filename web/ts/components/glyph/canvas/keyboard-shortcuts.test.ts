@@ -1,6 +1,9 @@
 /**
  * Tests for canvas keyboard shortcuts
  * Focus: AbortController pattern and callback invocation
+ *
+ * Personas:
+ * - Tim: Happy path user, normal workflows
  */
 
 import { describe, test, expect } from 'bun:test';
@@ -12,6 +15,7 @@ describe('Canvas Keyboard Shortcuts', () => {
         const controller = setupKeyboardShortcuts(
             container,
             () => true,
+            () => { },
             () => { },
             () => { }
         );
@@ -28,6 +32,7 @@ describe('Canvas Keyboard Shortcuts', () => {
                 container,
                 () => true,
                 () => { },
+                () => { },
                 () => { }
             );
         }).not.toThrow();
@@ -40,11 +45,38 @@ describe('Canvas Keyboard Shortcuts', () => {
             container,
             () => true,
             () => { },
+            () => { },
             () => { }
         );
 
         // Verify abort method exists and can be called
         expect(typeof controller.abort).toBe('function');
         expect(() => controller.abort()).not.toThrow();
+    });
+
+    test('Tim presses u to unmeld a composition', () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+
+        let unmeldCalled = false;
+        const onUnmeld = () => { unmeldCalled = true; };
+
+        setupKeyboardShortcuts(
+            container,
+            () => true, // has selection
+            () => { },
+            () => { },
+            onUnmeld
+        );
+
+        // Simulate 'u' key press
+        const event = new window.KeyboardEvent('keydown', {
+            key: 'u',
+            bubbles: true,
+            cancelable: true
+        });
+        container.dispatchEvent(event);
+
+        expect(unmeldCalled).toBe(true);
     });
 });
