@@ -40,3 +40,36 @@
 .glyph-run:hover .glyph-run-indicators {
     opacity: 1;
 }
+
+/* Shared resize handle for canvas glyphs (bottom-right corner) */
+.glyph-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    background-color: var(--bg-tertiary);
+    border-top-left-radius: 4px;
+}
+
+/* Smaller variant for note glyphs (sits over folded corner) */
+.glyph-resize-handle--small {
+    width: 10px;
+    height: 10px;
+    background-color: transparent;
+    border-top-left-radius: 0;
+}
+
+/* Shared title bar for canvas glyphs (ix, prompt, and similar) */
+.canvas-glyph-title-bar {
+    height: 32px;
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 8px;
+    cursor: move;
+    flex-shrink: 0;
+}

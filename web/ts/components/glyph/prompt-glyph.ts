@@ -190,15 +190,6 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Title bar
     const titleBar = document.createElement('div');
     titleBar.className = 'canvas-glyph-title-bar';
-    titleBar.style.height = '32px';
-    titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-    titleBar.style.borderBottom = '1px solid var(--border-color)';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'center';
-    titleBar.style.padding = '0 8px';
-    titleBar.style.gap = '8px';
-    titleBar.style.cursor = 'move';
-    titleBar.style.flexShrink = '0';
 
     const symbol = document.createElement('span');
     symbol.textContent = SO;
@@ -363,15 +354,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Resize handle
     const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'prompt-glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.width = '16px';
-    resizeHandle.style.height = '16px';
-    resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-    resizeHandle.style.borderTopLeftRadius = '4px';
+    resizeHandle.className = 'prompt-glyph-resize-handle glyph-resize-handle';
     element.appendChild(resizeHandle);
 
     // Save initial template if new glyph

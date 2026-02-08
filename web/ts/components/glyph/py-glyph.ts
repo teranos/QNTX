@@ -198,15 +198,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Resize handle
     const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'py-glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.width = '16px';
-    resizeHandle.style.height = '16px';
-    resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-    resizeHandle.style.borderTopLeftRadius = '4px';
+    resizeHandle.className = 'py-glyph-resize-handle glyph-resize-handle';
     element.appendChild(resizeHandle);
 
     // Initialize CodeMirror with loaded code
