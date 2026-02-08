@@ -17,7 +17,7 @@ import { addComposition, removeComposition, extractGlyphIds } from '../../state/
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
 export const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
-const UNMELD_OFFSET = 420; // px - horizontal spacing between glyphs when unmelding
+const UNMELD_OFFSET = 20; // px - horizontal spacing between glyphs when unmelding (gentle separation)
 const MIN_VERTICAL_ALIGNMENT = 0.3; // fraction - minimum vertical overlap required (30%)
 
 /**
