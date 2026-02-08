@@ -116,6 +116,8 @@
 ### Phase 4: Tests
 
 **TDD tests already written (skipped until implementation):**
+
+**Frontend tests:**
 - [ ] Unskip `web/ts/components/glyph/meld-system.test.ts`:
   - [ ] "Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition"
   - [ ] "Tim sees proximity feedback when dragging glyph toward composition"
@@ -127,10 +129,13 @@
   - [ ] "findCompositionByGlyph finds 3-glyph chains"
   - [ ] "extending composition adds glyph to array"
 
+**Backend tests:**
+- [ ] Unskip `glyph/handlers/canvas_test.go`:
+  - [ ] `TestCanvasHandler_HandleCompositions_POST_ThreeGlyphs` (POST with 3 glyph IDs)
+  - [ ] `TestCanvasHandler_HandleCompositions_GET_PreservesGlyphOrder` (verifies left-to-right order)
+  - [ ] `TestCanvasHandler_HandleCompositions_POST_FourGlyphChain` (4-glyph chain extensibility)
+
 **Additional tests needed:**
-- [ ] Update handler tests in `glyph/handlers/canvas_test.go`
-  - [ ] Test POST with 3 glyph IDs
-  - [ ] Test GET returns correct glyph order
 - [ ] Add visual layout tests
   - [ ] Test: glyphs horizontally aligned in 3-glyph chain
   - [ ] Test: no overlap between adjacent glyphs

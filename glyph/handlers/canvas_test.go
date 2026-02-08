@@ -463,3 +463,185 @@ func TestCanvasHandler_HandleCompositions_POST_InvalidJSON(t *testing.T) {
 		t.Errorf("Expected status 400, got %d", w.Code)
 	}
 }
+
+// TODO(#441): Phase 2-5 - Multi-glyph chain backend tests
+func TestCanvasHandler_HandleCompositions_POST_ThreeGlyphs(t *testing.T) {
+	t.Skip("TODO(#441): Unskip when 3-glyph chain UI is implemented")
+
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	// Create three glyphs (ax, py, prompt)
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "ax-1", Symbol: "🜶", X: 100, Y: 100},
+		{ID: "py-1", Symbol: "🝓", X: 200, Y: 100},
+		{ID: "prompt-1", Symbol: "🝗", X: 300, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := store.UpsertGlyph(context.Background(), g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Create 3-glyph composition (ax|py|prompt)
+	comp := glyphstorage.CanvasComposition{
+		ID:       "comp-ax-py-prompt",
+		Type:     "ax-py-prompt",
+		GlyphIDs: []string{"ax-1", "py-1", "prompt-1"},
+		X:        150,
+		Y:        150,
+	}
+
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleCompositions(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var response glyphstorage.CanvasComposition
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	// Verify 3 glyph IDs returned
+	if len(response.GlyphIDs) != 3 {
+		t.Errorf("Expected 3 glyph IDs, got %d", len(response.GlyphIDs))
+	}
+
+	// Verify correct order preserved
+	expectedOrder := []string{"ax-1", "py-1", "prompt-1"}
+	for i, expected := range expectedOrder {
+		if response.GlyphIDs[i] != expected {
+			t.Errorf("GlyphIDs[%d]: expected %s, got %s", i, expected, response.GlyphIDs[i])
+		}
+	}
+
+	// Verify type
+	if response.Type != "ax-py-prompt" {
+		t.Errorf("Type mismatch: got %s, want ax-py-prompt", response.Type)
+	}
+}
+
+func TestCanvasHandler_HandleCompositions_GET_PreservesGlyphOrder(t *testing.T) {
+	t.Skip("TODO(#441): Unskip when 3-glyph chain UI is implemented")
+
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	// Create glyphs
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "ax-1", Symbol: "🜶", X: 100, Y: 100},
+		{ID: "py-1", Symbol: "🝓", X: 200, Y: 100},
+		{ID: "prompt-1", Symbol: "🝗", X: 300, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := store.UpsertGlyph(context.Background(), g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Create 3-glyph composition directly in storage
+	comp := &glyphstorage.CanvasComposition{
+		ID:       "comp-1",
+		Type:     "ax-py-prompt",
+		GlyphIDs: []string{"ax-1", "py-1", "prompt-1"},
+		X:        150,
+		Y:        150,
+	}
+	if err := store.UpsertComposition(context.Background(), comp); err != nil {
+		t.Fatalf("UpsertComposition failed: %v", err)
+	}
+
+	// GET single composition
+	req := httptest.NewRequest(http.MethodGet, "/api/canvas/compositions/comp-1", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleCompositions(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var response glyphstorage.CanvasComposition
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	// Critical: Verify order is preserved (left-to-right: ax, py, prompt)
+	expectedOrder := []string{"ax-1", "py-1", "prompt-1"}
+	if len(response.GlyphIDs) != len(expectedOrder) {
+		t.Fatalf("Expected %d glyphs, got %d", len(expectedOrder), len(response.GlyphIDs))
+	}
+
+	for i, expected := range expectedOrder {
+		if response.GlyphIDs[i] != expected {
+			t.Errorf("GlyphIDs[%d]: expected %s, got %s (order not preserved)", i, expected, response.GlyphIDs[i])
+		}
+	}
+}
+
+func TestCanvasHandler_HandleCompositions_POST_FourGlyphChain(t *testing.T) {
+	t.Skip("TODO(#441): Unskip when N-glyph chain extension is implemented")
+
+	db := qntxtest.CreateTestDB(t)
+	store := glyphstorage.NewCanvasStore(db)
+	handler := NewCanvasHandler(store)
+
+	// Create four glyphs
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "ax-1", Symbol: "🜶", X: 100, Y: 100},
+		{ID: "py-1", Symbol: "🝓", X: 200, Y: 100},
+		{ID: "prompt-1", Symbol: "🝗", X: 300, Y: 100},
+		{ID: "prompt-2", Symbol: "🝗", X: 400, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := store.UpsertGlyph(context.Background(), g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Create 4-glyph composition
+	comp := glyphstorage.CanvasComposition{
+		ID:       "comp-4-chain",
+		Type:     "ax-py-prompt-prompt",
+		GlyphIDs: []string{"ax-1", "py-1", "prompt-1", "prompt-2"},
+		X:        150,
+		Y:        150,
+	}
+
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleCompositions(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var response glyphstorage.CanvasComposition
+	if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	// Verify 4-glyph chain stored and retrieved correctly
+	if len(response.GlyphIDs) != 4 {
+		t.Errorf("Expected 4 glyph IDs, got %d", len(response.GlyphIDs))
+	}
+
+	// Verify order
+	expectedOrder := []string{"ax-1", "py-1", "prompt-1", "prompt-2"}
+	for i, expected := range expectedOrder {
+		if response.GlyphIDs[i] != expected {
+			t.Errorf("GlyphIDs[%d]: expected %s, got %s", i, expected, response.GlyphIDs[i])
+		}
+	}
+}
