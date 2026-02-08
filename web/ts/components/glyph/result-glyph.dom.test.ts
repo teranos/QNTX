@@ -7,7 +7,33 @@ import { describe, test, expect, beforeEach } from 'bun:test';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import type { Glyph } from './glyph';
 
+// Only run these tests when USE_JSDOM=1 (CI environment)
+const USE_JSDOM = process.env.USE_JSDOM === '1';
+
+// Setup jsdom if enabled
+if (USE_JSDOM) {
+    const { JSDOM } = await import('jsdom');
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+        url: 'http://localhost'
+    });
+    const { window } = dom;
+    const { document } = window;
+
+    globalThis.document = document as any;
+    globalThis.window = window as any;
+    globalThis.localStorage = window.localStorage as any;
+
+    // jsdom's AbortController is compatible with addEventListener signal option
+    globalThis.AbortController = window.AbortController as any;
+    globalThis.AbortSignal = window.AbortSignal as any;
+}
+
 describe('ResultGlyph', () => {
+    if (!USE_JSDOM) {
+        test.skip('Skipped locally (run with USE_JSDOM=1 to enable)', () => {});
+        return;
+    }
+
     let glyph: Glyph;
     let result: ExecutionResult;
 
@@ -97,6 +123,8 @@ describe('ResultGlyph', () => {
     describe('interactions', () => {
         test('close button removes element from DOM', () => {
             const container = document.createElement('div');
+            document.body.appendChild(container);
+
             const element = createResultGlyph(glyph, result);
             container.appendChild(element);
 
@@ -104,6 +132,9 @@ describe('ResultGlyph', () => {
             closeBtn?.click();
 
             expect(container.contains(element)).toBe(false);
+
+            // Cleanup
+            document.body.removeChild(container);
         });
     });
 });
