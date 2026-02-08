@@ -305,7 +305,8 @@ interface CompositionState {
   - ✅ Drag ax near prompt → meld
   - ✅ Verify composition saved with edges to backend
   - ✅ Refresh page → verify composition restored correctly
-  - [ ] Unmeld → verify both glyphs restore independently (blocked: selection issue #TBD)
+  - ✅ Unmeld → verify both glyphs restore independently
+  - ✅ Note: Rectangle selection feature added to enable selecting glyphs within compositions
 
 ### Phase 2: Meldability Logic
 

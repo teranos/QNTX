@@ -36,6 +36,7 @@ import { makeDraggable } from './glyph-interaction';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
+import { setupRectangleSelection, didRectangleSelectionJustComplete } from './canvas/rectangle-selection';
 import { getAllCompositions, removeComposition, extractGlyphIds } from '../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
 
@@ -89,8 +90,15 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
             // Not selected — add to selection
             selectedGlyphIds.push(glyphId);
             const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+            log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Adding to selection', {
+                glyphId,
+                foundElement: !!el,
+                elementClass: el?.className
+            });
             if (el) {
                 el.classList.add('canvas-glyph-selected');
+            } else {
+                log.warn(SEG.GLYPH, '[Canvas] selectGlyph: Element not found', { glyphId });
             }
         }
     } else {
@@ -98,13 +106,25 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
         deselectAll(container);
         selectedGlyphIds = [glyphId];
         const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Replace mode', {
+            glyphId,
+            foundElement: !!el,
+            elementClass: el?.className
+        });
         if (el) {
             el.classList.add('canvas-glyph-selected');
+        } else {
+            log.warn(SEG.GLYPH, '[Canvas] selectGlyph: Element not found in replace mode', { glyphId });
         }
     }
 
     // Show/hide action bar based on selection
+    log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Checking action bar', {
+        selectedCount: selectedGlyphIds.length,
+        selectedIds: selectedGlyphIds
+    });
     if (selectedGlyphIds.length > 0) {
+        log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Showing action bar');
         showActionBar(
             selectedGlyphIds,
             container,
@@ -384,7 +404,10 @@ export function createCanvasGlyph(): Glyph {
                     }
                 } else {
                     // Clicked on background (not a glyph) — deselect
-                    deselectAll(container);
+                    // But skip if rectangle selection just completed (to avoid immediate deselection)
+                    if (!didRectangleSelectionJustComplete()) {
+                        deselectAll(container);
+                    }
                 }
             }, true);
 
@@ -398,6 +421,13 @@ export function createCanvasGlyph(): Glyph {
             );
             // Note: AbortController returned but not stored - signal handles cleanup automatically
             // Future: if we add explicit canvas.destroy(), store and call .abort()
+
+            // Setup rectangle selection (drag on canvas background to select glyphs)
+            void setupRectangleSelection(
+                container,
+                selectGlyph,
+                deselectAll
+            );
 
             // Clean up local glyphs array when a glyph is deleted
             container.addEventListener('glyph-deleted', ((e: CustomEvent<{ glyphId: string }>) => {
