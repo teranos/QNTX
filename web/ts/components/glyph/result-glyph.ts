@@ -51,7 +51,7 @@ export function createResultGlyph(
     // Style - integrated look with py glyph
     applyCanvasGlyphLayout(element, { x, y, width, height });
     element.style.minHeight = '80px';
-    element.style.backgroundColor = 'var(--bg-almost-black)';
+    // No background on parent - let header and content provide backgrounds
     element.style.borderRadius = '0 0 4px 4px';
     element.style.border = '1px solid var(--border-on-dark)';
     element.style.borderTop = 'none';
@@ -131,6 +131,7 @@ export function createResultGlyph(
     outputContainer.style.fontSize = '12px';
     outputContainer.style.whiteSpace = 'pre-wrap';
     outputContainer.style.wordBreak = 'break-word';
+    outputContainer.style.backgroundColor = 'rgba(10, 10, 10, 0.85)'; // 15% transparency
     outputContainer.style.color = 'var(--text-on-dark)';
 
     // Build output text
@@ -171,6 +172,9 @@ export function createResultGlyph(
     }
 
     element.appendChild(outputContainer);
+
+    // Ensure result data is attached to glyph object for drag persistence
+    (glyph as any).result = result;
 
     // Make draggable by header
     const cleanupDrag = makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });

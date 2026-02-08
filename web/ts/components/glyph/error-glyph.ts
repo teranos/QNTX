@@ -107,6 +107,19 @@ export function createErrorGlyph(
     buttonSection.style.display = 'flex';
     buttonSection.style.gap = '4px';
 
+    // Copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'glyph-play-btn';
+    copyBtn.textContent = '📋';
+    copyBtn.title = 'Copy error details';
+    copyBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const errorText = content.textContent || '';
+        await navigator.clipboard.writeText(errorText);
+        log.info(SEG.GLYPH, '[ErrorGlyph] Copied error details to clipboard');
+    });
+    buttonSection.appendChild(copyBtn);
+
     // Convert to prompt button
     const convertBtn = document.createElement('button');
     convertBtn.className = 'glyph-play-btn';
@@ -164,11 +177,6 @@ export function createErrorGlyph(
         }
     }
 
-    lines.push('');
-    lines.push('Actions:');
-    lines.push('  ⟶ Convert to prompt for debugging');
-    lines.push('  ✕ Dismiss and remove broken glyph');
-
     content.textContent = lines.join('\n');
     element.appendChild(content);
 
@@ -183,7 +191,9 @@ export function createErrorGlyph(
     let elementStartY = position.y;
 
     header.addEventListener('mousedown', (e) => {
-        if (e.target === dismissBtn) return;
+        // Don't start drag if clicking on buttons
+        if (buttonSection.contains(e.target as Node)) return;
+
         isDragging = true;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
@@ -307,37 +317,43 @@ async function convertErrorToPrompt(
         'Help me debug this error. What should I check?',
     ].join('\n');
 
-    // Remove error glyph and broken glyph from state
-    uiState.removeCanvasGlyph(failedGlyphId);
-    errorElement.remove();
+    try {
+        // Create new prompt glyph
+        const promptGlyph: Glyph = {
+            id: `prompt-${crypto.randomUUID()}`,
+            title: 'Debug Prompt',
+            symbol: SO,
+            x, y, width, height,
+            renderContent: () => {
+                const el = document.createElement('div');
+                el.textContent = 'Prompt glyph';
+                return el;
+            }
+        };
 
-    // Create new prompt glyph
-    const promptGlyph: Glyph = {
-        id: `prompt-${crypto.randomUUID()}`,
-        title: 'Debug Prompt',
-        symbol: SO,
-        x, y, width, height,
-        renderContent: () => {
-            const el = document.createElement('div');
-            el.textContent = 'Prompt glyph';
-            return el;
-        }
-    };
+        // Save template to storage
+        const storage = getScriptStorage();
+        await storage.save(promptGlyph.id, promptTemplate);
 
-    // Save template to storage
-    const storage = getScriptStorage();
-    await storage.save(promptGlyph.id, promptTemplate);
+        // Create and append prompt element
+        const promptElement = await createPromptGlyph(promptGlyph);
 
-    // Create and append prompt element
-    const promptElement = await createPromptGlyph(promptGlyph);
-    container.appendChild(promptElement);
+        // Only remove error glyph after successful prompt creation
+        uiState.removeCanvasGlyph(failedGlyphId);
+        errorElement.remove();
 
-    // Update state
-    uiState.addCanvasGlyph({
-        id: promptGlyph.id,
-        symbol: SO,
-        x, y, width, height,
-    });
+        container.appendChild(promptElement);
 
-    log.info(SEG.GLYPH, `[ErrorGlyph] Converted error to debug prompt ${promptGlyph.id}`);
+        // Update state
+        uiState.addCanvasGlyph({
+            id: promptGlyph.id,
+            symbol: SO,
+            x, y, width, height,
+        });
+
+        log.info(SEG.GLYPH, `[ErrorGlyph] Converted error to debug prompt ${promptGlyph.id}`);
+    } catch (err) {
+        log.error(SEG.GLYPH, '[ErrorGlyph] Failed to convert to prompt:', err);
+        // Error glyph remains visible on failure - user can retry
+    }
 }

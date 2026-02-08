@@ -30,7 +30,7 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { applyCanvasGlyphLayout, makeDraggable, preventDrag } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, preventDrag, storeCleanup } from './glyph-interaction';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
@@ -112,15 +112,16 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     input.style.outline = 'none';
     input.style.borderRadius = '2px';
 
+    // Create canvas once for text measurement (avoid creating on every keystroke)
+    const measureCanvas = document.createElement('canvas');
+    const measureContext = measureCanvas.getContext('2d');
+
     // Helper to resize glyph based on input text width
     const resizeToFitText = () => {
-        // Measure text width
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) return;
+        if (!measureContext) return;
 
-        context.font = '13px monospace'; // Match input font
-        const textWidth = context.measureText(input.value || input.placeholder).width;
+        measureContext.font = '13px monospace'; // Match input font
+        const textWidth = measureContext.measureText(input.value || input.placeholder).width;
 
         // Calculate glyph width: text width + padding + symbol + button
         const symbolWidth = 40; // Symbol space
@@ -363,6 +364,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     document.addEventListener(PULSE_EVENTS.EXECUTION_STARTED, handleExecutionStarted);
     document.addEventListener(PULSE_EVENTS.EXECUTION_COMPLETED, handleExecutionCompleted);
     document.addEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
+
+    // Register cleanup for event listeners
+    storeCleanup(element, () => {
+        document.removeEventListener(PULSE_EVENTS.EXECUTION_STARTED, handleExecutionStarted);
+        document.removeEventListener(PULSE_EVENTS.EXECUTION_COMPLETED, handleExecutionCompleted);
+        document.removeEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
+    });
 
     // Make draggable via symbol (matches ax-glyph pattern)
     makeDraggable(element, symbol, glyph, { logLabel: 'IX Glyph' });
