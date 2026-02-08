@@ -91,14 +91,8 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Run button
     const runButton = document.createElement('button');
     runButton.textContent = '▶';
+    runButton.className = 'glyph-play-btn';
     runButton.title = 'Run Python code';
-    runButton.style.background = 'var(--bg-hover)';
-    runButton.style.border = '1px solid var(--border-color)';
-    runButton.style.borderRadius = '3px';
-    runButton.style.padding = '2px 8px';
-    runButton.style.cursor = 'pointer';
-    runButton.style.fontSize = '12px';
-    runButton.style.color = 'var(--text-primary)';
 
     preventDrag(runButton);
 
