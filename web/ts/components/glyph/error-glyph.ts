@@ -128,16 +128,46 @@ export function createErrorGlyph(
     content.textContent = lines.join('\n');
     element.appendChild(content);
 
-    // Make draggable via header
-    const dummyGlyph = {
-        id: element.dataset.glyphId!,
-        title: 'Error',
-        symbol: 'error',
-        x: position.x,
-        y: position.y,
-        renderContent: () => element
+    // Make draggable via header (manual implementation - no uiState persistence)
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let elementStartX = position.x;
+    let elementStartY = position.y;
+
+    header.addEventListener('mousedown', (e) => {
+        if (e.target === dismissBtn) return;
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        elementStartX = parseInt(element.style.left) || position.x;
+        elementStartY = parseInt(element.style.top) || position.y;
+        e.preventDefault();
+    });
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return;
+        const container = element.parentElement;
+        if (!container) return;
+
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+        const newX = elementStartX + deltaX;
+        const newY = elementStartY + deltaY;
+
+        element.style.left = `${newX}px`;
+        element.style.top = `${newY}px`;
     };
-    makeDraggable(element, header, dummyGlyph, { logLabel: 'ErrorGlyph' });
+
+    const handleMouseUp = () => {
+        if (isDragging) {
+            isDragging = false;
+            log.debug(SEG.GLYPH, '[ErrorGlyph] Drag ended (not persisted - ephemeral)');
+        }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
 
     return element;
 }

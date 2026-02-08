@@ -248,7 +248,18 @@ function deleteSelectedGlyphs(container: HTMLElement): void {
  */
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
-    const savedGlyphs = uiState.getCanvasGlyphs();
+    const allSavedGlyphs = uiState.getCanvasGlyphs();
+
+    // Filter out error glyphs (ephemeral - should never be persisted)
+    const errorGlyphs = allSavedGlyphs.filter(g => g.symbol === 'error');
+    if (errorGlyphs.length > 0) {
+        log.warn(SEG.GLYPH, `[Canvas] Removing ${errorGlyphs.length} persisted error glyphs (should be ephemeral)`, {
+            ids: errorGlyphs.map(g => g.id)
+        });
+        errorGlyphs.forEach(g => uiState.removeCanvasGlyph(g.id));
+    }
+
+    const savedGlyphs = allSavedGlyphs.filter(g => g.symbol !== 'error');
     const resultCount = savedGlyphs.filter(g => g.symbol === 'result').length;
     log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state (${resultCount} result glyphs)`, {
         symbols: savedGlyphs.map(g => g.symbol),
