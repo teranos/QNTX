@@ -244,12 +244,11 @@ func TestCanvasStore_UpsertComposition(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:          "comp-1",
-		Type:        "ax-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           150,
-		Y:           150,
+		ID:       "comp-1",
+		Type:     "ax-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        150,
+		Y:        150,
 	}
 
 	err := store.UpsertComposition(ctx, comp)
@@ -268,11 +267,13 @@ func TestCanvasStore_UpsertComposition(t *testing.T) {
 	if retrieved.Type != comp.Type {
 		t.Errorf("Type mismatch: got %s, want %s", retrieved.Type, comp.Type)
 	}
-	if retrieved.InitiatorID != comp.InitiatorID {
-		t.Errorf("InitiatorID mismatch: got %s, want %s", retrieved.InitiatorID, comp.InitiatorID)
+	if len(retrieved.GlyphIDs) != len(comp.GlyphIDs) {
+		t.Errorf("GlyphIDs length mismatch: got %d, want %d", len(retrieved.GlyphIDs), len(comp.GlyphIDs))
 	}
-	if retrieved.TargetID != comp.TargetID {
-		t.Errorf("TargetID mismatch: got %s, want %s", retrieved.TargetID, comp.TargetID)
+	for i, id := range comp.GlyphIDs {
+		if retrieved.GlyphIDs[i] != id {
+			t.Errorf("GlyphID[%d] mismatch: got %s, want %s", i, retrieved.GlyphIDs[i], id)
+		}
 	}
 }
 
@@ -290,12 +291,11 @@ func TestCanvasStore_UpsertComposition_Update(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:          "comp-1",
-		Type:        "ax-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           150,
-		Y:           150,
+		ID:       "comp-1",
+		Type:     "ax-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        150,
+		Y:        150,
 	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
@@ -365,8 +365,8 @@ func TestCanvasStore_ListCompositions(t *testing.T) {
 	}
 
 	comps := []*CanvasComposition{
-		{ID: "comp-1", Type: "ax-prompt", InitiatorID: "g1", TargetID: "g2", X: 100, Y: 100},
-		{ID: "comp-2", Type: "ax-py", InitiatorID: "g2", TargetID: "g3", X: 200, Y: 200},
+		{ID: "comp-1", Type: "ax-prompt", GlyphIDs: []string{"g1", "g2"}, X: 100, Y: 100},
+		{ID: "comp-2", Type: "ax-py", GlyphIDs: []string{"g2", "g3"}, X: 200, Y: 200},
 	}
 
 	for _, c := range comps {
@@ -414,12 +414,11 @@ func TestCanvasStore_DeleteComposition(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:          "comp-1",
-		Type:        "py-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           100,
-		Y:           200,
+		ID:       "comp-1",
+		Type:     "py-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        100,
+		Y:        200,
 	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
@@ -497,12 +496,11 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 
 	// Test 1: Cannot create composition with non-existent glyph IDs
 	orphanedComp := &CanvasComposition{
-		ID:          "comp-orphaned",
-		Type:        "ax-prompt",
-		InitiatorID: "nonexistent-glyph-1",
-		TargetID:    "nonexistent-glyph-2",
-		X:           100,
-		Y:           100,
+		ID:       "comp-orphaned",
+		Type:     "ax-prompt",
+		GlyphIDs: []string{"nonexistent-glyph-1", "nonexistent-glyph-2"},
+		X:        100,
+		Y:        100,
 	}
 
 	err := store.UpsertComposition(ctx, orphanedComp)
@@ -532,12 +530,11 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 	}
 
 	comp := &CanvasComposition{
-		ID:          "comp-1",
-		Type:        "ax-prompt",
-		InitiatorID: "glyph-1",
-		TargetID:    "glyph-2",
-		X:           150,
-		Y:           150,
+		ID:       "comp-1",
+		Type:     "ax-prompt",
+		GlyphIDs: []string{"glyph-1", "glyph-2"},
+		X:        150,
+		Y:        150,
 	}
 
 	if err := store.UpsertComposition(ctx, comp); err != nil {
@@ -550,26 +547,37 @@ func TestCanvasStore_ForeignKeyConstraints(t *testing.T) {
 		t.Fatalf("GetComposition failed: %v", err)
 	}
 
-	// Delete initiator glyph - composition should cascade delete
+	// Delete one glyph - composition should still exist with remaining glyph
 	if err := store.DeleteGlyph(ctx, "glyph-1"); err != nil {
 		t.Fatalf("DeleteGlyph failed: %v", err)
 	}
 
-	// Verify composition was cascade deleted
-	_, err = store.GetComposition(ctx, "comp-1")
-	if err == nil {
-		t.Error("Expected composition to be cascade deleted when initiator glyph was deleted, but it still exists")
+	// Verify composition still exists with only glyph-2
+	comp, err = store.GetComposition(ctx, "comp-1")
+	if err != nil {
+		t.Fatalf("GetComposition failed after deleting one glyph: %v", err)
+	}
+	if len(comp.GlyphIDs) != 1 || comp.GlyphIDs[0] != "glyph-2" {
+		t.Errorf("Expected composition with [glyph-2], got %v", comp.GlyphIDs)
 	}
 
-	// Verify only glyph-2 remains
+	// Delete remaining glyph - composition becomes orphaned
+	if err := store.DeleteGlyph(ctx, "glyph-2"); err != nil {
+		t.Fatalf("DeleteGlyph failed: %v", err)
+	}
+
+	// Verify composition is now orphaned (GetComposition returns error)
+	_, err = store.GetComposition(ctx, "comp-1")
+	if err == nil {
+		t.Error("Expected composition to be orphaned when all glyphs deleted, but GetComposition succeeded")
+	}
+
+	// Verify all glyphs deleted
 	glyphs, err := store.ListGlyphs(ctx)
 	if err != nil {
 		t.Fatalf("ListGlyphs failed: %v", err)
 	}
-	if len(glyphs) != 1 {
-		t.Errorf("Expected 1 remaining glyph, got %d", len(glyphs))
-	}
-	if len(glyphs) == 1 && glyphs[0].ID != "glyph-2" {
-		t.Errorf("Expected remaining glyph to be glyph-2, got %s", glyphs[0].ID)
+	if len(glyphs) != 0 {
+		t.Errorf("Expected 0 remaining glyphs, got %d", len(glyphs))
 	}
 }
