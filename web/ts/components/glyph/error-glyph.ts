@@ -59,9 +59,9 @@ export function createErrorGlyph(
     applyCanvasGlyphLayout(element, { x: position.x, y: position.y, width, height: minHeight, useMinHeight: true });
 
     // Error styling - darker red like erroring AX glyphs
-    element.style.backgroundColor = 'var(--glyph-status-error-bg)'; // #3d1f1f
-    element.style.border = '1px solid var(--border-color)';
-    element.style.color = '#cc8888'; // Muted red for content
+    // No background on parent - let header and content provide backgrounds
+    element.style.border = '1px solid #ff6060'; // Bright red border
+    element.style.color = '#e09999'; // Brighter red for content
     element.style.fontFamily = 'monospace';
     element.style.fontSize = '11px';
     element.style.overflow = 'hidden';
@@ -71,11 +71,11 @@ export function createErrorGlyph(
     // Header with symbol, title, convert, and dismiss buttons
     const header = document.createElement('div');
     header.style.padding = '4px 4px 4px 8px';
-    header.style.borderBottom = '1px solid var(--border-color)';
+    header.style.borderBottom = '1px solid #ff6060';
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
     header.style.alignItems = 'center';
-    header.style.backgroundColor = 'var(--bg-tertiary)';
+    header.style.backgroundColor = '#1a0f0f'; // 10% darker than bg-tertiary for error state
     header.style.cursor = 'move';
     header.style.userSelect = 'none';
     header.style.flexShrink = '0';
@@ -88,7 +88,7 @@ export function createErrorGlyph(
 
     const symbol = document.createElement('span');
     symbol.textContent = '✕';
-    symbol.style.color = 'var(--glyph-status-error-text)'; // #ff6b6b - bright red
+    symbol.style.color = '#ff6060'; // More pure red for error emphasis
     symbol.style.fontSize = '16px';
     symbol.style.fontWeight = 'bold';
     leftSection.appendChild(symbol);
@@ -96,7 +96,7 @@ export function createErrorGlyph(
     const title = document.createElement('span');
     title.style.fontWeight = 'bold';
     title.style.fontSize = '12px';
-    title.style.color = 'var(--glyph-status-error-text)'; // #ff6b6b - bright red
+    title.style.color = '#ff6060'; // More pure red than default error text
     title.textContent = 'Glyph Rendering Error';
     leftSection.appendChild(title);
 
@@ -144,7 +144,8 @@ export function createErrorGlyph(
     content.style.lineHeight = '1.5';
     content.style.flex = '1';
     content.style.overflow = 'auto';
-    content.style.color = '#cc8888'; // Muted red
+    content.style.backgroundColor = 'rgba(36, 18, 18, 0.85)'; // 15% transparency
+    content.style.color = '#ff8282'; // More pure red
     content.style.fontSize = '11px';
 
     const lines = [
