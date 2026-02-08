@@ -11,7 +11,7 @@ import { log, SEG } from '../logger';
 import { upsertComposition as apiUpsertComposition, deleteComposition as apiDeleteComposition } from '../api/canvas';
 
 /**
- * Determine composition type from glyph CSS classes
+ * Determine composition type from glyph CSS classes (binary melding)
  */
 export function getCompositionType(
     initiatorElement: HTMLElement,
@@ -33,6 +33,9 @@ export function getCompositionType(
         if (targetClass.includes('canvas-prompt-glyph')) {
             return 'py-prompt';
         }
+        if (targetClass.includes('canvas-py-glyph')) {
+            return 'py-py';
+        }
     }
 
     log.debug(SEG.GLYPH, '[Compositions] No composition type match', {
@@ -40,6 +43,14 @@ export function getCompositionType(
         targetClass
     });
     return null;
+}
+
+/**
+ * Get composition type for N-glyph chains
+ * Returns 'multi-glyph' for chains with 3+ glyphs
+ */
+export function getMultiGlyphCompositionType(glyphCount: number): CompositionState['type'] {
+    return glyphCount >= 3 ? 'multi-glyph' : 'ax-prompt'; // Fallback shouldn't happen
 }
 
 /**
@@ -112,4 +123,18 @@ export function findCompositionByGlyph(glyphId: string): CompositionState | null
  */
 export function getAllCompositions(): CompositionState[] {
     return uiState.getCanvasCompositions();
+}
+
+/**
+ * Check if a composition can accept a new glyph
+ * A composition is meldable if the initiator glyph is compatible with the composition's rightmost glyph
+ */
+export function isCompositionMeldable(comp: CompositionState, initiatorGlyphType: string): boolean {
+    if (comp.glyphIds.length === 0) return false;
+
+    // Get the rightmost glyph type from the composition
+    // This would require looking up the glyph elements, which we'll handle in meld-system.ts
+    // For now, this is a placeholder that will be used by the DOM manipulation layer
+
+    return true; // Actual logic will be in canMeldWithComposition in meldability.ts
 }

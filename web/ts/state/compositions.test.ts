@@ -239,12 +239,12 @@ describe('Composition State Management', () => {
         });
     });
 
-    // TODO(#441): Phase 2-5 - Multi-glyph chain functionality tests
-    describe.skip('Multi-glyph chains (Phase 2-5)', () => {
+    // Phase 2: Multi-glyph chain state management
+    describe('Multi-glyph chains', () => {
         test('3-glyph composition stores correctly', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
-                type: 'ax-py-prompt',
+                type: 'multi-glyph',
                 glyphIds: ['ax1', 'py1', 'prompt1'],
                 x: 100,
                 y: 200
