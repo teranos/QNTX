@@ -117,7 +117,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
-    textarea.style.color = 'var(--glyph-status-success-text)';
+    textarea.style.color = 'var(--glyph-prompt-accent)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
@@ -205,22 +205,24 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Apply saved status on load
     updateStatus(savedStatus);
 
-    // Title bar
+    // Title bar (matches ax-glyph pattern: symbol is drag handle, bar is compact)
     const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
+    titleBar.className = 'ix-glyph-title-bar';
+    titleBar.style.padding = '4px 4px 4px 8px';
+    titleBar.style.backgroundColor = 'var(--bg-tertiary)';
+    titleBar.style.userSelect = 'none';
+    titleBar.style.fontSize = '14px';
+    titleBar.style.display = 'flex';
+    titleBar.style.alignItems = 'center';
+    titleBar.style.gap = '8px';
 
+    // Symbol (draggable area) — purple-toned to reflect pulse/ingestion lineage
     const symbol = document.createElement('span');
     symbol.textContent = IX;
-    symbol.style.fontSize = '16px';
-    symbol.style.color = 'var(--text-on-dark-emphasis)';
+    symbol.style.cursor = 'move';
     symbol.style.fontWeight = 'bold';
-
-    const title = document.createElement('span');
-    title.textContent = 'Ingest';
-    title.style.fontSize = '13px';
-    title.style.flex = '1';
-    title.style.color = 'var(--text-on-dark-emphasis)';
-    title.style.fontWeight = 'bold';
+    symbol.style.flexShrink = '0';
+    symbol.style.color = 'var(--glyph-prompt-accent)';
 
     // Play button
     const playBtn = document.createElement('button');
@@ -291,7 +293,6 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     });
 
     titleBar.appendChild(symbol);
-    titleBar.appendChild(title);
     titleBar.appendChild(playBtn);
 
     // Content area
@@ -371,8 +372,8 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     document.addEventListener(PULSE_EVENTS.EXECUTION_COMPLETED, handleExecutionCompleted);
     document.addEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
 
-    // Make draggable via title bar
-    makeDraggable(element, titleBar, glyph, { logLabel: 'IX Glyph' });
+    // Make draggable via symbol (matches ax-glyph pattern)
+    makeDraggable(element, symbol, glyph, { logLabel: 'IX Glyph' });
 
     // Make resizable via handle
     makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
