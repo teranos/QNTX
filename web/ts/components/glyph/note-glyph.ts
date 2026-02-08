@@ -14,7 +14,7 @@ import { Prose } from '@generated/sym.js';
 import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, storeCleanup } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -25,9 +25,20 @@ import { noteSchema } from '../../prose/note-schema.ts';
 import { noteMarkdownParser, noteMarkdownSerializer } from '../../prose/note-markdown.ts';
 
 /**
- * Create a note glyph with lightweight markdown editor on canvas
+ * Create a note glyph element and populate it
  */
 export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
+    const element = document.createElement('div');
+    await setupNoteGlyph(element, glyph);
+    return element;
+}
+
+/**
+ * Populate an element as a note glyph.
+ * Can be called on a fresh element (createNoteGlyph) or an existing one (conversion).
+ * Caller must runCleanup() and clear children before calling on an existing element.
+ */
+export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
     // Load saved content from storage
     const storage = getScriptStorage();
     const defaultContent = '# Note\n\nStart typing...';
@@ -41,7 +52,6 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
         log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
     }
 
-    const element = document.createElement('div');
     element.className = 'canvas-note-glyph canvas-glyph';
     element.dataset.glyphId = glyph.id;
     element.dataset.glyphSymbol = Prose;
@@ -51,6 +61,8 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     const width = glyph.width ?? 320;
     const height = glyph.height ?? 280;
 
+    // Reset inline styles (important when repopulating after conversion)
+    element.style.cssText = '';
     applyCanvasGlyphLayout(element, { x, y, width, height });
 
     // Post-it note styling: light beige/yellow background with torn top edge
@@ -65,8 +77,8 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Subtle tear effect - small amplitude for natural look
     const tearPoints: string[] = ['0% 0.5%'];
     for (let i = 1; i < 100; i++) {
-        const y = 0.3 + Math.sin(i * 0.5) * 0.15 + (Math.sin(i * 1.3) * 0.1);
-        tearPoints.push(`${i}% ${y}%`);
+        const ty = 0.3 + Math.sin(i * 0.5) * 0.15 + (Math.sin(i * 1.3) * 0.1);
+        tearPoints.push(`${i}% ${ty}%`);
     }
     tearPoints.push('100% 0.5%');
 
@@ -224,7 +236,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.appendChild(resizeHandle);
 
     // Make entire note draggable (no title bar) and resizable
-    makeDraggable(element, element, glyph, { logLabel: 'NoteGlyph' });
+    const cleanupDrag = makeDraggable(element, element, glyph, { logLabel: 'NoteGlyph' });
     makeResizable(element, resizeHandle, glyph, {
         logLabel: 'NoteGlyph',
         minWidth: 120,
@@ -234,10 +246,22 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Set up ResizeObserver for auto-sizing glyph to content
     setupNoteGlyphResizeObserver(element, editorContainer, glyph.id);
 
+    // Register cleanup for conversions
+    storeCleanup(element, cleanupDrag);
+    storeCleanup(element, () => editorView.destroy());
+    storeCleanup(element, () => {
+        if (saveTimeout !== undefined) clearTimeout(saveTimeout);
+    });
+    storeCleanup(element, () => {
+        const observer = (element as any).__resizeObserver;
+        if (observer) {
+            observer.disconnect();
+            delete (element as any).__resizeObserver;
+        }
+    });
+
     // Attach tooltip support
     tooltip.attach(element);
-
-    return element;
 }
 
 /**

@@ -1,9 +1,14 @@
 /**
  * Glyph Conversions
  *
- * Transforms one glyph type into another, preserving position, size, and content.
- * Swap is atomic: old element removed and new element added in the same tick
- * so state and DOM are never out of sync.
+ * Transforms one glyph type into another, preserving the SAME DOM element.
+ * Respects the axiom: "A Glyph is exactly ONE DOM element for its entire lifetime."
+ *
+ * Conversion pattern:
+ * 1. Capture layout and content from the existing element
+ * 2. Tear down old glyph internals (runCleanup + replaceChildren)
+ * 3. Repopulate the same element as the new glyph type (setupXxxGlyph)
+ * 4. Update uiState atomically
  */
 
 import type { Glyph } from './glyph';
@@ -11,8 +16,9 @@ import { SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { getScriptStorage } from '../../storage/script-storage';
-import { createPromptGlyph } from './prompt-glyph';
-import { createNoteGlyph } from './note-glyph';
+import { runCleanup } from './glyph-interaction';
+import { setupPromptGlyph } from './prompt-glyph';
+import { setupNoteGlyph } from './note-glyph';
 
 /**
  * Capture position and size of a glyph element relative to its canvas container
@@ -29,22 +35,22 @@ function captureLayout(container: HTMLElement, element: HTMLElement) {
 }
 
 /**
- * Convert a note glyph to a prompt glyph
+ * Convert a note glyph to a prompt glyph (in-place mutation)
  */
 export async function convertNoteToPrompt(container: HTMLElement, glyphId: string): Promise<boolean> {
-    const noteElement = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
-    if (!noteElement) {
+    const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    if (!element) {
         log.error(SEG.GLYPH, `[Note→Prompt] Note glyph ${glyphId} not found in container`);
         return false;
     }
 
-    const { x, y, width, height } = captureLayout(container, noteElement);
+    const { x, y, width, height } = captureLayout(container, element);
 
-    // Load note content
+    // Load note content before teardown
     const storage = getScriptStorage();
     const noteContent = await storage.load(glyphId) ?? '';
 
-    // Create new prompt glyph
+    // Build new glyph model
     const promptGlyph: Glyph = {
         id: `prompt-${crypto.randomUUID()}`,
         title: 'Prompt',
@@ -57,50 +63,46 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
         }
     };
 
-    const promptElement = await createPromptGlyph(promptGlyph);
-
-    // Transfer content
+    // Transfer content to new storage key before setup (setupPromptGlyph loads from storage)
     await storage.save(promptGlyph.id, noteContent);
     await storage.delete(glyphId);
 
-    const textarea = promptElement.querySelector('textarea');
-    if (textarea) {
-        textarea.value = noteContent;
-    }
+    // Tear down old glyph internals, repopulate as prompt
+    runCleanup(element);
+    element.replaceChildren();
+    await setupPromptGlyph(element, promptGlyph);
 
-    // Atomic swap: remove old, add new in same tick
+    // Update state atomically
     uiState.removeCanvasGlyph(glyphId);
-    noteElement.remove();
-    container.appendChild(promptElement);
     uiState.addCanvasGlyph({
         id: promptGlyph.id,
         symbol: SO,
         x, y, width, height,
     });
 
-    log.info(SEG.GLYPH, `[Note→Prompt] Converted ${glyphId} → ${promptGlyph.id}`);
+    log.info(SEG.GLYPH, `[Note→Prompt] Converted ${glyphId} → ${promptGlyph.id} (same element)`);
     return true;
 }
 
 /**
- * Convert a result glyph to a note glyph
+ * Convert a result glyph to a note glyph (in-place mutation)
  *
- * Captures the execution output text and creates a note containing it.
+ * Captures the execution output text and repopulates as a note.
  */
 export async function convertResultToNote(container: HTMLElement, glyphId: string): Promise<boolean> {
-    const resultElement = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
-    if (!resultElement) {
+    const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+    if (!element) {
         log.error(SEG.GLYPH, `[Result→Note] Result glyph ${glyphId} not found in container`);
         return false;
     }
 
-    const { x, y, width, height } = captureLayout(container, resultElement);
+    const { x, y, width, height } = captureLayout(container, element);
 
-    // Extract text content from the result output
-    const outputEl = resultElement.querySelector('.result-glyph-output');
+    // Extract text content from the result output before teardown
+    const outputEl = element.querySelector('.result-glyph-output');
     const outputText = outputEl?.textContent?.trim() ?? '';
 
-    // Create new note glyph
+    // Build new glyph model
     const noteGlyph: Glyph = {
         id: `note-${crypto.randomUUID()}`,
         title: 'Note',
@@ -113,22 +115,23 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
         }
     };
 
-    // Save content before rendering (createNoteGlyph loads from storage)
+    // Save content before setup (setupNoteGlyph loads from storage)
     const storage = getScriptStorage();
     await storage.save(noteGlyph.id, outputText);
 
-    const noteElement = await createNoteGlyph(noteGlyph);
+    // Tear down old glyph internals, repopulate as note
+    runCleanup(element);
+    element.replaceChildren();
+    await setupNoteGlyph(element, noteGlyph);
 
-    // Atomic swap: remove old, add new in same tick
+    // Update state atomically
     uiState.removeCanvasGlyph(glyphId);
-    resultElement.remove();
-    container.appendChild(noteElement);
     uiState.addCanvasGlyph({
         id: noteGlyph.id,
         symbol: Prose,
         x, y, width, height,
     });
 
-    log.info(SEG.GLYPH, `[Result→Note] Converted ${glyphId} → ${noteGlyph.id}`);
+    log.info(SEG.GLYPH, `[Result→Note] Converted ${glyphId} → ${noteGlyph.id} (same element)`);
     return true;
 }
