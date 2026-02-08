@@ -28,6 +28,7 @@ import { createIxGlyph } from './ix-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createPromptGlyph } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
+import { createErrorGlyph } from './error-glyph';
 import { uiState } from '../../state/ui';
 import { getMinimizeDuration } from './glyph';
 import { unmeldComposition, reconstructMeld } from './meld-system';
@@ -489,7 +490,7 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             return createResultGlyph(glyph, glyph.result as ExecutionResult);
         }
 
-        // Result glyph without execution data - show detailed error
+        // Result glyph without execution data - spawn error glyph (ephemeral)
         log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing execution data`, {
             glyphId: glyph.id,
             hasResult: !!glyph.result,
@@ -497,60 +498,42 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             size: { width: glyph.width, height: glyph.height }
         });
 
-        const placeholder = document.createElement('div');
-        placeholder.style.padding = '16px';
-        placeholder.style.backgroundColor = 'rgba(60, 20, 20, 0.8)';
-        placeholder.style.border = '1px solid #aa4444';
-        placeholder.style.borderRadius = '4px';
-        placeholder.style.color = '#ffaaaa';
-        placeholder.style.fontFamily = 'monospace';
-        placeholder.style.fontSize = '12px';
-        placeholder.style.whiteSpace = 'pre-wrap';
-
-        placeholder.textContent = [
-            '⚠️  Result Glyph Error',
-            '',
-            `Glyph ID: ${glyph.id}`,
-            `Symbol: ${glyph.symbol}`,
-            `Position: (${glyph.x}, ${glyph.y})`,
-            `Has result data: ${!!glyph.result}`,
-            '',
-            'Cause: Execution result data missing',
-            'Result glyphs display execution outputs and persist with their data.',
-            'This error indicates the glyph metadata was saved without',
-            'its execution result, likely from a bug or incomplete migration.',
-        ].join('\n');
-
-        return placeholder;
+        return createErrorGlyph(
+            glyph.id,
+            'result',
+            { x: glyph.x ?? 200, y: glyph.y ?? 200 },
+            {
+                type: 'missing_data',
+                message: 'Execution result data missing',
+                details: {
+                    'Has result': !!glyph.result,
+                    'Position': `(${glyph.x}, ${glyph.y})`,
+                    'Size': `${glyph.width}x${glyph.height}`,
+                    'Cause': 'Glyph metadata saved without execution result (migration bug)'
+                }
+            }
+        );
     }
 
-    // Unsupported glyph type - log error and return placeholder
+    // Unsupported glyph type - spawn error glyph (ephemeral)
     log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
         glyphId: glyph.id,
         symbol: glyph.symbol,
         position: { x: glyph.x, y: glyph.y }
     });
 
-    const placeholder = document.createElement('div');
-    placeholder.style.padding = '16px';
-    placeholder.style.backgroundColor = 'rgba(60, 20, 20, 0.8)';
-    placeholder.style.border = '1px solid #aa4444';
-    placeholder.style.borderRadius = '4px';
-    placeholder.style.color = '#ffaaaa';
-    placeholder.style.fontFamily = 'monospace';
-    placeholder.style.fontSize = '12px';
-    placeholder.style.whiteSpace = 'pre-wrap';
-
-    placeholder.textContent = [
-        '⚠️  Unknown Glyph Type',
-        '',
-        `Glyph ID: ${glyph.id}`,
-        `Symbol: ${glyph.symbol}`,
-        `Position: (${glyph.x}, ${glyph.y})`,
-        '',
-        'This glyph type is not supported in renderGlyph().',
-        'Check canvas-glyph.ts for supported types.',
-    ].join('\n');
-
-    return placeholder;
+    return createErrorGlyph(
+        glyph.id,
+        glyph.symbol,
+        { x: glyph.x ?? 200, y: glyph.y ?? 200 },
+        {
+            type: 'unknown_type',
+            message: `Glyph type '${glyph.symbol}' not supported`,
+            details: {
+                'Symbol': glyph.symbol,
+                'Position': `(${glyph.x}, ${glyph.y})`,
+                'Cause': 'Glyph type not implemented in renderGlyph() - check canvas-glyph.ts'
+            }
+        }
+    );
 }
