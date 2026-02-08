@@ -417,7 +417,9 @@ export function createCanvasGlyph(): Glyph {
                 log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
 
                 for (const comp of savedCompositions) {
+                    // TODO: Remove this guard after Feb 2026 (migration from initiatorId/targetId to glyphIds)
                     // Skip and clean up invalid compositions (old format without glyphIds array)
+                    // This handles stale IndexedDB data from before PR #436 schema change
                     if (!comp.glyphIds || !Array.isArray(comp.glyphIds)) {
                         log.warn(SEG.GLYPH, `[Canvas] Removing invalid composition ${comp.id} - old format (missing glyphIds array)`);
                         removeComposition(comp.id);
