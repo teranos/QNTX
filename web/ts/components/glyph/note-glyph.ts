@@ -14,7 +14,7 @@ import { Prose } from '@generated/sym.js';
 import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -42,7 +42,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     }
 
     const element = document.createElement('div');
-    element.className = 'canvas-note-glyph';
+    element.className = 'canvas-note-glyph canvas-glyph';
     element.dataset.glyphId = glyph.id;
     element.dataset.glyphSymbol = Prose;
 
@@ -51,21 +51,14 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
     const width = glyph.width ?? 320;
     const height = glyph.height ?? 280;
 
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
+    applyCanvasGlyphLayout(element, { x, y, width, height });
 
     // Post-it note styling: light beige/yellow background with torn top edge
-    element.style.backgroundColor = '#f5edb8'; // Slightly darker beige/yellow
-    element.style.border = '1px solid #d4c59a'; // Darker beige border
+    element.style.backgroundColor = '#f5edb8';
+    element.style.border = '1px solid #d4c59a';
     element.style.borderRadius = '2px';
     element.style.boxShadow = '2px 2px 8px rgba(0, 0, 0, 0.15)';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
-    element.style.cursor = 'move'; // Entire note is draggable
+    element.style.cursor = 'move';
 
     // Torn edge pattern using clip-path (percentage-based, scales with width)
     // Only tear the top edge, keep sides and bottom straight (except corner cutout)

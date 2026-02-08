@@ -20,7 +20,7 @@
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
@@ -99,19 +99,10 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.dataset.glyphSymbol = AX;
 
             // Style element - resizable
-            container.style.position = 'absolute';
-            container.style.left = `${glyph.x ?? x ?? 200}px`;
-            container.style.top = `${glyph.y ?? y ?? 200}px`;
-            container.style.width = `${width}px`;
-            container.style.height = `${height}px`;
+            applyCanvasGlyphLayout(container, { x: glyph.x ?? x ?? 200, y: glyph.y ?? y ?? 200, width, height });
             container.style.minWidth = '200px';
             container.style.minHeight = '120px';
-            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)'; // Darker with transparency
-            container.style.borderRadius = '4px';
-            container.style.border = '1px solid var(--border-color)';
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.overflow = 'hidden';
+            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
             container.style.zIndex = '1';
 
             // Title bar with inline query input

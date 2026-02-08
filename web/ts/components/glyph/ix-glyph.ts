@@ -30,7 +30,7 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
@@ -84,7 +84,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const savedStatus = loadIxStatus(glyph.id) ?? { state: 'idle' };
 
     const element = document.createElement('div');
-    element.className = 'canvas-ix-glyph';
+    element.className = 'canvas-ix-glyph canvas-glyph';
     element.dataset.glyphId = glyph.id;
     element.dataset.glyphSymbol = IX;
 
@@ -95,17 +95,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const width = glyph.width ?? 360;
     const height = glyph.height ?? 180;
 
-    // Style element
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.minHeight = `${height}px`;
-    element.style.backgroundColor = 'var(--bg-secondary)';
-    element.style.border = '1px solid var(--border-color)';
-    element.style.borderRadius = '4px';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
+    applyCanvasGlyphLayout(element, { x, y, width, height, useMinHeight: true });
     element.style.overflow = 'visible';
 
     // Textarea (declared early so play button can reference it)

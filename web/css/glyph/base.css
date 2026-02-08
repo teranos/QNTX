@@ -41,6 +41,19 @@
     opacity: 1;
 }
 
+/* Base container for all canvas-placed glyphs (ix, prompt, py, ax, result, note).
+ * Provides the standard dark-surface look. Glyphs override individual properties
+ * (e.g. note overrides background for its beige post-it aesthetic). */
+.canvas-glyph {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
 /* Shared resize handle for canvas glyphs (bottom-right corner) */
 .glyph-resize-handle {
     position: absolute;

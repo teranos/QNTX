@@ -17,7 +17,7 @@ import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
-import { makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 
 /**
@@ -77,17 +77,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const width = glyph.width ?? 420;
     const height = glyph.height ?? 340;
 
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
-    element.style.backgroundColor = 'var(--bg-secondary)';
-    element.style.border = '1px solid var(--border-color)';
-    element.style.borderRadius = '4px';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
+    element.className += ' canvas-glyph';
+    applyCanvasGlyphLayout(element, { x, y, width, height });
 
     // Template textarea (declared early for play button reference)
     const textarea = document.createElement('textarea');

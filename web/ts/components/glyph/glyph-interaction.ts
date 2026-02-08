@@ -42,6 +42,35 @@ export interface MakeResizableOptions {
     minHeight?: number;
 }
 
+// ── applyCanvasGlyphLayout ──────────────────────────────────────────
+
+export interface CanvasGlyphLayoutOptions {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    /** Use minHeight instead of height (e.g. ix-glyph grows with content) */
+    useMinHeight?: boolean;
+}
+
+/**
+ * Apply shared positioning and flex layout to a canvas-placed glyph.
+ *
+ * Pairs with the `.canvas-glyph` CSS class which provides the visual
+ * defaults (background, border, border-radius, overflow). This function
+ * handles the instance-specific values that can't live in CSS (x/y/size).
+ */
+export function applyCanvasGlyphLayout(el: HTMLElement, opts: CanvasGlyphLayoutOptions): void {
+    el.style.left = `${opts.x}px`;
+    el.style.top = `${opts.y}px`;
+    el.style.width = `${opts.width}px`;
+    if (opts.useMinHeight) {
+        el.style.minHeight = `${opts.height}px`;
+    } else {
+        el.style.height = `${opts.height}px`;
+    }
+}
+
 // ── preventDrag ─────────────────────────────────────────────────────
 
 /**

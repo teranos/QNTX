@@ -22,7 +22,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
@@ -65,19 +65,9 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const height = glyph.height ?? calculatedHeight;
 
     // Style element - auto-sized based on content or restored from saved size
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
+    applyCanvasGlyphLayout(element, { x, y, width, height });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
-    element.style.backgroundColor = 'var(--bg-secondary)';
-    element.style.borderRadius = '4px';
-    element.style.border = '1px solid var(--border-color)';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
     element.style.zIndex = '1';
 
     // Title bar for dragging
