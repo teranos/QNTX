@@ -36,7 +36,7 @@ import { makeDraggable } from './glyph-interaction';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
-import { getAllCompositions } from '../../state/compositions';
+import { getAllCompositions, removeComposition } from '../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
 
 // ============================================================================
