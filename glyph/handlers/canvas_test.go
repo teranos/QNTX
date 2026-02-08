@@ -9,8 +9,19 @@ import (
 	"testing"
 
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
+	pb "github.com/teranos/QNTX/glyph/proto"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
+
+// Helper function to create edges for testing
+func makeEdge(from, to, direction string, position int32) *pb.CompositionEdge {
+	return &pb.CompositionEdge{
+		From:      from,
+		To:        to,
+		Direction: direction,
+		Position:  position,
+	}
+}
 
 func TestCanvasHandler_HandleGlyphs_POST(t *testing.T) {
 	db := qntxtest.CreateTestDB(t)
@@ -225,11 +236,12 @@ func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
 	}
 
 	comp := glyphstorage.CanvasComposition{
-		ID:       "comp-1",
-		Type:     "ax-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        150,
-		Y:        150,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 150,
+		Y: 150,
 	}
 
 	body, _ := json.Marshal(comp)
@@ -251,8 +263,8 @@ func TestCanvasHandler_HandleCompositions_POST(t *testing.T) {
 	if response.ID != comp.ID {
 		t.Errorf("ID mismatch: got %s, want %s", response.ID, comp.ID)
 	}
-	if response.Type != comp.Type {
-		t.Errorf("Type mismatch: got %s, want %s", response.Type, comp.Type)
+	if len(response.Edges) != 1 {
+		t.Errorf("Expected 1 edge, got %d", len(response.Edges))
 	}
 }
 
@@ -273,8 +285,18 @@ func TestCanvasHandler_HandleCompositions_GET_List(t *testing.T) {
 	}
 
 	comps := []*glyphstorage.CanvasComposition{
-		{ID: "comp-1", Type: "ax-prompt", GlyphIDs: []string{"g1", "g2"}, X: 100, Y: 100},
-		{ID: "comp-2", Type: "ax-py", GlyphIDs: []string{"g2", "g3"}, X: 200, Y: 200},
+		{
+			ID:    "comp-1",
+			Edges: []*pb.CompositionEdge{makeEdge("g1", "g2", "right", 0)},
+			X:     100,
+			Y:     100,
+		},
+		{
+			ID:    "comp-2",
+			Edges: []*pb.CompositionEdge{makeEdge("g2", "g3", "right", 0)},
+			X:     200,
+			Y:     200,
+		},
 	}
 
 	for _, c := range comps {
@@ -316,11 +338,12 @@ func TestCanvasHandler_HandleCompositions_GET_Single(t *testing.T) {
 	}
 
 	comp := &glyphstorage.CanvasComposition{
-		ID:       "comp-1",
-		Type:     "py-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        100,
-		Y:        200,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 100,
+		Y: 200,
 	}
 
 	if err := store.UpsertComposition(context.Background(), comp); err != nil {
@@ -375,11 +398,12 @@ func TestCanvasHandler_HandleCompositions_DELETE(t *testing.T) {
 	}
 
 	comp := &glyphstorage.CanvasComposition{
-		ID:       "comp-1",
-		Type:     "ax-prompt",
-		GlyphIDs: []string{"glyph-1", "glyph-2"},
-		X:        100,
-		Y:        200,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("glyph-1", "glyph-2", "right", 0),
+		},
+		X: 100,
+		Y: 200,
 	}
 
 	if err := store.UpsertComposition(context.Background(), comp); err != nil {
@@ -484,13 +508,15 @@ func TestCanvasHandler_HandleCompositions_POST_ThreeGlyphs(t *testing.T) {
 		}
 	}
 
-	// Create 3-glyph composition (ax|py|prompt)
+	// Create 3-glyph composition (ax|py|prompt) - linear chain with 2 edges
 	comp := glyphstorage.CanvasComposition{
-		ID:       "comp-ax-py-prompt",
-		Type:     "ax-py-prompt",
-		GlyphIDs: []string{"ax-1", "py-1", "prompt-1"},
-		X:        150,
-		Y:        150,
+		ID: "comp-ax-py-prompt",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("ax-1", "py-1", "right", 0),
+			makeEdge("py-1", "prompt-1", "right", 1),
+		},
+		X: 150,
+		Y: 150,
 	}
 
 	body, _ := json.Marshal(comp)
@@ -509,22 +535,17 @@ func TestCanvasHandler_HandleCompositions_POST_ThreeGlyphs(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	// Verify 3 glyph IDs returned
-	if len(response.GlyphIDs) != 3 {
-		t.Errorf("Expected 3 glyph IDs, got %d", len(response.GlyphIDs))
+	// Verify 2 edges returned (3-glyph chain = 2 edges)
+	if len(response.Edges) != 2 {
+		t.Errorf("Expected 2 edges, got %d", len(response.Edges))
 	}
 
-	// Verify correct order preserved
-	expectedOrder := []string{"ax-1", "py-1", "prompt-1"}
-	for i, expected := range expectedOrder {
-		if response.GlyphIDs[i] != expected {
-			t.Errorf("GlyphIDs[%d]: expected %s, got %s", i, expected, response.GlyphIDs[i])
-		}
+	// Verify correct edge structure preserved
+	if response.Edges[0].From != "ax-1" || response.Edges[0].To != "py-1" {
+		t.Errorf("First edge incorrect: got %s→%s, want ax-1→py-1", response.Edges[0].From, response.Edges[0].To)
 	}
-
-	// Verify type
-	if response.Type != "ax-py-prompt" {
-		t.Errorf("Type mismatch: got %s, want ax-py-prompt", response.Type)
+	if response.Edges[1].From != "py-1" || response.Edges[1].To != "prompt-1" {
+		t.Errorf("Second edge incorrect: got %s→%s, want py-1→prompt-1", response.Edges[1].From, response.Edges[1].To)
 	}
 }
 
@@ -549,11 +570,13 @@ func TestCanvasHandler_HandleCompositions_GET_PreservesGlyphOrder(t *testing.T) 
 
 	// Create 3-glyph composition directly in storage
 	comp := &glyphstorage.CanvasComposition{
-		ID:       "comp-1",
-		Type:     "ax-py-prompt",
-		GlyphIDs: []string{"ax-1", "py-1", "prompt-1"},
-		X:        150,
-		Y:        150,
+		ID: "comp-1",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("ax-1", "py-1", "right", 0),
+			makeEdge("py-1", "prompt-1", "right", 1),
+		},
+		X: 150,
+		Y: 150,
 	}
 	if err := store.UpsertComposition(context.Background(), comp); err != nil {
 		t.Fatalf("UpsertComposition failed: %v", err)
@@ -574,16 +597,25 @@ func TestCanvasHandler_HandleCompositions_GET_PreservesGlyphOrder(t *testing.T) 
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	// Critical: Verify order is preserved (left-to-right: ax, py, prompt)
-	expectedOrder := []string{"ax-1", "py-1", "prompt-1"}
-	if len(response.GlyphIDs) != len(expectedOrder) {
-		t.Fatalf("Expected %d glyphs, got %d", len(expectedOrder), len(response.GlyphIDs))
+	// Critical: Verify edge order is preserved (left-to-right chain: ax→py→prompt)
+	if len(response.Edges) != 2 {
+		t.Fatalf("Expected 2 edges (3-glyph chain), got %d", len(response.Edges))
 	}
 
-	for i, expected := range expectedOrder {
-		if response.GlyphIDs[i] != expected {
-			t.Errorf("GlyphIDs[%d]: expected %s, got %s (order not preserved)", i, expected, response.GlyphIDs[i])
-		}
+	// Verify edges maintain position order
+	if response.Edges[0].Position != 0 || response.Edges[1].Position != 1 {
+		t.Errorf("Edge positions not preserved: got %d, %d; want 0, 1",
+			response.Edges[0].Position, response.Edges[1].Position)
+	}
+
+	// Verify edge structure
+	if response.Edges[0].From != "ax-1" || response.Edges[0].To != "py-1" {
+		t.Errorf("First edge wrong: got %s→%s, want ax-1→py-1",
+			response.Edges[0].From, response.Edges[0].To)
+	}
+	if response.Edges[1].From != "py-1" || response.Edges[1].To != "prompt-1" {
+		t.Errorf("Second edge wrong: got %s→%s, want py-1→prompt-1",
+			response.Edges[1].From, response.Edges[1].To)
 	}
 }
 
@@ -607,13 +639,16 @@ func TestCanvasHandler_HandleCompositions_POST_FourGlyphChain(t *testing.T) {
 		}
 	}
 
-	// Create 4-glyph composition
+	// Create 4-glyph composition (3 edges: ax→py→prompt1→prompt2)
 	comp := glyphstorage.CanvasComposition{
-		ID:       "comp-4-chain",
-		Type:     "ax-py-prompt-prompt",
-		GlyphIDs: []string{"ax-1", "py-1", "prompt-1", "prompt-2"},
-		X:        150,
-		Y:        150,
+		ID: "comp-4-chain",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("ax-1", "py-1", "right", 0),
+			makeEdge("py-1", "prompt-1", "right", 1),
+			makeEdge("prompt-1", "prompt-2", "right", 2),
+		},
+		X: 150,
+		Y: 150,
 	}
 
 	body, _ := json.Marshal(comp)
@@ -632,16 +667,21 @@ func TestCanvasHandler_HandleCompositions_POST_FourGlyphChain(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	// Verify 4-glyph chain stored and retrieved correctly
-	if len(response.GlyphIDs) != 4 {
-		t.Errorf("Expected 4 glyph IDs, got %d", len(response.GlyphIDs))
+	// Verify 4-glyph chain stored and retrieved correctly (3 edges)
+	if len(response.Edges) != 3 {
+		t.Errorf("Expected 3 edges (4-glyph chain), got %d", len(response.Edges))
 	}
 
-	// Verify order
-	expectedOrder := []string{"ax-1", "py-1", "prompt-1", "prompt-2"}
-	for i, expected := range expectedOrder {
-		if response.GlyphIDs[i] != expected {
-			t.Errorf("GlyphIDs[%d]: expected %s, got %s", i, expected, response.GlyphIDs[i])
+	// Verify edge structure and order
+	expectedEdges := [][2]string{
+		{"ax-1", "py-1"},
+		{"py-1", "prompt-1"},
+		{"prompt-1", "prompt-2"},
+	}
+	for i, expected := range expectedEdges {
+		if response.Edges[i].From != expected[0] || response.Edges[i].To != expected[1] {
+			t.Errorf("Edge[%d]: expected %s→%s, got %s→%s", i,
+				expected[0], expected[1], response.Edges[i].From, response.Edges[i].To)
 		}
 	}
 }
