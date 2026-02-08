@@ -516,9 +516,9 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             `Has result data: ${!!glyph.result}`,
             '',
             'Cause: Execution result data missing',
-            'Result glyphs are ephemeral execution outputs.',
-            'This can happen if the glyph was persisted without',
-            'its execution data, or if restoration failed.',
+            'Result glyphs display execution outputs and persist with their data.',
+            'This error indicates the glyph metadata was saved without',
+            'its execution result, likely from a bug or incomplete migration.',
         ].join('\n');
 
         return placeholder;
