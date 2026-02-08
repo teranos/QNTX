@@ -7,6 +7,7 @@
 - If something is unclear, ask - don't assume or fill in gaps
 - State only what you can directly verify
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
+- **Maximize signal-to-noise: essential information only, no filler.**
 
 ## Configuration (am package)
 
@@ -30,7 +31,7 @@ The developer always uses `make dev` to start the development environment with h
 
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
-**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries.
+**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
 ## Type Generation
 
@@ -84,7 +85,6 @@ func TestSomething(t *testing.T) {
 - `qntxtest.CreateTestDB(t)` runs actual migration files from `db/sqlite/migrations/`
 - Ensures tests use identical schema to production
 - Migrations are the single source of truth
-- Auto-cleanup via `t.Cleanup()`
 
 **NEVER do this:**
 
@@ -97,4 +97,3 @@ db.Exec("CREATE INDEX ...")
 **Pattern used throughout:**
 
 - `ats/storage/*_test.go` - All tests use `qntxtest.CreateTestDB(t)`
-- `internal/testing/database.go` - Implementation using `db.Migrate()`
