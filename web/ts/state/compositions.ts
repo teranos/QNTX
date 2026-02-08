@@ -62,8 +62,7 @@ export function addComposition(composition: CompositionState): void {
         log.debug(SEG.GLYPH, '[Compositions] Added composition', {
             id: composition.id,
             type: composition.type,
-            initiatorId: composition.initiatorId,
-            targetId: composition.targetId
+            glyphIds: composition.glyphIds
         });
     }
 
@@ -94,7 +93,7 @@ export function removeComposition(id: string): void {
 export function isGlyphInComposition(glyphId: string): boolean {
     const compositions = uiState.getCanvasCompositions();
     return compositions.some(c =>
-        c.initiatorId === glyphId || c.targetId === glyphId
+        c.glyphIds.includes(glyphId)
     );
 }
 
@@ -104,7 +103,7 @@ export function isGlyphInComposition(glyphId: string): boolean {
 export function findCompositionByGlyph(glyphId: string): CompositionState | null {
     const compositions = uiState.getCanvasCompositions();
     return compositions.find(c =>
-        c.initiatorId === glyphId || c.targetId === glyphId
+        c.glyphIds.includes(glyphId)
     ) || null;
 }
 

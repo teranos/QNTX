@@ -133,10 +133,10 @@ describe('Meld System - Critical Behavior', () => {
 
         // Assert: Result contains original elements
         expect(result).not.toBe(null);
-        expect(result?.initiatorElement).toBe(originalAxElement);
-        expect(result?.targetElement).toBe(originalPromptElement);
-        expect(result?.initiatorId).toBe('ax-test');
-        expect(result?.targetId).toBe('prompt-test');
+        expect(result?.glyphElements).toHaveLength(2);
+        expect(result?.glyphElements[0]).toBe(originalAxElement);
+        expect(result?.glyphElements[1]).toBe(originalPromptElement);
+        expect(result?.glyphIds).toEqual(['ax-test', 'prompt-test']);
 
         // Assert: Elements restored to canvas
         expect(originalAxElement.parentElement).toBe(canvas);
@@ -216,6 +216,222 @@ describe('Meld Composition Drag - Spike (Edge Cases)', () => {
 
         // Unmeld fails gracefully
         expect(result).toBe(null);
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+});
+
+// TODO(#441): Phase 2-5 - Multi-glyph chain functionality tests
+describe.skip('3-Glyph Chain Creation - Tim (Happy Path)', () => {
+    test('Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition', () => {
+        // Setup: Create canvas with ax-py composition and standalone prompt
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        // Create ax-py composition
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
+
+        const pyElement = document.createElement('div');
+        pyElement.className = 'canvas-py-glyph';
+        pyElement.setAttribute('data-glyph-id', 'py1');
+
+        const axPyComposition = document.createElement('div');
+        axPyComposition.className = 'melded-composition';
+        axPyComposition.setAttribute('data-glyph-id', 'melded-ax1-py1');
+        axPyComposition.style.position = 'absolute';
+        axPyComposition.style.left = '100px';
+        axPyComposition.style.top = '100px';
+        axPyComposition.appendChild(axElement);
+        axPyComposition.appendChild(pyElement);
+        canvas.appendChild(axPyComposition);
+
+        // Create standalone prompt
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        promptElement.style.position = 'absolute';
+        promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
+        promptElement.style.top = '100px';
+        canvas.appendChild(promptElement);
+
+        // Action: Tim drags prompt near ax-py composition
+        // Implementation needed: findMeldTarget should detect compositions as targets
+        // Implementation needed: performMeld should handle composition-to-glyph melding
+
+        // Assert: Single 3-glyph composition exists
+        const compositions = canvas.querySelectorAll('.melded-composition');
+        expect(compositions.length).toBe(1);
+
+        const composition = compositions[0];
+        const glyphs = composition.querySelectorAll('[data-glyph-id]');
+        expect(glyphs.length).toBe(3);
+
+        // Assert: Glyphs in correct left-to-right order
+        expect(glyphs[0]).toBe(axElement);
+        expect(glyphs[1]).toBe(pyElement);
+        expect(glyphs[2]).toBe(promptElement);
+
+        // Assert: Element identity preserved (no clones)
+        expect(promptElement.parentElement).toBe(composition);
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+
+    test('Tim sees proximity feedback when dragging glyph toward composition', () => {
+        // Setup: Create canvas with ax-py composition
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        const axPyComposition = document.createElement('div');
+        axPyComposition.className = 'melded-composition';
+        axPyComposition.style.position = 'absolute';
+        axPyComposition.style.left = '100px';
+        axPyComposition.style.top = '100px';
+        canvas.appendChild(axPyComposition);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.style.position = 'absolute';
+        promptElement.style.left = '150px';
+        promptElement.style.top = '100px';
+        canvas.appendChild(promptElement);
+
+        // Action: Call findMeldTarget with prompt as initiator
+        // Implementation needed: findMeldTarget should detect compositions as valid targets
+        // const { target, distance } = findMeldTarget(promptElement);
+
+        // Assert: Composition identified as valid target
+        // expect(target).toBe(axPyComposition);
+        // expect(distance).toBeLessThan(PROXIMITY_THRESHOLD);
+
+        // Assert: Visual feedback applied
+        // Implementation needed: applyMeldFeedback should handle composition targets
+        // applyMeldFeedback(promptElement, target, distance);
+        // expect(promptElement.style.boxShadow).not.toBe('');
+        // expect(axPyComposition.style.boxShadow).not.toBe('');
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+});
+
+describe.skip('Chain Extension - Tim (Happy Path)', () => {
+    test('Tim extends ax|py composition by dragging prompt onto it', () => {
+        // Setup: Create canvas with 2-glyph composition (ax|py)
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
+        axElement.style.position = 'absolute';
+        axElement.style.left = '100px';
+        axElement.style.top = '100px';
+        canvas.appendChild(axElement);
+
+        const pyElement = document.createElement('div');
+        pyElement.className = 'canvas-py-glyph';
+        pyElement.setAttribute('data-glyph-id', 'py1');
+        pyElement.style.position = 'absolute';
+        pyElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
+        pyElement.style.top = '100px';
+        canvas.appendChild(pyElement);
+
+        const axGlyph: Glyph = {
+            id: 'ax1',
+            title: 'AX',
+            renderContent: () => axElement
+        };
+
+        const pyGlyph: Glyph = {
+            id: 'py1',
+            title: 'Python',
+            renderContent: () => pyElement
+        };
+
+        // Create initial 2-glyph composition
+        const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph);
+        const compositionId = composition.getAttribute('data-glyph-id');
+
+        // Create standalone prompt
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        canvas.appendChild(promptElement);
+
+        const promptGlyph: Glyph = {
+            id: 'prompt1',
+            title: 'Prompt',
+            renderContent: () => promptElement
+        };
+
+        // Action: Tim drops prompt onto existing composition
+        // Implementation needed: extendComposition function in Phase 4
+        // const extended = extendComposition(composition, promptElement, promptGlyph);
+
+        // Assert: Same composition ID (not new composition)
+        // expect(extended.getAttribute('data-glyph-id')).toBe(compositionId);
+
+        // Assert: Now contains 3 glyphs in order
+        const glyphs = composition.querySelectorAll('[data-glyph-id]');
+        // expect(glyphs.length).toBe(3);
+        // expect(glyphs[0]).toBe(axElement);
+        // expect(glyphs[1]).toBe(pyElement);
+        // expect(glyphs[2]).toBe(promptElement);
+
+        // Assert: Element identity preserved (prompt not cloned)
+        // expect(promptElement.parentElement).toBe(composition);
+
+        // Assert: State updated with 3 glyphs
+        // Implementation needed: findCompositionByGlyph should return extended composition
+        // const comp = findCompositionByGlyph('prompt1');
+        // expect(comp?.glyphIds).toEqual(['ax1', 'py1', 'prompt1']);
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+
+    test('Tim extends 3-glyph chain into 4-glyph chain', () => {
+        // Setup: 3-glyph composition (ax|py|prompt) already exists
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.setAttribute('data-glyph-id', 'ax1');
+        const pyElement = document.createElement('div');
+        pyElement.setAttribute('data-glyph-id', 'py1');
+        const promptElement = document.createElement('div');
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
+
+        const composition = document.createElement('div');
+        composition.className = 'melded-composition';
+        composition.setAttribute('data-glyph-id', 'melded-ax1-py1-prompt1');
+        composition.appendChild(axElement);
+        composition.appendChild(pyElement);
+        composition.appendChild(promptElement);
+        canvas.appendChild(composition);
+
+        // Create another prompt to add
+        const prompt2Element = document.createElement('div');
+        prompt2Element.className = 'canvas-prompt-glyph';
+        prompt2Element.setAttribute('data-glyph-id', 'prompt2');
+        canvas.appendChild(prompt2Element);
+
+        // Action: Tim adds prompt2 to existing 3-glyph chain
+        // Implementation needed: extendComposition should handle N-glyph chains
+
+        // Assert: 4 glyphs in composition
+        // const glyphs = composition.querySelectorAll('[data-glyph-id]');
+        // expect(glyphs.length).toBe(4);
+        // expect(glyphs[3]).toBe(prompt2Element);
 
         // Cleanup
         document.body.innerHTML = '';
