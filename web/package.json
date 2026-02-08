@@ -40,7 +40,7 @@
     "prosemirror-schema-list": "1.4.1",
     "prosemirror-state": "1.4.3",
     "prosemirror-tables": "1.6.1",
-    "prosemirror-view": "1.38.1",
+    "prosemirror-view": "1.41.6",
     "ts-proto": "^2.11.2",
     "typescript": "5.7.2"
   },
