@@ -33,7 +33,7 @@ export function handleSystemCapabilities(data: SystemCapabilitiesMessage): void 
     });
 
     // Update Self diagnostic glyph
-    import('../test-glyphs.js').then(({ updateSelfCapabilities }) => {
+    import('../default-glyphs.js').then(({ updateSelfCapabilities }) => {
         updateSelfCapabilities(data);
     });
 
