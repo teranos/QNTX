@@ -36,7 +36,7 @@ import './prose/panel.ts';
 import './plugin-panel.ts';
 import { initDebugInterceptor } from './dev-debug-interceptor.ts';
 import { glyphRun } from './components/glyph/run.ts';
-import { registerTestGlyphs } from './test-glyphs.ts';
+import { registerDefaultGlyphs } from './default-glyphs.ts';
 import { initialize as initQntxWasm } from './qntx-wasm.ts';
 import { initStorage } from './indexeddb-storage.ts';
 import { initVisualMode } from './visual-mode.ts';
@@ -125,7 +125,7 @@ function handleVersion(data: VersionMessage): void {
     });
 
     // Update Self diagnostic glyph
-    import('./test-glyphs.js').then(({ updateSelfVersion }) => {
+    import('./default-glyphs.js').then(({ updateSelfVersion }) => {
         updateSelfVersion(data);
     });
 
@@ -278,8 +278,8 @@ async function init(): Promise<void> {
     // This ensures the run is ready to receive glyphs
     glyphRun.init();
 
-    // Register test glyphs to demonstrate the morphing behavior
-    registerTestGlyphs();
+    // Register default system glyphs
+    registerDefaultGlyphs();
 
     if (window.logLoaderStep) window.logLoaderStep('Setting up file upload...');
     initQueryFileDrop();

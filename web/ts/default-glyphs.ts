@@ -53,6 +53,7 @@
 
 import { glyphRun } from './components/glyph/run';
 import { createCanvasGlyph } from './components/glyph/canvas-glyph';
+import { createChartGlyph } from './components/glyph/chart-glyph';
 import { sendMessage } from './websocket';
 import { DB } from '@generated/sym.js';
 import { log, SEG } from './logger.ts';
@@ -233,8 +234,8 @@ function renderSelf(): void {
     `;
 }
 
-// Register test glyphs once DOM is ready
-export function registerTestGlyphs(): void {
+// Register default system glyphs
+export function registerDefaultGlyphs(): void {
     // Canvas Glyph - Fractal container with spatial grid
     glyphRun.add(createCanvasGlyph());
 
@@ -269,10 +270,26 @@ export function registerTestGlyphs(): void {
         initialHeight: '320px'
     });
 
-    // TODO: Replace console.log with proper logger (log.debug)
-    log.debug(SEG.UI, 'Test glyphs registered:', {
-        vidstream: 'VidStream monitoring',
-        database: 'Database Statistics',
-        self: 'Self diagnostics'
+    // Usage & Cost Chart Glyph
+    glyphRun.add(createChartGlyph(
+        'usage-chart',
+        '$ Usage & Costs',
+        '/api/timeseries/usage',
+        {
+            primaryLabel: 'Cost',
+            secondaryLabel: 'Requests',
+            primaryColor: '#4ade80',
+            secondaryColor: '#60a5fa',
+            chartType: 'area',
+            formatValue: (v) => `$${v.toFixed(2)}`,
+            defaultRange: 'week'
+        }
+    ));
+
+    log.debug(SEG.UI, 'Default glyphs registered:', {
+        canvas: 'Spatial canvas grid',
+        database: 'Database statistics',
+        self: 'Self diagnostics',
+        usage: 'API usage and costs'
     });
 }
