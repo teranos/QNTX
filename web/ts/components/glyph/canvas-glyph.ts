@@ -20,13 +20,14 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse, IX, AX, SO } from '@generated/sym.js';
+import { Pulse, IX, AX, SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createAxGlyph } from './ax-glyph';
 import { createIxGlyph } from './ix-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createPromptGlyph } from './prompt-glyph';
+import { createNoteGlyph } from './note-glyph';
 import { uiState } from '../../state/ui';
 import { getMinimizeDuration } from './glyph';
 import { unmeldComposition, reconstructMeld } from './meld-system';
@@ -35,6 +36,7 @@ import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
 import { getAllCompositions } from '../../state/compositions';
+import { convertNoteToPrompt } from './note-to-prompt';
 
 // ============================================================================
 // Selection State
@@ -106,7 +108,8 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
             selectedGlyphIds,
             container,
             () => deleteSelectedGlyphs(container),
-            (composition) => unmeldSelectedGlyphs(container, composition)
+            (composition) => unmeldSelectedGlyphs(container, composition),
+            () => convertNoteToPrompt(container, selectedGlyphIds[0])
         );
     } else {
         hideActionBar();
@@ -128,6 +131,9 @@ function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
     }
     if (element.classList.contains('canvas-prompt-glyph')) {
         return { id, title: 'Prompt', symbol: SO, renderContent: () => element };
+    }
+    if (element.classList.contains('canvas-note-glyph')) {
+        return { id, title: 'Note', symbol: Prose, renderContent: () => element };
     }
     // Fallback
     return { id, title: 'Glyph', renderContent: () => element };
@@ -319,8 +325,14 @@ export function createCanvasGlyph(): Glyph {
                     return;
                 }
 
-                // Ignore clicks on buttons, inputs, and textareas (allow interactive elements to work)
+                // Ignore clicks on buttons, inputs, textareas, and contenteditable elements (allow interactive elements to work)
+                // This includes ProseMirror and CodeMirror editors which use contenteditable divs
                 if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                // Check if click is inside a contenteditable element (editors)
+                if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
                     return;
                 }
 
@@ -441,6 +453,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     // For prompt glyphs, create template editor
     if (glyph.symbol === SO) {
         return await createPromptGlyph(glyph);
+    }
+
+    // For note glyphs, create markdown editor
+    if (glyph.symbol === Prose) {
+        return await createNoteGlyph(glyph);
     }
 
     // For AX glyphs, render content directly (they handle their own rendering)
