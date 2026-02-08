@@ -35,10 +35,19 @@ type BoundedStore struct {
 	logger *zap.SugaredLogger
 	config *BoundedStoreConfig
 
+	// Fuzzy matcher for rich text search (nil = exact SQL matching only)
+	fuzzyMatcher ats.RichSearchMatcher
+
 	// Cache for type definitions (used by rich search)
 	typeFieldsCache     map[string][]string
 	typeFieldsCacheLock sync.RWMutex
 	typeFieldsCacheTime time.Time
+}
+
+// SetFuzzyMatcher sets the fuzzy matcher for rich text search.
+// If nil, rich search falls back to exact SQL substring matching.
+func (bs *BoundedStore) SetFuzzyMatcher(m ats.RichSearchMatcher) {
+	bs.fuzzyMatcher = m
 }
 
 // NewBoundedStore creates a new bounded storage manager with default limits (16/64/64)
