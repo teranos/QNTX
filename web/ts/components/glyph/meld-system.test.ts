@@ -128,10 +128,10 @@ describe('Meld System - Critical Behavior', () => {
 
         // Assert: Result contains original elements
         expect(result).not.toBe(null);
-        expect(result?.initiatorElement).toBe(originalAxElement);
-        expect(result?.targetElement).toBe(originalPromptElement);
-        expect(result?.initiatorId).toBe('ax-test');
-        expect(result?.targetId).toBe('prompt-test');
+        expect(result?.glyphElements).toHaveLength(2);
+        expect(result?.glyphElements[0]).toBe(originalAxElement);
+        expect(result?.glyphElements[1]).toBe(originalPromptElement);
+        expect(result?.glyphIds).toEqual(['ax-test', 'prompt-test']);
 
         // Assert: Elements restored to canvas
         expect(originalAxElement.parentElement).toBe(canvas);
