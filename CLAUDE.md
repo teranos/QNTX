@@ -24,7 +24,7 @@ The developer always uses `make dev` to start the development environment with h
 
 **The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**
 
-`make test` runs both backend (Go) and frontend (TypeScript) tests.
+`make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
 
 **It is FORBIDDEN to craft custom test commands.**
 
