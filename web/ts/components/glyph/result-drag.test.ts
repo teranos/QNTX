@@ -129,3 +129,37 @@ describe('Result Glyph Drag Persistence - Tim (Happy Path)', () => {
         expect(output?.textContent).toContain('NameError');
     });
 });
+
+describe('Result Glyph Drag Persistence - Spike (Edge Cases)', () => {
+    test('Spike creates result with extremely long output', () => {
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+
+        const longOutput = 'Line of output\n'.repeat(1000);
+
+        const result: ExecutionResult = {
+            success: true,
+            stdout: longOutput,
+            stderr: '',
+            result: null,
+            error: null,
+            duration_ms: 5000
+        };
+
+        const glyph: Glyph = {
+            id: 'result-long',
+            title: 'Result',
+            symbol: 'result',
+            x: 100,
+            y: 100,
+            renderContent: () => document.createElement('div')
+        };
+
+        const element = createResultGlyph(glyph, result);
+        container.appendChild(element);
+
+        // Result glyph handles large output
+        expect(element.classList.contains('canvas-result-glyph')).toBe(true);
+        expect((glyph as any).result.stdout.length).toBe(longOutput.length);
+    });
+});

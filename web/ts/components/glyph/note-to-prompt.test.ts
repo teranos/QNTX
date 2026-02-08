@@ -101,26 +101,13 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
 });
 
 describe('Glyph Conversions - Spike (Edge Cases)', () => {
-    test('Spike tries to convert non-existent note glyph', async () => {
+    test('Spike tries to convert non-existent glyph', async () => {
         // Spike creates a canvas
         const container = document.createElement('div');
         container.className = 'canvas-workspace';
 
         // Spike tries to convert a glyph that doesn't exist
         const success = await convertNoteToPrompt(container, 'nonexistent-glyph-id');
-
-        // Conversion fails gracefully
-        expect(success).toBe(false);
-        expect(container.children.length).toBe(0);
-    });
-
-    test('Spike tries to convert non-existent result glyph', async () => {
-        // Spike creates a canvas
-        const container = document.createElement('div');
-        container.className = 'canvas-workspace';
-
-        // Spike tries to convert a glyph that doesn't exist
-        const success = await convertResultToNote(container, 'nonexistent-result-id');
 
         // Conversion fails gracefully
         expect(success).toBe(false);

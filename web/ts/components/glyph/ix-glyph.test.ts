@@ -98,3 +98,55 @@ describe('IX Glyph Auto-Sizing - Tim (Happy Path)', () => {
         expect(playBtn?.textContent).toBe('▶');
     });
 });
+
+describe('IX Glyph Auto-Sizing - Spike (Edge Cases)', () => {
+    test('Spike types extremely long URL', async () => {
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+
+        const glyph: Glyph = {
+            id: 'ix-long',
+            title: 'Ingest',
+            symbol: IX,
+            x: 100,
+            y: 100,
+            renderContent: () => document.createElement('div')
+        };
+
+        const element = await createIxGlyph(glyph);
+        container.appendChild(element);
+
+        const input = element.querySelector('input[type="text"]') as HTMLInputElement;
+
+        // Spike types a very long URL
+        const longUrl = 'https://example.com/' + 'a'.repeat(500);
+        input.value = longUrl;
+
+        // Glyph still functions
+        expect(input.value.length).toBe(longUrl.length);
+        expect(element.classList.contains('canvas-ix-glyph')).toBe(true);
+    });
+
+    test('Spike creates IX glyph with empty input', async () => {
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+
+        const glyph: Glyph = {
+            id: 'ix-empty',
+            title: 'Ingest',
+            symbol: IX,
+            x: 200,
+            y: 200,
+            renderContent: () => document.createElement('div')
+        };
+
+        const element = await createIxGlyph(glyph);
+        container.appendChild(element);
+
+        const input = element.querySelector('input[type="text"]') as HTMLInputElement;
+
+        // Empty input has placeholder
+        expect(input.placeholder).toBeTruthy();
+        expect(input.value).toBe('');
+    });
+});

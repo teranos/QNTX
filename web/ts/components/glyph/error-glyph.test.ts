@@ -100,3 +100,56 @@ describe('Error Glyph - Tim (Happy Path)', () => {
         expect(dismissBtn?.textContent).toBe('✕');
     });
 });
+
+describe('Error Glyph - Spike (Edge Cases)', () => {
+    test('Spike creates error glyph with empty error details', () => {
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+
+        const errorGlyph = createErrorGlyph(
+            'glyph-999',
+            'unknown',
+            { x: 0, y: 0 },
+            {
+                type: '',
+                message: ''
+            }
+        );
+
+        container.appendChild(errorGlyph);
+
+        // Error glyph still renders
+        expect(errorGlyph.classList.contains('canvas-error-glyph')).toBe(true);
+
+        const content = errorGlyph.querySelector('.error-glyph-content');
+        expect(content).toBeTruthy();
+    });
+
+    test('Spike creates error glyph with huge details object', () => {
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+
+        const hugeDetails: Record<string, unknown> = {};
+        for (let i = 0; i < 100; i++) {
+            hugeDetails[`key${i}`] = `value${i}`.repeat(50);
+        }
+
+        const errorGlyph = createErrorGlyph(
+            'glyph-huge',
+            'result',
+            { x: 100, y: 100 },
+            {
+                type: 'huge_error',
+                message: 'Error with massive details',
+                details: hugeDetails
+            }
+        );
+
+        container.appendChild(errorGlyph);
+
+        // Error glyph handles large data
+        expect(errorGlyph.classList.contains('canvas-error-glyph')).toBe(true);
+        const content = errorGlyph.querySelector('.error-glyph-content');
+        expect(content).toBeTruthy();
+    });
+});
