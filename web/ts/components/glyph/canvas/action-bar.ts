@@ -24,7 +24,8 @@ export function showActionBar(
     container: HTMLElement,
     onDelete: () => void,
     onUnmeld: (composition: HTMLElement) => void,
-    onConvertToPrompt?: () => void
+    onConvertToPrompt?: () => void,
+    onConvertToNote?: () => void,
 ): void {
     if (selectedGlyphIds.length === 0) {
         return;
@@ -48,22 +49,35 @@ export function showActionBar(
         }
     }
 
-    // Check if exactly one note glyph is selected (for convert-to-prompt button)
-    let isNoteSelected = false;
+    // Check single-glyph selection type for conversion buttons
+    let selectedSymbol: string | undefined;
     if (selectedGlyphIds.length === 1) {
         const glyphEl = container.querySelector(`[data-glyph-id="${selectedGlyphIds[0]}"]`) as HTMLElement | null;
-        isNoteSelected = glyphEl?.dataset.glyphSymbol === Prose;
+        selectedSymbol = glyphEl?.dataset.glyphSymbol;
     }
 
     // Add convert-to-prompt button if single note selected
-    if (isNoteSelected && onConvertToPrompt) {
+    if (selectedSymbol === Prose && onConvertToPrompt) {
         const convertBtn = document.createElement('button');
         convertBtn.className = 'canvas-action-button canvas-action-convert has-tooltip';
         convertBtn.dataset.tooltip = 'Convert to prompt glyph';
-        convertBtn.textContent = '⟶'; // SO symbol (prompt)
+        convertBtn.textContent = '⟶';
         convertBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             onConvertToPrompt();
+        });
+        bar.appendChild(convertBtn);
+    }
+
+    // Add convert-to-note button if single result selected
+    if (selectedSymbol === 'result' && onConvertToNote) {
+        const convertBtn = document.createElement('button');
+        convertBtn.className = 'canvas-action-button canvas-action-convert has-tooltip';
+        convertBtn.dataset.tooltip = 'Convert to note';
+        convertBtn.textContent = '✎';
+        convertBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onConvertToNote();
         });
         bar.appendChild(convertBtn);
     }

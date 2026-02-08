@@ -36,7 +36,7 @@ import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
 import { getAllCompositions } from '../../state/compositions';
-import { convertNoteToPrompt } from './note-to-prompt';
+import { convertNoteToPrompt, convertResultToNote } from './conversions';
 
 // ============================================================================
 // Selection State
@@ -109,7 +109,8 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
             container,
             () => deleteSelectedGlyphs(container),
             (composition) => unmeldSelectedGlyphs(container, composition),
-            () => convertNoteToPrompt(container, selectedGlyphIds[0])
+            () => convertNoteToPrompt(container, selectedGlyphIds[0]),
+            () => convertResultToNote(container, selectedGlyphIds[0]),
         );
     } else {
         hideActionBar();
