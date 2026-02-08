@@ -27,8 +27,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -44,8 +43,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -68,8 +66,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -92,8 +89,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -106,8 +102,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -120,8 +115,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -136,8 +130,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -151,8 +144,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -166,8 +158,7 @@ describe('Composition State Management', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -225,8 +216,7 @@ describe('Composition State Management', () => {
             const comp1: CompositionState = {
                 id: 'melded-ax1-prompt1',
                 type: 'ax-prompt',
-                initiatorId: 'ax1',
-                targetId: 'prompt1',
+                glyphIds: ['ax1', 'prompt1'],
                 x: 100,
                 y: 200
             };
@@ -234,8 +224,7 @@ describe('Composition State Management', () => {
             const comp2: CompositionState = {
                 id: 'melded-py1-prompt2',
                 type: 'py-prompt',
-                initiatorId: 'py1',
-                targetId: 'prompt2',
+                glyphIds: ['py1', 'prompt2'],
                 x: 300,
                 y: 400
             };
