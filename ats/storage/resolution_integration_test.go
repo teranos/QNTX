@@ -46,7 +46,7 @@ func TestAttestationResolution(t *testing.T) {
 	db := setupResolutionTestDB(t)
 
 	// Use executor factory for smart resolution
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Test Evolution scenario: same actor, different times (DOZER)
 	t.Run("evolution_resolution", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestAttestationResolution(t *testing.T) {
 func TestResolutionPerformance(t *testing.T) {
 	db := setupResolutionTestDB(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Test that smart resolution doesn't significantly slow down queries
 	// Note: Performance benchmarking should use b.Run with testing.B for accurate metrics
@@ -165,7 +165,7 @@ func TestResolutionWithAliases(t *testing.T) {
 	`)
 	require.NoError(t, err, "Failed to insert alias test data")
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Test that resolution works with alias resolution
 	filter := types.AxFilter{
@@ -186,7 +186,7 @@ func TestResolutionWithAliases(t *testing.T) {
 func TestResolutionEdgeCases(t *testing.T) {
 	db := setupResolutionTestDB(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Test empty query
 	t.Run("empty_query", func(t *testing.T) {
