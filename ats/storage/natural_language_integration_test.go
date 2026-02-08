@@ -326,7 +326,7 @@ func TestNaturalLanguageQueries(t *testing.T) {
 
 	// Create executor with query expander for semantic expansion
 	expander := &testDomainExpander{}
-	executor := NewExecutorWithOptions(db, ax.AxExecutorOptions{
+	executor := newTestExecutorWithOptions(db, ax.AxExecutorOptions{
 		QueryExpander: expander,
 	})
 
@@ -519,7 +519,7 @@ func TestPredicateContextMatching(t *testing.T) {
 
 	// Create executor with query expander for semantic expansion
 	expander := &testDomainExpander{}
-	executor := NewExecutorWithOptions(db, ax.AxExecutorOptions{
+	executor := newTestExecutorWithOptions(db, ax.AxExecutorOptions{
 		QueryExpander: expander,
 	})
 
@@ -605,7 +605,7 @@ func TestCaseInsensitiveContextMatching(t *testing.T) {
 
 	// Create executor with query expander for semantic expansion
 	expander := &testDomainExpander{}
-	executor := NewExecutorWithOptions(testDB, ax.AxExecutorOptions{
+	executor := newTestExecutorWithOptions(testDB, ax.AxExecutorOptions{
 		QueryExpander: expander,
 	})
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/teranos/QNTX/ats/ax"
 	"github.com/teranos/QNTX/ats/parser"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/errors"
@@ -871,8 +872,11 @@ func (c *Client) handleRichSearch(query string) {
 		"client_id", c.id,
 	)
 
-	// Create bounded store to access search functionality
+	// Create bounded store with fuzzy matcher for search
 	boundedStore := storage.NewBoundedStore(c.server.db, c.server.logger.Named("search"))
+	if m := ax.NewFuzzyRichSearchMatcher(); m != nil {
+		boundedStore.SetFuzzyMatcher(m)
+	}
 
 	// Just use the working substring search
 	ctx := c.server.ctx

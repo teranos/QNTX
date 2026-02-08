@@ -11,6 +11,7 @@ import (
 	"github.com/teranos/QNTX/ai/provider"
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/parser"
+	"github.com/teranos/QNTX/ats/setup"
 	"github.com/teranos/QNTX/ats/so/actions/prompt"
 	"github.com/teranos/QNTX/ats/storage"
 	"github.com/teranos/QNTX/ats/types"
@@ -173,7 +174,7 @@ func (s *QNTXServer) HandlePromptPreview(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Execute the query using storage executor
-	executor := storage.NewExecutor(s.db)
+	executor := setup.NewExecutor(s.db)
 	result, err := executor.ExecuteAsk(r.Context(), *filter)
 	if err != nil {
 		writeWrappedError(w, s.logger, err, "Failed to execute ax query", http.StatusInternalServerError)

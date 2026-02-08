@@ -1,11 +1,13 @@
-// Package storage provides convenience functions for creating ATS executors with storage.
-package storage
+// Package setup provides convenience functions for assembling ATS executors
+// from storage and alias components.
+package setup
 
 import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats/alias"
 	"github.com/teranos/QNTX/ats/ax"
+	"github.com/teranos/QNTX/ats/storage"
 )
 
 // NewExecutor creates a standard AxExecutor with all required dependencies initialized from a database connection.
@@ -23,11 +25,11 @@ import (
 //
 // Example:
 //
-//	executor := storage.NewExecutor(db)
+//	executor := setup.NewExecutor(db)
 //	result, err := executor.ExecuteAsk(ctx, filter)
 func NewExecutor(db *sql.DB) *ax.AxExecutor {
-	queryStore := NewSQLQueryStore(db)
-	aliasStore := NewAliasStore(db)
+	queryStore := storage.NewSQLQueryStore(db)
+	aliasStore := storage.NewAliasStore(db)
 	aliasResolver := alias.NewResolver(aliasStore)
 	return ax.NewAxExecutor(queryStore, aliasResolver)
 }
@@ -45,25 +47,25 @@ func NewExecutor(db *sql.DB) *ax.AxExecutor {
 //
 // Example with semantic query expansion:
 //
-//	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+//	executor := setup.NewExecutorWithOptions(db, ax.AxExecutorOptions{
 //	    QueryExpander: &myapp.SemanticExpander{},
 //	})
 //
 // Example with both query expansion and entity resolution:
 //
-//	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+//	executor := setup.NewExecutorWithOptions(db, ax.AxExecutorOptions{
 //	    QueryExpander:  &myapp.SemanticExpander{},
 //	    EntityResolver: atsAdapter.NewContactEntityResolver(db),
 //	})
 func NewExecutorWithOptions(db *sql.DB, opts ax.AxExecutorOptions) *ax.AxExecutor {
-	var queryStore *SQLQueryStore
+	var queryStore *storage.SQLQueryStore
 	if opts.QueryExpander != nil {
-		queryStore = NewSQLQueryStoreWithExpander(db, opts.QueryExpander)
+		queryStore = storage.NewSQLQueryStoreWithExpander(db, opts.QueryExpander)
 	} else {
-		queryStore = NewSQLQueryStore(db)
+		queryStore = storage.NewSQLQueryStore(db)
 	}
 
-	aliasStore := NewAliasStore(db)
+	aliasStore := storage.NewAliasStore(db)
 	aliasResolver := alias.NewResolver(aliasStore)
 
 	return ax.NewAxExecutorWithOptions(queryStore, aliasResolver, opts)

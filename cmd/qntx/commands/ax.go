@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/teranos/QNTX/ats/parser"
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/setup"
 	"github.com/teranos/QNTX/ats/types"
 	"github.com/teranos/QNTX/errors"
 	"github.com/teranos/QNTX/sym"
@@ -66,7 +66,7 @@ func runAxCommand(cmd *cobra.Command, args []string) error {
 	defer database.Close()
 
 	// Create executor (uses default fuzzy matcher)
-	executor := storage.NewExecutor(database)
+	executor := setup.NewExecutor(database)
 
 	// Execute query
 	result, err := executor.ExecuteAsk(context.Background(), *filter)

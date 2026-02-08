@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/ats"
-	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -95,12 +93,12 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		}
 	}
 
-	// For multi-word queries or when no exact matches, use fuzzy matching with Rust
-	if matcher := ax.NewDefaultMatcher(); matcher != nil && matcher.Backend() == ax.MatcherBackendRust {
+	// For multi-word queries or when no exact matches, use fuzzy matching
+	if bs.fuzzyMatcher != nil {
 		if bs.logger != nil {
 			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords))
 		}
-		fuzzyMatches, err := bs.searchFuzzyWithRust(ctx, query, limit)
+		fuzzyMatches, err := bs.searchFuzzy(ctx, query, limit)
 		if err != nil {
 			// Don't fail entirely, add warning and try fallback
 			if bs.logger != nil {
@@ -118,9 +116,9 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		}
 	} else {
 		if bs.logger != nil {
-			bs.logger.Debugw("Fuzzy matcher not available or not Rust backend")
+			bs.logger.Debugw("Fuzzy matcher not configured")
 		}
-		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (Rust backend required)")
+		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (no matcher configured)")
 		result.Degraded = true
 	}
 
@@ -311,10 +309,10 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 	return matches, nil
 }
 
-// searchFuzzyWithRust performs fuzzy matching using the Rust engine
-func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+// searchFuzzy performs fuzzy matching using the injected RichSearchMatcher
+func (bs *BoundedStore) searchFuzzy(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
 	if bs.logger != nil {
-		bs.logger.Debugw("Using Rust fuzzy matcher", "query", query)
+		bs.logger.Debugw("Using fuzzy matcher", "query", query)
 	}
 
 	// Get dynamic fields from type definitions once at the start
@@ -327,13 +325,6 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 		}
 		return []RichSearchMatch{}, nil
 	}
-
-	// Create fuzzy engine
-	engine, err := fuzzyax.NewFuzzyEngine()
-	if err != nil {
-		return nil, err
-	}
-	defer engine.Close()
 
 	// Build dynamic WHERE clause for fields with content
 	whereClauses := make([]string, len(richStringFields))
@@ -391,9 +382,6 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 			continue
 		}
 
-		// Use the dynamic fields we got at the beginning of the function
-		// (richStringFields is already defined)
-
 		// Debug first row
 		if rowCount == 1 && bs.logger != nil {
 			bs.logger.Debugw("First row attributes", "attributes", attributes)
@@ -412,7 +400,6 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 					case string:
 						strValue = v
 					default:
-						// Skip non-string values
 						continue
 					}
 
@@ -420,10 +407,8 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 						continue
 					}
 
-					// Extract words from the field
 					words := strings.Fields(strValue)
 					for _, word := range words {
-						// Clean word (remove punctuation)
 						word = strings.Trim(word, ".,!?;:\"'()[]{}/*&^%$#@")
 						if len(word) > 1 {
 							wordLower := strings.ToLower(word)
@@ -446,7 +431,7 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 		vocabSlice = append(vocabSlice, word)
 	}
 
-	// Check vocabulary size limit (Rust has MAX_VOCABULARY_SIZE = 100_000)
+	// Check vocabulary size limit
 	const maxVocabularySize = 100000
 	if len(vocabSlice) > maxVocabularySize {
 		if bs.logger != nil {
@@ -454,52 +439,37 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 				"size", len(vocabSlice),
 				"max", maxVocabularySize)
 		}
-		// Truncate to maximum size rather than failing
 		vocabSlice = vocabSlice[:maxVocabularySize]
 	}
 
-	// Rebuild fuzzy index with vocabulary from rich text
-	_, err = engine.RebuildIndex(vocabSlice, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to rebuild fuzzy index")
-	}
-
-	// Debug: Check if "commit" is in vocabulary
 	if bs.logger != nil {
-		hasCommit := false
-		for _, word := range vocabSlice {
-			if word == "commit" {
-				hasCommit = true
-				break
-			}
-		}
-		bs.logger.Debugw("Vocabulary built", "rows_processed", rowCount, "vocab_size", len(vocabSlice), "has_commit", hasCommit)
-		if len(vocabSlice) > 0 && len(vocabSlice) < 10 {
-			bs.logger.Debugw("Sample vocabulary", "words", vocabSlice)
-		}
+		bs.logger.Debugw("Vocabulary built", "rows_processed", rowCount, "vocab_size", len(vocabSlice))
 	}
 
-	// Split query into words and fuzzy match each
+	// Split query into words and fuzzy match via injected matcher
 	queryWords := strings.Fields(strings.ToLower(query))
-	// Map of query word -> list of possible matched words with scores
+
+	matchResult, err := bs.fuzzyMatcher.MatchWords(vocabSlice, queryWords, 10, 0.3)
+	if err != nil {
+		return nil, errors.Wrap(err, "fuzzy matcher failed")
+	}
+
+	// Convert matcher results to queryWordMatches format
 	queryWordMatches := make(map[string][]struct {
 		word  string
 		score float64
 	})
 
 	for _, queryWord := range queryWords {
-		// Find fuzzy matches for each word in the query
-		fuzzyMatches, _, err := engine.FindMatches(queryWord, fuzzyax.VocabPredicates, 10, 0.3)
-		if err == nil && len(fuzzyMatches) > 0 {
-			// Store all potential matches for this query word
-			for _, match := range fuzzyMatches {
+		if wordMatches, ok := matchResult[queryWord]; ok && len(wordMatches) > 0 {
+			for _, wm := range wordMatches {
 				queryWordMatches[queryWord] = append(queryWordMatches[queryWord], struct {
 					word  string
 					score float64
-				}{word: match.Value, score: match.Score})
+				}{word: wm.Value, score: wm.Score})
 			}
-			if bs.logger != nil && len(fuzzyMatches) > 0 {
-				bs.logger.Debugw("Fuzzy matched word", "query_word", queryWord, "matched", fuzzyMatches[0].Value, "score", fuzzyMatches[0].Score)
+			if bs.logger != nil {
+				bs.logger.Debugw("Fuzzy matched word", "query_word", queryWord, "matched", wordMatches[0].Value, "score", wordMatches[0].Score)
 			}
 		} else {
 			// If no fuzzy match, still look for exact match in vocabulary
@@ -514,7 +484,7 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 				queryWordMatches[queryWord] = append(queryWordMatches[queryWord], struct {
 					word  string
 					score float64
-				}{word: queryWord, score: 0.7}) // Lower score for non-vocabulary words
+				}{word: queryWord, score: 0.7})
 			}
 		}
 	}
