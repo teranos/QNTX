@@ -144,8 +144,10 @@ export function hideActionBar(): void {
     const bar = actionBar;
     actionBar = null;
 
-    // Cancel any running animations
-    bar.getAnimations().forEach(anim => anim.cancel());
+    // Cancel any running animations (if Web Animations API is available)
+    if (typeof bar.getAnimations === 'function') {
+        bar.getAnimations().forEach(anim => anim.cancel());
+    }
 
     const duration = getMinimizeDuration() * 0.5;
     if (duration === 0) {
