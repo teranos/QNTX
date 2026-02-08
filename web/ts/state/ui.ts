@@ -454,6 +454,15 @@ class UIState {
      * Add a glyph to canvas
      */
     addCanvasGlyph(glyph: CanvasGlyphState): void {
+        // Debug logging for result glyphs
+        if (glyph.symbol === 'result') {
+            log.debug(SEG.UI, `[UIState] Adding result glyph ${glyph.id}`, {
+                hasResult: !!glyph.result,
+                resultKeys: glyph.result ? Object.keys(glyph.result) : [],
+                resultSize: glyph.result ? JSON.stringify(glyph.result).length : 0
+            });
+        }
+
         const existing = this.state.canvasGlyphs.find(g => g.id === glyph.id);
         if (existing) {
             // Update existing glyph
@@ -575,7 +584,7 @@ class UIState {
             }
         }
 
-        // Persist to localStorage
+        // Persist to storage (IndexedDB)
         this.saveToStorage();
     }
 

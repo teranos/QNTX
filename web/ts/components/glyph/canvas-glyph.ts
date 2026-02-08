@@ -20,13 +20,15 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse, IX, AX, SO } from '@generated/sym.js';
+import { Pulse, IX, AX, SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createAxGlyph } from './ax-glyph';
 import { createIxGlyph } from './ix-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createPromptGlyph } from './prompt-glyph';
+import { createNoteGlyph } from './note-glyph';
+import { createErrorGlyph } from './error-glyph';
 import { uiState } from '../../state/ui';
 import { getMinimizeDuration } from './glyph';
 import { unmeldComposition, reconstructMeld } from './meld-system';
@@ -35,6 +37,7 @@ import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
 import { getAllCompositions } from '../../state/compositions';
+import { convertNoteToPrompt, convertResultToNote } from './conversions';
 
 // ============================================================================
 // Selection State
@@ -106,7 +109,9 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
             selectedGlyphIds,
             container,
             () => deleteSelectedGlyphs(container),
-            (composition) => unmeldSelectedGlyphs(container, composition)
+            (composition) => unmeldSelectedGlyphs(container, composition),
+            () => convertNoteToPrompt(container, selectedGlyphIds[0]),
+            () => convertResultToNote(container, selectedGlyphIds[0]),
         );
     } else {
         hideActionBar();
@@ -123,11 +128,20 @@ function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
     if (element.classList.contains('canvas-ax-glyph')) {
         return { id, title: 'AX Query', symbol: AX, renderContent: () => element };
     }
+    if (element.classList.contains('canvas-ix-glyph')) {
+        return { id, title: 'Ingest', symbol: IX, renderContent: () => element };
+    }
     if (element.classList.contains('canvas-py-glyph')) {
         return { id, title: 'Python', symbol: 'py', renderContent: () => element };
     }
     if (element.classList.contains('canvas-prompt-glyph')) {
         return { id, title: 'Prompt', symbol: SO, renderContent: () => element };
+    }
+    if (element.classList.contains('canvas-note-glyph')) {
+        return { id, title: 'Note', symbol: Prose, renderContent: () => element };
+    }
+    if (element.classList.contains('canvas-result-glyph')) {
+        return { id, title: 'Result', symbol: 'result', renderContent: () => element };
     }
     // Fallback
     return { id, title: 'Glyph', renderContent: () => element };
@@ -234,8 +248,26 @@ function deleteSelectedGlyphs(container: HTMLElement): void {
  */
 export function createCanvasGlyph(): Glyph {
     // Load persisted glyphs from uiState
-    const savedGlyphs = uiState.getCanvasGlyphs();
-    log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state`);
+    const allSavedGlyphs = uiState.getCanvasGlyphs();
+
+    // Filter out error glyphs (ephemeral - should never be persisted)
+    const errorGlyphs = allSavedGlyphs.filter(g => g.symbol === 'error');
+    if (errorGlyphs.length > 0) {
+        log.warn(SEG.GLYPH, `[Canvas] Removing ${errorGlyphs.length} persisted error glyphs (should be ephemeral)`, {
+            ids: errorGlyphs.map(g => g.id)
+        });
+        errorGlyphs.forEach(g => uiState.removeCanvasGlyph(g.id));
+    }
+
+    const savedGlyphs = allSavedGlyphs.filter(g => g.symbol !== 'error');
+    const resultCount = savedGlyphs.filter(g => g.symbol === 'result').length;
+    log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedGlyphs.length} glyphs from state (${resultCount} result glyphs)`, {
+        symbols: savedGlyphs.map(g => g.symbol),
+        resultGlyphs: savedGlyphs.filter(g => g.symbol === 'result').map(g => ({
+            id: g.id,
+            hasResult: !!g.result
+        }))
+    });
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
         // For ax glyphs, recreate using factory function to restore full functionality
@@ -263,10 +295,13 @@ export function createCanvasGlyph(): Glyph {
             width: saved.width,   // Restore custom size if saved
             height: saved.height,
             result: saved.result, // For result glyphs
-            // TODO: Clarify if grid glyphs should display content
+            // Placeholder renderContent - result glyphs render via createResultGlyph() instead
+            // TODO: Clarify if Pulse glyphs should display content
             renderContent: () => {
                 const content = document.createElement('div');
-                content.textContent = 'Pulse glyph content (TBD)';
+                content.textContent = saved.symbol === 'result'
+                    ? 'Result placeholder (should not be visible)'
+                    : 'Pulse glyph content (TBD)';
                 return content;
             }
         };
@@ -290,7 +325,7 @@ export function createCanvasGlyph(): Glyph {
             container.style.height = '100%';
             container.style.position = 'relative';
             container.style.overflow = 'hidden';
-            container.style.backgroundColor = '#2a2b2a'; // Mid-dark gray for night work
+            container.style.backgroundColor = 'var(--bg-dark-hover)';
             container.style.outline = 'none'; // Remove focus outline
 
             // Add subtle grid overlay
@@ -319,8 +354,14 @@ export function createCanvasGlyph(): Glyph {
                     return;
                 }
 
-                // Ignore clicks on buttons, inputs, and textareas (allow interactive elements to work)
+                // Ignore clicks on buttons, inputs, textareas, and contenteditable elements (allow interactive elements to work)
+                // This includes ProseMirror and CodeMirror editors which use contenteditable divs
                 if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                // Check if click is inside a contenteditable element (editors)
+                if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
                     return;
                 }
 
@@ -443,22 +484,67 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         return await createPromptGlyph(glyph);
     }
 
+    // For note glyphs, create markdown editor
+    if (glyph.symbol === Prose) {
+        return await createNoteGlyph(glyph);
+    }
+
     // For AX glyphs, render content directly (they handle their own rendering)
     if (glyph.symbol === AX) {
         return glyph.renderContent();
     }
 
     // For result glyphs, create result display
-    if (glyph.symbol === 'result' && glyph.result) {
-        log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
-        return createResultGlyph(glyph, glyph.result as ExecutionResult);
+    if (glyph.symbol === 'result') {
+        if (glyph.result) {
+            log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
+            return createResultGlyph(glyph, glyph.result as ExecutionResult);
+        }
+
+        // Result glyph without execution data - spawn error glyph (ephemeral)
+        log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing execution data`, {
+            glyphId: glyph.id,
+            hasResult: !!glyph.result,
+            position: { x: glyph.x, y: glyph.y },
+            size: { width: glyph.width, height: glyph.height }
+        });
+
+        return createErrorGlyph(
+            glyph.id,
+            'result',
+            { x: glyph.x ?? 200, y: glyph.y ?? 200 },
+            {
+                type: 'missing_data',
+                message: 'Execution result data missing',
+                details: {
+                    'Has result': !!glyph.result,
+                    'Position': `(${glyph.x}, ${glyph.y})`,
+                    'Size': `${glyph.width}x${glyph.height}`,
+                    'Cause': 'Glyph metadata saved without execution result (migration bug)'
+                }
+            }
+        );
     }
 
-    // Unsupported glyph type - log error and return placeholder
-    log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`);
-    const placeholder = document.createElement('div');
-    placeholder.textContent = `Unknown glyph type: ${glyph.symbol}`;
-    placeholder.style.padding = '8px';
-    placeholder.style.color = 'red';
-    return placeholder;
+    // Unsupported glyph type - spawn error glyph (ephemeral)
+    log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
+        glyphId: glyph.id,
+        symbol: glyph.symbol,
+        position: { x: glyph.x, y: glyph.y }
+    });
+
+    return createErrorGlyph(
+        glyph.id,
+        glyph.symbol ?? 'unknown',
+        { x: glyph.x ?? 200, y: glyph.y ?? 200 },
+        {
+            type: 'unknown_type',
+            message: `Glyph type '${glyph.symbol ?? 'unknown'}' not supported`,
+            details: {
+                'Symbol': glyph.symbol ?? 'unknown',
+                'Position': `(${glyph.x}, ${glyph.y})`,
+                'Cause': 'Glyph type not implemented in renderGlyph() - check canvas-glyph.ts'
+            }
+        }
+    );
 }

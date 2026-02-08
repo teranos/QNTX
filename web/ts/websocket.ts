@@ -139,7 +139,7 @@ const MESSAGE_HANDLERS = {
         });
 
         // Update database stats glyph
-        import('./test-glyphs.js').then(({ updateDatabaseStats }) => {
+        import('./default-glyphs.js').then(({ updateDatabaseStats }) => {
             updateDatabaseStats(data);
         });
 
