@@ -146,10 +146,11 @@ export class ChartGlyphState {
             } else {
                 const days = this.currentRange === 'week' ? 7 : 30;
                 const { apiFetch } = await import('../../api');
-                const response = await apiFetch(`${this.dataSource}?days=${days}`);
+                const url = `${this.dataSource}?days=${days}`;
+                const response = await apiFetch(url);
 
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch: ${response.statusText}`);
+                    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
                 }
 
                 this.data = await response.json() as TimeSeriesDataPoint[];
@@ -157,7 +158,7 @@ export class ChartGlyphState {
 
             this.render();
         } catch (error) {
-            log.warn(SEG.UI, `[ChartGlyph ${this.id}] Failed to load data:`, error);
+            log.warn(SEG.UI, `[ChartGlyph ${this.id}] Failed to load data from ${this.dataSource} (${this.currentRange}):`, error);
             if (this.element) {
                 const container = document.getElementById(`chart-${this.id}`);
                 if (container) {
