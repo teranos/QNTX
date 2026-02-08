@@ -52,8 +52,8 @@
     --glyph-status-success-text: #a8e6a1;
     --glyph-status-error-text: #ff6b6b;
 
-    /* Glyph Accent Colors */
-    --glyph-prompt-accent: #d4b8ff;
+    /* Accent Colors */
+    --accent-lavender: #d4b8ff;
 
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
