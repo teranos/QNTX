@@ -106,7 +106,7 @@ export function morphToCanvas(
             const errorContent = document.createElement('div');
             errorContent.style.padding = '16px';
             errorContent.style.flex = '1';
-            errorContent.style.color = '#ef4444';
+            errorContent.style.color = 'var(--color-error)';
             errorContent.innerHTML = `
                 <div style="font-weight: bold;">Error rendering content</div>
                 <div style="opacity: 0.8; font-size: 12px;">${error instanceof Error ? error.message : String(error)}</div>
