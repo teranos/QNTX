@@ -124,8 +124,10 @@ export function getAllCompositions(): CompositionState[] {
 /**
  * Check if a composition can accept a new glyph
  * A composition is meldable if the initiator glyph is compatible with the composition's rightmost glyph
+ *
+ * TODO(Phase 2): Implement actual meldability logic based on glyph types
  */
-export function isCompositionMeldable(comp: CompositionState, initiatorGlyphType: string): boolean {
+export function isCompositionMeldable(comp: CompositionState, _initiatorGlyphType: string): boolean {
     if (comp.edges.length === 0) return false;
 
     // Get the rightmost glyph type from the composition

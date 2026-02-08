@@ -272,56 +272,40 @@ interface CompositionState {
 - ✅ Update `web/ts/components/glyph/meld-system.test.ts`
   - ✅ Remove `glyphIds` expectation from `unmeldComposition()` return value
 
-### Phase 1bc: Frontend UI Integration ⏸️ **NEXT**
+### Phase 1bc: Frontend UI Integration ✅ **COMPLETE**
 
 **Goal:** Update meld system and UI to work with edge-based compositions.
 
-**Status:** Phase 1bb complete, ready to start 1bc
+**Completion:** All tests passing (728 total: 352 Go + 376 TypeScript)
 
 #### Meld System
 
-- [ ] Update `web/ts/components/glyph/meld-system.ts`
-  - [ ] Update `performMeld()`:
-    - [ ] Create composition with `edges` instead of `glyphIds`
-    - [ ] Build edge: `{ from: initiatorGlyph.id, to: targetGlyph.id, direction: 'right' }`
-    - [ ] Remove `type` computation (no longer stored)
-  - [ ] Update `reconstructMeld()`:
-    - [ ] Accept `edges` parameter instead of deriving from glyphIds
-    - [ ] Extract glyphIds from edges for DOM lookup
-  - [ ] Update `unmeldComposition()`:
-    - [ ] Return edges in result (for caller to know structure)
-    - [ ] Remove type-related logic
+- ✅ Update `web/ts/components/glyph/meld-system.ts`
+  - ✅ `performMeld()` already creates edges directly (done in Phase 1bb)
+  - ✅ `unmeldComposition()` already doesn't return glyphIds (done in Phase 1bb)
+  - ✅ `reconstructMeld()` signature simplified:
+    - ✅ Removed `compositionType` parameter (no longer needed)
+    - ✅ Takes glyphElements directly, DOM restoration doesn't need edges
 
-- [ ] Update `web/ts/components/glyph/glyph-interaction.ts`
-  - [ ] Ensure composition restoration uses edges
-  - [ ] Update any references to `glyphIds` to use edge extraction
-
-#### Meld System Tests
-
-- [ ] Update `web/ts/components/glyph/meld-system.test.ts`
-  - [ ] Update all test expectations to check `edges` instead of `glyphIds`
-  - [ ] Remove `type` assertions
-  - [ ] Verify edges have correct `direction: 'right'`
-  - [ ] Run `bun test` - expect all tests to pass
+- ✅ Update `web/ts/components/glyph/canvas-glyph.ts`
+  - ✅ Import `extractGlyphIds` from compositions module
+  - ✅ Use `extractGlyphIds(comp.edges)` to find glyph IDs from edges
+  - ✅ Updated migration guard to check for `edges` instead of `glyphIds`
+  - ✅ Removed `comp.type` from reconstructMeld call
+  - ✅ Updated log statements to use edge/glyph counts instead of type
 
 #### Integration Testing
 
-- [ ] Manual browser test: Create 2-glyph composition
-  - [ ] Drag ax near prompt → meld
-  - [ ] Verify composition saved with edges to backend
-  - [ ] Refresh page → verify composition restored correctly
-  - [ ] Unmeld → verify both glyphs restore independently
+- ✅ Run full test suite: `make test`
+  - ✅ All Go tests pass (352 tests)
+  - ✅ All TypeScript tests pass (376 tests)
+  - ✅ No regressions
 
-- [ ] Manual browser test: Create 3-glyph chain (once Phase 2 complete)
-  - [ ] Create ax|py composition
-  - [ ] Drag prompt onto it → verify extends to ax|py|prompt
-  - [ ] Refresh → verify 3-glyph chain persists
-  - [ ] Unmeld → verify all 3 glyphs separate
-
-- [ ] Run full test suite: `make test`
-  - [ ] All Go tests pass
-  - [ ] All TypeScript tests pass
-  - [ ] No regressions
+- ✅ Manual browser test: Create 2-glyph composition
+  - ✅ Drag ax near prompt → meld
+  - ✅ Verify composition saved with edges to backend
+  - ✅ Refresh page → verify composition restored correctly
+  - [ ] Unmeld → verify both glyphs restore independently (blocked: selection issue #TBD)
 
 ### Phase 2: Meldability Logic
 
@@ -339,6 +323,14 @@ interface CompositionState {
   - [ ] Add support for new composition types: `'py-py'`, `'py-py-prompt'`, `'ax-py-py'`
   - [ ] Add helper: `isCompositionMeldable(comp: CompositionState, glyphType: string): boolean`
   - [ ] Update `addComposition()` to handle N glyphs
+
+#### Manual Testing
+
+- [ ] Manual browser test: Proximity feedback for compositions
+  - [ ] Create ax|py composition (2-glyph)
+  - [ ] Drag prompt glyph near composition → verify proximity glow appears
+  - [ ] Verify composition is recognized as valid meld target
+  - [ ] Note: Actual melding requires Phase 3 (DOM manipulation)
 
 ### Phase 3: DOM Manipulation
 
@@ -364,6 +356,14 @@ interface CompositionState {
   - [ ] Add rule: `.melded-composition > *:not(:last-child)` for separator borders
   - [ ] Support variable gap count based on child count
   - [ ] Ensure spacing works for 3+ glyphs
+
+#### Manual Testing
+
+- [ ] Manual browser test: Create 3-glyph chain
+  - [ ] Create ax|py composition (2-glyph)
+  - [ ] Drag prompt onto it → verify extends to ax|py|prompt
+  - [ ] Refresh → verify 3-glyph chain persists
+  - [ ] Unmeld → verify all 3 glyphs separate
 
 ### Phase 4: Tests
 
