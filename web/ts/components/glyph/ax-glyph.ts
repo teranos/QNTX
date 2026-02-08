@@ -20,12 +20,16 @@
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, cleanupResizeObserver } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
+import {
+    CANVAS_GLYPH_TITLE_BAR_HEIGHT,
+    MAX_VIEWPORT_HEIGHT_RATIO
+} from './glyph';
 
 /**
  * Factory function to create an Ax query editor glyph
@@ -95,19 +99,10 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.dataset.glyphSymbol = AX;
 
             // Style element - resizable
-            container.style.position = 'absolute';
-            container.style.left = `${glyph.x ?? x ?? 200}px`;
-            container.style.top = `${glyph.y ?? y ?? 200}px`;
-            container.style.width = `${width}px`;
-            container.style.height = `${height}px`;
+            applyCanvasGlyphLayout(container, { x: glyph.x ?? x ?? 200, y: glyph.y ?? y ?? 200, width, height });
             container.style.minWidth = '200px';
             container.style.minHeight = '120px';
-            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)'; // Darker with transparency
-            container.style.borderRadius = '4px';
-            container.style.border = '1px solid var(--border-color)';
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.overflow = 'hidden';
+            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
             container.style.zIndex = '1';
 
             // Title bar with inline query input
@@ -127,7 +122,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             label.style.cursor = 'move';
             label.style.fontWeight = 'bold';
             label.style.flexShrink = '0';
-            label.style.color = '#6b9bd1'; // Azure-ish blue
+            label.style.color = 'var(--glyph-status-running-text)';
             titleBar.appendChild(label);
 
             // Single-line query input (takes remaining space)
@@ -244,20 +239,15 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
 
             // Resize handle
             const resizeHandle = document.createElement('div');
-            resizeHandle.className = 'ax-glyph-resize-handle';
-            resizeHandle.style.position = 'absolute';
-            resizeHandle.style.bottom = '0';
-            resizeHandle.style.right = '0';
-            resizeHandle.style.width = '16px';
-            resizeHandle.style.height = '16px';
-            resizeHandle.style.cursor = 'nwse-resize';
-            resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-            resizeHandle.style.borderTopLeftRadius = '4px';
+            resizeHandle.className = 'ax-glyph-resize-handle glyph-resize-handle';
             container.appendChild(resizeHandle);
 
             // Make draggable and resizable (drag via symbol only)
             makeDraggable(container, label, glyph, { logLabel: 'AxGlyph' });
             makeResizable(container, resizeHandle, glyph, { logLabel: 'AxGlyph' });
+
+            // Set up ResizeObserver for auto-sizing glyph to content
+            setupAxGlyphResizeObserver(container, resultsContainer, glyphId);
 
             // Subscribe to sync state changes for visual feedback
             syncStateManager.subscribe(glyphId, (state) => {
@@ -275,6 +265,39 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
     };
 
     return glyph;
+}
+
+/**
+ * Set up ResizeObserver to auto-size AX glyph to match results content height
+ * Works alongside manual resize handles - user can still drag to resize
+ */
+function setupAxGlyphResizeObserver(
+    glyphElement: HTMLElement,
+    resultsContainer: HTMLElement,
+    glyphId: string
+): void {
+    // Cleanup any existing observer to prevent memory leaks on re-render
+    cleanupResizeObserver(glyphElement, `AX ${glyphId}`);
+
+    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
+    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const contentHeight = entry.contentRect.height;
+            const totalHeight = Math.min(contentHeight + titleBarHeight, maxHeight);
+
+            // Update minHeight instead of height to allow manual resize
+            glyphElement.style.minHeight = `${totalHeight}px`;
+
+            log.debug(SEG.GLYPH, `[AX ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
+        }
+    });
+
+    resizeObserver.observe(resultsContainer);
+
+    // Store observer for cleanup
+    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 /**
@@ -384,7 +407,7 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     errorDisplay.style.padding = '6px 8px';
     errorDisplay.style.fontSize = '11px'; // Smaller font
     errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.backgroundColor = severity === 'error' ? '#2b1a1a' : '#2b2b1a';
+    errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : '#2b2b1a';
     errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
     errorDisplay.style.whiteSpace = 'pre-wrap';
     errorDisplay.style.wordBreak = 'break-word';

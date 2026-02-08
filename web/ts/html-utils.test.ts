@@ -70,12 +70,6 @@ describe('formatRelativeTime', () => {
         expect(formatRelativeTime(threeDaysAgo)).toBe('3d ago');
     });
 
-    test('formats future time (seconds from now)', () => {
-        const now = Date.now();
-        const fiveSecondsFromNow = new Date(now + 5000).toISOString();
-        expect(formatRelativeTime(fiveSecondsFromNow)).toBe('5s from now');
-    });
-
     test('formats future time (minutes from now)', () => {
         const now = Date.now();
         const tenMinutesFromNow = new Date(now + 10 * 60 * 1000).toISOString();

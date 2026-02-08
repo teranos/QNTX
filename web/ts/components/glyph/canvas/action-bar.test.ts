@@ -1,19 +1,38 @@
 /**
  * Tests for canvas action bar
- * Focus: API contract - accepts callbacks and selected glyph IDs
+ *
+ * Personas:
+ * - Tim: Happy path user, normal workflows
+ * - Spike: Tries to break things, edge cases
+ * - Jenny: Power user, complex scenarios
  */
 
 import { describe, test, expect } from 'bun:test';
+import { Window } from 'happy-dom';
 import { showActionBar, hideActionBar } from './action-bar';
 
-describe('Canvas Action Bar', () => {
-    test('accepts required parameters without errors', () => {
+// Setup happy-dom
+const window = new Window();
+const document = window.document;
+globalThis.document = document as any;
+globalThis.window = window as any;
+
+// Mock animate for tests
+(window as any).Element.prototype.animate = function() {
+    return { finished: Promise.resolve() } as any;
+};
+
+describe('Canvas Action Bar - Tim (Happy Path)', () => {
+    test('Tim selects glyphs and sees action bar', () => {
         const container = document.createElement('div');
+        container.style.position = 'relative';
+        document.body.appendChild(container);
+
         const selectedIds = ['glyph-1', 'glyph-2'];
         let onDeleteCalled = false;
         let onUnmeldCalled = false;
 
-        // Should accept all parameters
+        // Tim selects multiple glyphs and action bar appears
         expect(() => {
             showActionBar(
                 selectedIds,
@@ -21,13 +40,9 @@ describe('Canvas Action Bar', () => {
                 () => { onDeleteCalled = true; },
                 (comp) => { onUnmeldCalled = true; }
             );
-        }).toBeDefined();
-    });
+        }).not.toThrow();
 
-    test('hideActionBar can be called safely', () => {
-        // Should be callable even if no action bar exists
-        expect(() => {
-            hideActionBar();
-        }).toBeDefined();
+        // Cleanup
+        document.body.innerHTML = '';
     });
 });

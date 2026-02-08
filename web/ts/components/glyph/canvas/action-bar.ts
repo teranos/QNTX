@@ -7,6 +7,7 @@
 
 import { getMinimizeDuration } from '../glyph';
 import { isMeldedComposition } from '../meld-system';
+import { Prose } from '@generated/sym.js';
 
 // Action bar animation constants
 const ACTION_BAR_ANIMATION_SPEED = 0.5;
@@ -22,7 +23,9 @@ export function showActionBar(
     selectedGlyphIds: string[],
     container: HTMLElement,
     onDelete: () => void,
-    onUnmeld: (composition: HTMLElement) => void
+    onUnmeld: (composition: HTMLElement) => void,
+    onConvertToPrompt?: () => void,
+    onConvertToNote?: () => void,
 ): void {
     if (selectedGlyphIds.length === 0) {
         return;
@@ -44,6 +47,39 @@ export function showActionBar(
             meldedComposition = glyphEl.parentElement;
             break;
         }
+    }
+
+    // Check single-glyph selection type for conversion buttons
+    let selectedSymbol: string | undefined;
+    if (selectedGlyphIds.length === 1) {
+        const glyphEl = container.querySelector(`[data-glyph-id="${selectedGlyphIds[0]}"]`) as HTMLElement | null;
+        selectedSymbol = glyphEl?.dataset.glyphSymbol;
+    }
+
+    // Add convert-to-prompt button if single note selected
+    if (selectedSymbol === Prose && onConvertToPrompt) {
+        const convertBtn = document.createElement('button');
+        convertBtn.className = 'canvas-action-button canvas-action-convert has-tooltip';
+        convertBtn.dataset.tooltip = 'Convert to prompt glyph';
+        convertBtn.textContent = '⟶';
+        convertBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onConvertToPrompt();
+        });
+        bar.appendChild(convertBtn);
+    }
+
+    // Add convert-to-note button if single result selected
+    if (selectedSymbol === 'result' && onConvertToNote) {
+        const convertBtn = document.createElement('button');
+        convertBtn.className = 'canvas-action-button canvas-action-convert has-tooltip';
+        convertBtn.dataset.tooltip = 'Convert to note';
+        convertBtn.textContent = '✎';
+        convertBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onConvertToNote();
+        });
+        bar.appendChild(convertBtn);
     }
 
     // Add unmeld button if glyphs are in a meld
@@ -108,8 +144,10 @@ export function hideActionBar(): void {
     const bar = actionBar;
     actionBar = null;
 
-    // Cancel any running animations
-    bar.getAnimations().forEach(anim => anim.cancel());
+    // Cancel any running animations (if Web Animations API is available)
+    if (typeof bar.getAnimations === 'function') {
+        bar.getAnimations().forEach(anim => anim.cancel());
+    }
 
     const duration = getMinimizeDuration() * 0.5;
     if (duration === 0) {

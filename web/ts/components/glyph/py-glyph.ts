@@ -22,7 +22,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
@@ -65,19 +65,9 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     const height = glyph.height ?? calculatedHeight;
 
     // Style element - auto-sized based on content or restored from saved size
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
+    applyCanvasGlyphLayout(element, { x, y, width, height });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
-    element.style.backgroundColor = 'var(--bg-secondary)';
-    element.style.borderRadius = '4px';
-    element.style.border = '1px solid var(--border-color)';
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
     element.style.zIndex = '1';
 
     // Title bar for dragging
@@ -101,19 +91,10 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Run button
     const runButton = document.createElement('button');
     runButton.textContent = '▶';
+    runButton.className = 'glyph-play-btn';
     runButton.title = 'Run Python code';
-    runButton.style.background = 'var(--bg-hover)';
-    runButton.style.border = '1px solid var(--border-color)';
-    runButton.style.borderRadius = '3px';
-    runButton.style.padding = '2px 8px';
-    runButton.style.cursor = 'pointer';
-    runButton.style.fontSize = '12px';
-    runButton.style.color = 'var(--text-primary)';
 
-    // Prevent drag when clicking button
-    runButton.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-    });
+    preventDrag(runButton);
 
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
@@ -198,15 +179,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Resize handle
     const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'py-glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.width = '16px';
-    resizeHandle.style.height = '16px';
-    resizeHandle.style.cursor = 'nwse-resize';
-    resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-    resizeHandle.style.borderTopLeftRadius = '4px';
+    resizeHandle.className = 'py-glyph-resize-handle glyph-resize-handle';
     element.appendChild(resizeHandle);
 
     // Initialize CodeMirror with loaded code

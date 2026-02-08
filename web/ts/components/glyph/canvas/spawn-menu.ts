@@ -6,13 +6,14 @@
  */
 
 import type { Glyph } from '../glyph';
-import { IX, AX, SO } from '@generated/sym.js';
+import { IX, AX, SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getMinimizeDuration } from '../glyph';
 import { createIxGlyph } from '../ix-glyph';
 import { createAxGlyph } from '../ax-glyph';
 import { createPyGlyph } from '../py-glyph';
 import { createPromptGlyph } from '../prompt-glyph';
+import { createNoteGlyph } from '../note-glyph';
 import { uiState } from '../../../state/ui';
 
 /** Duration multiplier for spawn menu animation */
@@ -149,6 +150,19 @@ export function showSpawnMenu(
     });
 
     menu.appendChild(promptBtn);
+
+    // Add note button
+    const noteBtn = document.createElement('button');
+    noteBtn.className = 'canvas-spawn-button';
+    noteBtn.textContent = Prose;
+    noteBtn.title = 'Spawn Note glyph';
+
+    noteBtn.addEventListener('click', () => {
+        spawnNoteGlyph(x, y, canvas, glyphs);
+        removeMenu();
+    });
+
+    menu.appendChild(noteBtn);
 
     document.body.appendChild(menu);
 
@@ -378,4 +392,47 @@ async function spawnPromptGlyph(
     });
 
     log.debug(SEG.GLYPH, `[Canvas] Spawned Prompt glyph at (${x}, ${y}) with size ${width}x${height}`);
+}
+
+/**
+ * Spawn a new Note glyph at pixel position
+ */
+async function spawnNoteGlyph(
+    x: number,
+    y: number,
+    canvas: HTMLElement,
+    glyphs: Glyph[]
+): Promise<void> {
+    const noteGlyph: Glyph = {
+        id: `note-${crypto.randomUUID()}`,
+        title: 'Note',
+        symbol: Prose,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'Note glyph';
+            return content;
+        }
+    };
+
+    glyphs.push(noteGlyph);
+
+    const glyphElement = await createNoteGlyph(noteGlyph);
+    canvas.appendChild(glyphElement);
+
+    const rect = glyphElement.getBoundingClientRect();
+    const width = Math.round(rect.width);
+    const height = Math.round(rect.height);
+
+    uiState.addCanvasGlyph({
+        id: noteGlyph.id,
+        symbol: Prose,
+        x,
+        y,
+        width,
+        height
+    });
+
+    log.debug(SEG.GLYPH, `[Canvas] Spawned Note glyph at (${x}, ${y}) with size ${width}x${height}`);
 }
