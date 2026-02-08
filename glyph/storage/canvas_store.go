@@ -22,15 +22,15 @@ type CanvasGlyph struct {
 }
 
 // CanvasComposition represents a melded composition of glyphs
+// Supports multi-glyph chains via GlyphIDs array (ordered left-to-right)
 type CanvasComposition struct {
-	ID          string    `json:"id"`
-	Type        string    `json:"type"` // ax-prompt, ax-py, py-prompt
-	InitiatorID string    `json:"initiator_id"`
-	TargetID    string    `json:"target_id"`
-	X           int       `json:"x"`
-	Y           int       `json:"y"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+	Type      string    `json:"type"` // ax-prompt, ax-py, py-prompt, ax-py-prompt
+	GlyphIDs  []string  `json:"glyph_ids"`
+	X         int       `json:"x"`
+	Y         int       `json:"y"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // CanvasStore provides storage operations for canvas state
@@ -179,9 +179,17 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 	}
 	comp.UpdatedAt = now
 
+	// Start transaction for atomic composition + junction table updates
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transaction")
+	}
+	defer tx.Rollback()
+
+	// Upsert composition record
 	query := `
-		INSERT INTO canvas_compositions (id, type, initiator_id, target_id, x, y, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO canvas_compositions (id, type, x, y, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			type = excluded.type,
 			x = excluded.x,
@@ -189,8 +197,8 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 			updated_at = excluded.updated_at
 	`
 
-	_, err := s.db.ExecContext(ctx, query,
-		comp.ID, comp.Type, comp.InitiatorID, comp.TargetID, comp.X, comp.Y,
+	_, err = tx.ExecContext(ctx, query,
+		comp.ID, comp.Type, comp.X, comp.Y,
 		comp.CreatedAt.Format(time.RFC3339Nano),
 		comp.UpdatedAt.Format(time.RFC3339Nano),
 	)
@@ -198,19 +206,39 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 		return errors.Wrapf(err, "failed to upsert canvas composition %s", comp.ID)
 	}
 
+	// Delete existing junction table entries for this composition
+	deleteQuery := `DELETE FROM composition_glyphs WHERE composition_id = ?`
+	_, err = tx.ExecContext(ctx, deleteQuery, comp.ID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete old composition glyphs for %s", comp.ID)
+	}
+
+	// Insert new junction table entries for each glyph (with position)
+	insertQuery := `INSERT INTO composition_glyphs (composition_id, glyph_id, position) VALUES (?, ?, ?)`
+	for i, glyphID := range comp.GlyphIDs {
+		_, err = tx.ExecContext(ctx, insertQuery, comp.ID, glyphID, i)
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert composition glyph %s at position %d", glyphID, i)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit composition upsert transaction")
+	}
+
 	return nil
 }
 
 // GetComposition retrieves a composition by ID
 func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasComposition, error) {
-	query := `SELECT id, type, initiator_id, target_id, x, y, created_at, updated_at
+	query := `SELECT id, type, x, y, created_at, updated_at
 	          FROM canvas_compositions WHERE id = ?`
 
 	var comp CanvasComposition
 	var createdAt, updatedAt string
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&comp.ID, &comp.Type, &comp.InitiatorID, &comp.TargetID, &comp.X, &comp.Y,
+		&comp.ID, &comp.Type, &comp.X, &comp.Y,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -230,12 +258,39 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 		return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for composition %s: %s", comp.ID, updatedAt)
 	}
 
+	// Query junction table for glyph IDs (ordered by position)
+	glyphQuery := `SELECT glyph_id FROM composition_glyphs
+	               WHERE composition_id = ? ORDER BY position ASC`
+	rows, err := s.db.QueryContext(ctx, glyphQuery, id)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query composition glyphs for %s", id)
+	}
+	defer rows.Close()
+
+	comp.GlyphIDs = []string{}
+	for rows.Next() {
+		var glyphID string
+		if err := rows.Scan(&glyphID); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan glyph ID for composition %s", id)
+		}
+		comp.GlyphIDs = append(comp.GlyphIDs, glyphID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrapf(err, "error iterating composition glyphs for %s", id)
+	}
+
+	// Validate: composition must have at least one glyph
+	if len(comp.GlyphIDs) == 0 {
+		return nil, errors.Newf("composition %s has no glyphs (orphaned)", id)
+	}
+
 	return &comp, nil
 }
 
 // ListCompositions returns all compositions
 func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasComposition, error) {
-	query := `SELECT id, type, initiator_id, target_id, x, y, created_at, updated_at
+	query := `SELECT id, type, x, y, created_at, updated_at
 	          FROM canvas_compositions ORDER BY created_at ASC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -244,13 +299,14 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 	}
 	defer rows.Close()
 
+	// First pass: collect all composition data (avoid nested queries)
 	var comps []*CanvasComposition
 	for rows.Next() {
 		var comp CanvasComposition
 		var createdAt, updatedAt string
 
 		if err := rows.Scan(
-			&comp.ID, &comp.Type, &comp.InitiatorID, &comp.TargetID, &comp.X, &comp.Y,
+			&comp.ID, &comp.Type, &comp.X, &comp.Y,
 			&createdAt, &updatedAt,
 		); err != nil {
 			return nil, errors.Wrap(err, "failed to scan canvas composition")
@@ -267,6 +323,35 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 		}
 
 		comps = append(comps, &comp)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "error iterating compositions")
+	}
+
+	// Second pass: query junction table for each composition (after closing first result set)
+	glyphQuery := `SELECT glyph_id FROM composition_glyphs
+	               WHERE composition_id = ? ORDER BY position ASC`
+	for _, comp := range comps {
+		glyphRows, err := s.db.QueryContext(ctx, glyphQuery, comp.ID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to query composition glyphs for %s", comp.ID)
+		}
+
+		comp.GlyphIDs = []string{}
+		for glyphRows.Next() {
+			var glyphID string
+			if err := glyphRows.Scan(&glyphID); err != nil {
+				glyphRows.Close()
+				return nil, errors.Wrapf(err, "failed to scan glyph ID for composition %s", comp.ID)
+			}
+			comp.GlyphIDs = append(comp.GlyphIDs, glyphID)
+		}
+		glyphRows.Close()
+
+		if err := glyphRows.Err(); err != nil {
+			return nil, errors.Wrapf(err, "error iterating composition glyphs for %s", comp.ID)
+		}
 	}
 
 	return comps, nil
