@@ -107,7 +107,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
-    textarea.style.color = 'var(--glyph-prompt-accent)';
+    textarea.style.color = 'var(--accent-lavender)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
@@ -209,7 +209,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     symbol.style.cursor = 'move';
     symbol.style.fontWeight = 'bold';
     symbol.style.flexShrink = '0';
-    symbol.style.color = 'var(--glyph-prompt-accent)';
+    symbol.style.color = 'var(--accent-lavender)';
 
     // Play button
     const playBtn = document.createElement('button');

@@ -89,7 +89,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     textarea.style.fontSize = '13px';
     textarea.style.fontFamily = 'monospace';
     textarea.style.backgroundColor = 'var(--bg-almost-black)';
-    textarea.style.color = 'var(--glyph-prompt-accent)';
+    textarea.style.color = 'var(--accent-lavender)';
     textarea.style.border = '1px solid var(--border-color)';
     textarea.style.borderRadius = '4px';
     textarea.style.resize = 'none';
@@ -183,7 +183,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     const symbol = document.createElement('span');
     symbol.textContent = SO;
     symbol.style.fontSize = '16px';
-    symbol.style.color = 'var(--glyph-prompt-accent)';
+    symbol.style.color = 'var(--accent-lavender)';
     symbol.style.fontWeight = 'bold';
 
     const title = document.createElement('span');
