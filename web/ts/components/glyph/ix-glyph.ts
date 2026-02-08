@@ -30,12 +30,11 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, preventDrag } from './glyph-interaction';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
-import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 
 /**
  * IX glyph execution status (persisted in localStorage)
@@ -91,41 +90,70 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     const x = glyph.x ?? 200;
     const y = glyph.y ?? 200;
 
-    // Default size for IX glyph
+    // Initial width will be set by resizeToFitText()
     const width = glyph.width ?? 360;
-    const height = glyph.height ?? 180;
 
-    applyCanvasGlyphLayout(element, { x, y, width, height, useMinHeight: true });
+    applyCanvasGlyphLayout(element, { x, y, width, height: undefined, useMinHeight: false });
+    element.style.height = 'auto'; // Auto height based on content
     element.style.overflow = 'visible';
 
-    // Textarea (declared early so play button can reference it)
-    const textarea = document.createElement('textarea');
-    textarea.placeholder = 'Enter URL, file path, or data source...';
-    textarea.value = savedInput; // Restore saved content
-    textarea.style.flex = '1';
-    textarea.style.padding = '8px';
-    textarea.style.fontSize = '13px';
-    textarea.style.fontFamily = 'monospace';
-    textarea.style.backgroundColor = 'var(--bg-almost-black)';
-    textarea.style.color = 'var(--accent-lavender)';
-    textarea.style.border = '1px solid var(--border-color)';
-    textarea.style.borderRadius = '4px';
-    textarea.style.resize = 'none';
+    // Input field (declared early so play button can reference it)
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Enter URL, file path, or data source...';
+    input.value = savedInput; // Restore saved content
+    input.style.flex = '1';
+    input.style.padding = '4px 8px';
+    input.style.fontSize = '13px';
+    input.style.fontFamily = 'monospace';
+    input.style.backgroundColor = 'rgba(25, 25, 30, 0.95)';
+    input.style.color = 'var(--accent-lavender)';
+    input.style.border = 'none';
+    input.style.outline = 'none';
+    input.style.borderRadius = '2px';
 
-    // Auto-save input with debouncing
+    // Helper to resize glyph based on input text width
+    const resizeToFitText = () => {
+        // Measure text width
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) return;
+
+        context.font = '13px monospace'; // Match input font
+        const textWidth = context.measureText(input.value || input.placeholder).width;
+
+        // Calculate glyph width: text width + padding + symbol + button
+        const symbolWidth = 40; // Symbol space
+        const buttonWidth = 40; // Play button space
+        const padding = 40; // Input padding and gaps
+        const minWidth = 200;
+        const maxWidth = 800;
+
+        const newWidth = Math.max(minWidth, Math.min(maxWidth, textWidth + symbolWidth + buttonWidth + padding));
+        element.style.width = `${newWidth}px`;
+        glyph.width = newWidth;
+    };
+
+    // Auto-save input with debouncing and resize
     let saveTimeout: number | undefined;
-    textarea.addEventListener('input', () => {
+    input.addEventListener('input', () => {
+        // Resize immediately for responsive feel
+        resizeToFitText();
+
         if (saveTimeout !== undefined) {
             clearTimeout(saveTimeout);
         }
         saveTimeout = window.setTimeout(async () => {
-            const currentInput = textarea.value;
+            const currentInput = input.value;
             await storage.save(glyph.id, currentInput);
             log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
         }, 500);
     });
 
-    preventDrag(textarea);
+    // Initial resize based on saved content
+    resizeToFitText();
+
+    preventDrag(input);
 
     // Status display section (declared early so helpers can reference it)
     const statusSection = document.createElement('div');
@@ -216,16 +244,19 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     playBtn.textContent = '▶';
     playBtn.className = 'glyph-play-btn';
     playBtn.title = 'Execute';
+    playBtn.style.flexShrink = '0';
+
+    preventDrag(playBtn);
 
     playBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const input = textarea.value.trim();
-        if (!input) {
+        const inputValue = input.value.trim();
+        if (!inputValue) {
             log.debug(SEG.GLYPH, '[IX] No input provided');
             return;
         }
 
-        log.debug(SEG.GLYPH, `[IX] Executing: ${input}`);
+        log.debug(SEG.GLYPH, `[IX] Executing: ${inputValue}`);
 
         // Set to running state immediately
         updateStatus({
@@ -236,7 +267,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         try {
             // Wrap input as ATS command and trigger one-time Pulse job
-            const atsCode = `ix ${input}`;
+            const atsCode = `ix ${inputValue}`;
             const job = await forceTriggerJob(atsCode);
 
             // Store job ID for event tracking
@@ -269,27 +300,12 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     });
 
     titleBar.appendChild(symbol);
+    titleBar.appendChild(input);
     titleBar.appendChild(playBtn);
 
-    // Content area
-    const content = document.createElement('div');
-    content.style.flex = '1';
-    content.style.padding = '12px';
-    content.style.display = 'flex';
-    content.style.flexDirection = 'column';
-    content.style.overflow = 'visible';
-
     // Assemble
-    content.appendChild(textarea);
-    content.appendChild(statusSection);
-
     element.appendChild(titleBar);
-    element.appendChild(content);
-
-    // Resize handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'ix-glyph-resize-handle glyph-resize-handle';
-    element.appendChild(resizeHandle);
+    element.appendChild(statusSection);
 
     // Wire up Pulse execution event listeners
     const handleExecutionStarted = (e: Event) => {
@@ -351,51 +367,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Make draggable via symbol (matches ax-glyph pattern)
     makeDraggable(element, symbol, glyph, { logLabel: 'IX Glyph' });
 
-    // Make resizable via handle
-    makeResizable(element, resizeHandle, glyph, { logLabel: 'IX Glyph' });
-
-    // Set up ResizeObserver for auto-sizing glyph to content
-    setupCanvasGlyphResizeObserver(element, content, glyph.id, 'IX');
-
     return element;
-}
-
-/**
- * Set up ResizeObserver to auto-size canvas glyph to match content height
- * Works alongside manual resize handles - user can still drag to resize
- */
-function setupCanvasGlyphResizeObserver(
-    glyphElement: HTMLElement,
-    contentElement: HTMLElement,
-    glyphId: string,
-    glyphType: string
-): void {
-    // Cleanup any existing observer to prevent memory leaks on re-render
-    const existingObserver = (glyphElement as any).__resizeObserver;
-    if (existingObserver && typeof existingObserver.disconnect === 'function') {
-        existingObserver.disconnect();
-        delete (glyphElement as any).__resizeObserver;
-        log.debug(SEG.GLYPH, `[${glyphType} ${glyphId}] Disconnected existing ResizeObserver`);
-    }
-
-    const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
-
-    const resizeObserver = new ResizeObserver(entries => {
-        for (const entry of entries) {
-            const contentHeight = entry.contentRect.height;
-            const totalHeight = Math.min(contentHeight, maxHeight);
-
-            // Update minHeight instead of height to allow manual resize
-            glyphElement.style.minHeight = `${totalHeight}px`;
-
-            log.debug(SEG.GLYPH, `[${glyphType} ${glyphId}] Auto-resized to ${totalHeight}px (content: ${contentHeight}px)`);
-        }
-    });
-
-    resizeObserver.observe(contentElement);
-
-    // Store observer for cleanup
-    (glyphElement as any).__resizeObserver = resizeObserver;
 }
 
 
