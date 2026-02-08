@@ -378,13 +378,18 @@ export function unmeldComposition(composition: HTMLElement): {
     const top = isNaN(compTop) ? 0 : compTop;
 
     // Restore absolute positioning for each glyph
-    glyphElements.forEach((element, index) => {
+    let currentX = left;
+    glyphElements.forEach((element) => {
         element.style.position = 'absolute';
-        element.style.left = `${left + (index * UNMELD_OFFSET)}px`;
+        element.style.left = `${currentX}px`;
         element.style.top = `${top}px`;
 
         // Reparent back to canvas
         canvas.insertBefore(element, composition);
+
+        // Accumulate position for next glyph (current width + gap)
+        const width = element.getBoundingClientRect().width;
+        currentX += width + UNMELD_OFFSET;
     });
 
     // Remove composition from storage
