@@ -581,7 +581,7 @@ class UIState {
             }
         }
 
-        // Persist to localStorage
+        // Persist to storage (IndexedDB)
         this.saveToStorage();
     }
 
