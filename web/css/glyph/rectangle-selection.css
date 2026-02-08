@@ -1,0 +1,23 @@
+/**
+ * Rectangle Selection for Canvas
+ *
+ * Visual styling for drag-to-select rectangle on canvas.
+ * Dashed orange outline with highly transparent orange-brown background.
+ */
+
+.canvas-selection-rectangle {
+    /* Highly transparent orange-brown background */
+    background-color: rgba(222, 125, 44, 0.08);
+
+    /* Dashed orange outline (more opaque) */
+    border: 2px dashed rgba(255, 110, 30, 0.6);
+
+    /* Ensure it appears above grid but below action bar */
+    z-index: 100;
+
+    /* Pointer events disabled to not interfere with mouse tracking */
+    pointer-events: none;
+
+    /* Smooth transition for visual polish */
+    transition: opacity 0.1s ease-out;
+}

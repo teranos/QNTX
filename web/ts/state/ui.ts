@@ -18,6 +18,7 @@
  */
 
 import type { PanelState, Transform } from '../../types/core';
+import type { CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
 import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph } from '../api/canvas';
@@ -61,17 +62,18 @@ export interface GraphSessionState {
  * Melded composition state (for persistence)
  * Tracks spatial composition of glyphs that have been melded together
  *
- * Supports multi-glyph chains: glyphIds is an ordered array of glyph IDs
- * representing the left-to-right flow through the composition.
- * Example: ['ax-1', 'py-2', 'prompt-3'] = [ax|py|prompt]
+ * Uses edge-based DAG structure to support multi-directional melding.
+ * Edges define directed relationships between glyphs (right, top, bottom).
+ * See ADR-009 for rationale.
+ *
+ * Example: [ax|py|prompt] = two edges:
+ *   { from: 'ax-1', to: 'py-1', direction: 'right', position: 0 }
+ *   { from: 'py-1', to: 'prompt-1', direction: 'right', position: 1 }
+ *
+ * CompositionEdge and Composition types are imported from proto (ADR-007).
  */
-export interface CompositionState {
-    id: string;                          // Unique composition ID
-    type: 'ax-prompt' | 'ax-py' | 'py-prompt' | 'ax-py-prompt';  // Meld relationship type
-    glyphIds: string[];                  // Ordered array of glyph IDs (left to right)
-    x: number;                           // Composition X position in pixels
-    y: number;                           // Composition Y position in pixels
-}
+export type { CompositionEdge };
+export type CompositionState = Composition;
 
 /**
  * Canvas glyph state (for persistence)

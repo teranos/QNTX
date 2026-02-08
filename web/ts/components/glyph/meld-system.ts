@@ -10,13 +10,14 @@
 
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
+import type { CompositionEdge } from '../../state/ui';
 import { MELDABILITY, getInitiatorClasses, getTargetClasses } from './meldability';
-import { addComposition, removeComposition, getCompositionType } from '../../state/compositions';
+import { addComposition, removeComposition, extractGlyphIds } from '../../state/compositions';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
 export const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
-const UNMELD_OFFSET = 420; // px - horizontal spacing between glyphs when unmelding
+const UNMELD_OFFSET = 20; // px - horizontal spacing between glyphs when unmelding (gentle separation)
 const MIN_VERTICAL_ALIGNMENT = 0.3; // fraction - minimum vertical overlap required (30%)
 
 /**
@@ -188,14 +189,16 @@ export function performMeld(
 
     log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements');
 
-    // Determine composition type from element classes
-    const compositionType = getCompositionType(initiatorElement, targetElement);
-    if (!compositionType) {
-        throw new Error('Cannot determine composition type - incompatible glyphs');
-    }
-
     // Generate composition ID
     const compositionId = `melded-${initiatorGlyph.id}-${targetGlyph.id}`;
+
+    // Create edge directly (DAG-native: one edge for binary meld)
+    const edges: CompositionEdge[] = [{
+        from: initiatorGlyph.id,
+        to: targetGlyph.id,
+        direction: 'right',
+        position: 0
+    }];
 
     // Create composition container
     const composition = document.createElement('div');
@@ -247,15 +250,15 @@ export function performMeld(
     // Persist composition to storage
     addComposition({
         id: compositionId,
-        type: compositionType,
-        glyphIds: [initiatorGlyph.id, targetGlyph.id],
+        edges,
         x: isNaN(x) ? 0 : x,
         y: isNaN(y) ? 0 : y
     });
 
     log.info(SEG.GLYPH, '[MeldSystem] Meld complete - elements reparented and persisted', {
         compositionId,
-        type: compositionType
+        edges: edges.length,
+        glyphs: extractGlyphIds(edges)
     });
 
     return composition;
@@ -268,7 +271,6 @@ export function performMeld(
 export function reconstructMeld(
     glyphElements: HTMLElement[],
     compositionId: string,
-    compositionType: string,
     x: number,
     y: number
 ): HTMLElement {
@@ -313,7 +315,6 @@ export function reconstructMeld(
 
     log.info(SEG.GLYPH, '[MeldSystem] Meld reconstructed', {
         compositionId,
-        type: compositionType,
         glyphCount: glyphElements.length
     });
 
@@ -335,7 +336,6 @@ export function isMeldedComposition(element: HTMLElement): boolean {
  */
 export function unmeldComposition(composition: HTMLElement): {
     glyphElements: HTMLElement[];
-    glyphIds: string[];
 } | null {
     if (!isMeldedComposition(composition)) {
         log.warn(SEG.GLYPH, '[MeldSystem] Not a melded composition');
@@ -363,9 +363,6 @@ export function unmeldComposition(composition: HTMLElement): {
         return null;
     }
 
-    // Extract glyph IDs from elements
-    const glyphIds = glyphElements.map(el => el.getAttribute('data-glyph-id') || '').filter(id => id);
-
     // Restore absolute positioning
     const compLeft = parseInt(composition.style.left || '0', 10);
     const compTop = parseInt(composition.style.top || '0', 10);
@@ -381,13 +378,18 @@ export function unmeldComposition(composition: HTMLElement): {
     const top = isNaN(compTop) ? 0 : compTop;
 
     // Restore absolute positioning for each glyph
-    glyphElements.forEach((element, index) => {
+    let currentX = left;
+    glyphElements.forEach((element) => {
         element.style.position = 'absolute';
-        element.style.left = `${left + (index * UNMELD_OFFSET)}px`;
+        element.style.left = `${currentX}px`;
         element.style.top = `${top}px`;
 
         // Reparent back to canvas
         canvas.insertBefore(element, composition);
+
+        // Accumulate position for next glyph (current width + gap)
+        const width = element.getBoundingClientRect().width;
+        currentX += width + UNMELD_OFFSET;
     });
 
     // Remove composition from storage
@@ -405,7 +407,6 @@ export function unmeldComposition(composition: HTMLElement): {
 
     // Return elements so caller can restore drag handlers
     return {
-        glyphElements,
-        glyphIds
+        glyphElements
     };
 }
