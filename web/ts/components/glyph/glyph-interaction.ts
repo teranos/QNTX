@@ -42,6 +42,23 @@ export interface MakeResizableOptions {
     minHeight?: number;
 }
 
+// ── preventDrag ─────────────────────────────────────────────────────
+
+/**
+ * Prevent drag from starting on an interactive child element.
+ *
+ * Canvas glyphs are draggable, but their interactive children (textareas,
+ * buttons, inputs) need to receive mousedown without triggering a drag.
+ * This stops the event from bubbling to the drag handler.
+ */
+export function preventDrag(...elements: HTMLElement[]): void {
+    for (const el of elements) {
+        el.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+    }
+}
+
 // ── makeDraggable ───────────────────────────────────────────────────
 
 /**
