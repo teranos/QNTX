@@ -181,6 +181,30 @@ function deselectAll(container: HTMLElement): void {
 }
 
 /**
+ * Unmeld composition containing currently selected glyphs
+ * Called by keyboard shortcut 'u'
+ */
+function unmeldFromSelection(container: HTMLElement): void {
+    if (selectedGlyphIds.length === 0) {
+        return;
+    }
+
+    // Find if any selected glyph is in a composition
+    for (const glyphId of selectedGlyphIds) {
+        const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        if (!glyphEl) continue;
+
+        const composition = glyphEl.closest('.melded-composition') as HTMLElement | null;
+        if (composition) {
+            unmeldSelectedGlyphs(container, composition);
+            return;  // Only unmeld one composition at a time
+        }
+    }
+
+    log.debug(SEG.GLYPH, '[Canvas] No composition found for selected glyphs');
+}
+
+/**
  * Unmeld selected glyphs that are in a melded composition
  */
 function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement): void {
@@ -411,13 +435,14 @@ export function createCanvasGlyph(): Glyph {
                 }
             }, true);
 
-            // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete)
+            // Setup keyboard shortcuts (ESC to deselect, DELETE/BACKSPACE to delete, U to unmeld)
             // AbortController signal auto-cleans up when container is removed from DOM
             void setupKeyboardShortcuts(
                 container,
                 () => selectedGlyphIds.length > 0,
                 () => deselectAll(container),
-                () => deleteSelectedGlyphs(container)
+                () => deleteSelectedGlyphs(container),
+                () => unmeldFromSelection(container)
             );
             // Note: AbortController returned but not stored - signal handles cleanup automatically
             // Future: if we add explicit canvas.destroy(), store and call .abort()
