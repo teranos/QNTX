@@ -10,6 +10,21 @@
  * - Attestation creation trends
  * - Pulse job execution stats
  * - Custom time-series data from any source
+ *
+ * TODO(future): Multi-dimensional time-series patterns
+ * Research patterns for per-model/per-category breakdowns. Consider:
+ * - Stacked area charts (composition by category)
+ * - Interactive legend with filtering
+ * - Trade-offs: visual complexity vs. insight value
+ * - Inspiration: Grafana multi-series dashboards, Datadog analytics
+ *
+ * TODO(future): Period-over-period comparison
+ * Add percentage change indicators for trends:
+ * - Fetch previous period data (e.g., week N vs. week N-1)
+ * - Calculate: ((current - previous) / previous) * 100
+ * - Display: Small indicator (e.g., "+15% ↑" or "-8% ↓")
+ * - Color coding: Context-dependent (decrease may be good or bad)
+ * - Consider: Week-over-week, month-over-month, year-over-year
  */
 
 import * as d3 from 'd3';

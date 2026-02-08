@@ -271,6 +271,13 @@ export function registerDefaultGlyphs(): void {
     });
 
     // Usage & Cost Chart Glyph
+    // TODO(future): Budget alerting with notifications
+    // Implement cost threshold monitoring with user notifications:
+    // - Config: User-defined budget limits (daily/weekly/monthly)
+    // - Detection: Check total cost vs. budget in chart render
+    // - Notification: Toast alert when threshold crossed
+    // - Persistence: Store alert state to avoid repeat notifications
+    // - UX: Clear visual indication of budget status in chart
     glyphRun.add(createChartGlyph(
         'usage-chart',
         '$ Usage & Costs',
