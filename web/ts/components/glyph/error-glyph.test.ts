@@ -153,3 +153,48 @@ describe('Error Glyph - Spike (Edge Cases)', () => {
         expect(content).toBeTruthy();
     });
 });
+
+describe('Error Glyph - Jenny (Complex Scenarios)', () => {
+    test('Jenny rapidly clicks dismiss button twice', () => {
+        // Jenny creates an error glyph
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+        document.body.appendChild(container);
+
+        const errorGlyph = createErrorGlyph(
+            'result-double-click',
+            'result',
+            { x: 100, y: 100 },
+            {
+                type: 'test_error',
+                message: 'Test error for rapid dismiss'
+            }
+        );
+        container.appendChild(errorGlyph);
+
+        // Verify error glyph is in DOM
+        expect(container.contains(errorGlyph)).toBe(true);
+
+        // Get dismiss button
+        const dismissBtn = errorGlyph.querySelector('button[title*="Dismiss"]') as HTMLButtonElement;
+        expect(dismissBtn).toBeTruthy();
+
+        // Jenny clicks dismiss twice rapidly
+        dismissBtn.click();
+
+        // After first click, error glyph should be removed
+        expect(container.contains(errorGlyph)).toBe(false);
+
+        // Second click on already-removed element should not throw
+        expect(() => {
+            dismissBtn.click();
+        }).not.toThrow();
+
+        // Error glyph remains removed (no resurrection)
+        expect(container.contains(errorGlyph)).toBe(false);
+        expect(container.querySelectorAll('.canvas-error-glyph').length).toBe(0);
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+});

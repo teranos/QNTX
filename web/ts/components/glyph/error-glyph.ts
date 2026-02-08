@@ -12,10 +12,10 @@ import type { Glyph } from './glyph';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, storeCleanup } from './glyph-interaction';
+import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver } from './glyph-interaction';
 import { createPromptGlyph } from './prompt-glyph';
 import { getScriptStorage } from '../../storage/script-storage';
-import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
+import { MAX_VIEWPORT_HEIGHT_RATIO, CANVAS_GLYPH_TITLE_BAR_HEIGHT } from './glyph';
 
 /**
  * Error context for diagnostic display
@@ -127,7 +127,17 @@ export function createErrorGlyph(
     convertBtn.title = 'Convert to prompt for debugging';
     convertBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        await convertErrorToPrompt(element, failedGlyphId, failedSymbol, error);
+        try {
+            await convertErrorToPrompt(element, failedGlyphId, failedSymbol, error);
+        } catch (err) {
+            // Visual feedback on conversion failure
+            convertBtn.textContent = '⚠';
+            convertBtn.title = `Conversion failed: ${err instanceof Error ? err.message : String(err)}`;
+            setTimeout(() => {
+                convertBtn.textContent = '⟶';
+                convertBtn.title = 'Convert to prompt for debugging';
+            }, 3000);
+        }
     });
     buttonSection.appendChild(convertBtn);
 
@@ -244,13 +254,9 @@ function setupErrorGlyphResizeObserver(
     glyphId: string
 ): void {
     // Cleanup any existing observer
-    const existingObserver = (glyphElement as any).__resizeObserver;
-    if (existingObserver && typeof existingObserver.disconnect === 'function') {
-        existingObserver.disconnect();
-        delete (glyphElement as any).__resizeObserver;
-    }
+    cleanupResizeObserver(glyphElement);
 
-    const titleBarHeight = 32; // Approximate header height
+    const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
     const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
 
     const resizeObserver = new ResizeObserver(entries => {
@@ -354,6 +360,7 @@ async function convertErrorToPrompt(
         log.info(SEG.GLYPH, `[ErrorGlyph] Converted error to debug prompt ${promptGlyph.id}`);
     } catch (err) {
         log.error(SEG.GLYPH, '[ErrorGlyph] Failed to convert to prompt:', err);
-        // Error glyph remains visible on failure - user can retry
+        // Re-throw to allow caller to provide user feedback
+        throw err;
     }
 }

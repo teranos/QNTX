@@ -98,6 +98,21 @@ export function runCleanup(element: HTMLElement): void {
     }
 }
 
+/**
+ * Clean up ResizeObserver attached to an element.
+ * Prevents memory leaks when glyphs are removed or re-rendered.
+ */
+export function cleanupResizeObserver(element: HTMLElement, glyphId?: string): void {
+    const existing = (element as any).__resizeObserver;
+    if (existing && typeof existing.disconnect === 'function') {
+        existing.disconnect();
+        delete (element as any).__resizeObserver;
+        if (glyphId) {
+            log.debug(SEG.GLYPH, `[${glyphId}] Disconnected ResizeObserver`);
+        }
+    }
+}
+
 // ── preventDrag ─────────────────────────────────────────────────────
 
 /**

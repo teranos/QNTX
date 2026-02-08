@@ -535,13 +535,13 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     return createErrorGlyph(
         glyph.id,
-        glyph.symbol,
+        glyph.symbol ?? 'unknown',
         { x: glyph.x ?? 200, y: glyph.y ?? 200 },
         {
             type: 'unknown_type',
-            message: `Glyph type '${glyph.symbol}' not supported`,
+            message: `Glyph type '${glyph.symbol ?? 'unknown'}' not supported`,
             details: {
-                'Symbol': glyph.symbol,
+                'Symbol': glyph.symbol ?? 'unknown',
                 'Position': `(${glyph.x}, ${glyph.y})`,
                 'Cause': 'Glyph type not implemented in renderGlyph() - check canvas-glyph.ts'
             }
