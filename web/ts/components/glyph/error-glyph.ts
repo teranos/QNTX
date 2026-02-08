@@ -12,7 +12,7 @@ import type { Glyph } from './glyph';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver } from './glyph-interaction';
+import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver, runCleanup } from './glyph-interaction';
 import { createPromptGlyph } from './prompt-glyph';
 import { getScriptStorage } from '../../storage/script-storage';
 import { MAX_VIEWPORT_HEIGHT_RATIO, CANVAS_GLYPH_TITLE_BAR_HEIGHT } from './glyph';
@@ -150,7 +150,8 @@ export function createErrorGlyph(
         e.stopPropagation();
         // Remove the broken glyph from state
         uiState.removeCanvasGlyph(failedGlyphId);
-        // Remove error glyph from DOM
+        // Clean up event listeners before removing from DOM
+        runCleanup(element);
         element.remove();
         log.info(SEG.GLYPH, `[ErrorGlyph] Dismissed and removed broken glyph ${failedGlyphId}`);
     });
@@ -346,6 +347,7 @@ async function convertErrorToPrompt(
 
         // Only remove error glyph after successful prompt creation
         uiState.removeCanvasGlyph(failedGlyphId);
+        runCleanup(errorElement);
         errorElement.remove();
 
         container.appendChild(promptElement);
