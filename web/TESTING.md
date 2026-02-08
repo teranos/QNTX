@@ -2,7 +2,7 @@
 
 Uses [Bun Test](https://bun.sh/docs/cli/test) - Jest-compatible API, 10-100x faster.
 
-Don't test implementation details.
+Don't test implementation details. Organize tests by persona: **Tim** (happy path), **Spike** (edge cases), **Jenny** (complex scenarios).
 
 ## Quick Start
 

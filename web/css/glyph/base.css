@@ -40,3 +40,75 @@
 .glyph-run:hover .glyph-run-indicators {
     opacity: 1;
 }
+
+/* Base container for all canvas-placed glyphs (ix, prompt, py, ax, result, note).
+ * Provides the standard dark-surface look. Glyphs override individual properties
+ * (e.g. note overrides background for its beige post-it aesthetic). */
+.canvas-glyph {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Shared resize handle for canvas glyphs (bottom-right corner) */
+.glyph-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    background-color: var(--bg-tertiary);
+    border-top-left-radius: 4px;
+}
+
+/* Smaller variant for note glyphs (sits over folded corner) */
+.glyph-resize-handle--small {
+    width: 10px;
+    height: 10px;
+    background-color: transparent;
+    border-top-left-radius: 0;
+}
+
+/* Shared title bar for canvas glyphs (ix, prompt, and similar) */
+/* Shared play/execute button for canvas glyphs (ix, prompt, py) */
+.glyph-play-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 11px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.glyph-play-btn:hover {
+    background-color: var(--bg-dark-light);
+}
+
+.glyph-play-btn:active {
+    border-color: var(--border-light);
+}
+
+
+.canvas-glyph-title-bar {
+    height: 32px;
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 8px;
+    cursor: move;
+    flex-shrink: 0;
+}

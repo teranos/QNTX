@@ -113,11 +113,11 @@ export function morphToWindow(
         glyphElement.style.width = `${windowWidth}px`;
         glyphElement.style.height = `${windowHeight}px`;
         glyphElement.style.borderRadius = WINDOW_BORDER_RADIUS;
-        glyphElement.style.backgroundColor = '#1a1a1a';
+        glyphElement.style.backgroundColor = 'var(--bg-almost-black)';
         glyphElement.style.boxShadow = WINDOW_BOX_SHADOW;
         glyphElement.style.padding = '0';
         glyphElement.style.opacity = '1';
-        glyphElement.style.color = '#e0e0e0';
+        glyphElement.style.color = 'var(--text-on-dark)';
 
         // Set up window as flex container
         glyphElement.style.display = 'flex';
@@ -128,8 +128,8 @@ export function morphToWindow(
         titleBar.className = 'window-title-bar';
         titleBar.style.height = TITLE_BAR_HEIGHT;
         titleBar.style.width = '100%';
-        titleBar.style.backgroundColor = '#0d0d0d';
-        titleBar.style.borderBottom = '1px solid #333';
+        titleBar.style.backgroundColor = 'var(--bg-almost-black)';
+        titleBar.style.borderBottom = '1px solid var(--border-on-dark)';
         titleBar.style.borderRadius = '8px 8px 0 0';
         titleBar.style.display = 'flex';
         titleBar.style.alignItems = 'center';
@@ -141,7 +141,7 @@ export function morphToWindow(
         const titleText = document.createElement('span');
         titleText.textContent = stripHtml(glyph.title);
         titleText.style.flex = '1';
-        titleText.style.color = '#e0e0e0';
+        titleText.style.color = 'var(--text-on-dark)';
         titleBar.appendChild(titleText);
 
         // Add minimize button
@@ -152,7 +152,7 @@ export function morphToWindow(
         minimizeBtn.style.border = 'none';
         minimizeBtn.style.background = 'transparent';
         minimizeBtn.style.cursor = 'pointer';
-        minimizeBtn.style.color = '#e0e0e0';
+        minimizeBtn.style.color = 'var(--text-on-dark)';
         minimizeBtn.onclick = () => morphFromWindow(
             glyphElement,
             glyph,
@@ -170,7 +170,7 @@ export function morphToWindow(
             closeBtn.style.border = 'none';
             closeBtn.style.background = 'transparent';
             closeBtn.style.cursor = 'pointer';
-            closeBtn.style.color = '#e0e0e0';
+            closeBtn.style.color = 'var(--text-on-dark)';
             closeBtn.onclick = () => {
                 // Remove from tray data AND remove element
                 onRemove(glyph.id);
@@ -203,7 +203,7 @@ export function morphToWindow(
             errorContent.style.padding = '8px'; // Reduced from CONTENT_PADDING (16px)
             errorContent.style.flex = '1';
             errorContent.style.overflow = 'auto';
-            errorContent.style.color = '#ef4444'; // Red error text
+            errorContent.style.color = 'var(--color-error)';
             errorContent.style.fontFamily = 'var(--font-mono)';
             errorContent.innerHTML = `
                     <div style="margin-bottom: 8px; font-weight: bold;">Error rendering content</div>

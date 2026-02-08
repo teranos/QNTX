@@ -20,7 +20,7 @@
 import type { Glyph } from './glyph';
 import { AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { makeDraggable, makeResizable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, makeResizable, cleanupResizeObserver } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { tooltip } from '../tooltip';
@@ -99,19 +99,10 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             container.dataset.glyphSymbol = AX;
 
             // Style element - resizable
-            container.style.position = 'absolute';
-            container.style.left = `${glyph.x ?? x ?? 200}px`;
-            container.style.top = `${glyph.y ?? y ?? 200}px`;
-            container.style.width = `${width}px`;
-            container.style.height = `${height}px`;
+            applyCanvasGlyphLayout(container, { x: glyph.x ?? x ?? 200, y: glyph.y ?? y ?? 200, width, height });
             container.style.minWidth = '200px';
             container.style.minHeight = '120px';
-            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)'; // Darker with transparency
-            container.style.borderRadius = '4px';
-            container.style.border = '1px solid var(--border-color)';
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.overflow = 'hidden';
+            container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
             container.style.zIndex = '1';
 
             // Title bar with inline query input
@@ -131,7 +122,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             label.style.cursor = 'move';
             label.style.fontWeight = 'bold';
             label.style.flexShrink = '0';
-            label.style.color = '#6b9bd1'; // Azure-ish blue
+            label.style.color = 'var(--glyph-status-running-text)';
             titleBar.appendChild(label);
 
             // Single-line query input (takes remaining space)
@@ -248,15 +239,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
 
             // Resize handle
             const resizeHandle = document.createElement('div');
-            resizeHandle.className = 'ax-glyph-resize-handle';
-            resizeHandle.style.position = 'absolute';
-            resizeHandle.style.bottom = '0';
-            resizeHandle.style.right = '0';
-            resizeHandle.style.width = '16px';
-            resizeHandle.style.height = '16px';
-            resizeHandle.style.cursor = 'nwse-resize';
-            resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-            resizeHandle.style.borderTopLeftRadius = '4px';
+            resizeHandle.className = 'ax-glyph-resize-handle glyph-resize-handle';
             container.appendChild(resizeHandle);
 
             // Make draggable and resizable (drag via symbol only)
@@ -294,12 +277,7 @@ function setupAxGlyphResizeObserver(
     glyphId: string
 ): void {
     // Cleanup any existing observer to prevent memory leaks on re-render
-    const existingObserver = (glyphElement as any).__resizeObserver;
-    if (existingObserver && typeof existingObserver.disconnect === 'function') {
-        existingObserver.disconnect();
-        delete (glyphElement as any).__resizeObserver;
-        log.debug(SEG.GLYPH, `[AX ${glyphId}] Disconnected existing ResizeObserver`);
-    }
+    cleanupResizeObserver(glyphElement, `AX ${glyphId}`);
 
     const titleBarHeight = CANVAS_GLYPH_TITLE_BAR_HEIGHT;
     const maxHeight = window.innerHeight * MAX_VIEWPORT_HEIGHT_RATIO;
@@ -429,7 +407,7 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     errorDisplay.style.padding = '6px 8px';
     errorDisplay.style.fontSize = '11px'; // Smaller font
     errorDisplay.style.fontFamily = 'monospace';
-    errorDisplay.style.backgroundColor = severity === 'error' ? '#2b1a1a' : '#2b2b1a';
+    errorDisplay.style.backgroundColor = severity === 'error' ? 'var(--glyph-status-error-section-bg)' : '#2b2b1a';
     errorDisplay.style.color = severity === 'error' ? '#ff9999' : '#ffcc66';
     errorDisplay.style.whiteSpace = 'pre-wrap';
     errorDisplay.style.wordBreak = 'break-word';
