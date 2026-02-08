@@ -36,7 +36,7 @@ import { makeDraggable } from './glyph-interaction';
 import { showActionBar, hideActionBar } from './canvas/action-bar';
 import { showSpawnMenu } from './canvas/spawn-menu';
 import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
-import { getAllCompositions, removeComposition } from '../../state/compositions';
+import { getAllCompositions, removeComposition, extractGlyphIds } from '../../state/compositions';
 import { convertNoteToPrompt, convertResultToNote } from './conversions';
 
 // ============================================================================
@@ -171,11 +171,11 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
         return;
     }
 
-    const { glyphElements, glyphIds } = result;
+    const { glyphElements } = result;
 
     // Restore drag handlers on each unmelded glyph
-    glyphElements.forEach((element, index) => {
-        const glyphId = glyphIds[index];
+    glyphElements.forEach((element) => {
+        const glyphId = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
         const glyph = createGlyphFromElement(element, glyphId);
 
         // Determine log label from glyph symbol
@@ -187,7 +187,10 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
     // Clear selection and hide action bar
     deselectAll(container);
 
-    log.debug(SEG.GLYPH, '[Canvas] Unmelded composition', { glyphIds, count: glyphElements.length });
+    log.debug(SEG.GLYPH, '[Canvas] Unmelded composition', {
+        count: glyphElements.length,
+        glyphIds: glyphElements.map(el => el.dataset.glyphId).filter(Boolean)
+    });
 }
 
 /**
@@ -417,32 +420,35 @@ export function createCanvasGlyph(): Glyph {
                 log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
 
                 for (const comp of savedCompositions) {
-                    // TODO: Remove this guard after Feb 2026 (migration from initiatorId/targetId to glyphIds)
-                    // Skip and clean up invalid compositions (old format without glyphIds array)
-                    // This handles stale IndexedDB data from before PR #436 schema change
-                    if (!comp.glyphIds || !Array.isArray(comp.glyphIds)) {
-                        log.warn(SEG.GLYPH, `[Canvas] Removing invalid composition ${comp.id} - old format (missing glyphIds array)`);
+                    // TODO: Remove this guard after Feb 2026 (migration to edge-based DAG structure)
+                    // Skip and clean up invalid compositions (old format without edges)
+                    // This handles stale IndexedDB data from before PR #443 schema change
+                    if (!comp.edges || !Array.isArray(comp.edges)) {
+                        log.warn(SEG.GLYPH, `[Canvas] Removing invalid composition ${comp.id} - old format (missing edges array)`);
                         removeComposition(comp.id);
                         continue;
                     }
 
+                    // Extract glyph IDs from edges (DAG-native)
+                    const glyphIds = extractGlyphIds(comp.edges);
+
                     // Find all glyph elements in the DOM
-                    const glyphElements = comp.glyphIds
+                    const glyphElements = glyphIds
                         .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement)
                         .filter(el => el !== null);
 
-                    if (glyphElements.length !== comp.glyphIds.length) {
+                    if (glyphElements.length !== glyphIds.length) {
                         log.warn(SEG.GLYPH, `[Canvas] Cannot restore composition ${comp.id} - missing glyphs`, {
-                            glyphIds: comp.glyphIds,
+                            glyphIds,
                             foundCount: glyphElements.length,
-                            expectedCount: comp.glyphIds.length
+                            expectedCount: glyphIds.length
                         });
                         continue;
                     }
 
                     // Reconstruct the composition DOM (without persisting)
                     try {
-                        const composition = reconstructMeld(glyphElements, comp.id, comp.type, comp.x, comp.y);
+                        const composition = reconstructMeld(glyphElements, comp.id, comp.x, comp.y);
 
                         // Make the restored composition draggable
                         const compositionGlyph: Glyph = {
@@ -455,7 +461,8 @@ export function createCanvasGlyph(): Glyph {
                         });
 
                         log.debug(SEG.GLYPH, `[Canvas] Restored composition ${comp.id}`, {
-                            type: comp.type
+                            edgeCount: comp.edges.length,
+                            glyphCount: glyphIds.length
                         });
                     } catch (err) {
                         log.error(SEG.GLYPH, `[Canvas] Failed to restore composition ${comp.id}`, { error: err });

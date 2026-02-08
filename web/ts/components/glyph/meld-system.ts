@@ -271,7 +271,6 @@ export function performMeld(
 export function reconstructMeld(
     glyphElements: HTMLElement[],
     compositionId: string,
-    compositionType: string,
     x: number,
     y: number
 ): HTMLElement {
@@ -316,7 +315,6 @@ export function reconstructMeld(
 
     log.info(SEG.GLYPH, '[MeldSystem] Meld reconstructed', {
         compositionId,
-        type: compositionType,
         glyphCount: glyphElements.length
     });
 

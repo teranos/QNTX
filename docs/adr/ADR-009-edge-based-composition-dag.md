@@ -1,7 +1,7 @@
 # ADR-009: Edge-Based Composition DAG for Multi-Directional Melding
 
 ## Status
-Phase 1ba/1bb Complete (Backend + Frontend State Migration)
+Phase 1 Complete (Backend + Frontend + UI Integration)
 
 ## Context
 
