@@ -283,10 +283,13 @@ export function createCanvasGlyph(): Glyph {
             width: saved.width,   // Restore custom size if saved
             height: saved.height,
             result: saved.result, // For result glyphs
-            // TODO: Clarify if grid glyphs should display content
+            // Placeholder renderContent - result glyphs render via createResultGlyph() instead
+            // TODO: Clarify if Pulse glyphs should display content
             renderContent: () => {
                 const content = document.createElement('div');
-                content.textContent = 'Pulse glyph content (TBD)';
+                content.textContent = saved.symbol === 'result'
+                    ? 'Result placeholder (should not be visible)'
+                    : 'Pulse glyph content (TBD)';
                 return content;
             }
         };
