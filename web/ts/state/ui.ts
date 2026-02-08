@@ -64,10 +64,13 @@ export interface GraphSessionState {
  * Supports multi-glyph chains: glyphIds is an ordered array of glyph IDs
  * representing the left-to-right flow through the composition.
  * Example: ['ax-1', 'py-2', 'prompt-3'] = [ax|py|prompt]
+ *
+ * Type field: 2-glyph chains use specific types (ax-prompt, ax-py, py-prompt, py-py),
+ * while 3+ glyph chains use generic 'multi-glyph' type.
  */
 export interface CompositionState {
     id: string;                          // Unique composition ID
-    type: 'ax-prompt' | 'ax-py' | 'py-prompt' | 'ax-py-prompt';  // Meld relationship type
+    type: 'ax-prompt' | 'ax-py' | 'py-prompt' | 'py-py' | 'multi-glyph';  // Meld relationship type
     glyphIds: string[];                  // Ordered array of glyph IDs (left to right)
     x: number;                           // Composition X position in pixels
     y: number;                           // Composition Y position in pixels
