@@ -248,15 +248,7 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
 
             // Resize handle
             const resizeHandle = document.createElement('div');
-            resizeHandle.className = 'ax-glyph-resize-handle';
-            resizeHandle.style.position = 'absolute';
-            resizeHandle.style.bottom = '0';
-            resizeHandle.style.right = '0';
-            resizeHandle.style.width = '16px';
-            resizeHandle.style.height = '16px';
-            resizeHandle.style.cursor = 'nwse-resize';
-            resizeHandle.style.backgroundColor = 'var(--bg-tertiary)';
-            resizeHandle.style.borderTopLeftRadius = '4px';
+            resizeHandle.className = 'ax-glyph-resize-handle glyph-resize-handle';
             container.appendChild(resizeHandle);
 
             // Make draggable and resizable (drag via symbol only)

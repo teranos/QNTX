@@ -227,13 +227,7 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
 
     // Resize handle for bottom-right corner (over the folded corner cutout)
     const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'note-glyph-resize-handle';
-    resizeHandle.style.position = 'absolute';
-    resizeHandle.style.bottom = '0';
-    resizeHandle.style.right = '0';
-    resizeHandle.style.width = '10px';
-    resizeHandle.style.height = '10px';
-    resizeHandle.style.cursor = 'nwse-resize';
+    resizeHandle.className = 'note-glyph-resize-handle glyph-resize-handle glyph-resize-handle--small';
     element.appendChild(resizeHandle);
 
     // Make entire note draggable (no title bar) and resizable
