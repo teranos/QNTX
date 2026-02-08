@@ -189,6 +189,8 @@ bun install  # Resync package.json and bun.lock
 
 ## Testing
 
+See [TESTING.md](TESTING.md) for full testing documentation.
+
 ### Running Tests
 ```bash
 bun test              # Fast tests only (~1.5s)

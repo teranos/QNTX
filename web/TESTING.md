@@ -2,6 +2,8 @@
 
 Uses [Bun Test](https://bun.sh/docs/cli/test) - Jest-compatible API, 10-100x faster.
 
+Don't test implementation details.
+
 ## Quick Start
 
 ```bash
