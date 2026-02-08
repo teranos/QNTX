@@ -322,6 +322,7 @@ export function makeDraggable(
                         y,
                         width: g.width,
                         height: g.height,
+                        result: g.result, // Preserve result data for result glyphs
                     });
                 }
             }
@@ -344,6 +345,7 @@ export function makeDraggable(
                     y,
                     width: glyph.width,
                     height: glyph.height,
+                    result: glyph.result, // Preserve result data for result glyphs
                 });
             }
             log.debug(SEG.GLYPH, `[${logLabel}] Finished dragging ${glyph.id}`);
