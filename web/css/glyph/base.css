@@ -77,11 +77,11 @@
 /* Shared title bar for canvas glyphs (ix, prompt, and similar) */
 /* Shared play/execute button for canvas glyphs (ix, prompt, py) */
 .glyph-play-btn {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     padding: 0;
-    font-size: 12px;
-    border-radius: 4px;
+    font-size: 11px;
+    border-radius: 3px;
     cursor: pointer;
     display: flex;
     align-items: center;
