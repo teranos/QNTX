@@ -200,3 +200,24 @@ describe('Meld Composition Drag - Tim (Happy Path)', () => {
         document.body.innerHTML = '';
     });
 });
+
+describe('Meld Composition Drag - Spike (Edge Cases)', () => {
+    test('Spike tries to unmeld non-composition element', () => {
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        // Spike tries to unmeld a regular glyph (not a composition)
+        const regularGlyph = document.createElement('div');
+        regularGlyph.className = 'canvas-ax-glyph';
+        canvas.appendChild(regularGlyph);
+
+        const result = unmeldComposition(regularGlyph);
+
+        // Unmeld fails gracefully
+        expect(result).toBe(null);
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+});
