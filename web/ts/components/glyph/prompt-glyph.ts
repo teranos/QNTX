@@ -196,31 +196,8 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.className = 'has-tooltip';
+    playBtn.className = 'glyph-play-btn glyph-play-btn--green has-tooltip';
     playBtn.dataset.tooltip = 'Execute prompt';
-    playBtn.style.width = '24px';
-    playBtn.style.height = '24px';
-    playBtn.style.padding = '0';
-    playBtn.style.fontSize = '12px';
-    playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
-    playBtn.style.color = 'var(--glyph-status-success-text)';
-    playBtn.style.border = '1px solid rgba(90, 200, 90, 0.3)';
-    playBtn.style.borderRadius = '4px';
-    playBtn.style.cursor = 'pointer';
-    playBtn.style.display = 'flex';
-    playBtn.style.alignItems = 'center';
-    playBtn.style.justifyContent = 'center';
-    playBtn.style.transition = 'all 0.15s ease';
-
-    playBtn.addEventListener('mouseenter', () => {
-        playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.25)';
-        playBtn.style.borderColor = 'rgba(90, 200, 90, 0.5)';
-    });
-
-    playBtn.addEventListener('mouseleave', () => {
-        playBtn.style.backgroundColor = 'rgba(90, 200, 90, 0.15)';
-        playBtn.style.borderColor = 'rgba(90, 200, 90, 0.3)';
-    });
 
     playBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
