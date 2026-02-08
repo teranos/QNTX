@@ -114,3 +114,48 @@ describe('Glyph Conversions - Spike (Edge Cases)', () => {
         expect(container.children.length).toBe(0);
     });
 });
+
+describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
+    test('Jenny cannot convert glyph inside melded composition', async () => {
+        // Jenny has a canvas with a melded composition
+        const container = document.createElement('div');
+        container.className = 'canvas-workspace';
+
+        // Create a composition wrapper (simulating melded state)
+        const composition = document.createElement('div');
+        composition.className = 'glyph-composition';
+        composition.dataset.compositionId = 'comp-123';
+
+        // Add note glyph inside composition
+        const noteElement = document.createElement('div');
+        noteElement.className = 'canvas-note-glyph canvas-glyph';
+        noteElement.dataset.glyphId = 'note-nested';
+        noteElement.dataset.glyphSymbol = Prose;
+
+        const textarea = document.createElement('textarea');
+        textarea.value = 'Note inside composition';
+        noteElement.appendChild(textarea);
+
+        composition.appendChild(noteElement);
+        container.appendChild(composition);
+
+        // Jenny tries to convert the note inside the composition
+        const success = await convertNoteToPrompt(composition, 'note-nested');
+
+        // Conversion is blocked - cannot convert glyphs inside compositions
+        expect(success).toBe(false);
+
+        // Composition structure is unchanged
+        expect(composition.children.length).toBe(1);
+        const unchangedElement = composition.firstElementChild as HTMLElement;
+
+        // Glyph is still a note (not converted)
+        expect(unchangedElement.classList.contains('canvas-note-glyph')).toBe(true);
+        expect(unchangedElement.classList.contains('canvas-prompt-glyph')).toBe(false);
+        expect(unchangedElement.dataset.glyphSymbol).toBe(Prose);
+        expect(unchangedElement.dataset.glyphId).toBe('note-nested');
+
+        // Composition is intact
+        expect(composition.classList.contains('glyph-composition')).toBe(true);
+    });
+});

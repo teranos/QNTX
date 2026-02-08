@@ -44,6 +44,12 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
         return false;
     }
 
+    // Block conversion if glyph is inside a composition
+    if (element.parentElement?.classList.contains('glyph-composition')) {
+        log.info(SEG.GLYPH, `[Note→Prompt] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
+        return false;
+    }
+
     const { x, y, width, height } = captureLayout(container, element);
 
     // Load note content before teardown
@@ -93,6 +99,12 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
     const element = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
     if (!element) {
         log.error(SEG.GLYPH, `[Result→Note] Result glyph ${glyphId} not found in container`);
+        return false;
+    }
+
+    // Block conversion if glyph is inside a composition
+    if (element.parentElement?.classList.contains('glyph-composition')) {
+        log.info(SEG.GLYPH, `[Result→Note] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
         return false;
     }
 
