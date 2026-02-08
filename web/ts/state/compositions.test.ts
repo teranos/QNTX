@@ -238,4 +238,81 @@ describe('Composition State Management', () => {
             expect(compositions).toContainEqual(comp2);
         });
     });
+
+    // TODO(#441): Phase 2-5 - Multi-glyph chain functionality tests
+    describe.skip('Multi-glyph chains (Phase 2-5)', () => {
+        test('3-glyph composition stores correctly', () => {
+            const comp: CompositionState = {
+                id: 'melded-ax1-py1-prompt1',
+                type: 'ax-py-prompt',
+                glyphIds: ['ax1', 'py1', 'prompt1'],
+                x: 100,
+                y: 200
+            };
+
+            addComposition(comp);
+
+            const compositions = getAllCompositions();
+            expect(compositions).toHaveLength(1);
+            expect(compositions[0].glyphIds).toEqual(['ax1', 'py1', 'prompt1']);
+        });
+
+        test('isGlyphInComposition works with 3-glyph chains', () => {
+            const comp: CompositionState = {
+                id: 'melded-ax1-py1-prompt1',
+                type: 'ax-py-prompt',
+                glyphIds: ['ax1', 'py1', 'prompt1'],
+                x: 100,
+                y: 200
+            };
+
+            addComposition(comp);
+
+            expect(isGlyphInComposition('ax1')).toBe(true);
+            expect(isGlyphInComposition('py1')).toBe(true);
+            expect(isGlyphInComposition('prompt1')).toBe(true);
+            expect(isGlyphInComposition('ax2')).toBe(false);
+        });
+
+        test('findCompositionByGlyph finds 3-glyph chains', () => {
+            const comp: CompositionState = {
+                id: 'melded-ax1-py1-prompt1',
+                type: 'ax-py-prompt',
+                glyphIds: ['ax1', 'py1', 'prompt1'],
+                x: 100,
+                y: 200
+            };
+
+            addComposition(comp);
+
+            expect(findCompositionByGlyph('ax1')).toEqual(comp);
+            expect(findCompositionByGlyph('py1')).toEqual(comp);
+            expect(findCompositionByGlyph('prompt1')).toEqual(comp);
+        });
+
+        test('extending composition adds glyph to array', () => {
+            // Start with 2-glyph composition
+            const comp: CompositionState = {
+                id: 'melded-ax1-py1',
+                type: 'ax-py',
+                glyphIds: ['ax1', 'py1'],
+                x: 100,
+                y: 200
+            };
+
+            addComposition(comp);
+
+            // Extend to 3 glyphs (this functionality needs implementation in Phase 3)
+            const extended: CompositionState = {
+                ...comp,
+                type: 'ax-py-prompt',
+                glyphIds: [...comp.glyphIds, 'prompt1']
+            };
+
+            addComposition(extended);
+
+            const result = findCompositionByGlyph('prompt1');
+            expect(result?.glyphIds).toEqual(['ax1', 'py1', 'prompt1']);
+        });
+    });
 });

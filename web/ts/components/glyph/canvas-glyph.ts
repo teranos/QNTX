@@ -417,6 +417,13 @@ export function createCanvasGlyph(): Glyph {
                 log.debug(SEG.GLYPH, `[Canvas] Restoring ${savedCompositions.length} compositions from state`);
 
                 for (const comp of savedCompositions) {
+                    // Skip and clean up invalid compositions (old format without glyphIds array)
+                    if (!comp.glyphIds || !Array.isArray(comp.glyphIds)) {
+                        log.warn(SEG.GLYPH, `[Canvas] Removing invalid composition ${comp.id} - old format (missing glyphIds array)`);
+                        removeComposition(comp.id);
+                        continue;
+                    }
+
                     // Find all glyph elements in the DOM
                     const glyphElements = comp.glyphIds
                         .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement)
