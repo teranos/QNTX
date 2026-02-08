@@ -41,6 +41,20 @@
     --color-info: #3b83f6;
     --color-scheduled: #7b20a2;
 
+    /* Glyph Status Colors - dark-bg tints for running/success/error states */
+    --glyph-status-running-bg: #1f2a3d;
+    --glyph-status-success-bg: #1f3d1f;
+    --glyph-status-error-bg: #3d1f1f;
+    --glyph-status-running-section-bg: #1a2332;
+    --glyph-status-success-section-bg: #1a2b1a;
+    --glyph-status-error-section-bg: #2b1a1a;
+    --glyph-status-running-text: #6b9bd1;
+    --glyph-status-success-text: #a8e6a1;
+    --glyph-status-error-text: #ff6b6b;
+
+    /* Accent Colors */
+    --accent-lavender: #d4b8ff;
+
     /* Box Shadows */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);

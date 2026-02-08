@@ -8,7 +8,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { makeDraggable } from './glyph-interaction';
+import { applyCanvasGlyphLayout, makeDraggable, storeCleanup } from './glyph-interaction';
 
 /**
  * Python execution result data
@@ -30,7 +30,7 @@ export function createResultGlyph(
     result: ExecutionResult
 ): HTMLElement {
     const element = document.createElement('div');
-    element.className = 'canvas-result-glyph';
+    element.className = 'canvas-result-glyph canvas-glyph';
     element.dataset.glyphId = glyph.id;
     if (glyph.symbol) {
         element.dataset.glyphSymbol = glyph.symbol;
@@ -49,19 +49,12 @@ export function createResultGlyph(
     const height = glyph.height ?? calculatedHeight;
 
     // Style - integrated look with py glyph
-    element.style.position = 'absolute';
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-    element.style.width = `${width}px`;
-    element.style.height = `${height}px`;
+    applyCanvasGlyphLayout(element, { x, y, width, height });
     element.style.minHeight = '80px';
-    element.style.backgroundColor = '#1e1e1e'; // Solid dark background
-    element.style.borderRadius = '0 0 4px 4px'; // Rounded bottom only
-    element.style.border = '1px solid #3e3e3e';
-    element.style.borderTop = 'none'; // Visually connects to py glyph above
-    element.style.display = 'flex';
-    element.style.flexDirection = 'column';
-    element.style.overflow = 'hidden';
+    element.style.backgroundColor = 'var(--bg-almost-black)';
+    element.style.borderRadius = '0 0 4px 4px';
+    element.style.border = '1px solid var(--border-on-dark)';
+    element.style.borderTop = 'none';
     element.style.zIndex = '1';
 
     // Header with buttons
@@ -138,7 +131,7 @@ export function createResultGlyph(
     outputContainer.style.fontSize = '12px';
     outputContainer.style.whiteSpace = 'pre-wrap';
     outputContainer.style.wordBreak = 'break-word';
-    outputContainer.style.color = '#e0e0e0'; // Light text for dark background
+    outputContainer.style.color = 'var(--text-on-dark)';
 
     // Build output text
     let outputText = '';
@@ -149,7 +142,7 @@ export function createResultGlyph(
 
     if (result.stderr) {
         const stderrSpan = document.createElement('span');
-        stderrSpan.style.color = 'var(--error-color, #ff6b6b)';
+        stderrSpan.style.color = 'var(--glyph-status-error-text)';
         stderrSpan.textContent = result.stderr;
         outputContainer.appendChild(document.createTextNode(outputText));
         outputContainer.appendChild(stderrSpan);
@@ -158,7 +151,7 @@ export function createResultGlyph(
 
     if (result.error) {
         const errorSpan = document.createElement('span');
-        errorSpan.style.color = 'var(--error-color, #ff6b6b)';
+        errorSpan.style.color = 'var(--glyph-status-error-text)';
         errorSpan.style.fontWeight = 'bold';
         errorSpan.textContent = `\nError: ${result.error}`;
         outputContainer.appendChild(document.createTextNode(outputText));
@@ -180,7 +173,10 @@ export function createResultGlyph(
     element.appendChild(outputContainer);
 
     // Make draggable by header
-    makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
+    const cleanupDrag = makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
+
+    // Register cleanup for conversions
+    storeCleanup(element, cleanupDrag);
 
     return element;
 }

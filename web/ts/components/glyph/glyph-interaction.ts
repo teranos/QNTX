@@ -42,6 +42,79 @@ export interface MakeResizableOptions {
     minHeight?: number;
 }
 
+// ── applyCanvasGlyphLayout ──────────────────────────────────────────
+
+export interface CanvasGlyphLayoutOptions {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    /** Use minHeight instead of height (e.g. ix-glyph grows with content) */
+    useMinHeight?: boolean;
+}
+
+/**
+ * Apply shared positioning and flex layout to a canvas-placed glyph.
+ *
+ * Pairs with the `.canvas-glyph` CSS class which provides the visual
+ * defaults (background, border, border-radius, overflow). This function
+ * handles the instance-specific values that can't live in CSS (x/y/size).
+ */
+export function applyCanvasGlyphLayout(el: HTMLElement, opts: CanvasGlyphLayoutOptions): void {
+    el.style.left = `${opts.x}px`;
+    el.style.top = `${opts.y}px`;
+    el.style.width = `${opts.width}px`;
+    if (opts.useMinHeight) {
+        el.style.minHeight = `${opts.height}px`;
+    } else {
+        el.style.height = `${opts.height}px`;
+    }
+}
+
+// ── Cleanup registry ────────────────────────────────────────────────
+
+const CLEANUP_KEY = '__glyphCleanup';
+
+/**
+ * Store a cleanup function on a glyph element.
+ * Called by glyph setup code so conversions can tear down handlers
+ * before repopulating the same element as a different glyph type.
+ */
+export function storeCleanup(element: HTMLElement, fn: () => void): void {
+    const list: Array<() => void> = (element as any)[CLEANUP_KEY] ??= [];
+    list.push(fn);
+}
+
+/**
+ * Run all stored cleanup functions and clear the list.
+ * Tears down drag, resize, editor, and observer handlers
+ * so the element can be repopulated as a different glyph type.
+ */
+export function runCleanup(element: HTMLElement): void {
+    const list: Array<() => void> | undefined = (element as any)[CLEANUP_KEY];
+    if (list) {
+        for (const fn of list) fn();
+        (element as any)[CLEANUP_KEY] = [];
+    }
+}
+
+// ── preventDrag ─────────────────────────────────────────────────────
+
+/**
+ * Prevent drag from starting on an interactive child element.
+ *
+ * Canvas glyphs are draggable, but their interactive children (textareas,
+ * buttons, inputs) need to receive mousedown without triggering a drag.
+ * This stops the event from bubbling to the drag handler.
+ */
+export function preventDrag(...elements: HTMLElement[]): void {
+    for (const el of elements) {
+        el.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+    }
+}
+
 // ── makeDraggable ───────────────────────────────────────────────────
 
 /**

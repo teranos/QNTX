@@ -1,10 +1,10 @@
 /**
- * Tests for note-to-prompt conversion
+ * Tests for glyph conversions
  * Focus: API contract and error handling (fast tests)
  */
 
 import { describe, test, expect } from 'bun:test';
-import { convertNoteToPrompt } from './note-to-prompt';
+import { convertNoteToPrompt } from './conversions';
 
 describe('Note to Prompt Conversion - API Contract', () => {
     test('returns boolean for missing element', async () => {
