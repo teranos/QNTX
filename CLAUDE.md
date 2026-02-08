@@ -7,6 +7,7 @@
 - If something is unclear, ask - don't assume or fill in gaps
 - State only what you can directly verify
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
+- **Maximize signal-to-noise: essential information only, no filler.**
 
 ## Configuration (am package)
 
@@ -84,7 +85,6 @@ func TestSomething(t *testing.T) {
 - `qntxtest.CreateTestDB(t)` runs actual migration files from `db/sqlite/migrations/`
 - Ensures tests use identical schema to production
 - Migrations are the single source of truth
-- Auto-cleanup via `t.Cleanup()`
 
 **NEVER do this:**
 
@@ -97,4 +97,3 @@ db.Exec("CREATE INDEX ...")
 **Pattern used throughout:**
 
 - `ats/storage/*_test.go` - All tests use `qntxtest.CreateTestDB(t)`
-- `internal/testing/database.go` - Implementation using `db.Migrate()`
