@@ -149,6 +149,41 @@ export function beginMaximizeMorph(
 
 
 /**
+ * Begin a morph transaction for reshaping (rect to rect)
+ * Used for canvas ↔ window manifestation transitions where both
+ * source and target have explicit dimensions.
+ */
+export function beginReshapeMorph(
+    element: HTMLElement,
+    from: { x: number; y: number; width: number; height: number },
+    to: { x: number; y: number; width: number; height: number },
+    duration: number
+): Promise<void> {
+    const computedStyle = window.getComputedStyle(element);
+
+    const keyframes: Keyframe[] = [
+        {
+            left: `${from.x}px`,
+            top: `${from.y}px`,
+            width: `${from.width}px`,
+            height: `${from.height}px`,
+            borderRadius: computedStyle.borderRadius || '4px',
+            opacity: '1'
+        },
+        {
+            left: `${to.x}px`,
+            top: `${to.y}px`,
+            width: `${to.width}px`,
+            height: `${to.height}px`,
+            borderRadius: '8px',
+            opacity: '1'
+        }
+    ];
+
+    return createMorphAnimation(element, keyframes, duration, 'Reshape');
+}
+
+/**
  * Cancel any active morph for an element
  * Used when element is being removed or state is changing unexpectedly
  */
