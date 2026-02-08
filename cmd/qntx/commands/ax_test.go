@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/teranos/QNTX/ats/parser"
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/setup"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
 )
 
@@ -39,7 +39,7 @@ func TestAxCommand_Integration(t *testing.T) {
 		filter, err := parser.ParseAxCommand(tt.args)
 		require.NoError(t, err)
 
-		executor := storage.NewExecutor(db)
+		executor := setup.NewExecutor(db)
 		result, err := executor.ExecuteAsk(context.Background(), *filter)
 		require.NoError(t, err)
 
