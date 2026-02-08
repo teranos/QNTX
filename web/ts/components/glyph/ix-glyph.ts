@@ -214,18 +214,7 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.style.width = '24px';
-    playBtn.style.height = '24px';
-    playBtn.style.padding = '0';
-    playBtn.style.fontSize = '12px';
-    playBtn.style.backgroundColor = 'var(--bg-secondary)';
-    playBtn.style.color = 'var(--text-primary)';
-    playBtn.style.border = '1px solid var(--border-color)';
-    playBtn.style.borderRadius = '4px';
-    playBtn.style.cursor = 'pointer';
-    playBtn.style.display = 'flex';
-    playBtn.style.alignItems = 'center';
-    playBtn.style.justifyContent = 'center';
+    playBtn.className = 'glyph-play-btn';
     playBtn.title = 'Execute';
 
     playBtn.addEventListener('click', async (e) => {
