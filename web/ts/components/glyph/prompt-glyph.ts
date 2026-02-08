@@ -196,7 +196,7 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
-    playBtn.className = 'glyph-play-btn glyph-play-btn--green has-tooltip';
+    playBtn.className = 'glyph-play-btn has-tooltip';
     playBtn.dataset.tooltip = 'Execute prompt';
 
     playBtn.addEventListener('click', async (e) => {
