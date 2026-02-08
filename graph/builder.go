@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/setup"
 	"go.uber.org/zap"
 )
 
@@ -19,7 +19,7 @@ type AxGraphBuilder struct {
 // NewAxGraphBuilder creates a new Ax graph builder.
 // Node types are determined purely from attested node_type predicates.
 func NewAxGraphBuilder(db *sql.DB, verbosity int, logger *zap.SugaredLogger) (*AxGraphBuilder, error) {
-	executor := storage.NewExecutorWithOptions(db, ax.AxExecutorOptions{
+	executor := setup.NewExecutorWithOptions(db, ax.AxExecutorOptions{
 		Logger: logger.Named("ax"),
 	})
 

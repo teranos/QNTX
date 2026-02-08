@@ -112,6 +112,20 @@ func (n *NoOpQueryExpander) GetNaturalLanguagePredicates() []string {
 	return []string{}
 }
 
+// WordMatch represents a single fuzzy match result from a RichSearchMatcher.
+type WordMatch struct {
+	Value string
+	Score float64
+}
+
+// RichSearchMatcher performs fuzzy word matching for rich text search.
+// Implementations handle engine lifecycle (creation, indexing, cleanup) internally.
+type RichSearchMatcher interface {
+	// MatchWords finds fuzzy matches for each query word against the given vocabulary.
+	// Returns a map from query word to its fuzzy matches.
+	MatchWords(vocabulary []string, queryWords []string, limit int, minScore float64) (map[string][]WordMatch, error)
+}
+
 // getSystemActor generates a system-based actor string using environment variables.
 // This is used internally by DefaultActorDetector.
 func getSystemActor(fallback string) string {

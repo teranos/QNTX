@@ -91,7 +91,7 @@ func setupTestDatabaseWithAttestations(t *testing.T) *sql.DB {
 func TestAxExecutorBasicQueries(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	tests := []struct {
 		name             string
@@ -187,7 +187,7 @@ func TestAxExecutorBasicQueries(t *testing.T) {
 func TestAxExecutorTemporalFiltering(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Test temporal filtering
 	startTime, _ := time.Parse(time.RFC3339, "2024-01-02T00:00:00Z")
@@ -246,7 +246,7 @@ func TestAxExecutorTemporalFiltering(t *testing.T) {
 func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Test fuzzy predicate expansion directly
 	expanded, err := executor.expandFuzzyPredicates(context.Background(), []string{"engineer"})
@@ -276,7 +276,7 @@ func TestAxExecutorFuzzyPredicateExpansion(t *testing.T) {
 func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	// Get predicates directly from query store
 	queryStore := NewSQLQueryStore(testDB)
@@ -306,7 +306,7 @@ func TestAxExecutorGetAllPredicatesFromDB(t *testing.T) {
 func TestAxExecutorLimitHandling(t *testing.T) {
 	db := setupTestDatabaseWithAttestations(t)
 
-	executor := NewExecutor(db)
+	executor := newTestExecutor(db)
 
 	tests := []struct {
 		name          string
@@ -378,7 +378,7 @@ func TestAxExecutorEdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create fresh database and executor for each subtest
 			db := setupTestDatabaseWithAttestations(t)
-			executor := NewExecutor(db)
+			executor := newTestExecutor(db)
 
 			result, err := executor.ExecuteAsk(context.Background(), tt.filter)
 			require.NoError(t, err)
