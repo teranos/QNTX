@@ -25,13 +25,11 @@ export interface CompositionEdge {
 
 /**
  * Composition represents a DAG of melded glyphs
- * Replaces flat glyphIds array to support arbitrary graph topologies
+ * Edges define the graph structure - no derived fields
  */
 export interface Composition {
   id: string;
   edges: CompositionEdge[];
-  /** computed field: all unique glyph IDs in composition */
-  glyph_ids: string[];
   /** anchor X position in pixels */
   x: number;
   /** anchor Y position in pixels */

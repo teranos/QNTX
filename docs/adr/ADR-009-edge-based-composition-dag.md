@@ -1,7 +1,7 @@
 # ADR-009: Edge-Based Composition DAG for Multi-Directional Melding
 
 ## Status
-In Progress (Phase 1b)
+Phase 1ba/1bb Complete (Backend + Frontend State Migration)
 
 ## Context
 
@@ -39,7 +39,7 @@ message CompositionEdge {
 message Composition {
   string id = 1;
   repeated CompositionEdge edges = 2;
-  repeated string glyph_ids = 3;  // computed
+  reserved 3;  // formerly glyph_ids (removed for DAG-native approach)
   double x = 4;
   double y = 5;
 }
@@ -69,6 +69,12 @@ message Composition {
 - Edges ARE the type information
 - Simplifies schema, reduces maintenance
 
+**Why remove `glyph_ids` field?**
+- During Phase 1bb, removed derived `glyph_ids` for true DAG-native approach
+- Traverse edges to find glyphs (e.g., `composition.edges.some(e => e.from === glyphId)`)
+- Proto field 3 reserved to prevent accidental reuse
+- Reduces duplication and maintains single source of truth (edges)
+
 ## Implementation
 
 **Phase 1ba:** Backend (DB + storage)
@@ -77,10 +83,12 @@ message Composition {
 - Create `composition_edges` table with `from`, `to`, `direction`, `position`
 - Update Go storage layer to use proto edges
 
-**Phase 1bb:** API + Frontend state
+**Phase 1bb:** API + Frontend state ✅
 - API handlers accept/return proto edges
-- TypeScript state uses proto `CompositionEdge` interface
+- TypeScript state uses proto `Composition` directly
 - Remove `type` field from all layers
+- Remove `glyph_ids` field - DAG-native edge traversal only
+- All 728 tests passing (352 Go + 376 TypeScript)
 
 **Phase 1bc:** UI integration
 - Meld system creates edges with `direction: 'right'`
@@ -100,6 +108,8 @@ message Composition {
 - Database schema matches graph semantics (edges table)
 - Follows established patterns (ADR-006, ADR-007)
 - No technical debt from temporary solutions
+- **DAG-native thinking:** No derived fields, traverse edges directly
+- Proto field reservation prevents future mistakes
 
 ### Negative
 - Breaking change requires database recreation

@@ -14,11 +14,11 @@ message CompositionEdge {
 }
 
 // Composition represents a DAG of melded glyphs
-// Replaces flat glyphIds array to support arbitrary graph topologies
+// Edges define the graph structure - no derived fields
 message Composition {
   string id = 1;
   repeated CompositionEdge edges = 2;
-  repeated string glyph_ids = 3;  // computed field: all unique glyph IDs in composition
+  reserved 3;  // formerly glyph_ids (removed for DAG-native approach)
   double x = 4;                    // anchor X position in pixels
   double y = 5;                    // anchor Y position in pixels
 }

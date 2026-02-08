@@ -26,37 +26,41 @@
 
 ## Architecture Decision
 
-**Edge-based DAG structure** (not flat array)
+**Edge-based DAG structure** (DAG-native, no derived fields)
 
 Initial Phase 1 implemented `glyphIds: string[]` for linear chains. However, QNTX requires multi-directional melding:
 - **Horizontal (right):** data flow chains (ax → py → prompt)
 - **Vertical (top):** configuration injection (system-prompt ↓ prompt)
 - **Vertical (bottom):** result attachment (chart ↑ ax for real-time monitoring)
 
-Flat arrays cannot represent DAG structures. Phase 1b migrates to edge-based composition:
+Flat arrays cannot represent DAG structures. Phase 1b migrates to edge-based composition.
+
+**Final structure (DAG-native):**
 
 ```typescript
 interface CompositionEdge {
   from: string;           // source glyph ID
   to: string;             // target glyph ID
   direction: 'right' | 'top' | 'bottom';
-  position?: number;      // ordering for multiple edges same direction
+  position: number;       // ordering for multiple edges same direction
 }
 
 interface CompositionState {
   id: string;
-  type: string;
   edges: CompositionEdge[];
-  glyphIds: string[];     // all glyphs in composition (for quick lookup)
   x: number;
   y: number;
 }
 ```
 
+**Key principle:** No `glyph_ids` field. Traverse edges to find glyphs (DAG-native thinking).
+
 **Rationale:**
 - Supports arbitrary DAG topologies
+- **DAG-native:** No derived `glyph_ids` field - traverse edges to find glyphs
 - Phase 2-3 only create `direction: 'right'` edges (horizontal chains)
 - Structure ready for vertical melding (future work)
+- Proto field 3 reserved (formerly `glyph_ids`) to prevent accidental reuse
 - Follows patterns from flow-based programming (GoFlow, dataflow editors)
 
 ## Implementation Checklist
@@ -111,7 +115,7 @@ interface CompositionState {
   - ✅ Tim extends 3-glyph chain into 4-glyph chain
 - ✅ All active tests passing: 352 pass, 0 fail (8 skipped)
 
-### Phase 1b Prerequisites: Proto Definitions
+### Phase 1b Prerequisites: Proto Definitions ✅ **COMPLETE**
 
 **Goal:** Define composition DAG structure in protobuf as single source of truth (ADR-006).
 
@@ -119,12 +123,12 @@ interface CompositionState {
 
 #### Create Proto Definition
 
-- [ ] Create `plugin/grpc/protocol/canvas.proto`:
+- ✅ Create `glyph/proto/canvas.proto`:
   ```protobuf
   syntax = "proto3";
-  package protocol;
+  package proto;
 
-  option go_package = "github.com/teranos/QNTX/plugin/grpc/protocol";
+  option go_package = "github.com/teranos/QNTX/glyph/proto";
 
   // CompositionEdge represents a directed edge in the composition DAG
   message CompositionEdge {
@@ -146,15 +150,15 @@ interface CompositionState {
 
 #### Update Proto Generation
 
-- [ ] Update `proto.nix`:
-  - [ ] Add `canvas.proto` to Go generation (generate-proto-go):
+- ✅ Update `proto.nix`:
+  - ✅ Add `canvas.proto` to Go generation (generate-proto-go):
     ```nix
     ${pkgs.protobuf}/bin/protoc \
       --plugin=${pkgs.protoc-gen-go}/bin/protoc-gen-go \
       --go_out=. --go_opt=paths=source_relative \
-      plugin/grpc/protocol/canvas.proto
+      glyph/proto/canvas.proto
     ```
-  - [ ] Add `canvas.proto` to TypeScript generation (generate-proto-typescript):
+  - ✅ Add `canvas.proto` to TypeScript generation (generate-proto-typescript):
     ```nix
     ${pkgs.protobuf}/bin/protoc \
       --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
@@ -166,16 +170,16 @@ interface CompositionState {
       --ts_proto_opt=onlyTypes=true \
       --ts_proto_opt=snakeToCamel=false \
       --ts_proto_out=web/ts/generated/proto \
-      plugin/grpc/protocol/canvas.proto
+      glyph/proto/canvas.proto
     ```
 
-- [ ] Run `make proto` to generate code:
-  - [ ] Verify Go types generated in `plugin/grpc/protocol/canvas.pb.go`
-  - [ ] Verify TypeScript interfaces generated in `web/ts/generated/proto/plugin/grpc/protocol/canvas.ts`
+- ✅ Run `make proto` to generate code:
+  - ✅ Verify Go types generated in `glyph/proto/canvas.pb.go`
+  - ✅ Verify TypeScript interfaces generated in `web/ts/generated/proto/glyph/proto/canvas.ts`
 
-- [ ] Commit proto definition and generated code
+- ✅ Commit proto definition and generated code
 
-### Phase 1ba: Backend DAG Migration
+### Phase 1ba: Backend DAG Migration ✅ **COMPLETE**
 
 **Goal:** Migrate database and Go storage layer from `composition_glyphs` junction table to edge-based DAG structure.
 
@@ -183,144 +187,96 @@ interface CompositionState {
 
 #### Database Schema
 
-- [ ] Create migration `021_dag_composition_edges.sql`
-  - [ ] Create `composition_edges` table:
-    ```sql
-    CREATE TABLE composition_edges (
-      composition_id TEXT NOT NULL,
-      from_glyph_id TEXT NOT NULL,
-      to_glyph_id TEXT NOT NULL,
-      direction TEXT NOT NULL CHECK(direction IN ('right', 'top', 'bottom')),
-      position INTEGER DEFAULT 0,
-      FOREIGN KEY (composition_id) REFERENCES canvas_compositions(id) ON DELETE CASCADE,
-      PRIMARY KEY (composition_id, from_glyph_id, to_glyph_id, direction)
-    );
-    CREATE INDEX idx_composition_edges_composition_id ON composition_edges(composition_id);
-    ```
-  - [ ] Drop `composition_glyphs` table (breaking change)
-  - [ ] Remove `type` column from `canvas_compositions` table (no longer needed)
+- ✅ Create migration `021_dag_composition_edges.sql`
+  - ✅ Create `composition_edges` table with foreign keys to compositions and glyphs
+  - ✅ Drop `composition_glyphs` table (breaking change)
+  - ✅ Recreate `canvas_compositions` without `type` column
 
 #### Storage Layer
 
-- [ ] Update `glyph/storage/canvas_store.go`
-  - [ ] Import proto types: `import pb "github.com/teranos/QNTX/plugin/grpc/protocol"`
-  - [ ] Add internal `compositionEdge` struct for database operations:
-    ```go
-    type compositionEdge struct {
-      From      string `db:"from_glyph_id"`
-      To        string `db:"to_glyph_id"`
-      Direction string `db:"direction"`
-      Position  int    `db:"position"`
-    }
-    ```
-  - [ ] Update `Composition` struct (ADR-006 pattern: Go structs for internal, proto at boundaries):
-    - [ ] Replace `GlyphIDs []string` with `Edges []*pb.CompositionEdge`
-    - [ ] Remove `Type string` field
-  - [ ] Add conversion helpers:
-    - [ ] `toProtoEdge(e compositionEdge) *pb.CompositionEdge`
-    - [ ] `fromProtoEdge(e *pb.CompositionEdge) compositionEdge`
-  - [ ] Update `UpsertComposition()`:
-    - [ ] Accept `Edges []CompositionEdge`
-    - [ ] Write to `composition_edges` table in transaction
-    - [ ] Delete old edges before inserting new ones (for updates)
-  - [ ] Update `GetComposition()`:
-    - [ ] Join `composition_edges` table
-    - [ ] Return composition with edges array
-  - [ ] Update `ListCompositions()`:
-    - [ ] Load edges for each composition (two-pass approach or JOIN)
-  - [ ] Update `DeleteComposition()`:
-    - [ ] Cascade delete handled by foreign key constraint
+- ✅ Update `glyph/storage/canvas_store.go`
+  - ✅ Import proto types: `import pb "github.com/teranos/QNTX/glyph/proto"`
+  - ✅ Add internal `compositionEdge` struct for database operations
+  - ✅ Update `CanvasComposition` struct with `Edges []*pb.CompositionEdge`
+  - ✅ Add conversion helpers: `toProtoEdge()` and `fromProtoEdge()`
+  - ✅ Update `UpsertComposition()` to write edges in transaction
+  - ✅ Update `GetComposition()` to load edges via JOIN
+  - ✅ Update `ListCompositions()` to load edges (two-pass approach)
+  - ✅ `DeleteComposition()` cascade handled by foreign key constraints
 
 #### Backend Tests
 
-- [ ] Update `glyph/storage/canvas_store_test.go`
-  - [ ] Replace all `GlyphIDs` with `Edges` in test data
-  - [ ] Update `TestCanvasStore_UpsertComposition` to use edges
-  - [ ] Update `TestCanvasStore_GetComposition` to expect edges
-  - [ ] Update `TestCanvasStore_ListCompositions` to verify edges loaded
-  - [ ] Update `TestCanvasStore_DeleteComposition` to verify cascade
-  - [ ] Remove all references to `Type` field
-  - [ ] Run `make test` - expect Go tests to pass
+- ✅ Update `glyph/storage/canvas_store_test.go`
+  - ✅ Replace all `GlyphIDs` with `Edges` in test data
+  - ✅ All tests updated to use edge structure
+  - ✅ Remove all references to `Type` field
+  - ✅ Run `make test` - all Go tests passing (356 pass, 24 skip, 0 fail)
 
-### Phase 1bb: API & Frontend State Migration
+- ✅ Update `glyph/handlers/canvas_test.go`
+  - ✅ All handler tests updated to use edges
+  - ✅ Handler implementation requires no changes (generic JSON passthrough)
+
+### Phase 1bb: API & Frontend State Migration ✅ **COMPLETE**
 
 **Goal:** Update API handlers and TypeScript state management for edge-based compositions.
 
+**Completion:** All tests passing (728 total: 352 Go + 376 TypeScript)
+
 #### Backend API Handlers
 
-- [ ] Update `glyph/handlers/canvas.go`
-  - [ ] Import proto types: `import pb "github.com/teranos/QNTX/plugin/grpc/protocol"`
-  - [ ] Update composition POST request payload:
-    - [ ] Accept `edges: []*pb.CompositionEdge`
-    - [ ] Keep `glyph_ids: []string` as computed field (for backward compat during rollout)
-    - [ ] Remove `type` field
-  - [ ] Update composition GET response:
-    - [ ] Return `edges: []*pb.CompositionEdge`
-    - [ ] Return `glyph_ids: []string` (computed from edges)
-    - [ ] Remove `type` field
-  - [ ] Add validation:
-    - [ ] Reject compositions with cycles (DAG validation)
-    - [ ] Verify all glyph IDs in edges exist
-    - [ ] Verify `direction` is one of: 'right', 'top', 'bottom'
+- ✅ `glyph/handlers/canvas.go` requires no changes (generic JSON passthrough)
+- ✅ Handler automatically serializes storage layer's edge-based `CanvasComposition` struct
+- ⏸️ **Deferred:** DAG validation (cycle detection, invalid direction) - add when needed
 
-- [ ] Update `glyph/handlers/canvas_test.go`
-  - [ ] Update all composition handler tests to use edges
-  - [ ] Remove references to `glyph_ids` and `type`
-  - [ ] Add test: reject composition with cycle
-  - [ ] Add test: reject composition with invalid direction
-  - [ ] Run `make test` - expect Go tests to pass
+#### Proto Definition (DAG-Native)
+
+- ✅ **Removed `glyph_ids` field from proto** - edges ARE the composition
+- ✅ Proto uses `reserved 3` to prevent field reuse
+- ✅ `Composition` message contains only: `id`, `edges`, `x`, `y`
 
 #### Frontend State
 
-- [ ] Update `web/ts/state/ui.ts`
-  - [ ] Import proto types (ADR-007 pattern: interfaces only):
-    ```typescript
-    import type { CompositionEdge, Composition } from '../generated/proto/plugin/grpc/protocol/canvas';
-    ```
-  - [ ] Update `CompositionState` to use proto types:
-    ```typescript
-    export interface CompositionState {
-      id: string;
-      edges: CompositionEdge[];
-      glyph_ids: string[];  // computed from edges
-      x: number;
-      y: number;
-    }
-    ```
-  - [ ] Remove `type` field entirely
+- ✅ Update `web/ts/state/ui.ts`
+  - ✅ Import proto types: `import type { CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas'`
+  - ✅ Use proto `Composition` directly: `export type CompositionState = Composition`
+  - ✅ Remove `type` field
 
-- [ ] Update `web/ts/state/compositions.ts`
-  - [ ] Add helper: `buildEdgesFromChain(glyphIds: string[]): CompositionEdge[]`
-    - [ ] Creates right-direction edges between consecutive glyphs
-  - [ ] Add helper: `extractGlyphIds(edges: CompositionEdge[]): string[]`
-    - [ ] Returns unique glyph IDs from edge array
-  - [ ] Update `getCompositionType()`: Remove (no longer needed)
-  - [ ] Update `getMultiGlyphCompositionType()`: Remove (no longer needed)
-  - [ ] Update `addComposition()` to work with edges
-  - [ ] Update `isGlyphInComposition()` to check edges
-  - [ ] Update `findCompositionByGlyph()` to search edges
-  - [ ] Remove `isCompositionMeldable()` (placeholder, not needed yet)
+- ✅ Update `web/ts/state/compositions.ts` (DAG-native)
+  - ✅ Add helper: `buildEdgesFromChain(glyphIds: string[], direction): CompositionEdge[]` (for tests/migrations)
+  - ✅ Add helper: `extractGlyphIds(edges: CompositionEdge[]): string[]` (for logging)
+  - ✅ Remove `getCompositionType()` and `getMultiGlyphCompositionType()`
+  - ✅ Update `isGlyphInComposition()` - traverses edges (DAG-native)
+  - ✅ Update `findCompositionByGlyph()` - traverses edges (DAG-native)
 
-- [ ] Update `web/ts/api/canvas.ts`
-  - [ ] Update `upsertComposition()` to send edges format
-  - [ ] Update response parsing to expect edges
-  - [ ] Remove `glyph_ids` and `type` from API calls
+- ✅ Update `web/ts/api/canvas.ts`
+  - ✅ Update `upsertComposition()` to send edges only
+  - ✅ Update response parsing to expect edges only
+  - ✅ Remove `glyph_ids` and `type` fields from API calls
+
+- ✅ Update `web/ts/components/glyph/meld-system.ts` (DAG-native)
+  - ✅ Create edges directly in `performMeld()` (not array-then-convert)
+  - ✅ Binary meld creates one edge: `{ from: initiator, to: target, direction: 'right', position: 0 }`
+  - ✅ Remove `glyphIds` from `unmeldComposition()` return value
 
 #### Frontend Tests
 
-- [ ] Update `web/ts/state/compositions.test.ts`
-  - [ ] Replace all `glyphIds` with `edges` in test data
-  - [ ] Remove all `type` field references
-  - [ ] Update tests to use `buildEdgesFromChain()` helper
-  - [ ] Update tests to use `extractGlyphIds()` for assertions
-  - [ ] Test: `buildEdgesFromChain(['ax1', 'py1'])` creates one right edge
-  - [ ] Test: `buildEdgesFromChain(['ax1', 'py1', 'prompt1'])` creates two right edges
-  - [ ] Test: `extractGlyphIds(edges)` returns all unique IDs
-  - [ ] Run `bun test` - expect TypeScript tests to pass
+- ✅ Update `web/ts/state/compositions.test.ts`
+  - ✅ Replace all `glyphIds` with `edges` in test data (DAG-native)
+  - ✅ Remove all `type` field references
+  - ✅ Remove `getCompositionType()` tests (function removed)
+  - ✅ Update tests to create edges directly (not via helper)
+  - ✅ 2-glyph tests: `edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }]`
+  - ✅ 3-glyph tests: Two edges with position 0 and 1
+  - ✅ Run `bun test` - all TypeScript tests passing (376 tests)
 
-### Phase 1bc: Frontend UI Integration
+- ✅ Update `web/ts/components/glyph/meld-system.test.ts`
+  - ✅ Remove `glyphIds` expectation from `unmeldComposition()` return value
+
+### Phase 1bc: Frontend UI Integration ⏸️ **NEXT**
 
 **Goal:** Update meld system and UI to work with edge-based compositions.
+
+**Status:** Phase 1bb complete, ready to start 1bc
 
 #### Meld System
 
