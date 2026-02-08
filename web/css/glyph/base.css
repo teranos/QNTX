@@ -96,17 +96,6 @@
     background-color: var(--bg-dark-light);
 }
 
-/* Green-tinted variant for prompt glyph */
-.glyph-play-btn--green {
-    background-color: rgba(90, 200, 90, 0.15);
-    color: var(--glyph-status-success-text);
-    border-color: rgba(90, 200, 90, 0.3);
-}
-
-.glyph-play-btn--green:hover {
-    background-color: rgba(90, 200, 90, 0.25);
-    border-color: rgba(90, 200, 90, 0.5);
-}
 
 .canvas-glyph-title-bar {
     height: 32px;
