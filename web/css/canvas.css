@@ -200,6 +200,10 @@
     opacity: 0.9;
 }
 
+.canvas-action-button:active {
+    border: 1px solid var(--border-light);
+}
+
 .canvas-action-delete:hover {
     background: #3d1a0a;
     color: #d45030;
