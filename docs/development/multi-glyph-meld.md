@@ -5,11 +5,17 @@
 
 ## Current State
 
-- ✅ Binary melding works (2 glyphs only)
-- ✅ Three composition types: `ax-prompt`, `ax-py`, `py-prompt`
-- ✅ Persistence to database via `canvas_compositions` table
-- ❌ Cannot meld composition + glyph
-- ❌ No support for 3+ glyph chains
+**Phase 1 Complete:**
+- ✅ Storage layer supports N-glyph compositions (via junction table)
+- ✅ Four composition types: `ax-prompt`, `ax-py`, `py-prompt`, `ax-py-prompt`
+- ✅ Backend API accepts/returns `glyphIds: string[]`
+- ✅ Frontend state updated for array format
+- ✅ All tests passing (Go + TypeScript)
+
+**Still TODO (Phase 2-5):**
+- ❌ UI doesn't support melding composition + glyph yet (still binary only)
+- ❌ Meldability logic doesn't recognize compositions as targets
+- ❌ No 3+ glyph chain creation in browser yet
 
 ## Architecture Decision
 
@@ -20,34 +26,45 @@
 
 ## Implementation Checklist
 
-### Phase 1: State & Storage
+### Phase 1: State & Storage ✅ **COMPLETE**
 
-#### Frontend State
-- [ ] Update `CompositionState` type in `web/ts/state/ui.ts`
-  - [ ] Change `initiatorId: string` + `targetId: string` to `glyphIds: string[]`
-  - [ ] Add new composition types: `'ax-py-prompt'`, etc.
-  - [ ] Keep backward compatibility for existing 2-glyph compositions
+**Decision:** Clean breaking change (no backward compatibility). No melded compositions exist in production yet.
 
-#### Backend Storage
-- [ ] Create migration `020_multi_glyph_compositions.sql`
-  - [ ] Add `glyph_order INTEGER` column to `canvas_compositions`
-  - [ ] Create junction table `composition_glyphs(composition_id, glyph_id, position)`
-  - [ ] Migrate existing data: convert `initiator_id`/`target_id` to junction entries
+#### Frontend State ✅
+- ✅ Update `CompositionState` type in `web/ts/state/ui.ts`
+  - ✅ Change `initiatorId: string` + `targetId: string` to `glyphIds: string[]`
+  - ✅ Add new composition types: `'ax-py-prompt'`
+  - ✅ Updated all composition helper functions (`isGlyphInComposition`, `findCompositionByGlyph`)
+  - ✅ Updated unmeld return type to `{ glyphElements, glyphIds }`
 
-- [ ] Update `glyph/storage/canvas_store.go`
-  - [ ] Change `GetComposition()` to return `[]string` of glyph IDs
-  - [ ] Change `UpsertComposition()` to accept glyph ID array
-  - [ ] Add `AddGlyphToComposition(compId, glyphId, position)` method
+#### Backend Storage ✅
+- ✅ Create migration `020_multi_glyph_compositions.sql`
+  - ✅ Create junction table `composition_glyphs(composition_id, glyph_id, position)`
+  - ✅ Recreate `canvas_compositions` without `initiator_id`/`target_id` (breaking change)
+  - ✅ Foreign key constraints: composition → glyphs cascade delete
+  - ⚠️ No data migration (breaking change: existing compositions dropped)
 
-- [ ] Update `glyph/handlers/canvas.go`
-  - [ ] Update API payload to accept `glyph_ids: string[]`
-  - [ ] Return composition with full glyph array
+- ✅ Update `glyph/storage/canvas_store.go`
+  - ✅ `GetComposition()` returns `GlyphIDs []string` (queries junction table)
+  - ✅ `UpsertComposition()` accepts glyph ID array (transaction-based with junction table)
+  - ✅ `ListCompositions()` fixed nested query issue (two-pass approach)
+  - ✅ Orphan validation: compositions with zero glyphs return error
 
-#### Storage Tests
-- [ ] Update `glyph/storage/canvas_store_test.go`
-  - [ ] Test 3-glyph composition creation
-  - [ ] Test adding glyph to existing composition
-  - [ ] Test ordering of glyphs in chain
+- ✅ Update `glyph/handlers/canvas.go`
+  - ✅ API payload accepts `glyph_ids: string[]`
+  - ✅ Returns composition with full glyph array
+
+#### Storage Tests ✅
+- ✅ Update `glyph/storage/canvas_store_test.go`
+  - ✅ All tests updated for `GlyphIDs` array format
+  - ✅ Test cascade delete behavior (orphaning when all glyphs deleted)
+  - ✅ Test composition upsert and retrieval with N glyphs
+  - ✅ Fixed `ForeignKeyConstraints` test for new junction table behavior
+
+#### Frontend Tests ✅
+- ✅ Update `web/ts/state/compositions.test.ts` for `glyphIds` array
+- ✅ Update `web/ts/components/glyph/meld-system.test.ts` for new unmeld return format
+- ✅ All tests passing: 325 pass, 0 fail
 
 ### Phase 2: Meldability Logic
 
@@ -121,16 +138,18 @@
 
 ## Migration Strategy
 
-**Backward compatibility:**
-- Existing 2-glyph compositions must keep working
-- Database migration converts `initiator_id`/`target_id` to glyph array
-- Frontend reads both old and new formats during transition
+**Actual approach (Phase 1):** Clean breaking change
 
-**Rollout:**
-1. Add new schema alongside old (no breaking changes)
-2. Migrate existing data
-3. Update frontend to write new format
-4. Deprecate old columns (future cleanup)
+Since no melded compositions exist in production yet, we opted for a simpler breaking change:
+- Database migration recreates `canvas_compositions` table (drops old schema)
+- No backward compatibility layer
+- Production database deleted and recreated with new schema
+- All tests updated to use new format
+
+**Rationale:**
+- Simpler implementation (no dual-format handling)
+- No data loss risk (no production compositions exist)
+- Cleaner codebase without compatibility shims
 
 ## Related Work
 
