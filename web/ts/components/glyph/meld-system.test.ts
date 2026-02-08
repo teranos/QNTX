@@ -1,7 +1,12 @@
 /**
- * Critical minimal test for glyph melding behavior
+ * Tests for glyph melding behavior
  *
  * Validates the core axiom: proximity-based melding preserves element identity
+ *
+ * Personas:
+ * - Tim: Happy path user, normal workflows
+ * - Spike: Tries to break things, edge cases
+ * - Jenny: Power user, complex scenarios
  */
 
 import { describe, test, expect } from 'bun:test';
@@ -143,6 +148,53 @@ describe('Meld System - Critical Behavior', () => {
 
         // Assert: Composition removed from DOM
         expect(composition.parentElement).toBe(null);
+
+        // Cleanup
+        document.body.innerHTML = '';
+    });
+});
+
+describe('Meld Composition Drag - Tim (Happy Path)', () => {
+    test('Tim sees melded composition contains both glyphs', () => {
+        const canvas = document.createElement('div');
+        canvas.className = 'canvas';
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.style.position = 'absolute';
+        axElement.style.left = '100px';
+        axElement.style.top = '100px';
+        canvas.appendChild(axElement);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.style.position = 'absolute';
+        promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
+        promptElement.style.top = '100px';
+        canvas.appendChild(promptElement);
+
+        const axGlyph: Glyph = {
+            id: 'ax-test',
+            title: 'AX',
+            renderContent: () => axElement
+        };
+
+        const promptGlyph: Glyph = {
+            id: 'prompt-test',
+            title: 'Prompt',
+            renderContent: () => promptElement
+        };
+
+        // Tim performs meld
+        const composition = performMeld(axElement, promptElement, axGlyph, promptGlyph);
+
+        // Composition is identified as melded
+        expect(isMeldedComposition(composition)).toBe(true);
+
+        // Contains both child glyphs
+        expect(composition.contains(axElement)).toBe(true);
+        expect(composition.contains(promptElement)).toBe(true);
 
         // Cleanup
         document.body.innerHTML = '';
