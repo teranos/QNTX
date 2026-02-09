@@ -17,9 +17,10 @@ import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
-import { preventDrag, storeCleanup } from './glyph-interaction';
+import { preventDrag, storeCleanup, makeDraggable } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { performMeld, extendComposition } from './meld/meld-system';
 import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
 
@@ -297,36 +298,38 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     tooltip.attach(element);
 
     /**
-     * Spawn a result glyph directly below this prompt glyph
+     * Spawn a result glyph directly below this prompt glyph.
+     * Composition-aware: extends existing composition or creates new meld.
      */
     function spawnResultGlyph(promptEl: HTMLElement, result: ExecutionResult): void {
         const promptRect = promptEl.getBoundingClientRect();
-        const canvas = promptEl.parentElement;
-        const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const canvas = promptEl.closest('.canvas-workspace') as HTMLElement;
+        if (!canvas) {
+            log.error(SEG.GLYPH, '[Prompt] Cannot spawn result glyph: no canvas-workspace ancestor');
+            return;
+        }
+        const canvasRect = canvas.getBoundingClientRect();
 
         const rx = promptRect.left - canvasRect.left;
         const ry = promptRect.bottom - canvasRect.top;
 
+        const resultGlyphId = `result-${crypto.randomUUID()}`;
         const resultGlyph: Glyph = {
-            id: `result-${crypto.randomUUID()}`,
+            id: resultGlyphId,
             title: 'Prompt Result',
             symbol: 'result',
             x: rx,
             y: ry,
             width: Math.round(promptRect.width),
-            renderContent: () => {
-                const el = document.createElement('div');
-                el.textContent = 'Result glyph';
-                return el;
-            }
+            renderContent: () => document.createElement('div')
         };
 
         const resultElement = createResultGlyph(resultGlyph, result);
-        canvas?.appendChild(resultElement);
+        canvas.appendChild(resultElement);
 
         const resultRect = resultElement.getBoundingClientRect();
         uiState.addCanvasGlyph({
-            id: resultGlyph.id,
+            id: resultGlyphId,
             symbol: 'result',
             x: rx,
             y: ry,
@@ -335,6 +338,55 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             result,
         });
 
-        log.debug(SEG.GLYPH, `[Prompt] Spawned result glyph ${resultGlyph.id} at (${rx}, ${ry})`);
+        // Auto-meld result below prompt glyph (bottom port)
+        const promptGlyphId = promptEl.dataset.glyphId;
+        if (promptGlyphId) {
+            const promptComposition = promptEl.closest('.melded-composition') as HTMLElement | null;
+            if (promptComposition) {
+                try {
+                    extendComposition(promptComposition, resultElement, resultGlyphId, promptGlyphId, 'bottom', 'to');
+
+                    const updatedId = promptComposition.getAttribute('data-glyph-id') || '';
+                    const compositionGlyph: Glyph = {
+                        id: updatedId,
+                        title: 'Melded Composition',
+                        renderContent: () => promptComposition
+                    };
+                    makeDraggable(promptComposition, promptComposition, compositionGlyph, {
+                        logLabel: 'MeldedComposition'
+                    });
+
+                    log.debug(SEG.GLYPH, `[Prompt] Extended composition with result below ${promptGlyphId}`);
+                } catch (err) {
+                    log.error(SEG.GLYPH, `[Prompt] Failed to extend composition with result:`, err);
+                }
+                return;
+            }
+
+            // Standalone prompt — create new composition
+            const promptGlyphObj: Glyph = {
+                id: promptGlyphId,
+                title: 'Prompt',
+                symbol: 'prompt',
+                renderContent: () => promptEl
+            };
+
+            try {
+                const composition = performMeld(promptEl, resultElement, promptGlyphObj, resultGlyph, 'bottom');
+
+                const compositionGlyph: Glyph = {
+                    id: composition.getAttribute('data-glyph-id') || `melded-${promptGlyphId}-${resultGlyphId}`,
+                    title: 'Melded Composition',
+                    renderContent: () => composition
+                };
+                makeDraggable(composition, composition, compositionGlyph, {
+                    logLabel: 'MeldedComposition'
+                });
+
+                log.debug(SEG.GLYPH, `[Prompt] Auto-melded result below ${promptGlyphId}`);
+            } catch (err) {
+                log.error(SEG.GLYPH, `[Prompt] Failed to auto-meld result with prompt:`, err);
+            }
+        }
     }
 }
