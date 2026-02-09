@@ -237,3 +237,61 @@ export function getMeldOptions(
 
     return options;
 }
+
+/**
+ * Compute grid row/col for each glyph in an edge DAG.
+ * BFS from roots: 'right' → same row, next col; 'bottom' → next row, same col.
+ * Single source of truth for composition spatial layout.
+ */
+export function computeGridPositions(
+    edges: Array<{ from: string; to: string; direction: string }>
+): Map<string, { row: number; col: number }> {
+    const positions = new Map<string, { row: number; col: number }>();
+
+    if (edges.length === 0) return positions;
+
+    const roots = getRootGlyphIds(edges);
+
+    // Build adjacency list
+    const adjacency = new Map<string, Array<{ to: string; direction: string }>>();
+    for (const edge of edges) {
+        if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+        adjacency.get(edge.from)!.push({ to: edge.to, direction: edge.direction });
+    }
+
+    // BFS from roots
+    const queue: string[] = [];
+    for (let i = 0; i < roots.length; i++) {
+        positions.set(roots[i], { row: 1, col: 1 + i });
+        queue.push(roots[i]);
+    }
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        const pos = positions.get(current)!;
+        const neighbors = adjacency.get(current);
+        if (!neighbors) continue;
+
+        // Track offset for multiple children in the same direction (e.g., two results below py)
+        const dirOffset = new Map<string, number>();
+
+        for (const { to, direction } of neighbors) {
+            if (positions.has(to)) continue; // first assignment wins
+
+            const offset = dirOffset.get(direction) || 0;
+
+            if (direction === 'right') {
+                positions.set(to, { row: pos.row, col: pos.col + 1 + offset });
+            } else if (direction === 'bottom') {
+                positions.set(to, { row: pos.row + 1 + offset, col: pos.col });
+            } else if (direction === 'top') {
+                positions.set(to, { row: pos.row - 1 - offset, col: pos.col });
+            }
+
+            dirOffset.set(direction, offset + 1);
+            queue.push(to);
+        }
+    }
+
+    return positions;
+}
