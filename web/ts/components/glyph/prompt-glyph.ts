@@ -17,7 +17,8 @@ import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag, storeCleanup } from './glyph-interaction';
+import { preventDrag, storeCleanup } from './glyph-interaction';
+import { canvasPlaced } from './manifestations/canvas-placed';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { uiState } from '../../state/ui';
 import { tooltip } from '../tooltip';
@@ -81,18 +82,6 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
     // Reset inline styles (important when repopulating after conversion)
     element.style.cssText = '';
-    element.className = 'canvas-prompt-glyph';
-    element.dataset.glyphId = glyph.id;
-    element.dataset.glyphSymbol = SO;
-
-    const x = glyph.x ?? 200;
-    const y = glyph.y ?? 200;
-
-    const width = glyph.width ?? 420;
-    const height = glyph.height ?? 340;
-
-    element.className += ' canvas-glyph';
-    applyCanvasGlyphLayout(element, { x, y, width, height });
 
     // Template textarea (declared early for play button reference)
     const textarea = document.createElement('textarea');
@@ -178,16 +167,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     // Apply saved status on load
     updateStatus(savedStatus);
 
-    // Title bar
-    const titleBar = document.createElement('div');
-    titleBar.className = 'canvas-glyph-title-bar';
-
-    const symbol = document.createElement('span');
-    symbol.textContent = SO;
-    symbol.style.fontSize = '16px';
-    symbol.style.color = 'var(--accent-lavender)';
-    symbol.style.fontWeight = 'bold';
-
+    // Title bar elements
     const title = document.createElement('span');
     title.textContent = 'Prompt';
     title.style.fontSize = '13px';
@@ -195,7 +175,6 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     title.style.color = 'var(--text-on-dark-emphasis)';
     title.style.fontWeight = 'bold';
 
-    // Play button
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
     playBtn.className = 'glyph-play-btn has-tooltip';
@@ -279,9 +258,23 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         }
     });
 
-    titleBar.appendChild(symbol);
-    titleBar.appendChild(title);
-    titleBar.appendChild(playBtn);
+    canvasPlaced({
+        element,
+        glyph,
+        className: 'canvas-prompt-glyph',
+        defaults: { x: 200, y: 200, width: 420, height: 340 },
+        titleBar: { label: SO, actions: [title, playBtn] },
+        resizable: { minWidth: 280, minHeight: 200 },
+        logLabel: 'PromptGlyph',
+    });
+
+    // Style the label span created by canvasPlaced
+    const labelSpan = element.querySelector('.canvas-glyph-title-bar > span:first-child') as HTMLElement;
+    if (labelSpan) {
+        labelSpan.style.fontSize = '16px';
+        labelSpan.style.color = 'var(--accent-lavender)';
+        labelSpan.style.fontWeight = 'bold';
+    }
 
     // Content area
     const content = document.createElement('div');
@@ -294,30 +287,14 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     content.appendChild(textarea);
     content.appendChild(statusSection);
 
-    element.appendChild(titleBar);
     element.appendChild(content);
-
-    // Resize handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'prompt-glyph-resize-handle glyph-resize-handle';
-    element.appendChild(resizeHandle);
 
     // Save initial template if new glyph
     if (!(await storage.load(glyph.id))) {
         await storage.save(glyph.id, defaultTemplate);
     }
 
-    // Make draggable and resizable
-    const cleanupDrag = makeDraggable(element, titleBar, glyph, { logLabel: 'PromptGlyph' });
-    const cleanupResize = makeResizable(element, resizeHandle, glyph, {
-        logLabel: 'PromptGlyph',
-        minWidth: 280,
-        minHeight: 200
-    });
-
-    // Register cleanup for conversions
-    storeCleanup(element, cleanupDrag);
-    storeCleanup(element, cleanupResize);
+    // Register cleanup for conversions (drag/resize handled by canvasPlaced)
     storeCleanup(element, () => {
         if (saveTimeout !== undefined) clearTimeout(saveTimeout);
     });

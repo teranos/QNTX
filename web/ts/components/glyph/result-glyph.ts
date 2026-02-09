@@ -8,7 +8,7 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, makeDraggable, storeCleanup } from './glyph-interaction';
+import { canvasPlaced } from './manifestations/canvas-placed';
 
 /**
  * Python execution result data
@@ -29,35 +29,14 @@ export function createResultGlyph(
     glyph: Glyph,
     result: ExecutionResult
 ): HTMLElement {
-    const element = document.createElement('div');
-    element.className = 'canvas-result-glyph canvas-glyph';
-    element.dataset.glyphId = glyph.id;
-    if (glyph.symbol) {
-        element.dataset.glyphSymbol = glyph.symbol;
-    }
-
-    const x = glyph.x ?? 200;
-    const y = glyph.y ?? 200;
-    const width = glyph.width ?? 400;
-
     // Calculate height based on content
     const lineCount = (result.stdout + result.stderr + (result.error || '')).split('\n').length;
     const minHeight = 80;
     const maxHeight = 400;
     const lineHeight = 18;
     const calculatedHeight = Math.min(maxHeight, Math.max(minHeight, lineCount * lineHeight + 60));
-    const height = glyph.height ?? calculatedHeight;
 
-    // Style - integrated look with py glyph
-    applyCanvasGlyphLayout(element, { x, y, width, height });
-    element.style.minHeight = '80px';
-    // No background on parent - let header and content provide backgrounds
-    element.style.borderRadius = '0 0 4px 4px';
-    element.style.border = '1px solid var(--border-on-dark)';
-    element.style.borderTop = 'none';
-    element.style.zIndex = '1';
-
-    // Header with buttons
+    // Build header first (used as custom drag handle)
     const header = document.createElement('div');
     header.className = 'result-glyph-header';
     header.style.padding = '4px 8px';
@@ -119,6 +98,20 @@ export function createResultGlyph(
 
     buttonContainer.appendChild(closeBtn);
     header.appendChild(buttonContainer);
+
+    const { element } = canvasPlaced({
+        glyph,
+        className: 'canvas-result-glyph',
+        defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
+        dragHandle: header,
+        draggableOptions: { ignoreButtons: true },
+        logLabel: 'ResultGlyph',
+    });
+    element.style.minHeight = '80px';
+    element.style.borderRadius = '0 0 4px 4px';
+    element.style.border = '1px solid var(--border-on-dark)';
+    element.style.borderTop = 'none';
+    element.style.zIndex = '1';
     element.appendChild(header);
 
     // Output container
@@ -175,12 +168,6 @@ export function createResultGlyph(
 
     // Ensure result data is attached to glyph object for drag persistence
     (glyph as any).result = result;
-
-    // Make draggable by header
-    const cleanupDrag = makeDraggable(element, header, glyph, { ignoreButtons: true, logLabel: 'ResultGlyph' });
-
-    // Register cleanup for conversions
-    storeCleanup(element, cleanupDrag);
 
     return element;
 }
