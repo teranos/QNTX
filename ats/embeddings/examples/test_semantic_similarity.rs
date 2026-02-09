@@ -27,8 +27,16 @@ fn main() -> anyhow::Result<()> {
         ("cat", "car", "Should be less similar (animal vs vehicle)"),
         ("happy", "joyful", "Should be very similar (synonyms)"),
         ("happy", "sad", "Should be opposite (antonyms)"),
-        ("The weather is nice today", "It's a beautiful day", "Should be similar (same meaning)"),
-        ("The weather is nice today", "The stock market crashed", "Should be dissimilar (unrelated)"),
+        (
+            "The weather is nice today",
+            "It's a beautiful day",
+            "Should be similar (same meaning)",
+        ),
+        (
+            "The weather is nice today",
+            "The stock market crashed",
+            "Should be dissimilar (unrelated)",
+        ),
     ];
 
     println!("Generating embeddings and calculating similarities...\n");
@@ -71,7 +79,7 @@ fn main() -> anyhow::Result<()> {
         let mut count = 0;
 
         for i in 0..embeddings.len() {
-            for j in i+1..embeddings.len() {
+            for j in i + 1..embeddings.len() {
                 let sim = cosine_similarity(&embeddings[i], &embeddings[j]);
                 total_similarity += sim;
                 count += 1;
@@ -80,7 +88,10 @@ fn main() -> anyhow::Result<()> {
         }
 
         if count > 0 {
-            println!("  Average similarity: {:.4}\n", total_similarity / count as f32);
+            println!(
+                "  Average similarity: {:.4}\n",
+                total_similarity / count as f32
+            );
         }
     }
 
