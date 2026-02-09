@@ -84,7 +84,7 @@ describe('PyGlyph', () => {
 
         test('has title bar with py label', async () => {
             const element = await createPyGlyph(glyph);
-            const titleBar = element.querySelector('.py-glyph-title-bar');
+            const titleBar = element.querySelector('.canvas-glyph-title-bar');
             expect(titleBar).not.toBeNull();
             expect(titleBar?.textContent).toContain('py');
         });
@@ -126,7 +126,7 @@ describe('PyGlyph', () => {
 
         test('has resize handle', async () => {
             const element = await createPyGlyph(glyph);
-            const resizeHandle = element.querySelector('.py-glyph-resize-handle');
+            const resizeHandle = element.querySelector('.glyph-resize-handle');
             expect(resizeHandle).not.toBeNull();
         });
     });
