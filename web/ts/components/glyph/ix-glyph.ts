@@ -30,7 +30,8 @@
 import type { Glyph } from './glyph';
 import { IX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { applyCanvasGlyphLayout, makeDraggable, preventDrag, storeCleanup } from './glyph-interaction';
+import { preventDrag, storeCleanup } from './glyph-interaction';
+import { canvasPlaced } from './manifestations/canvas-placed';
 import { forceTriggerJob } from '../../pulse/api';
 import { getScriptStorage } from '../../storage/script-storage';
 import { PULSE_EVENTS } from '../../pulse/events';
@@ -82,19 +83,22 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load saved execution status
     const savedStatus = loadIxStatus(glyph.id) ?? { state: 'idle' };
 
-    const element = document.createElement('div');
-    element.className = 'canvas-ix-glyph canvas-glyph';
-    element.dataset.glyphId = glyph.id;
-    element.dataset.glyphSymbol = IX;
+    // Symbol (draggable area) — created before canvasPlaced to use as drag handle
+    const symbol = document.createElement('span');
+    symbol.textContent = IX;
+    symbol.style.cursor = 'move';
+    symbol.style.fontWeight = 'bold';
+    symbol.style.flexShrink = '0';
+    symbol.style.color = 'var(--accent-lavender)';
 
-    const x = glyph.x ?? 200;
-    const y = glyph.y ?? 200;
-
-    // Initial width will be set by resizeToFitText()
-    const width = glyph.width ?? 360;
-
-    applyCanvasGlyphLayout(element, { x, y, width, height: 120, useMinHeight: false });
-    element.style.height = 'auto'; // Auto height based on content
+    const { element } = canvasPlaced({
+        glyph,
+        className: 'canvas-ix-glyph',
+        defaults: { x: 200, y: 200, width: 360, height: 120 },
+        dragHandle: symbol,
+        logLabel: 'IX Glyph',
+    });
+    element.style.height = 'auto';
     element.style.overflow = 'visible';
 
     // Input field (declared early so play button can reference it)
@@ -221,24 +225,9 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Apply saved status on load
     updateStatus(savedStatus);
 
-    // Title bar (matches ax-glyph pattern: symbol is drag handle, bar is compact)
+    // Title bar (custom layout: symbol + input + play button)
     const titleBar = document.createElement('div');
-    titleBar.className = 'ix-glyph-title-bar';
-    titleBar.style.padding = '4px 4px 4px 8px';
-    titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-    titleBar.style.userSelect = 'none';
-    titleBar.style.fontSize = '14px';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'center';
-    titleBar.style.gap = '8px';
-
-    // Symbol (draggable area) — purple-toned to reflect pulse/ingestion lineage
-    const symbol = document.createElement('span');
-    symbol.textContent = IX;
-    symbol.style.cursor = 'move';
-    symbol.style.fontWeight = 'bold';
-    symbol.style.flexShrink = '0';
-    symbol.style.color = 'var(--accent-lavender)';
+    titleBar.className = 'canvas-glyph-title-bar';
 
     // Play button
     const playBtn = document.createElement('button');
@@ -371,9 +360,6 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         document.removeEventListener(PULSE_EVENTS.EXECUTION_COMPLETED, handleExecutionCompleted);
         document.removeEventListener(PULSE_EVENTS.EXECUTION_FAILED, handleExecutionFailed);
     });
-
-    // Make draggable via symbol (matches ax-glyph pattern)
-    makeDraggable(element, symbol, glyph, { logLabel: 'IX Glyph' });
 
     return element;
 }

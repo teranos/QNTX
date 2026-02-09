@@ -52,7 +52,7 @@
  */
 
 import { glyphRun } from './components/glyph/run';
-import { createCanvasGlyph } from './components/glyph/canvas-glyph';
+import { createCanvasGlyph } from './components/glyph/canvas/canvas-glyph';
 import { createChartGlyph } from './components/glyph/chart-glyph';
 import { sendMessage } from './websocket';
 import { DB } from '@generated/sym.js';

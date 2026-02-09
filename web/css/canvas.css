@@ -110,10 +110,7 @@
     transform: scale(0.95);
 }
 
-/* Python editor glyphs on canvas */
-.canvas-py-glyph {
-    /* Base styles are set inline in py-glyph.ts */
-}
+/* Python editor glyphs on canvas — brand colors applied inline in py-glyph.ts */
 
 /* Interaction states for glyphs */
 .canvas-py-glyph.is-dragging {
