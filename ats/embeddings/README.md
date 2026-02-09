@@ -6,6 +6,25 @@
 
 Sentence transformer embeddings for semantic search in QNTX using ONNX Runtime.
 
+## Model Files
+
+The ONNX model files are NOT checked into git (they are binary files ~86MB). To obtain them:
+
+```bash
+# Install dependencies
+pip install transformers optimum[onnxruntime]
+
+# Export the model from HuggingFace
+cd ats/embeddings
+python export_model.py
+
+# This creates:
+# - models/all-MiniLM-L6-v2/model.onnx (the ONNX model)
+# - models/all-MiniLM-L6-v2/tokenizer.json (the tokenizer config)
+```
+
+The script downloads the model from HuggingFace and converts it to ONNX format.
+
 ## Current State
 
 ✅ **Working:**
