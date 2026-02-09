@@ -309,6 +309,9 @@ export function makeDraggable(
                             return;
                         }
                     }
+                    // No valid options (ports occupied) — don't fall through to performMeld
+                    log.debug(SEG.GLYPH, `[${logLabel}] No free ports for ${standaloneId}, skipping meld`);
+                    return;
                 }
 
                 // Neither is in a composition — create new 2-glyph composition
