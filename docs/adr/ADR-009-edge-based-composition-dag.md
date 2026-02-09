@@ -1,7 +1,7 @@
 # ADR-009: Edge-Based Composition DAG for Multi-Directional Melding
 
 ## Status
-Phase 1 Complete (Backend + Frontend + UI Integration)
+Phase 2 Complete (Port-aware meldability + multi-directional melding)
 
 ## Context
 
@@ -95,10 +95,14 @@ message Composition {
 - Reconstruction loads from edges
 - Vertical melding support deferred (structure ready)
 
-**Phase 2-5:** Horizontal chain UI
-- Only create `direction: 'right'` edges
-- Multi-glyph chains work via composition-to-glyph melding
-- Vertical melding (top/bottom) implemented later
+**Phase 2:** Port-aware meldability + multi-directional melding ✅
+- MELDABILITY registry restructured: each glyph class maps to `PortRule[]` with direction + targets
+- Proximity detection, performMeld, reconstructMeld all respect edge direction
+- Edges created with actual direction (`'right'`, `'bottom'`) not just `'right'`
+- Result glyphs auto-meld below py on execution (bottom port)
+- Port-based model pulled forward from "future work" — spatial ports are concrete, not abstract
+
+**Phase 3+:** Composition extension (melding into existing compositions)
 
 ## Consequences
 
@@ -128,9 +132,9 @@ message Composition {
 - Defers inevitable refactoring
 
 **Port-based model (à la GoFlow):**
-- Over-engineered for current needs
-- Glyphs don't have explicit ports (yet)
-- Can add port abstraction layer later if needed
+- Initially deferred as over-engineered
+- Pulled forward in Phase 2: spatial ports (right/bottom/top) per glyph class
+- Lightweight implementation — ports are directional rules in a registry, not abstract objects
 
 **Graph library (Graphology, dominikbraun/graph):**
 - Runtime overhead for storage/retrieval
@@ -139,11 +143,10 @@ message Composition {
 
 ## Future Work
 
-- Vertical melding UI (top/bottom directions)
+- Composition extension: melding a glyph into an existing composition (Phase 3)
 - Cycle detection validation
 - Topological sort for execution order
 - Graph visualization/debugging tools
-- Port-based connections (if semantic clarity needed)
 
 ## References
 
