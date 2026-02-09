@@ -27,6 +27,68 @@ export function exists_attestation(id) {
 }
 
 /**
+ * Rebuild the fuzzy search index from current IndexedDB vocabulary.
+ * Pulls distinct predicates and contexts from the attestation store.
+ * Returns JSON: {"predicates": N, "contexts": N, "hash": "..."}
+ * @returns {Promise<string>}
+ */
+export function fuzzy_rebuild_index() {
+    const ret = wasm.fuzzy_rebuild_index();
+    return ret;
+}
+
+/**
+ * Search the fuzzy index for matching vocabulary.
+ * vocab_type: "predicates" or "contexts"
+ * Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
+ * @param {string} query
+ * @param {string} vocab_type
+ * @param {number} limit
+ * @param {number} min_score
+ * @returns {string}
+ */
+export function fuzzy_search(query, vocab_type, limit, min_score) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passStringToWasm0(query, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(vocab_type, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.fuzzy_search(ptr0, len0, ptr1, len1, limit, min_score);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
+
+/**
+ * Get fuzzy engine status.
+ * Returns JSON: {"ready": bool, "predicates": N, "contexts": N, "hash": "..."}
+ * @returns {string}
+ */
+export function fuzzy_status() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const ret = wasm.fuzzy_status();
+        deferred1_0 = ret[0];
+        deferred1_1 = ret[1];
+        return getStringFromWasm0(ret[0], ret[1]);
+    } finally {
+        wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
@@ -220,6 +282,10 @@ function __wbg_get_imports() {
             const ret = arg0.getAllKeys();
             return ret;
         }, arguments); },
+        __wbg_getAll_33c9f4f22da09509: function() { return handleError(function (arg0) {
+            const ret = arg0.getAll();
+            return ret;
+        }, arguments); },
         __wbg_get_5e856edb32ac1289: function() { return handleError(function (arg0, arg1) {
             const ret = arg0.get(arg1);
             return ret;
@@ -375,17 +441,17 @@ function __wbg_get_imports() {
             return ret;
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 68, function: Function { arguments: [NamedExternref("Event")], shim_idx: 69, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 75, function: Function { arguments: [NamedExternref("Event")], shim_idx: 76, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h332095daeac88dbb, wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 68, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 69, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 75, function: Function { arguments: [NamedExternref("IDBVersionChangeEvent")], shim_idx: 76, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h332095daeac88dbb, wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2);
             return ret;
         },
         __wbindgen_cast_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { dtor_idx: 87, function: Function { arguments: [Externref], shim_idx: 88, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { dtor_idx: 94, function: Function { arguments: [Externref], shim_idx: 95, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm.wasm_bindgen__closure__destroy__h622d11ff1c80a730, wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea);
             return ret;
         },
@@ -602,6 +668,12 @@ function passStringToWasm0(arg, malloc, realloc) {
 
     WASM_VECTOR_LEN = offset;
     return ptr;
+}
+
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_externrefs.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });

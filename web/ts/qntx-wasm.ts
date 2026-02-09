@@ -30,6 +30,31 @@ export type ParseResult =
     | { ok: true; query: AxQuery }
     | { ok: false; error: string };
 
+/** A fuzzy match result from the WASM engine */
+export interface FuzzyMatch {
+    value: string;
+    score: number;
+    strategy: string;
+}
+
+/** Fuzzy index rebuild statistics */
+export interface FuzzyIndexStats {
+    predicates: number;
+    contexts: number;
+    hash: string;
+}
+
+/** Fuzzy engine status */
+export interface FuzzyStatus {
+    ready: boolean;
+    predicates: number;
+    contexts: number;
+    hash: string;
+}
+
+/** Vocabulary type for fuzzy search */
+export type FuzzyVocabType = 'predicates' | 'contexts';
+
 /** Promise that resolves when WASM is initialized */
 let initPromise: Promise<void> | null = null;
 
@@ -75,7 +100,10 @@ export async function initialize(dbName: string = DEFAULT_DB_NAME): Promise<void
         // Initialize IndexedDB store
         await wasm.init_store(dbName);
 
-        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()})`);
+        // Build fuzzy index from existing IndexedDB vocabulary
+        const statsJson = await wasm.fuzzy_rebuild_index();
+        const stats: FuzzyIndexStats = JSON.parse(statsJson);
+        log.info(SEG.WASM, `[qntx-wasm] Initialized (v${wasm.version()}) fuzzy: ${stats.predicates}P/${stats.contexts}C`);
     })();
 
     return initPromise;
@@ -158,6 +186,46 @@ export async function listAttestationIds(): Promise<string[]> {
     const json = await wasm.list_attestation_ids();
     return JSON.parse(json);
 }
+
+// ============================================================================
+// Fuzzy Search
+// ============================================================================
+
+/**
+ * Rebuild the fuzzy search index from current IndexedDB vocabulary.
+ * Call after init, and again after storing attestations with new predicates/contexts.
+ * Hash-based dedup makes redundant calls cheap.
+ */
+export async function rebuildFuzzyIndex(): Promise<FuzzyIndexStats> {
+    await ensureInit();
+    const json = await wasm.fuzzy_rebuild_index();
+    return JSON.parse(json);
+}
+
+/**
+ * Search vocabulary using the fuzzy engine.
+ * Returns matches sorted by score descending.
+ */
+export function fuzzySearch(
+    query: string,
+    vocabType: FuzzyVocabType,
+    limit: number = 20,
+    minScore: number = 0.6,
+): FuzzyMatch[] {
+    const json = wasm.fuzzy_search(query, vocabType, limit, minScore);
+    return JSON.parse(json);
+}
+
+/**
+ * Get fuzzy engine status (ready state, vocabulary counts, index hash).
+ */
+export function getFuzzyStatus(): FuzzyStatus {
+    return JSON.parse(wasm.fuzzy_status());
+}
+
+// ============================================================================
+// Utilities
+// ============================================================================
 
 /**
  * Get the qntx-core version.
