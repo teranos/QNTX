@@ -14,6 +14,30 @@ export function delete_attestation(id: string): Promise<boolean>;
 export function exists_attestation(id: string): Promise<boolean>;
 
 /**
+ * Get the current fuzzy index hash for change detection.
+ */
+export function fuzzy_get_hash(): string;
+
+/**
+ * Check if the fuzzy engine has vocabulary indexed.
+ */
+export function fuzzy_is_ready(): boolean;
+
+/**
+ * Rebuild the fuzzy index with new vocabulary.
+ * Takes two JSON arrays: predicates and contexts.
+ * Returns JSON: `{"predicate_count":N,"context_count":N,"hash":"..."}`
+ */
+export function fuzzy_rebuild_index(predicates_json: string, contexts_json: string): string;
+
+/**
+ * Search the fuzzy index for matches.
+ * vocab_type: "predicates" or "contexts"
+ * Returns JSON: `[{"value":"...","score":F,"strategy":"..."},...]`
+ */
+export function fuzzy_search(query: string, vocab_type: string, limit: number, min_score: number): string;
+
+/**
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
@@ -67,6 +91,10 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly delete_attestation: (a: number, b: number) => any;
     readonly exists_attestation: (a: number, b: number) => any;
+    readonly fuzzy_get_hash: () => [number, number];
+    readonly fuzzy_is_ready: () => number;
+    readonly fuzzy_rebuild_index: (a: number, b: number, c: number, d: number) => [number, number, number, number];
+    readonly fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly get_attestation: (a: number, b: number) => any;
     readonly init_store: (a: number, b: number) => any;
     readonly is_store_initialized: () => number;
@@ -74,17 +102,18 @@ export interface InitOutput {
     readonly parse_query: (a: number, b: number) => [number, number];
     readonly put_attestation: (a: number, b: number) => any;
     readonly version: () => [number, number];
-    readonly wasm_bindgen__closure__destroy__h332095daeac88dbb: (a: number, b: number) => void;
-    readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2: (a: number, b: number, c: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__closure__destroy__h8220019b907fc76c: (a: number, b: number) => void;
+    readonly wasm_bindgen__closure__destroy__h9e9eb2a865ed478c: (a: number, b: number) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__hbd107e223a93ecf5: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__hb0bc71d46e4311a7: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__h38672a799bd6a05d: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

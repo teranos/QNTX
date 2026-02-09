@@ -14,6 +14,7 @@
 //! - JSON matches proto schema (timestamps as numbers, attributes as string)
 //! - Converted to qntx_core::Attestation for internal storage operations
 
+use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
 use qntx_core::parser::Parser;
 use qntx_indexeddb::IndexedDbStore;
 use qntx_proto::Attestation as ProtoAttestation;
@@ -25,6 +26,7 @@ use wasm_bindgen::prelude::*;
 /// Using Rc<RefCell<>> because WASM is single-threaded and we need to share across async boundaries
 thread_local! {
     static STORE: RefCell<Option<Rc<IndexedDbStore>>> = RefCell::new(None);
+    static FUZZY_ENGINE: RefCell<FuzzyEngine> = RefCell::new(FuzzyEngine::new());
 }
 
 /// Default database name for browser IndexedDB storage
@@ -174,6 +176,74 @@ pub async fn list_attestation_ids() -> Result<String, JsValue> {
 
     serde_json::to_string(&ids)
         .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+// ============================================================================
+// Fuzzy matching
+// ============================================================================
+
+/// Rebuild the fuzzy index with new vocabulary.
+/// Takes two JSON arrays: predicates and contexts.
+/// Returns JSON: `{"predicate_count":N,"context_count":N,"hash":"..."}`
+#[wasm_bindgen]
+pub fn fuzzy_rebuild_index(predicates_json: &str, contexts_json: &str) -> Result<String, JsValue> {
+    let predicates: Vec<String> = serde_json::from_str(predicates_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid predicates JSON: {}", e)))?;
+
+    let contexts: Vec<String> = serde_json::from_str(contexts_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid contexts JSON: {}", e)))?;
+
+    FUZZY_ENGINE.with(|engine| {
+        let mut engine = engine.borrow_mut();
+        let (pred_count, ctx_count, hash) = engine.rebuild_index(predicates, contexts);
+
+        Ok(format!(
+            r#"{{"predicate_count":{},"context_count":{},"hash":"{}"}}"#,
+            pred_count, ctx_count, hash
+        ))
+    })
+}
+
+/// Search the fuzzy index for matches.
+/// vocab_type: "predicates" or "contexts"
+/// Returns JSON: `[{"value":"...","score":F,"strategy":"..."},...]`
+#[wasm_bindgen]
+pub fn fuzzy_search(
+    query: &str,
+    vocab_type: &str,
+    limit: u32,
+    min_score: f64,
+) -> Result<String, JsValue> {
+    let vocab = match vocab_type {
+        "predicates" => VocabularyType::Predicates,
+        "contexts" => VocabularyType::Contexts,
+        other => {
+            return Err(JsValue::from_str(&format!(
+                "Invalid vocab_type '{}': expected 'predicates' or 'contexts'",
+                other
+            )))
+        }
+    };
+
+    FUZZY_ENGINE.with(|engine| {
+        let engine = engine.borrow();
+        let matches = engine.find_matches(query, vocab, limit as usize, min_score);
+
+        serde_json::to_string(&matches)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    })
+}
+
+/// Check if the fuzzy engine has vocabulary indexed.
+#[wasm_bindgen]
+pub fn fuzzy_is_ready() -> bool {
+    FUZZY_ENGINE.with(|engine| engine.borrow().is_ready())
+}
+
+/// Get the current fuzzy index hash for change detection.
+#[wasm_bindgen]
+pub fn fuzzy_get_hash() -> String {
+    FUZZY_ENGINE.with(|engine| engine.borrow().get_index_hash().to_string())
 }
 
 // ============================================================================

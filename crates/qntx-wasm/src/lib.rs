@@ -43,8 +43,17 @@ pub use browser::*;
 use qntx_core::parser::Parser;
 
 #[cfg(not(feature = "browser"))]
+use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
+
+#[cfg(not(feature = "browser"))]
 mod wazero {
     use super::*;
+    use std::cell::RefCell;
+
+    // Global fuzzy engine. WASM is single-threaded so RefCell is safe.
+    thread_local! {
+        static FUZZY_ENGINE: RefCell<FuzzyEngine> = RefCell::new(FuzzyEngine::new());
+    }
 
     // ============================================================================
     // Memory management
@@ -160,6 +169,130 @@ mod wazero {
             }
             Err(e) => write_error(&format!("{}", e)),
         }
+    }
+    // ============================================================================
+    // Fuzzy matching
+    // ============================================================================
+
+    /// Rebuild the fuzzy index with new vocabulary.
+    /// Input: JSON `{"predicates":["a","b"],"contexts":["c","d"]}`
+    /// Output: JSON `{"predicate_count":N,"context_count":N,"hash":"..."}`
+    #[no_mangle]
+    pub extern "C" fn fuzzy_rebuild_index(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+
+        let v: serde_json::Value = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return write_error(&format!("invalid rebuild input: {}", e)),
+        };
+
+        let predicates: Vec<String> = v
+            .get("predicates")
+            .and_then(|a| a.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let contexts: Vec<String> = v
+            .get("contexts")
+            .and_then(|a| a.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        FUZZY_ENGINE.with(|engine| {
+            let mut engine = engine.borrow_mut();
+            let (pred_count, ctx_count, hash) = engine.rebuild_index(predicates, contexts);
+
+            let result = format!(
+                r#"{{"predicate_count":{},"context_count":{},"hash":"{}"}}"#,
+                pred_count, ctx_count, hash
+            );
+            write_result(&result)
+        })
+    }
+
+    /// Search the fuzzy index.
+    /// Input: JSON `{"query":"...","vocab_type":"predicates"|"contexts","limit":N,"min_score":F}`
+    /// Output: JSON `{"matches":[{"value":"...","score":F,"strategy":"..."}]}`
+    #[no_mangle]
+    pub extern "C" fn fuzzy_search(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+
+        let v: serde_json::Value = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return write_error(&format!("invalid search input: {}", e)),
+        };
+
+        let query = match v.get("query").and_then(|q| q.as_str()) {
+            Some(q) => q,
+            None => return write_error("missing or invalid 'query' field"),
+        };
+
+        let vocab_type = match v.get("vocab_type").and_then(|vt| vt.as_str()) {
+            Some(vt) => vt,
+            None => return write_error("missing or invalid 'vocab_type' field"),
+        };
+
+        let limit = v
+            .get("limit")
+            .and_then(|l| l.as_u64())
+            .unwrap_or(20) as usize;
+        let min_score = v
+            .get("min_score")
+            .and_then(|s| s.as_f64())
+            .unwrap_or(0.6);
+
+        let vocab = match vocab_type {
+            "predicates" => VocabularyType::Predicates,
+            "contexts" => VocabularyType::Contexts,
+            other => {
+                return write_error(&format!(
+                    "invalid vocab_type '{}': expected 'predicates' or 'contexts'",
+                    other
+                ))
+            }
+        };
+
+        FUZZY_ENGINE.with(|engine| {
+            let engine = engine.borrow();
+            let matches = engine.find_matches(query, vocab, limit, min_score);
+
+            match serde_json::to_string(&matches) {
+                Ok(json) => {
+                    let result = format!(r#"{{"matches":{}}}"#, json);
+                    write_result(&result)
+                }
+                Err(e) => write_error(&format!("serialization failed: {}", e)),
+            }
+        })
+    }
+
+    /// Check if the fuzzy engine has vocabulary indexed.
+    /// Returns 1 if ready, 0 if not.
+    #[no_mangle]
+    pub extern "C" fn fuzzy_is_ready() -> u32 {
+        FUZZY_ENGINE.with(|engine| if engine.borrow().is_ready() { 1 } else { 0 })
+    }
+
+    /// Get the fuzzy index hash. Returns packed u64 string.
+    #[no_mangle]
+    pub extern "C" fn fuzzy_get_hash() -> u64 {
+        FUZZY_ENGINE.with(|engine| {
+            let engine = engine.borrow();
+            let hash = engine.get_index_hash();
+            if hash.is_empty() {
+                write_result("")
+            } else {
+                write_result(hash)
+            }
+        })
     }
 } // end mod wazero
 
