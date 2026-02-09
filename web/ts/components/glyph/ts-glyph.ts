@@ -117,13 +117,14 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.minHeight = '120px';
     element.style.zIndex = '1';
 
-    // TypeScript brand colors on title bar
+    // Orange = local-only glyph (ts-glyph always runs in-browser)
+    element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
     const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
     if (titleBar) {
-        titleBar.style.backgroundColor = '#3178C6';
+        titleBar.style.backgroundColor = '#5c3d1a';
         const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
         if (labelSpan) {
-            labelSpan.style.color = '#ffffff';
+            labelSpan.style.color = '#f0c878';
             labelSpan.style.fontWeight = 'bold';
             labelSpan.style.flex = '1';
         }
