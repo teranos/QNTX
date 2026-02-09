@@ -239,6 +239,7 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     }
     const canvasRect = canvas.getBoundingClientRect();
 
+    // TODO(#447): round to int — backend rejects float coordinates
     const x = pyRect.left - canvasRect.left;
     const y = pyRect.bottom - canvasRect.top;
 
