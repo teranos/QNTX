@@ -85,6 +85,13 @@ class SelfWindow {
 
         const sections: string[] = [];
 
+        sections.push(`
+            <div style="background: #44370a; border: 1px solid #665510; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.9em;">
+                <strong style="color: #fbbf24;">Deprecated</strong>
+                <span style="color: #ccc;"> — Use the Self glyph from the glyph tray instead.</span>
+            </div>
+        `);
+
         // QNTX Server version section
         if (version) {
             const buildTimeFormatted = formatBuildTime(version.build_time) || version.build_time || 'unknown';
