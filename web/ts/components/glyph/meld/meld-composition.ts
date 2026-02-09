@@ -40,10 +40,12 @@ function applyGridLayout(
     for (const el of elements) {
         const id = el.getAttribute('data-glyph-id') || '';
         const pos = positions.get(id);
-        if (pos) {
-            el.style.gridRow = String(pos.row);
-            el.style.gridColumn = String(pos.col);
+        if (!pos) {
+            log.warn(SEG.GLYPH, `[MeldSystem] No grid position computed for glyph ${id}`);
+            continue;
         }
+        el.style.gridRow = String(pos.row);
+        el.style.gridColumn = String(pos.col);
     }
 }
 
@@ -63,7 +65,7 @@ export function performMeld(
 ): HTMLElement {
     const canvas = initiatorElement.parentElement;
     if (!canvas) {
-        throw new Error('Cannot meld: no canvas parent');
+        throw new Error(`Cannot meld: no canvas parent for initiator ${initiatorGlyph.id}`);
     }
 
     log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements', { direction });
@@ -230,12 +232,12 @@ export function reconstructMeld(
     y: number
 ): HTMLElement {
     if (glyphElements.length === 0) {
-        throw new Error('Cannot reconstruct meld: no glyph elements provided');
+        throw new Error(`Cannot reconstruct meld: no glyph elements provided for composition ${compositionId}`);
     }
 
     const canvas = glyphElements[0].parentElement;
     if (!canvas) {
-        throw new Error('Cannot reconstruct meld: no canvas parent');
+        throw new Error(`Cannot reconstruct meld: no canvas parent for composition ${compositionId}`);
     }
 
     log.info(SEG.GLYPH, '[MeldSystem] Reconstructing meld from storage', {
