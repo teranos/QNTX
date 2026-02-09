@@ -10,7 +10,6 @@
  */
 
 import type { Glyph } from './glyph';
-import { Prose } from '@generated/sym.js';
 import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
