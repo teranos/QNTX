@@ -9,6 +9,8 @@ import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { canvasPlaced } from './manifestations/canvas-placed';
+import { unmeldComposition } from './meld/meld-composition';
+import { makeDraggable } from './glyph-interaction';
 
 /**
  * Python execution result data
@@ -91,6 +93,31 @@ export function createResultGlyph(
     closeBtn.style.color = 'var(--text-primary)';
 
     closeBtn.addEventListener('click', () => {
+        // Check if result is in a composition
+        const composition = element.closest('.melded-composition') as HTMLElement | null;
+        if (composition) {
+            // Unmeld composition first, then remove the result
+            const unmelded = unmeldComposition(composition);
+            if (unmelded) {
+                // Restore drag handlers for the unmelded glyphs (excluding the result we're closing)
+                for (const glyphElement of unmelded.glyphElements) {
+                    const glyphId = glyphElement.getAttribute('data-glyph-id');
+                    if (glyphId && glyphId !== glyph.id) {
+                        const glyphObj: Glyph = {
+                            id: glyphId,
+                            title: glyphElement.getAttribute('data-glyph-symbol') || 'Glyph',
+                            symbol: glyphElement.getAttribute('data-glyph-symbol') || undefined,
+                            renderContent: () => glyphElement
+                        };
+                        makeDraggable(glyphElement, glyphElement, glyphObj, {
+                            logLabel: 'RestoredGlyph'
+                        });
+                    }
+                }
+                log.debug(SEG.GLYPH, `[ResultGlyph] Unmelded composition before closing ${glyph.id}`);
+            }
+        }
+
         element.remove();
         uiState.removeCanvasGlyph(glyph.id);
         log.debug(SEG.GLYPH, `[ResultGlyph] Closed ${glyph.id}`);
