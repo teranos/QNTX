@@ -11,8 +11,8 @@
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 import type { CompositionEdge } from '../../state/ui';
-import { MELDABILITY, getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, type EdgeDirection } from './meldability';
-import { addComposition, removeComposition, extractGlyphIds } from '../../state/compositions';
+import { getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, type EdgeDirection } from './meldability';
+import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../state/compositions';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
@@ -101,60 +101,92 @@ function checkDirectionalProximity(
 }
 
 /**
- * Find nearest meldable target for an initiator glyph
- * Checks all port directions defined in the MELDABILITY registry
+ * Find nearest meldable target for a dragged glyph
+ *
+ * Checks both directions:
+ * 1. Forward: dragged element initiates meld toward nearby targets
+ * 2. Reverse: nearby elements initiate meld toward dragged element
+ *
+ * When reversed, the caller must swap initiator/target in performMeld
+ * so edges record the correct from→to direction.
  */
-export function findMeldTarget(initiatorElement: HTMLElement): {
+export function findMeldTarget(draggedElement: HTMLElement): {
     target: HTMLElement | null;
     distance: number;
     direction: EdgeDirection;
+    reversed: boolean;
 } {
-    const noMatch = { target: null as HTMLElement | null, distance: Infinity, direction: 'right' as EdgeDirection };
+    const noMatch = { target: null as HTMLElement | null, distance: Infinity, direction: 'right' as EdgeDirection, reversed: false };
 
-    if (!canInitiateMeld(initiatorElement)) {
+    // Element must participate in melding (as initiator or target)
+    if (!canInitiateMeld(draggedElement) && !canReceiveMeld(draggedElement)) {
         return noMatch;
     }
 
-    const canvas = initiatorElement.parentElement;
+    const canvas = draggedElement.parentElement;
     if (!canvas) {
         return noMatch;
-    }
-
-    // Find all potential targets based on meldability rules
-    const potentialTargets: HTMLElement[] = [];
-    for (const targetClass of getTargetClasses()) {
-        canvas.querySelectorAll(`.${targetClass}`).forEach(el => {
-            potentialTargets.push(el as HTMLElement);
-        });
     }
 
     let closestTarget: HTMLElement | null = null;
     let closestDistance = Infinity;
     let closestDirection: EdgeDirection = 'right';
+    let closestReversed = false;
 
-    const initiatorRect = initiatorElement.getBoundingClientRect();
+    const draggedRect = draggedElement.getBoundingClientRect();
 
-    potentialTargets.forEach(targetElement => {
-        // Skip if already in a meld
-        if (targetElement.parentElement?.classList.contains('melded-composition')) {
-            return;
+    // Forward: dragged element initiates toward nearby targets
+    if (canInitiateMeld(draggedElement)) {
+        for (const targetClass of getTargetClasses()) {
+            canvas.querySelectorAll(`.${targetClass}`).forEach(el => {
+                const targetElement = el as HTMLElement;
+                if (targetElement === draggedElement) return;
+                // Skip if already in a meld (Phase 3: allow melding into existing compositions)
+                if (targetElement.parentElement?.classList.contains('melded-composition')) return;
+
+                const direction = areCompatible(draggedElement, targetElement);
+                if (!direction) return;
+
+                const targetRect = targetElement.getBoundingClientRect();
+                const distance = checkDirectionalProximity(draggedRect, targetRect, direction);
+
+                if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                    closestDistance = distance;
+                    closestTarget = targetElement;
+                    closestDirection = direction;
+                    closestReversed = false;
+                }
+            });
         }
+    }
 
-        // Check compatibility — returns the direction for this pairing
-        const direction = areCompatible(initiatorElement, targetElement);
-        if (!direction) return;
+    // Reverse: nearby elements initiate toward dragged element
+    if (canReceiveMeld(draggedElement)) {
+        for (const initiatorClass of getInitiatorClasses()) {
+            canvas.querySelectorAll(`.${initiatorClass}`).forEach(el => {
+                const nearbyElement = el as HTMLElement;
+                if (nearbyElement === draggedElement) return;
+                if (nearbyElement.parentElement?.classList.contains('melded-composition')) return;
 
-        const targetRect = targetElement.getBoundingClientRect();
-        const distance = checkDirectionalProximity(initiatorRect, targetRect, direction);
+                // Check if the nearby element can initiate toward the dragged element
+                const direction = areCompatible(nearbyElement, draggedElement);
+                if (!direction) return;
 
-        if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
-            closestDistance = distance;
-            closestTarget = targetElement;
-            closestDirection = direction;
+                // Proximity: nearby is the meld initiator, dragged is the target
+                const nearbyRect = nearbyElement.getBoundingClientRect();
+                const distance = checkDirectionalProximity(nearbyRect, draggedRect, direction);
+
+                if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                    closestDistance = distance;
+                    closestTarget = nearbyElement;
+                    closestDirection = direction;
+                    closestReversed = true;
+                }
+            });
         }
-    });
+    }
 
-    return { target: closestTarget, distance: closestDistance, direction: closestDirection };
+    return { target: closestTarget, distance: closestDistance, direction: closestDirection, reversed: closestReversed };
 }
 
 /**
@@ -162,31 +194,39 @@ export function findMeldTarget(initiatorElement: HTMLElement): {
  * This modifies styles in place - no new elements created
  */
 export function applyMeldFeedback(
-    axElement: HTMLElement,
-    promptElement: HTMLElement | null,
-    distance: number
+    initiatorElement: HTMLElement,
+    targetElement: HTMLElement | null,
+    distance: number,
+    direction: EdgeDirection = 'right'
 ): void {
     // Clear any existing feedback
-    clearMeldFeedback(axElement);
+    clearMeldFeedback(initiatorElement);
 
-    if (!promptElement || distance >= PROXIMITY_THRESHOLD) {
+    if (!targetElement || distance >= PROXIMITY_THRESHOLD) {
         return;
     }
 
     const intensity = 1 - (distance / PROXIMITY_THRESHOLD);
+    const isVertical = direction === 'bottom' || direction === 'top';
+
+    // Shadow offsets: glow toward the meld edge
+    const strongOffset = isVertical ? '0 10px' : '10px 0';
+    const strongOffsetReverse = isVertical ? '0 -10px' : '-10px 0';
+    const mildOffset = isVertical ? '0 5px' : '5px 0';
+    const mildOffsetReverse = isVertical ? '0 -5px' : '-5px 0';
 
     // Apply glow based on distance
     if (distance < MELD_THRESHOLD) {
         // Ready to meld - strong glow
-        axElement.style.boxShadow = `10px 0 20px rgba(255, 69, 0, ${intensity * 0.6})`;
-        promptElement.style.boxShadow = `-10px 0 20px rgba(255, 69, 0, ${intensity * 0.6})`;
-        axElement.classList.add('meld-ready');
-        promptElement.classList.add('meld-target');
+        initiatorElement.style.boxShadow = `${strongOffset} 20px rgba(255, 69, 0, ${intensity * 0.6})`;
+        targetElement.style.boxShadow = `${strongOffsetReverse} 20px rgba(255, 69, 0, ${intensity * 0.6})`;
+        initiatorElement.classList.add('meld-ready');
+        targetElement.classList.add('meld-target');
     } else {
         // Approaching - mild glow
         const glowIntensity = intensity * 0.3;
-        axElement.style.boxShadow = `5px 0 10px rgba(255, 140, 0, ${glowIntensity})`;
-        promptElement.style.boxShadow = `-5px 0 10px rgba(255, 140, 0, ${glowIntensity})`;
+        initiatorElement.style.boxShadow = `${mildOffset} 10px rgba(255, 140, 0, ${glowIntensity})`;
+        targetElement.style.boxShadow = `${mildOffsetReverse} 10px rgba(255, 140, 0, ${glowIntensity})`;
     }
 }
 
@@ -244,8 +284,6 @@ export function performMeld(
     composition.className = 'melded-composition';
     composition.setAttribute('data-melded', 'true');
     composition.setAttribute('data-glyph-id', compositionId);
-    composition.setAttribute('data-initiator-id', initiatorGlyph.id);
-    composition.setAttribute('data-target-id', targetGlyph.id);
 
     // Position at initiator location
     composition.style.position = 'absolute';
@@ -438,19 +476,30 @@ export function unmeldComposition(composition: HTMLElement): {
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
 
-    // Restore absolute positioning for each glyph
+    // Determine unmeld direction from stored edges
+    const firstChildId = glyphElements[0].getAttribute('data-glyph-id') || '';
+    const storedComp = findCompositionByGlyph(firstChildId);
+    const isVertical = storedComp?.edges.some(e => e.direction === 'bottom' || e.direction === 'top')
+        && !storedComp?.edges.some(e => e.direction === 'right');
+
+    // Restore absolute positioning for each glyph, spacing along the original axis
     let currentX = left;
+    let currentY = top;
     glyphElements.forEach((element) => {
         element.style.position = 'absolute';
         element.style.left = `${currentX}px`;
-        element.style.top = `${top}px`;
+        element.style.top = `${currentY}px`;
 
         // Reparent back to canvas
         canvas.insertBefore(element, composition);
 
-        // Accumulate position for next glyph (current width + gap)
-        const width = element.getBoundingClientRect().width;
-        currentX += width + UNMELD_OFFSET;
+        // Accumulate position for next glyph along the original axis
+        const rect = element.getBoundingClientRect();
+        if (isVertical) {
+            currentY += rect.height + UNMELD_OFFSET;
+        } else {
+            currentX += rect.width + UNMELD_OFFSET;
+        }
     });
 
     // Remove composition from storage

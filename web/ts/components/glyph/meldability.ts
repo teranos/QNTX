@@ -10,7 +10,7 @@
  * - top: (reserved for future upward connections)
  */
 
-export type EdgeDirection = 'right' | 'bottom' | 'top';
+export type EdgeDirection = 'right' | 'bottom' | 'top'; // 'top' reserved for future upward connections
 
 export interface PortRule {
     direction: EdgeDirection;
