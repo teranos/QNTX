@@ -179,6 +179,16 @@ export async function existsAttestation(id: string): Promise<boolean> {
 }
 
 /**
+ * Query attestations from IndexedDB using an AxFilter.
+ * Returns matching attestations in proto format.
+ */
+export async function queryAttestations(filter: AxQuery): Promise<Attestation[]> {
+    await ensureInit();
+    const json = await wasm.query_attestations(JSON.stringify(filter));
+    return JSON.parse(json);
+}
+
+/**
  * List all attestation IDs in IndexedDB.
  */
 export async function listAttestationIds(): Promise<string[]> {

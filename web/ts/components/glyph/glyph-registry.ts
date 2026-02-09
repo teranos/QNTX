@@ -13,6 +13,7 @@ import { createPyGlyph } from './py-glyph';
 import { createIxGlyph } from './ix-glyph';
 import { createPromptGlyph } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
+import { createTsGlyph } from './ts-glyph';
 
 export interface GlyphTypeEntry {
     /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
@@ -32,6 +33,7 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',   label: 'Py',     render: createPyGlyph },
     { symbol: IX,       className: 'canvas-ix-glyph',      title: 'Ingest',   label: 'IX',     render: createIxGlyph },
     { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',   label: 'Prompt', render: createPromptGlyph },
+    { symbol: 'ts',     className: 'canvas-ts-glyph',      title: 'TypeScript', label: 'TS',   render: createTsGlyph },
     { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',     label: 'Note',   render: createNoteGlyph },
 ];
 

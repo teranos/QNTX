@@ -23,6 +23,7 @@ import { log, SEG } from '../../logger';
 import { applyCanvasGlyphLayout, makeDraggable, makeResizable, cleanupResizeObserver } from './glyph-interaction';
 import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
+import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
@@ -168,11 +169,42 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                 resultsContainer.appendChild(emptyState);
 
                 // Debounce save and watcher update for 500ms
-                saveTimeout = window.setTimeout(() => {
+                saveTimeout = window.setTimeout(async () => {
                     saveQuery(glyphId, currentQuery);
 
-                    // Send watcher upsert via WebSocket
-                    if (currentQuery.trim()) {
+                    if (!currentQuery.trim()) {
+                        container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
+                        return;
+                    }
+
+                    // Local IndexedDB query — immediate results, no server round-trip
+                    try {
+                        const parsed = parseQuery(currentQuery.trim());
+                        if (parsed.ok) {
+                            const localResults = await queryAttestations(parsed.query);
+                            if (localResults.length > 0) {
+                                const empty = resultsContainer.querySelector('.ax-glyph-empty-state');
+                                if (empty) empty.remove();
+
+                                const displayedIds = new Set<string>();
+                                for (const att of localResults) {
+                                    if (att.id) displayedIds.add(att.id);
+                                    resultsContainer.appendChild(renderAttestation(att));
+                                }
+                                (container as any)._localIds = displayedIds;
+
+                                log.debug(SEG.GLYPH, `[AxGlyph] Local query: ${localResults.length} results for ${glyphId}`);
+                            }
+                        }
+                    } catch (err) {
+                        log.debug(SEG.GLYPH, `[AxGlyph] Local query failed for ${glyphId}:`, err);
+                    }
+
+                    // Orange = local/WASM results, teal = server watcher active
+                    container.style.backgroundColor = 'rgba(61, 45, 20, 0.92)'; // Orange: local-only
+
+                    // Send watcher upsert via WebSocket when online (server supplements local)
+                    if (connectivityManager.state === 'online') {
                         sendMessage({
                             type: 'watcher_upsert',
                             watcher_id: `ax-glyph-${glyphId}`,
@@ -180,15 +212,11 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
                             watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}${currentQuery.length > 30 ? '...' : ''}`,
                             enabled: true
                         });
-
-                        // Update background to indicate active watcher
-                        container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
-
-                        log.debug(SEG.GLYPH, `[AxGlyph] Sent watcher upsert for ${glyphId}: "${currentQuery}"`);
-                    } else {
-                        // Empty query - revert to default
-                        container.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
+                        // Shift to teal once server watcher is active
+                        container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)';
                     }
+
+                    log.debug(SEG.GLYPH, `[AxGlyph] Query updated for ${glyphId}: "${currentQuery}"`);
                 }, 500);
             });
 
@@ -221,20 +249,43 @@ export function createAxGlyph(id?: string, initialQuery: string = '', x?: number
             // Attach tooltip support for attestation results
             tooltip.attach(resultsContainer, '.ax-glyph-result-item');
 
-            // If we loaded a persisted query, send watcher_upsert to activate it
+            // If we loaded a persisted query, run local + server query
             if (currentQuery.trim()) {
-                sendMessage({
-                    type: 'watcher_upsert',
-                    watcher_id: `ax-glyph-${glyphId}`,
-                    watcher_query: currentQuery.trim(),
-                    watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}${currentQuery.length > 30 ? '...' : ''}`,
-                    enabled: true
-                });
+                // Local query first
+                (async () => {
+                    try {
+                        const parsed = parseQuery(currentQuery.trim());
+                        if (parsed.ok) {
+                            const localResults = await queryAttestations(parsed.query);
+                            if (localResults.length > 0) {
+                                const empty = resultsContainer.querySelector('.ax-glyph-empty-state');
+                                if (empty) empty.remove();
+                                const displayedIds = new Set<string>();
+                                for (const att of localResults) {
+                                    if (att.id) displayedIds.add(att.id);
+                                    resultsContainer.appendChild(renderAttestation(att));
+                                }
+                                (container as any)._localIds = displayedIds;
+                            }
+                        }
+                    } catch { /* WASM not ready yet — server will provide results */ }
+                })();
 
-                // Update background to show active watcher state
-                container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal/cyan tint for "watching"
+                // Orange = local-only, teal = server active
+                container.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
 
-                log.debug(SEG.GLYPH, `[AxGlyph] Restored and activated watcher for ${glyphId}: "${currentQuery}"`);
+                if (connectivityManager.state === 'online') {
+                    sendMessage({
+                        type: 'watcher_upsert',
+                        watcher_id: `ax-glyph-${glyphId}`,
+                        watcher_query: currentQuery.trim(),
+                        watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}${currentQuery.length > 30 ? '...' : ''}`,
+                        enabled: true
+                    });
+                    container.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal: server watcher active
+                }
+
+                log.debug(SEG.GLYPH, `[AxGlyph] Restored query for ${glyphId}: "${currentQuery}"`);
             }
 
             // Resize handle
@@ -362,6 +413,15 @@ export function updateAxGlyphResults(glyphId: string, attestation: Attestation):
     const errorDisplay = resultsContainer.querySelector('.ax-glyph-error');
     if (errorDisplay) {
         errorDisplay.remove();
+    }
+
+    // Dedup: skip if already shown from local IndexedDB query
+    if (attestation.id) {
+        const localIds = (glyph as any)._localIds as Set<string> | undefined;
+        if (localIds?.has(attestation.id)) {
+            log.debug(SEG.GLYPH, `[AxGlyph] Skipped duplicate ${attestation.id} (already from local)`);
+            return;
+        }
     }
 
     // Add new result at top (most recent first)
