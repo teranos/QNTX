@@ -26,7 +26,7 @@ import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } fro
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import { performMeld } from './meld-system';
+import { performMeld, extendComposition } from './meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 
@@ -307,16 +307,27 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     // Auto-meld result below py glyph (bottom port)
     const pyGlyphId = pyElement.dataset.glyphId;
     if (pyGlyphId) {
-        // If py is already inside a composition, reparent it to canvas first
-        // (performMeld needs both elements as direct children of canvas)
-        const pyParent = pyElement.parentElement;
-        const pyWasInComposition = pyParent?.classList.contains('melded-composition');
-        if (pyWasInComposition && pyParent) {
-            // TODO(Phase 3): extend existing composition instead of pulling py out
-            log.warn(SEG.GLYPH, '[PyGlyph] py is inside composition — result glyph spawned standalone', {
-                pyGlyphId,
-                resultGlyphId
-            });
+        // If py is already inside a composition, extend it with the result glyph
+        // Uses .closest() to find composition even when py is inside a sub-container
+        const pyComposition = pyElement.closest('.melded-composition') as HTMLElement | null;
+        if (pyComposition) {
+            try {
+                extendComposition(pyComposition, resultElement, resultGlyphId, pyGlyphId, 'bottom', 'to');
+
+                const updatedId = pyComposition.getAttribute('data-glyph-id') || '';
+                const compositionGlyph: Glyph = {
+                    id: updatedId,
+                    title: 'Melded Composition',
+                    renderContent: () => pyComposition
+                };
+                makeDraggable(pyComposition, pyComposition, compositionGlyph, {
+                    logLabel: 'MeldedComposition'
+                });
+
+                log.debug(SEG.GLYPH, `[PyGlyph] Extended composition with result below py ${pyGlyphId}`);
+            } catch (err) {
+                log.error(SEG.GLYPH, `[PyGlyph] Failed to extend composition with result:`, err);
+            }
             return;
         }
 
