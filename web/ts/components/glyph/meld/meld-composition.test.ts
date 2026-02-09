@@ -12,8 +12,8 @@ import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
 import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition } from './meld-composition';
 import { MELD_THRESHOLD } from './meld-detect';
-import type { Glyph } from './glyph';
-import { uiState } from '../../state/ui';
+import type { Glyph } from '../glyph';
+import { uiState } from '../../../state/ui';
 
 // Setup happy-dom
 const window = new Window();
