@@ -1,23 +1,40 @@
 /**
- * Meldability - Defines which glyphs can meld and their relationships
+ * Meldability - Port-aware glyph melding rules
  *
  * Melding is QNTX's spatial composition model where glyphs physically fuse
  * through proximity rather than connecting via wires.
  *
- * Each relationship has semantic meaning:
- * - ax → prompt: Query fills template variables
- * - ax → py: Query drives Python script execution
- * - py → prompt: Script output populates template
+ * Each glyph has directional ports that define valid connections:
+ * - right: horizontal data flow (ax → py → prompt, py → py)
+ * - bottom: result/output attachment (py ↓ result, prompt ↓ result)
+ * - top: (reserved for future upward connections)
  */
 
+export type EdgeDirection = 'right' | 'bottom' | 'top';
+
+export interface PortRule {
+    direction: EdgeDirection;
+    targets: readonly string[];
+}
+
 /**
- * Meldability rules: maps initiator classes to compatible target classes
- *
- * Phase 2 extension: py → py chaining enabled for sequential pipelines
+ * Port-aware meldability rules: maps glyph classes to their output ports
+ * Each port specifies a direction and which target classes can connect there
  */
-export const MELDABILITY: Record<string, readonly string[]> = {
-    'canvas-ax-glyph': ['canvas-prompt-glyph', 'canvas-py-glyph'],
-    'canvas-py-glyph': ['canvas-prompt-glyph', 'canvas-py-glyph']
+export const MELDABILITY: Record<string, readonly PortRule[]> = {
+    'canvas-ax-glyph': [
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] }
+    ],
+    'canvas-py-glyph': [
+        { direction: 'right', targets: ['canvas-prompt-glyph', 'canvas-py-glyph'] },
+        { direction: 'bottom', targets: ['canvas-result-glyph'] }
+    ],
+    'canvas-prompt-glyph': [
+        { direction: 'bottom', targets: ['canvas-result-glyph'] }
+    ],
+    'canvas-note-glyph': [
+        { direction: 'bottom', targets: ['canvas-prompt-glyph'] }
+    ]
 } as const;
 
 /**
@@ -28,30 +45,52 @@ export function getInitiatorClasses(): string[] {
 }
 
 /**
- * Get all classes that can receive meld
+ * Get all classes that can receive meld (across all directions)
  */
 export function getTargetClasses(): string[] {
-    return [...new Set(Object.values(MELDABILITY).flat())];
+    const targets = new Set<string>();
+    for (const ports of Object.values(MELDABILITY)) {
+        for (const port of ports) {
+            for (const target of port.targets) {
+                targets.add(target);
+            }
+        }
+    }
+    return [...targets];
 }
 
 /**
- * Get compatible target classes for a given initiator class
+ * Get compatible target classes for a given initiator (across all directions)
  */
-export function getCompatibleTargets(initiatorClass: string): readonly string[] {
-    return MELDABILITY[initiatorClass] || [];
+export function getCompatibleTargets(initiatorClass: string): string[] {
+    const ports = MELDABILITY[initiatorClass];
+    if (!ports) return [];
+    const targets = new Set<string>();
+    for (const port of ports) {
+        for (const target of port.targets) {
+            targets.add(target);
+        }
+    }
+    return [...targets];
 }
 
 /**
  * Check if two glyph classes are compatible for melding
+ * Returns the edge direction if compatible, null if not
  */
-export function areClassesCompatible(initiatorClass: string, targetClass: string): boolean {
-    const compatibleTargets = MELDABILITY[initiatorClass];
-    return compatibleTargets ? compatibleTargets.includes(targetClass) : false;
+export function areClassesCompatible(initiatorClass: string, targetClass: string): EdgeDirection | null {
+    const ports = MELDABILITY[initiatorClass];
+    if (!ports) return null;
+    for (const port of ports) {
+        if (port.targets.includes(targetClass)) {
+            return port.direction;
+        }
+    }
+    return null;
 }
 
 /**
- * Extract glyph IDs from a composition element
- * Returns array of glyph IDs in left-to-right order
+ * Extract glyph IDs from a composition element's children
  */
 export function getCompositionGlyphIds(composition: HTMLElement): string[] {
     const glyphElements = composition.querySelectorAll('[data-glyph-id]');
@@ -65,26 +104,106 @@ export function getCompositionGlyphIds(composition: HTMLElement): string[] {
     return glyphIds;
 }
 
-/**
- * Get the CSS class of the rightmost glyph in a composition
- * Used to determine if an initiator glyph can extend the composition
- */
-export function getCompositionRightmostGlyphClass(composition: HTMLElement): string | null {
-    const glyphElements = composition.querySelectorAll('[data-glyph-id]');
-    if (glyphElements.length === 0) return null;
+const GLYPH_CLASS_RE = /^canvas-\w+-glyph$/;
 
-    const rightmostGlyph = glyphElements[glyphElements.length - 1] as HTMLElement;
-    return rightmostGlyph.className;
+/**
+ * Extract the canonical glyph class (e.g. 'canvas-py-glyph') from an element's classList
+ */
+export function getGlyphClass(element: HTMLElement): string | null {
+    for (const cls of element.classList) {
+        if (GLYPH_CLASS_RE.test(cls)) return cls;
+    }
+    return null;
 }
 
 /**
- * Check if an initiator glyph can meld with a composition
- * A glyph can meld with a composition if it's compatible with the composition's rightmost glyph
+ * Find leaf nodes — glyphs with no outgoing edges (graph sinks)
  */
-export function canMeldWithComposition(initiatorClass: string, composition: HTMLElement): boolean {
-    const rightmostClass = getCompositionRightmostGlyphClass(composition);
-    if (!rightmostClass) return false;
+export function getLeafGlyphIds(
+    edges: Array<{ from: string; to: string; direction: string }>
+): string[] {
+    const allIds = new Set<string>();
+    const fromIds = new Set<string>();
 
-    // Check if initiator is compatible with the rightmost glyph's class
-    return areClassesCompatible(initiatorClass, rightmostClass);
+    for (const edge of edges) {
+        allIds.add(edge.from);
+        allIds.add(edge.to);
+        fromIds.add(edge.from);
+    }
+
+    return [...allIds].filter(id => !fromIds.has(id));
+}
+
+/**
+ * Find root nodes — glyphs with no incoming edges (graph sources)
+ */
+export function getRootGlyphIds(
+    edges: Array<{ from: string; to: string; direction: string }>
+): string[] {
+    const allIds = new Set<string>();
+    const toIds = new Set<string>();
+
+    for (const edge of edges) {
+        allIds.add(edge.from);
+        allIds.add(edge.to);
+        toIds.add(edge.to);
+    }
+
+    return [...allIds].filter(id => !toIds.has(id));
+}
+
+export interface MeldOption {
+    /** The glyph in the composition that the incoming glyph connects with */
+    glyphId: string;
+    /** Edge direction for this connection */
+    direction: EdgeDirection;
+    /** Whether the incoming glyph is the 'from' (prepend) or 'to' (append) in the edge */
+    incomingRole: 'from' | 'to';
+}
+
+/**
+ * Get all possible ways an incoming glyph could meld with a composition.
+ *
+ * Checks two things:
+ * 1. Leaf nodes: can any leaf's output port accept the incoming glyph? (append, incoming is 'to')
+ * 2. Root nodes: can the incoming glyph's output port connect to any root? (prepend, incoming is 'from')
+ */
+export function getMeldOptions(
+    incomingClass: string,
+    compositionElement: HTMLElement,
+    edges: Array<{ from: string; to: string; direction: string }>
+): MeldOption[] {
+    const options: MeldOption[] = [];
+
+    // 1. Check leaf nodes — incoming glyph appends as target
+    const leafIds = getLeafGlyphIds(edges);
+    for (const leafId of leafIds) {
+        const leafElement = compositionElement.querySelector(`[data-glyph-id="${leafId}"]`) as HTMLElement | null;
+        if (!leafElement) continue;
+
+        const leafClass = getGlyphClass(leafElement);
+        if (!leafClass) continue;
+
+        const direction = areClassesCompatible(leafClass, incomingClass);
+        if (direction) {
+            options.push({ glyphId: leafId, direction, incomingRole: 'to' });
+        }
+    }
+
+    // 2. Check root nodes — incoming glyph prepends as source
+    const rootIds = getRootGlyphIds(edges);
+    for (const rootId of rootIds) {
+        const rootElement = compositionElement.querySelector(`[data-glyph-id="${rootId}"]`) as HTMLElement | null;
+        if (!rootElement) continue;
+
+        const rootClass = getGlyphClass(rootElement);
+        if (!rootClass) continue;
+
+        const direction = areClassesCompatible(incomingClass, rootClass);
+        if (direction) {
+            options.push({ glyphId: rootId, direction, incomingRole: 'from' });
+        }
+    }
+
+    return options;
 }

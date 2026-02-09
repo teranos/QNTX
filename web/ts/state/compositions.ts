@@ -121,18 +121,3 @@ export function getAllCompositions(): CompositionState[] {
     return uiState.getCanvasCompositions();
 }
 
-/**
- * Check if a composition can accept a new glyph
- * A composition is meldable if the initiator glyph is compatible with the composition's rightmost glyph
- *
- * TODO(Phase 2): Implement actual meldability logic based on glyph types
- */
-export function isCompositionMeldable(comp: CompositionState, _initiatorGlyphType: string): boolean {
-    if (comp.edges.length === 0) return false;
-
-    // Get the rightmost glyph type from the composition
-    // This would require looking up the glyph elements, which we'll handle in meld-system.ts
-    // For now, this is a placeholder that will be used by the DOM manipulation layer
-
-    return true; // Actual logic will be in canMeldWithComposition in meldability.ts
-}

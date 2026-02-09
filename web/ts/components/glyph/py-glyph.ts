@@ -26,6 +26,7 @@ import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } fro
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { performMeld } from './meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 
@@ -265,30 +266,36 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionResult): void {
     // Calculate position for result glyph (directly below the py glyph)
     const pyRect = pyElement.getBoundingClientRect();
-    const canvas = pyElement.parentElement;
-    const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const canvas = pyElement.closest('.canvas-workspace') as HTMLElement;
+    if (!canvas) {
+        log.error(SEG.GLYPH, '[PyGlyph] Cannot spawn result glyph: no canvas-workspace ancestor');
+        return;
+    }
+    const canvasRect = canvas.getBoundingClientRect();
 
     const x = pyRect.left - canvasRect.left;
     const y = pyRect.bottom - canvasRect.top;
 
     // Create result glyph metadata
-    const resultGlyph: Partial<Glyph> & { id: string; symbol: string; x: number; y: number } = {
-        id: `result-${crypto.randomUUID()}`,
+    const resultGlyphId = `result-${crypto.randomUUID()}`;
+    const resultGlyph: Glyph = {
+        id: resultGlyphId,
         title: 'Python Result',
         symbol: 'result',
         x,
         y,
-        width: Math.round(pyRect.width)
+        width: Math.round(pyRect.width),
+        renderContent: () => document.createElement('div')
     };
 
-    // Render result glyph
-    const resultElement = createResultGlyph(resultGlyph as Glyph, result);
-    canvas?.appendChild(resultElement);
+    // Render result glyph and add to canvas (performMeld needs both on canvas)
+    const resultElement = createResultGlyph(resultGlyph, result);
+    canvas.appendChild(resultElement);
 
     // Persist to uiState with execution result
     const resultRect = resultElement.getBoundingClientRect();
     uiState.addCanvasGlyph({
-        id: resultGlyph.id,
+        id: resultGlyphId,
         symbol: 'result',
         x,
         y,
@@ -297,6 +304,46 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
         result: result
     });
 
-    log.debug(SEG.GLYPH, `[PyGlyph] Spawned result glyph at (${x}, ${y}), duration ${result.duration_ms}ms`);
+    // Auto-meld result below py glyph (bottom port)
+    const pyGlyphId = pyElement.dataset.glyphId;
+    if (pyGlyphId) {
+        // If py is already inside a composition, reparent it to canvas first
+        // (performMeld needs both elements as direct children of canvas)
+        const pyParent = pyElement.parentElement;
+        const pyWasInComposition = pyParent?.classList.contains('melded-composition');
+        if (pyWasInComposition && pyParent) {
+            // TODO(Phase 3): extend existing composition instead of pulling py out
+            log.warn(SEG.GLYPH, '[PyGlyph] py is inside composition — result glyph spawned standalone', {
+                pyGlyphId,
+                resultGlyphId
+            });
+            return;
+        }
+
+        const pyGlyph: Glyph = {
+            id: pyGlyphId,
+            title: 'Python',
+            symbol: 'py',
+            renderContent: () => pyElement
+        };
+
+        try {
+            const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
+
+            // Make the composition draggable as a unit
+            const compositionGlyph: Glyph = {
+                id: composition.getAttribute('data-glyph-id') || `melded-${pyGlyphId}-${resultGlyphId}`,
+                title: 'Melded Composition',
+                renderContent: () => composition
+            };
+            makeDraggable(composition, composition, compositionGlyph, {
+                logLabel: 'MeldedComposition'
+            });
+
+            log.debug(SEG.GLYPH, `[PyGlyph] Auto-melded result below py ${pyGlyphId}`);
+        } catch (err) {
+            log.error(SEG.GLYPH, `[PyGlyph] Failed to auto-meld result with py:`, err);
+        }
+    }
 }
 

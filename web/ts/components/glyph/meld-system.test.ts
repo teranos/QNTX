@@ -11,7 +11,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
-import { performMeld, unmeldComposition, isMeldedComposition, MELD_THRESHOLD } from './meld-system';
+import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, MELD_THRESHOLD } from './meld-system';
 import type { Glyph } from './glyph';
 
 // Setup happy-dom
@@ -217,6 +217,227 @@ describe('Meld Composition Drag - Spike (Edge Cases)', () => {
         expect(result).toBe(null);
 
         // Cleanup
+        document.body.innerHTML = '';
+    });
+});
+
+describe('Directional Melding', () => {
+    test('bottom meld: py + result uses column layout', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const pyElement = document.createElement('div');
+        pyElement.className = 'canvas-py-glyph';
+        pyElement.style.position = 'absolute';
+        pyElement.style.left = '100px';
+        pyElement.style.top = '100px';
+        canvas.appendChild(pyElement);
+
+        const resultElement = document.createElement('div');
+        resultElement.className = 'canvas-result-glyph';
+        resultElement.style.position = 'absolute';
+        resultElement.style.left = '100px';
+        resultElement.style.top = '200px';
+        canvas.appendChild(resultElement);
+
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
+        const resultGlyph: Glyph = { id: 'result1', title: 'Result', renderContent: () => resultElement };
+
+        const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
+
+        expect(composition.style.flexDirection).toBe('column');
+        expect(composition.contains(pyElement)).toBe(true);
+        expect(composition.contains(resultElement)).toBe(true);
+
+        document.body.innerHTML = '';
+    });
+
+    test('bottom meld: note above prompt uses column layout', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const noteElement = document.createElement('div');
+        noteElement.className = 'canvas-note-glyph';
+        noteElement.style.position = 'absolute';
+        noteElement.style.left = '100px';
+        noteElement.style.top = '100px';
+        canvas.appendChild(noteElement);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.style.position = 'absolute';
+        promptElement.style.left = '100px';
+        promptElement.style.top = '200px';
+        canvas.appendChild(promptElement);
+
+        const noteGlyph: Glyph = { id: 'note1', title: 'Note', renderContent: () => noteElement };
+        const promptGlyph: Glyph = { id: 'prompt1', title: 'Prompt', renderContent: () => promptElement };
+
+        const composition = performMeld(noteElement, promptElement, noteGlyph, promptGlyph, 'bottom');
+
+        expect(composition.style.flexDirection).toBe('column');
+        expect(composition.contains(noteElement)).toBe(true);
+        expect(composition.contains(promptElement)).toBe(true);
+
+        document.body.innerHTML = '';
+    });
+
+    test('right meld: ax + py uses row layout', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.style.position = 'absolute';
+        axElement.style.left = '100px';
+        axElement.style.top = '100px';
+        canvas.appendChild(axElement);
+
+        const pyElement = document.createElement('div');
+        pyElement.className = 'canvas-py-glyph';
+        pyElement.style.position = 'absolute';
+        pyElement.style.left = '200px';
+        pyElement.style.top = '100px';
+        canvas.appendChild(pyElement);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => axElement };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
+
+        const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph, 'right');
+
+        expect(composition.style.flexDirection).toBe('row');
+
+        document.body.innerHTML = '';
+    });
+
+    test('edge stores correct direction', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const pyElement = document.createElement('div');
+        pyElement.className = 'canvas-py-glyph';
+        pyElement.style.position = 'absolute';
+        pyElement.style.left = '100px';
+        pyElement.style.top = '100px';
+        canvas.appendChild(pyElement);
+
+        const resultElement = document.createElement('div');
+        resultElement.className = 'canvas-result-glyph';
+        resultElement.style.position = 'absolute';
+        resultElement.style.left = '100px';
+        resultElement.style.top = '200px';
+        canvas.appendChild(resultElement);
+
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
+        const resultGlyph: Glyph = { id: 'result1', title: 'Result', renderContent: () => resultElement };
+
+        const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
+
+        expect(composition.getAttribute('data-initiator-id')).toBe('py1');
+        expect(composition.getAttribute('data-target-id')).toBe('result1');
+
+        document.body.innerHTML = '';
+    });
+});
+
+describe('Direction-aware reconstructMeld', () => {
+    test('reconstructs horizontal composition from right edges', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.setAttribute('data-glyph-id', 'ax1');
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.setAttribute('data-glyph-id', 'py1');
+        canvas.appendChild(py);
+
+        const edges = [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }];
+        const composition = reconstructMeld([ax, py], edges, 'comp1', 50, 75);
+
+        expect(composition.style.flexDirection).toBe('row');
+        expect(composition.style.left).toBe('50px');
+        expect(composition.style.top).toBe('75px');
+        expect(composition.children.length).toBe(2);
+        expect(composition.children[0]).toBe(ax);
+        expect(composition.children[1]).toBe(py);
+
+        document.body.innerHTML = '';
+    });
+
+    test('reconstructs vertical composition from bottom edges', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const py = document.createElement('div');
+        py.setAttribute('data-glyph-id', 'py1');
+        canvas.appendChild(py);
+
+        const result = document.createElement('div');
+        result.setAttribute('data-glyph-id', 'result1');
+        canvas.appendChild(result);
+
+        const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
+        const composition = reconstructMeld([py, result], edges, 'comp2', 100, 100);
+
+        expect(composition.style.flexDirection).toBe('column');
+        expect(composition.contains(py)).toBe(true);
+        expect(composition.contains(result)).toBe(true);
+
+        document.body.innerHTML = '';
+    });
+
+    test('mixed right+bottom edges use row layout', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.setAttribute('data-glyph-id', 'ax1');
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.setAttribute('data-glyph-id', 'py1');
+        canvas.appendChild(py);
+
+        const result = document.createElement('div');
+        result.setAttribute('data-glyph-id', 'result1');
+        canvas.appendChild(result);
+
+        const edges = [
+            { from: 'ax1', to: 'py1', direction: 'right', position: 0 },
+            { from: 'py1', to: 'result1', direction: 'bottom', position: 1 }
+        ];
+        const composition = reconstructMeld([ax, py, result], edges, 'comp3', 0, 0);
+
+        // Mixed edges with right present → row layout
+        expect(composition.style.flexDirection).toBe('row');
+
+        document.body.innerHTML = '';
+    });
+
+    test('reparents elements without cloning', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const py = document.createElement('div');
+        py.setAttribute('data-glyph-id', 'py1');
+        canvas.appendChild(py);
+
+        const result = document.createElement('div');
+        result.setAttribute('data-glyph-id', 'result1');
+        canvas.appendChild(result);
+
+        const originalPy = py;
+        const originalResult = result;
+
+        const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
+        const composition = reconstructMeld([py, result], edges, 'comp4', 0, 0);
+
+        expect(composition.children[0]).toBe(originalPy);
+        expect(composition.children[1]).toBe(originalResult);
+        expect(originalPy.style.position).toBe('relative');
+
         document.body.innerHTML = '';
     });
 });

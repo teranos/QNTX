@@ -11,14 +11,14 @@
 import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 import type { CompositionEdge } from '../../state/ui';
-import { MELDABILITY, getInitiatorClasses, getTargetClasses } from './meldability';
+import { MELDABILITY, getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, type EdgeDirection } from './meldability';
 import { addComposition, removeComposition, extractGlyphIds } from '../../state/compositions';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
 export const MELD_THRESHOLD = 30; // px - distance at which glyphs meld
 const UNMELD_OFFSET = 20; // px - horizontal spacing between glyphs when unmelding (gentle separation)
-const MIN_VERTICAL_ALIGNMENT = 0.3; // fraction - minimum vertical overlap required (30%)
+const MIN_ALIGNMENT = 0.3; // fraction - minimum overlap required on the alignment axis (30%)
 
 /**
  * Check if element can initiate melding
@@ -40,27 +40,84 @@ export function canReceiveMeld(element: HTMLElement): boolean {
 
 /**
  * Check if two elements are compatible for melding
+ * Returns the edge direction if compatible, null otherwise
  */
-function areCompatible(initiator: HTMLElement, target: HTMLElement): boolean {
-    for (const [initiatorClass, targetClasses] of Object.entries(MELDABILITY)) {
-        if (initiator.classList.contains(initiatorClass)) {
-            return targetClasses.some(cls => target.classList.contains(cls));
-        }
+function areCompatible(initiator: HTMLElement, target: HTMLElement): EdgeDirection | null {
+    const initiatorClass = getGlyphClass(initiator);
+    const targetClass = getGlyphClass(target);
+    if (!initiatorClass || !targetClass) return null;
+    return areClassesCompatible(initiatorClass, targetClass);
+}
+
+/**
+ * Check proximity between two elements for a given direction
+ * Returns distance if elements are correctly oriented and aligned, Infinity otherwise
+ */
+function checkDirectionalProximity(
+    initiatorRect: DOMRect,
+    targetRect: DOMRect,
+    direction: EdgeDirection
+): number {
+    if (direction === 'right') {
+        // Vertical alignment check
+        const verticalOverlap = Math.min(initiatorRect.bottom, targetRect.bottom) -
+                              Math.max(initiatorRect.top, targetRect.top);
+        const minHeight = Math.min(initiatorRect.height, targetRect.height);
+        if (minHeight > 0 && verticalOverlap < minHeight * MIN_ALIGNMENT) return Infinity;
+
+        // Initiator must be left of target
+        if (initiatorRect.right > targetRect.left) return Infinity;
+
+        return targetRect.left - initiatorRect.right;
     }
-    return false;
+
+    if (direction === 'bottom') {
+        // Horizontal alignment check
+        const horizontalOverlap = Math.min(initiatorRect.right, targetRect.right) -
+                                Math.max(initiatorRect.left, targetRect.left);
+        const minWidth = Math.min(initiatorRect.width, targetRect.width);
+        if (minWidth > 0 && horizontalOverlap < minWidth * MIN_ALIGNMENT) return Infinity;
+
+        // Initiator must be above target
+        if (initiatorRect.bottom > targetRect.top) return Infinity;
+
+        return targetRect.top - initiatorRect.bottom;
+    }
+
+    if (direction === 'top') {
+        // Horizontal alignment check
+        const horizontalOverlap = Math.min(initiatorRect.right, targetRect.right) -
+                                Math.max(initiatorRect.left, targetRect.left);
+        const minWidth = Math.min(initiatorRect.width, targetRect.width);
+        if (minWidth > 0 && horizontalOverlap < minWidth * MIN_ALIGNMENT) return Infinity;
+
+        // Initiator must be below target
+        if (initiatorRect.top < targetRect.bottom) return Infinity;
+
+        return initiatorRect.top - targetRect.bottom;
+    }
+
+    return Infinity;
 }
 
 /**
  * Find nearest meldable target for an initiator glyph
+ * Checks all port directions defined in the MELDABILITY registry
  */
-export function findMeldTarget(initiatorElement: HTMLElement): { target: HTMLElement | null; distance: number } {
+export function findMeldTarget(initiatorElement: HTMLElement): {
+    target: HTMLElement | null;
+    distance: number;
+    direction: EdgeDirection;
+} {
+    const noMatch = { target: null as HTMLElement | null, distance: Infinity, direction: 'right' as EdgeDirection };
+
     if (!canInitiateMeld(initiatorElement)) {
-        return { target: null, distance: Infinity };
+        return noMatch;
     }
 
     const canvas = initiatorElement.parentElement;
     if (!canvas) {
-        return { target: null, distance: Infinity };
+        return noMatch;
     }
 
     // Find all potential targets based on meldability rules
@@ -73,46 +130,31 @@ export function findMeldTarget(initiatorElement: HTMLElement): { target: HTMLEle
 
     let closestTarget: HTMLElement | null = null;
     let closestDistance = Infinity;
+    let closestDirection: EdgeDirection = 'right';
 
     const initiatorRect = initiatorElement.getBoundingClientRect();
 
     potentialTargets.forEach(targetElement => {
-        // Skip if not compatible with this specific initiator
-        if (!areCompatible(initiatorElement, targetElement)) {
-            return;
-        }
-
         // Skip if already in a meld
         if (targetElement.parentElement?.classList.contains('melded-composition')) {
             return;
         }
 
+        // Check compatibility — returns the direction for this pairing
+        const direction = areCompatible(initiatorElement, targetElement);
+        if (!direction) return;
+
         const targetRect = targetElement.getBoundingClientRect();
-
-        // Check vertical alignment
-        const verticalOverlap = Math.min(initiatorRect.bottom, targetRect.bottom) -
-                              Math.max(initiatorRect.top, targetRect.top);
-        const minHeight = Math.min(initiatorRect.height, targetRect.height);
-
-        if (verticalOverlap < minHeight * MIN_VERTICAL_ALIGNMENT) {
-            return; // Not aligned vertically
-        }
-
-        // Check if initiator is to the left of target (correct orientation)
-        if (initiatorRect.right > targetRect.left) {
-            return; // Wrong orientation
-        }
-
-        // Calculate distance between right edge of initiator and left edge of target
-        const distance = targetRect.left - initiatorRect.right;
+        const distance = checkDirectionalProximity(initiatorRect, targetRect, direction);
 
         if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
             closestDistance = distance;
             closestTarget = targetElement;
+            closestDirection = direction;
         }
     });
 
-    return { target: closestTarget, distance: closestDistance };
+    return { target: closestTarget, distance: closestDistance, direction: closestDirection };
 }
 
 /**
@@ -170,33 +212,30 @@ export function clearMeldFeedback(element: HTMLElement): void {
  * CRITICAL: This reparents the actual DOM elements, does NOT clone them
  *
  * Compositions are now persisted to storage and survive page refresh.
- *
- * TODO: Support multi-glyph chains (ax|python|prompt).
- * Current implementation only supports binary melding (two glyphs).
- * Will require: composition-to-glyph melding, recursive DOM structure.
- * Tracked in: https://github.com/teranos/QNTX/issues/411
+ * Supports multi-directional melding: right (horizontal) and bottom (vertical).
  */
 export function performMeld(
     initiatorElement: HTMLElement,
     targetElement: HTMLElement,
     initiatorGlyph: Glyph,
-    targetGlyph: Glyph
+    targetGlyph: Glyph,
+    direction: EdgeDirection = 'right'
 ): HTMLElement {
     const canvas = initiatorElement.parentElement;
     if (!canvas) {
         throw new Error('Cannot meld: no canvas parent');
     }
 
-    log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements');
+    log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements', { direction });
 
     // Generate composition ID
     const compositionId = `melded-${initiatorGlyph.id}-${targetGlyph.id}`;
 
-    // Create edge directly (DAG-native: one edge for binary meld)
+    // Create edge with the actual direction from proximity detection
     const edges: CompositionEdge[] = [{
         from: initiatorGlyph.id,
         to: targetGlyph.id,
-        direction: 'right',
+        direction,
         position: 0
     }];
 
@@ -212,8 +251,16 @@ export function performMeld(
     composition.style.position = 'absolute';
     composition.style.left = initiatorElement.style.left;
     composition.style.top = initiatorElement.style.top;
+
+    // Layout direction based on edge direction
     composition.style.display = 'flex';
-    composition.style.alignItems = 'center';
+    if (direction === 'bottom' || direction === 'top') {
+        composition.style.flexDirection = 'column';
+        composition.style.alignItems = 'flex-start';
+    } else {
+        composition.style.flexDirection = 'row';
+        composition.style.alignItems = 'center';
+    }
 
     // Parse position for storage
     const x = parseInt(initiatorElement.style.left || '0', 10);
@@ -270,6 +317,7 @@ export function performMeld(
  */
 export function reconstructMeld(
     glyphElements: HTMLElement[],
+    edges: CompositionEdge[],
     compositionId: string,
     x: number,
     y: number
@@ -284,8 +332,12 @@ export function reconstructMeld(
     }
 
     log.info(SEG.GLYPH, '[MeldSystem] Reconstructing meld from storage', {
-        glyphCount: glyphElements.length
+        glyphCount: glyphElements.length,
+        edgeCount: edges.length
     });
+
+    // Determine layout from edge directions
+    const hasVertical = edges.some(e => e.direction === 'bottom' || e.direction === 'top');
 
     // Create composition container
     const composition = document.createElement('div');
@@ -298,7 +350,16 @@ export function reconstructMeld(
     composition.style.left = `${x}px`;
     composition.style.top = `${y}px`;
     composition.style.display = 'flex';
-    composition.style.alignItems = 'center';
+
+    if (hasVertical && !edges.some(e => e.direction === 'right')) {
+        // Pure vertical layout
+        composition.style.flexDirection = 'column';
+        composition.style.alignItems = 'flex-start';
+    } else {
+        // Horizontal (or mixed — for now, use row with wrapping)
+        composition.style.flexDirection = 'row';
+        composition.style.alignItems = 'center';
+    }
 
     // Clear positioning from glyphs and reparent them
     glyphElements.forEach(element => {
