@@ -14,6 +14,26 @@ export function delete_attestation(id: string): Promise<boolean>;
 export function exists_attestation(id: string): Promise<boolean>;
 
 /**
+ * Rebuild the fuzzy search index from current IndexedDB vocabulary.
+ * Pulls distinct predicates and contexts from the attestation store.
+ * Returns JSON: {"predicates": N, "contexts": N, "hash": "..."}
+ */
+export function fuzzy_rebuild_index(): Promise<string>;
+
+/**
+ * Search the fuzzy index for matching vocabulary.
+ * vocab_type: "predicates" or "contexts"
+ * Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
+ */
+export function fuzzy_search(query: string, vocab_type: string, limit: number, min_score: number): string;
+
+/**
+ * Get fuzzy engine status.
+ * Returns JSON: {"ready": bool, "predicates": N, "contexts": N, "hash": "..."}
+ */
+export function fuzzy_status(): string;
+
+/**
  * Retrieve an attestation by ID from IndexedDB.
  * Returns a Promise that resolves to JSON-serialized attestation or null if not found.
  *
@@ -67,6 +87,9 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly delete_attestation: (a: number, b: number) => any;
     readonly exists_attestation: (a: number, b: number) => any;
+    readonly fuzzy_rebuild_index: () => any;
+    readonly fuzzy_search: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly fuzzy_status: () => [number, number];
     readonly get_attestation: (a: number, b: number) => any;
     readonly init_store: (a: number, b: number) => any;
     readonly is_store_initialized: () => number;
@@ -84,6 +107,7 @@ export interface InitOutput {
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_start: () => void;
 }

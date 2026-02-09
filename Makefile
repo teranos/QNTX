@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -6,9 +6,9 @@ PREFIX ?= $(HOME)/.qntx
 # Use prebuilt qntx if available in PATH, otherwise use ./bin/qntx
 QNTX := $(shell command -v qntx 2>/dev/null || echo ./bin/qntx)
 
-cli: rust-fuzzy rust-vidstream rust-sqlite rust-wasm ## Build QNTX CLI binary (with Rust fuzzy optimization, ONNX video, SQLite backend, and WASM parser)
-	@echo "Building QNTX CLI with Rust optimizations (fuzzy, video, sqlite) and WASM parser..."
-	@go build -tags "rustfuzzy,rustvideo,rustsqlite,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
+cli: rust-vidstream rust-sqlite rust-wasm ## Build QNTX CLI binary (with Rust optimizations and WASM fuzzy+parser)
+	@echo "Building QNTX CLI with Rust optimizations (video, sqlite) and WASM (parser, fuzzy)..."
+	@go build -tags "rustvideo,rustsqlite,qntxwasm" -ldflags="-X 'github.com/teranos/QNTX/internal/version.VersionTag=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)' -X 'github.com/teranos/QNTX/internal/version.BuildTime=$(shell date -u '+%Y-%m-%d %H:%M:%S UTC')' -X 'github.com/teranos/QNTX/internal/version.CommitHash=$(shell git rev-parse HEAD)'" -o bin/qntx ./cmd/qntx
 
 cli-nocgo: ## Build QNTX CLI binary without CGO (for Windows or environments without Rust toolchain)
 	@echo "Building QNTX CLI (pure Go, no CGO)..."
@@ -97,7 +97,6 @@ test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
 	@# Test with core tags to ensure we test what we ship
-	@# TODO: Add rustfuzzy,rustvideo once those are stabilized
 	@go test -tags "rustsqlite,qntxwasm" -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
@@ -195,14 +194,6 @@ code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
 	@echo "✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"
 
-# Rust fuzzy matching library (ax segment optimization)
-rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
-	@echo "Building Rust fuzzy matching library..."
-	@cd ats/ax/fuzzy-ax && cargo build --release --lib
-	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
-	@echo "  Static:  libqntx_fuzzy.a"
-	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
-
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."
 	@cd ats/vidstream && cargo build --release --features onnx --lib
@@ -234,24 +225,6 @@ rust-wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@cp -r crates/qntx-wasm/pkg/* web/wasm/
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
-
-rust-fuzzy-test: ## Run Rust fuzzy matching tests
-	@echo "Running Rust fuzzy matching tests..."
-	@cd ats/ax/fuzzy-ax && cargo test --lib
-	@echo "✓ All Rust tests passed"
-
-rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
-	@echo "Checking Rust fuzzy matching code..."
-	@cd ats/ax/fuzzy-ax && cargo fmt --check
-	@cd ats/ax/fuzzy-ax && cargo clippy --lib -- -D warnings
-	@echo "✓ Rust code checks passed"
-
-rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rust)
-	@echo "Running Rust fuzzy integration tests..."
-	@export DYLD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$DYLD_LIBRARY_PATH && \
-		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
-		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
-	@echo "✓ Integration tests passed"
 
 # Rust Python plugin (PyO3-based Python execution)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
