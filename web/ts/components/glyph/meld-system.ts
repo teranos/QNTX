@@ -141,8 +141,12 @@ export function findMeldTarget(draggedElement: HTMLElement): {
             canvas.querySelectorAll(`.${targetClass}`).forEach(el => {
                 const targetElement = el as HTMLElement;
                 if (targetElement === draggedElement) return;
-                // Skip if already in a meld (Phase 3: allow melding into existing compositions)
-                if (targetElement.parentElement?.classList.contains('melded-composition')) return;
+                // Skip elements in the same composition (no internal rearrangement)
+                // Uses .closest() to handle elements inside sub-containers
+                const targetComp = targetElement.closest('.melded-composition');
+                if (targetComp) {
+                    if (draggedElement.closest('.melded-composition') === targetComp) return;
+                }
 
                 const direction = areCompatible(draggedElement, targetElement);
                 if (!direction) return;
@@ -166,7 +170,10 @@ export function findMeldTarget(draggedElement: HTMLElement): {
             canvas.querySelectorAll(`.${initiatorClass}`).forEach(el => {
                 const nearbyElement = el as HTMLElement;
                 if (nearbyElement === draggedElement) return;
-                if (nearbyElement.parentElement?.classList.contains('melded-composition')) return;
+                const nearbyComp = nearbyElement.closest('.melded-composition');
+                if (nearbyComp) {
+                    if (draggedElement.closest('.melded-composition') === nearbyComp) return;
+                }
 
                 // Check if the nearby element can initiate toward the dragged element
                 const direction = areCompatible(nearbyElement, draggedElement);
@@ -350,6 +357,126 @@ export function performMeld(
 }
 
 /**
+ * Extend an existing composition by adding a glyph at a leaf (append) or root (prepend)
+ *
+ * CRITICAL: Reparents the incoming element into the existing composition container.
+ * Regenerates composition ID and updates storage.
+ */
+export function extendComposition(
+    compositionElement: HTMLElement,
+    incomingElement: HTMLElement,
+    incomingGlyphId: string,
+    anchorGlyphId: string,
+    direction: EdgeDirection,
+    incomingRole: 'from' | 'to'
+): HTMLElement {
+    // Look up existing composition state
+    const existingComp = findCompositionByGlyph(anchorGlyphId);
+    if (!existingComp) {
+        throw new Error(`Cannot extend composition: no composition found for glyph ${anchorGlyphId}`);
+    }
+
+    const oldId = existingComp.id;
+
+    // Build new edge based on role
+    const newEdge: CompositionEdge = incomingRole === 'to'
+        ? { from: anchorGlyphId, to: incomingGlyphId, direction, position: existingComp.edges.length }
+        : { from: incomingGlyphId, to: anchorGlyphId, direction, position: existingComp.edges.length };
+
+    // Regenerate composition ID from the new edge
+    const newId = `melded-${newEdge.from}-${newEdge.to}`;
+
+    log.info(SEG.GLYPH, '[MeldSystem] Extending composition', {
+        oldId,
+        newId,
+        anchor: anchorGlyphId,
+        incoming: incomingGlyphId,
+        direction,
+        incomingRole
+    });
+
+    // Clear positioning and meld feedback on incoming element
+    incomingElement.style.position = 'relative';
+    incomingElement.style.left = '0';
+    incomingElement.style.top = '0';
+    clearMeldFeedback(incomingElement);
+
+    // Check if this is a cross-axis extension (e.g., adding 'bottom' result to a 'row' composition)
+    const compositionFlexDir = compositionElement.style.flexDirection;
+    const isCrossAxis =
+        (compositionFlexDir === 'row' && (direction === 'bottom' || direction === 'top')) ||
+        (compositionFlexDir === 'column' && direction === 'right');
+
+    if (isCrossAxis) {
+        // Find the anchor element in the composition
+        const anchorElement = compositionElement.querySelector(`[data-glyph-id="${anchorGlyphId}"]`) as HTMLElement;
+        if (!anchorElement) {
+            throw new Error(`Cannot extend: anchor glyph ${anchorGlyphId} not found in composition`);
+        }
+
+        // Check if anchor is already in a sub-container (e.g., second execution result)
+        const existingSub = anchorElement.parentElement;
+        if (existingSub?.classList.contains('meld-sub-container')) {
+            if (incomingRole === 'to') {
+                existingSub.appendChild(incomingElement);
+            } else {
+                existingSub.insertBefore(incomingElement, existingSub.firstChild);
+            }
+        } else {
+            // Create sub-container with cross-axis direction
+            const subContainer = document.createElement('div');
+            subContainer.className = 'meld-sub-container';
+            subContainer.style.display = 'flex';
+            if (direction === 'bottom' || direction === 'top') {
+                subContainer.style.flexDirection = 'column';
+                subContainer.style.alignItems = 'flex-start';
+            } else {
+                subContainer.style.flexDirection = 'row';
+                subContainer.style.alignItems = 'center';
+            }
+
+            // Replace anchor with sub-container, then move anchor into it
+            compositionElement.insertBefore(subContainer, anchorElement);
+            subContainer.appendChild(anchorElement);
+
+            if (incomingRole === 'to') {
+                subContainer.appendChild(incomingElement);
+            } else {
+                subContainer.insertBefore(incomingElement, subContainer.firstChild);
+            }
+        }
+    } else {
+        // Same-axis: simple append/prepend
+        if (incomingRole === 'to') {
+            compositionElement.appendChild(incomingElement);
+        } else {
+            compositionElement.insertBefore(incomingElement, compositionElement.firstChild);
+        }
+    }
+
+    // Update composition ID on DOM
+    compositionElement.setAttribute('data-glyph-id', newId);
+
+    // Update storage: remove old, add new with all edges
+    const allEdges = [...existingComp.edges, newEdge];
+    removeComposition(oldId);
+    addComposition({
+        id: newId,
+        edges: allEdges,
+        x: existingComp.x,
+        y: existingComp.y
+    });
+
+    log.info(SEG.GLYPH, '[MeldSystem] Composition extended', {
+        newId,
+        edges: allEdges.length,
+        glyphs: extractGlyphIds(allEdges)
+    });
+
+    return compositionElement;
+}
+
+/**
  * Reconstruct a melded composition from storage (without persisting)
  * Used when restoring compositions on page load
  */
@@ -399,15 +526,60 @@ export function reconstructMeld(
         composition.style.alignItems = 'center';
     }
 
-    // Clear positioning from glyphs and reparent them
+    // Clear positioning from glyphs
     glyphElements.forEach(element => {
         element.style.position = 'relative';
         element.style.left = '0';
         element.style.top = '0';
-
-        // REPARENT the actual element (NOT a clone!)
-        composition.appendChild(element);
     });
+
+    // For mixed-direction compositions, build sub-containers for cross-axis edges
+    const isMixedDirection = hasVertical && edges.some(e => e.direction === 'right');
+
+    if (isMixedDirection) {
+        // Identify cross-axis children (targets of non-main-axis edges)
+        const crossAxisEdges = new Map<string, HTMLElement[]>();
+        const crossAxisChildren = new Set<string>();
+        for (const edge of edges) {
+            if (edge.direction !== 'right') {
+                const toEl = glyphElements.find(el => el.getAttribute('data-glyph-id') === edge.to);
+                if (toEl) {
+                    const existing = crossAxisEdges.get(edge.from) || [];
+                    existing.push(toEl);
+                    crossAxisEdges.set(edge.from, existing);
+                    crossAxisChildren.add(edge.to);
+                }
+            }
+        }
+
+        // Walk glyph elements: create sub-containers for cross-axis anchors
+        for (const element of glyphElements) {
+            const id = element.getAttribute('data-glyph-id') || '';
+            if (crossAxisChildren.has(id)) continue; // Added as part of sub-container
+
+            const children = crossAxisEdges.get(id);
+            if (children && children.length > 0) {
+                const subContainer = document.createElement('div');
+                subContainer.className = 'meld-sub-container';
+                subContainer.style.display = 'flex';
+                subContainer.style.flexDirection = 'column';
+                subContainer.style.alignItems = 'flex-start';
+
+                subContainer.appendChild(element);
+                for (const child of children) {
+                    subContainer.appendChild(child);
+                }
+                composition.appendChild(subContainer);
+            } else {
+                composition.appendChild(element);
+            }
+        }
+    } else {
+        // Pure single-direction: simple append
+        glyphElements.forEach(element => {
+            composition.appendChild(element);
+        });
+    }
 
     // Add to canvas
     canvas.appendChild(composition);

@@ -54,8 +54,8 @@ interface CompositionState {
 **Rationale:**
 - Supports arbitrary DAG topologies
 - **DAG-native:** No derived `glyph_ids` field - traverse edges to find glyphs
-- Phase 2-3 only create `direction: 'right'` edges (horizontal chains)
-- Structure ready for vertical melding (future work)
+- Phase 2 creates both `'right'` and `'bottom'` edges (multi-directional)
+- Structure ready for `'top'` direction (reserved)
 - Proto field 3 reserved (formerly `glyph_ids`) to prevent accidental reuse
 - Follows patterns from flow-based programming (GoFlow, dataflow editors)
 
@@ -350,90 +350,76 @@ interface CompositionState {
 
 ### Phase 3: Composition Extension
 
-**Goal:** Meld a standalone glyph into an existing composition (drag-to-extend and auto-meld-into).
+**Goal:** Meld a standalone glyph into an existing composition (edges-only: append to leaf / prepend to root). Also fix auto-meld when py is already inside a composition.
 
-- [ ] Update `findMeldTarget()` to recognize glyphs inside compositions as targets
-  - [ ] Use `getMeldOptions()` to check leaf/root compatibility with composition
-- [ ] Add `extendComposition()`: append/prepend glyph to existing composition
-  - [ ] Reparent glyph into composition container
-  - [ ] Add edge to composition's edge set
-  - [ ] Update storage
-- [ ] Update `glyph-interaction.ts`: handle extending compositions during drag
-- [ ] Update `py-glyph.ts`: auto-meld result when py is already inside a composition
+**Composition ID strategy:** Regenerate ID on extend (`melded-{from}-{to}` with the new edge's endpoints).
+
+#### Drag-to-extend
+- [ ] Update `findMeldTarget()` to recognize compositions as meld targets
+  - [ ] Remove the `parentElement?.classList.contains('melded-composition')` skip guard
+  - [ ] Use `getMeldOptions()` to check leaf/root compatibility
+  - [ ] Support both forward and reverse (bidirectional detection already exists)
+- [ ] Add `extendComposition()` function in `meld-system.ts`
+  - [ ] Reparent incoming glyph into composition container
+  - [ ] Add new edge to composition's edge set
+  - [ ] Regenerate composition ID
+  - [ ] Update storage (remove old, add new)
+- [ ] Update `glyph-interaction.ts`: detect composition targets and call `extendComposition`
+
+#### Auto-meld-into-composition
+- [ ] Update `py-glyph.ts`: when py is already inside a composition, extend it with result glyph
+  - [ ] Replace the `pyWasInComposition` early return with `extendComposition` call
 
 #### Manual Testing
-
 - [ ] Drag prompt near ax|py composition → extends to ax|py|prompt
-  - [ ] Refresh → 3-glyph chain persists
+  - [ ] Refresh → 3-glyph composition persists
   - [ ] Unmeld → all 3 glyphs separate
-- [ ] Run py code when py is in ax|py composition → result attaches below py
+- [ ] Run py code when py is in ax|py composition → result attaches below py within composition
 
 ### Phase 4: Tests
 
-**TDD tests already written (skipped until implementation):**
+**Existing skipped tests to unskip and update for DAG structure:**
 
 **Frontend tests:**
-- [ ] Unskip `web/ts/components/glyph/meld-system.test.ts`:
-  - [ ] "Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition"
-  - [ ] "Tim sees proximity feedback when dragging glyph toward composition"
+- [ ] Unskip and update `web/ts/components/glyph/meld-system.test.ts`:
+  - [ ] "Tim creates 3-glyph chain by dragging onto composition"
   - [ ] "Tim extends ax|py composition by dragging prompt onto it"
   - [ ] "Tim extends 3-glyph chain into 4-glyph chain"
-- [ ] Unskip `web/ts/state/compositions.test.ts`:
-  - [ ] "3-glyph composition stores correctly"
-  - [ ] "isGlyphInComposition works with 3-glyph chains"
-  - [ ] "findCompositionByGlyph finds 3-glyph chains"
-  - [ ] "extending composition adds glyph to array"
+- [ ] Add new tests:
+  - [ ] `extendComposition` adds edge and reparents glyph
+  - [ ] Composition ID regenerated on extend
+  - [ ] Auto-meld result into existing composition (py-glyph integration)
 
 **Backend tests:**
 - [ ] Unskip `glyph/handlers/canvas_test.go`:
-  - [ ] `TestCanvasHandler_HandleCompositions_POST_ThreeGlyphs` (POST with 3 glyph IDs)
-  - [ ] `TestCanvasHandler_HandleCompositions_GET_PreservesGlyphOrder` (verifies left-to-right order)
-  - [ ] `TestCanvasHandler_HandleCompositions_POST_FourGlyphChain` (4-glyph chain extensibility)
-
-**Additional tests needed:**
-- [ ] Add visual layout tests
-  - [ ] Test: glyphs horizontally aligned in 3-glyph chain
-  - [ ] Test: no overlap between adjacent glyphs
-  - [ ] Test: proper spacing maintained
-- [ ] Add py-py chaining tests
-  - [ ] Test: `py + py → [py|py]` creates 2-glyph py chain
-  - [ ] Test: `[py|py] + prompt → [py|py|prompt]` extends py chain
-  - [ ] Test: `ax + py → [ax|py]` then `[ax|py] + py → [ax|py|py]`
-  - [ ] Test: meldability registry allows py → py melding
+  - [ ] 3-edge composition POST/GET roundtrip
+  - [ ] Edge ordering preserved
 
 ### Phase 5: Integration & Polish
 
-- [ ] Test manually in browser
-  - [ ] Create `[ax|py]`, verify it works
-  - [ ] Drag `prompt` to meld → verify `[ax|py|prompt]` forms
-  - [ ] Refresh page → verify chain persists
-  - [ ] Unmeld → verify all 3 glyphs separate correctly
-  - [ ] **py-py chaining:**
-    - [ ] Create `[py|py]` by dragging py onto py
-    - [ ] Extend to `[py|py|prompt]` by dragging prompt
-    - [ ] Verify `[ax|py|py]` works (ax followed by 2 py scripts)
-    - [ ] Test data flows correctly through sequential py scripts
-
-- [ ] Update documentation
-  - [ ] Add example to `docs/vision/glyph-melding.md`
-  - [ ] Document py-py chain semantics (sequential pipeline)
-  - [ ] Note limitations (linear only, no branching)
+- [ ] Manual browser testing
+  - [ ] `[ax|py]` + drag prompt → `[ax|py|prompt]`
+  - [ ] Refresh → persists with correct layout
+  - [ ] Unmeld → all glyphs separate
+  - [ ] py-py chaining: `[py|py]` → `[py|py|prompt]`
+  - [ ] py execution inside composition → result extends composition below py
+- [ ] Update ADR-009 for Phase 3 completion
 
 ## Open Questions
 
-1. **Maximum chain length?** Propose: limit to 4-5 glyphs for UX clarity
-2. **Chain validation?** Should we enforce valid orderings (e.g., prevent `[prompt|ax]`)?
-3. **Data flow semantics?** How does data pass through 3-glyph chains?
-4. **Unmeld granularity?** Should pulling middle glyph split chain in two?
+1. **Unmeld granularity?** Should pulling a middle glyph split the composition in two, or always unmeld everything?
+2. **Maximum composition size?** No hard limit yet — monitor UX as chains grow.
 
 ## Design Decisions
 
-**py → py chaining (Phase 2 extension):**
-- **Decision:** Enable py glyphs to chain with other py glyphs
+**py → py chaining:**
+- **Decision:** Enabled in Phase 2 via port-aware MELDABILITY registry
 - **Rationale:** Sequential Python pipelines are a common pattern (ETL, data transformation chains)
-- **Semantic:** Output of first py script feeds as input to second py script
-- **New composition types:** `py-py`, `py-py-prompt`, `ax-py-py`, `py-py-py`, etc.
-- **Implementation:** Update `MELDABILITY` to include `'canvas-py-glyph': ['canvas-prompt-glyph', 'canvas-py-glyph']`
+- **Implementation:** `MELDABILITY['canvas-py-glyph']` includes `{ direction: 'right', targets: ['canvas-py-glyph'] }`
+
+**Edge-based composition IDs:**
+- **Decision:** Regenerate ID on composition extension (`melded-{from}-{to}`)
+- **Rationale:** Keeps naming consistent with creation pattern; old ID removed from storage, new ID added
 
 ## Migration Strategy
 
