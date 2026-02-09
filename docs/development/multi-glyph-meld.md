@@ -15,12 +15,13 @@
 - ✅ Result glyphs auto-meld below py on execution
 - ✅ py → py chaining enabled
 
-**Phase 3 Complete:** Composition extension + cross-axis sub-containers
+**Phase 3 Complete:** Composition extension, consolidation, CSS Grid layout
 - ✅ Drag-to-extend: standalone glyph melds into existing composition (append/prepend)
 - ✅ 3+ glyph chains in browser (ax|py|prompt, etc.)
 - ✅ Auto-meld result when py is already inside a composition
-- ✅ Cross-axis sub-containers (result below py in horizontal composition)
 - ✅ Meld system split into focused modules (detect/feedback/composition)
+- ✅ Glyph system consolidation: canvas-placed wrapper, registry dispatch
+- ✅ CSS Grid layout replaces flex+sub-containers (single applyGridLayout function)
 
 ## Architecture Decision
 
@@ -408,17 +409,50 @@ interface CompositionState {
 - ✅ Run py in ax|py composition → result appears below py (cross-axis sub-container)
 - ✅ Drag note above prompt inside composition → extends composition
 
-### Phase 4: Backend Tests
+### Phase 3b: Glyph System Consolidation ✅ **COMPLETE**
 
-**Backend tests deferred from Phase 3:**
-- [ ] Unskip `glyph/handlers/canvas_test.go`:
-  - [ ] 3-edge composition POST/GET roundtrip
-  - [ ] Edge ordering preserved
+**PR:** #446
 
-### Phase 5: Integration & Polish
+- ✅ Meld correctness: each-side-one-connection axiom enforced at detection, extension, and mouseup layers
+- ✅ Glyph system consolidation: canvas-placed wrapper extracts shared boilerplate from 5 factories
+- ✅ Glyph registry replaces parallel if/else chains for type dispatch
+- ✅ Result glyph removed from registry (always created programmatically with execution data)
+- ✅ Prompt glyph results participate in composition system (no more orphaning on refresh)
 
-- [ ] py-py chaining manual test: `[py|py]` → `[py|py|prompt]`
-- ✅ Update ADR-009 for Phase 3 completion
+### Phase 3c: CSS Grid Layout ✅ **COMPLETE**
+
+**PR:** #451 (continues #446)
+
+**Goal:** Replace flex+sub-container layout with CSS Grid. Three parallel code paths (extendComposition, reconstructMeld, unmeldComposition) that independently managed sub-containers collapse into one shared `applyGridLayout()` function.
+
+- ✅ `computeGridPositions()` in `meldability.ts` — BFS from roots, handles multi-child fan-out per direction
+- ✅ `applyGridLayout()` in `meld-composition.ts` — single source of truth for all composition layout
+- ✅ `performMeld`, `extendComposition`, `reconstructMeld` simplified (net code reduction)
+- ✅ `unmeldComposition` clears grid styles on restore
+- ✅ CSS: `.melded-composition` uses `display: grid` instead of `display: flex`
+- ✅ Sub-containers eliminated — all glyphs are direct children with `grid-row`/`grid-column`
+- ✅ 9 tests for `computeGridPositions` (base cases + edge cases: fan-out, multi-root, top direction)
+- ✅ All 413 tests passing, 0 fail
+
+#### Known issues (filed)
+- [ ] #447 Float glyph coordinates rejected by backend
+- [ ] #448 Unmeld spreads mixed-direction compositions into flat row
+- [ ] #449 Meld feedback glow lingers after right-to-left meld
+- [ ] #450 Unmeld is not animated
+
+### Cleanup
+
+**Deferred backend tests:**
+- [ ] Unskip `glyph/handlers/canvas_test.go`: 3-edge composition POST/GET roundtrip, edge ordering preserved
+
+**Manual verification:**
+- ✅ py-py chaining: `[py|py]` → `[py|py|prompt]`
+
+**Open issues:**
+- [ ] #447 Float glyph coordinates rejected by backend
+- [ ] #448 Unmeld spreads mixed-direction compositions into flat row
+- [ ] #449 Meld feedback glow lingers after right-to-left meld
+- [ ] #450 Unmeld is not animated
 
 ## Open Questions
 
@@ -436,10 +470,9 @@ interface CompositionState {
 - **Decision:** Regenerate ID on composition extension (`melded-{from}-{to}`)
 - **Rationale:** Keeps naming consistent with creation pattern; old ID removed from storage, new ID added
 
-**Cross-axis sub-containers:**
-- **Decision:** Nested `meld-sub-container` divs for mixed-direction compositions
-- **Rationale:** A single flex container can only flow in one direction. When a composition has both horizontal (right) and vertical (bottom) edges, the cross-axis glyphs need their own flex container.
-- **Implementation:** `extendComposition()` detects cross-axis and wraps anchor + incoming in a sub-container. `reconstructMeld()` builds sub-containers from stored edges. All guards use `.closest('.melded-composition')` to traverse through sub-containers.
+**Cross-axis layout (superseded in Phase 3c):**
+- **Phase 3a:** Nested `meld-sub-container` divs with flex layout. Three parallel code paths independently managed sub-containers — fragile and blocked composition-to-composition melding.
+- **Phase 3c:** Replaced with CSS Grid. Each glyph is a direct child with `grid-row`/`grid-column` derived from the edge DAG by `computeGridPositions()`. Single `applyGridLayout()` function used by all composition operations.
 
 **Meld system module split:**
 - **Decision:** Split monolith `meld-system.ts` into `meld-detect.ts`, `meld-feedback.ts`, `meld-composition.ts` with barrel re-export

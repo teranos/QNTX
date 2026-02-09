@@ -51,6 +51,7 @@ export function applyMeldFeedback(
 
 /**
  * Clear meld feedback from elements
+ * TODO(#449): glow lingers after right-to-left meld
  */
 export function clearMeldFeedback(element: HTMLElement): void {
     element.style.boxShadow = '';
