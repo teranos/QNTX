@@ -22,11 +22,10 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { makeDraggable } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import { performMeld, extendComposition } from './meld/meld-system';
+import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import { canvasPlaced } from './manifestations/canvas-placed';
@@ -274,54 +273,7 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     // Auto-meld result below py glyph (bottom port)
     const pyGlyphId = pyElement.dataset.glyphId;
     if (pyGlyphId) {
-        // If py is already inside a composition, extend it with the result glyph
-        // Uses .closest() to find composition even when py is inside a sub-container
-        const pyComposition = pyElement.closest('.melded-composition') as HTMLElement | null;
-        if (pyComposition) {
-            try {
-                extendComposition(pyComposition, resultElement, resultGlyphId, pyGlyphId, 'bottom', 'to');
-
-                const updatedId = pyComposition.getAttribute('data-glyph-id') || '';
-                const compositionGlyph: Glyph = {
-                    id: updatedId,
-                    title: 'Melded Composition',
-                    renderContent: () => pyComposition
-                };
-                makeDraggable(pyComposition, pyComposition, compositionGlyph, {
-                    logLabel: 'MeldedComposition'
-                });
-
-                log.debug(SEG.GLYPH, `[PyGlyph] Extended composition with result below py ${pyGlyphId}`);
-            } catch (err) {
-                log.error(SEG.GLYPH, `[PyGlyph] Failed to extend composition with result:`, err);
-            }
-            return;
-        }
-
-        const pyGlyph: Glyph = {
-            id: pyGlyphId,
-            title: 'Python',
-            symbol: 'py',
-            renderContent: () => pyElement
-        };
-
-        try {
-            const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
-
-            // Make the composition draggable as a unit
-            const compositionGlyph: Glyph = {
-                id: composition.getAttribute('data-glyph-id') || `melded-${pyGlyphId}-${resultGlyphId}`,
-                title: 'Melded Composition',
-                renderContent: () => composition
-            };
-            makeDraggable(composition, composition, compositionGlyph, {
-                logLabel: 'MeldedComposition'
-            });
-
-            log.debug(SEG.GLYPH, `[PyGlyph] Auto-melded result below py ${pyGlyphId}`);
-        } catch (err) {
-            log.error(SEG.GLYPH, `[PyGlyph] Failed to auto-meld result with py:`, err);
-        }
+        autoMeldResultBelow(pyElement, pyGlyphId, 'py', 'Python', resultElement, resultGlyphId, 'PyGlyph');
     }
 }
 
