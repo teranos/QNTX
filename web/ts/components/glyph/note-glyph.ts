@@ -237,7 +237,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
 
     // Make entire note draggable (no title bar) and resizable
     const cleanupDrag = makeDraggable(element, element, glyph, { logLabel: 'NoteGlyph' });
-    makeResizable(element, resizeHandle, glyph, {
+    const cleanupResize = makeResizable(element, resizeHandle, glyph, {
         logLabel: 'NoteGlyph',
         minWidth: 120,
         minHeight: 100
@@ -248,6 +248,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
 
     // Register cleanup for conversions
     storeCleanup(element, cleanupDrag);
+    storeCleanup(element, cleanupResize);
     storeCleanup(element, () => editorView.destroy());
     storeCleanup(element, () => {
         if (saveTimeout !== undefined) clearTimeout(saveTimeout);

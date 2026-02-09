@@ -45,13 +45,13 @@ import { convertNoteToPrompt, convertResultToNote } from './conversions';
 // ============================================================================
 
 /** Currently selected glyph IDs (empty = nothing selected) */
-let selectedGlyphIds: string[] = [];
+let selectedGlyphIds = new Set<string>();
 
 /**
  * Check if a glyph is currently selected
  */
 export function isGlyphSelected(glyphId: string): boolean {
-    return selectedGlyphIds.includes(glyphId);
+    return selectedGlyphIds.has(glyphId);
 }
 
 /**
@@ -65,7 +65,7 @@ export function getSelectedGlyphIds(): string[] {
  * Get all selected glyph elements from the canvas
  */
 export function getSelectedGlyphElements(container: HTMLElement): HTMLElement[] {
-    return selectedGlyphIds
+    return [...selectedGlyphIds]
         .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null)
         .filter((el): el is HTMLElement => el !== null);
 }
@@ -78,17 +78,16 @@ export function getSelectedGlyphElements(container: HTMLElement): HTMLElement[] 
 function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean): void {
     if (shiftKey) {
         // Toggle glyph in selection
-        const idx = selectedGlyphIds.indexOf(glyphId);
-        if (idx !== -1) {
+        if (selectedGlyphIds.has(glyphId)) {
             // Already selected — deselect it
-            selectedGlyphIds.splice(idx, 1);
+            selectedGlyphIds.delete(glyphId);
             const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
             if (el) {
                 el.classList.remove('canvas-glyph-selected');
             }
         } else {
             // Not selected — add to selection
-            selectedGlyphIds.push(glyphId);
+            selectedGlyphIds.add(glyphId);
             const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
             log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Adding to selection', {
                 glyphId,
@@ -104,7 +103,7 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
     } else {
         // Replace selection
         deselectAll(container);
-        selectedGlyphIds = [glyphId];
+        selectedGlyphIds = new Set([glyphId]);
         const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
         log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Replace mode', {
             glyphId,
@@ -119,25 +118,26 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
     }
 
     // Show/hide action bar based on selection
+    const selectedIds = [...selectedGlyphIds];
     log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Checking action bar', {
-        selectedCount: selectedGlyphIds.length,
-        selectedIds: selectedGlyphIds
+        selectedCount: selectedGlyphIds.size,
+        selectedIds
     });
-    if (selectedGlyphIds.length > 0) {
+    if (selectedGlyphIds.size > 0) {
         log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Showing action bar');
         showActionBar(
-            selectedGlyphIds,
+            selectedIds,
             container,
             () => deleteSelectedGlyphs(container),
             (composition) => unmeldSelectedGlyphs(container, composition),
-            () => convertNoteToPrompt(container, selectedGlyphIds[0]),
-            () => convertResultToNote(container, selectedGlyphIds[0]),
+            () => convertNoteToPrompt(container, selectedIds[0]),
+            () => convertResultToNote(container, selectedIds[0]),
         );
     } else {
         hideActionBar();
     }
 
-    log.debug(SEG.GLYPH, `[Canvas] Selected ${selectedGlyphIds.length} glyphs`, { selectedGlyphIds });
+    log.debug(SEG.GLYPH, `[Canvas] Selected ${selectedGlyphIds.size} glyphs`, { selectedIds });
 }
 
 /**
@@ -171,13 +171,13 @@ function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
  * Deselect all glyphs and hide action bar
  */
 function deselectAll(container: HTMLElement): void {
-    if (selectedGlyphIds.length === 0) return;
+    if (selectedGlyphIds.size === 0) return;
 
     const selected = container.querySelectorAll('.canvas-glyph-selected');
     selected.forEach(el => el.classList.remove('canvas-glyph-selected'));
 
     hideActionBar();
-    selectedGlyphIds = [];
+    selectedGlyphIds = new Set();
 }
 
 /**
@@ -185,7 +185,7 @@ function deselectAll(container: HTMLElement): void {
  * Called by keyboard shortcut 'u'
  */
 function unmeldFromSelection(container: HTMLElement): void {
-    if (selectedGlyphIds.length === 0) {
+    if (selectedGlyphIds.size === 0) {
         return;
     }
 
@@ -242,13 +242,13 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
  * Animates scale-down + fade-out before removal (respects reduced motion)
  */
 function deleteSelectedGlyphs(container: HTMLElement): void {
-    if (selectedGlyphIds.length === 0) return;
+    if (selectedGlyphIds.size === 0) return;
 
     const glyphIdsToDelete = [...selectedGlyphIds];
 
     // Clear selection immediately (prevent double-delete)
     hideActionBar();
-    selectedGlyphIds = [];
+    selectedGlyphIds = new Set();
 
     const duration = getMinimizeDuration();
 
@@ -439,7 +439,7 @@ export function createCanvasGlyph(): Glyph {
             // AbortController signal auto-cleans up when container is removed from DOM
             void setupKeyboardShortcuts(
                 container,
-                () => selectedGlyphIds.length > 0,
+                () => selectedGlyphIds.size > 0,
                 () => deselectAll(container),
                 () => deleteSelectedGlyphs(container),
                 () => unmeldFromSelection(container)
