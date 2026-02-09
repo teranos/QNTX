@@ -70,6 +70,18 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     element.style.minHeight = '120px';
     element.style.zIndex = '1';
 
+    // Python brand colors on title bar
+    const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    if (titleBar) {
+        titleBar.style.backgroundColor = '#2a5578';
+        const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
+        if (labelSpan) {
+            labelSpan.style.color = '#FFD43B';
+            labelSpan.style.fontWeight = 'bold';
+            labelSpan.style.flex = '1';
+        }
+    }
+
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
         const editor = (element as any).editor;

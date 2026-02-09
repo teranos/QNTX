@@ -110,16 +110,7 @@
     transform: scale(0.95);
 }
 
-/* Python editor glyphs on canvas */
-.canvas-py-glyph > .canvas-glyph-title-bar {
-    background-color: #2a5578;
-}
-
-.canvas-py-glyph > .canvas-glyph-title-bar > span:first-child {
-    color: #FFD43B;
-    font-weight: bold;
-    flex: 1;
-}
+/* Python editor glyphs on canvas — brand colors applied inline in py-glyph.ts */
 
 /* Interaction states for glyphs */
 .canvas-py-glyph.is-dragging {
