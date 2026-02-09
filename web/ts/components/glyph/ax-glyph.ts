@@ -41,6 +41,16 @@ import {
  */
 const QUERY_STORAGE_KEY = 'qntx-ax-query:';
 
+function appendEmptyState(container: HTMLElement): void {
+    const empty = document.createElement('div');
+    empty.className = 'ax-glyph-empty-state';
+    empty.textContent = 'No matches yet';
+    empty.style.color = 'var(--text-secondary)';
+    empty.style.textAlign = 'center';
+    empty.style.padding = '20px';
+    container.appendChild(empty);
+}
+
 /**
  * Load persisted query from localStorage
  */
@@ -96,7 +106,6 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     });
     element.style.minWidth = '200px';
     element.style.minHeight = '120px';
-    element.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
 
     // Single-line query input (takes remaining space)
     const editor = document.createElement('input');
@@ -126,6 +135,21 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
     element.appendChild(titleBar);
 
+    // Title bar background must track container state (opaque bg blocks parent tint)
+    const COLOR_STATES = {
+        idle:    { container: 'rgba(30, 30, 35, 0.92)',  titleBar: 'var(--bg-tertiary)' },
+        pending: { container: 'rgba(42, 43, 61, 0.92)',  titleBar: 'rgba(42, 43, 61, 0.92)' },
+        orange:  { container: 'rgba(61, 45, 20, 0.92)',  titleBar: '#5c3d1a' },
+        teal:    { container: 'rgba(31, 61, 61, 0.92)',  titleBar: '#1f3d3d' },
+    } as const;
+
+    function setColorState(state: keyof typeof COLOR_STATES) {
+        element.style.backgroundColor = COLOR_STATES[state].container;
+        titleBar.style.backgroundColor = COLOR_STATES[state].titleBar;
+    }
+
+    setColorState('idle');
+
     // Results container - scrollable list of matched attestations (gets all remaining space)
     const resultsContainer = document.createElement('div');
     resultsContainer.className = 'ax-glyph-results';
@@ -137,19 +161,59 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     resultsContainer.style.fontSize = '12px';
     resultsContainer.style.fontFamily = 'monospace';
 
-    // Initial empty state
-    const emptyState = document.createElement('div');
-    emptyState.className = 'ax-glyph-empty-state';
-    emptyState.textContent = 'No matches yet';
-    emptyState.style.color = 'var(--text-secondary)';
-    emptyState.style.textAlign = 'center';
-    emptyState.style.padding = '20px';
-    resultsContainer.appendChild(emptyState);
+    appendEmptyState(resultsContainer);
 
     element.appendChild(resultsContainer);
 
     // Attach tooltip support for attestation results
     tooltip.attach(resultsContainer, '.ax-glyph-result-item');
+
+    // Shared: run local IndexedDB query, populate results, update color state
+    async function runLocalQuery(): Promise<void> {
+        const query = currentQuery.trim();
+        if (!query) return;
+
+        // Clear and re-populate results from IndexedDB
+        resultsContainer.innerHTML = '';
+        try {
+            const parsed = parseQuery(query);
+            if (parsed.ok) {
+                const localResults = await queryAttestations(parsed.query);
+                const displayedIds = new Set<string>();
+                for (const att of localResults) {
+                    if (att.id) displayedIds.add(att.id);
+                    resultsContainer.appendChild(renderAttestation(att));
+                }
+                (element as any)._localIds = displayedIds;
+
+                if (localResults.length === 0) {
+                    appendEmptyState(resultsContainer);
+                }
+
+                log.debug(SEG.GLYPH, `[AxGlyph] Local query: ${localResults.length} results for ${glyphId}`);
+            }
+        } catch (err) {
+            log.debug(SEG.GLYPH, `[AxGlyph] Local query failed for ${glyphId}:`, err);
+            appendEmptyState(resultsContainer);
+        }
+
+        // Update color + data attributes
+        element.dataset.localActive = 'true';
+        resultsContainer.dataset.localActive = 'true';
+
+        if (connectivityManager.state === 'online') {
+            sendMessage({
+                type: 'watcher_upsert',
+                watcher_id: `ax-glyph-${glyphId}`,
+                watcher_query: query,
+                watcher_name: `AX Glyph: ${query.substring(0, 30)}${query.length > 30 ? '...' : ''}`,
+                enabled: true
+            });
+            setColorState('teal');
+        } else {
+            setColorState('orange');
+        }
+    }
 
     // Auto-save and watcher update with debouncing (500ms delay)
     let saveTimeout: number | undefined;
@@ -162,110 +226,29 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
         }
 
         // Update background to indicate pending state
-        element.style.backgroundColor = 'rgba(42, 43, 61, 0.92)'; // Slight blue tint for "updating"
+        setColorState('pending');
 
         // Clear results immediately when query changes
         resultsContainer.innerHTML = '';
-        const pendingEmpty = document.createElement('div');
-        pendingEmpty.className = 'ax-glyph-empty-state';
-        pendingEmpty.textContent = 'No matches yet';
-        pendingEmpty.style.color = 'var(--text-secondary)';
-        pendingEmpty.style.textAlign = 'center';
-        pendingEmpty.style.padding = '20px';
-        resultsContainer.appendChild(pendingEmpty);
+        appendEmptyState(resultsContainer);
 
         // Debounce save and watcher update for 500ms
         saveTimeout = window.setTimeout(async () => {
             saveQuery(glyphId, currentQuery);
 
             if (!currentQuery.trim()) {
-                element.style.backgroundColor = 'rgba(30, 30, 35, 0.92)';
+                setColorState('idle');
                 return;
             }
 
-            // Local IndexedDB query — immediate results, no server round-trip
-            try {
-                const parsed = parseQuery(currentQuery.trim());
-                if (parsed.ok) {
-                    const localResults = await queryAttestations(parsed.query);
-                    if (localResults.length > 0) {
-                        const empty = resultsContainer.querySelector('.ax-glyph-empty-state');
-                        if (empty) empty.remove();
-
-                        const displayedIds = new Set<string>();
-                        for (const att of localResults) {
-                            if (att.id) displayedIds.add(att.id);
-                            resultsContainer.appendChild(renderAttestation(att));
-                        }
-                        (element as any)._localIds = displayedIds;
-
-                        log.debug(SEG.GLYPH, `[AxGlyph] Local query: ${localResults.length} results for ${glyphId}`);
-                    }
-                }
-            } catch (err) {
-                log.debug(SEG.GLYPH, `[AxGlyph] Local query failed for ${glyphId}:`, err);
-            }
-
-            // Orange = local/WASM results, teal = server watcher active
-            element.dataset.localActive = 'true';
-            resultsContainer.dataset.localActive = 'true';
-            element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)'; // Orange: local-only
-
-            // Send watcher upsert via WebSocket when online (server supplements local)
-            if (connectivityManager.state === 'online') {
-                sendMessage({
-                    type: 'watcher_upsert',
-                    watcher_id: `ax-glyph-${glyphId}`,
-                    watcher_query: currentQuery.trim(),
-                    watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}${currentQuery.length > 30 ? '...' : ''}`,
-                    enabled: true
-                });
-                // Shift to teal once server watcher is active
-                element.style.backgroundColor = 'rgba(31, 61, 61, 0.92)';
-            }
-
+            await runLocalQuery();
             log.debug(SEG.GLYPH, `[AxGlyph] Query updated for ${glyphId}: "${currentQuery}"`);
         }, 500);
     });
 
     // If we loaded a persisted query, run local + server query
     if (currentQuery.trim()) {
-        // Local query first
-        (async () => {
-            try {
-                const parsed = parseQuery(currentQuery.trim());
-                if (parsed.ok) {
-                    const localResults = await queryAttestations(parsed.query);
-                    if (localResults.length > 0) {
-                        const empty = resultsContainer.querySelector('.ax-glyph-empty-state');
-                        if (empty) empty.remove();
-                        const displayedIds = new Set<string>();
-                        for (const att of localResults) {
-                            if (att.id) displayedIds.add(att.id);
-                            resultsContainer.appendChild(renderAttestation(att));
-                        }
-                        (element as any)._localIds = displayedIds;
-                    }
-                }
-            } catch { /* WASM not ready yet — server will provide results */ }
-        })();
-
-        // Orange = local-only, teal = server active
-        element.dataset.localActive = 'true';
-        resultsContainer.dataset.localActive = 'true';
-        element.style.backgroundColor = 'rgba(61, 45, 20, 0.92)';
-
-        if (connectivityManager.state === 'online') {
-            sendMessage({
-                type: 'watcher_upsert',
-                watcher_id: `ax-glyph-${glyphId}`,
-                watcher_query: currentQuery.trim(),
-                watcher_name: `AX Glyph: ${currentQuery.substring(0, 30)}${currentQuery.length > 30 ? '...' : ''}`,
-                enabled: true
-            });
-            element.style.backgroundColor = 'rgba(31, 61, 61, 0.92)'; // Teal: server watcher active
-        }
-
+        void runLocalQuery();
         log.debug(SEG.GLYPH, `[AxGlyph] Restored query for ${glyphId}: "${currentQuery}"`);
     }
 
@@ -278,10 +261,15 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
     });
     storeCleanup(element, syncUnsub);
 
-    // Subscribe to connectivity state changes
+    // Subscribe to connectivity state changes — re-fire local query on transition
     const connectUnsub = connectivityManager.subscribe((state) => {
         element.dataset.connectivityMode = state;
         resultsContainer.dataset.connectivityMode = state;
+
+        // Re-query IndexedDB on connectivity change (picks up new local attestations + updates color)
+        if (currentQuery.trim()) {
+            void runLocalQuery();
+        }
     });
     storeCleanup(element, connectUnsub);
 
@@ -455,8 +443,12 @@ export function updateAxGlyphError(glyphId: string, errorMsg: string, severity: 
     // Add error display at top of results
     resultsContainer.insertBefore(errorDisplay, resultsContainer.firstChild);
 
-    // Update glyph background to indicate error state
-    glyph.style.backgroundColor = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)'; // Red tint for error, yellow for warning
+    // Update glyph + title bar background to indicate error state
+    const errorBg = severity === 'error' ? 'rgba(61, 31, 31, 0.92)' : 'rgba(61, 61, 31, 0.92)';
+    const errorTitleBg = severity === 'error' ? '#3d1f1f' : '#3d3d1f';
+    glyph.style.backgroundColor = errorBg;
+    const errorTitleBar = glyph.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    if (errorTitleBar) errorTitleBar.style.backgroundColor = errorTitleBg;
 
     log.debug(SEG.GLYPH, `[AxGlyph] Displayed ${severity} for ${glyphId}:`, errorMsg);
 }
