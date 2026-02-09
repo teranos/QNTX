@@ -180,8 +180,9 @@ function renderSelf(): void {
             `<span style="color: #4ade80;">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
             `<span style="color: #fbbf24;">⚠ Go native parser</span>`;
 
+        const fuzzyBackendLabel = caps.fuzzy_backend === 'wasm' ? 'WASM' : caps.fuzzy_backend === 'rust' ? 'Rust' : 'Go';
         const fuzzyStatus = caps.fuzzy_optimized ?
-            `<span style="color: #4ade80;">✓ Optimized (Rust)</span>` :
+            `<span style="color: #4ade80;">✓ Optimized (${fuzzyBackendLabel})</span>` :
             `<span style="color: #fbbf24;">⚠ Fallback (Go)</span>`;
 
         const vidstreamStatus = caps.vidstream_optimized ?
