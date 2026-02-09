@@ -16,10 +16,12 @@ import {
     applyMeldFeedback,
     clearMeldFeedback,
     performMeld,
+    extendComposition,
     isMeldedComposition,
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
 } from './meld-system';
+import { getMeldOptions, getGlyphClass } from './meldability';
 import { isGlyphSelected, getSelectedGlyphIds } from './canvas-glyph';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
@@ -274,6 +276,42 @@ export function makeDraggable(
                     ? [nearbyElement, element, nearbyGlyph, glyph]
                     : [element, nearbyElement, glyph, nearbyGlyph];
 
+                // Check if either element is inside an existing composition → extend it
+                // Uses .closest() to handle elements nested in sub-containers
+                const targetComp = meldTarget.closest('.melded-composition') as HTMLElement | null;
+                const initiatorComp = meldInitiator.closest('.melded-composition') as HTMLElement | null;
+
+                if (targetComp || initiatorComp) {
+                    const compositionElement = (targetComp || initiatorComp)!;
+                    const standaloneElement = targetComp ? meldInitiator : meldTarget;
+                    const standaloneId = standaloneElement.dataset.glyphId || '';
+                    const standaloneClass = getGlyphClass(standaloneElement);
+                    const anchorId = (targetComp ? meldTarget : meldInitiator).dataset.glyphId || '';
+                    const existingComp = findCompositionByGlyph(anchorId);
+
+                    if (existingComp && standaloneClass) {
+                        const options = getMeldOptions(standaloneClass, compositionElement, existingComp.edges);
+                        if (options.length > 0) {
+                            const option = options[0];
+                            extendComposition(compositionElement, standaloneElement, standaloneId, option.glyphId, option.direction, option.incomingRole);
+
+                            const updatedId = compositionElement.getAttribute('data-glyph-id') || '';
+                            const compositionGlyph: Glyph = {
+                                id: updatedId,
+                                title: 'Melded Composition',
+                                renderContent: () => compositionElement
+                            };
+                            makeDraggable(compositionElement, compositionElement, compositionGlyph, {
+                                logLabel: 'MeldedComposition'
+                            });
+
+                            log.info(SEG.GLYPH, `[${logLabel}] Extended composition with ${standaloneId} (${option.direction}, ${option.incomingRole})`);
+                            return;
+                        }
+                    }
+                }
+
+                // Neither is in a composition — create new 2-glyph composition
                 const composition = performMeld(meldInitiator, meldTarget, meldInitiatorGlyph, meldTargetGlyph, meldInfo.direction);
 
                 // Make the composition draggable as a unit

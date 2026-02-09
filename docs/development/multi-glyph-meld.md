@@ -15,10 +15,12 @@
 - ✅ Result glyphs auto-meld below py on execution
 - ✅ py → py chaining enabled
 
-**Still TODO (Phase 3+):**
-- ❌ UI doesn't support melding into existing compositions (standalone-to-composition)
-- ❌ No 3+ glyph chain creation in browser yet
-- ❌ Auto-meld result when py is already inside a composition
+**Phase 3 Complete:** Composition extension + cross-axis sub-containers
+- ✅ Drag-to-extend: standalone glyph melds into existing composition (append/prepend)
+- ✅ 3+ glyph chains in browser (ax|py|prompt, etc.)
+- ✅ Auto-meld result when py is already inside a composition
+- ✅ Cross-axis sub-containers (result below py in horizontal composition)
+- ✅ Meld system split into focused modules (detect/feedback/composition)
 
 ## Architecture Decision
 
@@ -54,8 +56,8 @@ interface CompositionState {
 **Rationale:**
 - Supports arbitrary DAG topologies
 - **DAG-native:** No derived `glyph_ids` field - traverse edges to find glyphs
-- Phase 2-3 only create `direction: 'right'` edges (horizontal chains)
-- Structure ready for vertical melding (future work)
+- Phase 2 creates both `'right'` and `'bottom'` edges (multi-directional)
+- Structure ready for `'top'` direction (reserved)
 - Proto field 3 reserved (formerly `glyph_ids`) to prevent accidental reuse
 - Follows patterns from flow-based programming (GoFlow, dataflow editors)
 
@@ -98,13 +100,13 @@ interface CompositionState {
 
 #### Frontend Tests ✅
 - ✅ Update `web/ts/state/compositions.test.ts` for `glyphIds` array
-- ✅ Update `web/ts/components/glyph/meld-system.test.ts` for new unmeld return format
+- ✅ Update `web/ts/components/glyph/meld-composition.test.ts` for new unmeld return format
 - ✅ Add skipped TDD tests in `web/ts/state/compositions.test.ts`:
   - ✅ 3-glyph composition stores correctly
   - ✅ `isGlyphInComposition` works with 3-glyph chains
   - ✅ `findCompositionByGlyph` finds 3-glyph chains
   - ✅ Extending composition adds glyph to array
-- ✅ Add skipped TDD tests in `web/ts/components/glyph/meld-system.test.ts`:
+- ✅ Add skipped TDD tests in `web/ts/components/glyph/meld-composition.test.ts`:
   - ✅ Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition
   - ✅ Tim sees proximity feedback when dragging glyph toward composition
   - ✅ Tim extends ax|py composition by dragging prompt onto it
@@ -265,7 +267,7 @@ interface CompositionState {
   - ✅ 3-glyph tests: Two edges with position 0 and 1
   - ✅ Run `bun test` - all TypeScript tests passing (376 tests)
 
-- ✅ Update `web/ts/components/glyph/meld-system.test.ts`
+- ✅ Update `web/ts/components/glyph/meld-composition.test.ts`
   - ✅ Remove `glyphIds` expectation from `unmeldComposition()` return value
 
 ### Phase 1bc: Frontend UI Integration ✅ **COMPLETE**
@@ -330,7 +332,7 @@ interface CompositionState {
 #### Auto-meld result below py ✅
 - ✅ `py-glyph.ts`: `createAndDisplayResultGlyph` calls `performMeld('bottom')`
 - ✅ Composition made draggable immediately after auto-meld
-- ⚠️ When py is already in a composition, result spawns standalone (Phase 3)
+- ✅ When py is already in a composition, result extends composition (Phase 3)
 
 #### Call site updates ✅
 - ✅ `glyph-interaction.ts`: passes direction to `performMeld`
@@ -339,8 +341,9 @@ interface CompositionState {
 
 #### Tests ✅
 - ✅ `meldability.test.ts` (new): port-aware registry, DAG helpers, getMeldOptions
-- ✅ `meld-system.test.ts`: directional melding, direction-aware reconstruction
-- ✅ All 387 tests passing, 0 fail
+- ✅ `meld-composition.test.ts`: directional melding, direction-aware reconstruction
+- ✅ `meld-detect.test.ts`: bidirectional detection, composition target finding
+- ✅ All 397 tests passing, 0 fail
 
 #### Manual Testing ✅
 - ✅ Horizontal meld (ax+prompt, ax+py) works as before
@@ -348,92 +351,97 @@ interface CompositionState {
 - ✅ Composition draggable after auto-meld
 - ✅ Refresh reconstructs compositions with correct layout direction
 
-### Phase 3: Composition Extension
+### Phase 3: Composition Extension ✅ **COMPLETE**
 
-**Goal:** Meld a standalone glyph into an existing composition (drag-to-extend and auto-meld-into).
+**Goal:** Meld a standalone glyph into an existing composition (edges-only: append to leaf / prepend to root). Also fix auto-meld when py is already inside a composition.
 
-- [ ] Update `findMeldTarget()` to recognize glyphs inside compositions as targets
-  - [ ] Use `getMeldOptions()` to check leaf/root compatibility with composition
-- [ ] Add `extendComposition()`: append/prepend glyph to existing composition
-  - [ ] Reparent glyph into composition container
-  - [ ] Add edge to composition's edge set
-  - [ ] Update storage
-- [ ] Update `glyph-interaction.ts`: handle extending compositions during drag
-- [ ] Update `py-glyph.ts`: auto-meld result when py is already inside a composition
+**Composition ID strategy:** Regenerate ID on extend (`melded-{from}-{to}` with the new edge's endpoints).
 
-#### Manual Testing
+#### Module split ✅
+- ✅ Split `meld-system.ts` into focused modules:
+  - `meld-detect.ts` — proximity detection, target finding (`findMeldTarget`, `canInitiateMeld`, `canReceiveMeld`)
+  - `meld-feedback.ts` — visual proximity cues (`applyMeldFeedback`, `clearMeldFeedback`)
+  - `meld-composition.ts` — composition CRUD (`performMeld`, `extendComposition`, `reconstructMeld`, `unmeldComposition`)
+  - `meld-system.ts` — barrel re-export (zero import churn for callers)
+- ✅ Split tests into `meld-detect.test.ts` and `meld-composition.test.ts`
 
-- [ ] Drag prompt near ax|py composition → extends to ax|py|prompt
-  - [ ] Refresh → 3-glyph chain persists
-  - [ ] Unmeld → all 3 glyphs separate
-- [ ] Run py code when py is in ax|py composition → result attaches below py
+#### Drag-to-extend ✅
+- ✅ `findMeldTarget()` recognizes glyphs inside compositions as meld targets
+  - ✅ Relaxed guards: only skip elements in the SAME composition
+  - ✅ Uses `.closest('.melded-composition')` for sub-container awareness
+  - ✅ Both forward and reverse detection work with composition targets
+- ✅ `extendComposition()` in `meld-composition.ts`
+  - ✅ Same-axis: append/prepend to composition container
+  - ✅ Cross-axis: creates `meld-sub-container` (nested flex) to preserve spatial layout
+  - ✅ Reuses existing sub-container for repeat extensions (e.g., second py execution)
+  - ✅ Regenerates composition ID, updates storage
+- ✅ `glyph-interaction.ts`: detects composition targets via `.closest()`, calls `extendComposition`
 
-### Phase 4: Tests
+#### Cross-axis sub-containers ✅
+- ✅ DOM structure for mixed-direction compositions:
+  ```
+  .melded-composition (flex-direction: row)
+    ├── ax-glyph
+    └── .meld-sub-container (flex-direction: column)
+        ├── py-glyph
+        └── result-glyph
+  ```
+- ✅ `reconstructMeld()` rebuilds sub-containers from stored mixed-direction edges on page reload
+- ✅ All guards use `.closest('.melded-composition')` instead of `parentElement?.classList.contains()`
 
-**TDD tests already written (skipped until implementation):**
+#### Auto-meld-into-composition ✅
+- ✅ `py-glyph.ts`: uses `.closest('.melded-composition')` to find parent composition
+  - ✅ Calls `extendComposition` with direction `'bottom'` and role `'to'`
+  - ✅ Works when py is direct child or inside sub-container
 
-**Frontend tests:**
-- [ ] Unskip `web/ts/components/glyph/meld-system.test.ts`:
-  - [ ] "Tim creates 3-glyph chain (ax|py|prompt) by dragging onto composition"
-  - [ ] "Tim sees proximity feedback when dragging glyph toward composition"
-  - [ ] "Tim extends ax|py composition by dragging prompt onto it"
-  - [ ] "Tim extends 3-glyph chain into 4-glyph chain"
-- [ ] Unskip `web/ts/state/compositions.test.ts`:
-  - [ ] "3-glyph composition stores correctly"
-  - [ ] "isGlyphInComposition works with 3-glyph chains"
-  - [ ] "findCompositionByGlyph finds 3-glyph chains"
-  - [ ] "extending composition adds glyph to array"
+#### Tests ✅
+- ✅ `meld-detect.test.ts`: reverse meld detection, composition target detection
+- ✅ `meld-composition.test.ts`: meld/unmeld, directional layout, reconstruction, extension (same-axis + cross-axis + repeat execution), storage verification
+- ✅ All 397 tests passing, 0 fail
 
-**Backend tests:**
+#### Manual Testing ✅
+- ✅ Drag prompt near ax|py composition → extends to ax|py|prompt
+- ✅ Refresh → 3-glyph composition persists
+- ✅ Unmeld → all 3 glyphs separate
+- ✅ Run py in ax|py composition → result appears below py (cross-axis sub-container)
+- ✅ Drag note above prompt inside composition → extends composition
+
+### Phase 4: Backend Tests
+
+**Backend tests deferred from Phase 3:**
 - [ ] Unskip `glyph/handlers/canvas_test.go`:
-  - [ ] `TestCanvasHandler_HandleCompositions_POST_ThreeGlyphs` (POST with 3 glyph IDs)
-  - [ ] `TestCanvasHandler_HandleCompositions_GET_PreservesGlyphOrder` (verifies left-to-right order)
-  - [ ] `TestCanvasHandler_HandleCompositions_POST_FourGlyphChain` (4-glyph chain extensibility)
-
-**Additional tests needed:**
-- [ ] Add visual layout tests
-  - [ ] Test: glyphs horizontally aligned in 3-glyph chain
-  - [ ] Test: no overlap between adjacent glyphs
-  - [ ] Test: proper spacing maintained
-- [ ] Add py-py chaining tests
-  - [ ] Test: `py + py → [py|py]` creates 2-glyph py chain
-  - [ ] Test: `[py|py] + prompt → [py|py|prompt]` extends py chain
-  - [ ] Test: `ax + py → [ax|py]` then `[ax|py] + py → [ax|py|py]`
-  - [ ] Test: meldability registry allows py → py melding
+  - [ ] 3-edge composition POST/GET roundtrip
+  - [ ] Edge ordering preserved
 
 ### Phase 5: Integration & Polish
 
-- [ ] Test manually in browser
-  - [ ] Create `[ax|py]`, verify it works
-  - [ ] Drag `prompt` to meld → verify `[ax|py|prompt]` forms
-  - [ ] Refresh page → verify chain persists
-  - [ ] Unmeld → verify all 3 glyphs separate correctly
-  - [ ] **py-py chaining:**
-    - [ ] Create `[py|py]` by dragging py onto py
-    - [ ] Extend to `[py|py|prompt]` by dragging prompt
-    - [ ] Verify `[ax|py|py]` works (ax followed by 2 py scripts)
-    - [ ] Test data flows correctly through sequential py scripts
-
-- [ ] Update documentation
-  - [ ] Add example to `docs/vision/glyph-melding.md`
-  - [ ] Document py-py chain semantics (sequential pipeline)
-  - [ ] Note limitations (linear only, no branching)
+- [ ] py-py chaining manual test: `[py|py]` → `[py|py|prompt]`
+- [ ] Update ADR-009 for Phase 3 completion
 
 ## Open Questions
 
-1. **Maximum chain length?** Propose: limit to 4-5 glyphs for UX clarity
-2. **Chain validation?** Should we enforce valid orderings (e.g., prevent `[prompt|ax]`)?
-3. **Data flow semantics?** How does data pass through 3-glyph chains?
-4. **Unmeld granularity?** Should pulling middle glyph split chain in two?
+1. **Unmeld granularity?** Should pulling a middle glyph split the composition in two, or always unmeld everything?
+2. **Maximum composition size?** No hard limit yet — monitor UX as chains grow.
 
 ## Design Decisions
 
-**py → py chaining (Phase 2 extension):**
-- **Decision:** Enable py glyphs to chain with other py glyphs
+**py → py chaining:**
+- **Decision:** Enabled in Phase 2 via port-aware MELDABILITY registry
 - **Rationale:** Sequential Python pipelines are a common pattern (ETL, data transformation chains)
-- **Semantic:** Output of first py script feeds as input to second py script
-- **New composition types:** `py-py`, `py-py-prompt`, `ax-py-py`, `py-py-py`, etc.
-- **Implementation:** Update `MELDABILITY` to include `'canvas-py-glyph': ['canvas-prompt-glyph', 'canvas-py-glyph']`
+- **Implementation:** `MELDABILITY['canvas-py-glyph']` includes `{ direction: 'right', targets: ['canvas-py-glyph'] }`
+
+**Edge-based composition IDs:**
+- **Decision:** Regenerate ID on composition extension (`melded-{from}-{to}`)
+- **Rationale:** Keeps naming consistent with creation pattern; old ID removed from storage, new ID added
+
+**Cross-axis sub-containers:**
+- **Decision:** Nested `meld-sub-container` divs for mixed-direction compositions
+- **Rationale:** A single flex container can only flow in one direction. When a composition has both horizontal (right) and vertical (bottom) edges, the cross-axis glyphs need their own flex container.
+- **Implementation:** `extendComposition()` detects cross-axis and wraps anchor + incoming in a sub-container. `reconstructMeld()` builds sub-containers from stored edges. All guards use `.closest('.melded-composition')` to traverse through sub-containers.
+
+**Meld system module split:**
+- **Decision:** Split monolith `meld-system.ts` into `meld-detect.ts`, `meld-feedback.ts`, `meld-composition.ts` with barrel re-export
+- **Rationale:** File exceeded 700 lines with three distinct concerns. Barrel re-export preserves all existing import paths.
 
 ## Migration Strategy
 
