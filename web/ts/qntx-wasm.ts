@@ -30,6 +30,20 @@ export type ParseResult =
     | { ok: true; query: AxQuery }
     | { ok: false; error: string };
 
+/** Fuzzy match result */
+export interface FuzzyMatch {
+    value: string;
+    score: number;
+    strategy: string;
+}
+
+/** Fuzzy index rebuild result */
+export interface FuzzyRebuildResult {
+    predicate_count: number;
+    context_count: number;
+    hash: string;
+}
+
 /** Promise that resolves when WASM is initialized */
 let initPromise: Promise<void> | null = null;
 
@@ -157,6 +171,65 @@ export async function listAttestationIds(): Promise<string[]> {
     await ensureInit();
     const json = await wasm.list_attestation_ids();
     return JSON.parse(json);
+}
+
+// ============================================================================
+// Fuzzy matching (offline-capable, runs entirely in WASM)
+// ============================================================================
+
+/**
+ * Rebuild the fuzzy search index with new vocabulary.
+ * Call this when the local attestation vocabulary changes.
+ */
+export function rebuildFuzzyIndex(
+    predicates: string[],
+    contexts: string[],
+): FuzzyRebuildResult {
+    const result = wasm.fuzzy_rebuild_index(
+        JSON.stringify(predicates),
+        JSON.stringify(contexts),
+    );
+    return JSON.parse(result);
+}
+
+/**
+ * Fuzzy search predicates vocabulary.
+ * Returns matches sorted by score descending.
+ */
+export function searchPredicates(
+    query: string,
+    limit: number = 20,
+    minScore: number = 0.6,
+): FuzzyMatch[] {
+    const json = wasm.fuzzy_search(query, 'predicates', limit, minScore);
+    return JSON.parse(json);
+}
+
+/**
+ * Fuzzy search contexts vocabulary.
+ * Returns matches sorted by score descending.
+ */
+export function searchContexts(
+    query: string,
+    limit: number = 20,
+    minScore: number = 0.6,
+): FuzzyMatch[] {
+    const json = wasm.fuzzy_search(query, 'contexts', limit, minScore);
+    return JSON.parse(json);
+}
+
+/**
+ * Check if the fuzzy engine has vocabulary indexed.
+ */
+export function isFuzzyReady(): boolean {
+    return wasm.fuzzy_is_ready();
+}
+
+/**
+ * Get the fuzzy index hash for change detection.
+ */
+export function getFuzzyHash(): string {
+    return wasm.fuzzy_get_hash();
 }
 
 /**
