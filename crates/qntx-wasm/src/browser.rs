@@ -189,19 +189,19 @@ pub async fn list_attestation_ids() -> Result<String, JsValue> {
 pub async fn fuzzy_rebuild_index() -> Result<String, JsValue> {
     let store = get_store();
 
-    let predicates = store
-        .predicates()
-        .await
-        .map_err(|e| JsValue::from_str(&format!("Failed to load predicates from IndexedDB: {:?}", e)))?;
+    let predicates = store.predicates().await.map_err(|e| {
+        JsValue::from_str(&format!(
+            "Failed to load predicates from IndexedDB: {:?}",
+            e
+        ))
+    })?;
 
-    let contexts = store
-        .contexts()
-        .await
-        .map_err(|e| JsValue::from_str(&format!("Failed to load contexts from IndexedDB: {:?}", e)))?;
+    let contexts = store.contexts().await.map_err(|e| {
+        JsValue::from_str(&format!("Failed to load contexts from IndexedDB: {:?}", e))
+    })?;
 
-    let (pred_count, ctx_count, hash) = FUZZY.with(|f| {
-        f.borrow_mut().rebuild_index(predicates, contexts)
-    });
+    let (pred_count, ctx_count, hash) =
+        FUZZY.with(|f| f.borrow_mut().rebuild_index(predicates, contexts));
 
     Ok(format!(
         r#"{{"predicates":{},"contexts":{},"hash":"{}"}}"#,
@@ -213,18 +213,24 @@ pub async fn fuzzy_rebuild_index() -> Result<String, JsValue> {
 /// vocab_type: "predicates" or "contexts"
 /// Returns JSON array: [{"value":"...", "score":0.95, "strategy":"exact"}, ...]
 #[wasm_bindgen]
-pub fn fuzzy_search(query: &str, vocab_type: &str, limit: usize, min_score: f64) -> Result<String, JsValue> {
+pub fn fuzzy_search(
+    query: &str,
+    vocab_type: &str,
+    limit: usize,
+    min_score: f64,
+) -> Result<String, JsValue> {
     let vtype = match vocab_type {
         "predicates" => VocabularyType::Predicates,
         "contexts" => VocabularyType::Contexts,
-        _ => return Err(JsValue::from_str(&format!(
-            "Invalid vocab_type '{}', expected 'predicates' or 'contexts'", vocab_type
-        ))),
+        _ => {
+            return Err(JsValue::from_str(&format!(
+                "Invalid vocab_type '{}', expected 'predicates' or 'contexts'",
+                vocab_type
+            )))
+        }
     };
 
-    let matches = FUZZY.with(|f| {
-        f.borrow().find_matches(query, vtype, limit, min_score)
-    });
+    let matches = FUZZY.with(|f| f.borrow().find_matches(query, vtype, limit, min_score));
 
     serde_json::to_string(&matches)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize fuzzy matches: {}", e)))
