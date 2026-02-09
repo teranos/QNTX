@@ -97,7 +97,6 @@ test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
 	@mkdir -p tmp
 	@# Test with core tags to ensure we test what we ship
-	@# TODO: Add rustfuzzy,rustvideo once those are stabilized
 	@go test -tags "rustsqlite,qntxwasm" -short -coverprofile=tmp/coverage.out -covermode=count ./...
 	@go tool cover -html=tmp/coverage.out -o tmp/coverage.html
 	@echo "✓ Go tests complete. Coverage report: tmp/coverage.html"
@@ -245,13 +244,6 @@ rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
 	@cd ats/ax/fuzzy-ax && cargo fmt --check
 	@cd ats/ax/fuzzy-ax && cargo clippy --lib -- -D warnings
 	@echo "✓ Rust code checks passed"
-
-rust-fuzzy-integration: rust-fuzzy ## Run Rust fuzzy integration tests (Go + Rust)
-	@echo "Running Rust fuzzy integration tests..."
-	@export DYLD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$DYLD_LIBRARY_PATH && \
-		export LD_LIBRARY_PATH=$(PWD)/ats/ax/fuzzy-ax/target/release:$$LD_LIBRARY_PATH && \
-		go test -tags "integration rustfuzzy" -v ./ats/ax/fuzzy-ax/...
-	@echo "✓ Integration tests passed"
 
 # Rust Python plugin (PyO3-based Python execution)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
