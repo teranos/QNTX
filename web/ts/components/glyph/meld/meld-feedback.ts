@@ -56,8 +56,9 @@ export function clearMeldFeedback(element: HTMLElement): void {
     element.style.boxShadow = '';
     element.classList.remove('meld-ready');
 
-    // Clear from any potential targets
-    const canvas = element.parentElement;
+    // Clear from any potential targets — walk up to canvas to handle
+    // elements inside compositions or sub-containers
+    const canvas = element.closest('.canvas-workspace') ?? element.parentElement;
     if (canvas) {
         canvas.querySelectorAll('.meld-target').forEach(target => {
             target.classList.remove('meld-target');
