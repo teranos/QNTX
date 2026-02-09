@@ -6,40 +6,45 @@
  * to keep composition-specific logic separate.
  */
 
-import { uiState, type CompositionState } from './ui';
+import { uiState, type CompositionState, type CompositionEdge } from './ui';
 import { log, SEG } from '../logger';
 import { upsertComposition as apiUpsertComposition, deleteComposition as apiDeleteComposition } from '../api/canvas';
 
 /**
- * Determine composition type from glyph CSS classes
+ * Build edges from a linear chain of glyph IDs
+ * Creates consecutive edges connecting glyphs in order
  */
-export function getCompositionType(
-    initiatorElement: HTMLElement,
-    targetElement: HTMLElement
-): CompositionState['type'] | null {
-    const initiatorClass = initiatorElement.className;
-    const targetClass = targetElement.className;
-
-    if (initiatorClass.includes('canvas-ax-glyph')) {
-        if (targetClass.includes('canvas-prompt-glyph')) {
-            return 'ax-prompt';
-        }
-        if (targetClass.includes('canvas-py-glyph')) {
-            return 'ax-py';
-        }
+export function buildEdgesFromChain(
+    glyphIds: string[],
+    direction: 'right' | 'top' | 'bottom' = 'right'
+): CompositionEdge[] {
+    if (glyphIds.length < 2) {
+        return [];
     }
 
-    if (initiatorClass.includes('canvas-py-glyph')) {
-        if (targetClass.includes('canvas-prompt-glyph')) {
-            return 'py-prompt';
-        }
+    const edges: CompositionEdge[] = [];
+    for (let i = 0; i < glyphIds.length - 1; i++) {
+        edges.push({
+            from: glyphIds[i],
+            to: glyphIds[i + 1],
+            direction,
+            position: i
+        });
     }
+    return edges;
+}
 
-    log.debug(SEG.GLYPH, '[Compositions] No composition type match', {
-        initiatorClass,
-        targetClass
-    });
-    return null;
+/**
+ * Extract all unique glyph IDs from edges
+ * Returns deduplicated array of glyph IDs
+ */
+export function extractGlyphIds(edges: CompositionEdge[]): string[] {
+    const ids = new Set<string>();
+    for (const edge of edges) {
+        ids.add(edge.from);
+        ids.add(edge.to);
+    }
+    return Array.from(ids);
 }
 
 /**
@@ -61,8 +66,8 @@ export function addComposition(composition: CompositionState): void {
         uiState.setCanvasCompositions([...compositions, composition]);
         log.debug(SEG.GLYPH, '[Compositions] Added composition', {
             id: composition.id,
-            type: composition.type,
-            glyphIds: composition.glyphIds
+            edges: composition.edges.length,
+            glyphs: extractGlyphIds(composition.edges)
         });
     }
 
@@ -88,22 +93,24 @@ export function removeComposition(id: string): void {
 }
 
 /**
- * Check if a glyph is part of any composition
+ * Check if a glyph is part of any composition (DAG-native)
+ * Traverses edges to find if glyph appears in any from/to
  */
 export function isGlyphInComposition(glyphId: string): boolean {
     const compositions = uiState.getCanvasCompositions();
     return compositions.some(c =>
-        c.glyphIds.includes(glyphId)
+        c.edges.some(edge => edge.from === glyphId || edge.to === glyphId)
     );
 }
 
 /**
- * Find composition containing a specific glyph
+ * Find composition containing a specific glyph (DAG-native)
+ * Traverses edges to find composition where glyph appears
  */
 export function findCompositionByGlyph(glyphId: string): CompositionState | null {
     const compositions = uiState.getCanvasCompositions();
     return compositions.find(c =>
-        c.glyphIds.includes(glyphId)
+        c.edges.some(edge => edge.from === glyphId || edge.to === glyphId)
     ) || null;
 }
 
@@ -113,3 +120,4 @@ export function findCompositionByGlyph(glyphId: string): CompositionState | null
 export function getAllCompositions(): CompositionState[] {
     return uiState.getCanvasCompositions();
 }
+

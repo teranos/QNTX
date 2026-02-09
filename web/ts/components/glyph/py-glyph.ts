@@ -22,12 +22,13 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } from './glyph-interaction';
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
+import { canvasPlaced } from './manifestations/canvas-placed';
 
 /**
  * Create a Python editor glyph with CodeMirror
@@ -36,57 +37,19 @@ import { connectivityManager } from '../../connectivity';
  * TODO: Store editor reference for later access (code execution, content updates)
  */
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
-    const element = document.createElement('div');
-    element.className = 'canvas-py-glyph canvas-glyph';
-    element.dataset.glyphId = glyph.id;
-    if (glyph.symbol) {
-        element.dataset.glyphSymbol = glyph.symbol;
-    }
-
-    const x = glyph.x ?? 200;
-    const y = glyph.y ?? 200;
-
     // Load code from storage or use default
     const storage = getScriptStorage();
     const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
     const savedCode = await storage.load(glyph.id);
     const code = savedCode ?? defaultCode;
 
-    // Calculate initial size based on content (if no saved size)
+    // Calculate initial height based on content (if no saved size)
     const lineCount = code.split('\n').length;
-    const lineHeight = 24; // Approximate height per line in CodeMirror
-    const titleBarHeight = 36;
+    const lineHeight = 24;
+    const titleBarH = 36;
     const minHeight = 120;
     const maxHeight = 600;
-    const calculatedHeight = Math.min(maxHeight, Math.max(minHeight, titleBarHeight + lineCount * lineHeight + 40));
-
-    // Use saved size if available, otherwise use defaults
-    const width = glyph.width ?? 400;
-    const height = glyph.height ?? calculatedHeight;
-
-    // Style element - auto-sized based on content or restored from saved size
-    applyCanvasGlyphLayout(element, { x, y, width, height });
-    element.style.minWidth = '200px';
-    element.style.minHeight = '120px';
-    element.style.zIndex = '1';
-
-    // Title bar for dragging
-    const titleBar = document.createElement('div');
-    titleBar.className = 'py-glyph-title-bar';
-    titleBar.style.padding = '8px';
-    titleBar.style.backgroundColor = 'var(--bg-tertiary)';
-    titleBar.style.cursor = 'move';
-    titleBar.style.userSelect = 'none';
-    titleBar.style.fontWeight = 'bold';
-    titleBar.style.fontSize = '14px';
-    titleBar.style.display = 'flex';
-    titleBar.style.alignItems = 'center';
-    titleBar.style.justifyContent = 'space-between';
-
-    // Label
-    const label = document.createElement('span');
-    label.textContent = 'py';
-    titleBar.appendChild(label);
+    const calculatedHeight = Math.min(maxHeight, Math.max(minHeight, titleBarH + lineCount * lineHeight + 40));
 
     // Run button
     const runButton = document.createElement('button');
@@ -94,7 +57,29 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     runButton.className = 'glyph-play-btn';
     runButton.title = 'Run Python code';
 
-    preventDrag(runButton);
+    const { element } = canvasPlaced({
+        glyph,
+        className: 'canvas-py-glyph',
+        defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
+        titleBar: { label: 'py', actions: [runButton] },
+        resizable: true,
+        logLabel: 'PyGlyph',
+    });
+    element.style.minWidth = '200px';
+    element.style.minHeight = '120px';
+    element.style.zIndex = '1';
+
+    // Python brand colors on title bar
+    const titleBar = element.querySelector('.canvas-glyph-title-bar') as HTMLElement;
+    if (titleBar) {
+        titleBar.style.backgroundColor = '#2a5578';
+        const labelSpan = titleBar.querySelector('span:first-child') as HTMLElement;
+        if (labelSpan) {
+            labelSpan.style.color = '#FFD43B';
+            labelSpan.style.fontWeight = 'bold';
+            labelSpan.style.flex = '1';
+        }
+    }
 
     // Execute Python code on click
     runButton.addEventListener('click', async () => {
@@ -163,24 +148,12 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         }
     });
 
-    titleBar.appendChild(runButton);
-
-    // TODO: Add click handler to spawn programmature manifestation
-    // titleBar.addEventListener('click', () => spawnProgrammatureManifestation(glyph));
-
-    element.appendChild(titleBar);
-
     // Editor container
     const editorContainer = document.createElement('div');
     editorContainer.className = 'py-glyph-editor';
     editorContainer.style.flex = '1';
     editorContainer.style.overflow = 'hidden';
     element.appendChild(editorContainer);
-
-    // Resize handle
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'py-glyph-resize-handle glyph-resize-handle';
-    element.appendChild(resizeHandle);
 
     // Initialize CodeMirror with loaded code
     // TODO: Add run button in title bar that executes code via /api/python/execute
@@ -240,12 +213,6 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         editorContainer.textContent = 'Error loading editor';
     }
 
-    // Make draggable by title bar
-    makeDraggable(element, titleBar, glyph, { logLabel: 'PyGlyph' });
-
-    // Make resizable by handle
-    makeResizable(element, resizeHandle, glyph, { logLabel: 'PyGlyph' });
-
     // Subscribe to sync state changes for visual feedback
     syncStateManager.subscribe(glyph.id, (state) => {
         element.dataset.syncState = state;
@@ -265,30 +232,36 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
 function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionResult): void {
     // Calculate position for result glyph (directly below the py glyph)
     const pyRect = pyElement.getBoundingClientRect();
-    const canvas = pyElement.parentElement;
-    const canvasRect = canvas?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const canvas = pyElement.closest('.canvas-workspace') as HTMLElement;
+    if (!canvas) {
+        log.error(SEG.GLYPH, '[PyGlyph] Cannot spawn result glyph: no canvas-workspace ancestor');
+        return;
+    }
+    const canvasRect = canvas.getBoundingClientRect();
 
     const x = pyRect.left - canvasRect.left;
     const y = pyRect.bottom - canvasRect.top;
 
     // Create result glyph metadata
-    const resultGlyph: Partial<Glyph> & { id: string; symbol: string; x: number; y: number } = {
-        id: `result-${crypto.randomUUID()}`,
+    const resultGlyphId = `result-${crypto.randomUUID()}`;
+    const resultGlyph: Glyph = {
+        id: resultGlyphId,
         title: 'Python Result',
         symbol: 'result',
         x,
         y,
-        width: Math.round(pyRect.width)
+        width: Math.round(pyRect.width),
+        renderContent: () => document.createElement('div')
     };
 
-    // Render result glyph
-    const resultElement = createResultGlyph(resultGlyph as Glyph, result);
-    canvas?.appendChild(resultElement);
+    // Render result glyph and add to canvas (performMeld needs both on canvas)
+    const resultElement = createResultGlyph(resultGlyph, result);
+    canvas.appendChild(resultElement);
 
     // Persist to uiState with execution result
     const resultRect = resultElement.getBoundingClientRect();
     uiState.addCanvasGlyph({
-        id: resultGlyph.id,
+        id: resultGlyphId,
         symbol: 'result',
         x,
         y,
@@ -297,6 +270,10 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
         result: result
     });
 
-    log.debug(SEG.GLYPH, `[PyGlyph] Spawned result glyph at (${x}, ${y}), duration ${result.duration_ms}ms`);
+    // Auto-meld result below py glyph (bottom port)
+    const pyGlyphId = pyElement.dataset.glyphId;
+    if (pyGlyphId) {
+        autoMeldResultBelow(pyElement, pyGlyphId, 'py', 'Python', resultElement, resultGlyphId, 'PyGlyph');
+    }
 }
 

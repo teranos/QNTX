@@ -12,8 +12,7 @@ import {
     removeComposition,
     isGlyphInComposition,
     findCompositionByGlyph,
-    getAllCompositions,
-    getCompositionType
+    getAllCompositions
 } from './compositions';
 
 describe('Composition State Management', () => {
@@ -26,8 +25,7 @@ describe('Composition State Management', () => {
         test('adds new composition to storage', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -42,8 +40,7 @@ describe('Composition State Management', () => {
         test('updates existing composition', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -65,8 +62,7 @@ describe('Composition State Management', () => {
         test('removes composition from storage', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -88,8 +84,7 @@ describe('Composition State Management', () => {
         test('returns true when glyph is initiator', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -101,8 +96,7 @@ describe('Composition State Management', () => {
         test('returns true when glyph is target', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -114,8 +108,7 @@ describe('Composition State Management', () => {
         test('returns false when glyph is not in any composition', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -129,8 +122,7 @@ describe('Composition State Management', () => {
         test('finds composition by initiator id', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -143,8 +135,7 @@ describe('Composition State Management', () => {
         test('finds composition by target id', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -157,8 +148,7 @@ describe('Composition State Management', () => {
         test('returns null when glyph not in any composition', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -169,62 +159,18 @@ describe('Composition State Management', () => {
         });
     });
 
-    describe('getCompositionType', () => {
-        test('detects ax-prompt composition', () => {
-            const initiator = document.createElement('div');
-            initiator.className = 'canvas-ax-glyph';
-            const target = document.createElement('div');
-            target.className = 'canvas-prompt-glyph';
-
-            const type = getCompositionType(initiator, target);
-            expect(type).toBe('ax-prompt');
-        });
-
-        test('detects ax-py composition', () => {
-            const initiator = document.createElement('div');
-            initiator.className = 'canvas-ax-glyph';
-            const target = document.createElement('div');
-            target.className = 'canvas-py-glyph';
-
-            const type = getCompositionType(initiator, target);
-            expect(type).toBe('ax-py');
-        });
-
-        test('detects py-prompt composition', () => {
-            const initiator = document.createElement('div');
-            initiator.className = 'canvas-py-glyph';
-            const target = document.createElement('div');
-            target.className = 'canvas-prompt-glyph';
-
-            const type = getCompositionType(initiator, target);
-            expect(type).toBe('py-prompt');
-        });
-
-        test('returns null for incompatible glyphs', () => {
-            const initiator = document.createElement('div');
-            initiator.className = 'canvas-prompt-glyph';
-            const target = document.createElement('div');
-            target.className = 'canvas-prompt-glyph';
-
-            const type = getCompositionType(initiator, target);
-            expect(type).toBe(null);
-        });
-    });
-
     describe('persistence integration', () => {
         test('compositions persist through state updates', () => {
             const comp1: CompositionState = {
                 id: 'melded-ax1-prompt1',
-                type: 'ax-prompt',
-                glyphIds: ['ax1', 'prompt1'],
+                edges: [{ from: 'ax1', to: 'prompt1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
 
             const comp2: CompositionState = {
                 id: 'melded-py1-prompt2',
-                type: 'py-prompt',
-                glyphIds: ['py1', 'prompt2'],
+                edges: [{ from: 'py1', to: 'prompt2', direction: 'right', position: 0 }],
                 x: 300,
                 y: 400
             };
@@ -239,13 +185,15 @@ describe('Composition State Management', () => {
         });
     });
 
-    // TODO(#441): Phase 2-5 - Multi-glyph chain functionality tests
-    describe.skip('Multi-glyph chains (Phase 2-5)', () => {
+    // Phase 2: Multi-glyph chain state management
+    describe('Multi-glyph chains', () => {
         test('3-glyph composition stores correctly', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
-                type: 'ax-py-prompt',
-                glyphIds: ['ax1', 'py1', 'prompt1'],
+                edges: [
+                    { from: 'ax1', to: 'py1', direction: 'right', position: 0 },
+                    { from: 'py1', to: 'prompt1', direction: 'right', position: 1 }
+                ],
                 x: 100,
                 y: 200
             };
@@ -254,14 +202,16 @@ describe('Composition State Management', () => {
 
             const compositions = getAllCompositions();
             expect(compositions).toHaveLength(1);
-            expect(compositions[0].glyphIds).toEqual(['ax1', 'py1', 'prompt1']);
+            expect(compositions[0].edges).toHaveLength(2);
         });
 
         test('isGlyphInComposition works with 3-glyph chains', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
-                type: 'ax-py-prompt',
-                glyphIds: ['ax1', 'py1', 'prompt1'],
+                edges: [
+                    { from: 'ax1', to: 'py1', direction: 'right', position: 0 },
+                    { from: 'py1', to: 'prompt1', direction: 'right', position: 1 }
+                ],
                 x: 100,
                 y: 200
             };
@@ -277,8 +227,10 @@ describe('Composition State Management', () => {
         test('findCompositionByGlyph finds 3-glyph chains', () => {
             const comp: CompositionState = {
                 id: 'melded-ax1-py1-prompt1',
-                type: 'ax-py-prompt',
-                glyphIds: ['ax1', 'py1', 'prompt1'],
+                edges: [
+                    { from: 'ax1', to: 'py1', direction: 'right', position: 0 },
+                    { from: 'py1', to: 'prompt1', direction: 'right', position: 1 }
+                ],
                 x: 100,
                 y: 200
             };
@@ -290,12 +242,11 @@ describe('Composition State Management', () => {
             expect(findCompositionByGlyph('prompt1')).toEqual(comp);
         });
 
-        test('extending composition adds glyph to array', () => {
+        test('extending composition adds edge to graph', () => {
             // Start with 2-glyph composition
             const comp: CompositionState = {
                 id: 'melded-ax1-py1',
-                type: 'ax-py',
-                glyphIds: ['ax1', 'py1'],
+                edges: [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }],
                 x: 100,
                 y: 200
             };
@@ -305,14 +256,16 @@ describe('Composition State Management', () => {
             // Extend to 3 glyphs (this functionality needs implementation in Phase 3)
             const extended: CompositionState = {
                 ...comp,
-                type: 'ax-py-prompt',
-                glyphIds: [...comp.glyphIds, 'prompt1']
+                edges: [
+                    ...comp.edges,
+                    { from: 'py1', to: 'prompt1', direction: 'right', position: 1 }
+                ]
             };
 
             addComposition(extended);
 
             const result = findCompositionByGlyph('prompt1');
-            expect(result?.glyphIds).toEqual(['ax1', 'py1', 'prompt1']);
+            expect(result?.edges).toHaveLength(2);
         });
     });
 });

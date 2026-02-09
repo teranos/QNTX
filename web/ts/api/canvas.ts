@@ -5,7 +5,7 @@
  * to the backend database.
  */
 
-import type { CanvasGlyphState, CompositionState } from '../state/ui';
+import type { CanvasGlyphState, CompositionState, CompositionEdge } from '../state/ui';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
 import { syncStateManager } from '../state/sync-state';
@@ -24,8 +24,7 @@ export interface CanvasGlyphResponse {
 
 export interface CompositionResponse {
     id: string;
-    type: 'ax-prompt' | 'ax-py' | 'py-prompt' | 'ax-py-prompt';
-    glyph_ids: string[];
+    edges: CompositionEdge[];
     x: number;
     y: number;
     created_at: string;
@@ -134,8 +133,7 @@ export async function upsertComposition(composition: CompositionState): Promise<
     try {
         const payload = {
             id: composition.id,
-            type: composition.type,
-            glyph_ids: composition.glyphIds,
+            edges: composition.edges,
             x: composition.x,
             y: composition.y,
         };
@@ -256,8 +254,7 @@ export async function loadCanvasState(): Promise<{
 
         const compositions: CompositionState[] = compositionsResponse.map(c => ({
             id: c.id,
-            type: c.type,
-            glyphIds: c.glyph_ids,
+            edges: c.edges,
             x: c.x,
             y: c.y,
         }));

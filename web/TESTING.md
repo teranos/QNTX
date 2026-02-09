@@ -10,6 +10,7 @@ Don't test implementation details. Organize tests by persona: **Tim** (happy pat
 bun test              # Run once
 bun test --watch      # Watch mode
 make test-web         # From project root
+USE_JSDOM=1 bun test path/to/test.dom.test.ts  # Run single JSDOM test locally
 ```
 
 ## File Organization

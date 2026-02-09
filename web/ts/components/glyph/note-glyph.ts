@@ -10,12 +10,12 @@
  */
 
 import type { Glyph } from './glyph';
-import { Prose } from '@generated/sym.js';
 import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
 import { getScriptStorage } from '../../storage/script-storage';
-import { applyCanvasGlyphLayout, makeDraggable, makeResizable, storeCleanup } from './glyph-interaction';
+import { storeCleanup } from './glyph-interaction';
 import { tooltip } from '../tooltip';
+import { canvasPlaced } from './manifestations/canvas-placed';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history, undo, redo } from 'prosemirror-history';
@@ -52,18 +52,18 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
         log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
     }
 
-    element.className = 'canvas-note-glyph canvas-glyph';
-    element.dataset.glyphId = glyph.id;
-    element.dataset.glyphSymbol = Prose;
-
-    const x = glyph.x ?? 300;
-    const y = glyph.y ?? 200;
-    const width = glyph.width ?? 320;
-    const height = glyph.height ?? 280;
-
     // Reset inline styles (important when repopulating after conversion)
     element.style.cssText = '';
-    applyCanvasGlyphLayout(element, { x, y, width, height });
+
+    canvasPlaced({
+        element,
+        glyph,
+        className: 'canvas-note-glyph',
+        defaults: { x: 300, y: 200, width: 320, height: 280 },
+        resizable: { minWidth: 120, minHeight: 100 },
+        resizeHandleClass: 'glyph-resize-handle--small',
+        logLabel: 'NoteGlyph',
+    });
 
     // Post-it note styling: light beige/yellow background with torn top edge
     element.style.backgroundColor = '#f5edb8';
@@ -227,27 +227,13 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
         // Clicking on padding area allows drag to work
     });
 
-    // Assemble glyph (no title bar)
+    // Assemble glyph (no title bar — draggable by element itself via canvasPlaced)
     element.appendChild(editorContainer);
-
-    // Resize handle for bottom-right corner (over the folded corner cutout)
-    const resizeHandle = document.createElement('div');
-    resizeHandle.className = 'note-glyph-resize-handle glyph-resize-handle glyph-resize-handle--small';
-    element.appendChild(resizeHandle);
-
-    // Make entire note draggable (no title bar) and resizable
-    const cleanupDrag = makeDraggable(element, element, glyph, { logLabel: 'NoteGlyph' });
-    makeResizable(element, resizeHandle, glyph, {
-        logLabel: 'NoteGlyph',
-        minWidth: 120,
-        minHeight: 100
-    });
 
     // Set up ResizeObserver for auto-sizing glyph to content
     setupNoteGlyphResizeObserver(element, editorContainer, glyph.id);
 
-    // Register cleanup for conversions
-    storeCleanup(element, cleanupDrag);
+    // Register cleanup for conversions (drag/resize cleanup handled by canvasPlaced)
     storeCleanup(element, () => editorView.destroy());
     storeCleanup(element, () => {
         if (saveTimeout !== undefined) clearTimeout(saveTimeout);
