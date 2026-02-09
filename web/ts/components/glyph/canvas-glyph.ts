@@ -20,14 +20,10 @@
  */
 
 import type { Glyph } from './glyph';
-import { Pulse, IX, AX, SO, Prose } from '@generated/sym.js';
+import { Pulse, IX, AX } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
+import { getGlyphTypeBySymbol, getGlyphTypeByElement } from './glyph-registry';
 import { createAxGlyph } from './ax-glyph';
-import { createIxGlyph } from './ix-glyph';
-import { createPyGlyph } from './py-glyph';
-import { createPromptGlyph } from './prompt-glyph';
-import { createNoteGlyph } from './note-glyph';
 import { createErrorGlyph } from './error-glyph';
 import { uiState } from '../../state/ui';
 import { getMinimizeDuration } from './glyph';
@@ -141,30 +137,17 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
 }
 
 /**
- * Create a Glyph object from a DOM element by detecting its type
- * Used when restoring glyphs after unmeld
+ * Create a Glyph object from a DOM element by detecting its type.
+ * Uses glyph-registry for symbol/title lookup instead of per-type if/else.
  */
 function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
-    if (element.classList.contains('canvas-ax-glyph')) {
-        return { id, title: 'AX Query', symbol: AX, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-ix-glyph')) {
-        return { id, title: 'Ingest', symbol: IX, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-py-glyph')) {
-        return { id, title: 'Python', symbol: 'py', renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-prompt-glyph')) {
-        return { id, title: 'Prompt', symbol: SO, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-note-glyph')) {
-        return { id, title: 'Note', symbol: Prose, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-result-glyph')) {
-        return { id, title: 'Result', symbol: 'result', renderContent: () => element };
-    }
-    // Fallback
-    return { id, title: 'Glyph', renderContent: () => element };
+    const entry = getGlyphTypeByElement(element);
+    return {
+        id,
+        title: entry?.title ?? 'Glyph',
+        symbol: entry?.symbol,
+        renderContent: () => element,
+    };
 }
 
 /**
@@ -221,11 +204,9 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
     glyphElements.forEach((element) => {
         const glyphId = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
         const glyph = createGlyphFromElement(element, glyphId);
+        const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
 
-        // Determine log label from glyph symbol
-        const label = glyph.symbol === AX ? 'AX' : glyph.symbol === SO ? 'Prompt' : 'Py';
-
-        makeDraggable(element, element, glyph, { logLabel: label });
+        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Glyph' });
     });
 
     // Clear selection and hide action bar
@@ -317,7 +298,7 @@ export function createCanvasGlyph(): Glyph {
     });
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
-        // For ax glyphs, recreate using factory function to restore full functionality
+        // AX glyphs need factory restoration for full WebSocket/query functionality
         if (saved.symbol === AX) {
             const axGlyph = createAxGlyph(saved.id, '', saved.x, saved.y);
             axGlyph.width = saved.width;
@@ -333,24 +314,17 @@ export function createCanvasGlyph(): Glyph {
             });
         }
 
+        const entry = saved.symbol ? getGlyphTypeBySymbol(saved.symbol) : undefined;
         return {
             id: saved.id,
-            title: saved.symbol === 'result' ? 'Python Result' : 'Pulse Schedule',
+            title: entry?.title ?? 'Glyph',
             symbol: saved.symbol,
             x: saved.x,
             y: saved.y,
-            width: saved.width,   // Restore custom size if saved
+            width: saved.width,
             height: saved.height,
-            result: saved.result, // For result glyphs
-            // Placeholder renderContent - result glyphs render via createResultGlyph() instead
-            // TODO: Clarify if Pulse glyphs should display content
-            renderContent: () => {
-                const content = document.createElement('div');
-                content.textContent = saved.symbol === 'result'
-                    ? 'Result placeholder (should not be visible)'
-                    : 'Pulse glyph content (TBD)';
-                return content;
-            }
+            result: saved.result,
+            renderContent: () => document.createElement('div'),
         };
     });
 
@@ -531,8 +505,8 @@ export function createCanvasGlyph(): Glyph {
 }
 
 /**
- * Render a glyph on the canvas
- * Checks symbol type and creates appropriate glyph element
+ * Render a glyph on the canvas.
+ * Uses glyph-registry for dispatch instead of per-type if/else.
  */
 async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     log.debug(SEG.GLYPH, `[Canvas] Rendering glyph ${glyph.id}`, {
@@ -540,42 +514,10 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         hasResult: !!glyph.result
     });
 
-    // For py glyphs, create full editor
-    if (glyph.symbol === 'py') {
-        return await createPyGlyph(glyph);
-    }
-
-    // For IX glyphs, create full form
-    if (glyph.symbol === IX) {
-        return await createIxGlyph(glyph);
-    }
-
-    // For prompt glyphs, create template editor
-    if (glyph.symbol === SO) {
-        return await createPromptGlyph(glyph);
-    }
-
-    // For note glyphs, create markdown editor
-    if (glyph.symbol === Prose) {
-        return await createNoteGlyph(glyph);
-    }
-
-    // For AX glyphs, render content directly (they handle their own rendering)
-    if (glyph.symbol === AX) {
-        return glyph.renderContent();
-    }
-
-    // For result glyphs, create result display
-    if (glyph.symbol === 'result') {
-        if (glyph.result) {
-            log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
-            return createResultGlyph(glyph, glyph.result as ExecutionResult);
-        }
-
-        // Result glyph without execution data - spawn error glyph (ephemeral)
+    // Result without execution data → diagnostic error glyph
+    if (glyph.symbol === 'result' && !glyph.result) {
         log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing execution data`, {
             glyphId: glyph.id,
-            hasResult: !!glyph.result,
             position: { x: glyph.x, y: glyph.y },
             size: { width: glyph.width, height: glyph.height }
         });
@@ -588,7 +530,7 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
                 type: 'missing_data',
                 message: 'Execution result data missing',
                 details: {
-                    'Has result': !!glyph.result,
+                    'Has result': false,
                     'Position': `(${glyph.x}, ${glyph.y})`,
                     'Size': `${glyph.width}x${glyph.height}`,
                     'Cause': 'Glyph metadata saved without execution result (migration bug)'
@@ -597,7 +539,13 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         );
     }
 
-    // Unsupported glyph type - spawn error glyph (ephemeral)
+    // Look up glyph type in registry
+    const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+    if (entry) {
+        return await entry.render(glyph);
+    }
+
+    // Unknown glyph type → diagnostic error glyph
     log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
         glyphId: glyph.id,
         symbol: glyph.symbol,
@@ -614,7 +562,7 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             details: {
                 'Symbol': glyph.symbol ?? 'unknown',
                 'Position': `(${glyph.x}, ${glyph.y})`,
-                'Cause': 'Glyph type not implemented in renderGlyph() - check canvas-glyph.ts'
+                'Cause': 'Glyph type not recognized by registry - check glyph-registry.ts'
             }
         }
     );
