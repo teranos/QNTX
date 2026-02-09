@@ -9,6 +9,7 @@
 
 import type { Glyph } from './glyph';
 import { AX, IX, SO, Prose } from '@generated/sym.js';
+import { createAxGlyph } from './ax-glyph';
 import { createPyGlyph } from './py-glyph';
 import { createIxGlyph } from './ix-glyph';
 import { createPromptGlyph } from './prompt-glyph';
@@ -29,7 +30,7 @@ export interface GlyphTypeEntry {
 }
 
 const GLYPH_TYPES: GlyphTypeEntry[] = [
-    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query', label: 'AX',     render: (g) => g.renderContent() },
+    { symbol: AX,       className: 'canvas-ax-glyph',      title: 'AX Query', label: 'AX',     render: createAxGlyph },
     { symbol: 'py',     className: 'canvas-py-glyph',      title: 'Python',   label: 'Py',     render: createPyGlyph },
     { symbol: IX,       className: 'canvas-ix-glyph',      title: 'Ingest',   label: 'IX',     render: createIxGlyph },
     { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',   label: 'Prompt', render: createPromptGlyph },
