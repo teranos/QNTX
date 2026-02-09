@@ -111,8 +111,14 @@
 }
 
 /* Python editor glyphs on canvas */
-.canvas-py-glyph {
-    /* Base styles are set inline in py-glyph.ts */
+.canvas-py-glyph > .canvas-glyph-title-bar {
+    background-color: #2a5578;
+}
+
+.canvas-py-glyph > .canvas-glyph-title-bar > span:first-child {
+    color: #FFD43B;
+    font-weight: bold;
+    flex: 1;
 }
 
 /* Interaction states for glyphs */
