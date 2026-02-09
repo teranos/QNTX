@@ -6,8 +6,6 @@ type MatcherBackend string
 const (
 	// MatcherBackendGo indicates the built-in Go implementation
 	MatcherBackendGo MatcherBackend = "go"
-	// MatcherBackendRust indicates the CGO-backed Rust implementation
-	MatcherBackendRust MatcherBackend = "rust"
 	// MatcherBackendWasm indicates the WASM-backed Rust implementation (via wazero)
 	MatcherBackendWasm MatcherBackend = "wasm"
 )
@@ -22,7 +20,7 @@ type Matcher interface {
 	// Returns matching contexts from the provided vocabulary.
 	FindContextMatches(queryContext string, allContexts []string) []string
 
-	// Backend returns which implementation is being used (go, rust, or wasm)
+	// Backend returns which implementation is being used (go or wasm)
 	Backend() MatcherBackend
 
 	// SetLogger sets an optional logger for debug output.
