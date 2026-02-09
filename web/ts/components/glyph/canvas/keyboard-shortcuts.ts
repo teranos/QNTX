@@ -4,6 +4,7 @@
  * Handles keyboard interactions for canvas operations:
  * - ESC: deselect all glyphs
  * - DELETE/BACKSPACE: remove selected glyphs
+ * - U: unmeld selected composition
  *
  * Shortcuts are scoped to the focused canvas container
  * Uses AbortController for automatic cleanup when container is removed
@@ -24,7 +25,8 @@ export function setupKeyboardShortcuts(
     container: HTMLElement,
     hasSelection: HasSelectionCallback,
     onDeselect: () => void,
-    onDelete: () => void
+    onDelete: () => void,
+    onUnmeld: () => void
 ): AbortController {
     const controller = new AbortController();
 
@@ -54,6 +56,15 @@ export function setupKeyboardShortcuts(
             e.preventDefault();
             onDelete();
             log.debug(SEG.GLYPH, '[Canvas] DELETE/BACKSPACE pressed - deleting selected glyphs');
+            return;
+        }
+
+        // U to unmeld composition
+        if (e.key === 'u' || e.key === 'U') {
+            e.preventDefault();
+            onUnmeld();
+            log.debug(SEG.GLYPH, '[Canvas] U pressed - unmelding selected composition');
+            return;
         }
     };
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/teranos/QNTX/errors"
+	pb "github.com/teranos/QNTX/glyph/proto"
 )
 
 // CanvasGlyph represents a glyph on the canvas workspace
@@ -22,15 +23,44 @@ type CanvasGlyph struct {
 }
 
 // CanvasComposition represents a melded composition of glyphs
-// Supports multi-glyph chains via GlyphIDs array (ordered left-to-right)
+// Uses edge-based DAG structure to support multi-directional melding
+// See ADR-009 for rationale
 type CanvasComposition struct {
-	ID        string    `json:"id"`
-	Type      string    `json:"type"` // ax-prompt, ax-py, py-prompt, ax-py-prompt
-	GlyphIDs  []string  `json:"glyph_ids"`
-	X         int       `json:"x"`
-	Y         int       `json:"y"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string                  `json:"id"`
+	Edges     []*pb.CompositionEdge   `json:"edges"`
+	X         int                     `json:"x"`
+	Y         int                     `json:"y"`
+	CreatedAt time.Time               `json:"created_at"`
+	UpdatedAt time.Time               `json:"updated_at"`
+}
+
+// compositionEdge is an internal struct for database operations
+// Maps proto CompositionEdge to database schema
+type compositionEdge struct {
+	From      string `db:"from_glyph_id"`
+	To        string `db:"to_glyph_id"`
+	Direction string `db:"direction"`
+	Position  int32  `db:"position"`
+}
+
+// toProtoEdge converts internal DB struct to proto
+func (e *compositionEdge) toProtoEdge() *pb.CompositionEdge {
+	return &pb.CompositionEdge{
+		From:      e.From,
+		To:        e.To,
+		Direction: e.Direction,
+		Position:  e.Position,
+	}
+}
+
+// fromProtoEdge converts proto to internal DB struct
+func fromProtoEdge(e *pb.CompositionEdge) *compositionEdge {
+	return &compositionEdge{
+		From:      e.From,
+		To:        e.To,
+		Direction: e.Direction,
+		Position:  e.Position,
+	}
 }
 
 // CanvasStore provides storage operations for canvas state
@@ -179,7 +209,7 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 	}
 	comp.UpdatedAt = now
 
-	// Start transaction for atomic composition + junction table updates
+	// Start transaction for atomic composition + edges table updates
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to begin transaction")
@@ -188,17 +218,16 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 
 	// Upsert composition record
 	query := `
-		INSERT INTO canvas_compositions (id, type, x, y, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO canvas_compositions (id, x, y, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
-			type = excluded.type,
 			x = excluded.x,
 			y = excluded.y,
 			updated_at = excluded.updated_at
 	`
 
 	_, err = tx.ExecContext(ctx, query,
-		comp.ID, comp.Type, comp.X, comp.Y,
+		comp.ID, comp.X, comp.Y,
 		comp.CreatedAt.Format(time.RFC3339Nano),
 		comp.UpdatedAt.Format(time.RFC3339Nano),
 	)
@@ -206,19 +235,21 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 		return errors.Wrapf(err, "failed to upsert canvas composition %s", comp.ID)
 	}
 
-	// Delete existing junction table entries for this composition
-	deleteQuery := `DELETE FROM composition_glyphs WHERE composition_id = ?`
+	// Delete existing edges for this composition
+	deleteQuery := `DELETE FROM composition_edges WHERE composition_id = ?`
 	_, err = tx.ExecContext(ctx, deleteQuery, comp.ID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete old composition glyphs for %s", comp.ID)
+		return errors.Wrapf(err, "failed to delete old composition edges for %s", comp.ID)
 	}
 
-	// Insert new junction table entries for each glyph (with position)
-	insertQuery := `INSERT INTO composition_glyphs (composition_id, glyph_id, position) VALUES (?, ?, ?)`
-	for i, glyphID := range comp.GlyphIDs {
-		_, err = tx.ExecContext(ctx, insertQuery, comp.ID, glyphID, i)
+	// Insert new edges
+	insertQuery := `INSERT INTO composition_edges (composition_id, from_glyph_id, to_glyph_id, direction, position)
+	                VALUES (?, ?, ?, ?, ?)`
+	for _, edge := range comp.Edges {
+		_, err = tx.ExecContext(ctx, insertQuery,
+			comp.ID, edge.From, edge.To, edge.Direction, edge.Position)
 		if err != nil {
-			return errors.Wrapf(err, "failed to insert composition glyph %s at position %d", glyphID, i)
+			return errors.Wrapf(err, "failed to insert composition edge %s→%s", edge.From, edge.To)
 		}
 	}
 
@@ -231,14 +262,14 @@ func (s *CanvasStore) UpsertComposition(ctx context.Context, comp *CanvasComposi
 
 // GetComposition retrieves a composition by ID
 func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasComposition, error) {
-	query := `SELECT id, type, x, y, created_at, updated_at
+	query := `SELECT id, x, y, created_at, updated_at
 	          FROM canvas_compositions WHERE id = ?`
 
 	var comp CanvasComposition
 	var createdAt, updatedAt string
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&comp.ID, &comp.Type, &comp.X, &comp.Y,
+		&comp.ID, &comp.X, &comp.Y,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -258,31 +289,33 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 		return nil, errors.Wrapf(parseErr, "invalid updated_at timestamp for composition %s: %s", comp.ID, updatedAt)
 	}
 
-	// Query junction table for glyph IDs (ordered by position)
-	glyphQuery := `SELECT glyph_id FROM composition_glyphs
-	               WHERE composition_id = ? ORDER BY position ASC`
-	rows, err := s.db.QueryContext(ctx, glyphQuery, id)
+	// Query edges table
+	edgeQuery := `SELECT from_glyph_id, to_glyph_id, direction, position
+	              FROM composition_edges
+	              WHERE composition_id = ?
+	              ORDER BY position ASC`
+	rows, err := s.db.QueryContext(ctx, edgeQuery, id)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to query composition glyphs for %s", id)
+		return nil, errors.Wrapf(err, "failed to query composition edges for %s", id)
 	}
 	defer rows.Close()
 
-	comp.GlyphIDs = []string{}
+	comp.Edges = []*pb.CompositionEdge{}
 	for rows.Next() {
-		var glyphID string
-		if err := rows.Scan(&glyphID); err != nil {
-			return nil, errors.Wrapf(err, "failed to scan glyph ID for composition %s", id)
+		var edge compositionEdge
+		if err := rows.Scan(&edge.From, &edge.To, &edge.Direction, &edge.Position); err != nil {
+			return nil, errors.Wrapf(err, "failed to scan edge for composition %s", id)
 		}
-		comp.GlyphIDs = append(comp.GlyphIDs, glyphID)
+		comp.Edges = append(comp.Edges, edge.toProtoEdge())
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, errors.Wrapf(err, "error iterating composition glyphs for %s", id)
+		return nil, errors.Wrapf(err, "error iterating composition edges for %s", id)
 	}
 
-	// Validate: composition must have at least one glyph
-	if len(comp.GlyphIDs) == 0 {
-		return nil, errors.Newf("composition %s has no glyphs (orphaned)", id)
+	// Validate: composition must have at least one edge
+	if len(comp.Edges) == 0 {
+		return nil, errors.Newf("composition %s has no edges (orphaned)", id)
 	}
 
 	return &comp, nil
@@ -290,7 +323,7 @@ func (s *CanvasStore) GetComposition(ctx context.Context, id string) (*CanvasCom
 
 // ListCompositions returns all compositions
 func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasComposition, error) {
-	query := `SELECT id, type, x, y, created_at, updated_at
+	query := `SELECT id, x, y, created_at, updated_at
 	          FROM canvas_compositions ORDER BY created_at ASC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -306,7 +339,7 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 		var createdAt, updatedAt string
 
 		if err := rows.Scan(
-			&comp.ID, &comp.Type, &comp.X, &comp.Y,
+			&comp.ID, &comp.X, &comp.Y,
 			&createdAt, &updatedAt,
 		); err != nil {
 			return nil, errors.Wrap(err, "failed to scan canvas composition")
@@ -329,28 +362,30 @@ func (s *CanvasStore) ListCompositions(ctx context.Context) ([]*CanvasCompositio
 		return nil, errors.Wrap(err, "error iterating compositions")
 	}
 
-	// Second pass: query junction table for each composition (after closing first result set)
-	glyphQuery := `SELECT glyph_id FROM composition_glyphs
-	               WHERE composition_id = ? ORDER BY position ASC`
+	// Second pass: query edges table for each composition (after closing first result set)
+	edgeQuery := `SELECT from_glyph_id, to_glyph_id, direction, position
+	              FROM composition_edges
+	              WHERE composition_id = ?
+	              ORDER BY position ASC`
 	for _, comp := range comps {
-		glyphRows, err := s.db.QueryContext(ctx, glyphQuery, comp.ID)
+		edgeRows, err := s.db.QueryContext(ctx, edgeQuery, comp.ID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query composition glyphs for %s", comp.ID)
+			return nil, errors.Wrapf(err, "failed to query composition edges for %s", comp.ID)
 		}
 
-		comp.GlyphIDs = []string{}
-		for glyphRows.Next() {
-			var glyphID string
-			if err := glyphRows.Scan(&glyphID); err != nil {
-				glyphRows.Close()
-				return nil, errors.Wrapf(err, "failed to scan glyph ID for composition %s", comp.ID)
+		comp.Edges = []*pb.CompositionEdge{}
+		for edgeRows.Next() {
+			var edge compositionEdge
+			if err := edgeRows.Scan(&edge.From, &edge.To, &edge.Direction, &edge.Position); err != nil {
+				edgeRows.Close()
+				return nil, errors.Wrapf(err, "failed to scan edge for composition %s", comp.ID)
 			}
-			comp.GlyphIDs = append(comp.GlyphIDs, glyphID)
+			comp.Edges = append(comp.Edges, edge.toProtoEdge())
 		}
-		glyphRows.Close()
+		edgeRows.Close()
 
-		if err := glyphRows.Err(); err != nil {
-			return nil, errors.Wrapf(err, "error iterating composition glyphs for %s", comp.ID)
+		if err := edgeRows.Err(); err != nil {
+			return nil, errors.Wrapf(err, "error iterating composition edges for %s", comp.ID)
 		}
 	}
 

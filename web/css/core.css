@@ -30,6 +30,8 @@
     --text-on-dark-emphasis: #fefffe; /* Headings/emphasis on dark */
     --bg-dark-hover: #2a2b2a; /* Hover state on dark backgrounds */
     --bg-dark-light: #343534; /* Lighter dark surface - buttons, inputs, controls */
+    --bg-secondary: #252625; /* Dark surface - glyph bodies, canvas panels */
+    --bg-tertiary: #2e2f2e; /* Slightly lighter dark surface - title bars, headers */
     --border-on-dark: #3f4140; /* Borders on dark backgrounds */
     --accent-on-dark: #7dba8a; /* Accent/links on dark backgrounds */
     --accent-on-dark-hover: #9acca5; /* Accent hover on dark backgrounds */

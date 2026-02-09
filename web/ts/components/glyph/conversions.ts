@@ -51,7 +51,8 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     }
 
     // Block conversion if glyph is inside a composition
-    if (element.parentElement?.classList.contains('glyph-composition')) {
+    // Uses .closest() to handle glyphs nested in sub-containers within compositions
+    if (element.closest('.melded-composition')) {
         log.warn(SEG.GLYPH, `[Note→Prompt] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
         return false;
     }
@@ -121,7 +122,8 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
     }
 
     // Block conversion if glyph is inside a composition
-    if (element.parentElement?.classList.contains('glyph-composition')) {
+    // Uses .closest() to handle glyphs nested in sub-containers within compositions
+    if (element.closest('.melded-composition')) {
         log.warn(SEG.GLYPH, `[Result→Note] Cannot convert glyph ${glyphId} inside composition - unmeld first`);
         return false;
     }
