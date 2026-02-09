@@ -9,20 +9,23 @@ Sentence transformer embeddings for semantic search in QNTX using ONNX Runtime.
 ## Current State
 
 ✅ **Working:**
-- ONNX Runtime 2.0 API fully integrated
+- ONNX Runtime 2.0 API fully integrated with proper library paths
 - Successfully loads and runs all-MiniLM-L6-v2 model
 - Real HuggingFace tokenizer integration (tokenizers crate)
 - Generates semantically meaningful 384-dimensional embeddings
 - Mean pooling for sentence-level embeddings
-- ~78ms inference time per sentence (including tokenization)
-- Verified semantic similarity (cat/kitten: 0.94, cat/car: 0.87)
+- ~67ms inference time per sentence (including tokenization)
+- Verified semantic similarity (cat/kitten: 0.94, cat/dog: 0.92, cat/car: 0.88)
 - sqlite-vec extension fully integrated (v0.1.6)
 - vec0 virtual tables and FLOAT32_BLOB types working
 - Vector distance functions (L2) tested and working
+- Full Go-Rust FFI integration via CGO
+- Go service layer with batch processing support
+- Embedding serialization for sqlite-vec FLOAT32_BLOB format
 
 ⚠️ **Still Needs Work:**
-- No Go service layer
 - No API endpoints
+- No database integration with embeddings table
 
 ## Files That Exist
 
