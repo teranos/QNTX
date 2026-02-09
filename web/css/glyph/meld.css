@@ -5,8 +5,9 @@
 
 /* Melded composition container */
 .melded-composition {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-auto-rows: auto;
+    grid-auto-columns: auto;
     gap: 0;
     position: absolute;
     background: transparent;

@@ -13,6 +13,7 @@ import {
     getLeafGlyphIds,
     getRootGlyphIds,
     getMeldOptions,
+    computeGridPositions,
     type EdgeDirection
 } from './meldability';
 
@@ -242,6 +243,50 @@ describe('Port-aware MELDABILITY registry', () => {
             // ix glyph has no meld compatibility
             const options = getMeldOptions('canvas-ix-glyph', composition, edges);
             expect(options).toEqual([]);
+        });
+    });
+
+    describe('computeGridPositions', () => {
+        test('single right edge → row 1, cols 1-2', () => {
+            const edges = [{ from: 'ax1', to: 'py1', direction: 'right' }];
+            const positions = computeGridPositions(edges);
+            expect(positions.get('ax1')).toEqual({ row: 1, col: 1 });
+            expect(positions.get('py1')).toEqual({ row: 1, col: 2 });
+        });
+
+        test('single bottom edge → col 1, rows 1-2', () => {
+            const edges = [{ from: 'py1', to: 'result1', direction: 'bottom' }];
+            const positions = computeGridPositions(edges);
+            expect(positions.get('py1')).toEqual({ row: 1, col: 1 });
+            expect(positions.get('result1')).toEqual({ row: 2, col: 1 });
+        });
+
+        test('mixed right+bottom → ax{1,1} py{1,2} result{2,2}', () => {
+            const edges = [
+                { from: 'ax1', to: 'py1', direction: 'right' },
+                { from: 'py1', to: 'result1', direction: 'bottom' }
+            ];
+            const positions = computeGridPositions(edges);
+            expect(positions.get('ax1')).toEqual({ row: 1, col: 1 });
+            expect(positions.get('py1')).toEqual({ row: 1, col: 2 });
+            expect(positions.get('result1')).toEqual({ row: 2, col: 2 });
+        });
+
+        test('chain ax→py→prompt with py→result → 4 positions on 2D grid', () => {
+            const edges = [
+                { from: 'ax1', to: 'py1', direction: 'right' },
+                { from: 'py1', to: 'prompt1', direction: 'right' },
+                { from: 'py1', to: 'result1', direction: 'bottom' }
+            ];
+            const positions = computeGridPositions(edges);
+            expect(positions.get('ax1')).toEqual({ row: 1, col: 1 });
+            expect(positions.get('py1')).toEqual({ row: 1, col: 2 });
+            expect(positions.get('prompt1')).toEqual({ row: 1, col: 3 });
+            expect(positions.get('result1')).toEqual({ row: 2, col: 2 });
+        });
+
+        test('empty edges → empty map', () => {
+            expect(computeGridPositions([]).size).toBe(0);
         });
     });
 });
