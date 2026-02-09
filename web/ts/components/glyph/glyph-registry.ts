@@ -13,10 +13,9 @@ import { createPyGlyph } from './py-glyph';
 import { createIxGlyph } from './ix-glyph';
 import { createPromptGlyph } from './prompt-glyph';
 import { createNoteGlyph } from './note-glyph';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
 
 export interface GlyphTypeEntry {
-    /** Symbol identifier (e.g., AX, 'py', SO, Prose, 'result') */
+    /** Symbol identifier (e.g., AX, 'py', SO, Prose) */
     symbol: string;
     /** CSS class on the canvas element (e.g., 'canvas-py-glyph') */
     className: string;
@@ -34,7 +33,6 @@ const GLYPH_TYPES: GlyphTypeEntry[] = [
     { symbol: IX,       className: 'canvas-ix-glyph',      title: 'Ingest',   label: 'IX',     render: createIxGlyph },
     { symbol: SO,       className: 'canvas-prompt-glyph',  title: 'Prompt',   label: 'Prompt', render: createPromptGlyph },
     { symbol: Prose,    className: 'canvas-note-glyph',    title: 'Note',     label: 'Note',   render: createNoteGlyph },
-    { symbol: 'result', className: 'canvas-result-glyph',  title: 'Result',   label: 'Result', render: (g) => createResultGlyph(g, g.result as ExecutionResult) },
 ];
 
 const _bySymbol = new Map(GLYPH_TYPES.map(e => [e.symbol, e]));

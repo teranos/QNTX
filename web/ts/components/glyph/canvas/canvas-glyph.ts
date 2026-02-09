@@ -25,6 +25,7 @@ import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
 import { createAxGlyph } from '../ax-glyph';
 import { createErrorGlyph } from '../error-glyph';
+import { createResultGlyph } from '../result-glyph';
 import { uiState } from '../../../state/ui';
 import { getMinimizeDuration } from '../glyph';
 import { unmeldComposition, reconstructMeld } from '../meld/meld-system';
@@ -515,6 +516,11 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
                 }
             }
         );
+    }
+
+    // Result glyphs with valid data — handled explicitly (not in registry, always created programmatically)
+    if (glyph.symbol === 'result' && glyph.result) {
+        return createResultGlyph(glyph, glyph.result);
     }
 
     // Look up glyph type in registry
