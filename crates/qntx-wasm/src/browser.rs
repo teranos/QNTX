@@ -164,6 +164,31 @@ pub async fn exists_attestation(id: &str) -> Result<bool, JsValue> {
         .map_err(|e| JsValue::from_str(&format!("Store error: {:?}", e)))
 }
 
+/// Query attestations from IndexedDB using an AxFilter.
+/// Expects JSON-serialized AxFilter. Returns JSON array of proto-format attestations.
+#[wasm_bindgen]
+pub async fn query_attestations(filter_json: &str) -> Result<String, JsValue> {
+    use qntx_core::attestation::AxFilter;
+
+    let filter: AxFilter = serde_json::from_str(filter_json)
+        .map_err(|e| JsValue::from_str(&format!("Invalid filter JSON: {}", e)))?;
+
+    let store = get_store();
+    let result = store
+        .query(&filter)
+        .await
+        .map_err(|e| JsValue::from_str(&format!("Query error: {:?}", e)))?;
+
+    let proto_attestations: Vec<ProtoAttestation> = result
+        .attestations
+        .into_iter()
+        .map(qntx_proto::proto_convert::to_proto)
+        .collect();
+
+    serde_json::to_string(&proto_attestations)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
 /// Get all attestation IDs from IndexedDB.
 /// Returns a Promise that resolves to JSON array of IDs.
 #[wasm_bindgen]
