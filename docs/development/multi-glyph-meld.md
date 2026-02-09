@@ -5,24 +5,20 @@
 
 ## Current State
 
-**Phase 1 Complete:**
-- ✅ Storage layer supports N-glyph compositions (via junction table)
-- ✅ Backend API accepts/returns `glyphIds: string[]`
-- ✅ Frontend state updated for array format
-- ✅ All tests passing (Go + TypeScript)
+**Phase 1 Complete:** Storage + DAG migration (PRs #436, #443)
+- ✅ Edge-based DAG structure (`composition_edges` table, proto types)
+- ✅ Frontend uses proto `Composition` directly, no derived fields
 
-**Phase 1b Required (DAG Migration):**
-- ❌ Current `glyphIds: string[]` structure cannot represent DAG topologies
-- ❌ Need edge-based structure for multi-directional melding (horizontal, top, bottom)
-- ❌ Breaking change required: migrate to `composition_edges` table
-- ❌ Remove `type` field (edges are the type information)
+**Phase 2 Complete:** Port-aware meldability + multi-directional melding
+- ✅ MELDABILITY registry encodes spatial ports (right/bottom/top per glyph class)
+- ✅ Multi-directional proximity detection and layout
+- ✅ Result glyphs auto-meld below py on execution
+- ✅ py → py chaining enabled
 
-**Still TODO (Phase 2-5):**
-- ❌ UI doesn't support melding composition + glyph yet (still binary only)
-- ❌ Meldability logic doesn't recognize compositions as targets
+**Still TODO (Phase 3+):**
+- ❌ UI doesn't support melding into existing compositions (standalone-to-composition)
 - ❌ No 3+ glyph chain creation in browser yet
-- ❌ py → py chaining not yet enabled (planned extension for sequential pipelines)
-- ❌ Vertical melding (top/bottom directions) not yet supported
+- ❌ Auto-meld result when py is already inside a composition
 
 ## Architecture Decision
 
@@ -308,63 +304,69 @@ interface CompositionState {
   - ✅ Unmeld → verify both glyphs restore independently
   - ✅ Note: Rectangle selection feature added to enable selecting glyphs within compositions
 
-### Phase 2: Meldability Logic
+### Phase 2: Port-Aware Meldability ✅ **COMPLETE**
 
-- [ ] Update `web/ts/components/glyph/meldability.ts`
-  - [ ] Add `'melded-composition'` to `MELDABILITY` registry
-  - [ ] Define what glyphs can meld with compositions
-  - [ ] Add `getCompositionGlyphIds(composition: HTMLElement): string[]` helper
-  - [ ] **Extension:** Enable py → py chaining
-    - [ ] Add `'canvas-py-glyph'` to py's compatible targets: `['canvas-prompt-glyph', 'canvas-py-glyph']`
-    - [ ] Enables sequential Python pipelines: `py|py`, `py|py|prompt`, `ax|py|py`
-    - [ ] Semantic: output of first py script feeds into second py script
+**Goal:** Spatial ports on glyphs defining valid directional connections, multi-directional proximity detection and layout.
 
-- [ ] Update `web/ts/state/compositions.ts`
-  - [ ] Add `getCompositionType()` support for 3-glyph chains
-  - [ ] Add support for new composition types: `'py-py'`, `'py-py-prompt'`, `'ax-py-py'`
-  - [ ] Add helper: `isCompositionMeldable(comp: CompositionState, glyphType: string): boolean`
-  - [ ] Update `addComposition()` to handle N glyphs
+#### Port-aware registry ✅
+- ✅ `meldability.ts`: Restructured from flat `class → class[]` to `class → PortRule[]`
+  - `EdgeDirection = 'right' | 'bottom' | 'top'`
+  - `PortRule = { direction, targets[] }`
+  - ax: right → prompt, py
+  - py: right → prompt, py; bottom → result
+  - prompt: bottom → result
+  - note: bottom → prompt (note sits above prompt)
+- ✅ `areClassesCompatible()` returns `EdgeDirection | null`
+- ✅ `getLeafGlyphIds()` / `getRootGlyphIds()` for DAG sink/source detection
+- ✅ `getMeldOptions()` for append (leaf) and prepend (root) with `incomingRole: 'from' | 'to'`
+- ✅ `getGlyphClass()` regex-based, decoupled from registry
+
+#### Multi-directional meld system ✅
+- ✅ `meld-system.ts`: `checkDirectionalProximity()` handles right/bottom/top with alignment
+- ✅ `findMeldTarget()` returns `{ target, distance, direction }`
+- ✅ `performMeld()` accepts direction, switches flex layout (row vs column)
+- ✅ `reconstructMeld()` accepts edges, determines layout from edge directions
+
+#### Auto-meld result below py ✅
+- ✅ `py-glyph.ts`: `createAndDisplayResultGlyph` calls `performMeld('bottom')`
+- ✅ Composition made draggable immediately after auto-meld
+- ⚠️ When py is already in a composition, result spawns standalone (Phase 3)
+
+#### Call site updates ✅
+- ✅ `glyph-interaction.ts`: passes direction to `performMeld`
+- ✅ `canvas-glyph.ts`: passes edges to `reconstructMeld`
+- ✅ `compositions.ts`: removed `isCompositionMeldable` placeholder
+
+#### Tests ✅
+- ✅ `meldability.test.ts` (new): port-aware registry, DAG helpers, getMeldOptions
+- ✅ `meld-system.test.ts`: directional melding, direction-aware reconstruction
+- ✅ All 387 tests passing, 0 fail
+
+#### Manual Testing ✅
+- ✅ Horizontal meld (ax+prompt, ax+py) works as before
+- ✅ Bottom meld: py execution auto-melds result below
+- ✅ Composition draggable after auto-meld
+- ✅ Refresh reconstructs compositions with correct layout direction
+
+### Phase 3: Composition Extension
+
+**Goal:** Meld a standalone glyph into an existing composition (drag-to-extend and auto-meld-into).
+
+- [ ] Update `findMeldTarget()` to recognize glyphs inside compositions as targets
+  - [ ] Use `getMeldOptions()` to check leaf/root compatibility with composition
+- [ ] Add `extendComposition()`: append/prepend glyph to existing composition
+  - [ ] Reparent glyph into composition container
+  - [ ] Add edge to composition's edge set
+  - [ ] Update storage
+- [ ] Update `glyph-interaction.ts`: handle extending compositions during drag
+- [ ] Update `py-glyph.ts`: auto-meld result when py is already inside a composition
 
 #### Manual Testing
 
-- [ ] Manual browser test: Proximity feedback for compositions
-  - [ ] Create ax|py composition (2-glyph)
-  - [ ] Drag prompt glyph near composition → verify proximity glow appears
-  - [ ] Verify composition is recognized as valid meld target
-  - [ ] Note: Actual melding requires Phase 3 (DOM manipulation)
-
-### Phase 3: DOM Manipulation
-
-- [ ] Update `web/ts/components/glyph/meld-system.ts`
-  - [ ] Modify `findMeldTarget()` to recognize compositions as valid targets
-  - [ ] Update `performMeld()`:
-    - [ ] Detect if target is composition (`isMeldedComposition(target)`)
-    - [ ] If composition: append glyph to existing container (don't create new wrapper)
-    - [ ] If glyph: create new composition (existing behavior)
-    - [ ] Update `data-glyph-ids` attribute with full array
-  - [ ] Update `unmeldComposition()`:
-    - [ ] Restore N glyphs (not just 2)
-    - [ ] Space glyphs horizontally based on count
-    - [ ] Return array of restored elements
-  - [ ] Update `reconstructMeld()` for N-glyph restoration
-
-- [ ] Update `web/ts/components/glyph/glyph-interaction.ts`
-  - [ ] Ensure composition targets work in `handleMouseUp` (line ~160)
-  - [ ] Update meld feedback to work with composition targets
-
-#### CSS Styling
-- [ ] Update `web/css/glyph/meld.css`
-  - [ ] Add rule: `.melded-composition > *:not(:last-child)` for separator borders
-  - [ ] Support variable gap count based on child count
-  - [ ] Ensure spacing works for 3+ glyphs
-
-#### Manual Testing
-
-- [ ] Manual browser test: Create 3-glyph chain
-  - [ ] Create ax|py composition (2-glyph)
-  - [ ] Drag prompt onto it → verify extends to ax|py|prompt
-  - [ ] Refresh → verify 3-glyph chain persists
-  - [ ] Unmeld → verify all 3 glyphs separate
+- [ ] Drag prompt near ax|py composition → extends to ax|py|prompt
+  - [ ] Refresh → 3-glyph chain persists
+  - [ ] Unmeld → all 3 glyphs separate
+- [ ] Run py code when py is in ax|py composition → result attaches below py
 
 ### Phase 4: Tests
 

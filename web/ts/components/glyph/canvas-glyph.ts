@@ -503,7 +503,7 @@ export function createCanvasGlyph(): Glyph {
 
                     // Reconstruct the composition DOM (without persisting)
                     try {
-                        const composition = reconstructMeld(glyphElements, comp.id, comp.x, comp.y);
+                        const composition = reconstructMeld(glyphElements, comp.edges, comp.id, comp.x, comp.y);
 
                         // Make the restored composition draggable
                         const compositionGlyph: Glyph = {

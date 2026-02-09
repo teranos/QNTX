@@ -11,6 +11,7 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import {
     canInitiateMeld,
+    canReceiveMeld,
     findMeldTarget,
     applyMeldFeedback,
     clearMeldFeedback,
@@ -209,12 +210,16 @@ export function makeDraggable(
         }
 
         // Schedule meld feedback for next frame (prevents interleaving during fast drags)
-        if (canInitiateMeld(element)) {
+        if (canInitiateMeld(element) || canReceiveMeld(element)) {
             rafId = requestAnimationFrame(() => {
                 rafId = null;
                 const meldInfo = findMeldTarget(element);
                 if (meldInfo.target && meldInfo.distance < PROXIMITY_THRESHOLD) {
-                    applyMeldFeedback(element, meldInfo.target, meldInfo.distance);
+                    // When reversed, the nearby element is the meld initiator — glow from its edge
+                    const [initiator, target] = meldInfo.reversed
+                        ? [meldInfo.target, element]
+                        : [element, meldInfo.target];
+                    applyMeldFeedback(initiator, target, meldInfo.distance, meldInfo.direction);
                     currentMeldTarget = meldInfo.target;
                 } else if (currentMeldTarget) {
                     clearMeldFeedback(element);
@@ -242,20 +247,17 @@ export function makeDraggable(
             }
         }
 
-        // Check if we should meld (for ax-glyphs only)
-        if (canInitiateMeld(element)) {
+        // Check if we should meld (forward: dragged initiates, or reverse: nearby initiates toward dragged)
+        if (canInitiateMeld(element) || canReceiveMeld(element)) {
             const meldInfo = findMeldTarget(element);
             if (meldInfo.target && meldInfo.distance < MELD_THRESHOLD) {
-                const targetElement = meldInfo.target; // Store for type safety
+                const nearbyElement = meldInfo.target;
+                const nearbyGlyphId = nearbyElement.dataset.glyphId || 'glyph-unknown';
 
-                // Get the prompt glyph ID from the target element
-                const promptGlyphId = targetElement.dataset.glyphId || 'prompt-unknown';
-
-                // Create minimal glyph object for the target
-                const targetGlyph: Glyph = {
-                    id: promptGlyphId,
-                    title: 'Prompt',
-                    renderContent: () => targetElement
+                const nearbyGlyph: Glyph = {
+                    id: nearbyGlyphId,
+                    title: 'Glyph',
+                    renderContent: () => nearbyElement
                 };
 
                 // Clean up event listeners and animations before melding
@@ -266,12 +268,17 @@ export function makeDraggable(
                 setupController.abort();
                 dragController?.abort();
 
-                // Perform the meld - this reparents the actual DOM elements
-                const composition = performMeld(element, targetElement, glyph, targetGlyph);
+                // When reversed, the nearby element is the meld initiator (from) and
+                // the dragged element is the target (to) — swap arguments to performMeld
+                const [meldInitiator, meldTarget, meldInitiatorGlyph, meldTargetGlyph] = meldInfo.reversed
+                    ? [nearbyElement, element, nearbyGlyph, glyph]
+                    : [element, nearbyElement, glyph, nearbyGlyph];
+
+                const composition = performMeld(meldInitiator, meldTarget, meldInitiatorGlyph, meldTargetGlyph, meldInfo.direction);
 
                 // Make the composition draggable as a unit
                 const compositionGlyph: Glyph = {
-                    id: `melded-${glyph.id}-${promptGlyphId}`,
+                    id: composition.getAttribute('data-glyph-id') || `melded-${meldInitiatorGlyph.id}-${meldTargetGlyph.id}`,
                     title: 'Melded Composition',
                     renderContent: () => composition
                 };
@@ -280,7 +287,7 @@ export function makeDraggable(
                     logLabel: 'MeldedComposition'
                 });
 
-                log.info(SEG.GLYPH, `[${logLabel}] Melded with prompt glyph`);
+                log.info(SEG.GLYPH, `[${logLabel}] Melded ${meldInitiatorGlyph.id} → ${meldTargetGlyph.id} (${meldInfo.direction}${meldInfo.reversed ? ', reversed' : ''})`);
                 return;
             }
         }
@@ -301,10 +308,11 @@ export function makeDraggable(
 
             // Get composition data from DOM
             const compositionId = element.getAttribute('data-glyph-id') || '';
-            const initiatorId = element.getAttribute('data-initiator-id') || '';
 
-            // Find existing composition in storage to get type
-            const existingComp = findCompositionByGlyph(initiatorId);
+            // Find existing composition in storage via first child glyph
+            const firstChild = element.querySelector('[data-glyph-id]');
+            const childId = firstChild?.getAttribute('data-glyph-id') || '';
+            const existingComp = findCompositionByGlyph(childId);
             if (existingComp) {
                 // Update composition position
                 addComposition({
