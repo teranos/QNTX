@@ -168,13 +168,6 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     updateStatus(savedStatus);
 
     // Title bar elements
-    const title = document.createElement('span');
-    title.textContent = 'Prompt';
-    title.style.fontSize = '13px';
-    title.style.flex = '1';
-    title.style.color = 'var(--text-on-dark-emphasis)';
-    title.style.fontWeight = 'bold';
-
     const playBtn = document.createElement('button');
     playBtn.textContent = '▶';
     playBtn.className = 'glyph-play-btn has-tooltip';
@@ -263,7 +256,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         glyph,
         className: 'canvas-prompt-glyph',
         defaults: { x: 200, y: 200, width: 420, height: 340 },
-        titleBar: { label: SO, actions: [title, playBtn] },
+        titleBar: { label: `${SO} Prompt`, actions: [playBtn] },
         resizable: { minWidth: 280, minHeight: 200 },
         logLabel: 'PromptGlyph',
     });
@@ -274,6 +267,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         labelSpan.style.fontSize = '16px';
         labelSpan.style.color = 'var(--accent-lavender)';
         labelSpan.style.fontWeight = 'bold';
+        labelSpan.style.flex = '1';
     }
 
     // Content area
