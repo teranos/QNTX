@@ -10,7 +10,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
-import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition } from './meld-composition';
+import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, extendComposition, mergeCompositions } from './meld-composition';
 import { MELD_THRESHOLD } from './meld-detect';
 import type { Glyph } from './glyph';
 import { uiState } from '../../state/ui';
@@ -650,6 +650,206 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         expect(newComp!.edges.length).toBe(2);
         expect(newComp!.edges[0]).toEqual({ from: 'ax1', to: 'py1', direction: 'right', position: 0 });
         expect(newComp!.edges[1]).toEqual({ from: 'py1', to: 'prompt1', direction: 'right', position: 1 });
+
+        clearState();
+    });
+});
+
+describe('Composition Merging - Tim (Happy Path)', () => {
+    function clearState() {
+        uiState.setCanvasCompositions([]);
+        document.body.innerHTML = '';
+    }
+
+    test('Tim merges ax|py with prompt composition into ax|py|prompt', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        // Build first composition: ax|py
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        py.style.left = '200px';
+        py.style.top = '100px';
+        canvas.appendChild(py);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const comp1 = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+
+        // Build second composition: prompt (single-glyph, but still a composition for testing)
+        const prompt = document.createElement('div');
+        prompt.className = 'canvas-prompt-glyph';
+        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.style.position = 'absolute';
+        prompt.style.left = '400px';
+        prompt.style.top = '100px';
+        canvas.appendChild(prompt);
+
+        const py2 = document.createElement('div');
+        py2.className = 'canvas-py-glyph';
+        py2.setAttribute('data-glyph-id', 'py2');
+        py2.style.position = 'absolute';
+        py2.style.left = '500px';
+        py2.style.top = '100px';
+        canvas.appendChild(py2);
+
+        const promptGlyph: Glyph = { id: 'prompt1', title: 'Prompt', renderContent: () => prompt };
+        const py2Glyph: Glyph = { id: 'py2', title: 'Py2', renderContent: () => py2 };
+        const comp2 = performMeld(prompt, py2, promptGlyph, py2Glyph, 'right');
+
+        // Merge: py1 (leaf of comp1) → prompt1 (root of comp2)
+        const result = mergeCompositions(comp1, comp2, 'py1', 'prompt1', 'right');
+
+        // Surviving comp has all 4 children
+        expect(result).toBe(comp1);
+        expect(result.children.length).toBe(4);
+        expect(result.children[0]).toBe(ax);
+        expect(result.children[1]).toBe(py);
+        expect(result.children[2]).toBe(prompt);
+        expect(result.children[3]).toBe(py2);
+
+        // Absorbed comp removed from DOM
+        expect(comp2.parentElement).toBe(null);
+
+        // Storage: surviving updated, absorbed removed
+        const compositions = uiState.getCanvasCompositions();
+        expect(compositions.length).toBe(1);
+        expect(compositions[0].id).toBe('melded-py1-prompt1');
+        expect(compositions[0].edges.length).toBe(3); // 2 original + 1 bridge
+
+        clearState();
+    });
+
+    test('mergeCompositions creates sub-container for cross-axis bridge', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        // Horizontal composition: ax|py
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        py.style.left = '200px';
+        py.style.top = '100px';
+        canvas.appendChild(py);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const comp1 = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+        expect(comp1.style.flexDirection).toBe('row');
+
+        // Vertical composition: result (standalone, but wrapped in comp for test)
+        const result1 = document.createElement('div');
+        result1.className = 'canvas-result-glyph';
+        result1.setAttribute('data-glyph-id', 'result1');
+        result1.style.position = 'absolute';
+        result1.style.left = '200px';
+        result1.style.top = '300px';
+        canvas.appendChild(result1);
+
+        const result2 = document.createElement('div');
+        result2.className = 'canvas-result-glyph';
+        result2.setAttribute('data-glyph-id', 'result2');
+        result2.style.position = 'absolute';
+        result2.style.left = '200px';
+        result2.style.top = '400px';
+        canvas.appendChild(result2);
+
+        const r1Glyph: Glyph = { id: 'result1', title: 'Result1', renderContent: () => result1 };
+        const r2Glyph: Glyph = { id: 'result2', title: 'Result2', renderContent: () => result2 };
+        const comp2 = performMeld(result1, result2, r1Glyph, r2Glyph, 'bottom');
+
+        // Merge with cross-axis bridge: py1 → result1 (bottom)
+        mergeCompositions(comp1, comp2, 'py1', 'result1', 'bottom');
+
+        // Cross-axis: absorbed children wrapped in sub-container
+        expect(comp1.children.length).toBe(3); // ax, py, sub-container
+        const subContainer = comp1.children[2] as HTMLElement;
+        expect(subContainer.classList.contains('meld-sub-container')).toBe(true);
+        expect(subContainer.style.flexDirection).toBe('column');
+        expect(subContainer.children[0]).toBe(result1);
+        expect(subContainer.children[1]).toBe(result2);
+
+        clearState();
+    });
+
+    test('mergeCompositions removes absorbed composition from storage', () => {
+        clearState();
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const ax = document.createElement('div');
+        ax.className = 'canvas-ax-glyph';
+        ax.setAttribute('data-glyph-id', 'ax1');
+        ax.style.position = 'absolute';
+        ax.style.left = '100px';
+        ax.style.top = '100px';
+        canvas.appendChild(ax);
+
+        const py = document.createElement('div');
+        py.className = 'canvas-py-glyph';
+        py.setAttribute('data-glyph-id', 'py1');
+        py.style.position = 'absolute';
+        py.style.left = '200px';
+        py.style.top = '100px';
+        canvas.appendChild(py);
+
+        const axGlyph: Glyph = { id: 'ax1', title: 'AX', renderContent: () => ax };
+        const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
+        const comp1 = performMeld(ax, py, axGlyph, pyGlyph, 'right');
+
+        const prompt = document.createElement('div');
+        prompt.className = 'canvas-prompt-glyph';
+        prompt.setAttribute('data-glyph-id', 'prompt1');
+        prompt.style.position = 'absolute';
+        prompt.style.left = '400px';
+        prompt.style.top = '100px';
+        canvas.appendChild(prompt);
+
+        const py2 = document.createElement('div');
+        py2.className = 'canvas-py-glyph';
+        py2.setAttribute('data-glyph-id', 'py2');
+        py2.style.position = 'absolute';
+        py2.style.left = '500px';
+        py2.style.top = '100px';
+        canvas.appendChild(py2);
+
+        const promptGlyph: Glyph = { id: 'prompt1', title: 'Prompt', renderContent: () => prompt };
+        const py2Glyph: Glyph = { id: 'py2', title: 'Py2', renderContent: () => py2 };
+        const comp2 = performMeld(prompt, py2, promptGlyph, py2Glyph, 'right');
+
+        // Should have 2 compositions before merge
+        expect(uiState.getCanvasCompositions().length).toBe(2);
+
+        mergeCompositions(comp1, comp2, 'py1', 'prompt1', 'right');
+
+        // Should have 1 composition after merge
+        const compositions = uiState.getCanvasCompositions();
+        expect(compositions.length).toBe(1);
+
+        // Absorbed composition ID should be gone
+        const absorbedId = 'melded-prompt1-py2';
+        expect(compositions.find(c => c.id === absorbedId)).toBeUndefined();
 
         clearState();
     });

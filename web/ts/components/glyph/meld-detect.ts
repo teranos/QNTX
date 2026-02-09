@@ -5,7 +5,9 @@
  * Bidirectional: checks both forward (dragged→nearby) and reverse (nearby→dragged).
  */
 
-import { getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, type EdgeDirection } from './meldability';
+import { getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, getCompositionCompatibility, type EdgeDirection } from './meldability';
+import { findCompositionByGlyph } from '../../state/compositions';
+import { log, SEG } from '../../logger';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
@@ -16,6 +18,7 @@ const MIN_ALIGNMENT = 0.3; // fraction - minimum overlap required on the alignme
  * Check if element can initiate melding
  */
 export function canInitiateMeld(element: HTMLElement): boolean {
+    if (element.classList.contains('melded-composition')) return true;
     return getInitiatorClasses().some(cls =>
         element.classList.contains(cls)
     );
@@ -25,6 +28,7 @@ export function canInitiateMeld(element: HTMLElement): boolean {
  * Check if element can receive meld
  */
 export function canReceiveMeld(element: HTMLElement): boolean {
+    if (element.classList.contains('melded-composition')) return true;
     return getTargetClasses().some(cls =>
         element.classList.contains(cls)
     );
@@ -120,6 +124,13 @@ export function findMeldTarget(draggedElement: HTMLElement): {
         return noMatch;
     }
 
+    log.debug(SEG.GLYPH, '[findMeldTarget] start', {
+        draggedId: draggedElement.getAttribute('data-glyph-id'),
+        draggedClasses: draggedElement.className,
+        canvasId: canvas.getAttribute('id') || canvas.className?.substring(0, 40),
+        canvasIsComp: canvas.classList.contains('melded-composition'),
+    });
+
     let closestTarget: HTMLElement | null = null;
     let closestDistance = Infinity;
     let closestDirection: EdgeDirection = 'right';
@@ -183,6 +194,200 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                 }
             });
         }
+    }
+
+    // Composition-to-composition: dragged composition toward nearby compositions
+    const draggedComp = draggedElement.classList.contains('melded-composition')
+        ? draggedElement
+        : draggedElement.closest('.melded-composition') as HTMLElement | null;
+
+    const allComps = canvas.querySelectorAll('.melded-composition');
+    log.debug(SEG.GLYPH, '[findMeldTarget] comp-to-comp search', {
+        draggedIsComp: draggedElement.classList.contains('melded-composition'),
+        draggedComp: draggedComp?.getAttribute('data-glyph-id'),
+        compsOnCanvas: allComps.length,
+    });
+
+    allComps.forEach(el => {
+        const compElement = el as HTMLElement;
+        if (compElement === draggedElement) return;
+        if (compElement === draggedComp) return;
+
+        // Get edges for both compositions
+        const compFirstChild = compElement.querySelector('[data-glyph-id]');
+        const compChildId = compFirstChild?.getAttribute('data-glyph-id') || '';
+        const compState = findCompositionByGlyph(compChildId);
+
+        log.debug(SEG.GLYPH, '[findMeldTarget] examining nearby comp', {
+            compId: compElement.getAttribute('data-glyph-id'),
+            compChildId,
+            compStateFound: !!compState,
+        });
+
+        if (!compState) return;
+
+        // Forward: dragged element's leaves → nearby composition's roots
+        if (draggedComp) {
+            const draggedFirstChild = draggedComp.querySelector('[data-glyph-id]');
+            const draggedChildId = draggedFirstChild?.getAttribute('data-glyph-id') || '';
+            const draggedState = findCompositionByGlyph(draggedChildId);
+            if (draggedState) {
+                const direction = getCompositionCompatibility(
+                    draggedComp, compElement,
+                    draggedState.edges, compState.edges
+                );
+                const compRect = compElement.getBoundingClientRect();
+                const distance = direction ? checkDirectionalProximity(draggedRect, compRect, direction) : Infinity;
+
+                log.debug(SEG.GLYPH, '[findMeldTarget] comp-to-comp forward', {
+                    draggedChildId,
+                    direction,
+                    distance: distance === Infinity ? 'Inf' : distance,
+                    draggedRight: draggedRect.right,
+                    compLeft: compRect.left,
+                });
+
+                if (direction && distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                    closestDistance = distance;
+                    closestTarget = compElement;
+                    closestDirection = direction;
+                    closestReversed = false;
+                }
+            }
+        }
+
+        // Reverse: nearby composition's leaves → dragged element's roots
+        if (draggedComp) {
+            const draggedFirstChild = draggedComp.querySelector('[data-glyph-id]');
+            const draggedChildId = draggedFirstChild?.getAttribute('data-glyph-id') || '';
+            const draggedState = findCompositionByGlyph(draggedChildId);
+            if (draggedState) {
+                const direction = getCompositionCompatibility(
+                    compElement, draggedComp,
+                    compState.edges, draggedState.edges
+                );
+                const compRect = compElement.getBoundingClientRect();
+                const distance = direction ? checkDirectionalProximity(compRect, draggedRect, direction) : Infinity;
+
+                log.debug(SEG.GLYPH, '[findMeldTarget] comp-to-comp reverse', {
+                    direction,
+                    distance: distance === Infinity ? 'Inf' : distance,
+                    compRight: compRect.right,
+                    draggedLeft: draggedRect.left,
+                });
+
+                if (direction && distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                    closestDistance = distance;
+                    closestTarget = compElement;
+                    closestDirection = direction;
+                    closestReversed = true;
+                }
+            }
+        } else {
+            // Dragged is a standalone glyph — check against nearby composition
+            // Forward: standalone glyph → composition roots
+            const glyphClass = getGlyphClass(draggedElement);
+            if (glyphClass) {
+                const direction = getCompositionCompatibility(
+                    draggedElement, compElement,
+                    undefined, compState.edges
+                );
+                if (direction) {
+                    const compRect = compElement.getBoundingClientRect();
+                    const distance = checkDirectionalProximity(draggedRect, compRect, direction);
+                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = compElement;
+                        closestDirection = direction;
+                        closestReversed = false;
+                    }
+                }
+            }
+
+            // Reverse: composition leaves → standalone glyph
+            if (glyphClass) {
+                const direction = getCompositionCompatibility(
+                    compElement, draggedElement,
+                    compState.edges, undefined
+                );
+                if (direction) {
+                    const compRect = compElement.getBoundingClientRect();
+                    const distance = checkDirectionalProximity(compRect, draggedRect, direction);
+                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = compElement;
+                        closestDirection = direction;
+                        closestReversed = true;
+                    }
+                }
+            }
+        }
+    });
+
+    // Composition dragged near standalone glyphs
+    if (draggedComp) {
+        const draggedFirstChild = draggedComp.querySelector('[data-glyph-id]');
+        const draggedChildId = draggedFirstChild?.getAttribute('data-glyph-id') || '';
+        const draggedState = findCompositionByGlyph(draggedChildId);
+
+        if (draggedState) {
+            // Forward: composition leaves → standalone targets
+            for (const targetClass of getTargetClasses()) {
+                canvas.querySelectorAll(`.${targetClass}`).forEach(el => {
+                    const targetElement = el as HTMLElement;
+                    if (targetElement.closest('.melded-composition')) return; // skip glyphs in compositions
+
+                    const direction = getCompositionCompatibility(
+                        draggedComp, targetElement,
+                        draggedState.edges, undefined
+                    );
+                    if (!direction) return;
+
+                    const targetRect = targetElement.getBoundingClientRect();
+                    const distance = checkDirectionalProximity(draggedRect, targetRect, direction);
+
+                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = targetElement;
+                        closestDirection = direction;
+                        closestReversed = false;
+                    }
+                });
+            }
+
+            // Reverse: standalone initiators → composition roots
+            for (const initiatorClass of getInitiatorClasses()) {
+                canvas.querySelectorAll(`.${initiatorClass}`).forEach(el => {
+                    const nearbyElement = el as HTMLElement;
+                    if (nearbyElement.closest('.melded-composition')) return;
+
+                    const direction = getCompositionCompatibility(
+                        nearbyElement, draggedComp,
+                        undefined, draggedState.edges
+                    );
+                    if (!direction) return;
+
+                    const nearbyRect = nearbyElement.getBoundingClientRect();
+                    const distance = checkDirectionalProximity(nearbyRect, draggedRect, direction);
+
+                    if (distance < PROXIMITY_THRESHOLD && distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = nearbyElement;
+                        closestDirection = direction;
+                        closestReversed = true;
+                    }
+                });
+            }
+        }
+    }
+
+    if (closestTarget) {
+        log.debug(SEG.GLYPH, '[findMeldTarget] result', {
+            targetId: closestTarget.getAttribute('data-glyph-id'),
+            distance: closestDistance,
+            direction: closestDirection,
+            reversed: closestReversed,
+        });
     }
 
     return { target: closestTarget, distance: closestDistance, direction: closestDirection, reversed: closestReversed };

@@ -152,6 +152,64 @@ export function getRootGlyphIds(
     return [...allIds].filter(id => !toIds.has(id));
 }
 
+/**
+ * Get the glyph classes at the boundary of an element (standalone glyph or composition).
+ *
+ * For a standalone glyph: returns its own class.
+ * For a composition: returns the leaf or root glyph classes by querying the DOM.
+ */
+export function getElementBoundaryClasses(
+    element: HTMLElement,
+    boundary: 'leaves' | 'roots',
+    edges?: Array<{ from: string; to: string; direction: string }>
+): string[] {
+    // Standalone glyph — just return its own class
+    if (!element.classList.contains('melded-composition')) {
+        const cls = getGlyphClass(element);
+        return cls ? [cls] : [];
+    }
+
+    // Composition — need edges to find boundary nodes
+    if (!edges) return [];
+
+    const boundaryIds = boundary === 'leaves'
+        ? getLeafGlyphIds(edges)
+        : getRootGlyphIds(edges);
+
+    const classes: string[] = [];
+    for (const id of boundaryIds) {
+        const el = element.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null;
+        if (!el) continue;
+        const cls = getGlyphClass(el);
+        if (cls) classes.push(cls);
+    }
+    return classes;
+}
+
+/**
+ * Check if two elements (standalone glyphs or compositions) have compatible boundaries.
+ *
+ * Checks initiator's leaf classes against target's root classes.
+ * Returns the first matching edge direction, or null if incompatible.
+ */
+export function getCompositionCompatibility(
+    initiator: HTMLElement,
+    target: HTMLElement,
+    initiatorEdges?: Array<{ from: string; to: string; direction: string }>,
+    targetEdges?: Array<{ from: string; to: string; direction: string }>
+): EdgeDirection | null {
+    const leafClasses = getElementBoundaryClasses(initiator, 'leaves', initiatorEdges);
+    const rootClasses = getElementBoundaryClasses(target, 'roots', targetEdges);
+
+    for (const leafClass of leafClasses) {
+        for (const rootClass of rootClasses) {
+            const direction = areClassesCompatible(leafClass, rootClass);
+            if (direction) return direction;
+        }
+    }
+    return null;
+}
+
 export interface MeldOption {
     /** The glyph in the composition that the incoming glyph connects with */
     glyphId: string;
