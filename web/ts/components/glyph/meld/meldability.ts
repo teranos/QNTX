@@ -37,17 +37,9 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     ]
 } as const;
 
-/**
- * Get all classes that can initiate melding
- */
-export function getInitiatorClasses(): string[] {
-    return Object.keys(MELDABILITY);
-}
-
-/**
- * Get all classes that can receive meld (across all directions)
- */
-export function getTargetClasses(): string[] {
+// Cached class lists — derived from static MELDABILITY registry
+const _initiatorClasses: string[] = Object.keys(MELDABILITY);
+const _targetClasses: string[] = (() => {
     const targets = new Set<string>();
     for (const ports of Object.values(MELDABILITY)) {
         for (const port of ports) {
@@ -57,6 +49,20 @@ export function getTargetClasses(): string[] {
         }
     }
     return [...targets];
+})();
+
+/**
+ * Get all classes that can initiate melding
+ */
+export function getInitiatorClasses(): readonly string[] {
+    return _initiatorClasses;
+}
+
+/**
+ * Get all classes that can receive meld (across all directions)
+ */
+export function getTargetClasses(): readonly string[] {
+    return _targetClasses;
 }
 
 /**
@@ -152,6 +158,22 @@ export function getRootGlyphIds(
     return [...allIds].filter(id => !toIds.has(id));
 }
 
+/**
+ * Check if a glyph's port is free (no existing edge occupies it)
+ */
+export function isPortFree(
+    glyphId: string,
+    direction: string,
+    role: 'incoming' | 'outgoing',
+    edges: Array<{ from: string; to: string; direction: string }>
+): boolean {
+    for (const edge of edges) {
+        if (role === 'outgoing' && edge.from === glyphId && edge.direction === direction) return false;
+        if (role === 'incoming' && edge.to === glyphId && edge.direction === direction) return false;
+    }
+    return true;
+}
+
 export interface MeldOption {
     /** The glyph in the composition that the incoming glyph connects with */
     glyphId: string;
@@ -164,9 +186,11 @@ export interface MeldOption {
 /**
  * Get all possible ways an incoming glyph could meld with a composition.
  *
- * Checks two things:
- * 1. Leaf nodes: can any leaf's output port accept the incoming glyph? (append, incoming is 'to')
- * 2. Root nodes: can the incoming glyph's output port connect to any root? (prepend, incoming is 'from')
+ * Checks every glyph in the composition for a free port:
+ * 1. Append (incoming is 'to'): glyph's outgoing port in the compatible direction must be unoccupied
+ * 2. Prepend (incoming is 'from'): glyph's incoming port in the compatible direction must be unoccupied
+ *
+ * Axiom: each side of a glyph accepts at most one connection.
  */
 export function getMeldOptions(
     incomingClass: string,
@@ -175,33 +199,39 @@ export function getMeldOptions(
 ): MeldOption[] {
     const options: MeldOption[] = [];
 
-    // 1. Check leaf nodes — incoming glyph appends as target
-    const leafIds = getLeafGlyphIds(edges);
-    for (const leafId of leafIds) {
-        const leafElement = compositionElement.querySelector(`[data-glyph-id="${leafId}"]`) as HTMLElement | null;
-        if (!leafElement) continue;
-
-        const leafClass = getGlyphClass(leafElement);
-        if (!leafClass) continue;
-
-        const direction = areClassesCompatible(leafClass, incomingClass);
-        if (direction) {
-            options.push({ glyphId: leafId, direction, incomingRole: 'to' });
-        }
+    // Collect all glyph IDs from edges
+    const allIds = new Set<string>();
+    for (const edge of edges) {
+        allIds.add(edge.from);
+        allIds.add(edge.to);
     }
 
-    // 2. Check root nodes — incoming glyph prepends as source
-    const rootIds = getRootGlyphIds(edges);
-    for (const rootId of rootIds) {
-        const rootElement = compositionElement.querySelector(`[data-glyph-id="${rootId}"]`) as HTMLElement | null;
-        if (!rootElement) continue;
+    // Build port occupancy: which directions are taken for each glyph
+    const outgoing = new Map<string, Set<string>>();
+    const incoming = new Map<string, Set<string>>();
+    for (const edge of edges) {
+        if (!outgoing.has(edge.from)) outgoing.set(edge.from, new Set());
+        outgoing.get(edge.from)!.add(edge.direction);
+        if (!incoming.has(edge.to)) incoming.set(edge.to, new Set());
+        incoming.get(edge.to)!.add(edge.direction);
+    }
 
-        const rootClass = getGlyphClass(rootElement);
-        if (!rootClass) continue;
+    for (const glyphId of allIds) {
+        const el = compositionElement.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
+        if (!el) continue;
+        const cls = getGlyphClass(el);
+        if (!cls) continue;
 
-        const direction = areClassesCompatible(incomingClass, rootClass);
-        if (direction) {
-            options.push({ glyphId: rootId, direction, incomingRole: 'from' });
+        // 1. Append: this glyph sends to the incoming glyph (outgoing port)
+        const appendDir = areClassesCompatible(cls, incomingClass);
+        if (appendDir && !outgoing.get(glyphId)?.has(appendDir)) {
+            options.push({ glyphId, direction: appendDir, incomingRole: 'to' });
+        }
+
+        // 2. Prepend: the incoming glyph sends to this glyph (incoming port)
+        const prependDir = areClassesCompatible(incomingClass, cls);
+        if (prependDir && !incoming.get(glyphId)?.has(prependDir)) {
+            options.push({ glyphId, direction: prependDir, incomingRole: 'from' });
         }
     }
 

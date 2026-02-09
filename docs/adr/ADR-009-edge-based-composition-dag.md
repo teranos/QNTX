@@ -1,7 +1,7 @@
 # ADR-009: Edge-Based Composition DAG for Multi-Directional Melding
 
 ## Status
-Phase 2 Complete (Port-aware meldability + multi-directional melding)
+Phase 3 Complete (Composition extension + cross-axis sub-containers)
 
 ## Context
 
@@ -102,7 +102,12 @@ message Composition {
 - Result glyphs auto-meld below py on execution (bottom port)
 - Port-based model pulled forward from "future work" — spatial ports are concrete, not abstract
 
-**Phase 3+:** Composition extension (melding into existing compositions)
+**Phase 3:** Composition extension + cross-axis sub-containers ✅
+- Drag-to-extend: standalone glyph melds into existing composition (append to leaf / prepend to root)
+- Cross-axis sub-containers: nested `meld-sub-container` flex divs for mixed-direction edges
+- Meld system split into focused modules: `meld-detect.ts`, `meld-feedback.ts`, `meld-composition.ts` with barrel re-export
+- All guards use `.closest('.melded-composition')` to traverse through sub-containers
+- 3+ glyph chains in browser, composition persistence across page reload
 
 ## Consequences
 
@@ -143,10 +148,10 @@ message Composition {
 
 ## Future Work
 
-- Composition extension: melding a glyph into an existing composition (Phase 3)
-- Cycle detection validation
+- Cycle detection validation (DAG invariant enforcement)
 - Topological sort for execution order
 - Graph visualization/debugging tools
+- Unmeld granularity: splitting a composition at a middle glyph
 
 ## References
 

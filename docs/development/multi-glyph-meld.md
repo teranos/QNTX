@@ -124,23 +124,25 @@ interface CompositionState {
 - ✅ Create `glyph/proto/canvas.proto`:
   ```protobuf
   syntax = "proto3";
-  package proto;
+  package glyph;
 
   option go_package = "github.com/teranos/QNTX/glyph/proto";
 
   // CompositionEdge represents a directed edge in the composition DAG
+  // Supports multi-directional melding: horizontal (right), vertical (top/bottom)
   message CompositionEdge {
     string from = 1;           // source glyph ID
     string to = 2;             // target glyph ID
     string direction = 3;      // 'right', 'top', 'bottom'
-    int32 position = 4;        // ordering for multiple edges same direction
+    int32 position = 4;        // ordering for multiple edges in same direction
   }
 
   // Composition represents a DAG of melded glyphs
+  // Edges define the graph structure - no derived fields
   message Composition {
     string id = 1;
     repeated CompositionEdge edges = 2;
-    repeated string glyph_ids = 3;  // computed field: all unique glyph IDs
+    reserved 3;  // formerly glyph_ids (removed for DAG-native approach)
     double x = 4;                    // anchor X position in pixels
     double y = 5;                    // anchor Y position in pixels
   }
@@ -416,7 +418,7 @@ interface CompositionState {
 ### Phase 5: Integration & Polish
 
 - [ ] py-py chaining manual test: `[py|py]` → `[py|py|prompt]`
-- [ ] Update ADR-009 for Phase 3 completion
+- ✅ Update ADR-009 for Phase 3 completion
 
 ## Open Questions
 

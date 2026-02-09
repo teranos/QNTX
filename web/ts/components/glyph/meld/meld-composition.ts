@@ -8,11 +8,11 @@
  * Melding is achieved through reparenting, not cloning.
  */
 
-import { log, SEG } from '../../logger';
-import type { Glyph } from './glyph';
-import type { CompositionEdge } from '../../state/ui';
+import { log, SEG } from '../../../logger';
+import type { Glyph } from '../glyph';
+import type { CompositionEdge } from '../../../state/ui';
 import type { EdgeDirection } from './meldability';
-import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../state/compositions';
+import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding

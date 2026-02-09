@@ -20,9 +20,9 @@ import {
     isMeldedComposition,
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
-} from './meld-system';
-import { getMeldOptions, getGlyphClass } from './meldability';
-import { isGlyphSelected, getSelectedGlyphIds } from './canvas-glyph';
+} from './meld/meld-system';
+import { getMeldOptions, getGlyphClass } from './meld/meldability';
+import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
 // ── Options ─────────────────────────────────────────────────────────
@@ -309,6 +309,9 @@ export function makeDraggable(
                             return;
                         }
                     }
+                    // No valid options (ports occupied) — don't fall through to performMeld
+                    log.debug(SEG.GLYPH, `[${logLabel}] No free ports for ${standaloneId}, skipping meld`);
+                    return;
                 }
 
                 // Neither is in a composition — create new 2-glyph composition
@@ -517,9 +520,10 @@ export function makeResizable(
     handle: HTMLElement,
     glyph: Glyph,
     opts: MakeResizableOptions = {},
-): void {
+): () => void {
     const { logLabel = 'Glyph', minWidth = 200, minHeight = 120 } = opts;
 
+    const setupController = new AbortController();
     let isResizing = false;
     let startX = 0;
     let startY = 0;
@@ -590,5 +594,10 @@ export function makeResizable(
         document.addEventListener('mouseup', handleMouseUp, { signal: abortController.signal });
 
         log.debug(SEG.GLYPH, `[${logLabel}] Started resizing`);
-    });
+    }, { signal: setupController.signal });
+
+    return () => {
+        setupController.abort();
+        abortController?.abort();
+    };
 }

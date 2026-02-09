@@ -8,7 +8,7 @@
 import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
 import { findMeldTarget, PROXIMITY_THRESHOLD } from './meld-detect';
-import { uiState } from '../../state/ui';
+import { uiState } from '../../../state/ui';
 
 // Setup happy-dom
 const window = new Window();
