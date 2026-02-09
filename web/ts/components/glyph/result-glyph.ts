@@ -105,6 +105,7 @@ export function createResultGlyph(
         defaults: { x: 200, y: 200, width: 400, height: calculatedHeight },
         dragHandle: header,
         draggableOptions: { ignoreButtons: true },
+        resizable: { minWidth: 200, minHeight: 80 },
         logLabel: 'ResultGlyph',
     });
     element.style.minHeight = '80px';
