@@ -5,7 +5,8 @@
  * Bidirectional: checks both forward (dragged→nearby) and reverse (nearby→dragged).
  */
 
-import { getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, type EdgeDirection } from './meldability';
+import { getInitiatorClasses, getTargetClasses, areClassesCompatible, getGlyphClass, isPortFree, type EdgeDirection } from './meldability';
+import { findCompositionByGlyph } from '../../../state/compositions';
 
 // Configuration
 export const PROXIMITY_THRESHOLD = 100; // px - distance at which proximity feedback starts
@@ -143,6 +144,15 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                 const direction = areCompatible(draggedElement, targetElement);
                 if (!direction) return;
 
+                // Axiom: one glyph per side — skip if target's incoming port is occupied
+                if (targetComp) {
+                    const targetId = targetElement.dataset.glyphId;
+                    if (targetId) {
+                        const comp = findCompositionByGlyph(targetId);
+                        if (comp && !isPortFree(targetId, direction, 'incoming', comp.edges)) return;
+                    }
+                }
+
                 const targetRect = targetElement.getBoundingClientRect();
                 const distance = checkDirectionalProximity(draggedRect, targetRect, direction);
 
@@ -170,6 +180,15 @@ export function findMeldTarget(draggedElement: HTMLElement): {
                 // Check if the nearby element can initiate toward the dragged element
                 const direction = areCompatible(nearbyElement, draggedElement);
                 if (!direction) return;
+
+                // Axiom: one glyph per side — skip if nearby's outgoing port is occupied
+                if (nearbyComp) {
+                    const nearbyId = nearbyElement.dataset.glyphId;
+                    if (nearbyId) {
+                        const comp = findCompositionByGlyph(nearbyId);
+                        if (comp && !isPortFree(nearbyId, direction, 'outgoing', comp.edges)) return;
+                    }
+                }
 
                 // Proximity: nearby is the meld initiator, dragged is the target
                 const nearbyRect = nearbyElement.getBoundingClientRect();
