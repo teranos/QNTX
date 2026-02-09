@@ -40,9 +40,9 @@ pub use browser::*;
 // ============================================================================
 
 #[cfg(not(feature = "browser"))]
-use qntx_core::parser::Parser;
-#[cfg(not(feature = "browser"))]
 use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
+#[cfg(not(feature = "browser"))]
+use qntx_core::parser::Parser;
 
 #[cfg(not(feature = "browser"))]
 mod wazero {
@@ -198,7 +198,8 @@ mod wazero {
         };
 
         let (pred_count, ctx_count, hash) = FUZZY.with(|f| {
-            f.borrow_mut().rebuild_index(parsed.predicates, parsed.contexts)
+            f.borrow_mut()
+                .rebuild_index(parsed.predicates, parsed.contexts)
         });
 
         format!(
@@ -217,13 +218,17 @@ mod wazero {
         let vtype = match parsed.vocab_type.as_str() {
             "predicates" => VocabularyType::Predicates,
             "contexts" => VocabularyType::Contexts,
-            other => return error_json(&format!(
-                "invalid vocab_type '{}', expected 'predicates' or 'contexts'", other
-            )),
+            other => {
+                return error_json(&format!(
+                    "invalid vocab_type '{}', expected 'predicates' or 'contexts'",
+                    other
+                ))
+            }
         };
 
         let matches = FUZZY.with(|f| {
-            f.borrow().find_matches(&parsed.query, vtype, parsed.limit, parsed.min_score)
+            f.borrow()
+                .find_matches(&parsed.query, vtype, parsed.limit, parsed.min_score)
         });
 
         match serde_json::to_string(&matches) {
@@ -347,10 +352,7 @@ mod wazero {
 
         #[test]
         fn find_matches_respects_limit() {
-            rebuild(
-                &["alpha", "alpine", "also", "alter", "always"],
-                &[],
-            );
+            rebuild(&["alpha", "alpine", "also", "alter", "always"], &[]);
             let matches = find("al", "predicates", 2, 0.5);
             let arr = matches.as_array().unwrap();
             assert!(arr.len() <= 2);
@@ -378,7 +380,10 @@ mod wazero {
                 r#"{"query":"test","vocab_type":"invalid","limit":10,"min_score":0.6}"#,
             );
             let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-            assert!(parsed["error"].as_str().unwrap().contains("invalid vocab_type"));
+            assert!(parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("invalid vocab_type"));
         }
 
         #[test]
