@@ -160,7 +160,7 @@ export class ChartGlyphState {
         } catch (error) {
             log.warn(SEG.UI, `[ChartGlyph ${this.id}] Failed to load data from ${this.dataSource} (${this.currentRange}):`, error);
             if (this.element) {
-                const container = document.getElementById(`chart-${this.id}`);
+                const container = this.element.querySelector(`#chart-${this.id}`);
                 if (container) {
                     container.innerHTML = '<div class="glyph-loading">Failed to load chart data</div>';
                 }
@@ -172,7 +172,7 @@ export class ChartGlyphState {
      * Render D3 chart
      */
     private render(): void {
-        const container = document.getElementById(`chart-${this.id}`);
+        const container = this.element?.querySelector(`#chart-${this.id}`) as HTMLElement | null;
         if (!container || !this.data || this.data.length === 0) {
             if (container) {
                 container.innerHTML = '<div class="glyph-loading">No data available</div>';

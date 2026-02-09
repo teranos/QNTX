@@ -19,56 +19,31 @@
  * This demonstrates the fractal principle: all glyphs are containers.
  */
 
-import type { Glyph } from './glyph';
-import { Pulse, IX, AX, SO, Prose } from '@generated/sym.js';
-import { log, SEG } from '../../logger';
-import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import { createAxGlyph } from './ax-glyph';
-import { createIxGlyph } from './ix-glyph';
-import { createPyGlyph } from './py-glyph';
-import { createPromptGlyph } from './prompt-glyph';
-import { createNoteGlyph } from './note-glyph';
-import { createErrorGlyph } from './error-glyph';
-import { uiState } from '../../state/ui';
-import { getMinimizeDuration } from './glyph';
-import { unmeldComposition, reconstructMeld } from './meld-system';
-import { makeDraggable } from './glyph-interaction';
-import { showActionBar, hideActionBar } from './canvas/action-bar';
-import { showSpawnMenu } from './canvas/spawn-menu';
-import { setupKeyboardShortcuts } from './canvas/keyboard-shortcuts';
-import { setupRectangleSelection, didRectangleSelectionJustComplete } from './canvas/rectangle-selection';
-import { getAllCompositions, removeComposition, extractGlyphIds } from '../../state/compositions';
-import { convertNoteToPrompt, convertResultToNote } from './conversions';
+import type { Glyph } from '../glyph';
+import { Pulse, IX, AX } from '@generated/sym.js';
+import { log, SEG } from '../../../logger';
+import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
+import { createAxGlyph } from '../ax-glyph';
+import { createErrorGlyph } from '../error-glyph';
+import { createResultGlyph } from '../result-glyph';
+import { uiState } from '../../../state/ui';
+import { getMinimizeDuration } from '../glyph';
+import { unmeldComposition, reconstructMeld } from '../meld/meld-system';
+import { makeDraggable } from '../glyph-interaction';
+import { showActionBar, hideActionBar } from './action-bar';
+import { showSpawnMenu } from './spawn-menu';
+import { setupKeyboardShortcuts } from './keyboard-shortcuts';
+import { setupRectangleSelection, didRectangleSelectionJustComplete } from './rectangle-selection';
+import { getAllCompositions, removeComposition, extractGlyphIds } from '../../../state/compositions';
+import { convertNoteToPrompt, convertResultToNote } from '../conversions';
+import {
+    hasSelection, selectionSize, getSelectedGlyphIds,
+    addToSelection, removeFromSelection, replaceSelection, clearSelection,
+    isGlyphSelected,
+} from './selection';
 
-// ============================================================================
-// Selection State
-// ============================================================================
-
-/** Currently selected glyph IDs (empty = nothing selected) */
-let selectedGlyphIds: string[] = [];
-
-/**
- * Check if a glyph is currently selected
- */
-export function isGlyphSelected(glyphId: string): boolean {
-    return selectedGlyphIds.includes(glyphId);
-}
-
-/**
- * Get all currently selected glyph IDs
- */
-export function getSelectedGlyphIds(): string[] {
-    return [...selectedGlyphIds];
-}
-
-/**
- * Get all selected glyph elements from the canvas
- */
-export function getSelectedGlyphElements(container: HTMLElement): HTMLElement[] {
-    return selectedGlyphIds
-        .map(id => container.querySelector(`[data-glyph-id="${id}"]`) as HTMLElement | null)
-        .filter((el): el is HTMLElement => el !== null);
-}
+// Re-export selection queries so existing consumers don't break
+export { isGlyphSelected, getSelectedGlyphIds, getSelectedGlyphElements } from './selection';
 
 /**
  * Select a glyph on the canvas.
@@ -78,17 +53,16 @@ export function getSelectedGlyphElements(container: HTMLElement): HTMLElement[] 
 function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean): void {
     if (shiftKey) {
         // Toggle glyph in selection
-        const idx = selectedGlyphIds.indexOf(glyphId);
-        if (idx !== -1) {
+        if (isGlyphSelected(glyphId)) {
             // Already selected — deselect it
-            selectedGlyphIds.splice(idx, 1);
+            removeFromSelection(glyphId);
             const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
             if (el) {
                 el.classList.remove('canvas-glyph-selected');
             }
         } else {
             // Not selected — add to selection
-            selectedGlyphIds.push(glyphId);
+            addToSelection(glyphId);
             const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
             log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Adding to selection', {
                 glyphId,
@@ -104,7 +78,7 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
     } else {
         // Replace selection
         deselectAll(container);
-        selectedGlyphIds = [glyphId];
+        replaceSelection([glyphId]);
         const el = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
         log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Replace mode', {
             glyphId,
@@ -119,65 +93,53 @@ function selectGlyph(glyphId: string, container: HTMLElement, shiftKey: boolean)
     }
 
     // Show/hide action bar based on selection
+    const selectedIds = getSelectedGlyphIds();
     log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Checking action bar', {
-        selectedCount: selectedGlyphIds.length,
-        selectedIds: selectedGlyphIds
+        selectedCount: selectionSize(),
+        selectedIds
     });
-    if (selectedGlyphIds.length > 0) {
+    if (hasSelection()) {
         log.debug(SEG.GLYPH, '[Canvas] selectGlyph: Showing action bar');
         showActionBar(
-            selectedGlyphIds,
+            selectedIds,
             container,
             () => deleteSelectedGlyphs(container),
             (composition) => unmeldSelectedGlyphs(container, composition),
-            () => convertNoteToPrompt(container, selectedGlyphIds[0]),
-            () => convertResultToNote(container, selectedGlyphIds[0]),
+            () => convertNoteToPrompt(container, selectedIds[0]),
+            () => convertResultToNote(container, selectedIds[0]),
         );
     } else {
         hideActionBar();
     }
 
-    log.debug(SEG.GLYPH, `[Canvas] Selected ${selectedGlyphIds.length} glyphs`, { selectedGlyphIds });
+    log.debug(SEG.GLYPH, `[Canvas] Selected ${selectionSize()} glyphs`, { selectedIds });
 }
 
 /**
- * Create a Glyph object from a DOM element by detecting its type
- * Used when restoring glyphs after unmeld
+ * Create a Glyph object from a DOM element by detecting its type.
+ * Uses glyph-registry for symbol/title lookup instead of per-type if/else.
  */
 function createGlyphFromElement(element: HTMLElement, id: string): Glyph {
-    if (element.classList.contains('canvas-ax-glyph')) {
-        return { id, title: 'AX Query', symbol: AX, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-ix-glyph')) {
-        return { id, title: 'Ingest', symbol: IX, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-py-glyph')) {
-        return { id, title: 'Python', symbol: 'py', renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-prompt-glyph')) {
-        return { id, title: 'Prompt', symbol: SO, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-note-glyph')) {
-        return { id, title: 'Note', symbol: Prose, renderContent: () => element };
-    }
-    if (element.classList.contains('canvas-result-glyph')) {
-        return { id, title: 'Result', symbol: 'result', renderContent: () => element };
-    }
-    // Fallback
-    return { id, title: 'Glyph', renderContent: () => element };
+    const entry = getGlyphTypeByElement(element);
+    return {
+        id,
+        title: entry?.title ?? 'Glyph',
+        symbol: entry?.symbol,
+        renderContent: () => element,
+    };
 }
 
 /**
  * Deselect all glyphs and hide action bar
  */
 function deselectAll(container: HTMLElement): void {
-    if (selectedGlyphIds.length === 0) return;
+    if (!hasSelection()) return;
 
     const selected = container.querySelectorAll('.canvas-glyph-selected');
     selected.forEach(el => el.classList.remove('canvas-glyph-selected'));
 
     hideActionBar();
-    selectedGlyphIds = [];
+    clearSelection();
 }
 
 /**
@@ -185,12 +147,12 @@ function deselectAll(container: HTMLElement): void {
  * Called by keyboard shortcut 'u'
  */
 function unmeldFromSelection(container: HTMLElement): void {
-    if (selectedGlyphIds.length === 0) {
+    if (!hasSelection()) {
         return;
     }
 
     // Find if any selected glyph is in a composition
-    for (const glyphId of selectedGlyphIds) {
+    for (const glyphId of getSelectedGlyphIds()) {
         const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
         if (!glyphEl) continue;
 
@@ -221,11 +183,9 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
     glyphElements.forEach((element) => {
         const glyphId = element.dataset.glyphId || element.getAttribute('data-glyph-id') || 'unknown';
         const glyph = createGlyphFromElement(element, glyphId);
+        const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
 
-        // Determine log label from glyph symbol
-        const label = glyph.symbol === AX ? 'AX' : glyph.symbol === SO ? 'Prompt' : 'Py';
-
-        makeDraggable(element, element, glyph, { logLabel: label });
+        makeDraggable(element, element, glyph, { logLabel: entry?.label ?? 'Glyph' });
     });
 
     // Clear selection and hide action bar
@@ -242,13 +202,13 @@ function unmeldSelectedGlyphs(container: HTMLElement, composition: HTMLElement):
  * Animates scale-down + fade-out before removal (respects reduced motion)
  */
 function deleteSelectedGlyphs(container: HTMLElement): void {
-    if (selectedGlyphIds.length === 0) return;
+    if (!hasSelection()) return;
 
-    const glyphIdsToDelete = [...selectedGlyphIds];
+    const glyphIdsToDelete = getSelectedGlyphIds();
 
     // Clear selection immediately (prevent double-delete)
     hideActionBar();
-    selectedGlyphIds = [];
+    clearSelection();
 
     const duration = getMinimizeDuration();
 
@@ -317,7 +277,7 @@ export function createCanvasGlyph(): Glyph {
     });
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
-        // For ax glyphs, recreate using factory function to restore full functionality
+        // AX glyphs need factory restoration for full WebSocket/query functionality
         if (saved.symbol === AX) {
             const axGlyph = createAxGlyph(saved.id, '', saved.x, saved.y);
             axGlyph.width = saved.width;
@@ -333,24 +293,17 @@ export function createCanvasGlyph(): Glyph {
             });
         }
 
+        const entry = saved.symbol ? getGlyphTypeBySymbol(saved.symbol) : undefined;
         return {
             id: saved.id,
-            title: saved.symbol === 'result' ? 'Python Result' : 'Pulse Schedule',
+            title: entry?.title ?? 'Glyph',
             symbol: saved.symbol,
             x: saved.x,
             y: saved.y,
-            width: saved.width,   // Restore custom size if saved
+            width: saved.width,
             height: saved.height,
-            result: saved.result, // For result glyphs
-            // Placeholder renderContent - result glyphs render via createResultGlyph() instead
-            // TODO: Clarify if Pulse glyphs should display content
-            renderContent: () => {
-                const content = document.createElement('div');
-                content.textContent = saved.symbol === 'result'
-                    ? 'Result placeholder (should not be visible)'
-                    : 'Pulse glyph content (TBD)';
-                return content;
-            }
+            result: saved.result,
+            renderContent: () => document.createElement('div'),
         };
     });
 
@@ -439,7 +392,7 @@ export function createCanvasGlyph(): Glyph {
             // AbortController signal auto-cleans up when container is removed from DOM
             void setupKeyboardShortcuts(
                 container,
-                () => selectedGlyphIds.length > 0,
+                hasSelection,
                 () => deselectAll(container),
                 () => deleteSelectedGlyphs(container),
                 () => unmeldFromSelection(container)
@@ -531,8 +484,8 @@ export function createCanvasGlyph(): Glyph {
 }
 
 /**
- * Render a glyph on the canvas
- * Checks symbol type and creates appropriate glyph element
+ * Render a glyph on the canvas.
+ * Uses glyph-registry for dispatch instead of per-type if/else.
  */
 async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     log.debug(SEG.GLYPH, `[Canvas] Rendering glyph ${glyph.id}`, {
@@ -540,42 +493,10 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         hasResult: !!glyph.result
     });
 
-    // For py glyphs, create full editor
-    if (glyph.symbol === 'py') {
-        return await createPyGlyph(glyph);
-    }
-
-    // For IX glyphs, create full form
-    if (glyph.symbol === IX) {
-        return await createIxGlyph(glyph);
-    }
-
-    // For prompt glyphs, create template editor
-    if (glyph.symbol === SO) {
-        return await createPromptGlyph(glyph);
-    }
-
-    // For note glyphs, create markdown editor
-    if (glyph.symbol === Prose) {
-        return await createNoteGlyph(glyph);
-    }
-
-    // For AX glyphs, render content directly (they handle their own rendering)
-    if (glyph.symbol === AX) {
-        return glyph.renderContent();
-    }
-
-    // For result glyphs, create result display
-    if (glyph.symbol === 'result') {
-        if (glyph.result) {
-            log.debug(SEG.GLYPH, `[Canvas] Creating result glyph for ${glyph.id}`);
-            return createResultGlyph(glyph, glyph.result as ExecutionResult);
-        }
-
-        // Result glyph without execution data - spawn error glyph (ephemeral)
+    // Result without execution data → diagnostic error glyph
+    if (glyph.symbol === 'result' && !glyph.result) {
         log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing execution data`, {
             glyphId: glyph.id,
-            hasResult: !!glyph.result,
             position: { x: glyph.x, y: glyph.y },
             size: { width: glyph.width, height: glyph.height }
         });
@@ -588,7 +509,7 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
                 type: 'missing_data',
                 message: 'Execution result data missing',
                 details: {
-                    'Has result': !!glyph.result,
+                    'Has result': false,
                     'Position': `(${glyph.x}, ${glyph.y})`,
                     'Size': `${glyph.width}x${glyph.height}`,
                     'Cause': 'Glyph metadata saved without execution result (migration bug)'
@@ -597,7 +518,18 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
         );
     }
 
-    // Unsupported glyph type - spawn error glyph (ephemeral)
+    // Result glyphs with valid data — handled explicitly (not in registry, always created programmatically)
+    if (glyph.symbol === 'result' && glyph.result) {
+        return createResultGlyph(glyph, glyph.result);
+    }
+
+    // Look up glyph type in registry
+    const entry = glyph.symbol ? getGlyphTypeBySymbol(glyph.symbol) : undefined;
+    if (entry) {
+        return await entry.render(glyph);
+    }
+
+    // Unknown glyph type → diagnostic error glyph
     log.error(SEG.GLYPH, `[Canvas] Unsupported glyph type: ${glyph.symbol}`, {
         glyphId: glyph.id,
         symbol: glyph.symbol,
@@ -614,7 +546,7 @@ async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
             details: {
                 'Symbol': glyph.symbol ?? 'unknown',
                 'Position': `(${glyph.x}, ${glyph.y})`,
-                'Cause': 'Glyph type not implemented in renderGlyph() - check canvas-glyph.ts'
+                'Cause': 'Glyph type not recognized by registry - check glyph-registry.ts'
             }
         }
     );
