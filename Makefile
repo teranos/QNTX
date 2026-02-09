@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-fuzzy rust-vidstream rust-sqlite rust-fuzzy-test rust-fuzzy-check rust-wasm rust-python
+.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -194,14 +194,6 @@ code-plugin: ## Build and install code plugin to ~/.qntx/plugins/
 	@chmod +x $(PREFIX)/plugins/qntx-code-plugin
 	@echo "✓ qntx-code-plugin → $(PREFIX)/plugins/qntx-code-plugin"
 
-# Rust fuzzy matching library (ax segment optimization)
-rust-fuzzy: ## Build Rust fuzzy matching library (for CGO integration)
-	@echo "Building Rust fuzzy matching library..."
-	@cd ats/ax/fuzzy-ax && cargo build --release --lib
-	@echo "✓ libqntx_fuzzy built in ats/ax/fuzzy-ax/target/release/"
-	@echo "  Static:  libqntx_fuzzy.a"
-	@echo "  Shared:  libqntx_fuzzy.so (Linux) / libqntx_fuzzy.dylib (macOS)"
-
 rust-vidstream: ## Build Rust vidstream library with ONNX support (for CGO integration)
 	@echo "Building Rust vidstream library with ONNX..."
 	@cd ats/vidstream && cargo build --release --features onnx --lib
@@ -233,17 +225,6 @@ rust-wasm: ## Build qntx-core as WASM module (for wazero integration + browser)
 	@cp -r crates/qntx-wasm/pkg/* web/wasm/
 	@echo "  ✓ Browser WASM built and copied to web/wasm/"
 	@ls -lh web/wasm/*.wasm 2>/dev/null | awk '{print "    Size: " $$5 " - " $$9}' || (echo "    ERROR: wasm-pack ran but produced no .wasm files"; exit 1)
-
-rust-fuzzy-test: ## Run Rust fuzzy matching tests
-	@echo "Running Rust fuzzy matching tests..."
-	@cd ats/ax/fuzzy-ax && cargo test --lib
-	@echo "✓ All Rust tests passed"
-
-rust-fuzzy-check: ## Check Rust fuzzy matching code (fmt + clippy)
-	@echo "Checking Rust fuzzy matching code..."
-	@cd ats/ax/fuzzy-ax && cargo fmt --check
-	@cd ats/ax/fuzzy-ax && cargo clippy --lib -- -D warnings
-	@echo "✓ Rust code checks passed"
 
 # Rust Python plugin (PyO3-based Python execution)
 # REQUIRES Nix: Platform-specific Python linking issues make cargo-only builds unreliable
