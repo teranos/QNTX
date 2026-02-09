@@ -11,7 +11,7 @@
 
 import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
-import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, MELD_THRESHOLD } from './meld-system';
+import { performMeld, unmeldComposition, isMeldedComposition, reconstructMeld, findMeldTarget, MELD_THRESHOLD, PROXIMITY_THRESHOLD } from './meld-system';
 import type { Glyph } from './glyph';
 
 // Setup happy-dom
@@ -333,8 +333,106 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
 
-        expect(composition.getAttribute('data-initiator-id')).toBe('py1');
-        expect(composition.getAttribute('data-target-id')).toBe('result1');
+        // Composition container identifies via data-glyph-id only; child glyphs
+        // are discoverable through edges (no binary initiator/target attributes)
+        expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-result1');
+
+        document.body.innerHTML = '';
+    });
+});
+
+describe('Reverse Meld Detection - Tim (Happy Path)', () => {
+    /** Helper: mock getBoundingClientRect on an element */
+    function mockRect(el: HTMLElement, rect: { left: number; top: number; width: number; height: number }) {
+        el.getBoundingClientRect = () => ({
+            left: rect.left, top: rect.top,
+            right: rect.left + rect.width, bottom: rect.top + rect.height,
+            width: rect.width, height: rect.height,
+            x: rect.left, y: rect.top,
+            toJSON: () => ({})
+        });
+    }
+
+    test('Tim drags prompt toward ax from the right — reverse meld detected', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
+        canvas.appendChild(axElement);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        canvas.appendChild(promptElement);
+
+        // ax on the left, prompt approaching from the right (gap < threshold)
+        mockRect(axElement, { left: 100, top: 100, width: 200, height: 150 });
+        mockRect(promptElement, { left: 320, top: 100, width: 200, height: 150 });
+
+        // Prompt is dragged — findMeldTarget should detect ax via reverse lookup
+        const result = findMeldTarget(promptElement);
+
+        expect(result.target).toBe(axElement);
+        expect(result.reversed).toBe(true);
+        expect(result.direction).toBe('right');
+        expect(result.distance).toBeLessThan(PROXIMITY_THRESHOLD);
+
+        document.body.innerHTML = '';
+    });
+
+    test('Tim drags prompt toward ax from the right — forward check finds nothing', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
+        canvas.appendChild(axElement);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        canvas.appendChild(promptElement);
+
+        // ax on the left, prompt on the right — prompt has no right→ax port
+        mockRect(axElement, { left: 100, top: 100, width: 200, height: 150 });
+        mockRect(promptElement, { left: 320, top: 100, width: 200, height: 150 });
+
+        const result = findMeldTarget(promptElement);
+
+        // Should NOT find ax via forward lookup (prompt→ax is not in registry)
+        // but SHOULD find via reverse (ax→right→prompt)
+        expect(result.target).toBe(axElement);
+        expect(result.reversed).toBe(true);
+
+        document.body.innerHTML = '';
+    });
+
+    test('Tim drags ax toward prompt from the left — forward meld detected (not reversed)', () => {
+        const canvas = document.createElement('div');
+        document.body.appendChild(canvas);
+
+        const axElement = document.createElement('div');
+        axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
+        canvas.appendChild(axElement);
+
+        const promptElement = document.createElement('div');
+        promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
+        canvas.appendChild(promptElement);
+
+        // ax on the left approaching prompt on the right
+        mockRect(axElement, { left: 100, top: 100, width: 200, height: 150 });
+        mockRect(promptElement, { left: 320, top: 100, width: 200, height: 150 });
+
+        const result = findMeldTarget(axElement);
+
+        expect(result.target).toBe(promptElement);
+        expect(result.reversed).toBe(false);
+        expect(result.direction).toBe('right');
 
         document.body.innerHTML = '';
     });
