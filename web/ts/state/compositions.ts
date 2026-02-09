@@ -78,6 +78,26 @@ export function addComposition(composition: CompositionState): void {
 }
 
 /**
+ * Replace a composition atomically (e.g., during extension when ID changes)
+ * Single local state update + sequential API calls (upsert new before deleting old)
+ */
+export function replaceComposition(oldId: string, newComp: CompositionState): void {
+    const compositions = uiState.getCanvasCompositions();
+    const updated = compositions.filter(c => c.id !== oldId);
+    updated.push(newComp);
+    uiState.setCanvasCompositions(updated);
+
+    log.debug(SEG.GLYPH, '[Compositions] Replaced composition', { oldId, newId: newComp.id });
+
+    // Upsert new first, then delete old — prevents window where neither exists
+    apiUpsertComposition(newComp)
+        .then(() => apiDeleteComposition(oldId))
+        .catch(err => {
+            log.error(SEG.GLYPH, '[Compositions] Failed to sync composition replacement:', err);
+        });
+}
+
+/**
  * Remove a composition from storage
  */
 export function removeComposition(id: string): void {

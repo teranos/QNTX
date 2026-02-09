@@ -12,10 +12,76 @@ import { log, SEG } from '../../logger';
 import type { Glyph } from './glyph';
 import type { CompositionEdge } from '../../state/ui';
 import type { EdgeDirection } from './meldability';
-import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../state/compositions';
+import { addComposition, replaceComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
+
+/**
+ * Topologically sort glyph elements by walking the edge graph from roots to leaves.
+ * Ensures reconstruction order matches the visual layout regardless of storage order.
+ */
+function topoSortElements(
+    glyphElements: HTMLElement[],
+    edges: CompositionEdge[]
+): HTMLElement[] {
+    const elementMap = new Map<string, HTMLElement>();
+    for (const el of glyphElements) {
+        const id = el.getAttribute('data-glyph-id') || '';
+        if (id) elementMap.set(id, el);
+    }
+
+    // Build adjacency for main-axis edges only (right)
+    // Cross-axis edges (bottom/top) don't affect main ordering
+    const children = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+
+    for (const id of elementMap.keys()) {
+        children.set(id, []);
+        inDegree.set(id, 0);
+    }
+
+    for (const edge of edges) {
+        if (edge.direction === 'right') {
+            children.get(edge.from)?.push(edge.to);
+            inDegree.set(edge.to, (inDegree.get(edge.to) || 0) + 1);
+        }
+    }
+
+    // BFS from roots (in-degree 0 for main-axis edges)
+    const sorted: HTMLElement[] = [];
+    const visited = new Set<string>();
+    const queue: string[] = [];
+
+    for (const [id, deg] of inDegree) {
+        if (deg === 0) queue.push(id);
+    }
+
+    while (queue.length > 0) {
+        const id = queue.shift()!;
+        if (visited.has(id)) continue;
+        visited.add(id);
+
+        const el = elementMap.get(id);
+        if (el) sorted.push(el);
+
+        for (const childId of children.get(id) || []) {
+            inDegree.set(childId, (inDegree.get(childId) || 0) - 1);
+            if (inDegree.get(childId) === 0) {
+                queue.push(childId);
+            }
+        }
+    }
+
+    // Append any remaining elements not reached by main-axis traversal
+    // (cross-axis-only nodes like standalone results)
+    for (const el of glyphElements) {
+        const id = el.getAttribute('data-glyph-id') || '';
+        if (!visited.has(id)) sorted.push(el);
+    }
+
+    return sorted;
+}
 
 /**
  * Perform meld operation
@@ -223,10 +289,9 @@ export function extendComposition(
     // Update composition ID on DOM
     compositionElement.setAttribute('data-glyph-id', newId);
 
-    // Update storage: remove old, add new with all edges
+    // Atomic storage update: replace old composition with extended one
     const allEdges = [...existingComp.edges, newEdge];
-    removeComposition(oldId);
-    addComposition({
+    replaceComposition(oldId, {
         id: newId,
         edges: allEdges,
         x: existingComp.x,
@@ -292,8 +357,11 @@ export function reconstructMeld(
         composition.style.alignItems = 'center';
     }
 
+    // Sort elements by edge topology to ensure correct visual order
+    const sortedElements = topoSortElements(glyphElements, edges);
+
     // Clear positioning from glyphs
-    glyphElements.forEach(element => {
+    sortedElements.forEach(element => {
         element.style.position = 'relative';
         element.style.left = '0';
         element.style.top = '0';
@@ -308,7 +376,7 @@ export function reconstructMeld(
         const crossAxisChildren = new Set<string>();
         for (const edge of edges) {
             if (edge.direction !== 'right') {
-                const toEl = glyphElements.find(el => el.getAttribute('data-glyph-id') === edge.to);
+                const toEl = sortedElements.find(el => el.getAttribute('data-glyph-id') === edge.to);
                 if (toEl) {
                     const existing = crossAxisEdges.get(edge.from) || [];
                     existing.push(toEl);
@@ -318,8 +386,8 @@ export function reconstructMeld(
             }
         }
 
-        // Walk glyph elements: create sub-containers for cross-axis anchors
-        for (const element of glyphElements) {
+        // Walk sorted elements: create sub-containers for cross-axis anchors
+        for (const element of sortedElements) {
             const id = element.getAttribute('data-glyph-id') || '';
             if (crossAxisChildren.has(id)) continue; // Added as part of sub-container
 
@@ -342,7 +410,7 @@ export function reconstructMeld(
         }
     } else {
         // Pure single-direction: simple append
-        glyphElements.forEach(element => {
+        sortedElements.forEach(element => {
             composition.appendChild(element);
         });
     }
@@ -457,4 +525,132 @@ export function unmeldComposition(composition: HTMLElement): {
     return {
         glyphElements
     };
+}
+
+/**
+ * Collect direct children of a composition (glyphs and sub-containers).
+ * Preserves the absorbed composition's internal layout structure.
+ */
+export function collectDirectGlyphChildren(composition: HTMLElement): HTMLElement[] {
+    const children: HTMLElement[] = [];
+    for (let i = 0; i < composition.children.length; i++) {
+        children.push(composition.children[i] as HTMLElement);
+    }
+    return children;
+}
+
+/**
+ * Merge two compositions into one.
+ *
+ * The surviving composition absorbs all children of the absorbed composition.
+ * A bridging edge connects the two graphs at their compatible boundary.
+ *
+ * CRITICAL: Reparents DOM elements, does NOT clone.
+ */
+export function mergeCompositions(
+    survivingComp: HTMLElement,
+    absorbedComp: HTMLElement,
+    bridgeFrom: string,
+    bridgeTo: string,
+    bridgeDirection: EdgeDirection
+): HTMLElement {
+    // Look up both compositions in state
+    const survivingFirstChild = survivingComp.querySelector('[data-glyph-id]');
+    const survivingChildId = survivingFirstChild?.getAttribute('data-glyph-id') || '';
+    const survivingState = findCompositionByGlyph(survivingChildId);
+
+    const absorbedFirstChild = absorbedComp.querySelector('[data-glyph-id]');
+    const absorbedChildId = absorbedFirstChild?.getAttribute('data-glyph-id') || '';
+    const absorbedState = findCompositionByGlyph(absorbedChildId);
+
+    if (!survivingState || !absorbedState) {
+        throw new Error(`Cannot merge: missing composition state (surviving=${survivingChildId}, absorbed=${absorbedChildId})`);
+    }
+
+    const oldSurvivingId = survivingState.id;
+    const oldAbsorbedId = absorbedState.id;
+
+    // Build bridging edge
+    const bridgeEdge: CompositionEdge = {
+        from: bridgeFrom,
+        to: bridgeTo,
+        direction: bridgeDirection,
+        position: survivingState.edges.length + absorbedState.edges.length
+    };
+
+    // New ID from bridge edge (consistent with extendComposition)
+    const newId = `melded-${bridgeFrom}-${bridgeTo}`;
+
+    // Merge all edges
+    const allEdges = [...survivingState.edges, ...absorbedState.edges, bridgeEdge];
+
+    log.info(SEG.GLYPH, '[MeldSystem] Merging compositions', {
+        surviving: oldSurvivingId,
+        absorbed: oldAbsorbedId,
+        newId,
+        bridgeFrom,
+        bridgeTo,
+        bridgeDirection
+    });
+
+    // Collect absorbed comp's children before reparenting
+    const absorbedChildren = collectDirectGlyphChildren(absorbedComp);
+
+    // Check if bridge direction crosses the surviving composition's flex axis
+    const survivingFlexDir = survivingComp.style.flexDirection;
+    const isCrossAxis =
+        (survivingFlexDir === 'row' && (bridgeDirection === 'bottom' || bridgeDirection === 'top')) ||
+        (survivingFlexDir === 'column' && bridgeDirection === 'right');
+
+    // Clear meld feedback on absorbed children
+    for (const child of absorbedChildren) {
+        clearMeldFeedback(child);
+    }
+
+    if (isCrossAxis) {
+        // Cross-axis: wrap absorbed children in a sub-container
+        const subContainer = document.createElement('div');
+        subContainer.className = 'meld-sub-container';
+        subContainer.style.display = 'flex';
+        if (bridgeDirection === 'bottom' || bridgeDirection === 'top') {
+            subContainer.style.flexDirection = 'column';
+            subContainer.style.alignItems = 'flex-start';
+        } else {
+            subContainer.style.flexDirection = 'row';
+            subContainer.style.alignItems = 'center';
+        }
+
+        for (const child of absorbedChildren) {
+            subContainer.appendChild(child);
+        }
+        survivingComp.appendChild(subContainer);
+    } else {
+        // Same-axis: append children directly
+        for (const child of absorbedChildren) {
+            survivingComp.appendChild(child);
+        }
+    }
+
+    // Update DOM
+    survivingComp.setAttribute('data-glyph-id', newId);
+
+    // Update storage: replace surviving with merged, remove absorbed
+    replaceComposition(oldSurvivingId, {
+        id: newId,
+        edges: allEdges,
+        x: survivingState.x,
+        y: survivingState.y
+    });
+    removeComposition(oldAbsorbedId);
+
+    // Remove absorbed container from DOM
+    absorbedComp.remove();
+
+    log.info(SEG.GLYPH, '[MeldSystem] Compositions merged', {
+        newId,
+        edges: allEdges.length,
+        glyphs: extractGlyphIds(allEdges)
+    });
+
+    return survivingComp;
 }

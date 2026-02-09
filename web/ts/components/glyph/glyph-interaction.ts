@@ -17,11 +17,12 @@ import {
     clearMeldFeedback,
     performMeld,
     extendComposition,
+    mergeCompositions,
     isMeldedComposition,
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
 } from './meld-system';
-import { getMeldOptions, getGlyphClass } from './meldability';
+import { getMeldOptions, getGlyphClass, getLeafGlyphIds, getRootGlyphIds, areClassesCompatible } from './meldability';
 import { isGlyphSelected, getSelectedGlyphIds } from './canvas-glyph';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
@@ -281,12 +282,124 @@ export function makeDraggable(
                 const targetComp = meldTarget.closest('.melded-composition') as HTMLElement | null;
                 const initiatorComp = meldInitiator.closest('.melded-composition') as HTMLElement | null;
 
+                // Both elements are in different compositions → merge compositions
+                if (targetComp && initiatorComp && targetComp !== initiatorComp) {
+                    // Surviving = stationary (nearby), absorbed = dragged
+                    const survivingComp = targetComp;
+                    const absorbedComp = initiatorComp;
+
+                    // Find bridge: leaf of absorbed → root of surviving
+                    const absFirstChild = absorbedComp.querySelector('[data-glyph-id]');
+                    const absChildId = absFirstChild?.getAttribute('data-glyph-id') || '';
+                    const absState = findCompositionByGlyph(absChildId);
+
+                    const survFirstChild = survivingComp.querySelector('[data-glyph-id]');
+                    const survChildId = survFirstChild?.getAttribute('data-glyph-id') || '';
+                    const survState = findCompositionByGlyph(survChildId);
+
+                    log.info(SEG.GLYPH, `[${logLabel}] Comp-to-comp merge attempt`, {
+                        absChildId, absStateFound: !!absState,
+                        survChildId, survStateFound: !!survState,
+                        targetIsComp: meldTarget.classList.contains('melded-composition'),
+                        initiatorIsComp: meldInitiator.classList.contains('melded-composition'),
+                    });
+
+                    if (absState && survState) {
+                        // Find compatible bridge: try absorbed leaves → surviving roots first
+                        let bridgeFrom = '';
+                        let bridgeTo = '';
+                        let bridgeDir = meldInfo.direction;
+
+                        const absLeafIds = getLeafGlyphIds(absState.edges);
+                        const survRootIds = getRootGlyphIds(survState.edges);
+
+                        for (const leafId of absLeafIds) {
+                            const leafEl = absorbedComp.querySelector(`[data-glyph-id="${leafId}"]`) as HTMLElement | null;
+                            if (!leafEl) continue;
+                            const leafClass = getGlyphClass(leafEl);
+                            if (!leafClass) continue;
+
+                            for (const rootId of survRootIds) {
+                                const rootEl = survivingComp.querySelector(`[data-glyph-id="${rootId}"]`) as HTMLElement | null;
+                                if (!rootEl) continue;
+                                const rootClass = getGlyphClass(rootEl);
+                                if (!rootClass) continue;
+
+                                const dir = areClassesCompatible(leafClass, rootClass);
+                                if (dir) {
+                                    bridgeFrom = leafId;
+                                    bridgeTo = rootId;
+                                    bridgeDir = dir;
+                                    break;
+                                }
+                            }
+                            if (bridgeFrom) break;
+                        }
+
+                        // If no forward bridge found, try reverse: surviving leaves → absorbed roots
+                        if (!bridgeFrom) {
+                            const survLeafIds = getLeafGlyphIds(survState.edges);
+                            const absRootIds = getRootGlyphIds(absState.edges);
+
+                            for (const leafId of survLeafIds) {
+                                const leafEl = survivingComp.querySelector(`[data-glyph-id="${leafId}"]`) as HTMLElement | null;
+                                if (!leafEl) continue;
+                                const leafClass = getGlyphClass(leafEl);
+                                if (!leafClass) continue;
+
+                                for (const rootId of absRootIds) {
+                                    const rootEl = absorbedComp.querySelector(`[data-glyph-id="${rootId}"]`) as HTMLElement | null;
+                                    if (!rootEl) continue;
+                                    const rootClass = getGlyphClass(rootEl);
+                                    if (!rootClass) continue;
+
+                                    const dir = areClassesCompatible(leafClass, rootClass);
+                                    if (dir) {
+                                        bridgeFrom = leafId;
+                                        bridgeTo = rootId;
+                                        bridgeDir = dir;
+                                        break;
+                                    }
+                                }
+                                if (bridgeFrom) break;
+                            }
+                        }
+
+                        if (bridgeFrom && bridgeTo) {
+                            mergeCompositions(survivingComp, absorbedComp, bridgeFrom, bridgeTo, bridgeDir);
+
+                            const updatedId = survivingComp.getAttribute('data-glyph-id') || '';
+                            const compositionGlyph: Glyph = {
+                                id: updatedId,
+                                title: 'Melded Composition',
+                                renderContent: () => survivingComp
+                            };
+                            makeDraggable(survivingComp, survivingComp, compositionGlyph, {
+                                logLabel: 'MeldedComposition'
+                            });
+
+                            log.info(SEG.GLYPH, `[${logLabel}] Merged compositions: ${bridgeFrom} → ${bridgeTo} (${bridgeDir})`);
+                            return;
+                        }
+                    }
+                }
+
                 if (targetComp || initiatorComp) {
                     const compositionElement = (targetComp || initiatorComp)!;
                     const standaloneElement = targetComp ? meldInitiator : meldTarget;
                     const standaloneId = standaloneElement.dataset.glyphId || '';
                     const standaloneClass = getGlyphClass(standaloneElement);
-                    const anchorId = (targetComp ? meldTarget : meldInitiator).dataset.glyphId || '';
+
+                    // When the anchor element IS the composition (dragged composition near standalone),
+                    // use its first child glyph to look up state
+                    const anchorElement = targetComp ? meldTarget : meldInitiator;
+                    let anchorId: string;
+                    if (anchorElement.classList.contains('melded-composition')) {
+                        const firstChild = anchorElement.querySelector('[data-glyph-id]');
+                        anchorId = firstChild?.getAttribute('data-glyph-id') || '';
+                    } else {
+                        anchorId = anchorElement.dataset.glyphId || '';
+                    }
                     const existingComp = findCompositionByGlyph(anchorId);
 
                     if (existingComp && standaloneClass) {

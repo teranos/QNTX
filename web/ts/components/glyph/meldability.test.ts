@@ -12,6 +12,8 @@ import {
     getLeafGlyphIds,
     getRootGlyphIds,
     getMeldOptions,
+    getCompositionCompatibility,
+    getElementBoundaryClasses,
     type EdgeDirection
 } from './meldability';
 
@@ -235,6 +237,108 @@ describe('Port-aware MELDABILITY registry', () => {
             // ix glyph has no meld compatibility
             const options = getMeldOptions('canvas-ix-glyph', composition, edges);
             expect(options).toEqual([]);
+        });
+    });
+
+    describe('getElementBoundaryClasses', () => {
+        test('standalone glyph returns its own class', () => {
+            const el = document.createElement('div');
+            el.className = 'canvas-py-glyph';
+            expect(getElementBoundaryClasses(el, 'leaves')).toEqual(['canvas-py-glyph']);
+            expect(getElementBoundaryClasses(el, 'roots')).toEqual(['canvas-py-glyph']);
+        });
+
+        test('composition returns leaf classes', () => {
+            const comp = document.createElement('div');
+            comp.className = 'melded-composition';
+
+            const ax = document.createElement('div');
+            ax.className = 'canvas-ax-glyph';
+            ax.setAttribute('data-glyph-id', 'ax1');
+            const py = document.createElement('div');
+            py.className = 'canvas-py-glyph';
+            py.setAttribute('data-glyph-id', 'py1');
+            comp.appendChild(ax);
+            comp.appendChild(py);
+
+            const edges = [{ from: 'ax1', to: 'py1', direction: 'right' }];
+
+            expect(getElementBoundaryClasses(comp, 'leaves', edges)).toEqual(['canvas-py-glyph']);
+            expect(getElementBoundaryClasses(comp, 'roots', edges)).toEqual(['canvas-ax-glyph']);
+        });
+
+        test('composition without edges returns empty', () => {
+            const comp = document.createElement('div');
+            comp.className = 'melded-composition';
+            expect(getElementBoundaryClasses(comp, 'leaves')).toEqual([]);
+        });
+    });
+
+    describe('getCompositionCompatibility', () => {
+        test('ax|py composition → prompt|result composition returns right (py→prompt)', () => {
+            const comp1 = document.createElement('div');
+            comp1.className = 'melded-composition';
+            const ax = document.createElement('div');
+            ax.className = 'canvas-ax-glyph';
+            ax.setAttribute('data-glyph-id', 'ax1');
+            const py = document.createElement('div');
+            py.className = 'canvas-py-glyph';
+            py.setAttribute('data-glyph-id', 'py1');
+            comp1.appendChild(ax);
+            comp1.appendChild(py);
+
+            const comp2 = document.createElement('div');
+            comp2.className = 'melded-composition';
+            const prompt = document.createElement('div');
+            prompt.className = 'canvas-prompt-glyph';
+            prompt.setAttribute('data-glyph-id', 'prompt1');
+            comp2.appendChild(prompt);
+
+            const edges1 = [{ from: 'ax1', to: 'py1', direction: 'right' }];
+            const edges2 = [{ from: 'prompt1', to: 'result1', direction: 'bottom' }];
+
+            const result = getCompositionCompatibility(comp1, comp2, edges1, edges2);
+            expect(result).toBe('right');
+        });
+
+        test('incompatible compositions return null', () => {
+            const comp1 = document.createElement('div');
+            comp1.className = 'melded-composition';
+            const prompt = document.createElement('div');
+            prompt.className = 'canvas-prompt-glyph';
+            prompt.setAttribute('data-glyph-id', 'prompt1');
+            comp1.appendChild(prompt);
+
+            const comp2 = document.createElement('div');
+            comp2.className = 'melded-composition';
+            const ax = document.createElement('div');
+            ax.className = 'canvas-ax-glyph';
+            ax.setAttribute('data-glyph-id', 'ax1');
+            comp2.appendChild(ax);
+
+            // prompt→ax is not valid
+            const edges1 = [{ from: 'prompt1', to: 'result1', direction: 'bottom' }];
+            const edges2 = [{ from: 'ax1', to: 'py1', direction: 'right' }];
+
+            const result = getCompositionCompatibility(comp1, comp2, edges1, edges2);
+            expect(result).toBe(null);
+        });
+
+        test('standalone glyph → composition returns direction', () => {
+            const standalone = document.createElement('div');
+            standalone.className = 'canvas-py-glyph';
+
+            const comp = document.createElement('div');
+            comp.className = 'melded-composition';
+            const prompt = document.createElement('div');
+            prompt.className = 'canvas-prompt-glyph';
+            prompt.setAttribute('data-glyph-id', 'prompt1');
+            comp.appendChild(prompt);
+
+            const compEdges = [{ from: 'prompt1', to: 'result1', direction: 'bottom' }];
+
+            const result = getCompositionCompatibility(standalone, comp, undefined, compEdges);
+            expect(result).toBe('right');
         });
     });
 });
