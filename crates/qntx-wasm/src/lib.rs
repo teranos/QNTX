@@ -116,10 +116,14 @@ mod wazero {
         ((ptr as u64) << 32) | (len as u64)
     }
 
-    /// Write an error JSON response.
+    /// Format an error as JSON string.
+    fn error_json(msg: &str) -> String {
+        format!(r#"{{"error":"{}"}}"#, msg.replace('"', "\\\""))
+    }
+
+    /// Write an error JSON response to WASM memory.
     fn write_error(msg: &str) -> u64 {
-        let json = format!(r#"{{"error":"{}"}}"#, msg.replace('"', "\\\""));
-        write_result(&json)
+        write_result(&error_json(msg))
     }
 
     // ============================================================================
@@ -172,6 +176,62 @@ mod wazero {
     // Fuzzy matching
     // ============================================================================
 
+    #[derive(serde::Deserialize)]
+    struct RebuildInput {
+        predicates: Vec<String>,
+        contexts: Vec<String>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct FindInput {
+        query: String,
+        vocab_type: String,
+        limit: usize,
+        min_score: f64,
+    }
+
+    /// Inner logic for fuzzy_rebuild_index — testable without WASM memory ABI.
+    fn fuzzy_rebuild_index_impl(input: &str) -> String {
+        let parsed: RebuildInput = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return error_json(&format!("invalid JSON: {}", e)),
+        };
+
+        let (pred_count, ctx_count, hash) = FUZZY.with(|f| {
+            f.borrow_mut().rebuild_index(parsed.predicates, parsed.contexts)
+        });
+
+        format!(
+            r#"{{"predicates":{},"contexts":{},"hash":"{}"}}"#,
+            pred_count, ctx_count, hash
+        )
+    }
+
+    /// Inner logic for fuzzy_find_matches — testable without WASM memory ABI.
+    fn fuzzy_find_matches_impl(input: &str) -> String {
+        let parsed: FindInput = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return error_json(&format!("invalid JSON: {}", e)),
+        };
+
+        let vtype = match parsed.vocab_type.as_str() {
+            "predicates" => VocabularyType::Predicates,
+            "contexts" => VocabularyType::Contexts,
+            other => return error_json(&format!(
+                "invalid vocab_type '{}', expected 'predicates' or 'contexts'", other
+            )),
+        };
+
+        let matches = FUZZY.with(|f| {
+            f.borrow().find_matches(&parsed.query, vtype, parsed.limit, parsed.min_score)
+        });
+
+        match serde_json::to_string(&matches) {
+            Ok(json) => json,
+            Err(e) => error_json(&format!("serialization failed: {}", e)),
+        }
+    }
+
     /// Rebuild the fuzzy search index. Takes (ptr, len) pointing to a JSON string:
     /// `{"predicates":["..."],"contexts":["..."]}`
     ///
@@ -180,27 +240,7 @@ mod wazero {
     #[no_mangle]
     pub extern "C" fn fuzzy_rebuild_index(ptr: u32, len: u32) -> u64 {
         let input = unsafe { read_str(ptr, len) };
-
-        #[derive(serde::Deserialize)]
-        struct Input {
-            predicates: Vec<String>,
-            contexts: Vec<String>,
-        }
-
-        let parsed: Input = match serde_json::from_str(input) {
-            Ok(v) => v,
-            Err(e) => return write_error(&format!("invalid JSON: {}", e)),
-        };
-
-        let (pred_count, ctx_count, hash) = FUZZY.with(|f| {
-            f.borrow_mut().rebuild_index(parsed.predicates, parsed.contexts)
-        });
-
-        let json = format!(
-            r#"{{"predicates":{},"contexts":{},"hash":"{}"}}"#,
-            pred_count, ctx_count, hash
-        );
-        write_result(&json)
+        write_result(&fuzzy_rebuild_index_impl(input))
     }
 
     /// Find fuzzy matches. Takes (ptr, len) pointing to a JSON string:
@@ -211,33 +251,141 @@ mod wazero {
     #[no_mangle]
     pub extern "C" fn fuzzy_find_matches(ptr: u32, len: u32) -> u64 {
         let input = unsafe { read_str(ptr, len) };
+        write_result(&fuzzy_find_matches_impl(input))
+    }
 
-        #[derive(serde::Deserialize)]
-        struct Input {
-            query: String,
-            vocab_type: String,
-            limit: usize,
-            min_score: f64,
+    // ============================================================================
+    // Tests
+    // ============================================================================
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn rebuild(predicates: &[&str], contexts: &[&str]) -> serde_json::Value {
+            let input = serde_json::json!({
+                "predicates": predicates,
+                "contexts": contexts,
+            });
+            let result = fuzzy_rebuild_index_impl(&input.to_string());
+            serde_json::from_str(&result).expect("rebuild result should be valid JSON")
         }
 
-        let parsed: Input = match serde_json::from_str(input) {
-            Ok(v) => v,
-            Err(e) => return write_error(&format!("invalid JSON: {}", e)),
-        };
+        fn find(query: &str, vocab_type: &str, limit: usize, min_score: f64) -> serde_json::Value {
+            let input = serde_json::json!({
+                "query": query,
+                "vocab_type": vocab_type,
+                "limit": limit,
+                "min_score": min_score,
+            });
+            let result = fuzzy_find_matches_impl(&input.to_string());
+            serde_json::from_str(&result).expect("find result should be valid JSON")
+        }
 
-        let vtype = match parsed.vocab_type.as_str() {
-            "predicates" => VocabularyType::Predicates,
-            "contexts" => VocabularyType::Contexts,
-            other => return write_error(&format!("invalid vocab_type '{}', expected 'predicates' or 'contexts'", other)),
-        };
+        #[test]
+        fn rebuild_index_basic() {
+            let result = rebuild(
+                &["is_author_of", "works_at", "is_maintainer_of"],
+                &["GitHub", "GitLab"],
+            );
+            assert_eq!(result["predicates"], 3);
+            assert_eq!(result["contexts"], 2);
+            assert!(!result["hash"].as_str().unwrap().is_empty());
+        }
 
-        let matches = FUZZY.with(|f| {
-            f.borrow().find_matches(&parsed.query, vtype, parsed.limit, parsed.min_score)
-        });
+        #[test]
+        fn rebuild_index_deduplicates() {
+            let result = rebuild(
+                &["works_at", "works_at", "is_author_of"],
+                &["GitHub", "GitHub", "GitHub"],
+            );
+            assert_eq!(result["predicates"], 2);
+            assert_eq!(result["contexts"], 1);
+        }
 
-        match serde_json::to_string(&matches) {
-            Ok(json) => write_result(&json),
-            Err(e) => write_error(&format!("serialization failed: {}", e)),
+        #[test]
+        fn rebuild_index_empty_vocabularies() {
+            let result = rebuild(&[], &[]);
+            assert_eq!(result["predicates"], 0);
+            assert_eq!(result["contexts"], 0);
+        }
+
+        #[test]
+        fn rebuild_index_invalid_json() {
+            let result = fuzzy_rebuild_index_impl("not json at all");
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].as_str().unwrap().contains("invalid JSON"));
+        }
+
+        #[test]
+        fn find_matches_exact() {
+            rebuild(&["works_at", "is_author_of"], &[]);
+            let matches = find("works_at", "predicates", 10, 0.6);
+            let arr = matches.as_array().unwrap();
+            assert!(!arr.is_empty());
+            assert_eq!(arr[0]["value"], "works_at");
+            assert_eq!(arr[0]["score"], 1.0);
+            assert_eq!(arr[0]["strategy"], "exact");
+        }
+
+        #[test]
+        fn find_matches_fuzzy() {
+            rebuild(&["authentication", "authorization", "database"], &[]);
+            let matches = find("authentican", "predicates", 10, 0.6);
+            let arr = matches.as_array().unwrap();
+            assert!(!arr.is_empty());
+            assert_eq!(arr[0]["value"], "authentication");
+        }
+
+        #[test]
+        fn find_matches_contexts() {
+            rebuild(&[], &["GitHub", "GitLab", "Bitbucket"]);
+            let matches = find("git", "contexts", 10, 0.5);
+            let arr = matches.as_array().unwrap();
+            assert!(arr.len() >= 2);
+        }
+
+        #[test]
+        fn find_matches_respects_limit() {
+            rebuild(
+                &["alpha", "alpine", "also", "alter", "always"],
+                &[],
+            );
+            let matches = find("al", "predicates", 2, 0.5);
+            let arr = matches.as_array().unwrap();
+            assert!(arr.len() <= 2);
+        }
+
+        #[test]
+        fn find_matches_empty_query() {
+            rebuild(&["works_at"], &[]);
+            let matches = find("", "predicates", 10, 0.6);
+            let arr = matches.as_array().unwrap();
+            assert!(arr.is_empty());
+        }
+
+        #[test]
+        fn find_matches_no_results() {
+            rebuild(&["works_at"], &[]);
+            let matches = find("xyz999", "predicates", 10, 0.95);
+            let arr = matches.as_array().unwrap();
+            assert!(arr.is_empty());
+        }
+
+        #[test]
+        fn find_matches_invalid_vocab_type() {
+            let result = fuzzy_find_matches_impl(
+                r#"{"query":"test","vocab_type":"invalid","limit":10,"min_score":0.6}"#,
+            );
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].as_str().unwrap().contains("invalid vocab_type"));
+        }
+
+        #[test]
+        fn find_matches_invalid_json() {
+            let result = fuzzy_find_matches_impl("broken");
+            let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+            assert!(parsed["error"].as_str().unwrap().contains("invalid JSON"));
         }
     }
 } // end mod wazero
