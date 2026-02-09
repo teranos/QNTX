@@ -23,7 +23,6 @@ import type { Glyph } from '../glyph';
 import { Pulse, IX, AX } from '@generated/sym.js';
 import { log, SEG } from '../../../logger';
 import { getGlyphTypeBySymbol, getGlyphTypeByElement } from '../glyph-registry';
-import { createAxGlyph } from '../ax-glyph';
 import { createErrorGlyph } from '../error-glyph';
 import { createResultGlyph } from '../result-glyph';
 import { uiState } from '../../../state/ui';
@@ -277,14 +276,6 @@ export function createCanvasGlyph(): Glyph {
     });
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
-        // AX glyphs need factory restoration for full WebSocket/query functionality
-        if (saved.symbol === AX) {
-            const axGlyph = createAxGlyph(saved.id, '', saved.x, saved.y);
-            axGlyph.width = saved.width;
-            axGlyph.height = saved.height;
-            return axGlyph;
-        }
-
         if (saved.symbol === 'result') {
             log.debug(SEG.GLYPH, `[Canvas] Restoring result glyph ${saved.id}`, {
                 hasResult: !!saved.result,

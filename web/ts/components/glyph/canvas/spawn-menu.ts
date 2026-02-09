@@ -289,23 +289,30 @@ function spawnAxGlyph(
     canvas: HTMLElement,
     glyphs: Glyph[]
 ): void {
-    const axGlyph = createAxGlyph(undefined, '', x, y);
+    const axGlyph: Glyph = {
+        id: `ax-${crypto.randomUUID()}`,
+        title: 'AX Query',
+        symbol: AX,
+        x,
+        y,
+        renderContent: () => {
+            const content = document.createElement('div');
+            content.textContent = 'AX glyph';
+            return content;
+        }
+    };
 
     // Add to glyphs array
     glyphs.push(axGlyph);
 
-    // Render glyph on canvas (ax glyphs now render themselves)
-    const glyphElement = axGlyph.renderContent();
+    // Render AX glyph with query form
+    const glyphElement = createAxGlyph(axGlyph);
     canvas.appendChild(glyphElement);
 
-    // Get actual rendered size and persist (ensures default size is saved)
+    // Get actual rendered size and persist
     const rect = glyphElement.getBoundingClientRect();
     const width = Math.round(rect.width);
     const height = Math.round(rect.height);
-
-    // Update glyph with actual dimensions
-    axGlyph.width = width;
-    axGlyph.height = height;
 
     uiState.addCanvasGlyph({
         id: axGlyph.id,

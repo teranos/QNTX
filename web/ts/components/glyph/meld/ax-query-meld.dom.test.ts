@@ -16,7 +16,8 @@ import { createAxGlyph, updateAxGlyphResults } from '../ax-glyph';
 import { createPromptGlyph } from '../prompt-glyph';
 import { findMeldTarget, performMeld, MELD_THRESHOLD } from './meld-system';
 import type { Attestation } from '../../../generated/proto/plugin/grpc/protocol/atsstore';
-import { SO } from '@generated/sym.js';
+import type { Glyph } from '../glyph';
+import { AX, SO } from '@generated/sym.js';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
@@ -90,8 +91,15 @@ describe('AX Query Meld - Jenny (Complex Scenarios)', () => {
         document.body.appendChild(canvas);
 
         // 2. Jenny creates AX glyph and renders it
-        const axGlyph = createAxGlyph('ax-jenny-qntx', '', 100, 100);
-        const axElement = axGlyph.renderContent();
+        const axGlyph: Glyph = {
+            id: 'ax-jenny-qntx',
+            title: 'AX Query',
+            symbol: AX,
+            x: 100,
+            y: 100,
+            renderContent: () => document.createElement('div') as any,
+        };
+        const axElement = createAxGlyph(axGlyph);
         canvas.appendChild(axElement);
 
         // 3. Jenny types "of qntx" in the query input
