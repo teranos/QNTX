@@ -8,11 +8,11 @@ const (
 	MatcherBackendGo MatcherBackend = "go"
 	// MatcherBackendRust indicates the CGO-backed Rust implementation
 	MatcherBackendRust MatcherBackend = "rust"
+	// MatcherBackendWasm indicates the WASM-backed Rust implementation (via wazero)
+	MatcherBackendWasm MatcherBackend = "wasm"
 )
 
 // Matcher defines the interface for fuzzy matching implementations.
-// Both the built-in Go implementation and CGO-backed Rust implementation
-// satisfy this interface.
 type Matcher interface {
 	// FindMatches finds predicates that match the query using fuzzy logic.
 	// Returns matching predicates from the provided vocabulary.
@@ -22,7 +22,7 @@ type Matcher interface {
 	// Returns matching contexts from the provided vocabulary.
 	FindContextMatches(queryContext string, allContexts []string) []string
 
-	// Backend returns which implementation is being used (go or rust)
+	// Backend returns which implementation is being used (go, rust, or wasm)
 	Backend() MatcherBackend
 
 	// SetLogger sets an optional logger for debug output.
@@ -31,26 +31,35 @@ type Matcher interface {
 }
 
 // NewDefaultMatcher creates the best available matcher implementation.
-// Prefers Rust CGO matcher if available (built with -tags rustfuzzy),
-// otherwise falls back to Go implementation.
+// Priority: WASM > pure Go.
 func NewDefaultMatcher() Matcher {
-	// Try CGO matcher first (only available with -tags rustfuzzy)
-	if matcher, err := NewCGOMatcher(); err == nil {
+	if matcher, err := NewWasmMatcher(); err == nil {
 		return matcher
 	}
-	// Fall back to Go implementation
 	return NewFuzzyMatcher()
 }
 
 // DetectBackend returns which fuzzy backend is available without
-// creating a matcher instance. This is more efficient than creating
-// a matcher just to check the backend.
+// creating a full matcher instance.
 func DetectBackend() MatcherBackend {
-	// Check if CGO matcher is available (build tag check)
-	if _, err := NewCGOMatcher(); err == nil {
-		return MatcherBackendRust
+	if _, err := NewWasmMatcher(); err == nil {
+		return MatcherBackendWasm
 	}
 	return MatcherBackendGo
+}
+
+// hashStrings computes a simple FNV-1a hash of a string slice for change detection.
+func hashStrings(strs []string) uint64 {
+	var hash uint64 = 14695981039346656037 // FNV-1a offset basis
+	for _, s := range strs {
+		for i := 0; i < len(s); i++ {
+			hash ^= uint64(s[i])
+			hash *= 1099511628211 // FNV-1a prime
+		}
+		hash ^= uint64(0xff) // separator
+		hash *= 1099511628211
+	}
+	return hash
 }
 
 // Ensure FuzzyMatcher implements Matcher

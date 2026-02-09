@@ -8,7 +8,7 @@ import (
 // This detects available optimizations (Rust fuzzy matching, ONNX video inference, Rust storage)
 func Get(fuzzyBackend ax.MatcherBackend) Message {
 	// Detect fuzzy backend
-	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust)
+	fuzzyOptimized := (fuzzyBackend == ax.MatcherBackendRust || fuzzyBackend == ax.MatcherBackendWasm)
 	fuzzyVersion := fuzzyBackendVersion()
 
 	// Detect vidstream/ONNX availability (requires CGO build with rustvideo tag)

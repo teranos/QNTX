@@ -41,10 +41,17 @@ pub use browser::*;
 
 #[cfg(not(feature = "browser"))]
 use qntx_core::parser::Parser;
+#[cfg(not(feature = "browser"))]
+use qntx_core::fuzzy::{FuzzyEngine, VocabularyType};
 
 #[cfg(not(feature = "browser"))]
 mod wazero {
     use super::*;
+    use std::cell::RefCell;
+
+    thread_local! {
+        static FUZZY: RefCell<FuzzyEngine> = RefCell::new(FuzzyEngine::new());
+    }
 
     // ============================================================================
     // Memory management
@@ -159,6 +166,78 @@ mod wazero {
                 }
             }
             Err(e) => write_error(&format!("{}", e)),
+        }
+    }
+    // ============================================================================
+    // Fuzzy matching
+    // ============================================================================
+
+    /// Rebuild the fuzzy search index. Takes (ptr, len) pointing to a JSON string:
+    /// `{"predicates":["..."],"contexts":["..."]}`
+    ///
+    /// Returns packed u64 pointing to JSON:
+    /// `{"predicates":N,"contexts":N,"hash":"..."}`
+    #[no_mangle]
+    pub extern "C" fn fuzzy_rebuild_index(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+
+        #[derive(serde::Deserialize)]
+        struct Input {
+            predicates: Vec<String>,
+            contexts: Vec<String>,
+        }
+
+        let parsed: Input = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return write_error(&format!("invalid JSON: {}", e)),
+        };
+
+        let (pred_count, ctx_count, hash) = FUZZY.with(|f| {
+            f.borrow_mut().rebuild_index(parsed.predicates, parsed.contexts)
+        });
+
+        let json = format!(
+            r#"{{"predicates":{},"contexts":{},"hash":"{}"}}"#,
+            pred_count, ctx_count, hash
+        );
+        write_result(&json)
+    }
+
+    /// Find fuzzy matches. Takes (ptr, len) pointing to a JSON string:
+    /// `{"query":"...","vocab_type":"predicates","limit":20,"min_score":0.6}`
+    ///
+    /// Returns packed u64 pointing to a JSON array:
+    /// `[{"value":"...","score":0.95,"strategy":"exact"},...]`
+    #[no_mangle]
+    pub extern "C" fn fuzzy_find_matches(ptr: u32, len: u32) -> u64 {
+        let input = unsafe { read_str(ptr, len) };
+
+        #[derive(serde::Deserialize)]
+        struct Input {
+            query: String,
+            vocab_type: String,
+            limit: usize,
+            min_score: f64,
+        }
+
+        let parsed: Input = match serde_json::from_str(input) {
+            Ok(v) => v,
+            Err(e) => return write_error(&format!("invalid JSON: {}", e)),
+        };
+
+        let vtype = match parsed.vocab_type.as_str() {
+            "predicates" => VocabularyType::Predicates,
+            "contexts" => VocabularyType::Contexts,
+            other => return write_error(&format!("invalid vocab_type '{}', expected 'predicates' or 'contexts'", other)),
+        };
+
+        let matches = FUZZY.with(|f| {
+            f.borrow().find_matches(&parsed.query, vtype, parsed.limit, parsed.min_score)
+        });
+
+        match serde_json::to_string(&matches) {
+            Ok(json) => write_result(&json),
+            Err(e) => write_error(&format!("serialization failed: {}", e)),
         }
     }
 } // end mod wazero
