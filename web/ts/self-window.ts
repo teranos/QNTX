@@ -125,8 +125,9 @@ class SelfWindow {
                 `<span class="capability-optimized" title="${parserTooltip}">✓ qntx-core WASM ${caps.parser_size ? `(${caps.parser_size})` : ''}</span>` :
                 `<span class="capability-degraded" title="${parserTooltip}">⚠ Go native parser</span>`;
 
+            const fuzzyBackendLabel = caps.fuzzy_backend === 'wasm' ? 'WASM' : caps.fuzzy_backend === 'rust' ? 'Rust' : 'Go';
             const fuzzyStatus = caps.fuzzy_optimized ?
-                `<span class="capability-optimized" title="Using Rust-based fuzzy matching for better performance">✓ Optimized (Rust)</span>` :
+                `<span class="capability-optimized" title="Using ${fuzzyBackendLabel} fuzzy matching">✓ Optimized (${fuzzyBackendLabel})</span>` :
                 `<span class="capability-degraded" title="Using Go fallback for fuzzy matching">⚠ Fallback (Go)</span>`;
 
             const vidstreamStatus = caps.vidstream_optimized ?
