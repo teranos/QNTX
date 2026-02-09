@@ -10,16 +10,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"
 	"github.com/teranos/QNTX/errors"
-)
-
-// Search scoring constants
-const (
-	// Maximum gap in characters between matched words to be considered sequential
-	maxWordGap = 50
-	// Score multiplier for matches with sequential/nearby words
-	sequentialMatchBoost = 1.5
 )
 
 // Note: Rich string fields are discovered dynamically from type definition attestations.
@@ -95,14 +86,14 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		}
 	}
 
-	// For multi-word queries or when no exact matches, use fuzzy matching with Rust
-	if matcher := ax.NewDefaultMatcher(); matcher != nil && matcher.Backend() == ax.MatcherBackendRust {
+	// For multi-word queries or when no exact matches, use fuzzy matching
+	backend := ax.DetectBackend()
+	if backend == ax.MatcherBackendWasm {
 		if bs.logger != nil {
-			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords))
+			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords), "backend", backend)
 		}
-		fuzzyMatches, err := bs.searchFuzzyWithRust(ctx, query, limit)
+		fuzzyMatches, err := bs.searchFuzzyWithEngine(ctx, query, limit)
 		if err != nil {
-			// Don't fail entirely, add warning and try fallback
 			if bs.logger != nil {
 				bs.logger.Warnw("Fuzzy search error, trying fallback", "error", err, "query", query)
 			}
@@ -118,9 +109,9 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		}
 	} else {
 		if bs.logger != nil {
-			bs.logger.Debugw("Fuzzy matcher not available or not Rust backend")
+			bs.logger.Debugw("Fuzzy matcher not available")
 		}
-		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (Rust backend required)")
+		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (WASM or Rust backend required)")
 		result.Degraded = true
 	}
 
@@ -261,11 +252,8 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 						// Extract excerpt
 						excerpt := extractExcerpt(strValue, query, 150)
 
-						// Infer type from field names if not specified
 						typeName := "Document"
-						if _, hasMessage := attributes["message"]; hasMessage {
-							typeName = "Commit"
-						} else if t, ok := attributes["type"].(string); ok {
+						if t, ok := attributes["type"].(string); ok {
 							typeName = t
 						}
 
@@ -308,392 +296,6 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].Score > matches[j].Score
 	})
-	return matches, nil
-}
-
-// searchFuzzyWithRust performs fuzzy matching using the Rust engine
-func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
-	if bs.logger != nil {
-		bs.logger.Debugw("Using Rust fuzzy matcher", "query", query)
-	}
-
-	// Get dynamic fields from type definitions once at the start
-	richStringFields := bs.buildDynamicRichStringFields(ctx)
-
-	// If no rich fields are discovered, return empty results
-	if len(richStringFields) == 0 {
-		if bs.logger != nil {
-			bs.logger.Debugw("No rich string fields discovered for fuzzy search, returning empty results")
-		}
-		return []RichSearchMatch{}, nil
-	}
-
-	// Create fuzzy engine
-	engine, err := fuzzyax.NewFuzzyEngine()
-	if err != nil {
-		return nil, err
-	}
-	defer engine.Close()
-
-	// Build dynamic WHERE clause for fields with content
-	whereClauses := make([]string, len(richStringFields))
-	for i, field := range richStringFields {
-		whereClauses[i] = fmt.Sprintf("json_extract(a.attributes, '$.%s') IS NOT NULL", field)
-	}
-
-	// Get attestations with rich text content for vocabulary building
-	sqlQuery := fmt.Sprintf(`
-		SELECT DISTINCT
-			a.id,
-			a.subjects,
-			a.attributes
-		FROM attestations a
-		WHERE a.attributes IS NOT NULL
-			AND (%s)
-		ORDER BY a.timestamp DESC
-		LIMIT 500
-	`, strings.Join(whereClauses, "\n\t\t\t\tOR "))
-
-	rows, err := bs.db.QueryContext(ctx, sqlQuery)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to query attestations")
-	}
-	defer rows.Close()
-
-	// Build vocabulary from rich text fields
-	vocabulary := make(map[string]bool)
-	nodeWordMap := make(map[string]map[string][]string) // nodeID -> fieldName -> words
-	nodeAttributes := make(map[string]map[string]interface{}) // nodeID -> attributes
-	rowCount := 0
-
-	for rows.Next() {
-		rowCount++
-		var (
-			id             string
-			subjectsJSON   string
-			attributesJSON string
-		)
-
-		if err := rows.Scan(&id, &subjectsJSON, &attributesJSON); err != nil {
-			if bs.logger != nil {
-				bs.logger.Warnw("Failed to scan row", "error", err)
-			}
-			continue
-		}
-
-		var subjects []string
-		if err := json.Unmarshal([]byte(subjectsJSON), &subjects); err != nil {
-			continue
-		}
-
-		var attributes map[string]interface{}
-		if err := json.Unmarshal([]byte(attributesJSON), &attributes); err != nil {
-			continue
-		}
-
-		// Use the dynamic fields we got at the beginning of the function
-		// (richStringFields is already defined)
-
-		// Debug first row
-		if rowCount == 1 && bs.logger != nil {
-			bs.logger.Debugw("First row attributes", "attributes", attributes)
-		}
-
-		for _, nodeID := range subjects {
-			nodeAttributes[nodeID] = attributes
-			if nodeWordMap[nodeID] == nil {
-				nodeWordMap[nodeID] = make(map[string][]string)
-			}
-
-			for _, fieldName := range richStringFields {
-				if value, exists := attributes[fieldName]; exists {
-					var strValue string
-					switch v := value.(type) {
-					case string:
-						strValue = v
-					default:
-						// Skip non-string values
-						continue
-					}
-
-					if strValue == "" {
-						continue
-					}
-
-					// Extract words from the field
-					words := strings.Fields(strValue)
-					for _, word := range words {
-						// Clean word (remove punctuation)
-						word = strings.Trim(word, ".,!?;:\"'()[]{}/*&^%$#@")
-						if len(word) > 1 {
-							wordLower := strings.ToLower(word)
-							vocabulary[wordLower] = true
-							nodeWordMap[nodeID][fieldName] = append(nodeWordMap[nodeID][fieldName], wordLower)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "error building vocabulary")
-	}
-
-	// Convert vocabulary map to slice
-	vocabSlice := make([]string, 0, len(vocabulary))
-	for word := range vocabulary {
-		vocabSlice = append(vocabSlice, word)
-	}
-
-	// Check vocabulary size limit (Rust has MAX_VOCABULARY_SIZE = 100_000)
-	const maxVocabularySize = 100000
-	if len(vocabSlice) > maxVocabularySize {
-		if bs.logger != nil {
-			bs.logger.Warnw("Vocabulary size exceeds maximum, truncating",
-				"size", len(vocabSlice),
-				"max", maxVocabularySize)
-		}
-		// Truncate to maximum size rather than failing
-		vocabSlice = vocabSlice[:maxVocabularySize]
-	}
-
-	// Rebuild fuzzy index with vocabulary from rich text
-	_, err = engine.RebuildIndex(vocabSlice, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to rebuild fuzzy index")
-	}
-
-	// Debug: Check if "commit" is in vocabulary
-	if bs.logger != nil {
-		hasCommit := false
-		for _, word := range vocabSlice {
-			if word == "commit" {
-				hasCommit = true
-				break
-			}
-		}
-		bs.logger.Debugw("Vocabulary built", "rows_processed", rowCount, "vocab_size", len(vocabSlice), "has_commit", hasCommit)
-		if len(vocabSlice) > 0 && len(vocabSlice) < 10 {
-			bs.logger.Debugw("Sample vocabulary", "words", vocabSlice)
-		}
-	}
-
-	// Split query into words and fuzzy match each
-	queryWords := strings.Fields(strings.ToLower(query))
-	// Map of query word -> list of possible matched words with scores
-	queryWordMatches := make(map[string][]struct {
-		word  string
-		score float64
-	})
-
-	for _, queryWord := range queryWords {
-		// Find fuzzy matches for each word in the query
-		fuzzyMatches, _, err := engine.FindMatches(queryWord, fuzzyax.VocabPredicates, 10, 0.3)
-		if err == nil && len(fuzzyMatches) > 0 {
-			// Store all potential matches for this query word
-			for _, match := range fuzzyMatches {
-				queryWordMatches[queryWord] = append(queryWordMatches[queryWord], struct {
-					word  string
-					score float64
-				}{word: match.Value, score: match.Score})
-			}
-			if bs.logger != nil && len(fuzzyMatches) > 0 {
-				bs.logger.Debugw("Fuzzy matched word", "query_word", queryWord, "matched", fuzzyMatches[0].Value, "score", fuzzyMatches[0].Score)
-			}
-		} else {
-			// If no fuzzy match, still look for exact match in vocabulary
-			if vocabulary[queryWord] {
-				queryWordMatches[queryWord] = append(queryWordMatches[queryWord], struct {
-					word  string
-					score float64
-				}{word: queryWord, score: 1.0})
-			}
-			// Even if not in vocabulary, keep track for substring matching later
-			if len(queryWordMatches[queryWord]) == 0 {
-				queryWordMatches[queryWord] = append(queryWordMatches[queryWord], struct {
-					word  string
-					score float64
-				}{word: queryWord, score: 0.7}) // Lower score for non-vocabulary words
-			}
-		}
-	}
-
-	if len(queryWordMatches) == 0 {
-		if bs.logger != nil {
-			bs.logger.Debugw("No matches found", "query", query)
-		}
-		return []RichSearchMatch{}, nil
-	}
-
-	// Now find nodes that contain ALL the fuzzy-matched words (for multi-word queries)
-	var matches []RichSearchMatch
-	processedNodes := make(map[string]bool)
-
-	// For each node, check if it contains matching words
-	for nodeID, fieldWords := range nodeWordMap {
-		if processedNodes[nodeID] {
-			continue
-		}
-
-		// Track which query words we've found matches for
-		queryWordsFound := make(map[string]float64) // query word -> best score found
-		var matchedFieldName string
-		var matchedFieldValue string
-
-		attributes := nodeAttributes[nodeID]
-
-		// Check each field in this node
-		for fieldName, words := range fieldWords {
-			// For each word in the field
-			for _, word := range words {
-				// Check against each query word's possible matches
-				for queryWord, possibleMatches := range queryWordMatches {
-					for _, match := range possibleMatches {
-						if word == match.word {
-							// Found a match! Track the best score for this query word
-							if currentScore, exists := queryWordsFound[queryWord]; !exists || match.score > currentScore {
-								queryWordsFound[queryWord] = match.score
-							}
-							// Remember which field had the match
-							if matchedFieldName == "" {
-								matchedFieldName = fieldName
-								if val, ok := attributes[fieldName]; ok {
-									if str, ok := val.(string); ok {
-										matchedFieldValue = str
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Also check for substring matches for words not found via fuzzy matching
-		// Check all rich text fields for substring matches
-		// (using richStringFields already defined at the start of the function)
-		for _, fieldName := range richStringFields {
-			if value, exists := attributes[fieldName]; exists {
-				if strValue, ok := value.(string); ok && strValue != "" {
-					lowerValue := strings.ToLower(strValue)
-					foundInThisField := false
-
-					for queryWord := range queryWordMatches {
-						if _, alreadyFound := queryWordsFound[queryWord]; !alreadyFound {
-							// Try substring match
-							if strings.Contains(lowerValue, queryWord) {
-								queryWordsFound[queryWord] = 0.6 // Lower score for substring match
-								foundInThisField = true
-							}
-						}
-					}
-
-					if foundInThisField && matchedFieldName == "" {
-						matchedFieldName = fieldName
-						matchedFieldValue = strValue
-					}
-				}
-			}
-		}
-
-		// Include if ANY words matched (partial match) OR ALL words matched (full match)
-		if len(queryWordsFound) > 0 {
-			displayLabel := nodeID
-			if label, ok := attributes["label"].(string); ok && label != "" {
-				displayLabel = label
-			} else if name, ok := attributes["name"].(string); ok && name != "" {
-				displayLabel = name
-			}
-
-			typeName := "Document"
-			if _, hasMessage := attributes["message"]; hasMessage {
-				typeName = "Commit"
-			}
-
-			// Calculate score based on how many words matched and their scores
-			var totalScore float64
-			for _, score := range queryWordsFound {
-				totalScore += score
-			}
-			matchRatio := float64(len(queryWordsFound)) / float64(len(queryWordMatches))
-			finalScore := (totalScore / float64(len(queryWordsFound))) * matchRatio
-
-			// Boost score if words appear sequentially in the text
-			if matchedFieldValue != "" && len(queryWords) > 1 {
-				// Check if the query words appear near each other in the text
-				lowerValue := strings.ToLower(matchedFieldValue)
-				var positions []int
-
-				// Get positions of query words in the text
-				for queryWord := range queryWordsFound {
-					pos := strings.Index(lowerValue, queryWord)
-					if pos >= 0 {
-						positions = append(positions, pos)
-					}
-				}
-
-				// If words are found in sequence/proximity, boost score
-				if len(positions) > 1 {
-					sort.Ints(positions)
-					sequential := true
-					for i := 1; i < len(positions); i++ {
-						if positions[i] - positions[i-1] > maxWordGap {
-							sequential = false
-							break
-						}
-					}
-					if sequential {
-						finalScore *= sequentialMatchBoost
-						if finalScore > 1.0 {
-							finalScore = 1.0
-						}
-					}
-				}
-			}
-
-			strategy := "fuzzy:partial"
-			if len(queryWordsFound) == len(queryWordMatches) {
-				strategy = "fuzzy:all-words"
-			}
-
-			// Collect the actual matched words for highlighting
-			matchedWordsList := make([]string, 0, len(queryWordsFound))
-			for word := range queryWordsFound {
-				matchedWordsList = append(matchedWordsList, word)
-			}
-
-			matches = append(matches, RichSearchMatch{
-				NodeID:       nodeID,
-				TypeName:     typeName,
-				TypeLabel:    typeName,
-				FieldName:    matchedFieldName,
-				FieldValue:   matchedFieldValue,
-				Excerpt:      extractExcerpt(matchedFieldValue, strings.Join(queryWords, " "), 150),
-				Score:        finalScore,
-				Strategy:     strategy,
-				DisplayLabel: displayLabel,
-				Attributes:   attributes,
-				MatchedWords: matchedWordsList,
-			})
-
-			processedNodes[nodeID] = true
-		}
-
-		if len(matches) >= limit {
-			break
-		}
-	}
-
-	// Sort by score
-	sort.Slice(matches, func(i, j int) bool {
-		return matches[i].Score > matches[j].Score
-	})
-
-	if len(matches) > limit {
-		matches = matches[:limit]
-	}
-
 	return matches, nil
 }
 

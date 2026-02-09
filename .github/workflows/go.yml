@@ -59,7 +59,6 @@ jobs:
 
       - name: Run tests
         # Test with core tags to ensure we test what we ship
-        # TODO: Add rustfuzzy,rustvideo once those are stabilized
         run: |
           export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
           go test -tags "rustsqlite,qntxwasm" ./...
