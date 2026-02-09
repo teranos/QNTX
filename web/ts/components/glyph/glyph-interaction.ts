@@ -20,9 +20,9 @@ import {
     isMeldedComposition,
     PROXIMITY_THRESHOLD,
     MELD_THRESHOLD
-} from './meld-system';
-import { getMeldOptions, getGlyphClass } from './meldability';
-import { isGlyphSelected, getSelectedGlyphIds } from './canvas-glyph';
+} from './meld/meld-system';
+import { getMeldOptions, getGlyphClass } from './meld/meldability';
+import { isGlyphSelected, getSelectedGlyphIds } from './canvas/selection';
 import { addComposition, findCompositionByGlyph } from '../../state/compositions';
 
 // ── Options ─────────────────────────────────────────────────────────

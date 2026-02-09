@@ -26,7 +26,7 @@ import { applyCanvasGlyphLayout, makeDraggable, makeResizable, preventDrag } fro
 import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
-import { performMeld, extendComposition } from './meld-system';
+import { performMeld, extendComposition } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 
