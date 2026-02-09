@@ -17,6 +17,7 @@ package wasm
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"sync"
 
 	"github.com/teranos/QNTX/errors"
@@ -98,6 +99,84 @@ func (e *Engine) CallNoArgs(fnName string) (string, error) {
 	defer e.mu.Unlock()
 
 	return callNoArgsFn(context.Background(), e.mod, fnName)
+}
+
+// FuzzyMatch represents a single fuzzy match result from the WASM engine.
+type FuzzyMatch struct {
+	Value    string  `json:"value"`
+	Score    float64 `json:"score"`
+	Strategy string  `json:"strategy"`
+}
+
+// RebuildFuzzyIndex rebuilds the fuzzy engine's vocabulary index.
+// Returns predicate count, context count, index hash, and any error.
+func (e *Engine) RebuildFuzzyIndex(predicates, contexts []string) (int, int, string, error) {
+	if predicates == nil {
+		predicates = []string{}
+	}
+	if contexts == nil {
+		contexts = []string{}
+	}
+	input, err := json.Marshal(struct {
+		Predicates []string `json:"predicates"`
+		Contexts   []string `json:"contexts"`
+	}{Predicates: predicates, Contexts: contexts})
+	if err != nil {
+		return 0, 0, "", errors.Wrap(err, "marshal fuzzy_rebuild_index input")
+	}
+
+	raw, err := e.Call("fuzzy_rebuild_index", string(input))
+	if err != nil {
+		return 0, 0, "", err
+	}
+
+	var result struct {
+		Predicates int    `json:"predicates"`
+		Contexts   int    `json:"contexts"`
+		Hash       string `json:"hash"`
+		Error      string `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return 0, 0, "", errors.Wrapf(err, "unmarshal fuzzy_rebuild_index result: %s", raw)
+	}
+	if result.Error != "" {
+		return 0, 0, "", errors.Newf("fuzzy_rebuild_index: %s", result.Error)
+	}
+
+	return result.Predicates, result.Contexts, result.Hash, nil
+}
+
+// FindFuzzyMatches finds vocabulary items matching a query via the WASM fuzzy engine.
+func (e *Engine) FindFuzzyMatches(query, vocabType string, limit int, minScore float64) ([]FuzzyMatch, error) {
+	input, err := json.Marshal(struct {
+		Query     string  `json:"query"`
+		VocabType string  `json:"vocab_type"`
+		Limit     int     `json:"limit"`
+		MinScore  float64 `json:"min_score"`
+	}{Query: query, VocabType: vocabType, Limit: limit, MinScore: minScore})
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal fuzzy_find_matches input")
+	}
+
+	raw, err := e.Call("fuzzy_find_matches", string(input))
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for error response
+	var errResp struct {
+		Error string `json:"error,omitempty"`
+	}
+	if json.Unmarshal([]byte(raw), &errResp) == nil && errResp.Error != "" {
+		return nil, errors.Newf("fuzzy_find_matches: %s", errResp.Error)
+	}
+
+	var matches []FuzzyMatch
+	if err := json.Unmarshal([]byte(raw), &matches); err != nil {
+		return nil, errors.Wrapf(err, "unmarshal fuzzy_find_matches result: %s", raw)
+	}
+
+	return matches, nil
 }
 
 // GetWASMSize returns the size of the embedded WASM module in bytes.

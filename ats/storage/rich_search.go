@@ -10,7 +10,7 @@ import (
 
 	"github.com/teranos/QNTX/ats"
 	"github.com/teranos/QNTX/ats/ax"
-	"github.com/teranos/QNTX/ats/ax/fuzzy-ax/fuzzyax"
+	"github.com/teranos/QNTX/ats/wasm"
 	"github.com/teranos/QNTX/errors"
 )
 
@@ -95,14 +95,14 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		}
 	}
 
-	// For multi-word queries or when no exact matches, use fuzzy matching with Rust
-	if matcher := ax.NewDefaultMatcher(); matcher != nil && matcher.Backend() == ax.MatcherBackendRust {
+	// For multi-word queries or when no exact matches, use fuzzy matching
+	backend := ax.DetectBackend()
+	if backend == ax.MatcherBackendRust || backend == ax.MatcherBackendWasm {
 		if bs.logger != nil {
-			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords))
+			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords), "backend", backend)
 		}
-		fuzzyMatches, err := bs.searchFuzzyWithRust(ctx, query, limit)
+		fuzzyMatches, err := bs.searchFuzzyWithEngine(ctx, query, limit)
 		if err != nil {
-			// Don't fail entirely, add warning and try fallback
 			if bs.logger != nil {
 				bs.logger.Warnw("Fuzzy search error, trying fallback", "error", err, "query", query)
 			}
@@ -118,9 +118,9 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 		}
 	} else {
 		if bs.logger != nil {
-			bs.logger.Debugw("Fuzzy matcher not available or not Rust backend")
+			bs.logger.Debugw("Fuzzy matcher not available")
 		}
-		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (Rust backend required)")
+		result.Warnings = append(result.Warnings, "Fuzzy search unavailable (WASM or Rust backend required)")
 		result.Degraded = true
 	}
 
@@ -311,10 +311,15 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 	return matches, nil
 }
 
-// searchFuzzyWithRust performs fuzzy matching using the Rust engine
-func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
+// searchFuzzyWithEngine performs fuzzy matching using the WASM fuzzy engine
+func (bs *BoundedStore) searchFuzzyWithEngine(ctx context.Context, query string, limit int) ([]RichSearchMatch, error) {
 	if bs.logger != nil {
-		bs.logger.Debugw("Using Rust fuzzy matcher", "query", query)
+		bs.logger.Debugw("Using WASM fuzzy engine", "query", query)
+	}
+
+	engine, err := wasm.GetEngine()
+	if err != nil {
+		return nil, errors.Wrap(err, "wasm engine unavailable")
 	}
 
 	// Get dynamic fields from type definitions once at the start
@@ -327,13 +332,6 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 		}
 		return []RichSearchMatch{}, nil
 	}
-
-	// Create fuzzy engine
-	engine, err := fuzzyax.NewFuzzyEngine()
-	if err != nil {
-		return nil, err
-	}
-	defer engine.Close()
 
 	// Build dynamic WHERE clause for fields with content
 	whereClauses := make([]string, len(richStringFields))
@@ -459,7 +457,7 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 	}
 
 	// Rebuild fuzzy index with vocabulary from rich text
-	_, err = engine.RebuildIndex(vocabSlice, nil)
+	_, _, _, err = engine.RebuildFuzzyIndex(vocabSlice, []string{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to rebuild fuzzy index")
 	}
@@ -489,16 +487,15 @@ func (bs *BoundedStore) searchFuzzyWithRust(ctx context.Context, query string, l
 
 	for _, queryWord := range queryWords {
 		// Find fuzzy matches for each word in the query
-		fuzzyMatches, _, err := engine.FindMatches(queryWord, fuzzyax.VocabPredicates, 10, 0.3)
+		fuzzyMatches, err := engine.FindFuzzyMatches(queryWord, "predicates", 10, 0.3)
 		if err == nil && len(fuzzyMatches) > 0 {
-			// Store all potential matches for this query word
 			for _, match := range fuzzyMatches {
 				queryWordMatches[queryWord] = append(queryWordMatches[queryWord], struct {
 					word  string
 					score float64
 				}{word: match.Value, score: match.Score})
 			}
-			if bs.logger != nil && len(fuzzyMatches) > 0 {
+			if bs.logger != nil {
 				bs.logger.Debugw("Fuzzy matched word", "query_word", queryWord, "matched", fuzzyMatches[0].Value, "score", fuzzyMatches[0].Score)
 			}
 		} else {

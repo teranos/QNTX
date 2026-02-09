@@ -3763,12 +3763,13 @@ dependencies = [
 
 [[package]]
 name = "qntx-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "js-sys",
  "qntx-core",
  "qntx-indexeddb",
  "qntx-proto",
+ "serde",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
