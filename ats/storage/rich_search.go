@@ -261,11 +261,8 @@ func (bs *BoundedStore) searchExactSQL(ctx context.Context, query string, limit 
 						// Extract excerpt
 						excerpt := extractExcerpt(strValue, query, 150)
 
-						// Infer type from field names if not specified
 						typeName := "Document"
-						if _, hasMessage := attributes["message"]; hasMessage {
-							typeName = "Commit"
-						} else if t, ok := attributes["type"].(string); ok {
+						if t, ok := attributes["type"].(string); ok {
 							typeName = t
 						}
 
