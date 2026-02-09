@@ -135,20 +135,28 @@
 }
 
 /* Totally monochrome while dragging offline (indicates unsaved local change) */
-.canvas-glyph.is-dragging[data-connectivity-mode="offline"] {
+.canvas-glyph.is-dragging[data-connectivity-mode="offline"]:not([data-local-active]) {
     filter: grayscale(100%);
     border-color: rgba(220, 222, 221, 0.15) !important; /* Almost invisible border */
 }
 
 /* Ghostly appearance for unsynced/failed glyphs while offline (persists after drag) */
-.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="unsynced"],
-.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="failed"] {
+/* Local-active glyphs (ts-glyph, ax-glyph querying IndexedDB) stay orange */
+.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="unsynced"]:not([data-local-active]),
+.canvas-glyph[data-connectivity-mode="offline"][data-sync-state="failed"]:not([data-local-active]) {
     filter: grayscale(100%);
     border-color: rgba(220, 222, 221, 0.15) !important; /* Almost invisible border */
 }
 
+/* Local-active glyphs: orange tint when offline (still functional via WASM/IndexedDB) */
+.canvas-glyph[data-connectivity-mode="offline"][data-local-active] {
+    filter: saturate(90%) hue-rotate(-10deg);
+    border-color: rgba(200, 160, 80, 0.5);
+}
+
 /* Server-side results: grayscale when offline (indicates stale/cached data) */
-.ax-glyph-results[data-connectivity-mode="offline"] {
+/* Local results inside AX glyph stay colored */
+.ax-glyph-results[data-connectivity-mode="offline"]:not([data-local-active]) {
     filter: grayscale(100%);
     transition: filter var(--mode-transition-duration) var(--mode-transition-timing);
 }
