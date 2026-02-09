@@ -6,7 +6,7 @@
  */
 
 import { getMinimizeDuration } from '../glyph';
-import { isMeldedComposition } from '../meld-system';
+
 import { Prose } from '@generated/sym.js';
 
 // Action bar animation constants
@@ -40,11 +40,13 @@ export function showActionBar(
     bar.className = 'canvas-action-bar';
 
     // Check if any selected glyphs are in a meld
+    // Uses .closest() to handle glyphs inside sub-containers within compositions
     let meldedComposition: HTMLElement | null = null;
     for (const glyphId of selectedGlyphIds) {
         const glyphEl = container.querySelector(`[data-glyph-id="${glyphId}"]`) as HTMLElement | null;
-        if (glyphEl?.parentElement && isMeldedComposition(glyphEl.parentElement)) {
-            meldedComposition = glyphEl.parentElement;
+        const comp = glyphEl?.closest('.melded-composition') as HTMLElement | null;
+        if (comp) {
+            meldedComposition = comp;
             break;
         }
     }

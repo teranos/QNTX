@@ -37,17 +37,9 @@ export const MELDABILITY: Record<string, readonly PortRule[]> = {
     ]
 } as const;
 
-/**
- * Get all classes that can initiate melding
- */
-export function getInitiatorClasses(): string[] {
-    return Object.keys(MELDABILITY);
-}
-
-/**
- * Get all classes that can receive meld (across all directions)
- */
-export function getTargetClasses(): string[] {
+// Cached class lists — derived from static MELDABILITY registry
+const _initiatorClasses: string[] = Object.keys(MELDABILITY);
+const _targetClasses: string[] = (() => {
     const targets = new Set<string>();
     for (const ports of Object.values(MELDABILITY)) {
         for (const port of ports) {
@@ -57,6 +49,20 @@ export function getTargetClasses(): string[] {
         }
     }
     return [...targets];
+})();
+
+/**
+ * Get all classes that can initiate melding
+ */
+export function getInitiatorClasses(): readonly string[] {
+    return _initiatorClasses;
+}
+
+/**
+ * Get all classes that can receive meld (across all directions)
+ */
+export function getTargetClasses(): readonly string[] {
+    return _targetClasses;
 }
 
 /**
