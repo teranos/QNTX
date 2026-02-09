@@ -267,7 +267,7 @@ export function makeDraggable(
                 dragController?.abort();
 
                 // Perform the meld - this reparents the actual DOM elements
-                const composition = performMeld(element, targetElement, glyph, targetGlyph);
+                const composition = performMeld(element, targetElement, glyph, targetGlyph, meldInfo.direction);
 
                 // Make the composition draggable as a unit
                 const compositionGlyph: Glyph = {
