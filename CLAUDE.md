@@ -7,6 +7,7 @@
 - If something is unclear, ask - don't assume or fill in gaps
 - State only what you can directly verify
 - When a task cannot be completed correctly, stop and explain the blocker rather than implementing workarounds
+- **Maximize signal-to-noise: essential information only, no filler.**
 
 ## Configuration (am package)
 
@@ -18,23 +19,23 @@
 
 The developer always uses `make dev` to start the development environment with hot-reloading for both backend (port 877) and frontend (port 8820). `make dev` builds the Go backend and runs the hot-reloading TypeScript frontend dev server.
 
-**ASSUME** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
+**KNOW** the developer is always running the latest version of QNTX. It is **FORBIDDEN** to discuss or question whether the developer has run the latest version. If there is an issue, it is in the code, not with running the latest binary (`make dev` solves this) or configuration (QNTX works without configuration).
 
 ## Testing
 
 **The AI agent MUST execute `make test` before claiming completion of any work. The cost is ~17 seconds.**
 
-`make test` runs both backend (Go) and frontend (TypeScript) tests.
+`make test` runs both backend (Go) and frontend (TypeScript) tests. See [web/TESTING.md](web/TESTING.md) for frontend testing patterns.
 
-**It is FORBIDDEN to craft custom test commands.**
+**It is DISCOURAGED to craft custom test commands.**
 
 **Tests passing ≠ feature is correct.** Only manual verification by the developer confirms behavior matches intent.
 
-**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries.
+**Prose encodes vision:** PR descriptions, commit messages, and code comments **MUST** capture intent and reasoning from the user's own words, not describe implementation. Code is easily regenerated; vision outlives code. Ask questions to extract and preserve the user's mental model _verbatim_ rather than generating descriptive summaries. **Maximize signal-to-noise: essential context only, no filler.**
 
 ## Type Generation
 
-**NEVER manually edit files in `types/generated/`.** Fix the generator in `code/typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
+**NEVER manually edit files in `types/generated/`.** Fix the generator in `typegen/` instead, then run `make types`. See [typegen.md](docs/typegen.md) for struct tags and troubleshooting.
 
 ## Glyphs
 
@@ -51,13 +52,12 @@ See [GLOSSARY.md](docs/GLOSSARY.md) for symbol definitions and [glyphs.md](docs/
 
 ### Code Quality
 
-- **Deterministic operations**: Use sorted map keys, consistent error patterns, predictable behavior
-
-Use `github.com/teranos/QNTX/errors` (wraps cockroachdb/errors). Always wrap with context:
+- **CRITICAL**: Include available context in errors, logs, and messages. If variables exist in scope (URLs, paths, IDs, status codes), reference them. If critical information isn't in scope, bring it into scope. Generic messages like "operation failed" or "task completed" are FORBIDDEN.
+Use `github.com/teranos/QNTX/errors` for go (wraps cockroachdb/errors). Always wrap with context:
 
 ```go
-if err := doSomething(); err != nil {
-    return errors.Wrap(err, "failed to do something")
+if err := os.ReadFile(configPath); err != nil {
+    return errors.Wrapf(err, "failed to read config from %s", configPath)
 }
 ```
 
@@ -85,7 +85,6 @@ func TestSomething(t *testing.T) {
 - `qntxtest.CreateTestDB(t)` runs actual migration files from `db/sqlite/migrations/`
 - Ensures tests use identical schema to production
 - Migrations are the single source of truth
-- Auto-cleanup via `t.Cleanup()`
 
 **NEVER do this:**
 
@@ -98,4 +97,3 @@ db.Exec("CREATE INDEX ...")
 **Pattern used throughout:**
 
 - `ats/storage/*_test.go` - All tests use `qntxtest.CreateTestDB(t)`
-- `internal/testing/database.go` - Implementation using `db.Migrate()`
