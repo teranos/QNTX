@@ -2,6 +2,7 @@
  * Tests for meld composition — create, extend, reconstruct, unmeld
  *
  * Validates the core axiom: proximity-based melding preserves element identity
+ * Layout: CSS Grid with per-glyph grid-row/grid-column placement
  *
  * Personas:
  * - Tim: Happy path user, normal workflows
@@ -29,6 +30,7 @@ describe('Meld System - Critical Behavior', () => {
 
         const axElement = document.createElement('div');
         axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax-test');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
@@ -36,6 +38,7 @@ describe('Meld System - Critical Behavior', () => {
 
         const promptElement = document.createElement('div');
         promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt-test');
         promptElement.style.position = 'absolute';
         promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
         promptElement.style.top = '100px';
@@ -60,6 +63,13 @@ describe('Meld System - Critical Behavior', () => {
         expect(originalPromptElement.parentElement).toBe(composition);
         expect(composition.style.left).toBe('100px');
         expect(composition.style.top).toBe('100px');
+
+        // Grid layout applied
+        expect(composition.style.display).toBe('grid');
+        expect(originalAxElement.style.gridRow).toBe('1');
+        expect(originalAxElement.style.gridColumn).toBe('1');
+        expect(originalPromptElement.style.gridRow).toBe('1');
+        expect(originalPromptElement.style.gridColumn).toBe('2');
 
         document.body.innerHTML = '';
     });
@@ -98,6 +108,8 @@ describe('Meld System - Critical Behavior', () => {
         expect(axElement.parentElement).toBe(canvas);
         expect(promptElement.parentElement).toBe(canvas);
         expect(axElement.style.position).toBe('absolute');
+        expect(axElement.style.gridRow).toBe('');
+        expect(axElement.style.gridColumn).toBe('');
         expect(composition.parentElement).toBe(null);
 
         document.body.innerHTML = '';
@@ -111,6 +123,7 @@ describe('Meld Composition - Tim (Happy Path)', () => {
 
         const axElement = document.createElement('div');
         axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax-test');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
@@ -118,6 +131,7 @@ describe('Meld Composition - Tim (Happy Path)', () => {
 
         const promptElement = document.createElement('div');
         promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt-test');
         promptElement.style.position = 'absolute';
         promptElement.style.left = `${100 + MELD_THRESHOLD - 5}px`;
         promptElement.style.top = '100px';
@@ -153,12 +167,13 @@ describe('Meld Composition - Spike (Edge Cases)', () => {
 });
 
 describe('Directional Melding', () => {
-    test('bottom meld: py + result uses column layout', () => {
+    test('bottom meld: py + result uses grid layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
         const pyElement = document.createElement('div');
         pyElement.className = 'canvas-py-glyph';
+        pyElement.setAttribute('data-glyph-id', 'py1');
         pyElement.style.position = 'absolute';
         pyElement.style.left = '100px';
         pyElement.style.top = '100px';
@@ -166,6 +181,7 @@ describe('Directional Melding', () => {
 
         const resultElement = document.createElement('div');
         resultElement.className = 'canvas-result-glyph';
+        resultElement.setAttribute('data-glyph-id', 'result1');
         resultElement.style.position = 'absolute';
         resultElement.style.left = '100px';
         resultElement.style.top = '200px';
@@ -176,19 +192,24 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(pyElement, resultElement, pyGlyph, resultGlyph, 'bottom');
 
-        expect(composition.style.flexDirection).toBe('column');
+        expect(composition.style.display).toBe('grid');
         expect(composition.contains(pyElement)).toBe(true);
         expect(composition.contains(resultElement)).toBe(true);
+        expect(pyElement.style.gridRow).toBe('1');
+        expect(pyElement.style.gridColumn).toBe('1');
+        expect(resultElement.style.gridRow).toBe('2');
+        expect(resultElement.style.gridColumn).toBe('1');
 
         document.body.innerHTML = '';
     });
 
-    test('bottom meld: note above prompt uses column layout', () => {
+    test('bottom meld: note above prompt uses grid layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
         const noteElement = document.createElement('div');
         noteElement.className = 'canvas-note-glyph';
+        noteElement.setAttribute('data-glyph-id', 'note1');
         noteElement.style.position = 'absolute';
         noteElement.style.left = '100px';
         noteElement.style.top = '100px';
@@ -196,6 +217,7 @@ describe('Directional Melding', () => {
 
         const promptElement = document.createElement('div');
         promptElement.className = 'canvas-prompt-glyph';
+        promptElement.setAttribute('data-glyph-id', 'prompt1');
         promptElement.style.position = 'absolute';
         promptElement.style.left = '100px';
         promptElement.style.top = '200px';
@@ -206,19 +228,22 @@ describe('Directional Melding', () => {
 
         const composition = performMeld(noteElement, promptElement, noteGlyph, promptGlyph, 'bottom');
 
-        expect(composition.style.flexDirection).toBe('column');
+        expect(composition.style.display).toBe('grid');
         expect(composition.contains(noteElement)).toBe(true);
         expect(composition.contains(promptElement)).toBe(true);
+        expect(noteElement.style.gridRow).toBe('1');
+        expect(promptElement.style.gridRow).toBe('2');
 
         document.body.innerHTML = '';
     });
 
-    test('right meld: ax + py uses row layout', () => {
+    test('right meld: ax + py uses grid layout', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
         const axElement = document.createElement('div');
         axElement.className = 'canvas-ax-glyph';
+        axElement.setAttribute('data-glyph-id', 'ax1');
         axElement.style.position = 'absolute';
         axElement.style.left = '100px';
         axElement.style.top = '100px';
@@ -226,6 +251,7 @@ describe('Directional Melding', () => {
 
         const pyElement = document.createElement('div');
         pyElement.className = 'canvas-py-glyph';
+        pyElement.setAttribute('data-glyph-id', 'py1');
         pyElement.style.position = 'absolute';
         pyElement.style.left = '200px';
         pyElement.style.top = '100px';
@@ -235,7 +261,11 @@ describe('Directional Melding', () => {
         const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => pyElement };
 
         const composition = performMeld(axElement, pyElement, axGlyph, pyGlyph, 'right');
-        expect(composition.style.flexDirection).toBe('row');
+        expect(composition.style.display).toBe('grid');
+        expect(axElement.style.gridRow).toBe('1');
+        expect(axElement.style.gridColumn).toBe('1');
+        expect(pyElement.style.gridRow).toBe('1');
+        expect(pyElement.style.gridColumn).toBe('2');
 
         document.body.innerHTML = '';
     });
@@ -246,6 +276,7 @@ describe('Directional Melding', () => {
 
         const pyElement = document.createElement('div');
         pyElement.className = 'canvas-py-glyph';
+        pyElement.setAttribute('data-glyph-id', 'py1');
         pyElement.style.position = 'absolute';
         pyElement.style.left = '100px';
         pyElement.style.top = '100px';
@@ -253,6 +284,7 @@ describe('Directional Melding', () => {
 
         const resultElement = document.createElement('div');
         resultElement.className = 'canvas-result-glyph';
+        resultElement.setAttribute('data-glyph-id', 'result1');
         resultElement.style.position = 'absolute';
         resultElement.style.left = '100px';
         resultElement.style.top = '200px';
@@ -284,12 +316,16 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'ax1', to: 'py1', direction: 'right', position: 0 }];
         const composition = reconstructMeld([ax, py], edges, 'comp1', 50, 75);
 
-        expect(composition.style.flexDirection).toBe('row');
+        expect(composition.style.display).toBe('grid');
         expect(composition.style.left).toBe('50px');
         expect(composition.style.top).toBe('75px');
         expect(composition.children.length).toBe(2);
         expect(composition.children[0]).toBe(ax);
         expect(composition.children[1]).toBe(py);
+        expect(ax.style.gridRow).toBe('1');
+        expect(ax.style.gridColumn).toBe('1');
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('2');
 
         document.body.innerHTML = '';
     });
@@ -309,14 +345,18 @@ describe('Direction-aware reconstructMeld', () => {
         const edges = [{ from: 'py1', to: 'result1', direction: 'bottom', position: 0 }];
         const composition = reconstructMeld([py, result], edges, 'comp2', 100, 100);
 
-        expect(composition.style.flexDirection).toBe('column');
+        expect(composition.style.display).toBe('grid');
         expect(composition.contains(py)).toBe(true);
         expect(composition.contains(result)).toBe(true);
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('1');
+        expect(result.style.gridRow).toBe('2');
+        expect(result.style.gridColumn).toBe('1');
 
         document.body.innerHTML = '';
     });
 
-    test('mixed right+bottom edges use row layout with sub-container', () => {
+    test('mixed right+bottom edges — flat children with grid positions, no sub-containers', () => {
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
 
@@ -338,15 +378,20 @@ describe('Direction-aware reconstructMeld', () => {
         ];
         const composition = reconstructMeld([ax, py, result], edges, 'comp3', 0, 0);
 
-        expect(composition.style.flexDirection).toBe('row');
-        expect(composition.children.length).toBe(2);
+        expect(composition.style.display).toBe('grid');
+        // All 3 are direct children — no sub-containers
+        expect(composition.children.length).toBe(3);
         expect(composition.children[0]).toBe(ax);
+        expect(composition.children[1]).toBe(py);
+        expect(composition.children[2]).toBe(result);
 
-        const subContainer = composition.children[1] as HTMLElement;
-        expect(subContainer.classList.contains('meld-sub-container')).toBe(true);
-        expect(subContainer.style.flexDirection).toBe('column');
-        expect(subContainer.children[0]).toBe(py);
-        expect(subContainer.children[1]).toBe(result);
+        // Grid positions
+        expect(ax.style.gridRow).toBe('1');
+        expect(ax.style.gridColumn).toBe('1');
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('2');
+        expect(result.style.gridRow).toBe('2');
+        expect(result.style.gridColumn).toBe('2');
 
         document.body.innerHTML = '';
     });
@@ -427,6 +472,14 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         expect(prompt.style.position).toBe('relative');
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-py1-prompt1');
 
+        // Grid positions
+        expect(ax.style.gridRow).toBe('1');
+        expect(ax.style.gridColumn).toBe('1');
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('2');
+        expect(prompt.style.gridRow).toBe('1');
+        expect(prompt.style.gridColumn).toBe('3');
+
         clearState();
     });
 
@@ -470,6 +523,8 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         expect(composition.children.length).toBe(4);
         expect(composition.children[3]).toBe(py2);
+        expect(py2.style.gridRow).toBe('1');
+        expect(py2.style.gridColumn).toBe('4');
 
         clearState();
     });
@@ -507,15 +562,20 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         extendComposition(composition, ax, 'ax1', 'py1', 'right', 'from');
 
         expect(composition.children.length).toBe(3);
-        expect(composition.children[0]).toBe(ax);
-        expect(composition.children[1]).toBe(py);
-        expect(composition.children[2]).toBe(prompt);
         expect(composition.getAttribute('data-glyph-id')).toBe('melded-ax1-py1');
+
+        // Grid positions — ax prepended as new root
+        expect(ax.style.gridRow).toBe('1');
+        expect(ax.style.gridColumn).toBe('1');
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('2');
+        expect(prompt.style.gridRow).toBe('1');
+        expect(prompt.style.gridColumn).toBe('3');
 
         clearState();
     });
 
-    test('Tim extends ax|py with result below py (cross-axis sub-container)', () => {
+    test('Tim extends ax|py with result below py (cross-axis, flat grid)', () => {
         clearState();
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
@@ -540,7 +600,6 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         const pyGlyph: Glyph = { id: 'py1', title: 'Py', renderContent: () => py };
 
         const composition = performMeld(ax, py, axGlyph, pyGlyph, 'right');
-        expect(composition.style.flexDirection).toBe('row');
 
         const result = document.createElement('div');
         result.className = 'canvas-result-glyph';
@@ -550,19 +609,24 @@ describe('Composition Extension - Tim (Happy Path)', () => {
 
         extendComposition(composition, result, 'result1', 'py1', 'bottom', 'to');
 
-        expect(composition.children.length).toBe(2);
+        // All 3 are direct children — no sub-containers
+        expect(composition.children.length).toBe(3);
         expect(composition.children[0]).toBe(ax);
+        expect(composition.children[1]).toBe(py);
+        expect(composition.children[2]).toBe(result);
 
-        const subContainer = composition.children[1] as HTMLElement;
-        expect(subContainer.classList.contains('meld-sub-container')).toBe(true);
-        expect(subContainer.style.flexDirection).toBe('column');
-        expect(subContainer.children[0]).toBe(py);
-        expect(subContainer.children[1]).toBe(result);
+        // Grid positions
+        expect(ax.style.gridRow).toBe('1');
+        expect(ax.style.gridColumn).toBe('1');
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('2');
+        expect(result.style.gridRow).toBe('2');
+        expect(result.style.gridColumn).toBe('2');
 
         clearState();
     });
 
-    test('Tim runs py twice in ax|py — second result joins existing sub-container', () => {
+    test('Tim runs py twice in ax|py — second result is direct child with grid position', () => {
         clearState();
         const canvas = document.createElement('div');
         document.body.appendChild(canvas);
@@ -598,13 +662,20 @@ describe('Composition Extension - Tim (Happy Path)', () => {
         canvas.appendChild(result2);
         extendComposition(composition, result2, 'r2', 'py1', 'bottom', 'to');
 
-        expect(composition.children.length).toBe(2);
+        // All 4 are direct children
+        expect(composition.children.length).toBe(4);
+        expect(composition.children[0]).toBe(ax);
+        expect(composition.children[1]).toBe(py);
+        expect(composition.children[2]).toBe(result1);
+        expect(composition.children[3]).toBe(result2);
 
-        const subContainer = composition.children[1] as HTMLElement;
-        expect(subContainer.children.length).toBe(3);
-        expect(subContainer.children[0]).toBe(py);
-        expect(subContainer.children[1]).toBe(result1);
-        expect(subContainer.children[2]).toBe(result2);
+        // Grid positions
+        expect(py.style.gridRow).toBe('1');
+        expect(py.style.gridColumn).toBe('2');
+        expect(result1.style.gridRow).toBe('2');
+        expect(result1.style.gridColumn).toBe('2');
+        expect(result2.style.gridRow).toBe('3');
+        expect(result2.style.gridColumn).toBe('2');
 
         clearState();
     });

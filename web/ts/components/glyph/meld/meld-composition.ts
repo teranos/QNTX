@@ -6,16 +6,48 @@
  *
  * NO cloneNode. NO createElement for existing glyphs.
  * Melding is achieved through reparenting, not cloning.
+ *
+ * Layout: CSS Grid with per-glyph grid-row/grid-column placement
+ * derived from the edge DAG via computeGridPositions().
  */
 
 import { log, SEG } from '../../../logger';
 import type { Glyph } from '../glyph';
 import type { CompositionEdge } from '../../../state/ui';
 import type { EdgeDirection } from './meldability';
+import { computeGridPositions } from './meldability';
 import { addComposition, removeComposition, extractGlyphIds, findCompositionByGlyph } from '../../../state/compositions';
 import { clearMeldFeedback } from './meld-feedback';
 
 const UNMELD_OFFSET = 20; // px - spacing between glyphs when unmelding
+
+/**
+ * Apply CSS Grid layout to a composition based on its edge graph.
+ * Single source of truth — used by performMeld, extendComposition, and reconstructMeld.
+ */
+function applyGridLayout(
+    composition: HTMLElement,
+    elements: HTMLElement[],
+    edges: CompositionEdge[]
+): void {
+    composition.style.display = 'grid';
+    composition.style.gridAutoRows = 'auto';
+    composition.style.gridAutoColumns = 'auto';
+    composition.style.gap = '0';
+
+    const positions = computeGridPositions(edges);
+
+    for (const el of elements) {
+        const id = el.getAttribute('data-glyph-id') || '';
+        const pos = positions.get(id);
+        if (!pos) {
+            log.warn(SEG.GLYPH, `[MeldSystem] No grid position computed for glyph ${id}`);
+            continue;
+        }
+        el.style.gridRow = String(pos.row);
+        el.style.gridColumn = String(pos.col);
+    }
+}
 
 /**
  * Perform meld operation
@@ -33,7 +65,7 @@ export function performMeld(
 ): HTMLElement {
     const canvas = initiatorElement.parentElement;
     if (!canvas) {
-        throw new Error('Cannot meld: no canvas parent');
+        throw new Error(`Cannot meld: no canvas parent for initiator ${initiatorGlyph.id}`);
     }
 
     log.info(SEG.GLYPH, '[MeldSystem] Performing meld - reparenting elements', { direction });
@@ -59,16 +91,6 @@ export function performMeld(
     composition.style.position = 'absolute';
     composition.style.left = initiatorElement.style.left;
     composition.style.top = initiatorElement.style.top;
-
-    // Layout direction based on edge direction
-    composition.style.display = 'flex';
-    if (direction === 'bottom' || direction === 'top') {
-        composition.style.flexDirection = 'column';
-        composition.style.alignItems = 'flex-start';
-    } else {
-        composition.style.flexDirection = 'row';
-        composition.style.alignItems = 'center';
-    }
 
     // Parse position for storage
     const x = parseInt(initiatorElement.style.left || '0', 10);
@@ -99,6 +121,9 @@ export function performMeld(
     composition.appendChild(initiatorElement);
     composition.appendChild(targetElement);
 
+    // Apply grid layout from edge graph
+    applyGridLayout(composition, [initiatorElement, targetElement], edges);
+
     // Add to canvas
     canvas.appendChild(composition);
 
@@ -124,9 +149,6 @@ export function performMeld(
  *
  * CRITICAL: Reparents the incoming element into the existing composition container.
  * Regenerates composition ID and updates storage.
- *
- * Cross-axis extensions (e.g., bottom result in a row composition) create nested
- * sub-containers to preserve correct spatial layout.
  */
 export function extendComposition(
     compositionElement: HTMLElement,
@@ -167,58 +189,8 @@ export function extendComposition(
     incomingElement.style.top = '0';
     clearMeldFeedback(incomingElement);
 
-    // Check if this is a cross-axis extension (e.g., adding 'bottom' result to a 'row' composition)
-    const compositionFlexDir = compositionElement.style.flexDirection;
-    const isCrossAxis =
-        (compositionFlexDir === 'row' && (direction === 'bottom' || direction === 'top')) ||
-        (compositionFlexDir === 'column' && direction === 'right');
-
-    if (isCrossAxis) {
-        // Find the anchor element in the composition
-        const anchorElement = compositionElement.querySelector(`[data-glyph-id="${anchorGlyphId}"]`) as HTMLElement;
-        if (!anchorElement) {
-            throw new Error(`Cannot extend: anchor glyph ${anchorGlyphId} not found in composition`);
-        }
-
-        // Check if anchor is already in a sub-container (e.g., second execution result)
-        const existingSub = anchorElement.parentElement;
-        if (existingSub?.classList.contains('meld-sub-container')) {
-            if (incomingRole === 'to') {
-                existingSub.appendChild(incomingElement);
-            } else {
-                existingSub.insertBefore(incomingElement, existingSub.firstChild);
-            }
-        } else {
-            // Create sub-container with cross-axis direction
-            const subContainer = document.createElement('div');
-            subContainer.className = 'meld-sub-container';
-            subContainer.style.display = 'flex';
-            if (direction === 'bottom' || direction === 'top') {
-                subContainer.style.flexDirection = 'column';
-                subContainer.style.alignItems = 'flex-start';
-            } else {
-                subContainer.style.flexDirection = 'row';
-                subContainer.style.alignItems = 'center';
-            }
-
-            // Replace anchor with sub-container, then move anchor into it
-            compositionElement.insertBefore(subContainer, anchorElement);
-            subContainer.appendChild(anchorElement);
-
-            if (incomingRole === 'to') {
-                subContainer.appendChild(incomingElement);
-            } else {
-                subContainer.insertBefore(incomingElement, subContainer.firstChild);
-            }
-        }
-    } else {
-        // Same-axis: simple append/prepend
-        if (incomingRole === 'to') {
-            compositionElement.appendChild(incomingElement);
-        } else {
-            compositionElement.insertBefore(incomingElement, compositionElement.firstChild);
-        }
-    }
+    // Append incoming as direct child — grid handles placement
+    compositionElement.appendChild(incomingElement);
 
     // Update composition ID on DOM
     compositionElement.setAttribute('data-glyph-id', newId);
@@ -232,6 +204,12 @@ export function extendComposition(
         x: existingComp.x,
         y: existingComp.y
     });
+
+    // Rebuild grid positions for all children
+    const allChildren = Array.from(
+        compositionElement.querySelectorAll('[data-glyph-id]')
+    ) as HTMLElement[];
+    applyGridLayout(compositionElement, allChildren, allEdges);
 
     log.info(SEG.GLYPH, '[MeldSystem] Composition extended', {
         newId,
@@ -254,21 +232,18 @@ export function reconstructMeld(
     y: number
 ): HTMLElement {
     if (glyphElements.length === 0) {
-        throw new Error('Cannot reconstruct meld: no glyph elements provided');
+        throw new Error(`Cannot reconstruct meld: no glyph elements provided for composition ${compositionId}`);
     }
 
     const canvas = glyphElements[0].parentElement;
     if (!canvas) {
-        throw new Error('Cannot reconstruct meld: no canvas parent');
+        throw new Error(`Cannot reconstruct meld: no canvas parent for composition ${compositionId}`);
     }
 
     log.info(SEG.GLYPH, '[MeldSystem] Reconstructing meld from storage', {
         glyphCount: glyphElements.length,
         edgeCount: edges.length
     });
-
-    // Determine layout from edge directions
-    const hasVertical = edges.some(e => e.direction === 'bottom' || e.direction === 'top');
 
     // Create composition container
     const composition = document.createElement('div');
@@ -280,72 +255,17 @@ export function reconstructMeld(
     composition.style.position = 'absolute';
     composition.style.left = `${x}px`;
     composition.style.top = `${y}px`;
-    composition.style.display = 'flex';
 
-    if (hasVertical && !edges.some(e => e.direction === 'right')) {
-        // Pure vertical layout
-        composition.style.flexDirection = 'column';
-        composition.style.alignItems = 'flex-start';
-    } else {
-        // Horizontal (or mixed)
-        composition.style.flexDirection = 'row';
-        composition.style.alignItems = 'center';
-    }
-
-    // Clear positioning from glyphs
+    // Clear positioning from glyphs and reparent
     glyphElements.forEach(element => {
         element.style.position = 'relative';
         element.style.left = '0';
         element.style.top = '0';
+        composition.appendChild(element);
     });
 
-    // For mixed-direction compositions, build sub-containers for cross-axis edges
-    const isMixedDirection = hasVertical && edges.some(e => e.direction === 'right');
-
-    if (isMixedDirection) {
-        // Identify cross-axis children (targets of non-main-axis edges)
-        const crossAxisEdges = new Map<string, HTMLElement[]>();
-        const crossAxisChildren = new Set<string>();
-        for (const edge of edges) {
-            if (edge.direction !== 'right') {
-                const toEl = glyphElements.find(el => el.getAttribute('data-glyph-id') === edge.to);
-                if (toEl) {
-                    const existing = crossAxisEdges.get(edge.from) || [];
-                    existing.push(toEl);
-                    crossAxisEdges.set(edge.from, existing);
-                    crossAxisChildren.add(edge.to);
-                }
-            }
-        }
-
-        // Walk glyph elements: create sub-containers for cross-axis anchors
-        for (const element of glyphElements) {
-            const id = element.getAttribute('data-glyph-id') || '';
-            if (crossAxisChildren.has(id)) continue; // Added as part of sub-container
-
-            const children = crossAxisEdges.get(id);
-            if (children && children.length > 0) {
-                const subContainer = document.createElement('div');
-                subContainer.className = 'meld-sub-container';
-                subContainer.style.display = 'flex';
-                subContainer.style.flexDirection = 'column';
-                subContainer.style.alignItems = 'flex-start';
-
-                subContainer.appendChild(element);
-                for (const child of children) {
-                    subContainer.appendChild(child);
-                }
-                composition.appendChild(subContainer);
-            } else {
-                composition.appendChild(element);
-            }
-        }
-    } else {
-        // Pure single-direction: simple append
-        glyphElements.forEach(element => {
-            composition.appendChild(element);
-        });
-    }
+    // Apply grid layout from edge graph
+    applyGridLayout(composition, glyphElements, edges);
 
     // Add to canvas
     canvas.appendChild(composition);
@@ -388,7 +308,7 @@ export function unmeldComposition(composition: HTMLElement): {
     // Get composition ID for storage removal
     const compositionId = composition.getAttribute('data-glyph-id') || '';
 
-    // Find all child glyphs in composition (including those inside sub-containers)
+    // Find all child glyphs in composition
     const glyphElements = Array.from(composition.querySelectorAll('[data-glyph-id]')) as HTMLElement[];
 
     if (glyphElements.length === 0) {
@@ -414,19 +334,21 @@ export function unmeldComposition(composition: HTMLElement): {
     const left = isNaN(compLeft) ? 0 : compLeft;
     const top = isNaN(compTop) ? 0 : compTop;
 
-    // Determine unmeld direction from stored edges
+    // TODO(#448): binary heuristic — mixed-direction compositions spread into a flat row
     const firstChildId = glyphElements[0].getAttribute('data-glyph-id') || '';
     const storedComp = findCompositionByGlyph(firstChildId);
     const isVertical = storedComp?.edges.some(e => e.direction === 'bottom' || e.direction === 'top')
         && !storedComp?.edges.some(e => e.direction === 'right');
 
-    // Restore absolute positioning for each glyph, spacing along the original axis
+    // TODO(#450): animate the separation instead of instant repositioning
     let currentX = left;
     let currentY = top;
     glyphElements.forEach((element) => {
         element.style.position = 'absolute';
         element.style.left = `${currentX}px`;
         element.style.top = `${currentY}px`;
+        element.style.gridRow = '';
+        element.style.gridColumn = '';
 
         // Reparent back to canvas
         canvas.insertBefore(element, composition);
@@ -445,7 +367,7 @@ export function unmeldComposition(composition: HTMLElement): {
         removeComposition(compositionId);
     }
 
-    // Remove composition container (sub-containers cleaned up with it)
+    // Remove composition container
     composition.remove();
 
     log.info(SEG.GLYPH, '[MeldSystem] Unmeld complete - elements restored and removed from storage', {

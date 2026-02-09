@@ -62,8 +62,10 @@ describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
         expect(composition?.contains(pyElement)).toBe(true);
         expect(composition?.contains(resultElement)).toBe(true);
 
-        // Verify composition layout is vertical (bottom direction)
-        expect((composition as HTMLElement)?.style.flexDirection).toBe('column');
+        // Verify composition uses grid layout with py above result
+        expect((composition as HTMLElement)?.style.display).toBe('grid');
+        expect(pyElement.style.gridRow).toBe('1');
+        expect(resultElement.style.gridRow).toBe('2');
 
         clearState();
     });
@@ -118,11 +120,13 @@ describe('Auto-Meld Result Below - Tim (Happy Path)', () => {
         expect(composition.contains(axElement)).toBe(true);
         expect(composition.contains(pyElement)).toBe(true);
 
-        // Verify sub-container was created for cross-axis (py → result is bottom, but ax → py is right)
-        const subContainer = pyElement.parentElement;
-        expect(subContainer?.classList.contains('meld-sub-container')).toBe(true);
-        expect(subContainer?.contains(pyElement)).toBe(true);
-        expect(subContainer?.contains(resultElement)).toBe(true);
+        // Verify all glyphs are direct children with correct grid positions (no sub-containers)
+        expect(pyElement.parentElement).toBe(composition);
+        expect(resultElement.parentElement).toBe(composition);
+        expect(pyElement.style.gridRow).toBe('1');
+        expect(pyElement.style.gridColumn).toBe('2');
+        expect(resultElement.style.gridRow).toBe('2');
+        expect(resultElement.style.gridColumn).toBe('2');
 
         clearState();
     });
