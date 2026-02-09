@@ -97,7 +97,7 @@ func (bs *BoundedStore) SearchRichStringFieldsWithResult(ctx context.Context, qu
 
 	// For multi-word queries or when no exact matches, use fuzzy matching
 	backend := ax.DetectBackend()
-	if backend == ax.MatcherBackendRust || backend == ax.MatcherBackendWasm {
+	if backend == ax.MatcherBackendWasm {
 		if bs.logger != nil {
 			bs.logger.Debugw("Using fuzzy search for query", "query", query, "wordCount", len(queryWords), "backend", backend)
 		}

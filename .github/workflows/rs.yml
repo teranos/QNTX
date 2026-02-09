@@ -62,13 +62,6 @@ jobs:
       - name: Build release
         run: cd ats/ax/fuzzy-ax && cargo build --release --lib
 
-      - name: Test CGO integration
-        run: |
-          cd ats/ax/fuzzy-ax && cargo build --release --lib
-          export LD_LIBRARY_PATH=$PWD/target/release:$LD_LIBRARY_PATH
-          export DYLD_LIBRARY_PATH=$PWD/target/release:$DYLD_LIBRARY_PATH
-          cd ../../.. && go test -tags rustfuzzy -v ./ats/ax/...
-
   qntx-sqlite:
     name: SQLite Backend
     runs-on: ubuntu-latest
