@@ -123,7 +123,7 @@ describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
 
         // Create a composition wrapper (simulating melded state)
         const composition = document.createElement('div');
-        composition.className = 'glyph-composition';
+        composition.className = 'melded-composition';
         composition.dataset.compositionId = 'comp-123';
 
         // Add note glyph inside composition
@@ -156,6 +156,6 @@ describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
         expect(unchangedElement.dataset.glyphId).toBe('note-nested');
 
         // Composition is intact
-        expect(composition.classList.contains('glyph-composition')).toBe(true);
+        expect(composition.classList.contains('melded-composition')).toBe(true);
     });
 });
