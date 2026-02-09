@@ -28,32 +28,57 @@ globalThis.ResizeObserver = class ResizeObserver {
 } as any;
 
 describe('AX Glyph - Tim (Happy Path)', () => {
-    test('Tim creates AX glyph with query', () => {
-        // Tim creates an AX query glyph
-        const glyph = createAxGlyph('ax-123', 'test query', 100, 200);
+    test('Tim creates AX glyph and gets HTMLElement back', () => {
+        // Tim creates a Glyph object and passes it to createAxGlyph
+        const glyph: Glyph = {
+            id: 'ax-123',
+            title: 'AX Query',
+            symbol: AX,
+            x: 100,
+            y: 200,
+            renderContent: () => document.createElement('div') as any,
+        };
 
-        // AX glyph is created
-        expect(glyph.id).toBe('ax-123');
-        expect(glyph.symbol).toBe(AX);
-        expect(glyph.x).toBe(100);
-        expect(glyph.y).toBe(200);
+        const element = createAxGlyph(glyph);
 
-        // Glyph has render function
-        expect(glyph.renderContent).toBeDefined();
+        // Element has correct data attributes
+        expect(element.dataset.glyphId).toBe('ax-123');
+        expect(element.dataset.glyphSymbol).toBe(AX);
+        expect(element.classList.contains('canvas-ax-glyph')).toBe(true);
+        expect(element.classList.contains('canvas-glyph')).toBe(true);
+
+        // Has title bar with shared CSS class
+        const titleBar = element.querySelector('.canvas-glyph-title-bar');
+        expect(titleBar).toBeTruthy();
+
+        // Has query input
+        const input = element.querySelector('.ax-query-input') as HTMLInputElement;
+        expect(input).toBeTruthy();
+
+        // Has results container
+        const results = element.querySelector('.ax-glyph-results');
+        expect(results).toBeTruthy();
     });
 });
 
 describe('AX Glyph - Spike (Edge Cases)', () => {
     test('Spike types wildcard "*" and sees helpful error message', () => {
         // Spike creates an AX glyph
-        const glyph = createAxGlyph('ax-wildcard', '', 100, 200);
+        const glyph: Glyph = {
+            id: 'ax-wildcard',
+            title: 'AX Query',
+            symbol: AX,
+            x: 100,
+            y: 200,
+            renderContent: () => document.createElement('div') as any,
+        };
 
         // Render to DOM
         const container = document.createElement('div');
         container.className = 'canvas-workspace';
         document.body.appendChild(container);
 
-        const glyphElement = glyph.renderContent();
+        const glyphElement = createAxGlyph(glyph);
         container.appendChild(glyphElement);
 
         // Spike types "*" in the query editor
@@ -85,9 +110,8 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
         // Error display has error styling
         expect(errorDisplay.style.backgroundColor).toContain('var(--glyph-status-error-section-bg)');
 
-        // Glyph container has error background tint
-        const axContainer = glyphElement.closest('.canvas-ax-glyph') as HTMLElement;
-        expect(axContainer?.style.backgroundColor).toContain('rgba(61, 31, 31'); // Red tint
+        // Glyph element itself gets error background (element IS the container now)
+        expect(glyphElement.style.backgroundColor).toContain('rgba(61, 31, 31'); // Red tint
 
         // Cleanup
         document.body.innerHTML = '';
