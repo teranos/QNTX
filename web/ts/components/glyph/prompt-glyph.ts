@@ -309,7 +309,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
     // Make draggable and resizable
     const cleanupDrag = makeDraggable(element, titleBar, glyph, { logLabel: 'PromptGlyph' });
-    makeResizable(element, resizeHandle, glyph, {
+    const cleanupResize = makeResizable(element, resizeHandle, glyph, {
         logLabel: 'PromptGlyph',
         minWidth: 280,
         minHeight: 200
@@ -317,6 +317,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
 
     // Register cleanup for conversions
     storeCleanup(element, cleanupDrag);
+    storeCleanup(element, cleanupResize);
     storeCleanup(element, () => {
         if (saveTimeout !== undefined) clearTimeout(saveTimeout);
     });
