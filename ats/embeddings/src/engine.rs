@@ -65,7 +65,9 @@ impl EmbeddingEngine {
         };
 
         // Load tokenizer from same directory as model
-        let model_dir = model_path.as_ref().parent()
+        let model_dir = model_path
+            .as_ref()
+            .parent()
             .ok_or_else(|| anyhow::anyhow!("Invalid model path"))?;
         let tokenizer_path = model_dir.join("tokenizer.json");
 
@@ -92,7 +94,9 @@ impl EmbeddingEngine {
         let (input_ids, attention_mask) = self.tokenizer.encode(text)?;
 
         // Get input names from the model
-        let input_names: Vec<String> = self.session.inputs()
+        let input_names: Vec<String> = self
+            .session
+            .inputs()
             .iter()
             .map(|i| i.name().to_string())
             .collect();
@@ -173,9 +177,11 @@ impl EmbeddingEngine {
         })
     }
 
-
     /// Extract embeddings from model output with mean pooling
-    fn extract_embeddings(outputs: &SessionOutputs, expected_dimensions: usize) -> Result<Vec<f32>> {
+    fn extract_embeddings(
+        outputs: &SessionOutputs,
+        expected_dimensions: usize,
+    ) -> Result<Vec<f32>> {
         // Get the output names
         let output_names: Vec<String> = outputs.keys().map(|s| s.to_string()).collect();
 
@@ -184,13 +190,13 @@ impl EmbeddingEngine {
         }
 
         // Try to find the right output (usually "last_hidden_state" or the first output)
-        let output_name = output_names.iter()
+        let output_name = output_names
+            .iter()
             .find(|name: &&String| name.contains("hidden_state") || name.contains("output"))
             .unwrap_or(&output_names[0]);
 
         // Extract the tensor - SessionOutputs can be indexed by &str
-        let (tensor_shape, data) = outputs[output_name.as_str()]
-            .try_extract_tensor::<f32>()?;
+        let (tensor_shape, data) = outputs[output_name.as_str()].try_extract_tensor::<f32>()?;
 
         // Shape is an ort::tensor::Shape which we can iterate
         let shape: Vec<i64> = tensor_shape.iter().copied().collect();
@@ -253,12 +259,7 @@ impl EmbeddingEngine {
 
                 data[..hidden_size].to_vec()
             }
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Unexpected output shape: {:?}",
-                    shape
-                ))
-            }
+            _ => return Err(anyhow::anyhow!("Unexpected output shape: {:?}", shape)),
         };
 
         // Ensure we have the right dimension

@@ -53,7 +53,7 @@ pub extern "C" fn embedding_engine_free() {
 pub extern "C" fn embedding_engine_dimensions() -> c_int {
     unsafe {
         if let Some(ref engine_mutex) = ENGINE {
-            if let Ok(engine) = engine_mutex.lock() {
+            if let Ok(mut engine) = engine_mutex.lock() {
                 return engine.model_info().dimensions as c_int;
             }
         }
@@ -82,7 +82,7 @@ pub extern "C" fn embedding_engine_embed(
         };
 
         if let Some(ref engine_mutex) = ENGINE {
-            if let Ok(engine) = engine_mutex.lock() {
+            if let Ok(mut engine) = engine_mutex.lock() {
                 match engine.embed(text_str) {
                     Ok(result) => {
                         let actual_dims = result.embedding.len();
@@ -124,7 +124,7 @@ pub extern "C" fn embedding_engine_embed_json(text: *const c_char) -> *mut c_cha
         };
 
         if let Some(ref engine_mutex) = ENGINE {
-            if let Ok(engine) = engine_mutex.lock() {
+            if let Ok(mut engine) = engine_mutex.lock() {
                 match engine.embed(text_str) {
                     Ok(result) => match serde_json::to_string(&result) {
                         Ok(json) => match CString::new(json) {

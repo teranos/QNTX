@@ -25,7 +25,8 @@ impl EmbeddingTokenizer {
     /// Encode text into token IDs and attention mask
     pub fn encode(&self, text: &str) -> Result<(Array2<i64>, Array2<i64>)> {
         // Encode with special tokens (CLS and SEP) automatically added
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, true)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 
@@ -51,7 +52,8 @@ impl EmbeddingTokenizer {
 
     /// Get the actual number of tokens (for accurate counting)
     pub fn count_tokens(&self, text: &str) -> Result<usize> {
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, true)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 

@@ -3,7 +3,7 @@
 package embeddings
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/../target/release -lqntx_embeddings
+#cgo LDFLAGS: -L${SRCDIR}/../../../target/release -lqntx_embeddings -L/nix/store/m4wq7714cbksjnc2ga1l09gwk2ww7hrf-onnxruntime-1.22.2/lib -lonnxruntime
 #cgo darwin LDFLAGS: -framework CoreFoundation -framework Security -lresolv
 #cgo CFLAGS: -I${SRCDIR}/../include
 
@@ -13,7 +13,6 @@ package embeddings
 import "C"
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 	"unsafe"
 
