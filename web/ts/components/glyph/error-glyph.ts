@@ -338,7 +338,7 @@ async function convertErrorToPrompt(
         };
 
         // The prompt template will be saved when createPromptGlyph sets up the glyph
-        // No need to save here - uiState.upsertCanvasGlyph will be called with the code
+        // No need to save here - uiState.addCanvasGlyph will be called with the code
 
         // Create and append prompt element
         const promptElement = await createPromptGlyph(promptGlyph);
