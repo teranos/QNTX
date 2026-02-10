@@ -203,12 +203,8 @@ export async function loadCanvasState(): Promise<{
             listCompositions(),
         ]);
 
-        // Strip timestamps from proto types — frontend state doesn't track them
-        const glyphs: CanvasGlyphState[] = glyphsResponse.map(
-            ({ created_at, updated_at, ...state }) => state
-        );
-
-        // Composition proto type matches CompositionState exactly
+        // Proto types flow through directly — CanvasGlyphState and CompositionState derive from proto
+        const glyphs: CanvasGlyphState[] = glyphsResponse;
         const compositions: CompositionState[] = compositionsResponse;
 
         log.info(SEG.GLYPH, `[CanvasAPI] Loaded canvas state: ${glyphs.length} glyphs, ${compositions.length} compositions`);

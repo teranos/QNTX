@@ -77,12 +77,12 @@ export type CompositionState = Composition;
 
 /**
  * Canvas glyph state (for persistence)
- * Derived from proto CanvasGlyph — width/height/content are optional in frontend
- * (proto3 defaults 0/"" mean "unset"), timestamps are backend-only.
+ * Derived from proto CanvasGlyph — id/symbol/x/y always present,
+ * everything else optional (proto3 defaults 0/"" mean "unset").
  */
 export type CanvasGlyphState =
-    Omit<CanvasGlyph, 'width' | 'height' | 'content' | 'created_at' | 'updated_at'>
-    & Partial<Pick<CanvasGlyph, 'width' | 'height' | 'content'>>;
+    Pick<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>
+    & Partial<Omit<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>>;
 
 /**
  * Consolidated UI state
