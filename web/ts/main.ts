@@ -169,30 +169,19 @@ async function init(): Promise<void> {
     // while preserving any locally-created glyphs that haven't been synced yet.
     try {
         if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
-        const { loadCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+        const { loadCanvasState, mergeCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
 
-        // Load backend state and merge items not present locally.
-        // Uses setCanvasGlyphs/setCanvasCompositions (bulk setters) to avoid
-        // triggering per-item backend upserts -- the sync loop below handles that.
+        // Merge backend state into local. Uses bulk setters to avoid per-item backend upserts.
         try {
             const backendState = await loadCanvasState();
-            const localGlyphs = uiState.getCanvasGlyphs();
-            const localComps = uiState.getCanvasCompositions();
-            const localGlyphIds = new Set(localGlyphs.map(g => g.id));
-            const localCompIds = new Set(localComps.map(c => c.id));
+            const local = { glyphs: uiState.getCanvasGlyphs(), compositions: uiState.getCanvasCompositions() };
+            const merged = mergeCanvasState(local, backendState);
 
-            const newGlyphs = backendState.glyphs.filter(g => !localGlyphIds.has(g.id));
-            const newComps = backendState.compositions.filter(c => !localCompIds.has(c.id));
+            if (merged.mergedGlyphs > 0) uiState.setCanvasGlyphs(merged.glyphs);
+            if (merged.mergedComps > 0) uiState.setCanvasCompositions(merged.compositions);
 
-            if (newGlyphs.length > 0) {
-                uiState.setCanvasGlyphs([...localGlyphs, ...newGlyphs]);
-            }
-            if (newComps.length > 0) {
-                uiState.setCanvasCompositions([...localComps, ...newComps]);
-            }
-
-            if (newGlyphs.length > 0 || newComps.length > 0) {
-                log.info(SEG.GLYPH, `[Init] Merged ${newGlyphs.length} glyphs and ${newComps.length} compositions from backend`);
+            if (merged.mergedGlyphs > 0 || merged.mergedComps > 0) {
+                log.info(SEG.GLYPH, `[Init] Merged ${merged.mergedGlyphs} glyphs and ${merged.mergedComps} compositions from backend`);
             }
         } catch (error: unknown) {
             log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
