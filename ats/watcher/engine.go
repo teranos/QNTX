@@ -529,19 +529,10 @@ func (e *Engine) executeGlyph(watcher *storage.Watcher, as *types.As) error {
 
 // executeGlyphPython runs a py glyph's code with the attestation injected as `upstream`
 func (e *Engine) executeGlyphPython(glyphID string, code string, attestationJSON []byte) error {
-	// Inject attestation as `upstream` dict — same pattern as executePython but with `upstream` variable name
-	injectedCode := fmt.Sprintf(`
-import json
-_upstream_json = %q
-upstream = json.loads(_upstream_json)
-
-# Glyph code below
-%s
-`, string(attestationJSON), code)
-
 	reqBody, err := json.Marshal(map[string]interface{}{
-		"code":     injectedCode,
-		"glyph_id": glyphID,
+		"code":                  code,
+		"glyph_id":              glyphID,
+		"upstream_attestation":  json.RawMessage(attestationJSON),
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal request body")

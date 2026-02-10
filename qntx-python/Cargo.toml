@@ -1,6 +1,6 @@
 [package]
 name = "qntx-python-plugin"
-version = "0.4.2"
+version = "0.5.0"
 edition.workspace = true
 description = "QNTX gRPC plugin for running Python code"
 license.workspace = true

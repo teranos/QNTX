@@ -113,37 +113,39 @@ When the backend receives a composition upsert (POST `/api/canvas/compositions`)
 
 For producer→downstream edges to work, attestations created by py/prompt must carry `actor: glyph:{glyphId}`.
 
-- [ ] Pass glyph ID into python execution request
-  - Add `glyph_id` field to `/api/python/execute` request body
-  - Frontend `py-glyph.ts:95-101` sends glyph ID in POST
-  - Python plugin HTTP handler passes it through to execution context
+- [x] Pass glyph ID into python execution request
+  - `py-glyph.ts:95-99` sends `glyph_id: glyph.id` in POST body
+  - `qntx-python/src/handlers.rs:58` parses `glyph_id` from request, sets thread-local
 
-- [ ] Inject glyph ID as default actor in `attest()`
-  - Option A: Rust side (`atsstore.rs`) — if actors is empty and glyph_id is set, default to `["glyph:{glyph_id}"]`
-  - Option B: Python side — inject `_glyph_id` global, let user override but provide default
-  - Prefer Option A: transparent, user doesn't need to know
+- [x] Inject glyph ID as default actor in `attest()`
+  - Option A (chosen): Rust side — `atsstore.rs` thread-local `CURRENT_GLYPH_ID`
+  - `attest()` defaults actors to `["glyph:{id}"]` when glyph_id is set and user didn't pass explicit actors
 
-- [ ] Same for prompt handler result attestations
-  - When prompt executes via `glyph_execute` action, pass glyph ID through
-  - `createResultAttestation()` at `ats/so/actions/prompt/handler.go:352` uses glyph ID as actor
+- [x] Same for prompt handler result attestations
+  - `PromptDirectRequest` has `glyph_id` field (`server/prompt_handlers.go:78`)
+  - `executeGlyphPrompt` (`engine.go`) already sends `glyph_id` in request body
+  - Prompt handler doesn't create attestations yet (Phase 2.4); field is ready for when it does
 
 ### 2.4 Upstream attestation injection
 
 The downstream glyph needs the triggering attestation.
 
-- [ ] Add `upstream_attestation` field to `/api/python/execute` request
-  - JSON attestation object, optional (null for standalone execution)
-  - Rust plugin deserializes and injects as Python global `upstream`
+- [x] Add `upstream_attestation` field to `/api/python/execute` request
+  - `qntx-python/src/handlers.rs:62` — `upstream_attestation: Option<serde_json::Value>` in ExecuteRequest
+  - Threaded through `execute_with_ats` → `execute_inner` as new parameter
+  - `ats/watcher/engine.go:534` — sends `upstream_attestation: json.RawMessage` in request body (replaces code-prepend hack)
 
-- [ ] Inject `upstream` in Python runtime
-  - `qntx-python/src/execution.rs` — after `inject_attest_function()`, inject upstream dict
+- [x] Bump qntx-python-plugin version 0.4.2 → 0.5.0 (new `upstream_attestation` field + actor convention)
+
+- [x] Inject `upstream` in Python runtime
+  - `qntx-python/src/execution.rs:135-152` — after `inject_attest_function()`, uses `json.loads()` to convert attestation JSON to Python dict
   - When present: `upstream = {"id": "...", "subjects": [...], ...}`
-  - When absent: `upstream = None`
+  - When absent: `upstream = None` (always available as global)
 
-- [ ] Inject attestation into prompt template resolution
-  - `prompt-glyph.ts:186-197` — replace "coming soon" error with actual resolution
-  - When glyph receives attestation via `glyph_fired` WebSocket message, interpolate `{{variables}}` from attestation fields
-  - Alternatively: prompt execution happens server-side in `executeGlyph()`, template interpolation in Go
+- [x] Inject attestation into prompt template resolution
+  - Server-side approach: `server/prompt_handlers.go:79` — `UpstreamAttestation *types.As` on `PromptDirectRequest`
+  - `HandlePromptDirect` parses template with `prompt.Parse()`, interpolates `{{field}}` placeholders from upstream attestation
+  - `ats/watcher/engine.go:572` — `executeGlyphPrompt` sends `upstream_attestation` in request body
 
 **Manual verification for Phase 2:**
 1. Meld [ax: contact] → [py] where py code is `print(upstream.subjects)`. Query `watchers` table — confirm `meld-edge-*` watcher exists.
