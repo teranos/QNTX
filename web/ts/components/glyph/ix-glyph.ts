@@ -50,7 +50,6 @@ interface IxGlyphStatus {
 
 /**
  * Save IX glyph status to localStorage
- * TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
  */
 function saveIxStatus(glyphId: string, status: IxGlyphStatus): void {
     const key = `ix-status-${glyphId}`;
