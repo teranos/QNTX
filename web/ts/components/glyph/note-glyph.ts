@@ -12,7 +12,7 @@
 import type { Glyph } from './glyph';
 import { MAX_VIEWPORT_HEIGHT_RATIO } from './glyph';
 import { log, SEG } from '../../logger';
-import { getScriptStorage } from '../../storage/script-storage';
+import { uiState } from '../../state/ui';
 import { storeCleanup } from './glyph-interaction';
 import { tooltip } from '../tooltip';
 import { canvasPlaced } from './manifestations/canvas-placed';
@@ -39,16 +39,16 @@ export async function createNoteGlyph(glyph: Glyph): Promise<HTMLElement> {
  * Caller must runCleanup() and clear children before calling on an existing element.
  */
 export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
-    // Load saved content from storage
-    const storage = getScriptStorage();
+    // Load saved content from canvas state
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultContent = '# Note\n\nStart typing...';
-    const savedContent = await storage.load(glyph.id);
+    const savedContent = existingGlyph?.code;
 
     // Save initial content immediately if this is a new glyph
     // This prevents race condition with auto-save if user starts typing quickly
     const contentToUse = savedContent ?? defaultContent;
-    if (!savedContent) {
-        await storage.save(glyph.id, defaultContent);
+    if (!savedContent && existingGlyph) {
+        uiState.upsertCanvasGlyph({ ...existingGlyph, code: defaultContent });
         log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
     }
 
@@ -204,10 +204,13 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
                 if (saveTimeout !== undefined) {
                     clearTimeout(saveTimeout);
                 }
-                saveTimeout = window.setTimeout(async () => {
+                saveTimeout = window.setTimeout(() => {
                     const markdown = noteMarkdownSerializer.serialize(editorView.state.doc);
-                    await storage.save(glyph.id, markdown);
-                    log.debug(SEG.GLYPH, `[Note Glyph] Auto-saved content for ${glyph.id}`);
+                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+                    if (existing) {
+                        uiState.upsertCanvasGlyph({ ...existing, code: markdown });
+                        log.debug(SEG.GLYPH, `[Note Glyph] Auto-saved content for ${glyph.id}`);
+                    }
                 }, 500);
             }
         },
