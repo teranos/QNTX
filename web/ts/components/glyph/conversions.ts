@@ -15,7 +15,6 @@ import type { Glyph } from './glyph';
 import { SO, Prose } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { getScriptStorage } from '../../storage/script-storage';
 import { runCleanup } from './glyph-interaction';
 import { setupPromptGlyph } from './prompt-glyph';
 import { setupNoteGlyph } from './note-glyph';
@@ -59,9 +58,9 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
 
     const { x, y, width, height } = captureLayout(container, element);
 
-    // Load note content before teardown
-    const storage = getScriptStorage();
-    const noteContent = await storage.load(glyphId) ?? '';
+    // Load note content from canvas state before teardown
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+    const noteContent = existingGlyph?.code ?? '';
 
     // Build new glyph model
     const promptGlyph: Glyph = {
@@ -76,15 +75,13 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
         }
     };
 
-    // Transfer content to new storage key before setup (setupPromptGlyph loads from storage)
-    await storage.save(promptGlyph.id, noteContent);
-
-    try {
-        await storage.delete(glyphId);
-    } catch (err) {
-        log.warn(SEG.GLYPH, `[Note→Prompt] Failed to delete old note storage for ${glyphId}:`, err);
-        // Continue with conversion even if delete fails - orphaned data is non-critical
-    }
+    // Create new canvas glyph with transferred content (setupPromptGlyph will load from uiState)
+    uiState.upsertCanvasGlyph({
+        id: promptGlyph.id,
+        symbol: promptGlyph.symbol,
+        x, y, width, height,
+        code: noteContent,
+    });
 
     // Tear down old glyph internals, repopulate as prompt
     runCleanup(element);
@@ -147,21 +144,18 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
         }
     };
 
-    // Save content before setup (setupNoteGlyph loads from storage)
-    const storage = getScriptStorage();
-    await storage.save(noteGlyph.id, outputText);
-
     // Tear down old glyph internals, repopulate as note
     runCleanup(element);
     element.replaceChildren();
     await setupNoteGlyph(element, noteGlyph);
 
-    // Update state atomically
+    // Update state atomically (setupNoteGlyph loads from uiState)
     uiState.removeCanvasGlyph(glyphId);
     uiState.addCanvasGlyph({
         id: noteGlyph.id,
         symbol: Prose,
         x, y, width, height,
+        code: outputText,
     });
 
     log.info(SEG.GLYPH, `[Result→Note] Converted ${glyphId} → ${noteGlyph.id} (same element)`);

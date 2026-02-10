@@ -21,6 +21,124 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// CanvasGlyph represents a glyph on the canvas workspace
+// Synced between frontend (IndexedDB) and backend (SQLite)
+type CanvasGlyph struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Symbol        string                 `protobuf:"bytes,2,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	X             float64                `protobuf:"fixed64,3,opt,name=x,proto3" json:"x,omitempty"`                                   // X position in pixels
+	Y             float64                `protobuf:"fixed64,4,opt,name=y,proto3" json:"y,omitempty"`                                   // Y position in pixels
+	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`                            // optional: custom width (0 = use default)
+	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`                          // optional: custom height (0 = use default)
+	Code          string                 `protobuf:"bytes,7,opt,name=code,proto3" json:"code,omitempty"`                               // optional: script content for py/ts/prompt/note glyphs
+	ResultData    string                 `protobuf:"bytes,8,opt,name=result_data,json=resultData,proto3" json:"result_data,omitempty"` // optional: JSON execution result for result glyphs
+	CreatedAt     string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`    // ISO 8601 timestamp
+	UpdatedAt     string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`   // ISO 8601 timestamp
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CanvasGlyph) Reset() {
+	*x = CanvasGlyph{}
+	mi := &file_glyph_proto_canvas_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CanvasGlyph) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CanvasGlyph) ProtoMessage() {}
+
+func (x *CanvasGlyph) ProtoReflect() protoreflect.Message {
+	mi := &file_glyph_proto_canvas_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CanvasGlyph.ProtoReflect.Descriptor instead.
+func (*CanvasGlyph) Descriptor() ([]byte, []int) {
+	return file_glyph_proto_canvas_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CanvasGlyph) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CanvasGlyph) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *CanvasGlyph) GetX() float64 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *CanvasGlyph) GetY() float64 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+func (x *CanvasGlyph) GetWidth() int32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *CanvasGlyph) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *CanvasGlyph) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *CanvasGlyph) GetResultData() string {
+	if x != nil {
+		return x.ResultData
+	}
+	return ""
+}
+
+func (x *CanvasGlyph) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *CanvasGlyph) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 // CompositionEdge represents a directed edge in the composition DAG
 // Supports multi-directional melding: horizontal (right), vertical (top/bottom)
 type CompositionEdge struct {
@@ -35,7 +153,7 @@ type CompositionEdge struct {
 
 func (x *CompositionEdge) Reset() {
 	*x = CompositionEdge{}
-	mi := &file_glyph_proto_canvas_proto_msgTypes[0]
+	mi := &file_glyph_proto_canvas_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +165,7 @@ func (x *CompositionEdge) String() string {
 func (*CompositionEdge) ProtoMessage() {}
 
 func (x *CompositionEdge) ProtoReflect() protoreflect.Message {
-	mi := &file_glyph_proto_canvas_proto_msgTypes[0]
+	mi := &file_glyph_proto_canvas_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +178,7 @@ func (x *CompositionEdge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompositionEdge.ProtoReflect.Descriptor instead.
 func (*CompositionEdge) Descriptor() ([]byte, []int) {
-	return file_glyph_proto_canvas_proto_rawDescGZIP(), []int{0}
+	return file_glyph_proto_canvas_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CompositionEdge) GetFrom() string {
@@ -105,7 +223,7 @@ type Composition struct {
 
 func (x *Composition) Reset() {
 	*x = Composition{}
-	mi := &file_glyph_proto_canvas_proto_msgTypes[1]
+	mi := &file_glyph_proto_canvas_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -117,7 +235,7 @@ func (x *Composition) String() string {
 func (*Composition) ProtoMessage() {}
 
 func (x *Composition) ProtoReflect() protoreflect.Message {
-	mi := &file_glyph_proto_canvas_proto_msgTypes[1]
+	mi := &file_glyph_proto_canvas_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -130,7 +248,7 @@ func (x *Composition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Composition.ProtoReflect.Descriptor instead.
 func (*Composition) Descriptor() ([]byte, []int) {
-	return file_glyph_proto_canvas_proto_rawDescGZIP(), []int{1}
+	return file_glyph_proto_canvas_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Composition) GetId() string {
@@ -165,7 +283,22 @@ var File_glyph_proto_canvas_proto protoreflect.FileDescriptor
 
 const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\n" +
-	"\x18glyph/proto/canvas.proto\x12\x05glyph\"o\n" +
+	"\x18glyph/proto/canvas.proto\x12\x05glyph\"\xf2\x01\n" +
+	"\vCanvasGlyph\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12\f\n" +
+	"\x01x\x18\x03 \x01(\x01R\x01x\x12\f\n" +
+	"\x01y\x18\x04 \x01(\x01R\x01y\x12\x14\n" +
+	"\x05width\x18\x05 \x01(\x05R\x05width\x12\x16\n" +
+	"\x06height\x18\x06 \x01(\x05R\x06height\x12\x12\n" +
+	"\x04code\x18\a \x01(\tR\x04code\x12\x1f\n" +
+	"\vresult_data\x18\b \x01(\tR\n" +
+	"resultData\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\t \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\n" +
+	" \x01(\tR\tupdatedAt\"o\n" +
 	"\x0fCompositionEdge\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x1c\n" +
@@ -189,13 +322,14 @@ func file_glyph_proto_canvas_proto_rawDescGZIP() []byte {
 	return file_glyph_proto_canvas_proto_rawDescData
 }
 
-var file_glyph_proto_canvas_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_glyph_proto_canvas_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_glyph_proto_canvas_proto_goTypes = []any{
-	(*CompositionEdge)(nil), // 0: glyph.CompositionEdge
-	(*Composition)(nil),     // 1: glyph.Composition
+	(*CanvasGlyph)(nil),     // 0: glyph.CanvasGlyph
+	(*CompositionEdge)(nil), // 1: glyph.CompositionEdge
+	(*Composition)(nil),     // 2: glyph.Composition
 }
 var file_glyph_proto_canvas_proto_depIdxs = []int32{
-	0, // 0: glyph.Composition.edges:type_name -> glyph.CompositionEdge
+	1, // 0: glyph.Composition.edges:type_name -> glyph.CompositionEdge
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -214,7 +348,7 @@ func file_glyph_proto_canvas_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_glyph_proto_canvas_proto_rawDesc), len(file_glyph_proto_canvas_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -14,7 +14,6 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { getScriptStorage } from '../../storage/script-storage';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
 import { syncStateManager } from '../../state/sync-state';
@@ -92,10 +91,10 @@ function buildQntxApi(outputLines: string[]) {
  * Create a TypeScript/JavaScript editor glyph with CodeMirror
  */
 export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
-    const storage = getScriptStorage();
+    // Load code from canvas state or use default
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultCode = '// TypeScript editor\nqntx.log("Hello from canvas!")\n';
-    const savedCode = await storage.load(glyph.id);
-    const code = savedCode ?? defaultCode;
+    const code = existingGlyph?.code ?? defaultCode;
 
     const lineCount = code.split('\n').length;
     const lineHeight = 24;
@@ -199,10 +198,13 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
         const autoSaveExtension = EditorView.updateListener.of((update) => {
             if (update.docChanged) {
                 if (saveTimeout !== undefined) clearTimeout(saveTimeout);
-                saveTimeout = window.setTimeout(async () => {
+                saveTimeout = window.setTimeout(() => {
                     const currentCode = update.state.doc.toString();
-                    await storage.save(glyph.id, currentCode);
-                    log.debug(SEG.GLYPH, `[TsGlyph] Auto-saved code for ${glyph.id}`);
+                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+                    if (existing) {
+                        uiState.upsertCanvasGlyph({ ...existing, code: currentCode });
+                        log.debug(SEG.GLYPH, `[TsGlyph] Auto-saved code for ${glyph.id}`);
+                    }
                 }, 500);
             }
         });
@@ -223,9 +225,12 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         (element as any).editor = editor;
 
-        if (!savedCode) {
-            await storage.save(glyph.id, code);
-            log.debug(SEG.GLYPH, `[TsGlyph] Saved initial code for new glyph ${glyph.id}`);
+        if (!existingGlyph?.code) {
+            const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            if (canvasGlyph) {
+                uiState.upsertCanvasGlyph({ ...canvasGlyph, code });
+                log.debug(SEG.GLYPH, `[TsGlyph] Saved initial code for new glyph ${glyph.id}`);
+            }
         }
 
         log.debug(SEG.GLYPH, `[TsGlyph] CodeMirror initialized for ${glyph.id}`);

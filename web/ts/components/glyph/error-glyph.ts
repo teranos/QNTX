@@ -14,7 +14,6 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver, runCleanup } from './glyph-interaction';
 import { createPromptGlyph } from './prompt-glyph';
-import { getScriptStorage } from '../../storage/script-storage';
 import { MAX_VIEWPORT_HEIGHT_RATIO, CANVAS_GLYPH_TITLE_BAR_HEIGHT } from './glyph';
 
 /**
@@ -338,9 +337,8 @@ async function convertErrorToPrompt(
             }
         };
 
-        // Save template to storage
-        const storage = getScriptStorage();
-        await storage.save(promptGlyph.id, promptTemplate);
+        // The prompt template will be saved when createPromptGlyph sets up the glyph
+        // No need to save here - uiState.upsertCanvasGlyph will be called with the code
 
         // Create and append prompt element
         const promptElement = await createPromptGlyph(promptGlyph);

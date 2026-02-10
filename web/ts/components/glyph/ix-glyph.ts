@@ -33,7 +33,7 @@ import { log, SEG } from '../../logger';
 import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
 import { forceTriggerJob } from '../../pulse/api';
-import { getScriptStorage } from '../../storage/script-storage';
+import { uiState } from '../../state/ui';
 import { PULSE_EVENTS } from '../../pulse/events';
 import type { ExecutionStartedDetail, ExecutionCompletedDetail, ExecutionFailedDetail } from '../../pulse/events';
 
@@ -76,9 +76,9 @@ function loadIxStatus(glyphId: string): IxGlyphStatus | null {
  * Create an IX glyph with input form on canvas
  */
 export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
-    // Load saved input from storage
-    const storage = getScriptStorage();
-    const savedInput = await storage.load(glyph.id) ?? '';
+    // Load saved input from canvas state
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+    const savedInput = existingGlyph?.code ?? '';
 
     // Load saved execution status
     const savedStatus = loadIxStatus(glyph.id) ?? { state: 'idle' };
@@ -148,10 +148,13 @@ export async function createIxGlyph(glyph: Glyph): Promise<HTMLElement> {
         if (saveTimeout !== undefined) {
             clearTimeout(saveTimeout);
         }
-        saveTimeout = window.setTimeout(async () => {
+        saveTimeout = window.setTimeout(() => {
             const currentInput = input.value;
-            await storage.save(glyph.id, currentInput);
-            log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
+            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            if (existing) {
+                uiState.upsertCanvasGlyph({ ...existing, code: currentInput });
+                log.debug(SEG.GLYPH, `[IX Glyph] Auto-saved input for ${glyph.id}`);
+            }
         }, 500);
     });
 

@@ -7,7 +7,7 @@
  * - Jenny: Power user, complex scenarios
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, mock } from 'bun:test';
 import { Window } from 'happy-dom';
 import { createErrorGlyph } from './error-glyph';
 
@@ -24,6 +24,40 @@ globalThis.ResizeObserver = class ResizeObserver {
     unobserve() {}
     disconnect() {}
 } as any;
+
+// Mock uiState to prevent API calls during tests
+const mockCanvasGlyphs: any[] = [];
+const mockCanvasCompositions: any[] = [];
+mock.module('../../state/ui', () => ({
+    uiState: {
+        getCanvasGlyphs: () => mockCanvasGlyphs,
+        setCanvasGlyphs: (glyphs: any[]) => {
+            mockCanvasGlyphs.length = 0;
+            mockCanvasGlyphs.push(...glyphs);
+        },
+        upsertCanvasGlyph: (glyph: any) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
+            if (index >= 0) {
+                mockCanvasGlyphs[index] = glyph;
+            } else {
+                mockCanvasGlyphs.push(glyph);
+            }
+        },
+        addCanvasGlyph: (glyph: any) => mockCanvasGlyphs.push(glyph),
+        removeCanvasGlyph: (id: string) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === id);
+            if (index >= 0) mockCanvasGlyphs.splice(index, 1);
+        },
+        getCanvasCompositions: () => mockCanvasCompositions,
+        setCanvasCompositions: (comps: any[]) => {
+            mockCanvasCompositions.length = 0;
+            mockCanvasCompositions.push(...comps);
+        },
+        clearCanvasGlyphs: () => mockCanvasGlyphs.length = 0,
+        clearCanvasCompositions: () => mockCanvasCompositions.length = 0,
+        loadPersistedState: () => {},
+    },
+}));
 
 describe('Error Glyph - Tim (Happy Path)', () => {
     test('Tim sees error glyph for failed result rendering', () => {

@@ -4,6 +4,21 @@ package glyph;
 
 option go_package = "github.com/teranos/QNTX/glyph/proto";
 
+// CanvasGlyph represents a glyph on the canvas workspace
+// Synced between frontend (IndexedDB) and backend (SQLite)
+message CanvasGlyph {
+  string id = 1;
+  string symbol = 2;
+  double x = 3;                    // X position in pixels
+  double y = 4;                    // Y position in pixels
+  int32 width = 5;                 // optional: custom width (0 = use default)
+  int32 height = 6;                // optional: custom height (0 = use default)
+  string code = 7;                 // optional: script content for py/ts/prompt/note glyphs
+  string result_data = 8;          // optional: JSON execution result for result glyphs
+  string created_at = 9;           // ISO 8601 timestamp
+  string updated_at = 10;          // ISO 8601 timestamp
+}
+
 // CompositionEdge represents a directed edge in the composition DAG
 // Supports multi-directional melding: horizontal (right), vertical (top/bottom)
 message CompositionEdge {

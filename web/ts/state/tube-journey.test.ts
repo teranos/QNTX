@@ -168,66 +168,110 @@ describe('mergeCanvasState', () => {
 
 // --- Overnight collaboration merge ---
 //
-// Jenny gets off her bike at Morden, 08:29. Kofi, a collaborator in Accra,
-// worked overnight building an analysis pipeline on their shared QNTX instance.
+// Jenny gets off her bike at Morden, 08:29. Parbattie, a field researcher in Guyana (UTC-4),
+// worked through the evening (London night = Guyana evening) documenting rare flora/fauna inventory.
 // Jenny opens the app on her phone before boarding. Her local IndexedDB has only
-// the AX glyph she left there yesterday. The backend has everything Kofi built
-// overnight. mergeCanvasState delivers his work to her screen.
+// the AX glyph she left there yesterday. The backend has everything Parbattie documented
+// overnight. mergeCanvasState delivers the field notes to her screen.
 
-describe('08:29 Morden: Jenny opens QNTX and receives Kofi\'s overnight work', () => {
+describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight field notes', () => {
     const jennyLocal = {
         glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
         compositions: [],
     };
 
-    const backendAfterKofi = {
+    const backendAfterParbattie = {
         glyphs: [
-            glyph('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),         // same glyph, Kofi may have moved it
-            glyph('py-kofi', { symbol: 'py', x: 200, y: 0 }),         // Kofi's python transform
-            glyph('prompt-kofi', { symbol: 'prompt', x: 400, y: 0 }), // Kofi's prompt glyph
+            glyph('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),              // same glyph, Parbattie may have moved it
+            glyph('note-inventory', { symbol: 'note', x: 200, y: 0 }),    // Parbattie's field inventory notes
+            glyph('note-priority', { symbol: 'note', x: 400, y: 0 }),     // Parbattie's sequencing priorities
         ],
         compositions: [
-            composition('strip-kofi', {
+            composition('field-notes', {
                 edges: [
-                    { from: 'ax-jenny', to: 'py-kofi', direction: 'right' as const, position: 0 },
-                    { from: 'py-kofi', to: 'prompt-kofi', direction: 'right' as const, position: 1 },
+                    { from: 'ax-jenny', to: 'note-inventory', direction: 'right' as const, position: 0 },
+                    { from: 'note-inventory', to: 'note-priority', direction: 'right' as const, position: 1 },
                 ],
             }),
         ],
     };
 
-    test('Jenny sees her glyph plus Kofi\'s overnight pipeline', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+    test('Jenny sees her glyph plus Parbattie\'s overnight field notes', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
 
         expect(merged.glyphs).toHaveLength(3);
-        expect(merged.glyphs.map(g => g.id)).toEqual(['ax-jenny', 'py-kofi', 'prompt-kofi']);
+        expect(merged.glyphs.map(g => g.id)).toEqual(['ax-jenny', 'note-inventory', 'note-priority']);
     });
 
-    test('Jenny\'s local position preserved, not overwritten by Kofi\'s move', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+    test('Jenny\'s local position preserved, not overwritten by Parbattie\'s edits', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
         const jennyGlyph = merged.glyphs.find(g => g.id === 'ax-jenny')!;
 
         expect(jennyGlyph.x).toBe(120);
         expect(jennyGlyph.y).toBe(80);
     });
 
-    test('Kofi\'s composition arrives intact', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+    test('Parbattie\'s field notes composition arrives intact', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
 
         expect(merged.compositions).toHaveLength(1);
-        expect(merged.compositions[0].id).toBe('strip-kofi');
+        expect(merged.compositions[0].id).toBe('field-notes');
         expect(merged.compositions[0].edges).toHaveLength(2);
     });
 
     test('merge counts reflect what was new to Jenny', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
 
-        expect(merged.mergedGlyphs).toBe(2);  // py-kofi + prompt-kofi
-        expect(merged.mergedComps).toBe(1);    // strip-kofi
+        expect(merged.mergedGlyphs).toBe(2);  // note-inventory + note-priority
+        expect(merged.mergedComps).toBe(1);    // field-notes
     });
 
-    // TODO(#canvas-live-sync): Jenny won't see changes Kofi makes AFTER she opens
-    // the app. That requires a WebSocket `canvas_update` broadcast -- backend emits
+    test('Parbattie\'s field note content syncs to Jenny', () => {
+        // Parbattie documented rare species overnight (Guyana evening = London night)
+        // 23:00 GYT (11pm Guyana) = 03:00 GMT (3am London next day)
+        const backendWithCode = {
+            glyphs: [
+                glyph('note-parbattie', {
+                    symbol: 'note',
+                    x: 200,
+                    y: 0,
+                    code: '# Rare Flora Inventory - Kaieteur Falls\n\n' +
+                          '## Priority for Georgetown Sequencing\n' +
+                          '- *Heliamphora chimantensis* (pitcher plant) - 3 specimens\n' +
+                          '- Unknown orchid sp. - possible new species\n' +
+                          '- GPS: 5.1753°N, 59.4803°W',
+                }),
+            ],
+            compositions: [],
+        };
+
+        // Jenny's local has no field notes yet
+        const jennyEmpty = { glyphs: [], compositions: [] };
+
+        const merged = mergeCanvasState(jennyEmpty, backendWithCode);
+
+        // Jenny receives the note with Parbattie's field inventory intact
+        expect(merged.glyphs).toHaveLength(1);
+        const noteGlyph = merged.glyphs[0];
+        expect(noteGlyph.id).toBe('note-parbattie');
+        expect(noteGlyph.code).toContain('Heliamphora chimantensis');
+        expect(noteGlyph.code).toContain('Kaieteur Falls');
+        expect(noteGlyph.code).toContain('Georgetown');
+    });
+
+    // TODO(#431): Test conflict resolution for Jenny's own stale offline edits
+    // Current behavior: stale local edit silently overwrites newer work (data loss!)
+    // Desired behavior: conflict UI showing both versions, let Jenny decide which to keep
+    // This requires offline queue + conflict detection + merge UI
+    // Example conflict scenario (Jenny vs. Jenny across devices):
+    //   - Day before: Jenny drafts note on laptop at home (router unplugged → queued offline)
+    //   - 08:29 GMT: Jenny at Morden, creates NEW version of same note on phone during tube ride
+    //   - 08:45 GMT: At Oval station, housemate reconnects home router
+    //   - Laptop syncs stale draft from yesterday, conflicts with fresh phone version from 15min ago
+    //   - Should see conflict UI: "laptop version (yesterday)" vs "phone version (just now)"
+
+    // TODO(#canvas-live-sync): Jenny won't see changes Parbattie makes AFTER she opens
+    // the app. That requires WebSocket `canvas_update` broadcast -- backend emits
     // glyph/composition mutations to all connected clients for live merge.
 });
 

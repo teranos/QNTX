@@ -17,6 +17,7 @@ export interface CanvasGlyphResponse {
     y: number;
     width?: number;
     height?: number;
+    code?: string;
     result_data?: string;
     created_at: string;
     updated_at: string;
@@ -46,6 +47,7 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
             y: glyph.y,
             width: glyph.width,
             height: glyph.height,
+            code: glyph.code,
             result_data: glyph.result ? JSON.stringify(glyph.result) : undefined,
         };
 
@@ -249,6 +251,7 @@ export async function loadCanvasState(): Promise<{
             y: g.y,
             width: g.width,
             height: g.height,
+            code: g.code,
             result: g.result_data ? parseResultData(g.result_data, g.id) : undefined,
         }));
 
