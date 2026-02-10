@@ -25,10 +25,8 @@ export interface CanvasGlyph {
   height: number;
   /** glyph content: source code, markdown, template, or JSON result */
   content: string;
-  /** ISO 8601 timestamp */
-  created_at: string;
-  /** ISO 8601 timestamp */
-  updated_at: string;
+  created_at: string | undefined;
+  updated_at: string | undefined;
 }
 
 /**
@@ -57,4 +55,6 @@ export interface Composition {
   x: number;
   /** anchor Y position in pixels */
   y: number;
+  created_at: string | undefined;
+  updated_at: string | undefined;
 }

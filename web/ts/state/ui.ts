@@ -73,7 +73,9 @@ export interface GraphSessionState {
  * CompositionEdge and Composition types are imported from proto (ADR-007).
  */
 export type { CompositionEdge };
-export type CompositionState = Composition;
+export type CompositionState =
+    Pick<Composition, 'id' | 'edges' | 'x' | 'y'>
+    & Partial<Omit<Composition, 'id' | 'edges' | 'x' | 'y'>>;
 
 /**
  * Canvas glyph state (for persistence)
