@@ -267,3 +267,26 @@ export async function loadCanvasState(): Promise<{
         throw error;
     }
 }
+
+/**
+ * Merge backend canvas state into local state.
+ * Backend-only items are appended; local items are preserved as-is (local wins on ID conflict).
+ * Pure function -- no side effects.
+ */
+export function mergeCanvasState(
+    local: { glyphs: CanvasGlyphState[]; compositions: CompositionState[] },
+    backend: { glyphs: CanvasGlyphState[]; compositions: CompositionState[] },
+): { glyphs: CanvasGlyphState[]; compositions: CompositionState[]; mergedGlyphs: number; mergedComps: number } {
+    const localGlyphIds = new Set(local.glyphs.map(g => g.id));
+    const localCompIds = new Set(local.compositions.map(c => c.id));
+
+    const newGlyphs = backend.glyphs.filter(g => !localGlyphIds.has(g.id));
+    const newComps = backend.compositions.filter(c => !localCompIds.has(c.id));
+
+    return {
+        glyphs: newGlyphs.length > 0 ? [...local.glyphs, ...newGlyphs] : local.glyphs,
+        compositions: newComps.length > 0 ? [...local.compositions, ...newComps] : local.compositions,
+        mergedGlyphs: newGlyphs.length,
+        mergedComps: newComps.length,
+    };
+}
