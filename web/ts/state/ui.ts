@@ -456,6 +456,13 @@ class UIState {
      * Add a glyph to canvas
      */
     addCanvasGlyph(glyph: CanvasGlyphState): void {
+        // Round coordinates to integers at the boundary (backend expects int, not float)
+        const normalizedGlyph = {
+            ...glyph,
+            x: Math.round(glyph.x),
+            y: Math.round(glyph.y)
+        };
+
         // Debug logging for result glyphs
         if (glyph.symbol === 'result') {
             log.debug(SEG.UI, `[UIState] Adding result glyph ${glyph.id}`, {
@@ -465,21 +472,21 @@ class UIState {
             });
         }
 
-        const existing = this.state.canvasGlyphs.find(g => g.id === glyph.id);
+        const existing = this.state.canvasGlyphs.find(g => g.id === normalizedGlyph.id);
         if (existing) {
             // Update existing glyph
             const updated = this.state.canvasGlyphs.map(g =>
-                g.id === glyph.id ? glyph : g
+                g.id === normalizedGlyph.id ? normalizedGlyph : g
             );
             this.update('canvasGlyphs', updated);
         } else {
             // Add new glyph
-            const updated = [...this.state.canvasGlyphs, glyph];
+            const updated = [...this.state.canvasGlyphs, normalizedGlyph];
             this.update('canvasGlyphs', updated);
         }
 
         // Sync with backend (fire-and-forget)
-        apiUpsertGlyph(glyph).catch(err => {
+        apiUpsertGlyph(normalizedGlyph).catch(err => {
             log.error(SEG.UI, '[UIState] Failed to sync glyph to backend:', err);
         });
     }

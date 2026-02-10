@@ -76,7 +76,7 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     };
 
     // Create new canvas glyph with transferred content (setupPromptGlyph will load from uiState)
-    uiState.upsertCanvasGlyph({
+    uiState.addCanvasGlyph({
         id: promptGlyph.id,
         symbol: promptGlyph.symbol,
         x, y, width, height,
