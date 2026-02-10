@@ -57,6 +57,7 @@ export class FrontmatterNodeView {
         this.storageKey = `frontmatter-collapsed-${docPath}`;
     }
 
+    // TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
     private get isCollapsed(): boolean {
         // Check localStorage first for user preference
         const stored = localStorage.getItem(this.storageKey);
