@@ -59,8 +59,8 @@ export function showSpawnMenu(
 
     // Calculate pixel position relative to canvas
     const canvasRect = canvas.getBoundingClientRect();
-    const x = mouseX - canvasRect.left;
-    const y = mouseY - canvasRect.top;
+    const x = Math.round(mouseX - canvasRect.left);
+    const y = Math.round(mouseY - canvasRect.top);
 
     // Create spawn menu
     const menu = document.createElement('div');

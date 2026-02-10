@@ -44,15 +44,8 @@ export interface Glyph {
     width?: number;                      // Custom width in pixels
     height?: number;                     // Custom height in pixels
 
-    // Execution result metadata (for result glyphs)
-    result?: {
-        success: boolean;
-        stdout: string;
-        stderr: string;
-        result: unknown;
-        error: string | null;
-        duration_ms: number;
-    };
+    // Glyph content: source code, markdown, template, or JSON result
+    content?: string;
 }
 
 // Function to check if user prefers reduced motion
