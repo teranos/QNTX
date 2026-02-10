@@ -18,7 +18,7 @@
  */
 
 import type { PanelState, Transform } from '../../types/core';
-import type { CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
+import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
 import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph } from '../api/canvas';
@@ -77,16 +77,12 @@ export type CompositionState = Composition;
 
 /**
  * Canvas glyph state (for persistence)
+ * Derived from proto CanvasGlyph — width/height/content are optional in frontend
+ * (proto3 defaults 0/"" mean "unset"), timestamps are backend-only.
  */
-export interface CanvasGlyphState {
-    id: string;
-    symbol: string;
-    x: number;       // X position in pixels
-    y: number;       // Y position in pixels
-    width?: number;  // Optional: custom width in pixels (for resizable glyphs)
-    height?: number; // Optional: custom height in pixels (for resizable glyphs)
-    content?: string; // Glyph content: source code, markdown, template, or JSON result
-}
+export type CanvasGlyphState =
+    Omit<CanvasGlyph, 'width' | 'height' | 'content' | 'created_at' | 'updated_at'>
+    & Partial<Pick<CanvasGlyph, 'width' | 'height' | 'content'>>;
 
 /**
  * Consolidated UI state
