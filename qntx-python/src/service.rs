@@ -547,6 +547,7 @@ impl PythonPluginService {
                 &payload.script_code,
                 &config,
                 Some(state.ats_client.clone()),
+                None,
             )
         };
 
@@ -623,7 +624,7 @@ impl PythonPluginService {
             let state = self.handlers.state.read();
             state
                 .engine
-                .execute_with_ats(&script_code, &config, Some(state.ats_client.clone()))
+                .execute_with_ats(&script_code, &config, Some(state.ats_client.clone()), None)
         };
 
         // Convert execution result to ExecuteJobResponse

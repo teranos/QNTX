@@ -71,10 +71,12 @@ type PromptExecuteRequest struct {
 
 // PromptDirectRequest represents a request to execute a prompt without attestations
 type PromptDirectRequest struct {
-	Template     string `json:"template"`           // Prompt template (no {{variables}} required)
-	SystemPrompt string `json:"system_prompt,omitempty"`
-	Provider     string `json:"provider,omitempty"` // "openrouter" or "local"
-	Model        string `json:"model,omitempty"`
+	Template              string          `json:"template"`                         // Prompt template with optional {{field}} placeholders
+	SystemPrompt          string          `json:"system_prompt,omitempty"`
+	Provider              string          `json:"provider,omitempty"`               // "openrouter" or "local"
+	Model                 string          `json:"model,omitempty"`
+	GlyphID               string          `json:"glyph_id,omitempty"`              // Canvas glyph ID — result attestations use actor "glyph:{id}"
+	UpstreamAttestation   *types.As       `json:"upstream_attestation,omitempty"`   // Triggering attestation — enables {{field}} interpolation
 }
 
 // PromptDirectResponse represents the direct execution response
@@ -446,8 +448,25 @@ func (s *QNTXServer) HandlePromptDirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Use body directly (no template interpolation needed)
-	promptText := doc.Body
+	// Interpolate template with upstream attestation if provided
+	var promptText string
+	if req.UpstreamAttestation != nil {
+		tmpl, err := prompt.Parse(doc.Body)
+		if err != nil {
+			// No valid placeholders — use body as-is
+			promptText = doc.Body
+		} else {
+			interpolated, err := tmpl.Execute(req.UpstreamAttestation)
+			if err != nil {
+				wrappedErr := errors.Wrapf(err, "failed to interpolate template with upstream attestation %s", req.UpstreamAttestation.ID)
+				writeWrappedError(w, s.logger, wrappedErr, "Template interpolation failed", http.StatusBadRequest)
+				return
+			}
+			promptText = interpolated
+		}
+	} else {
+		promptText = doc.Body
+	}
 
 	// Determine model (request > frontmatter > config default)
 	modelName := req.Model
