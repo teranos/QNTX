@@ -13,7 +13,6 @@ import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createErrorGlyph } from './error-glyph';
-import { getScriptStorage } from '../../storage/script-storage';
 import type { Glyph } from './glyph';
 
 // Setup happy-dom
@@ -61,17 +60,18 @@ describe('Error Recovery Workflow - Jenny (Complex Scenarios)', () => {
         const resultElement = createResultGlyph(resultGlyph, executionResult);
         canvas.appendChild(resultElement);
 
-        // Verify execution data is attached
-        expect((resultGlyph as any).result).toBeDefined();
-        expect((resultGlyph as any).result.stdout).toContain('42 records');
+        // Verify execution data is attached as JSON string
+        expect((resultGlyph as any).content).toBeDefined();
+        const parsed = JSON.parse((resultGlyph as any).content);
+        expect(parsed.stdout).toContain('42 records');
 
         // 2. SIMULATE DATA LOSS (drag bug, page reload, etc.)
-        // In real scenario, this happens when result field isn't preserved during drag
-        delete (resultGlyph as any).result;
+        // In real scenario, this happens when content field isn't preserved during drag
+        delete (resultGlyph as any).content;
 
         // 3. Try to re-render result glyph - fails due to missing execution data
         // This simulates what happens when UI tries to restore a result glyph without data
-        const hasExecutionData = (resultGlyph as any).result !== undefined;
+        const hasExecutionData = (resultGlyph as any).content !== undefined;
         expect(hasExecutionData).toBe(false);
 
         // 4. Error glyph spawns when rendering fails
