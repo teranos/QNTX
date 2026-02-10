@@ -266,6 +266,7 @@ export class Window {
 
     /**
      * Restore minimized state from localStorage on window creation
+     * TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
      */
     private restoreMinimizedState(): void {
         // DEPRECATED: windowTray integration removed
