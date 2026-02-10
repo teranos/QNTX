@@ -16,6 +16,8 @@ import { connectivityManager } from '../connectivity';
 const STORAGE_KEY = 'qntx-attestation-sync-queue';
 
 class SyncQueueImpl {
+    private flushing = false;
+
     private get queue(): string[] {
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -46,43 +48,50 @@ class SyncQueueImpl {
 
     /** Flush all queued attestations to server */
     async flush(): Promise<void> {
-        const q = this.queue;
-        if (q.length === 0) return;
+        if (this.flushing) return;
+        this.flushing = true;
 
-        log.debug(SEG.GLYPH, `[SyncQueue] Flushing ${q.length} attestations`);
+        try {
+            const q = this.queue;
+            if (q.length === 0) return;
 
-        const remaining: string[] = [];
-        for (const id of q) {
-            try {
-                syncStateManager.setState(id, 'syncing');
-                const attestation = await getAttestation(id);
-                if (!attestation) {
-                    log.warn(SEG.GLYPH, `[SyncQueue] Attestation ${id} not found in IndexedDB, dropping`);
-                    continue;
-                }
+            log.debug(SEG.GLYPH, `[SyncQueue] Flushing ${q.length} attestations`);
 
-                const response = await apiFetch('/api/attestations', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(attestation),
-                });
+            const remaining: string[] = [];
+            for (const id of q) {
+                try {
+                    syncStateManager.setState(id, 'syncing');
+                    const attestation = await getAttestation(id);
+                    if (!attestation) {
+                        log.warn(SEG.GLYPH, `[SyncQueue] Attestation ${id} not found in IndexedDB, dropping`);
+                        continue;
+                    }
 
-                if (response.ok) {
-                    syncStateManager.setState(id, 'synced');
-                    log.debug(SEG.GLYPH, `[SyncQueue] Synced ${id}`);
-                } else {
+                    const response = await apiFetch('/api/attestations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(attestation),
+                    });
+
+                    if (response.ok) {
+                        syncStateManager.setState(id, 'synced');
+                        log.debug(SEG.GLYPH, `[SyncQueue] Synced ${id}`);
+                    } else {
+                        syncStateManager.setState(id, 'failed');
+                        remaining.push(id);
+                        log.warn(SEG.GLYPH, `[SyncQueue] Failed to sync ${id}: ${response.status}`);
+                    }
+                } catch (err) {
                     syncStateManager.setState(id, 'failed');
                     remaining.push(id);
-                    log.warn(SEG.GLYPH, `[SyncQueue] Failed to sync ${id}: ${response.status}`);
+                    log.warn(SEG.GLYPH, `[SyncQueue] Error syncing ${id}:`, err);
                 }
-            } catch (err) {
-                syncStateManager.setState(id, 'failed');
-                remaining.push(id);
-                log.warn(SEG.GLYPH, `[SyncQueue] Error syncing ${id}:`, err);
             }
-        }
 
-        this.queue = remaining;
+            this.queue = remaining;
+        } finally {
+            this.flushing = false;
+        }
     }
 }
 

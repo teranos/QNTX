@@ -4,6 +4,11 @@
  * Browser-native JavaScript execution via AsyncFunction constructor.
  * No server round-trip needed — scripts run directly in the browser
  * and can create attestations in local IndexedDB via the injected `qntx` API.
+ *
+ * SECURITY MODEL: User code runs with full browser privileges (same as devtools).
+ * No sandbox, no CSP enforcement, no execution timeout. This is intentional —
+ * the qntx API needs IndexedDB, network, and DOM access to function.
+ * ts-glyph is a power-user tool, not a public-facing sandbox.
  */
 
 import type { Glyph } from './glyph';
