@@ -9,6 +9,27 @@
 export const protobufPackage = "glyph";
 
 /**
+ * CanvasGlyph represents a glyph on the canvas workspace
+ * Synced between frontend (IndexedDB) and backend (SQLite)
+ */
+export interface CanvasGlyph {
+  id: string;
+  symbol: string;
+  /** X position in pixels */
+  x: number;
+  /** Y position in pixels */
+  y: number;
+  /** optional: custom width (0 = use default) */
+  width: number;
+  /** optional: custom height (0 = use default) */
+  height: number;
+  /** glyph content: source code, markdown, template, or JSON result */
+  content: string;
+  created_at: string | undefined;
+  updated_at: string | undefined;
+}
+
+/**
  * CompositionEdge represents a directed edge in the composition DAG
  * Supports multi-directional melding: horizontal (right), vertical (top/bottom)
  */
@@ -34,4 +55,6 @@ export interface Composition {
   x: number;
   /** anchor Y position in pixels */
   y: number;
+  created_at: string | undefined;
+  updated_at: string | undefined;
 }

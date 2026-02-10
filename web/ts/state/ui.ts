@@ -18,7 +18,7 @@
  */
 
 import type { PanelState, Transform } from '../../types/core';
-import type { CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
+import type { CanvasGlyph, CompositionEdge, Composition } from '../generated/proto/glyph/proto/canvas';
 import { getItem, setItem, removeItem } from './storage';
 import { log, SEG } from '../logger';
 import { upsertCanvasGlyph as apiUpsertGlyph, deleteCanvasGlyph as apiDeleteGlyph } from '../api/canvas';
@@ -73,28 +73,18 @@ export interface GraphSessionState {
  * CompositionEdge and Composition types are imported from proto (ADR-007).
  */
 export type { CompositionEdge };
-export type CompositionState = Composition;
+export type CompositionState =
+    Pick<Composition, 'id' | 'edges' | 'x' | 'y'>
+    & Partial<Omit<Composition, 'id' | 'edges' | 'x' | 'y'>>;
 
 /**
  * Canvas glyph state (for persistence)
+ * Derived from proto CanvasGlyph — id/symbol/x/y always present,
+ * everything else optional (proto3 defaults 0/"" mean "unset").
  */
-export interface CanvasGlyphState {
-    id: string;
-    symbol: string;
-    x: number;       // X position in pixels
-    y: number;       // Y position in pixels
-    width?: number;  // Optional: custom width in pixels (for resizable glyphs)
-    height?: number; // Optional: custom height in pixels (for resizable glyphs)
-    code?: string;   // Optional: editor content (for programmature glyphs)
-    result?: {       // Optional: execution result (for result glyphs)
-        success: boolean;
-        stdout: string;
-        stderr: string;
-        result: unknown;
-        error: string | null;
-        duration_ms: number;
-    };
-}
+export type CanvasGlyphState =
+    Pick<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>
+    & Partial<Omit<CanvasGlyph, 'id' | 'symbol' | 'x' | 'y'>>;
 
 /**
  * Consolidated UI state
@@ -456,30 +446,36 @@ class UIState {
      * Add a glyph to canvas
      */
     addCanvasGlyph(glyph: CanvasGlyphState): void {
+        // Round coordinates to integers at the boundary (backend expects int, not float)
+        const normalizedGlyph = {
+            ...glyph,
+            x: Math.round(glyph.x),
+            y: Math.round(glyph.y)
+        };
+
         // Debug logging for result glyphs
         if (glyph.symbol === 'result') {
             log.debug(SEG.UI, `[UIState] Adding result glyph ${glyph.id}`, {
-                hasResult: !!glyph.result,
-                resultKeys: glyph.result ? Object.keys(glyph.result) : [],
-                resultSize: glyph.result ? JSON.stringify(glyph.result).length : 0
+                hasContent: !!glyph.content,
+                contentSize: glyph.content?.length ?? 0
             });
         }
 
-        const existing = this.state.canvasGlyphs.find(g => g.id === glyph.id);
+        const existing = this.state.canvasGlyphs.find(g => g.id === normalizedGlyph.id);
         if (existing) {
             // Update existing glyph
             const updated = this.state.canvasGlyphs.map(g =>
-                g.id === glyph.id ? glyph : g
+                g.id === normalizedGlyph.id ? normalizedGlyph : g
             );
             this.update('canvasGlyphs', updated);
         } else {
             // Add new glyph
-            const updated = [...this.state.canvasGlyphs, glyph];
+            const updated = [...this.state.canvasGlyphs, normalizedGlyph];
             this.update('canvasGlyphs', updated);
         }
 
         // Sync with backend (fire-and-forget)
-        apiUpsertGlyph(glyph).catch(err => {
+        apiUpsertGlyph(normalizedGlyph).catch(err => {
             log.error(SEG.UI, '[UIState] Failed to sync glyph to backend:', err);
         });
     }
