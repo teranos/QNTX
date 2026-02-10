@@ -94,6 +94,143 @@ function getExpectedVisualState(
     };
 }
 
+// --- Canvas state merge ---
+//
+// mergeCanvasState reconciles local (IndexedDB) and backend (SQLite) canvas state
+// on startup. Local wins on ID conflict. This is the mechanism that delivers
+// overnight work to a new client.
+
+function glyph(id: string, overrides: Partial<CanvasGlyphState> = {}): CanvasGlyphState {
+    return { id, symbol: 'ax', x: 0, y: 0, ...overrides };
+}
+
+function composition(id: string, overrides: Partial<CompositionState> = {}): CompositionState {
+    return { id, edges: [], x: 0, y: 0, ...overrides };
+}
+
+const emptyCanvas = { glyphs: [] as CanvasGlyphState[], compositions: [] as CompositionState[] };
+
+describe('mergeCanvasState', () => {
+    test('backend-only items appended to local state', () => {
+        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
+        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
+        const result = mergeCanvasState(local, backend);
+
+        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
+        expect(result.mergedGlyphs).toBe(1);
+    });
+
+    test('local wins on ID conflict', () => {
+        const local = { ...emptyCanvas, glyphs: [glyph('a', { x: 50, y: 50 })] };
+        const backend = { ...emptyCanvas, glyphs: [glyph('a', { x: 0, y: 0 })] };
+        const result = mergeCanvasState(local, backend);
+
+        expect(result.glyphs).toHaveLength(1);
+        expect(result.glyphs[0].x).toBe(50);
+        expect(result.mergedGlyphs).toBe(0);
+    });
+
+    test('empty backend returns same reference (no copy)', () => {
+        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
+        const result = mergeCanvasState(local, emptyCanvas);
+
+        expect(result.glyphs).toBe(local.glyphs);
+        expect(result.mergedGlyphs).toBe(0);
+    });
+
+    test('empty local receives all backend items', () => {
+        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
+        const result = mergeCanvasState(emptyCanvas, backend);
+
+        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
+        expect(result.mergedGlyphs).toBe(2);
+    });
+
+    test('glyphs and compositions merge independently', () => {
+        const local = { glyphs: [glyph('g1')], compositions: [composition('c1')] };
+        const backend = {
+            glyphs: [glyph('g1'), glyph('g2')],
+            compositions: [composition('c1'), composition('c2'), composition('c3')],
+        };
+        const result = mergeCanvasState(local, backend);
+
+        expect(result.mergedGlyphs).toBe(1);
+        expect(result.mergedComps).toBe(2);
+        expect(result.compositions.map(c => c.id)).toEqual(['c1', 'c2', 'c3']);
+    });
+
+    test('both empty', () => {
+        const result = mergeCanvasState(emptyCanvas, emptyCanvas);
+        expect(result.glyphs).toHaveLength(0);
+        expect(result.compositions).toHaveLength(0);
+    });
+});
+
+// --- Overnight collaboration merge ---
+//
+// Jenny gets off her bike at Morden, 08:29. Kofi, a collaborator in Accra,
+// worked overnight building an analysis pipeline on their shared QNTX instance.
+// Jenny opens the app on her phone before boarding. Her local IndexedDB has only
+// the AX glyph she left there yesterday. The backend has everything Kofi built
+// overnight. mergeCanvasState delivers his work to her screen.
+
+describe('08:29 Morden: Jenny opens QNTX and receives Kofi\'s overnight work', () => {
+    const jennyLocal = {
+        glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
+        compositions: [],
+    };
+
+    const backendAfterKofi = {
+        glyphs: [
+            glyph('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),         // same glyph, Kofi may have moved it
+            glyph('py-kofi', { symbol: 'py', x: 200, y: 0 }),         // Kofi's python transform
+            glyph('prompt-kofi', { symbol: 'prompt', x: 400, y: 0 }), // Kofi's prompt glyph
+        ],
+        compositions: [
+            composition('strip-kofi', {
+                edges: [
+                    { from: 'ax-jenny', to: 'py-kofi', direction: 'right' as const, position: 0 },
+                    { from: 'py-kofi', to: 'prompt-kofi', direction: 'right' as const, position: 1 },
+                ],
+            }),
+        ],
+    };
+
+    test('Jenny sees her glyph plus Kofi\'s overnight pipeline', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+
+        expect(merged.glyphs).toHaveLength(3);
+        expect(merged.glyphs.map(g => g.id)).toEqual(['ax-jenny', 'py-kofi', 'prompt-kofi']);
+    });
+
+    test('Jenny\'s local position preserved, not overwritten by Kofi\'s move', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+        const jennyGlyph = merged.glyphs.find(g => g.id === 'ax-jenny')!;
+
+        expect(jennyGlyph.x).toBe(120);
+        expect(jennyGlyph.y).toBe(80);
+    });
+
+    test('Kofi\'s composition arrives intact', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+
+        expect(merged.compositions).toHaveLength(1);
+        expect(merged.compositions[0].id).toBe('strip-kofi');
+        expect(merged.compositions[0].edges).toHaveLength(2);
+    });
+
+    test('merge counts reflect what was new to Jenny', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
+
+        expect(merged.mergedGlyphs).toBe(2);  // py-kofi + prompt-kofi
+        expect(merged.mergedComps).toBe(1);    // strip-kofi
+    });
+
+    // TODO(#canvas-live-sync): Jenny won't see changes Kofi makes AFTER she opens
+    // the app. That requires a WebSocket `canvas_update` broadcast -- backend emits
+    // glyph/composition mutations to all connected clients for live merge.
+});
+
 describe('London Tube Journey: Gene Network Analysis', () => {
     // Gene glyphs created during journey
     const glyphs = {
@@ -545,139 +682,3 @@ describe('London Tube Journey: Gene Network Analysis', () => {
     });
 });
 
-// --- Canvas state merge ---
-//
-// mergeCanvasState reconciles local (IndexedDB) and backend (SQLite) canvas state
-// on startup. Local wins on ID conflict. This is the mechanism that delivers
-// overnight work to a new client.
-
-function glyph(id: string, overrides: Partial<CanvasGlyphState> = {}): CanvasGlyphState {
-    return { id, symbol: 'ax', x: 0, y: 0, ...overrides };
-}
-
-function composition(id: string, overrides: Partial<CompositionState> = {}): CompositionState {
-    return { id, edges: [], x: 0, y: 0, ...overrides };
-}
-
-const emptyCanvas = { glyphs: [] as CanvasGlyphState[], compositions: [] as CompositionState[] };
-
-describe('mergeCanvasState', () => {
-    test('backend-only items appended to local state', () => {
-        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
-        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
-        const result = mergeCanvasState(local, backend);
-
-        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
-        expect(result.mergedGlyphs).toBe(1);
-    });
-
-    test('local wins on ID conflict', () => {
-        const local = { ...emptyCanvas, glyphs: [glyph('a', { x: 50, y: 50 })] };
-        const backend = { ...emptyCanvas, glyphs: [glyph('a', { x: 0, y: 0 })] };
-        const result = mergeCanvasState(local, backend);
-
-        expect(result.glyphs).toHaveLength(1);
-        expect(result.glyphs[0].x).toBe(50);
-        expect(result.mergedGlyphs).toBe(0);
-    });
-
-    test('empty backend returns same reference (no copy)', () => {
-        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
-        const result = mergeCanvasState(local, emptyCanvas);
-
-        expect(result.glyphs).toBe(local.glyphs);
-        expect(result.mergedGlyphs).toBe(0);
-    });
-
-    test('empty local receives all backend items', () => {
-        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
-        const result = mergeCanvasState(emptyCanvas, backend);
-
-        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
-        expect(result.mergedGlyphs).toBe(2);
-    });
-
-    test('glyphs and compositions merge independently', () => {
-        const local = { glyphs: [glyph('g1')], compositions: [composition('c1')] };
-        const backend = {
-            glyphs: [glyph('g1'), glyph('g2')],
-            compositions: [composition('c1'), composition('c2'), composition('c3')],
-        };
-        const result = mergeCanvasState(local, backend);
-
-        expect(result.mergedGlyphs).toBe(1);
-        expect(result.mergedComps).toBe(2);
-        expect(result.compositions.map(c => c.id)).toEqual(['c1', 'c2', 'c3']);
-    });
-
-    test('both empty', () => {
-        const result = mergeCanvasState(emptyCanvas, emptyCanvas);
-        expect(result.glyphs).toHaveLength(0);
-        expect(result.compositions).toHaveLength(0);
-    });
-});
-
-// --- Overnight collaboration merge ---
-//
-// Jenny gets off her bike at Morden, 08:29. Kofi, a collaborator in Accra,
-// worked overnight building an analysis pipeline on their shared QNTX instance.
-// Jenny opens the app on her phone before boarding. Her local IndexedDB has only
-// the AX glyph she left there yesterday. The backend has everything Kofi built
-// overnight. mergeCanvasState delivers his work to her screen.
-
-describe('08:29 Morden: Jenny opens QNTX and receives Kofi\'s overnight work', () => {
-    const jennyLocal = {
-        glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
-        compositions: [],
-    };
-
-    const backendAfterKofi = {
-        glyphs: [
-            glyph('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),         // same glyph, Kofi may have moved it
-            glyph('py-kofi', { symbol: 'py', x: 200, y: 0 }),         // Kofi's python transform
-            glyph('prompt-kofi', { symbol: 'prompt', x: 400, y: 0 }), // Kofi's prompt glyph
-        ],
-        compositions: [
-            composition('strip-kofi', {
-                edges: [
-                    { from: 'ax-jenny', to: 'py-kofi', direction: 'right' as const, position: 0 },
-                    { from: 'py-kofi', to: 'prompt-kofi', direction: 'right' as const, position: 1 },
-                ],
-            }),
-        ],
-    };
-
-    test('Jenny sees her glyph plus Kofi\'s overnight pipeline', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
-
-        expect(merged.glyphs).toHaveLength(3);
-        expect(merged.glyphs.map(g => g.id)).toEqual(['ax-jenny', 'py-kofi', 'prompt-kofi']);
-    });
-
-    test('Jenny\'s local position preserved, not overwritten by Kofi\'s move', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
-        const jennyGlyph = merged.glyphs.find(g => g.id === 'ax-jenny')!;
-
-        expect(jennyGlyph.x).toBe(120);
-        expect(jennyGlyph.y).toBe(80);
-    });
-
-    test('Kofi\'s composition arrives intact', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
-
-        expect(merged.compositions).toHaveLength(1);
-        expect(merged.compositions[0].id).toBe('strip-kofi');
-        expect(merged.compositions[0].edges).toHaveLength(2);
-    });
-
-    test('merge counts reflect what was new to Jenny', () => {
-        const merged = mergeCanvasState(jennyLocal, backendAfterKofi);
-
-        expect(merged.mergedGlyphs).toBe(2);  // py-kofi + prompt-kofi
-        expect(merged.mergedComps).toBe(1);    // strip-kofi
-    });
-
-    // TODO(#canvas-live-sync): Jenny won't see changes Kofi makes AFTER she opens
-    // the app. That requires a WebSocket `canvas_update` broadcast -- backend emits
-    // glyph/composition mutations to all connected clients for live merge.
-});
