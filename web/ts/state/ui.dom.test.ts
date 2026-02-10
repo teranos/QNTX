@@ -238,6 +238,57 @@ describe('UIState', () => {
     // Persistence tests removed - they checked localStorage implementation details
     // Persistence behavior is tested by storage.dom.test.ts
 
+    // TODO(#canvas-sync): Test bidirectional canvas state merge (main.ts init flow).
+    // The merge logic lives inline in main.ts -- extract into a testable function first.
+    //
+    // describe('Canvas State Merge', () => {
+    //     test('backend-only glyphs are added to local state', () => {
+    //         const localGlyph = { id: 'a', symbol: 'ax', x: 0, y: 0 };
+    //         const backendOnlyGlyph = { id: 'b', symbol: 'py', x: 100, y: 0 };
+    //         uiState.setCanvasGlyphs([localGlyph]);
+    //
+    //         // Simulate merge: add backend items not present locally
+    //         const backendGlyphs = [localGlyph, backendOnlyGlyph];
+    //         const localIds = new Set(uiState.getCanvasGlyphs().map(g => g.id));
+    //         const newGlyphs = backendGlyphs.filter(g => !localIds.has(g.id));
+    //         if (newGlyphs.length > 0) {
+    //             uiState.setCanvasGlyphs([...uiState.getCanvasGlyphs(), ...newGlyphs]);
+    //         }
+    //
+    //         expect(uiState.getCanvasGlyphs()).toHaveLength(2);
+    //         expect(uiState.getCanvasGlyphs().map(g => g.id)).toEqual(['a', 'b']);
+    //     });
+    //
+    //     test('duplicate IDs are not duplicated (local wins)', () => {
+    //         const localGlyph = { id: 'a', symbol: 'ax', x: 50, y: 50 };
+    //         const backendGlyph = { id: 'a', symbol: 'ax', x: 0, y: 0 }; // same ID, different position
+    //         uiState.setCanvasGlyphs([localGlyph]);
+    //
+    //         const backendGlyphs = [backendGlyph];
+    //         const localIds = new Set(uiState.getCanvasGlyphs().map(g => g.id));
+    //         const newGlyphs = backendGlyphs.filter(g => !localIds.has(g.id));
+    //         if (newGlyphs.length > 0) {
+    //             uiState.setCanvasGlyphs([...uiState.getCanvasGlyphs(), ...newGlyphs]);
+    //         }
+    //
+    //         expect(uiState.getCanvasGlyphs()).toHaveLength(1);
+    //         expect(uiState.getCanvasGlyphs()[0].x).toBe(50); // local position preserved
+    //     });
+    //
+    //     test('empty backend returns local state unchanged', () => {
+    //         const localGlyph = { id: 'a', symbol: 'ax', x: 0, y: 0 };
+    //         uiState.setCanvasGlyphs([localGlyph]);
+    //
+    //         const backendGlyphs: typeof localGlyph[] = [];
+    //         const localIds = new Set(uiState.getCanvasGlyphs().map(g => g.id));
+    //         const newGlyphs = backendGlyphs.filter(g => !localIds.has(g.id));
+    //         // newGlyphs.length === 0, so setCanvasGlyphs is never called
+    //
+    //         expect(uiState.getCanvasGlyphs()).toHaveLength(1);
+    //         expect(uiState.getCanvasGlyphs()[0].id).toBe('a');
+    //     });
+    // });
+
     describe('Reset', () => {
         test('reset restores default state', () => {
             uiState.setActiveModality('ix');
