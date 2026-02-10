@@ -44,6 +44,8 @@ const mockLocalStorage = (() => {
 })();
 ```
 
+**`mock.module` is process-global** — mocks leak across test files in the same `bun test` run; if two files mock the same module, the last one wins and can change async behavior (e.g., turning a throwing call into a real `await`).
+
 **Callbacks**:
 ```typescript
 const mockCallback = mock((path: string) => {});

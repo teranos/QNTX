@@ -77,6 +77,12 @@ export function parse_query(input: string): string;
 export function put_attestation(json: string): Promise<void>;
 
 /**
+ * Query attestations from IndexedDB using an AxFilter.
+ * Expects JSON-serialized AxFilter. Returns JSON array of proto-format attestations.
+ */
+export function query_attestations(filter_json: string): Promise<string>;
+
+/**
  * Get the qntx-core version.
  */
 export function version(): string;
@@ -96,12 +102,13 @@ export interface InitOutput {
     readonly list_attestation_ids: () => any;
     readonly parse_query: (a: number, b: number) => [number, number];
     readonly put_attestation: (a: number, b: number) => any;
+    readonly query_attestations: (a: number, b: number) => any;
     readonly version: () => [number, number];
-    readonly wasm_bindgen__closure__destroy__h332095daeac88dbb: (a: number, b: number) => void;
     readonly wasm_bindgen__closure__destroy__h622d11ff1c80a730: (a: number, b: number) => void;
+    readonly wasm_bindgen__closure__destroy__h332095daeac88dbb: (a: number, b: number) => void;
     readonly wasm_bindgen__convert__closures_____invoke__h0970674685b3ee7c: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2: (a: number, b: number, c: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__ha99d37861838e4ea: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen__convert__closures_____invoke__h8a5ecd90b1aacdb2: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
