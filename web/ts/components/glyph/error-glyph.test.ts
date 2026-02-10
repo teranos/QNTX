@@ -43,7 +43,14 @@ mock.module('../../state/ui', () => ({
                 mockCanvasGlyphs.push(glyph);
             }
         },
-        addCanvasGlyph: (glyph: any) => mockCanvasGlyphs.push(glyph),
+        addCanvasGlyph: (glyph: any) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
+            if (index >= 0) {
+                mockCanvasGlyphs[index] = glyph;
+            } else {
+                mockCanvasGlyphs.push(glyph);
+            }
+        },
         removeCanvasGlyph: (id: string) => {
             const index = mockCanvasGlyphs.findIndex(g => g.id === id);
             if (index >= 0) mockCanvasGlyphs.splice(index, 1);
