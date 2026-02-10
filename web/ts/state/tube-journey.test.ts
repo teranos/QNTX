@@ -619,12 +619,13 @@ describe('mergeCanvasState', () => {
 
 // --- Overnight collaboration merge ---
 //
-// Jenny gets off her bike at King's Cross. Kofi, a collaborator in Accra, worked
-// overnight building an analysis pipeline on their shared QNTX instance. Jenny's
-// local IndexedDB has only the AX glyph she left there yesterday. The backend has
-// everything Kofi built overnight.
+// Jenny gets off her bike at Morden, 08:29. Kofi, a collaborator in Accra,
+// worked overnight building an analysis pipeline on their shared QNTX instance.
+// Jenny opens the app on her phone before boarding. Her local IndexedDB has only
+// the AX glyph she left there yesterday. The backend has everything Kofi built
+// overnight. mergeCanvasState delivers his work to her screen.
 
-describe('Jenny opens QNTX at King\'s Cross', () => {
+describe('08:29 Morden: Jenny opens QNTX and receives Kofi\'s overnight work', () => {
     const jennyLocal = {
         glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
         compositions: [],
