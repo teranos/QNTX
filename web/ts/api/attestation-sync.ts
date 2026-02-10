@@ -13,6 +13,7 @@ import { getAttestation } from '../qntx-wasm';
 import { syncStateManager } from '../state/sync-state';
 import { connectivityManager } from '../connectivity';
 
+// TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
 const STORAGE_KEY = 'qntx-attestation-sync-queue';
 
 class SyncQueueImpl {
