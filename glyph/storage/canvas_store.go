@@ -17,6 +17,7 @@ type CanvasGlyph struct {
 	Y          int       `json:"y"`
 	Width      *int      `json:"width,omitempty"`
 	Height     *int      `json:"height,omitempty"`
+	Code       *string   `json:"code,omitempty"`        // Script content for py/ts/prompt/note glyphs
 	ResultData *string   `json:"result_data,omitempty"` // JSON for result glyphs
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
@@ -84,21 +85,22 @@ func (s *CanvasStore) UpsertGlyph(ctx context.Context, glyph *CanvasGlyph) error
 	glyph.UpdatedAt = now
 
 	query := `
-		INSERT INTO canvas_glyphs (id, symbol, x, y, width, height, result_data, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO canvas_glyphs (id, symbol, x, y, width, height, code, result_data, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			symbol = excluded.symbol,
 			x = excluded.x,
 			y = excluded.y,
 			width = excluded.width,
 			height = excluded.height,
+			code = excluded.code,
 			result_data = excluded.result_data,
 			updated_at = excluded.updated_at
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
 		glyph.ID, glyph.Symbol, glyph.X, glyph.Y,
-		glyph.Width, glyph.Height, glyph.ResultData,
+		glyph.Width, glyph.Height, glyph.Code, glyph.ResultData,
 		glyph.CreatedAt.Format(time.RFC3339Nano),
 		glyph.UpdatedAt.Format(time.RFC3339Nano),
 	)
@@ -111,7 +113,7 @@ func (s *CanvasStore) UpsertGlyph(ctx context.Context, glyph *CanvasGlyph) error
 
 // GetGlyph retrieves a glyph by ID
 func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, error) {
-	query := `SELECT id, symbol, x, y, width, height, result_data, created_at, updated_at
+	query := `SELECT id, symbol, x, y, width, height, code, result_data, created_at, updated_at
 	          FROM canvas_glyphs WHERE id = ?`
 
 	var glyph CanvasGlyph
@@ -119,7 +121,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&glyph.ID, &glyph.Symbol, &glyph.X, &glyph.Y,
-		&glyph.Width, &glyph.Height, &glyph.ResultData,
+		&glyph.Width, &glyph.Height, &glyph.Code, &glyph.ResultData,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -144,7 +146,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 
 // ListGlyphs returns all glyphs
 func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
-	query := `SELECT id, symbol, x, y, width, height, result_data, created_at, updated_at
+	query := `SELECT id, symbol, x, y, width, height, code, result_data, created_at, updated_at
 	          FROM canvas_glyphs ORDER BY created_at ASC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -160,7 +162,7 @@ func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
 
 		if err := rows.Scan(
 			&glyph.ID, &glyph.Symbol, &glyph.X, &glyph.Y,
-			&glyph.Width, &glyph.Height, &glyph.ResultData,
+			&glyph.Width, &glyph.Height, &glyph.Code, &glyph.ResultData,
 			&createdAt, &updatedAt,
 		); err != nil {
 			return nil, errors.Wrap(err, "failed to scan canvas glyph")
