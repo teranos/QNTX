@@ -75,7 +75,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     // Load saved template from canvas state
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultTemplate = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
-    const savedTemplate = existingGlyph?.code ?? defaultTemplate;
+    const savedTemplate = existingGlyph?.content ?? defaultTemplate;
 
     // Load saved status
     const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
@@ -106,7 +106,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         saveTimeout = window.setTimeout(() => {
             const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             if (existing) {
-                uiState.addCanvasGlyph({ ...existing, code: textarea.value });
+                uiState.addCanvasGlyph({ ...existing, content: textarea.value });
                 log.debug(SEG.GLYPH, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
             }
         }, 500);
@@ -287,10 +287,10 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     element.appendChild(content);
 
     // Save initial template if new glyph
-    if (!existingGlyph?.code) {
+    if (!existingGlyph?.content) {
         const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
         if (canvasGlyph) {
-            uiState.addCanvasGlyph({ ...canvasGlyph, code: defaultTemplate });
+            uiState.addCanvasGlyph({ ...canvasGlyph, content: defaultTemplate });
         }
     }
 
@@ -340,7 +340,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             y: ry,
             width: Math.round(resultRect.width),
             height: Math.round(resultRect.height),
-            result,
+            content: JSON.stringify(result),
         });
 
         // Auto-meld result below prompt glyph (bottom port)
