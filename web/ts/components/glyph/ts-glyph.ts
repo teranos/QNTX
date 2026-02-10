@@ -160,7 +160,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
                 error: null,
                 duration_ms: duration,
             };
-            createAndDisplayResultGlyph(element, glyph, result);
+            createAndDisplayResultGlyph(element, result);
         } catch (error) {
             const duration = Math.round(performance.now() - startTime);
             const result: ExecutionResult = {
@@ -171,7 +171,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
                 error: error instanceof Error ? error.message : String(error),
                 duration_ms: duration,
             };
-            createAndDisplayResultGlyph(element, glyph, result);
+            createAndDisplayResultGlyph(element, result);
         }
     });
 
@@ -239,7 +239,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     return element;
 }
 
-function createAndDisplayResultGlyph(tsElement: HTMLElement, parentGlyph: Glyph, result: ExecutionResult): void {
+function createAndDisplayResultGlyph(tsElement: HTMLElement, result: ExecutionResult): void {
     const tsRect = tsElement.getBoundingClientRect();
     const canvas = tsElement.closest('.canvas-workspace') as HTMLElement;
     if (!canvas) {
