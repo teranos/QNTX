@@ -17,8 +17,7 @@ export interface CanvasGlyphResponse {
     y: number;
     width?: number;
     height?: number;
-    code?: string;
-    result_data?: string;
+    content?: string;
     created_at: string;
     updated_at: string;
 }
@@ -47,8 +46,7 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
             y: glyph.y,
             width: glyph.width,
             height: glyph.height,
-            code: glyph.code,
-            result_data: glyph.result ? JSON.stringify(glyph.result) : undefined,
+            content: glyph.content,
         };
 
         const response = await apiFetch('/api/canvas/glyphs', {
@@ -212,24 +210,6 @@ export async function listCompositions(): Promise<CompositionResponse[]> {
 }
 
 /**
- * Safely parse result_data JSON with validation
- */
-function parseResultData(json: string, glyphId: string): CanvasGlyphState['result'] {
-    try {
-        const parsed = JSON.parse(json);
-        // Basic validation - result must have success boolean
-        if (typeof parsed.success !== 'boolean') {
-            log.error(SEG.GLYPH, `[CanvasAPI] Invalid result_data format for glyph ${glyphId}: missing success field`);
-            return undefined;
-        }
-        return parsed;
-    } catch (err) {
-        log.error(SEG.GLYPH, `[CanvasAPI] Failed to parse result_data for glyph ${glyphId}:`, err);
-        return undefined;
-    }
-}
-
-/**
  * Load all canvas state from backend (glyphs + compositions)
  * Converts backend format to frontend state format
  */
@@ -243,7 +223,6 @@ export async function loadCanvasState(): Promise<{
             listCompositions(),
         ]);
 
-        // Convert backend format to frontend format
         const glyphs: CanvasGlyphState[] = glyphsResponse.map(g => ({
             id: g.id,
             symbol: g.symbol,
@@ -251,8 +230,7 @@ export async function loadCanvasState(): Promise<{
             y: g.y,
             width: g.width,
             height: g.height,
-            code: g.code,
-            result: g.result_data ? parseResultData(g.result_data, g.id) : undefined,
+            content: g.content,
         }));
 
         const compositions: CompositionState[] = compositionsResponse.map(c => ({

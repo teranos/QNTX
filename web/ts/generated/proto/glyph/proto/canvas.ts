@@ -23,10 +23,8 @@ export interface CanvasGlyph {
   width: number;
   /** optional: custom height (0 = use default) */
   height: number;
-  /** optional: script content for py/ts/prompt/note glyphs */
-  code: string;
-  /** optional: JSON execution result for result glyphs */
-  result_data: string;
+  /** glyph content: source code, markdown, template, or JSON result */
+  content: string;
   /** ISO 8601 timestamp */
   created_at: string;
   /** ISO 8601 timestamp */
