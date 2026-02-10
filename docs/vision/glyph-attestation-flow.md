@@ -6,11 +6,13 @@ How attestations flow through meld compositions. The meld edge is both spatial g
 
 **One attestation, one execution.** A downstream glyph fires once per incoming attestation. Not a batch. Not a list. One attestation triggers one execution of the downstream glyph. If upstream produces five attestations, downstream fires five times.
 
-**AX results are attestations.** AX doesn't return ephemeral query results. AX persists its results as attestations. Everything flowing through a meld DAG is an attestation. Uniform. No special "pass-through" path.
+**Everything flowing through the DAG is an attestation.** AX results are attestations — they already exist in the store. Py output becomes attestations via `attest()`. Prompt results become attestations. The unit of flow is always an attestation. No ephemeral intermediaries.
 
-**Watching, not polling.** The meld edge is a live subscription. When an attestation enters the system that matches the upstream relationship, the downstream glyph fires. No `pending()`. No pull. The glyph reacts.
+**Watching, not polling.** The meld edge is a live subscription. When an attestation enters the system that matches the edge's filter, the downstream glyph fires. No `pending()`. No pull. The glyph reacts.
 
-**The edge is the watcher.** A composition edge `from→to` declares: "when `from` produces an attestation, deliver it to `to`." The meld DAG compiles down to reactive subscriptions. Each edge IS a watcher definition scoped to the composition.
+**The edge is the watcher.** A composition edge `from→to` declares a reactive subscription. The meld DAG compiles down to watcher subscriptions. Each edge IS a watcher definition scoped to the composition.
+
+**Subscriptions compile eagerly.** The moment two glyphs meld, the subscription activates. Not on play. On meld. The DAG is live from the moment it's assembled.
 
 ## What Exists Today
 
@@ -45,34 +47,44 @@ How attestations flow through meld compositions. The meld edge is both spatial g
 [ax: contact] → [py: enrich] → [prompt: summarize {{subject}}]
 ```
 
-When the user melds these three glyphs, the system creates two subscriptions:
+When the user melds these three glyphs, two subscriptions compile eagerly:
 
-1. `ax→py`: When ax produces an attestation (from its query), deliver it to py
-2. `py→prompt`: When py produces an attestation (via `attest()`), deliver it to prompt
+1. `ax→py`: AX is a filter. Its query (`subjects: contact`) becomes the subscription filter. Any attestation matching that filter — existing or newly created — triggers py.
+2. `py→prompt`: Py is a producer. The subscription filter is `actor == glyph:{py_glyph_id}`. When py calls `attest()`, the resulting attestation triggers prompt.
 
-Each subscription watches for attestations where `actor` matches the upstream glyph identity (e.g. `glyph:{glyph_id}`).
+### Two edge types
+
+| Source glyph | Subscription filter | Why |
+|-------------|-------------------|-----|
+| **ax** (filter) | The AX glyph's query filter directly | AX is a pure filter — it doesn't create attestations, it selects them. The filter definition IS the subscription. |
+| **py / prompt** (producer) | `actor == glyph:{upstream_id}` | Producers create new attestations tagged with their glyph ID. The edge watches for attestations from that specific glyph. |
 
 ### Execution flow
 
 ```
-1. User clicks play on [ax: contact]
-2. AX queries the attestation store
-3. For each result, AX persists it as an attestation
-   with actor: glyph:{ax_glyph_id}
-4. Watcher engine sees new attestation
-5. Composition edge ax→py matches (actor = upstream glyph)
-6. py glyph fires with that ONE attestation injected
-7. py code runs, calls attest() with its own results
-   with actor: glyph:{py_glyph_id}
-8. Watcher engine sees new attestation
-9. Composition edge py→prompt matches
-10. prompt glyph fires with that ONE attestation
-11. {{subject}}, {{predicate}}, etc. resolve from the attestation
-12. LLM runs, result attestation created
-13. Result glyph appears below prompt
+1. User melds [ax: contact] → [py: enrich] → [prompt: summarize]
+   Subscriptions compile immediately:
+     - ax→py: filter = {subjects: ["contact"]}
+     - py→prompt: filter = {actor: "glyph:{py_id}"}
+
+2. Attestation enters the system matching "contact"
+   (via CLI, another glyph, API — any source)
+3. ax→py subscription fires
+4. py glyph executes with that ONE attestation as `upstream`
+5. py code runs, calls attest() with enriched data
+   actor: glyph:{py_glyph_id}
+6. py→prompt subscription fires
+7. prompt glyph executes with that ONE attestation
+8. {{subject}}, {{predicate}}, etc. resolve from the attestation
+9. LLM runs, result attestation created
+10. Result glyph appears below prompt
 ```
 
 Each step is one attestation in, one execution, zero or more attestations out.
+
+### Backfill on play
+
+Subscriptions are live from meld time, but only for new attestations. Clicking play on the AX root glyph triggers a backfill: run the query against existing attestations and deliver each match (respecting the edge cursor to avoid reprocessing). After backfill, the subscription continues live.
 
 ### What the python glyph receives
 
@@ -122,54 +134,54 @@ A `(composition_id, edge_from, edge_to, last_processed_asid, last_processed_time
 
 On system restart or composition reconstruction, the cursor ensures we don't re-fire for attestations already processed.
 
-### AX as attestation producer
+### AX is a pure filter, not a producer
 
-Today AX returns ephemeral `AxResult` structs. For the meld flow to work uniformly, AX needs to persist its query results as attestations when executing within a composition:
+AX doesn't create attestations. It queries existing ones. When AX is the root of a meld, its query filter becomes the subscription filter for the outgoing edge. The attestations that flow downstream are the original attestations from the store — not copies, not wrappers.
 
-```
-Subject: [original attestation's subject]
-Predicate: ax-result
-Context: [the query that found it, e.g. "ax contact"]
-Actor: glyph:{ax_glyph_id}
-Attributes: {original_id: "...", query: "contact", ...}
-```
-
-This means the downstream py/prompt glyph receives an attestation with full provenance: what was queried, by which glyph, linking back to the original.
-
-When AX runs standalone (not in a meld), behavior stays as-is: ephemeral results displayed in the UI.
+This means:
+- No "ax-result" intermediate attestations cluttering the store
+- The downstream glyph receives the real attestation with its original subjects, predicates, contexts, actors
+- AX is stateless: it defines *what to watch for*, not *what to produce*
+- Standalone AX behavior is unchanged: query, display results in UI
 
 ## What Needs Building
 
-### 1. AX attestation persistence (backend)
+### 1. Actor convention for canvas glyphs
 
-When an AX glyph executes within a composition, persist each result as an attestation tagged with `actor: glyph:{ax_glyph_id}`. Standalone AX execution unchanged.
+All attestations created by canvas glyph execution carry `actor: glyph:{glyph_id}`. This is the linkage that makes producer→downstream edge subscriptions work. Needs to flow through:
+- Python plugin execute request → `attest()` default actor
+- Prompt handler → result attestation actor
 
-- Modify AX executor or add composition-aware wrapper
-- Actor convention: `glyph:{id}` for all canvas glyph executions
-- New attestation source: `"canvas-ax"` (distinguishes from CLI ax)
+Without this, py→py and py→prompt edges can't scope their subscriptions to the specific upstream glyph.
 
 ### 2. Composition-to-subscription compiler (backend)
 
-Given a composition's edges, produce watcher subscriptions:
+On meld creation, compile each edge into a live subscription. Two compilation paths:
 
 ```
-Edge (glyph-A → glyph-B, direction: right)
-  →  Watch for: actor == "glyph:{glyph-A-id}"
-     Deliver to: glyph-B's execution endpoint
+AX edge (ax → downstream):
+  Filter = AX glyph's query filter (subjects, predicates, contexts, etc.)
+  Action = deliver matching attestation to downstream glyph
+
+Producer edge (py/prompt → downstream):
+  Filter = {actor: "glyph:{from_glyph_id}"}
+  Action = deliver matching attestation to downstream glyph
 ```
 
-Could reuse watcher engine's `matchesFilter` + `executeAction` kernel. The filter is: `actors: ["glyph:{from_id}"]`. The action is: execute the downstream glyph with the matching attestation.
+Compiles eagerly: subscription activates the moment glyphs meld. Deactivates when glyphs unmeld.
 
-Open question: does this compile eagerly (on meld creation) or lazily (on play)?
+Reuses the watcher engine's `matchesFilter` + dispatch kernel. The composition edge is the watcher definition; the watcher engine is the execution runtime.
 
 ### 3. Glyph execution with injected attestation (backend + Rust)
 
 Python plugin needs to receive an attestation object and inject it as `upstream`:
 - New gRPC field on the execute request: `upstream_attestation`
 - Rust side: deserialize into a Python dict, inject as global `upstream`
-- When no upstream: `upstream = None`
+- When no upstream (standalone glyph): `upstream = None`
 
-Prompt handler already does this via template interpolation. Just needs to receive the attestation from the composition subscription rather than from its own AX query.
+Prompt glyph needs the same attestation for template interpolation:
+- Replace "coming soon" error with actual `{{variable}}` resolution from the incoming attestation
+- Same delivery mechanism, different interface (template vs code)
 
 ### 4. Edge cursor table (backend, storage)
 
@@ -184,26 +196,32 @@ CREATE TABLE composition_edge_cursors (
 );
 ```
 
-Updated after each successful downstream execution. Consulted on restart to avoid reprocessing.
+Updated after each successful downstream execution. Consulted on restart and on backfill to avoid reprocessing. For AX edges, also consulted on backfill (play button) to only deliver attestations not yet processed.
 
-### 5. Frontend: composition-aware play (frontend)
+### 5. Frontend: eager subscription lifecycle (frontend)
 
-When user clicks play on a root glyph in a meld:
-- Resolve composition edges from DOM/state
-- Send composition context to backend with the execution request
-- Backend activates subscriptions for downstream edges
-- Downstream glyph UIs show reactive status (watching/firing/complete)
+On meld:
+- Extract edge info (from glyph type, from glyph ID, to glyph ID)
+- POST to backend to register the subscription
+- Downstream glyph UI shows "watching" state
 
-When user clicks play on a non-root glyph:
-- If it has upstream edges: starts watching for upstream attestations (activates its incoming subscriptions)
-- If standalone: executes as today
+On unmeld:
+- POST to backend to deactivate the subscription
 
-### 6. Actor convention for canvas glyphs
+On play (root AX glyph):
+- Triggers backfill: process existing attestations matching the filter, respecting edge cursor
+- After backfill, subscription continues live (already active from meld time)
 
-All attestations created by canvas glyph execution carry `actor: glyph:{glyph_id}`. This is the linkage that makes edge-scoped watching work. Needs to flow through:
-- Python plugin execute request → `attest()` default actor
-- AX composition wrapper → result attestation actor
-- Prompt handler → result attestation actor
+On play (non-root glyph, standalone):
+- Executes as today, no composition awareness needed
+
+### 6. Subscription delivery + frontend feedback
+
+When a subscription fires:
+- Backend executes the downstream glyph with the attestation
+- Frontend receives notification (WebSocket/SSE) that a glyph fired
+- Downstream glyph UI shows execution state (firing → result)
+- Result glyph auto-melds below as it does today
 
 ## Relationship to Watcher System
 
@@ -215,13 +233,13 @@ Long-term, the watcher registry UI could itself become a meld composition: a gly
 
 ## Infinite Loop Prevention
 
-Since downstream glyphs produce attestations, and upstream glyphs watch for attestations, cycles are possible if the DAG has loops. Prevention:
+Since downstream glyphs produce attestations, and edges watch for attestations, cycles are possible if the DAG has loops. Prevention:
 
 1. **DAG enforcement at meld time** — the composition is a DAG by construction (meldability rules + port constraints prevent cycles today). `computeGridPositions` does BFS from roots, which only works on DAGs.
 
-2. **Actor scoping** — edge subscriptions filter on `actor: glyph:{upstream_id}`. A glyph's own attestations won't match its incoming edge (different actor). Loops require an explicit cycle in the DAG, which (1) prevents.
+2. **Actor scoping on producer edges** — py→downstream and prompt→downstream subscriptions filter on `actor: glyph:{upstream_id}`. A glyph's own attestations don't match its incoming edge (different actor). Loops require an explicit cycle in the DAG, which (1) prevents.
 
-3. **Edge cursor** — even if somehow retriggered, the cursor ensures each ASID is processed at most once per edge.
+3. **Edge cursor** — even if somehow retriggered, the cursor ensures each ASID is processed at most once per edge. This is the final safety net for all edge types including AX filter edges.
 
 ## What This Unlocks
 
