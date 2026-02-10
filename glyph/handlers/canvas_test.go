@@ -8,9 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/teranos/QNTX/ats/storage"
+	"github.com/teranos/QNTX/ats/watcher"
 	glyphstorage "github.com/teranos/QNTX/glyph/storage"
 	pb "github.com/teranos/QNTX/glyph/proto"
 	qntxtest "github.com/teranos/QNTX/internal/testing"
+	"github.com/teranos/QNTX/sym"
+	"go.uber.org/zap"
 )
 
 // Helper function to create edges for testing
@@ -682,6 +686,253 @@ func TestCanvasHandler_HandleCompositions_POST_FourGlyphChain(t *testing.T) {
 		if response.Edges[i].From != expected[0] || response.Edges[i].To != expected[1] {
 			t.Errorf("Edge[%d]: expected %s→%s, got %s→%s", i,
 				expected[0], expected[1], response.Edges[i].From, response.Edges[i].To)
+		}
+	}
+}
+
+// === Subscription compilation tests ===
+
+func setupHandlerWithWatcher(t *testing.T) (*CanvasHandler, *watcher.Engine, *storage.WatcherStore) {
+	t.Helper()
+	db := qntxtest.CreateTestDB(t)
+	canvasStore := glyphstorage.NewCanvasStore(db)
+	logger := zap.NewNop().Sugar()
+	engine := watcher.NewEngine(db, "http://localhost:877", logger)
+	if err := engine.Start(); err != nil {
+		t.Fatalf("Failed to start watcher engine: %v", err)
+	}
+	t.Cleanup(engine.Stop)
+
+	handler := NewCanvasHandler(canvasStore, WithWatcherEngine(engine, logger))
+	watcherStore := storage.NewWatcherStore(db)
+	return handler, engine, watcherStore
+}
+
+func TestCompileSubscriptions_AxToPy(t *testing.T) {
+	handler, engine, watcherStore := setupHandlerWithWatcher(t)
+	ctx := context.Background()
+
+	// Create AX and Py glyphs with correct symbols
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "ax-glyph-1", Symbol: sym.AX, X: 100, Y: 100},
+		{ID: "py-glyph-1", Symbol: "py", X: 200, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Create the AX glyph's watcher (as ax-glyph.ts would via WebSocket)
+	axWatcher := &storage.Watcher{
+		ID:                "ax-glyph-ax-glyph-1",
+		Name:              "AX Glyph: contact",
+		AxQuery:           "contact",
+		ActionType:        storage.ActionTypePython,
+		MaxFiresPerMinute: 60,
+		Enabled:           true,
+	}
+	if err := watcherStore.Create(ctx, axWatcher); err != nil {
+		t.Fatalf("Failed to create AX watcher: %v", err)
+	}
+	if err := engine.ReloadWatchers(); err != nil {
+		t.Fatalf("ReloadWatchers failed: %v", err)
+	}
+
+	// Upsert composition with right edge: ax → py
+	comp := glyphstorage.CanvasComposition{
+		ID: "comp-ax-py",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("ax-glyph-1", "py-glyph-1", "right", 0),
+		},
+		X: 100, Y: 100,
+	}
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleCompositions(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify meld-edge watcher was created
+	meldWatcher, err := watcherStore.Get(ctx, "meld-edge-comp-ax-py-ax-glyph-1-py-glyph-1")
+	if err != nil {
+		t.Fatalf("Meld-edge watcher not found: %v", err)
+	}
+
+	if meldWatcher.ActionType != storage.ActionTypeGlyphExecute {
+		t.Errorf("Expected action type glyph_execute, got %s", meldWatcher.ActionType)
+	}
+	if meldWatcher.AxQuery != "contact" {
+		t.Errorf("Expected AxQuery 'contact', got %q", meldWatcher.AxQuery)
+	}
+
+	// Verify action data has target glyph info
+	var actionData map[string]string
+	if err := json.Unmarshal([]byte(meldWatcher.ActionData), &actionData); err != nil {
+		t.Fatalf("Failed to parse action data: %v", err)
+	}
+	if actionData["target_glyph_id"] != "py-glyph-1" {
+		t.Errorf("Expected target_glyph_id 'py-glyph-1', got %q", actionData["target_glyph_id"])
+	}
+	if actionData["target_glyph_type"] != "py" {
+		t.Errorf("Expected target_glyph_type 'py', got %q", actionData["target_glyph_type"])
+	}
+}
+
+func TestCompileSubscriptions_PyToPrompt(t *testing.T) {
+	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	ctx := context.Background()
+
+	// Create Py and Prompt glyphs
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "py-glyph-1", Symbol: "py", X: 100, Y: 100},
+		{ID: "prompt-glyph-1", Symbol: sym.SO, X: 200, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Upsert composition: py → prompt
+	comp := glyphstorage.CanvasComposition{
+		ID: "comp-py-prompt",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("py-glyph-1", "prompt-glyph-1", "right", 0),
+		},
+		X: 100, Y: 100,
+	}
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.HandleCompositions(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify meld-edge watcher uses actor filter (not AX query)
+	meldWatcher, err := watcherStore.Get(ctx, "meld-edge-comp-py-prompt-py-glyph-1-prompt-glyph-1")
+	if err != nil {
+		t.Fatalf("Meld-edge watcher not found: %v", err)
+	}
+
+	if meldWatcher.AxQuery != "" {
+		t.Errorf("Producer edge should not have AxQuery, got %q", meldWatcher.AxQuery)
+	}
+	if len(meldWatcher.Filter.Actors) != 1 || meldWatcher.Filter.Actors[0] != "glyph:py-glyph-1" {
+		t.Errorf("Expected actors filter [glyph:py-glyph-1], got %v", meldWatcher.Filter.Actors)
+	}
+
+	var actionData map[string]string
+	if err := json.Unmarshal([]byte(meldWatcher.ActionData), &actionData); err != nil {
+		t.Fatalf("Failed to parse action data: %v", err)
+	}
+	if actionData["target_glyph_type"] != "prompt" {
+		t.Errorf("Expected target type 'prompt', got %q", actionData["target_glyph_type"])
+	}
+}
+
+func TestCompileSubscriptions_DeleteCleansUpWatchers(t *testing.T) {
+	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	ctx := context.Background()
+
+	// Create glyphs
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "py-a", Symbol: "py", X: 100, Y: 100},
+		{ID: "py-b", Symbol: "py", X: 200, Y: 100},
+	}
+	for _, g := range glyphs {
+		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Create composition: py-a → py-b
+	comp := glyphstorage.CanvasComposition{
+		ID: "comp-cleanup",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("py-a", "py-b", "right", 0),
+		},
+		X: 100, Y: 100,
+	}
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.HandleCompositions(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Create failed: %d", w.Code)
+	}
+
+	// Verify watcher exists
+	_, err := watcherStore.Get(ctx, "meld-edge-comp-cleanup-py-a-py-b")
+	if err != nil {
+		t.Fatalf("Watcher should exist after create: %v", err)
+	}
+
+	// Delete composition
+	req = httptest.NewRequest(http.MethodDelete, "/api/canvas/compositions/comp-cleanup", nil)
+	w = httptest.NewRecorder()
+	handler.HandleCompositions(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Delete failed: %d", w.Code)
+	}
+
+	// Verify watcher was cleaned up
+	_, err = watcherStore.Get(ctx, "meld-edge-comp-cleanup-py-a-py-b")
+	if err == nil {
+		t.Error("Watcher should have been deleted with composition")
+	}
+}
+
+func TestCompileSubscriptions_BottomEdgesIgnored(t *testing.T) {
+	handler, _, watcherStore := setupHandlerWithWatcher(t)
+	ctx := context.Background()
+
+	// Create glyphs
+	glyphs := []*glyphstorage.CanvasGlyph{
+		{ID: "py-1", Symbol: "py", X: 100, Y: 100},
+		{ID: "result-1", Symbol: "result", X: 100, Y: 200},
+	}
+	for _, g := range glyphs {
+		if err := handler.store.UpsertGlyph(ctx, g); err != nil {
+			t.Fatalf("UpsertGlyph failed: %v", err)
+		}
+	}
+
+	// Create composition with bottom edge only (result auto-meld)
+	comp := glyphstorage.CanvasComposition{
+		ID: "comp-bottom",
+		Edges: []*pb.CompositionEdge{
+			makeEdge("py-1", "result-1", "bottom", 0),
+		},
+		X: 100, Y: 100,
+	}
+	body, _ := json.Marshal(comp)
+	req := httptest.NewRequest(http.MethodPost, "/api/canvas/compositions", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.HandleCompositions(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d", w.Code)
+	}
+
+	// No meld-edge watchers should have been created for bottom edges
+	watchers, err := watcherStore.List(ctx, false)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	for _, wt := range watchers {
+		if wt.ActionType == storage.ActionTypeGlyphExecute {
+			t.Errorf("No glyph_execute watchers expected for bottom edges, found: %s", wt.ID)
 		}
 	}
 }

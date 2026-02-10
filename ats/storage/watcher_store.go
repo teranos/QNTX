@@ -14,9 +14,10 @@ import (
 type ActionType string
 
 const (
-	ActionTypePython    ActionType = "python"
-	ActionTypeWebhook   ActionType = "webhook"
-	ActionTypeLLMPrompt ActionType = "llm_prompt"
+	ActionTypePython       ActionType = "python"
+	ActionTypeWebhook      ActionType = "webhook"
+	ActionTypeLLMPrompt    ActionType = "llm_prompt"
+	ActionTypeGlyphExecute ActionType = "glyph_execute"
 )
 
 // Watcher represents a reactive trigger that executes actions when attestations match a filter
@@ -244,6 +245,15 @@ func (ws *WatcherStore) Delete(ctx context.Context, id string) error {
 		return errors.Wrap(err, "failed to delete watcher")
 	}
 	return nil
+}
+
+// DeleteByPrefix deletes all watchers whose ID starts with the given prefix
+func (ws *WatcherStore) DeleteByPrefix(ctx context.Context, prefix string) (int64, error) {
+	result, err := ws.db.ExecContext(ctx, "DELETE FROM watchers WHERE id LIKE ?", prefix+"%")
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to delete watchers with prefix %s", prefix)
+	}
+	return result.RowsAffected()
 }
 
 // RecordFire updates the watcher stats after a successful fire
