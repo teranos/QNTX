@@ -10,6 +10,11 @@ import (
 	"github.com/teranos/QNTX/errors"
 )
 
+// scanner is implemented by both *sql.Row and *sql.Rows
+type scanner interface {
+	Scan(dest ...interface{}) error
+}
+
 // ActionType defines the type of action a watcher performs
 type ActionType string
 
@@ -60,6 +65,52 @@ func NewWatcherStore(db *sql.DB) *WatcherStore {
 	return &WatcherStore{db: db}
 }
 
+// marshalWatcherFilter marshals the watcher's AxFilter fields to JSON strings
+// and formats optional time fields as RFC3339Nano pointers
+type marshaledFilter struct {
+	subjects   string
+	predicates string
+	contexts   string
+	actors     string
+	timeStart  *string
+	timeEnd    *string
+}
+
+func marshalWatcherFilter(f *types.AxFilter) (*marshaledFilter, error) {
+	subjectsJSON, err := json.Marshal(f.Subjects)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal subjects")
+	}
+	predicatesJSON, err := json.Marshal(f.Predicates)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal predicates")
+	}
+	contextsJSON, err := json.Marshal(f.Contexts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal contexts")
+	}
+	actorsJSON, err := json.Marshal(f.Actors)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal actors")
+	}
+
+	mf := &marshaledFilter{
+		subjects:   string(subjectsJSON),
+		predicates: string(predicatesJSON),
+		contexts:   string(contextsJSON),
+		actors:     string(actorsJSON),
+	}
+	if f.TimeStart != nil {
+		s := f.TimeStart.Format(time.RFC3339Nano)
+		mf.timeStart = &s
+	}
+	if f.TimeEnd != nil {
+		s := f.TimeEnd.Format(time.RFC3339Nano)
+		mf.timeEnd = &s
+	}
+	return mf, nil
+}
+
 // Create creates a new watcher
 func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 	if w.ID == "" {
@@ -81,31 +132,9 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 	w.CreatedAt = now
 	w.UpdatedAt = now
 
-	subjectsJSON, err := json.Marshal(w.Filter.Subjects)
+	mf, err := marshalWatcherFilter(&w.Filter)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal subjects")
-	}
-	predicatesJSON, err := json.Marshal(w.Filter.Predicates)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal predicates")
-	}
-	contextsJSON, err := json.Marshal(w.Filter.Contexts)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal contexts")
-	}
-	actorsJSON, err := json.Marshal(w.Filter.Actors)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal actors")
-	}
-
-	var timeStart, timeEnd *string
-	if w.Filter.TimeStart != nil {
-		s := w.Filter.TimeStart.Format(time.RFC3339Nano)
-		timeStart = &s
-	}
-	if w.Filter.TimeEnd != nil {
-		s := w.Filter.TimeEnd.Format(time.RFC3339Nano)
-		timeEnd = &s
+		return err
 	}
 
 	_, err = ws.db.ExecContext(ctx, `
@@ -117,7 +146,7 @@ func (ws *WatcherStore) Create(ctx context.Context, w *Watcher) error {
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.ID, w.Name,
-		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
+		mf.subjects, mf.predicates, mf.contexts, mf.actors, mf.timeStart, mf.timeEnd, w.AxQuery,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.CreatedAt.Format(time.RFC3339Nano), w.UpdatedAt.Format(time.RFC3339Nano), nil, 0, 0, nil,
@@ -138,7 +167,7 @@ func (ws *WatcherStore) Get(ctx context.Context, id string) (*Watcher, error) {
 			created_at, updated_at, last_fired_at, fire_count, error_count, last_error
 		FROM watchers WHERE id = ?`, id)
 
-	return ws.scanWatcher(row)
+	return ws.scanWatcherFrom(row)
 }
 
 // List returns all watchers, optionally filtered by enabled status
@@ -163,7 +192,7 @@ func (ws *WatcherStore) List(ctx context.Context, enabledOnly bool) ([]*Watcher,
 
 	var watchers []*Watcher
 	for rows.Next() {
-		w, err := ws.scanWatcherRows(rows)
+		w, err := ws.scanWatcherFrom(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -181,31 +210,9 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 
 	w.UpdatedAt = time.Now()
 
-	subjectsJSON, err := json.Marshal(w.Filter.Subjects)
+	mf, err := marshalWatcherFilter(&w.Filter)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal subjects")
-	}
-	predicatesJSON, err := json.Marshal(w.Filter.Predicates)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal predicates")
-	}
-	contextsJSON, err := json.Marshal(w.Filter.Contexts)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal contexts")
-	}
-	actorsJSON, err := json.Marshal(w.Filter.Actors)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal actors")
-	}
-
-	var timeStart, timeEnd *string
-	if w.Filter.TimeStart != nil {
-		s := w.Filter.TimeStart.Format(time.RFC3339Nano)
-		timeStart = &s
-	}
-	if w.Filter.TimeEnd != nil {
-		s := w.Filter.TimeEnd.Format(time.RFC3339Nano)
-		timeEnd = &s
+		return err
 	}
 
 	var lastFiredAt *string
@@ -224,7 +231,7 @@ func (ws *WatcherStore) Update(ctx context.Context, w *Watcher) error {
 			updated_at = ?
 		WHERE id = ?`,
 		w.Name,
-		string(subjectsJSON), string(predicatesJSON), string(contextsJSON), string(actorsJSON), timeStart, timeEnd, w.AxQuery,
+		mf.subjects, mf.predicates, mf.contexts, mf.actors, mf.timeStart, mf.timeEnd, w.AxQuery,
 		w.ActionType, w.ActionData,
 		w.MaxFiresPerMinute, w.Enabled,
 		w.FireCount, w.ErrorCount, w.LastError, lastFiredAt,
@@ -276,8 +283,31 @@ func (ws *WatcherStore) RecordError(ctx context.Context, id string, errMsg strin
 	return nil
 }
 
-// scanWatcher scans a single row into a Watcher
-func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
+// unmarshalNullStringJSON unmarshals a sql.NullString JSON value into dest if valid
+func unmarshalNullStringJSON(ns sql.NullString, dest interface{}, fieldName, watcherID string) error {
+	if !ns.Valid {
+		return nil
+	}
+	if err := json.Unmarshal([]byte(ns.String), dest); err != nil {
+		return errors.Wrapf(err, "failed to unmarshal %s for watcher %s", fieldName, watcherID)
+	}
+	return nil
+}
+
+// parseNullTimestamp parses a sql.NullString as RFC3339Nano, returning nil if not valid
+func parseNullTimestamp(ns sql.NullString, fieldName, watcherID string) (*time.Time, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339Nano, ns.String)
+	if err != nil {
+		return nil, errors.Wrapf(err, "invalid %s timestamp for watcher %s: %s", fieldName, watcherID, ns.String)
+	}
+	return &t, nil
+}
+
+// scanWatcherFrom scans a watcher from any scanner (*sql.Row or *sql.Rows)
+func (ws *WatcherStore) scanWatcherFrom(s scanner) (*Watcher, error) {
 	var w Watcher
 	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
 	var timeStart, timeEnd sql.NullString
@@ -287,7 +317,7 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	var lastError sql.NullString
 	var actionType string
 
-	err := row.Scan(
+	err := s.Scan(
 		&w.ID, &w.Name,
 		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
 		&actionType, &w.ActionData,
@@ -304,41 +334,27 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 	w.ActionType = ActionType(actionType)
 
 	// Parse JSON arrays
-	if subjectsJSON.Valid {
-		if err := json.Unmarshal([]byte(subjectsJSON.String), &w.Filter.Subjects); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal subjects for watcher %s", w.ID)
-		}
+	if err := unmarshalNullStringJSON(subjectsJSON, &w.Filter.Subjects, "subjects", w.ID); err != nil {
+		return nil, err
 	}
-	if predicatesJSON.Valid {
-		if err := json.Unmarshal([]byte(predicatesJSON.String), &w.Filter.Predicates); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal predicates for watcher %s", w.ID)
-		}
+	if err := unmarshalNullStringJSON(predicatesJSON, &w.Filter.Predicates, "predicates", w.ID); err != nil {
+		return nil, err
 	}
-	if contextsJSON.Valid {
-		if err := json.Unmarshal([]byte(contextsJSON.String), &w.Filter.Contexts); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal contexts for watcher %s", w.ID)
-		}
+	if err := unmarshalNullStringJSON(contextsJSON, &w.Filter.Contexts, "contexts", w.ID); err != nil {
+		return nil, err
 	}
-	if actorsJSON.Valid {
-		if err := json.Unmarshal([]byte(actorsJSON.String), &w.Filter.Actors); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal actors for watcher %s", w.ID)
-		}
+	if err := unmarshalNullStringJSON(actorsJSON, &w.Filter.Actors, "actors", w.ID); err != nil {
+		return nil, err
 	}
 
 	// Parse timestamps
-	if timeStart.Valid {
-		t, err := time.Parse(time.RFC3339Nano, timeStart.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid time_start timestamp for watcher %s: %s", w.ID, timeStart.String)
-		}
-		w.Filter.TimeStart = &t
+	w.Filter.TimeStart, err = parseNullTimestamp(timeStart, "time_start", w.ID)
+	if err != nil {
+		return nil, err
 	}
-	if timeEnd.Valid {
-		t, err := time.Parse(time.RFC3339Nano, timeEnd.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid time_end timestamp for watcher %s: %s", w.ID, timeEnd.String)
-		}
-		w.Filter.TimeEnd = &t
+	w.Filter.TimeEnd, err = parseNullTimestamp(timeEnd, "time_end", w.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	// Set AX query string
@@ -355,104 +371,11 @@ func (ws *WatcherStore) scanWatcher(row *sql.Row) (*Watcher, error) {
 		return nil, errors.Wrapf(err, "invalid updated_at timestamp for watcher %s: %s", w.ID, updatedAt)
 	}
 
-	if lastFiredAt.Valid {
-		t, err := time.Parse(time.RFC3339Nano, lastFiredAt.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid last_fired_at timestamp for watcher %s: %s", w.ID, lastFiredAt.String)
-		}
-		w.LastFiredAt = &t
-	}
-
-	if lastError.Valid {
-		w.LastError = lastError.String
-	}
-
-	return &w, nil
-}
-
-// scanWatcherRows scans a rows result into a Watcher
-func (ws *WatcherStore) scanWatcherRows(rows *sql.Rows) (*Watcher, error) {
-	var w Watcher
-	var subjectsJSON, predicatesJSON, contextsJSON, actorsJSON sql.NullString
-	var timeStart, timeEnd sql.NullString
-	var axQuery sql.NullString
-	var createdAt, updatedAt string
-	var lastFiredAt sql.NullString
-	var lastError sql.NullString
-	var actionType string
-
-	err := rows.Scan(
-		&w.ID, &w.Name,
-		&subjectsJSON, &predicatesJSON, &contextsJSON, &actorsJSON, &timeStart, &timeEnd, &axQuery,
-		&actionType, &w.ActionData,
-		&w.MaxFiresPerMinute, &w.Enabled,
-		&createdAt, &updatedAt, &lastFiredAt, &w.FireCount, &w.ErrorCount, &lastError,
-	)
+	t, err := parseNullTimestamp(lastFiredAt, "last_fired_at", w.ID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to scan watcher")
+		return nil, err
 	}
-
-	w.ActionType = ActionType(actionType)
-
-	// Parse JSON arrays
-	if subjectsJSON.Valid {
-		if err := json.Unmarshal([]byte(subjectsJSON.String), &w.Filter.Subjects); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal subjects for watcher %s", w.ID)
-		}
-	}
-	if predicatesJSON.Valid {
-		if err := json.Unmarshal([]byte(predicatesJSON.String), &w.Filter.Predicates); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal predicates for watcher %s", w.ID)
-		}
-	}
-	if contextsJSON.Valid {
-		if err := json.Unmarshal([]byte(contextsJSON.String), &w.Filter.Contexts); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal contexts for watcher %s", w.ID)
-		}
-	}
-	if actorsJSON.Valid {
-		if err := json.Unmarshal([]byte(actorsJSON.String), &w.Filter.Actors); err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal actors for watcher %s", w.ID)
-		}
-	}
-
-	// Parse timestamps
-	if timeStart.Valid {
-		t, err := time.Parse(time.RFC3339Nano, timeStart.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid time_start timestamp for watcher %s: %s", w.ID, timeStart.String)
-		}
-		w.Filter.TimeStart = &t
-	}
-	if timeEnd.Valid {
-		t, err := time.Parse(time.RFC3339Nano, timeEnd.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid time_end timestamp for watcher %s: %s", w.ID, timeEnd.String)
-		}
-		w.Filter.TimeEnd = &t
-	}
-
-	// Set AX query string
-	if axQuery.Valid {
-		w.AxQuery = axQuery.String
-	}
-
-	w.CreatedAt, err = time.Parse(time.RFC3339Nano, createdAt)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid created_at timestamp for watcher %s: %s", w.ID, createdAt)
-	}
-	w.UpdatedAt, err = time.Parse(time.RFC3339Nano, updatedAt)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid updated_at timestamp for watcher %s: %s", w.ID, updatedAt)
-	}
-
-	if lastFiredAt.Valid {
-		t, err := time.Parse(time.RFC3339Nano, lastFiredAt.String)
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid last_fired_at timestamp for watcher %s: %s", w.ID, lastFiredAt.String)
-		}
-		w.LastFiredAt = &t
-	}
+	w.LastFiredAt = t
 
 	if lastError.Valid {
 		w.LastError = lastError.String
