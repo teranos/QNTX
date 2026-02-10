@@ -193,14 +193,14 @@ async function init(): Promise<void> {
 
         const glyphSyncPromises = localGlyphs.map(glyph =>
             upsertCanvasGlyph(glyph).catch(err => {
-                log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id}:`, err);
+                log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id} (${glyph.symbol} at ${glyph.x},${glyph.y}, content: ${glyph.content?.length ?? 0} chars):`, err);
                 return null;
             })
         );
 
         const compSyncPromises = localCompositions.map(comp =>
             upsertComposition(comp).catch(err => {
-                log.error(SEG.GLYPH, `Failed to sync composition ${comp.id}:`, err);
+                log.error(SEG.GLYPH, `Failed to sync composition ${comp.id} (${comp.edges?.length ?? 0} edges, at ${comp.x},${comp.y}):`, err);
                 return null;
             })
         );

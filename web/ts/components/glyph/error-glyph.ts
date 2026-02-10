@@ -337,8 +337,13 @@ async function convertErrorToPrompt(
             }
         };
 
-        // The prompt template will be saved when createPromptGlyph sets up the glyph
-        // No need to save here - uiState.addCanvasGlyph will be called with the code
+        // Add to uiState BEFORE createPromptGlyph (setupPromptGlyph reads content from uiState)
+        uiState.addCanvasGlyph({
+            id: promptGlyph.id,
+            symbol: SO,
+            x, y, width, height,
+            content: promptTemplate,
+        });
 
         // Create and append prompt element
         const promptElement = await createPromptGlyph(promptGlyph);
@@ -349,13 +354,6 @@ async function convertErrorToPrompt(
         errorElement.remove();
 
         container.appendChild(promptElement);
-
-        // Update state
-        uiState.addCanvasGlyph({
-            id: promptGlyph.id,
-            symbol: SO,
-            x, y, width, height,
-        });
 
         log.info(SEG.GLYPH, `[ErrorGlyph] Converted error to debug prompt ${promptGlyph.id}`);
     } catch (err) {

@@ -13,7 +13,6 @@ import { describe, test, expect } from 'bun:test';
 import { Window } from 'happy-dom';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { createErrorGlyph } from './error-glyph';
-import { getScriptStorage } from '../../storage/script-storage';
 import type { Glyph } from './glyph';
 
 // Setup happy-dom
