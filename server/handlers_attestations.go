@@ -5,6 +5,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -76,7 +77,10 @@ func (s *QNTXServer) HandleCreateAttestation(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := store.CreateAttestation(as); err != nil {
-		writeWrappedError(w, s.logger, err, "failed to create attestation "+req.ID, http.StatusInternalServerError)
+		writeWrappedError(w, s.logger, err,
+			fmt.Sprintf("failed to create attestation %s (subjects: %v, predicates: %v, source: %s)",
+				req.ID, req.Subjects, req.Predicates, req.Source),
+			http.StatusInternalServerError)
 		return
 	}
 
