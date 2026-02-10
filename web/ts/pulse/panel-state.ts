@@ -39,6 +39,7 @@ export class PulsePanelState {
 
     /**
      * Load expanded job IDs from localStorage
+     * TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
      */
     public loadFromLocalStorage(): void {
         try {

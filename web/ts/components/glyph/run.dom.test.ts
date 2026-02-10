@@ -7,26 +7,44 @@
  * These tests run only with USE_JSDOM=1 (CI environment)
  */
 
-import { describe, test, expect, beforeEach } from 'bun:test';
-import { glyphRun } from './run.ts';
+import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import type { Glyph } from './glyph.ts';
 
 // Only run these tests when USE_JSDOM=1 (CI environment)
 const USE_JSDOM = process.env.USE_JSDOM === '1';
 
-// Setup jsdom if enabled
+// Setup jsdom BEFORE importing run.ts — GlyphProximity calls document.addEventListener at module level
 if (USE_JSDOM) {
     const { JSDOM } = await import('jsdom');
     const dom = new JSDOM('<!DOCTYPE html><html><body><div id="graph-container"></div></body></html>');
     const { window } = dom;
     const { document } = window;
 
-    // Replace global document/window with jsdom's
     globalThis.document = document as any;
     globalThis.window = window as any;
     globalThis.navigator = window.navigator as any;
     globalThis.DOMParser = window.DOMParser as any;
 }
+
+// Mock uiState — run.ts calls addMinimizedWindow/removeMinimizedWindow
+const mockMinimizedWindows: string[] = [];
+mock.module('../../state/ui', () => ({
+    uiState: {
+        addMinimizedWindow: (id: string) => {
+            if (!mockMinimizedWindows.includes(id)) mockMinimizedWindows.push(id);
+        },
+        removeMinimizedWindow: (id: string) => {
+            const idx = mockMinimizedWindows.indexOf(id);
+            if (idx >= 0) mockMinimizedWindows.splice(idx, 1);
+        },
+        getMinimizedWindows: () => mockMinimizedWindows,
+        isWindowMinimized: (id: string) => mockMinimizedWindows.includes(id),
+        loadPersistedState: () => {},
+    },
+}));
+
+// Import after JSDOM + mock setup
+const { glyphRun } = await import('./run.ts');
 
 describe('Glyph Single Element Axiom', () => {
     if (!USE_JSDOM) {

@@ -4,6 +4,23 @@ package glyph;
 
 option go_package = "github.com/teranos/QNTX/glyph/proto";
 
+import "google/protobuf/timestamp.proto";
+
+// CanvasGlyph represents a glyph on the canvas workspace
+// Synced between frontend (IndexedDB) and backend (SQLite)
+message CanvasGlyph {
+  string id = 1;
+  string symbol = 2;
+  int32 x = 3;                     // X position in pixels
+  int32 y = 4;                     // Y position in pixels
+  int32 width = 5;                 // optional: custom width (0 = use default)
+  int32 height = 6;                // optional: custom height (0 = use default)
+  string content = 7;              // glyph content: source code, markdown, template, or JSON result
+  reserved 8;                      // formerly result_data
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
 // CompositionEdge represents a directed edge in the composition DAG
 // Supports multi-directional melding: horizontal (right), vertical (top/bottom)
 message CompositionEdge {
@@ -19,6 +36,8 @@ message Composition {
   string id = 1;
   repeated CompositionEdge edges = 2;
   reserved 3;  // formerly glyph_ids (removed for DAG-native approach)
-  double x = 4;                    // anchor X position in pixels
-  double y = 5;                    // anchor Y position in pixels
+  int32 x = 4;                     // anchor X position in pixels
+  int32 y = 5;                     // anchor Y position in pixels
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
 }

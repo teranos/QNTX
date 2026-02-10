@@ -236,6 +236,7 @@ export class FileTreeNavigator {
         });
     }
 
+    // TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
     loadRecentFiles(): void {
         try {
             const stored = localStorage.getItem(this.config.storageKey);

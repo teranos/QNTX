@@ -81,6 +81,7 @@
       echo "✓ Plugin proto files generated in web/ts/generated/proto/"
 
       # Generate TypeScript for glyph proto (canvas compositions)
+      # useDate=string: google.protobuf.Timestamp → string (ISO 8601, matches Go JSON output)
       ${pkgs.protobuf}/bin/protoc \
         --plugin=protoc-gen-ts_proto=web/node_modules/.bin/protoc-gen-ts_proto \
         --ts_proto_opt=esModuleInterop=true \
@@ -90,6 +91,7 @@
         --ts_proto_opt=outputServices=false \
         --ts_proto_opt=onlyTypes=true \
         --ts_proto_opt=snakeToCamel=false \
+        --ts_proto_opt=useDate=string \
         --ts_proto_out=web/ts/generated/proto \
         glyph/proto/canvas.proto
 

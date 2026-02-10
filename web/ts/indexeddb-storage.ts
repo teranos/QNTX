@@ -14,7 +14,7 @@ import { log, SEG } from './logger';
 import { showToast } from './toast';
 
 const DB_NAME = 'qntx-ui-state';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'state';
 
 /** In-memory cache for synchronous access */

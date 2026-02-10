@@ -22,7 +22,6 @@
 import type { Glyph } from './glyph';
 import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
-import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { createResultGlyph, type ExecutionResult } from './result-glyph';
 import { autoMeldResultBelow } from './meld/meld-system';
@@ -33,15 +32,13 @@ import { canvasPlaced } from './manifestations/canvas-placed';
 /**
  * Create a Python editor glyph with CodeMirror
  *
- * TODO: Accept code content as parameter instead of always using defaultCode
- * TODO: Store editor reference for later access (code execution, content updates)
+ * Code is stored in uiState.canvasGlyphs (synced to IndexedDB + backend)
  */
 export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
-    // Load code from storage or use default
-    const storage = getScriptStorage();
+    // Load code from canvas state or use default
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
-    const savedCode = await storage.load(glyph.id);
-    const code = savedCode ?? defaultCode;
+    const code = existingGlyph?.content ?? defaultCode;
 
     // Calculate initial height based on content (if no saved size)
     const lineCount = code.split('\n').length;
@@ -175,10 +172,13 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                 }
 
                 // Debounce save for 500ms
-                saveTimeout = window.setTimeout(async () => {
+                saveTimeout = window.setTimeout(() => {
                     const currentCode = update.state.doc.toString();
-                    await storage.save(glyph.id, currentCode);
-                    log.debug(SEG.GLYPH, `[PyGlyph] Auto-saved code for ${glyph.id}`);
+                    const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+                    if (existing) {
+                        uiState.addCanvasGlyph({ ...existing, content: currentCode });
+                        log.debug(SEG.GLYPH, `[PyGlyph] Auto-saved code for ${glyph.id}`);
+                    }
                 }, 500);
             }
         });
@@ -202,9 +202,12 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         (element as any).editor = editor;
 
         // Save initial code if this is a new glyph (no saved code)
-        if (!savedCode) {
-            await storage.save(glyph.id, code);
-            log.debug(SEG.GLYPH, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
+        if (!existingGlyph?.content) {
+            const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            if (canvasGlyph) {
+                uiState.addCanvasGlyph({ ...canvasGlyph, content: code });
+                log.debug(SEG.GLYPH, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
+            }
         }
 
         log.debug(SEG.GLYPH, `[PyGlyph] CodeMirror initialized for ${glyph.id}`);
@@ -239,9 +242,8 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
     }
     const canvasRect = canvas.getBoundingClientRect();
 
-    // TODO(#447): round to int — backend rejects float coordinates
-    const x = pyRect.left - canvasRect.left;
-    const y = pyRect.bottom - canvasRect.top;
+    const x = Math.round(pyRect.left - canvasRect.left);
+    const y = Math.round(pyRect.bottom - canvasRect.top);
 
     // Create result glyph metadata
     const resultGlyphId = `result-${crypto.randomUUID()}`;
@@ -268,7 +270,7 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
         y,
         width: Math.round(resultRect.width),
         height: Math.round(resultRect.height),
-        result: result
+        content: JSON.stringify(result),
     });
 
     // Auto-meld result below py glyph (bottom port)
