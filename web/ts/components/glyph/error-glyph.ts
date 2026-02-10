@@ -14,7 +14,6 @@ import { log, SEG } from '../../logger';
 import { uiState } from '../../state/ui';
 import { applyCanvasGlyphLayout, storeCleanup, cleanupResizeObserver, runCleanup } from './glyph-interaction';
 import { createPromptGlyph } from './prompt-glyph';
-import { getScriptStorage } from '../../storage/script-storage';
 import { MAX_VIEWPORT_HEIGHT_RATIO, CANVAS_GLYPH_TITLE_BAR_HEIGHT } from './glyph';
 
 /**
@@ -338,9 +337,13 @@ async function convertErrorToPrompt(
             }
         };
 
-        // Save template to storage
-        const storage = getScriptStorage();
-        await storage.save(promptGlyph.id, promptTemplate);
+        // Add to uiState BEFORE createPromptGlyph (setupPromptGlyph reads content from uiState)
+        uiState.addCanvasGlyph({
+            id: promptGlyph.id,
+            symbol: SO,
+            x, y, width, height,
+            content: promptTemplate,
+        });
 
         // Create and append prompt element
         const promptElement = await createPromptGlyph(promptGlyph);
@@ -351,13 +354,6 @@ async function convertErrorToPrompt(
         errorElement.remove();
 
         container.appendChild(promptElement);
-
-        // Update state
-        uiState.addCanvasGlyph({
-            id: promptGlyph.id,
-            symbol: SO,
-            x, y, width, height,
-        });
 
         log.info(SEG.GLYPH, `[ErrorGlyph] Converted error to debug prompt ${promptGlyph.id}`);
     } catch (err) {
