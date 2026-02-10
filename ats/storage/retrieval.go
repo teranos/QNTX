@@ -91,6 +91,17 @@ func GetAttestations(db *sql.DB, filters ats.AttestationFilter) ([]*types.As, er
 	return attestations, nil
 }
 
+// unmarshalJSONField unmarshals a JSON string into dest with contextual error wrapping
+func unmarshalJSONField(jsonStr string, dest interface{}, fieldName string, asID string) error {
+	if err := json.Unmarshal([]byte(jsonStr), dest); err != nil {
+		err = errors.Wrapf(err, "failed to unmarshal %s", fieldName)
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", asID))
+		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", jsonStr))
+		return err
+	}
+	return nil
+}
+
 // ScanAttestation scans a database row into an As struct
 func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 	var as types.As
@@ -113,40 +124,22 @@ func ScanAttestation(rows *sql.Rows) (*types.As, error) {
 	}
 
 	// Unmarshal JSON fields
-	if err := json.Unmarshal([]byte(subjectsJSON), &as.Subjects); err != nil {
-		err = errors.Wrap(err, "failed to unmarshal subjects")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", subjectsJSON))
+	if err := unmarshalJSONField(subjectsJSON, &as.Subjects, "subjects", as.ID); err != nil {
 		return nil, err
 	}
-
-	if err := json.Unmarshal([]byte(predicatesJSON), &as.Predicates); err != nil {
-		err = errors.Wrap(err, "failed to unmarshal predicates")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", predicatesJSON))
+	if err := unmarshalJSONField(predicatesJSON, &as.Predicates, "predicates", as.ID); err != nil {
 		return nil, err
 	}
-
-	if err := json.Unmarshal([]byte(contextsJSON), &as.Contexts); err != nil {
-		err = errors.Wrap(err, "failed to unmarshal contexts")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", contextsJSON))
+	if err := unmarshalJSONField(contextsJSON, &as.Contexts, "contexts", as.ID); err != nil {
 		return nil, err
 	}
-
-	if err := json.Unmarshal([]byte(actorsJSON), &as.Actors); err != nil {
-		err = errors.Wrap(err, "failed to unmarshal actors")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("JSON: %s", actorsJSON))
+	if err := unmarshalJSONField(actorsJSON, &as.Actors, "actors", as.ID); err != nil {
 		return nil, err
 	}
 
 	// Handle nullable attributes field
 	if attributesJSON.Valid && attributesJSON.String != "null" && attributesJSON.String != "" {
-		if err := json.Unmarshal([]byte(attributesJSON.String), &as.Attributes); err != nil {
-			err = errors.Wrap(err, "failed to unmarshal attributes")
-			err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-			err = errors.WithDetail(err, fmt.Sprintf("JSON length: %d bytes", len(attributesJSON.String)))
+		if err := unmarshalJSONField(attributesJSON.String, &as.Attributes, "attributes", as.ID); err != nil {
 			return nil, err
 		}
 	}

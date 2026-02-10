@@ -26,60 +26,40 @@ func (qb *queryBuilder) build() string {
 	return strings.Join(qb.whereClauses, " AND ")
 }
 
-// buildSubjectFilter creates LIKE clauses for subject matching (OR logic)
+// buildFieldFilter creates LIKE clauses for matching values in a JSON column (OR logic).
+// If caseInsensitive is true, adds COLLATE NOCASE to the LIKE clause.
+func (qb *queryBuilder) buildFieldFilter(column string, values []string, caseInsensitive bool) {
+	if len(values) == 0 {
+		return
+	}
+
+	likeExpr := column + " LIKE ? ESCAPE '\\'"
+	if caseInsensitive {
+		likeExpr = column + " LIKE ? COLLATE NOCASE ESCAPE '\\'"
+	}
+
+	clauses := make([]string, len(values))
+	for i, v := range values {
+		clauses[i] = likeExpr
+		qb.args = append(qb.args, "%\""+escapeLikePattern(v)+"\"%")
+	}
+	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(clauses, " OR ")+")")
+}
+
 func (qb *queryBuilder) buildSubjectFilter(subjects []string) {
-	if len(subjects) == 0 {
-		return
-	}
-
-	var subjectClauses []string
-	for _, subject := range subjects {
-		subjectClauses = append(subjectClauses, "subjects LIKE ? ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(subject)+"\"%")
-	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(subjectClauses, " OR ")+")")
+	qb.buildFieldFilter("subjects", subjects, false)
 }
 
-// buildPredicateFilter creates LIKE clauses for predicate matching (OR logic)
 func (qb *queryBuilder) buildPredicateFilter(predicates []string) {
-	if len(predicates) == 0 {
-		return
-	}
-
-	var predicateClauses []string
-	for _, predicate := range predicates {
-		predicateClauses = append(predicateClauses, "predicates LIKE ? ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(predicate)+"\"%")
-	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(predicateClauses, " OR ")+")")
+	qb.buildFieldFilter("predicates", predicates, false)
 }
 
-// buildContextFilter creates LIKE clauses for context matching (OR logic)
 func (qb *queryBuilder) buildContextFilter(contexts []string) {
-	if len(contexts) == 0 {
-		return
-	}
-
-	var contextClauses []string
-	for _, context := range contexts {
-		contextClauses = append(contextClauses, "contexts LIKE ? COLLATE NOCASE ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(context)+"\"%")
-	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(contextClauses, " OR ")+")")
+	qb.buildFieldFilter("contexts", contexts, true)
 }
 
-// buildActorFilter creates LIKE clauses for actor matching (OR logic)
 func (qb *queryBuilder) buildActorFilter(actors []string) {
-	if len(actors) == 0 {
-		return
-	}
-
-	var actorClauses []string
-	for _, actor := range actors {
-		actorClauses = append(actorClauses, "actors LIKE ? ESCAPE '\\'")
-		qb.args = append(qb.args, "%\""+escapeLikePattern(actor)+"\"%")
-	}
-	qb.whereClauses = append(qb.whereClauses, "("+strings.Join(actorClauses, " OR ")+")")
+	qb.buildFieldFilter("actors", actors, false)
 }
 
 // escapeLikePattern escapes special characters in LIKE patterns for SQL ESCAPE clause

@@ -27,58 +27,51 @@ type AttestationFields struct {
 	AttributesJSON string
 }
 
+// marshalField marshals a value to JSON with contextual error wrapping
+func marshalField(fieldName string, value interface{}, asID string) (string, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to marshal %s", fieldName)
+		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", asID))
+		err = errors.WithDetail(err, fmt.Sprintf("%s: %v", fieldName, value))
+		return "", err
+	}
+	return string(data), nil
+}
+
 // MarshalAttestationFields marshals all attestation array/map fields to JSON
 func MarshalAttestationFields(as *types.As) (*AttestationFields, error) {
 	if as == nil {
 		return nil, errors.New("attestation is nil")
 	}
 
-	subjectsJSON, err := json.Marshal(as.Subjects)
+	subjectsJSON, err := marshalField("subjects", as.Subjects, as.ID)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal subjects")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("Subjects: %v", as.Subjects))
 		return nil, err
 	}
-
-	predicatesJSON, err := json.Marshal(as.Predicates)
+	predicatesJSON, err := marshalField("predicates", as.Predicates, as.ID)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal predicates")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("Predicates: %v", as.Predicates))
 		return nil, err
 	}
-
-	contextsJSON, err := json.Marshal(as.Contexts)
+	contextsJSON, err := marshalField("contexts", as.Contexts, as.ID)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal contexts")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("Contexts: %v", as.Contexts))
 		return nil, err
 	}
-
-	actorsJSON, err := json.Marshal(as.Actors)
+	actorsJSON, err := marshalField("actors", as.Actors, as.ID)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal actors")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("Actors: %v", as.Actors))
 		return nil, err
 	}
-
-	attributesJSON, err := json.Marshal(as.Attributes)
+	attributesJSON, err := marshalField("attributes", as.Attributes, as.ID)
 	if err != nil {
-		err = errors.Wrap(err, "failed to marshal attributes")
-		err = errors.WithDetail(err, fmt.Sprintf("Attestation ID: %s", as.ID))
-		err = errors.WithDetail(err, fmt.Sprintf("Attribute count: %d", len(as.Attributes)))
 		return nil, err
 	}
 
 	return &AttestationFields{
-		SubjectsJSON:   string(subjectsJSON),
-		PredicatesJSON: string(predicatesJSON),
-		ContextsJSON:   string(contextsJSON),
-		ActorsJSON:     string(actorsJSON),
-		AttributesJSON: string(attributesJSON),
+		SubjectsJSON:   subjectsJSON,
+		PredicatesJSON: predicatesJSON,
+		ContextsJSON:   contextsJSON,
+		ActorsJSON:     actorsJSON,
+		AttributesJSON: attributesJSON,
 	}, nil
 }
 

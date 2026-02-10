@@ -33,84 +33,52 @@ func NewSQLQueryStoreWithExpander(db *sql.DB, expander ats.QueryExpander) *SQLQu
 	}
 }
 
-// GetAllPredicates returns all distinct predicates in the database
-func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
-	query := `
-		SELECT DISTINCT predicates
+// getAllDistinctValues returns all distinct non-placeholder values from a JSON array column
+func (s *SQLQueryStore) getAllDistinctValues(ctx context.Context, column string) ([]string, error) {
+	query := fmt.Sprintf(`
+		SELECT DISTINCT %s
 		FROM attestations
-		WHERE predicates != '["_"]' AND predicates != '[]'
-	`
+		WHERE %s != '["_"]' AND %s != '[]'
+	`, column, column, column)
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		err = errors.Wrap(err, "failed to query predicates")
-		err = errors.WithDetail(err, "Operation: GetAllPredicates")
+		err = errors.Wrapf(err, "failed to query %s", column)
+		err = errors.WithDetail(err, fmt.Sprintf("Operation: GetAll(%s)", column))
 		return nil, err
 	}
 	defer rows.Close()
 
-	var allPredicates []string
-	seenPredicates := make(map[string]bool)
+	var all []string
+	seen := make(map[string]bool)
 
 	for rows.Next() {
-		var predicatesJSON string
-		if err := rows.Scan(&predicatesJSON); err != nil {
-			err = errors.Wrap(err, "failed to scan predicates")
-			err = errors.WithDetail(err, "Operation: GetAllPredicates")
+		var jsonStr string
+		if err := rows.Scan(&jsonStr); err != nil {
+			err = errors.Wrapf(err, "failed to scan %s", column)
+			err = errors.WithDetail(err, fmt.Sprintf("Operation: GetAll(%s)", column))
 			return nil, err
 		}
 
-		// Simple JSON parsing - extract predicates from JSON array
-		predicates := parsePredicatesFromJSON(predicatesJSON)
-		for _, predicate := range predicates {
-			if predicate != "_" && predicate != "" && !seenPredicates[predicate] {
-				allPredicates = append(allPredicates, predicate)
-				seenPredicates[predicate] = true
+		for _, val := range parsePredicatesFromJSON(jsonStr) {
+			if val != "_" && val != "" && !seen[val] {
+				all = append(all, val)
+				seen[val] = true
 			}
 		}
 	}
 
-	return allPredicates, rows.Err()
+	return all, rows.Err()
+}
+
+// GetAllPredicates returns all distinct predicates in the database
+func (s *SQLQueryStore) GetAllPredicates(ctx context.Context) ([]string, error) {
+	return s.getAllDistinctValues(ctx, "predicates")
 }
 
 // GetAllContexts returns all distinct contexts in the database
 func (s *SQLQueryStore) GetAllContexts(ctx context.Context) ([]string, error) {
-	query := `
-		SELECT DISTINCT contexts
-		FROM attestations
-		WHERE contexts != '["_"]' AND contexts != '[]'
-	`
-
-	rows, err := s.db.QueryContext(ctx, query)
-	if err != nil {
-		err = errors.Wrap(err, "failed to query contexts")
-		err = errors.WithDetail(err, "Operation: GetAllContexts")
-		return nil, err
-	}
-	defer rows.Close()
-
-	var allContexts []string
-	seenContexts := make(map[string]bool)
-
-	for rows.Next() {
-		var contextsJSON string
-		if err := rows.Scan(&contextsJSON); err != nil {
-			err = errors.Wrap(err, "failed to scan contexts")
-			err = errors.WithDetail(err, "Operation: GetAllContexts")
-			return nil, err
-		}
-
-		// Simple JSON parsing - extract contexts from JSON array
-		contexts := parsePredicatesFromJSON(contextsJSON) // Reuse the JSON parser
-		for _, context := range contexts {
-			if context != "_" && context != "" && !seenContexts[context] {
-				allContexts = append(allContexts, context)
-				seenContexts[context] = true
-			}
-		}
-	}
-
-	return allContexts, rows.Err()
+	return s.getAllDistinctValues(ctx, "contexts")
 }
 
 // ExecuteAxQuery executes an ax filter query and returns matching attestations
