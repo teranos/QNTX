@@ -34,6 +34,7 @@ interface PromptGlyphStatus {
 
 /**
  * Save prompt glyph status to localStorage
+ * TODO: Migrate to IndexedDB via storage.ts (localStorage elimination)
  */
 function savePromptStatus(glyphId: string, status: PromptGlyphStatus): void {
     const key = `prompt-status-${glyphId}`;
