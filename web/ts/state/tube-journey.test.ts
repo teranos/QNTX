@@ -235,7 +235,7 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
                     symbol: 'note',
                     x: 200,
                     y: 0,
-                    code: '# Rare Flora Inventory - Kaieteur Falls\n\n' +
+                    content: '# Rare Flora Inventory - Kaieteur Falls\n\n' +
                           '## Priority for Georgetown Sequencing\n' +
                           '- *Heliamphora chimantensis* (pitcher plant) - 3 specimens\n' +
                           '- Unknown orchid sp. - possible new species\n' +
@@ -254,9 +254,9 @@ describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight fie
         expect(merged.glyphs).toHaveLength(1);
         const noteGlyph = merged.glyphs[0];
         expect(noteGlyph.id).toBe('note-parbattie');
-        expect(noteGlyph.code).toContain('Heliamphora chimantensis');
-        expect(noteGlyph.code).toContain('Kaieteur Falls');
-        expect(noteGlyph.code).toContain('Georgetown');
+        expect(noteGlyph.content).toContain('Heliamphora chimantensis');
+        expect(noteGlyph.content).toContain('Kaieteur Falls');
+        expect(noteGlyph.content).toContain('Georgetown');
     });
 
     // TODO(#431): Test conflict resolution for Jenny's own stale offline edits

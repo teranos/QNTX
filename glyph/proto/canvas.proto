@@ -13,8 +13,8 @@ message CanvasGlyph {
   int32 y = 4;                     // Y position in pixels
   int32 width = 5;                 // optional: custom width (0 = use default)
   int32 height = 6;                // optional: custom height (0 = use default)
-  string code = 7;                 // optional: script content for py/ts/prompt/note glyphs
-  string result_data = 8;          // optional: JSON execution result for result glyphs
+  string content = 7;              // glyph content: source code, markdown, template, or JSON result
+  reserved 8;                      // formerly result_data
   string created_at = 9;           // ISO 8601 timestamp
   string updated_at = 10;          // ISO 8601 timestamp
 }

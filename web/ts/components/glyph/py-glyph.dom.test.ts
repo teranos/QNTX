@@ -148,7 +148,7 @@ describe('PyGlyph', () => {
 
             // Check that default code was saved to uiState
             const saved = mockCanvasGlyphs.find(g => g.id === 'py-test-123');
-            expect(saved?.code).toContain('# Python editor');
+            expect(saved?.content).toContain('# Python editor');
         });
 
         test('loads saved code for existing glyph', async () => {
@@ -156,7 +156,7 @@ describe('PyGlyph', () => {
             mockCanvasGlyphs.push({
                 id: 'py-test-123',
                 symbol: 'py',
-                code: 'print("saved code")',
+                content: 'print("saved code")',
                 x: 0,
                 y: 0,
             });
@@ -167,7 +167,7 @@ describe('PyGlyph', () => {
 
             // Verify the saved code was loaded
             const saved = mockCanvasGlyphs.find(g => g.id === 'py-test-123');
-            expect(saved?.code).toBe('print("saved code")');
+            expect(saved?.content).toBe('print("saved code")');
         });
     });
 

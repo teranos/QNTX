@@ -38,7 +38,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultCode = '# Python editor\nprint("Hello from canvas!")\n';
-    const code = existingGlyph?.code ?? defaultCode;
+    const code = existingGlyph?.content ?? defaultCode;
 
     // Calculate initial height based on content (if no saved size)
     const lineCount = code.split('\n').length;
@@ -176,7 +176,7 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
                     const currentCode = update.state.doc.toString();
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                     if (existing) {
-                        uiState.addCanvasGlyph({ ...existing, code: currentCode });
+                        uiState.addCanvasGlyph({ ...existing, content: currentCode });
                         log.debug(SEG.GLYPH, `[PyGlyph] Auto-saved code for ${glyph.id}`);
                     }
                 }, 500);
@@ -202,10 +202,10 @@ export async function createPyGlyph(glyph: Glyph): Promise<HTMLElement> {
         (element as any).editor = editor;
 
         // Save initial code if this is a new glyph (no saved code)
-        if (!existingGlyph?.code) {
+        if (!existingGlyph?.content) {
             const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             if (canvasGlyph) {
-                uiState.addCanvasGlyph({ ...canvasGlyph, code });
+                uiState.addCanvasGlyph({ ...canvasGlyph, content: code });
                 log.debug(SEG.GLYPH, `[PyGlyph] Saved initial code for new glyph ${glyph.id}`);
             }
         }
@@ -270,7 +270,7 @@ function createAndDisplayResultGlyph(pyElement: HTMLElement, result: ExecutionRe
         y,
         width: Math.round(resultRect.width),
         height: Math.round(resultRect.height),
-        result: result
+        content: JSON.stringify(result),
     });
 
     // Auto-meld result below py glyph (bottom port)

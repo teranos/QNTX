@@ -60,7 +60,7 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
 
     // Load note content from canvas state before teardown
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
-    const noteContent = existingGlyph?.code ?? '';
+    const noteContent = existingGlyph?.content ?? '';
 
     // Build new glyph model
     const promptGlyph: Glyph = {
@@ -80,7 +80,7 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
         id: promptGlyph.id,
         symbol: promptGlyph.symbol,
         x, y, width, height,
-        code: noteContent,
+        content: noteContent,
     });
 
     // Tear down old glyph internals, repopulate as prompt
@@ -155,7 +155,7 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
         id: noteGlyph.id,
         symbol: Prose,
         x, y, width, height,
-        code: outputText,
+        content: outputText,
     });
 
     log.info(SEG.GLYPH, `[Result→Note] Converted ${glyphId} → ${noteGlyph.id} (same element)`);

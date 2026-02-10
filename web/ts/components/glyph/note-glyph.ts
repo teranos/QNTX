@@ -42,13 +42,13 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
     // Load saved content from canvas state
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultContent = '# Note\n\nStart typing...';
-    const savedContent = existingGlyph?.code;
+    const savedContent = existingGlyph?.content;
 
     // Save initial content immediately if this is a new glyph
     // This prevents race condition with auto-save if user starts typing quickly
     const contentToUse = savedContent ?? defaultContent;
     if (!savedContent && existingGlyph) {
-        uiState.addCanvasGlyph({ ...existingGlyph, code: defaultContent });
+        uiState.addCanvasGlyph({ ...existingGlyph, content: defaultContent });
         log.debug(SEG.GLYPH, `[Note Glyph] Saved initial content for new glyph ${glyph.id}`);
     }
 
@@ -208,7 +208,7 @@ export async function setupNoteGlyph(element: HTMLElement, glyph: Glyph): Promis
                     const markdown = noteMarkdownSerializer.serialize(editorView.state.doc);
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                     if (existing) {
-                        uiState.addCanvasGlyph({ ...existing, code: markdown });
+                        uiState.addCanvasGlyph({ ...existing, content: markdown });
                         log.debug(SEG.GLYPH, `[Note Glyph] Auto-saved content for ${glyph.id}`);
                     }
                 }, 500);

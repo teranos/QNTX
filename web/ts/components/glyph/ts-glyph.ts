@@ -94,7 +94,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
     // Load code from canvas state or use default
     const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultCode = '// TypeScript editor\nqntx.log("Hello from canvas!")\n';
-    const code = existingGlyph?.code ?? defaultCode;
+    const code = existingGlyph?.content ?? defaultCode;
 
     const lineCount = code.split('\n').length;
     const lineHeight = 24;
@@ -202,7 +202,7 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
                     const currentCode = update.state.doc.toString();
                     const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
                     if (existing) {
-                        uiState.addCanvasGlyph({ ...existing, code: currentCode });
+                        uiState.addCanvasGlyph({ ...existing, content: currentCode });
                         log.debug(SEG.GLYPH, `[TsGlyph] Auto-saved code for ${glyph.id}`);
                     }
                 }, 500);
@@ -225,10 +225,10 @@ export async function createTsGlyph(glyph: Glyph): Promise<HTMLElement> {
 
         (element as any).editor = editor;
 
-        if (!existingGlyph?.code) {
+        if (!existingGlyph?.content) {
             const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
             if (canvasGlyph) {
-                uiState.addCanvasGlyph({ ...canvasGlyph, code });
+                uiState.addCanvasGlyph({ ...canvasGlyph, content: code });
                 log.debug(SEG.GLYPH, `[TsGlyph] Saved initial code for new glyph ${glyph.id}`);
             }
         }
@@ -283,7 +283,7 @@ function createAndDisplayResultGlyph(tsElement: HTMLElement, result: ExecutionRe
         y,
         width: Math.round(resultRect.width),
         height: Math.round(resultRect.height),
-        result,
+        content: JSON.stringify(result),
     });
 
     const tsGlyphId = tsElement.dataset.glyphId;

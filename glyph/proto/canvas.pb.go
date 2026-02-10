@@ -27,14 +27,13 @@ type CanvasGlyph struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Symbol        string                 `protobuf:"bytes,2,opt,name=symbol,proto3" json:"symbol,omitempty"`
-	X             int32                  `protobuf:"varint,3,opt,name=x,proto3" json:"x,omitempty"`                                    // X position in pixels
-	Y             int32                  `protobuf:"varint,4,opt,name=y,proto3" json:"y,omitempty"`                                    // Y position in pixels
-	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`                            // optional: custom width (0 = use default)
-	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`                          // optional: custom height (0 = use default)
-	Code          string                 `protobuf:"bytes,7,opt,name=code,proto3" json:"code,omitempty"`                               // optional: script content for py/ts/prompt/note glyphs
-	ResultData    string                 `protobuf:"bytes,8,opt,name=result_data,json=resultData,proto3" json:"result_data,omitempty"` // optional: JSON execution result for result glyphs
-	CreatedAt     string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`    // ISO 8601 timestamp
-	UpdatedAt     string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`   // ISO 8601 timestamp
+	X             int32                  `protobuf:"varint,3,opt,name=x,proto3" json:"x,omitempty"`                                  // X position in pixels
+	Y             int32                  `protobuf:"varint,4,opt,name=y,proto3" json:"y,omitempty"`                                  // Y position in pixels
+	Width         int32                  `protobuf:"varint,5,opt,name=width,proto3" json:"width,omitempty"`                          // optional: custom width (0 = use default)
+	Height        int32                  `protobuf:"varint,6,opt,name=height,proto3" json:"height,omitempty"`                        // optional: custom height (0 = use default)
+	Content       string                 `protobuf:"bytes,7,opt,name=content,proto3" json:"content,omitempty"`                       // glyph content: source code, markdown, template, or JSON result
+	CreatedAt     string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`  // ISO 8601 timestamp
+	UpdatedAt     string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // ISO 8601 timestamp
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -111,16 +110,9 @@ func (x *CanvasGlyph) GetHeight() int32 {
 	return 0
 }
 
-func (x *CanvasGlyph) GetCode() string {
+func (x *CanvasGlyph) GetContent() string {
 	if x != nil {
-		return x.Code
-	}
-	return ""
-}
-
-func (x *CanvasGlyph) GetResultData() string {
-	if x != nil {
-		return x.ResultData
+		return x.Content
 	}
 	return ""
 }
@@ -283,22 +275,20 @@ var File_glyph_proto_canvas_proto protoreflect.FileDescriptor
 
 const file_glyph_proto_canvas_proto_rawDesc = "" +
 	"\n" +
-	"\x18glyph/proto/canvas.proto\x12\x05glyph\"\xf2\x01\n" +
+	"\x18glyph/proto/canvas.proto\x12\x05glyph\"\xdd\x01\n" +
 	"\vCanvasGlyph\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12\f\n" +
 	"\x01x\x18\x03 \x01(\x05R\x01x\x12\f\n" +
 	"\x01y\x18\x04 \x01(\x05R\x01y\x12\x14\n" +
 	"\x05width\x18\x05 \x01(\x05R\x05width\x12\x16\n" +
-	"\x06height\x18\x06 \x01(\x05R\x06height\x12\x12\n" +
-	"\x04code\x18\a \x01(\tR\x04code\x12\x1f\n" +
-	"\vresult_data\x18\b \x01(\tR\n" +
-	"resultData\x12\x1d\n" +
+	"\x06height\x18\x06 \x01(\x05R\x06height\x12\x18\n" +
+	"\acontent\x18\a \x01(\tR\acontent\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\t \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\tR\tupdatedAt\"o\n" +
+	" \x01(\tR\tupdatedAtJ\x04\b\b\x10\t\"o\n" +
 	"\x0fCompositionEdge\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\tR\x02to\x12\x1c\n" +
