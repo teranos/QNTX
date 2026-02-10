@@ -148,6 +148,11 @@ func (e *Engine) loadWatchers() error {
 			delete(e.parseErrors, w.ID)
 		}
 
+		// Apply edge cursor for meld-edge watchers: skip attestations already processed
+		if w.ActionType == storage.ActionTypeGlyphExecute {
+			e.applyEdgeCursor(w)
+		}
+
 		e.watchers[w.ID] = w
 		// Create rate limiter: MaxFiresPerMinute/60 = fires per second
 		// If MaxFiresPerMinute is 0, rate is 0/60 = 0, which means no fires allowed (QNTX LAW: zero means zero)
@@ -421,6 +426,57 @@ func (e *Engine) executeAction(watcher *storage.Watcher, as *types.As) {
 
 		// Record success
 		e.store.RecordFire(e.ctx, watcher.ID)
+
+		// Update edge cursor for meld-edge watchers to prevent reprocessing on restart
+		if watcher.ActionType == storage.ActionTypeGlyphExecute {
+			e.updateEdgeCursor(watcher, as)
+		}
+	}
+}
+
+// applyEdgeCursor sets TimeStart on a meld-edge watcher's filter based on the stored cursor.
+// This prevents reprocessing attestations that were already handled before a server restart.
+func (e *Engine) applyEdgeCursor(w *storage.Watcher) {
+	var action GlyphExecuteAction
+	if err := json.Unmarshal([]byte(w.ActionData), &action); err != nil || action.CompositionID == "" {
+		return
+	}
+
+	var lastProcessedAt time.Time
+	err := e.db.QueryRowContext(e.ctx,
+		"SELECT last_processed_at FROM composition_edge_cursors WHERE composition_id = ? AND from_glyph_id = ? AND to_glyph_id = ?",
+		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID,
+	).Scan(&lastProcessedAt)
+	if err != nil {
+		return // No cursor yet — first run, process everything
+	}
+
+	// Set TimeStart to cursor timestamp so matchesFilter skips already-processed attestations
+	w.Filter.TimeStart = &lastProcessedAt
+}
+
+// updateEdgeCursor records the last processed attestation for a meld-edge watcher.
+// On server restart, loadWatchers applies the cursor as TimeStart to avoid reprocessing.
+func (e *Engine) updateEdgeCursor(watcher *storage.Watcher, as *types.As) {
+	var action GlyphExecuteAction
+	if err := json.Unmarshal([]byte(watcher.ActionData), &action); err != nil {
+		return
+	}
+	if action.CompositionID == "" {
+		return
+	}
+
+	_, err := e.db.ExecContext(e.ctx, `
+		INSERT INTO composition_edge_cursors (composition_id, from_glyph_id, to_glyph_id, last_processed_id, last_processed_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (composition_id, from_glyph_id, to_glyph_id)
+		DO UPDATE SET last_processed_id = excluded.last_processed_id, last_processed_at = excluded.last_processed_at`,
+		action.CompositionID, action.SourceGlyphID, action.TargetGlyphID, as.ID, as.Timestamp)
+	if err != nil {
+		e.logger.Warnw("Failed to update edge cursor",
+			"watcher_id", watcher.ID,
+			"attestation_id", as.ID,
+			"error", err)
 	}
 }
 
@@ -475,6 +531,8 @@ attestation = json.loads(_attestation_json)
 type GlyphExecuteAction struct {
 	TargetGlyphID   string `json:"target_glyph_id"`
 	TargetGlyphType string `json:"target_glyph_type"`
+	CompositionID   string `json:"composition_id"`
+	SourceGlyphID   string `json:"source_glyph_id"`
 }
 
 // executeGlyph executes a canvas glyph with the triggering attestation
@@ -735,4 +793,8 @@ func (e *Engine) processRetryQueue() {
 // GetStore returns the underlying watcher store for CRUD operations
 func (e *Engine) GetStore() *storage.WatcherStore {
 	return e.store
+}
+
+func (e *Engine) DB() *sql.DB {
+	return e.db
 }
