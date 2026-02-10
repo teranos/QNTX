@@ -29,17 +29,13 @@ import { sendMessage } from '../../websocket';
 import type { Attestation } from '../../generated/proto/plugin/grpc/protocol/atsstore';
 import { queryAttestations, parseQuery } from '../../qntx-wasm';
 import { tooltip } from '../tooltip';
+import { uiState } from '../../state/ui';
 import { syncStateManager } from '../../state/sync-state';
 import { connectivityManager } from '../../connectivity';
 import {
     CANVAS_GLYPH_TITLE_BAR_HEIGHT,
     MAX_VIEWPORT_HEIGHT_RATIO
 } from './glyph';
-
-/**
- * LocalStorage key prefix for ax query persistence
- */
-const QUERY_STORAGE_KEY = 'qntx-ax-query:';
 
 function appendEmptyState(container: HTMLElement): void {
     const empty = document.createElement('div');
@@ -52,30 +48,6 @@ function appendEmptyState(container: HTMLElement): void {
 }
 
 /**
- * Load persisted query from localStorage
- */
-function loadQuery(id: string): string {
-    try {
-        return localStorage.getItem(QUERY_STORAGE_KEY + id) || '';
-    } catch (error) {
-        log.error(SEG.GLYPH, `[AxGlyph] Failed to load query for ${id}:`, error);
-        return '';
-    }
-}
-
-/**
- * Save query to localStorage
- */
-function saveQuery(id: string, query: string): void {
-    try {
-        localStorage.setItem(QUERY_STORAGE_KEY + id, query);
-        log.debug(SEG.GLYPH, `[AxGlyph] Saved query for ${id} (${query.length} chars)`);
-    } catch (error) {
-        log.error(SEG.GLYPH, `[AxGlyph] Failed to save query for ${id}:`, error);
-    }
-}
-
-/**
  * Create an AX glyph using canvasPlaced() with custom title bar (IX pattern).
  *
  * @param glyph - Glyph model with id, position, and size
@@ -84,9 +56,9 @@ function saveQuery(id: string, query: string): void {
 export function createAxGlyph(glyph: Glyph): HTMLElement {
     const glyphId = glyph.id;
 
-    // Load persisted query if available
-    const persistedQuery = loadQuery(glyphId);
-    let currentQuery = persistedQuery;
+    // Load persisted query from canvas state (or glyph argument on restore)
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+    let currentQuery = existingGlyph?.content ?? glyph.content ?? '';
 
     // Symbol (draggable area) — created before canvasPlaced to use as drag handle
     const symbol = document.createElement('span');
@@ -234,7 +206,10 @@ export function createAxGlyph(glyph: Glyph): HTMLElement {
 
         // Debounce save and watcher update for 500ms
         saveTimeout = window.setTimeout(async () => {
-            saveQuery(glyphId, currentQuery);
+            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyphId);
+            if (existing) {
+                uiState.addCanvasGlyph({ ...existing, content: currentQuery });
+            }
 
             if (!currentQuery.trim()) {
                 setColorState('idle');

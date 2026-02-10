@@ -41,6 +41,23 @@ mock.module('../../connectivity', () => ({
     },
 }));
 
+// Mock uiState — ax-glyph reads/writes query via content field
+const mockCanvasGlyphs: any[] = [];
+mock.module('../../state/ui', () => ({
+    uiState: {
+        getCanvasGlyphs: () => mockCanvasGlyphs,
+        addCanvasGlyph: (glyph: any) => {
+            const index = mockCanvasGlyphs.findIndex(g => g.id === glyph.id);
+            if (index >= 0) {
+                mockCanvasGlyphs[index] = glyph;
+            } else {
+                mockCanvasGlyphs.push(glyph);
+            }
+        },
+        loadPersistedState: () => {},
+    },
+}));
+
 mock.module('../../state/sync-state', () => ({
     syncStateManager: {
         subscribe() { return () => {}; },
@@ -86,7 +103,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     beforeEach(() => {
         resetGlobals();
         document.body.innerHTML = '';
-        localStorage.clear();
+        mockCanvasGlyphs.length = 0;
         mockState = 'offline';
         subscribers.clear();
     });
@@ -120,8 +137,8 @@ describe('AX Glyph - Tim (Happy Path)', () => {
         expect(titleBar.style.backgroundColor).toBe('var(--bg-tertiary)');
     });
 
-    test('Tim creates glyph with persisted query from localStorage', () => {
-        localStorage.setItem('qntx-ax-query:ax-tim-4', 'is git');
+    test('Tim creates glyph with persisted query from uiState', () => {
+        mockCanvasGlyphs.push({ id: 'ax-tim-4', symbol: AX, x: 0, y: 0, content: 'is git' });
 
         const element = createAxGlyph(makeGlyph('ax-tim-4'));
 
@@ -130,7 +147,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     });
 
     test('Tim goes online, container and title bar turn teal together', () => {
-        localStorage.setItem('qntx-ax-query:ax-tim-5', 'TEST5');
+        mockCanvasGlyphs.push({ id: 'ax-tim-5', symbol: AX, x: 0, y: 0, content: 'TEST5' });
 
         const element = createAxGlyph(makeGlyph('ax-tim-5'));
         document.body.appendChild(element);
@@ -147,7 +164,7 @@ describe('AX Glyph - Tim (Happy Path)', () => {
     });
 
     test('Tim title bar background always matches container state', () => {
-        localStorage.setItem('qntx-ax-query:ax-tim-6', 'ALICE');
+        mockCanvasGlyphs.push({ id: 'ax-tim-6', symbol: AX, x: 0, y: 0, content: 'ALICE' });
 
         const element = createAxGlyph(makeGlyph('ax-tim-6'));
         document.body.appendChild(element);
@@ -173,7 +190,7 @@ describe('AX Glyph - Spike (Edge Cases)', () => {
     beforeEach(() => {
         resetGlobals();
         document.body.innerHTML = '';
-        localStorage.clear();
+        mockCanvasGlyphs.length = 0;
         mockState = 'offline';
         subscribers.clear();
     });
@@ -194,13 +211,13 @@ describe('AX Glyph - Jenny (Power User)', () => {
     beforeEach(() => {
         resetGlobals();
         document.body.innerHTML = '';
-        localStorage.clear();
+        mockCanvasGlyphs.length = 0;
         mockState = 'online';
         subscribers.clear();
     });
 
     test('Jenny goes offline, AX re-fires local query and turns orange', () => {
-        localStorage.setItem('qntx-ax-query:ax-jenny-1', 'of qntx');
+        mockCanvasGlyphs.push({ id: 'ax-jenny-1', symbol: AX, x: 0, y: 0, content: 'of qntx' });
 
         const element = createAxGlyph(makeGlyph('ax-jenny-1'));
         document.body.appendChild(element);
