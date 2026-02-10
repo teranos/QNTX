@@ -109,8 +109,8 @@ func TestCanvasStore_UpsertGlyph_WithDimensions(t *testing.T) {
 	store := NewCanvasStore(db)
 	ctx := context.Background()
 
-	width := 120
-	height := 80
+	width := int32(120)
+	height := int32(80)
 	glyph := &CanvasGlyph{
 		ID:     "glyph-1",
 		Symbol: "🝗",
