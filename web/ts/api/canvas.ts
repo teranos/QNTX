@@ -5,31 +5,11 @@
  * to the backend database.
  */
 
-import type { CanvasGlyphState, CompositionState, CompositionEdge } from '../state/ui';
+import type { CanvasGlyphState, CompositionState } from '../state/ui';
+import type { CanvasGlyph, Composition } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
 import { syncStateManager } from '../state/sync-state';
-
-export interface CanvasGlyphResponse {
-    id: string;
-    symbol: string;
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-    content?: string;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface CompositionResponse {
-    id: string;
-    edges: CompositionEdge[];
-    x: number;
-    y: number;
-    created_at: string;
-    updated_at: string;
-}
 
 /**
  * Upsert a canvas glyph (create or update)
@@ -106,7 +86,7 @@ export async function deleteCanvasGlyph(id: string): Promise<void> {
 /**
  * List all canvas glyphs
  */
-export async function listCanvasGlyphs(): Promise<CanvasGlyphResponse[]> {
+export async function listCanvasGlyphs(): Promise<CanvasGlyph[]> {
     try {
         const response = await apiFetch('/api/canvas/glyphs');
         if (!response.ok) {
@@ -192,7 +172,7 @@ export async function deleteComposition(id: string): Promise<void> {
 /**
  * List all canvas compositions
  */
-export async function listCompositions(): Promise<CompositionResponse[]> {
+export async function listCompositions(): Promise<Composition[]> {
     try {
         const response = await apiFetch('/api/canvas/compositions');
         if (!response.ok) {
@@ -223,22 +203,13 @@ export async function loadCanvasState(): Promise<{
             listCompositions(),
         ]);
 
-        const glyphs: CanvasGlyphState[] = glyphsResponse.map(g => ({
-            id: g.id,
-            symbol: g.symbol,
-            x: g.x,
-            y: g.y,
-            width: g.width,
-            height: g.height,
-            content: g.content,
-        }));
+        // Strip timestamps from proto types — frontend state doesn't track them
+        const glyphs: CanvasGlyphState[] = glyphsResponse.map(
+            ({ created_at, updated_at, ...state }) => state
+        );
 
-        const compositions: CompositionState[] = compositionsResponse.map(c => ({
-            id: c.id,
-            edges: c.edges,
-            x: c.x,
-            y: c.y,
-        }));
+        // Composition proto type matches CompositionState exactly
+        const compositions: CompositionState[] = compositionsResponse;
 
         log.info(SEG.GLYPH, `[CanvasAPI] Loaded canvas state: ${glyphs.length} glyphs, ${compositions.length} compositions`);
 
