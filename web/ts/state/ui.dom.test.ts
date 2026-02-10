@@ -237,6 +237,7 @@ describe('UIState', () => {
 
     // Persistence tests removed - they checked localStorage implementation details
     // Persistence behavior is tested by storage.dom.test.ts
+    // Canvas merge tests extracted to api/canvas.test.ts (mergeCanvasState is a pure function)
 
     describe('Reset', () => {
         test('reset restores default state', () => {

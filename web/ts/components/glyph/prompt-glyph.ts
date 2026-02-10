@@ -15,7 +15,6 @@
 import type { Glyph } from './glyph';
 import { SO } from '@generated/sym.js';
 import { log, SEG } from '../../logger';
-import { getScriptStorage } from '../../storage/script-storage';
 import { apiFetch } from '../../api';
 import { preventDrag, storeCleanup } from './glyph-interaction';
 import { canvasPlaced } from './manifestations/canvas-placed';
@@ -73,10 +72,10 @@ export async function createPromptGlyph(glyph: Glyph): Promise<HTMLElement> {
  * Caller must runCleanup() and clear children before calling on an existing element.
  */
 export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Promise<void> {
-    // Load saved template from storage
-    const storage = getScriptStorage();
+    // Load saved template from canvas state
+    const existingGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
     const defaultTemplate = '---\nmodel: "anthropic/claude-haiku-4.5"\ntemperature: 0.7\nmax_tokens: 1000\n---\nWrite a haiku about quantum computing.\n';
-    const savedTemplate = await storage.load(glyph.id) ?? defaultTemplate;
+    const savedTemplate = existingGlyph?.content ?? defaultTemplate;
 
     // Load saved status
     const savedStatus = loadPromptStatus(glyph.id) ?? { state: 'idle' };
@@ -104,9 +103,12 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
         if (saveTimeout !== undefined) {
             clearTimeout(saveTimeout);
         }
-        saveTimeout = window.setTimeout(async () => {
-            await storage.save(glyph.id, textarea.value);
-            log.debug(SEG.GLYPH, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
+        saveTimeout = window.setTimeout(() => {
+            const existing = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+            if (existing) {
+                uiState.addCanvasGlyph({ ...existing, content: textarea.value });
+                log.debug(SEG.GLYPH, `[Prompt Glyph] Auto-saved template for ${glyph.id}`);
+            }
         }, 500);
     });
 
@@ -285,8 +287,11 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
     element.appendChild(content);
 
     // Save initial template if new glyph
-    if (!(await storage.load(glyph.id))) {
-        await storage.save(glyph.id, defaultTemplate);
+    if (!existingGlyph?.content) {
+        const canvasGlyph = uiState.getCanvasGlyphs().find(g => g.id === glyph.id);
+        if (canvasGlyph) {
+            uiState.addCanvasGlyph({ ...canvasGlyph, content: defaultTemplate });
+        }
     }
 
     // Register cleanup for conversions (drag/resize handled by canvasPlaced)
@@ -335,7 +340,7 @@ export async function setupPromptGlyph(element: HTMLElement, glyph: Glyph): Prom
             y: ry,
             width: Math.round(resultRect.width),
             height: Math.round(resultRect.height),
-            result,
+            content: JSON.stringify(result),
         });
 
         // Auto-meld result below prompt glyph (bottom port)

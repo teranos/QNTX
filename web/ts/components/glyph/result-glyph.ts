@@ -195,7 +195,7 @@ export function createResultGlyph(
     element.appendChild(outputContainer);
 
     // Ensure result data is attached to glyph object for drag persistence
-    (glyph as any).result = result;
+    (glyph as any).content = JSON.stringify(result);
 
     return element;
 }

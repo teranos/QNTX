@@ -271,14 +271,14 @@ export function createCanvasGlyph(): Glyph {
         symbols: savedGlyphs.map(g => g.symbol),
         resultGlyphs: savedGlyphs.filter(g => g.symbol === 'result').map(g => ({
             id: g.id,
-            hasResult: !!g.result
+            hasContent: !!g.content
         }))
     });
 
     const glyphs: Glyph[] = savedGlyphs.map(saved => {
         if (saved.symbol === 'result') {
             log.debug(SEG.GLYPH, `[Canvas] Restoring result glyph ${saved.id}`, {
-                hasResult: !!saved.result,
+                hasContent: !!saved.content,
                 x: saved.x,
                 y: saved.y
             });
@@ -293,7 +293,7 @@ export function createCanvasGlyph(): Glyph {
             y: saved.y,
             width: saved.width,
             height: saved.height,
-            result: saved.result,
+            content: saved.content,
             renderContent: () => document.createElement('div'),
         };
     });
@@ -481,37 +481,54 @@ export function createCanvasGlyph(): Glyph {
 async function renderGlyph(glyph: Glyph): Promise<HTMLElement> {
     log.debug(SEG.GLYPH, `[Canvas] Rendering glyph ${glyph.id}`, {
         symbol: glyph.symbol,
-        hasResult: !!glyph.result
+        hasContent: !!glyph.content
     });
 
-    // Result without execution data → diagnostic error glyph
-    if (glyph.symbol === 'result' && !glyph.result) {
-        log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing execution data`, {
-            glyphId: glyph.id,
-            position: { x: glyph.x, y: glyph.y },
-            size: { width: glyph.width, height: glyph.height }
-        });
+    // Result glyphs: parse content JSON to get ExecutionResult
+    if (glyph.symbol === 'result') {
+        if (!glyph.content) {
+            log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} missing content`, {
+                glyphId: glyph.id,
+                position: { x: glyph.x, y: glyph.y },
+                size: { width: glyph.width, height: glyph.height }
+            });
 
-        return createErrorGlyph(
-            glyph.id,
-            'result',
-            { x: glyph.x ?? 200, y: glyph.y ?? 200 },
-            {
-                type: 'missing_data',
-                message: 'Execution result data missing',
-                details: {
-                    'Has result': false,
-                    'Position': `(${glyph.x}, ${glyph.y})`,
-                    'Size': `${glyph.width}x${glyph.height}`,
-                    'Cause': 'Glyph metadata saved without execution result (migration bug)'
+            return createErrorGlyph(
+                glyph.id,
+                'result',
+                { x: glyph.x ?? 200, y: glyph.y ?? 200 },
+                {
+                    type: 'missing_data',
+                    message: 'Execution result data missing',
+                    details: {
+                        'Has content': false,
+                        'Position': `(${glyph.x}, ${glyph.y})`,
+                        'Size': `${glyph.width}x${glyph.height}`,
+                        'Cause': 'Glyph metadata saved without execution result (migration bug)'
+                    }
                 }
-            }
-        );
-    }
+            );
+        }
 
-    // Result glyphs with valid data — handled explicitly (not in registry, always created programmatically)
-    if (glyph.symbol === 'result' && glyph.result) {
-        return createResultGlyph(glyph, glyph.result);
+        try {
+            const result = JSON.parse(glyph.content);
+            return createResultGlyph(glyph, result);
+        } catch (err) {
+            log.error(SEG.GLYPH, `[Canvas] Result glyph ${glyph.id} has invalid JSON content`, err);
+            return createErrorGlyph(
+                glyph.id,
+                'result',
+                { x: glyph.x ?? 200, y: glyph.y ?? 200 },
+                {
+                    type: 'parse_failed',
+                    message: 'Failed to parse execution result JSON',
+                    details: {
+                        'Content length': glyph.content.length,
+                        'Content preview': glyph.content.substring(0, 100),
+                    }
+                }
+            );
+        }
     }
 
     // Look up glyph type in registry
