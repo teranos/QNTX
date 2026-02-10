@@ -75,10 +75,10 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
         }
     };
 
-    // Create new canvas glyph with transferred content (setupPromptGlyph will load from uiState)
+    // Add to uiState BEFORE setupPromptGlyph (it reads content from uiState)
     uiState.addCanvasGlyph({
         id: promptGlyph.id,
-        symbol: promptGlyph.symbol,
+        symbol: SO,
         x, y, width, height,
         content: noteContent,
     });
@@ -88,13 +88,8 @@ export async function convertNoteToPrompt(container: HTMLElement, glyphId: strin
     element.replaceChildren();
     await setupPromptGlyph(element, promptGlyph);
 
-    // Update state atomically
+    // Update state atomically — remove old, keep the already-added new glyph
     uiState.removeCanvasGlyph(glyphId);
-    uiState.addCanvasGlyph({
-        id: promptGlyph.id,
-        symbol: SO,
-        x, y, width, height,
-    });
 
     log.info(SEG.GLYPH, `[Note→Prompt] Converted ${glyphId} → ${promptGlyph.id} (same element)`);
     return true;
@@ -144,19 +139,21 @@ export async function convertResultToNote(container: HTMLElement, glyphId: strin
         }
     };
 
-    // Tear down old glyph internals, repopulate as note
-    runCleanup(element);
-    element.replaceChildren();
-    await setupNoteGlyph(element, noteGlyph);
-
-    // Update state atomically (setupNoteGlyph loads from uiState)
-    uiState.removeCanvasGlyph(glyphId);
+    // Add to uiState BEFORE setupNoteGlyph (it reads content from uiState)
     uiState.addCanvasGlyph({
         id: noteGlyph.id,
         symbol: Prose,
         x, y, width, height,
         content: outputText,
     });
+
+    // Tear down old glyph internals, repopulate as note
+    runCleanup(element);
+    element.replaceChildren();
+    await setupNoteGlyph(element, noteGlyph);
+
+    // Remove old glyph from state
+    uiState.removeCanvasGlyph(glyphId);
 
     log.info(SEG.GLYPH, `[Result→Note] Converted ${glyphId} → ${noteGlyph.id} (same element)`);
     return true;
