@@ -87,7 +87,7 @@ describe('Glyph Conversions - Tim (Happy Path)', () => {
             symbol: Prose,
             x: 0,
             y: 0,
-            code: 'Write a haiku about canvas',
+            content: 'Write a haiku about canvas',
         });
 
         // Tim clicks "convert to prompt"
@@ -208,7 +208,7 @@ describe('Glyph Conversions - Jenny (Complex Scenarios)', () => {
             symbol: Prose,
             x: 0,
             y: 0,
-            code: 'Note inside composition',
+            content: 'Note inside composition',
         });
 
         // Jenny tries to convert the note inside the composition
