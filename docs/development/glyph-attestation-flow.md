@@ -13,60 +13,52 @@ Before building anything, verify the full path attestations already travel. The 
 
 ### 1.1 Trace AX → watcher → broadcast → frontend
 
-- [ ] Confirm AX glyph sends `watcher_upsert` on query change
-  - `web/ts/components/glyph/ax-glyph.ts:204-211` — sends `watcher_upsert` via WebSocket with `watcher_id: ax-glyph-{glyphId}`
-  - Verify: type in AX glyph, check server logs for "Watcher upsert request"
+- [x] Confirm AX glyph sends `watcher_upsert` on query change
+  - `web/ts/components/glyph/ax-glyph.ts:177-183` — sends `watcher_upsert` via WebSocket with `watcher_id: ax-glyph-{glyphId}`
 
-- [ ] Confirm server creates watcher from WebSocket message
-  - `server/client.go:1025-1105` — `handleWatcherUpsert()` creates `storage.Watcher` with `AxQuery` field, persists to DB, calls `ReloadWatchers()`
-  - Verify: after typing in AX glyph, query `SELECT * FROM watchers` in SQLite
+- [x] Confirm server creates watcher from WebSocket message
+  - `server/client.go:1025-1148` — `handleWatcherUpsert()` creates `storage.Watcher` with `AxQuery` field, persists to DB, calls `ReloadWatchers()`
 
-- [ ] Confirm watcher engine parses AX query into filter
+- [x] Confirm watcher engine parses AX query into filter
   - `ats/watcher/engine.go:112-154` — `loadWatchers()` calls `parser.ParseAxCommandWithContext()` on `w.AxQuery`, merges into `w.Filter`
-  - Verify: check logs for parse errors or successful load
 
-- [ ] Confirm `OnAttestationCreated` matches and broadcasts
-  - `ats/watcher/engine.go:290-340` — iterates watchers, calls `matchesFilter()`, then `broadcastMatch()` callback
-  - `server/broadcast.go:746-749` — broadcasts as `watcher_match` message type
-  - Verify: create attestation via CLI (`as contact alice`), watch for `watcher_match` in browser WS devtools
+- [x] Confirm `OnAttestationCreated` matches and broadcasts
+  - `ats/watcher/engine.go:288-340` — iterates watchers, calls `matchesFilter()`, then `broadcastMatch()` callback
+  - `server/watcher_handlers.go:352-379` — broadcasts as `watcher_match` message type
 
-- [ ] Confirm frontend receives and routes `watcher_match`
-  - `web/ts/websocket.ts:161-178` — extracts glyph ID from `ax-glyph-{id}` prefix, calls `updateAxGlyphResults()`
-  - Verify: AX glyph shows new attestation in results after CLI `as` command
+- [x] Confirm frontend receives and routes `watcher_match`
+  - `web/ts/websocket.ts:161-179` — extracts glyph ID from `ax-glyph-{id}` prefix, calls `updateAxGlyphResults()`
 
 ### 1.2 Trace watcher action dispatch
 
-- [ ] Understand current `executeAction` dispatch
-  - `ats/watcher/engine.go:383-414` — switches on `ActionType`: python, webhook
+- [x] Understand current `executeAction` dispatch
+  - `ats/watcher/engine.go:383-414` — switches on `ActionType`: python, webhook, llm_prompt
   - `ats/watcher/engine.go:416-461` — `executePython()`: injects attestation as JSON string prepended to Python code, POSTs to `/api/python/execute`
   - Note: AX glyph watchers have `ActionData: ""` (empty), `ActionType: python` — they broadcast matches but don't execute code
 
-- [ ] Map the gap: broadcast exists, action execution doesn't trigger for AX glyph watchers
-  - The watcher engine has two paths: `broadcastMatch` (always, for UI) and `executeAction` (gated by `MaxFiresPerMinute > 0` and `ActionData` content)
-  - AX glyph watchers use broadcast only — no action dispatch today
+- [x] Map the gap: broadcast exists, action execution doesn't trigger for AX glyph watchers
+  - The watcher engine has two paths: `broadcastMatch` (always, for UI) and `executeAction` (gated by `MaxFiresPerMinute > 0`)
+  - AX glyph watchers use broadcast only — no `glyph_execute` action type exists yet
 
 ### 1.3 Trace composition edge availability
 
-- [ ] Confirm composition edges reach the backend
-  - `web/ts/components/glyph/meld/meld-composition.ts:131` — calls `addComposition()` which POSTs to `/api/canvas/compositions`
-  - `glyph/handlers/canvas.go:172-186` — `handleUpsertComposition()` stores edges in DB
+- [x] Confirm composition edges reach the backend
+  - `web/ts/components/glyph/meld/meld-composition.ts:131` → `addComposition()` → `POST /api/canvas/compositions`
+  - `glyph/handlers/canvas.go:172-186` — `handleUpsertComposition()` decodes and delegates to `canvas_store.go:205-262` (transactional insert)
   - `db/sqlite/migrations/021_dag_composition_edges.sql` — `composition_edges` table: `(composition_id, from_glyph_id, to_glyph_id, direction, position)`
-  - Verify: meld two glyphs, query `SELECT * FROM composition_edges`
 
-- [ ] Confirm edge data includes glyph types (or can be resolved)
-  - Edges store glyph IDs, not glyph types
-  - Glyph type stored in `canvas_glyphs` table (check schema for `type` or `class` column)
-  - Verify: `SELECT * FROM canvas_glyphs` — identify which column carries glyph type
+- [x] Confirm edge data includes glyph types (or can be resolved)
+  - Edges store glyph IDs only, not glyph types
+  - Glyph type stored in `canvas_glyphs.symbol` column (`db/sqlite/migrations/019_create_canvas_state_tables.sql`)
 
 ### 1.4 Map the python execution request shape
 
-- [ ] Document current `/api/python/execute` request
-  - Request body: `{"code": string, "capture_variables": bool}`
-  - No glyph ID, no upstream attestation, no composition context
-  - The plugin receives HTTP via gRPC proxy: `plugin/grpc/server.go:217` — `HandleHTTP()` forwards to Rust plugin
+- [x] Document current `/api/python/execute` request
+  - Request body: `{"code": string}` — no glyph ID, no upstream attestation, no composition context
+  - Watcher engine calls it at `ats/watcher/engine.go:442`
 
-- [ ] Document `attest()` actor field
-  - `qntx-python/src/atsstore.rs:183-189` — `actors: Option<Vec<String>>`, defaults to empty via `unwrap_or_default()`
+- [x] Document `attest()` actor field
+  - `qntx-python/src/atsstore.rs:181-213` — `actors: Option<Vec<String>>`, defaults to empty via `unwrap_or_default()`
   - No glyph identity injected — attestations from `attest()` have no actor unless user explicitly passes one
 
 **Manual verification for Phase 1:**
