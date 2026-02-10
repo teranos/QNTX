@@ -164,27 +164,55 @@ async function init(): Promise<void> {
     // Load persisted UI state from IndexedDB (must happen after initStorage())
     uiState.loadPersistedState();
 
-    // Sync local glyphs to backend (ensures backend has all existing glyphs)
-    // This is a one-way sync: local → backend, to preserve any glyphs created before backend persistence
+    // Bidirectional canvas state sync: merge backend state into local, then push local to backend.
+    // This ensures new clients receive canvas state from previous sessions on other devices,
+    // while preserving any locally-created glyphs that haven't been synced yet.
     try {
         if (window.logLoaderStep) window.logLoaderStep('Syncing canvas state...', false, true);
-        const { upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+        const { loadCanvasState, upsertCanvasGlyph, upsertComposition } = await import('./api/canvas.ts');
+
+        // Load backend state and merge items not present locally.
+        // Uses setCanvasGlyphs/setCanvasCompositions (bulk setters) to avoid
+        // triggering per-item backend upserts -- the sync loop below handles that.
+        try {
+            const backendState = await loadCanvasState();
+            const localGlyphs = uiState.getCanvasGlyphs();
+            const localComps = uiState.getCanvasCompositions();
+            const localGlyphIds = new Set(localGlyphs.map(g => g.id));
+            const localCompIds = new Set(localComps.map(c => c.id));
+
+            const newGlyphs = backendState.glyphs.filter(g => !localGlyphIds.has(g.id));
+            const newComps = backendState.compositions.filter(c => !localCompIds.has(c.id));
+
+            if (newGlyphs.length > 0) {
+                uiState.setCanvasGlyphs([...localGlyphs, ...newGlyphs]);
+            }
+            if (newComps.length > 0) {
+                uiState.setCanvasCompositions([...localComps, ...newComps]);
+            }
+
+            if (newGlyphs.length > 0 || newComps.length > 0) {
+                log.info(SEG.GLYPH, `[Init] Merged ${newGlyphs.length} glyphs and ${newComps.length} compositions from backend`);
+            }
+        } catch (error: unknown) {
+            log.warn(SEG.GLYPH, '[Init] Failed to load canvas state from backend, continuing with local state:', error);
+        }
+
+        // Push local state to backend (ensures backend has all glyphs including locally-created ones)
         const localGlyphs = uiState.getCanvasGlyphs();
         const localCompositions = uiState.getCanvasCompositions();
 
-        // Sync all local glyphs to backend (parallel for speed)
         const glyphSyncPromises = localGlyphs.map(glyph =>
             upsertCanvasGlyph(glyph).catch(err => {
                 log.error(SEG.GLYPH, `Failed to sync glyph ${glyph.id}:`, err);
-                return null; // Mark as failed but don't block other syncs
+                return null;
             })
         );
 
-        // Sync all local compositions to backend (parallel for speed)
         const compSyncPromises = localCompositions.map(comp =>
             upsertComposition(comp).catch(err => {
                 log.error(SEG.GLYPH, `Failed to sync composition ${comp.id}:`, err);
-                return null; // Mark as failed but don't block other syncs
+                return null;
             })
         );
 
