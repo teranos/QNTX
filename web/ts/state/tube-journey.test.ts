@@ -24,6 +24,8 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { syncStateManager, type GlyphSyncState } from './sync-state';
+import { mergeCanvasState } from '../api/canvas';
+import type { CanvasGlyphState, CompositionState } from './ui';
 
 /**
  * Helper to determine expected visual state based on connectivity and sync state
@@ -91,6 +93,187 @@ function getExpectedVisualState(
         description
     };
 }
+
+// --- Canvas state merge ---
+//
+// mergeCanvasState reconciles local (IndexedDB) and backend (SQLite) canvas state
+// on startup. Local wins on ID conflict. This is the mechanism that delivers
+// overnight work to a new client.
+
+function glyph(id: string, overrides: Partial<CanvasGlyphState> = {}): CanvasGlyphState {
+    return { id, symbol: 'ax', x: 0, y: 0, ...overrides };
+}
+
+function composition(id: string, overrides: Partial<CompositionState> = {}): CompositionState {
+    return { id, edges: [], x: 0, y: 0, ...overrides };
+}
+
+const emptyCanvas = { glyphs: [] as CanvasGlyphState[], compositions: [] as CompositionState[] };
+
+describe('mergeCanvasState', () => {
+    test('backend-only items appended to local state', () => {
+        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
+        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
+        const result = mergeCanvasState(local, backend);
+
+        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
+        expect(result.mergedGlyphs).toBe(1);
+    });
+
+    test('local wins on ID conflict', () => {
+        const local = { ...emptyCanvas, glyphs: [glyph('a', { x: 50, y: 50 })] };
+        const backend = { ...emptyCanvas, glyphs: [glyph('a', { x: 0, y: 0 })] };
+        const result = mergeCanvasState(local, backend);
+
+        expect(result.glyphs).toHaveLength(1);
+        expect(result.glyphs[0].x).toBe(50);
+        expect(result.mergedGlyphs).toBe(0);
+    });
+
+    test('empty backend returns same reference (no copy)', () => {
+        const local = { ...emptyCanvas, glyphs: [glyph('a')] };
+        const result = mergeCanvasState(local, emptyCanvas);
+
+        expect(result.glyphs).toBe(local.glyphs);
+        expect(result.mergedGlyphs).toBe(0);
+    });
+
+    test('empty local receives all backend items', () => {
+        const backend = { ...emptyCanvas, glyphs: [glyph('a'), glyph('b')] };
+        const result = mergeCanvasState(emptyCanvas, backend);
+
+        expect(result.glyphs.map(g => g.id)).toEqual(['a', 'b']);
+        expect(result.mergedGlyphs).toBe(2);
+    });
+
+    test('glyphs and compositions merge independently', () => {
+        const local = { glyphs: [glyph('g1')], compositions: [composition('c1')] };
+        const backend = {
+            glyphs: [glyph('g1'), glyph('g2')],
+            compositions: [composition('c1'), composition('c2'), composition('c3')],
+        };
+        const result = mergeCanvasState(local, backend);
+
+        expect(result.mergedGlyphs).toBe(1);
+        expect(result.mergedComps).toBe(2);
+        expect(result.compositions.map(c => c.id)).toEqual(['c1', 'c2', 'c3']);
+    });
+
+    test('both empty', () => {
+        const result = mergeCanvasState(emptyCanvas, emptyCanvas);
+        expect(result.glyphs).toHaveLength(0);
+        expect(result.compositions).toHaveLength(0);
+    });
+});
+
+// --- Overnight collaboration merge ---
+//
+// Jenny gets off her bike at Morden, 08:29. Parbattie, a field researcher in Guyana (UTC-4),
+// worked through the evening (London night = Guyana evening) documenting rare flora/fauna inventory.
+// Jenny opens the app on her phone before boarding. Her local IndexedDB has only
+// the AX glyph she left there yesterday. The backend has everything Parbattie documented
+// overnight. mergeCanvasState delivers the field notes to her screen.
+
+describe('08:29 Morden: Jenny opens QNTX and receives Parbattie\'s overnight field notes', () => {
+    const jennyLocal = {
+        glyphs: [glyph('ax-jenny', { symbol: 'ax', x: 120, y: 80 })],
+        compositions: [],
+    };
+
+    const backendAfterParbattie = {
+        glyphs: [
+            glyph('ax-jenny', { symbol: 'ax', x: 0, y: 0 }),              // same glyph, Parbattie may have moved it
+            glyph('note-inventory', { symbol: 'note', x: 200, y: 0 }),    // Parbattie's field inventory notes
+            glyph('note-priority', { symbol: 'note', x: 400, y: 0 }),     // Parbattie's sequencing priorities
+        ],
+        compositions: [
+            composition('field-notes', {
+                edges: [
+                    { from: 'ax-jenny', to: 'note-inventory', direction: 'right' as const, position: 0 },
+                    { from: 'note-inventory', to: 'note-priority', direction: 'right' as const, position: 1 },
+                ],
+            }),
+        ],
+    };
+
+    test('Jenny sees her glyph plus Parbattie\'s overnight field notes', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
+
+        expect(merged.glyphs).toHaveLength(3);
+        expect(merged.glyphs.map(g => g.id)).toEqual(['ax-jenny', 'note-inventory', 'note-priority']);
+    });
+
+    test('Jenny\'s local position preserved, not overwritten by Parbattie\'s edits', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
+        const jennyGlyph = merged.glyphs.find(g => g.id === 'ax-jenny')!;
+
+        expect(jennyGlyph.x).toBe(120);
+        expect(jennyGlyph.y).toBe(80);
+    });
+
+    test('Parbattie\'s field notes composition arrives intact', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
+
+        expect(merged.compositions).toHaveLength(1);
+        expect(merged.compositions[0].id).toBe('field-notes');
+        expect(merged.compositions[0].edges).toHaveLength(2);
+    });
+
+    test('merge counts reflect what was new to Jenny', () => {
+        const merged = mergeCanvasState(jennyLocal, backendAfterParbattie);
+
+        expect(merged.mergedGlyphs).toBe(2);  // note-inventory + note-priority
+        expect(merged.mergedComps).toBe(1);    // field-notes
+    });
+
+    test('Parbattie\'s field note content syncs to Jenny', () => {
+        // Parbattie documented rare species overnight (Guyana evening = London night)
+        // 23:00 GYT (11pm Guyana) = 03:00 GMT (3am London next day)
+        const backendWithCode = {
+            glyphs: [
+                glyph('note-parbattie', {
+                    symbol: 'note',
+                    x: 200,
+                    y: 0,
+                    content: '# Rare Flora Inventory - Kaieteur Falls\n\n' +
+                          '## Priority for Georgetown Sequencing\n' +
+                          '- *Heliamphora chimantensis* (pitcher plant) - 3 specimens\n' +
+                          '- Unknown orchid sp. - possible new species\n' +
+                          '- GPS: 5.1753°N, 59.4803°W',
+                }),
+            ],
+            compositions: [],
+        };
+
+        // Jenny's local has no field notes yet
+        const jennyEmpty = { glyphs: [], compositions: [] };
+
+        const merged = mergeCanvasState(jennyEmpty, backendWithCode);
+
+        // Jenny receives the note with Parbattie's field inventory intact
+        expect(merged.glyphs).toHaveLength(1);
+        const noteGlyph = merged.glyphs[0];
+        expect(noteGlyph.id).toBe('note-parbattie');
+        expect(noteGlyph.content).toContain('Heliamphora chimantensis');
+        expect(noteGlyph.content).toContain('Kaieteur Falls');
+        expect(noteGlyph.content).toContain('Georgetown');
+    });
+
+    // TODO(#431): Test conflict resolution for Jenny's own stale offline edits
+    // Current behavior: stale local edit silently overwrites newer work (data loss!)
+    // Desired behavior: conflict UI showing both versions, let Jenny decide which to keep
+    // This requires offline queue + conflict detection + merge UI
+    // Example conflict scenario (Jenny vs. Jenny across devices):
+    //   - Day before: Jenny drafts note on laptop at home (router unplugged → queued offline)
+    //   - 08:29 GMT: Jenny at Morden, creates NEW version of same note on phone during tube ride
+    //   - 08:45 GMT: At Oval station, housemate reconnects home router
+    //   - Laptop syncs stale draft from yesterday, conflicts with fresh phone version from 15min ago
+    //   - Should see conflict UI: "laptop version (yesterday)" vs "phone version (just now)"
+
+    // TODO(#canvas-live-sync): Jenny won't see changes Parbattie makes AFTER she opens
+    // the app. That requires WebSocket `canvas_update` broadcast -- backend emits
+    // glyph/composition mutations to all connected clients for live merge.
+});
 
 describe('London Tube Journey: Gene Network Analysis', () => {
     // Gene glyphs created during journey
@@ -542,3 +725,4 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         // Desktop ready for detailed validation work
     });
 });
+

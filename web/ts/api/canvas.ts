@@ -5,31 +5,11 @@
  * to the backend database.
  */
 
-import type { CanvasGlyphState, CompositionState, CompositionEdge } from '../state/ui';
+import type { CanvasGlyphState, CompositionState } from '../state/ui';
+import type { CanvasGlyph, Composition } from '../generated/proto/glyph/proto/canvas';
 import { log, SEG } from '../logger';
 import { apiFetch } from '../api';
 import { syncStateManager } from '../state/sync-state';
-
-export interface CanvasGlyphResponse {
-    id: string;
-    symbol: string;
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-    result_data?: string;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface CompositionResponse {
-    id: string;
-    edges: CompositionEdge[];
-    x: number;
-    y: number;
-    created_at: string;
-    updated_at: string;
-}
 
 /**
  * Upsert a canvas glyph (create or update)
@@ -46,7 +26,7 @@ export async function upsertCanvasGlyph(glyph: CanvasGlyphState): Promise<void> 
             y: glyph.y,
             width: glyph.width,
             height: glyph.height,
-            result_data: glyph.result ? JSON.stringify(glyph.result) : undefined,
+            content: glyph.content,
         };
 
         const response = await apiFetch('/api/canvas/glyphs', {
@@ -106,7 +86,7 @@ export async function deleteCanvasGlyph(id: string): Promise<void> {
 /**
  * List all canvas glyphs
  */
-export async function listCanvasGlyphs(): Promise<CanvasGlyphResponse[]> {
+export async function listCanvasGlyphs(): Promise<CanvasGlyph[]> {
     try {
         const response = await apiFetch('/api/canvas/glyphs');
         if (!response.ok) {
@@ -192,7 +172,7 @@ export async function deleteComposition(id: string): Promise<void> {
 /**
  * List all canvas compositions
  */
-export async function listCompositions(): Promise<CompositionResponse[]> {
+export async function listCompositions(): Promise<Composition[]> {
     try {
         const response = await apiFetch('/api/canvas/compositions');
         if (!response.ok) {
@@ -210,24 +190,6 @@ export async function listCompositions(): Promise<CompositionResponse[]> {
 }
 
 /**
- * Safely parse result_data JSON with validation
- */
-function parseResultData(json: string, glyphId: string): CanvasGlyphState['result'] {
-    try {
-        const parsed = JSON.parse(json);
-        // Basic validation - result must have success boolean
-        if (typeof parsed.success !== 'boolean') {
-            log.error(SEG.GLYPH, `[CanvasAPI] Invalid result_data format for glyph ${glyphId}: missing success field`);
-            return undefined;
-        }
-        return parsed;
-    } catch (err) {
-        log.error(SEG.GLYPH, `[CanvasAPI] Failed to parse result_data for glyph ${glyphId}:`, err);
-        return undefined;
-    }
-}
-
-/**
  * Load all canvas state from backend (glyphs + compositions)
  * Converts backend format to frontend state format
  */
@@ -241,23 +203,9 @@ export async function loadCanvasState(): Promise<{
             listCompositions(),
         ]);
 
-        // Convert backend format to frontend format
-        const glyphs: CanvasGlyphState[] = glyphsResponse.map(g => ({
-            id: g.id,
-            symbol: g.symbol,
-            x: g.x,
-            y: g.y,
-            width: g.width,
-            height: g.height,
-            result: g.result_data ? parseResultData(g.result_data, g.id) : undefined,
-        }));
-
-        const compositions: CompositionState[] = compositionsResponse.map(c => ({
-            id: c.id,
-            edges: c.edges,
-            x: c.x,
-            y: c.y,
-        }));
+        // Proto types flow through directly — CanvasGlyphState and CompositionState derive from proto
+        const glyphs: CanvasGlyphState[] = glyphsResponse;
+        const compositions: CompositionState[] = compositionsResponse;
 
         log.info(SEG.GLYPH, `[CanvasAPI] Loaded canvas state: ${glyphs.length} glyphs, ${compositions.length} compositions`);
 
@@ -266,4 +214,27 @@ export async function loadCanvasState(): Promise<{
         log.error(SEG.GLYPH, '[CanvasAPI] Failed to load canvas state:', error);
         throw error;
     }
+}
+
+/**
+ * Merge backend canvas state into local state.
+ * Backend-only items are appended; local items are preserved as-is (local wins on ID conflict).
+ * Pure function -- no side effects.
+ */
+export function mergeCanvasState(
+    local: { glyphs: CanvasGlyphState[]; compositions: CompositionState[] },
+    backend: { glyphs: CanvasGlyphState[]; compositions: CompositionState[] },
+): { glyphs: CanvasGlyphState[]; compositions: CompositionState[]; mergedGlyphs: number; mergedComps: number } {
+    const localGlyphIds = new Set(local.glyphs.map(g => g.id));
+    const localCompIds = new Set(local.compositions.map(c => c.id));
+
+    const newGlyphs = backend.glyphs.filter(g => !localGlyphIds.has(g.id));
+    const newComps = backend.compositions.filter(c => !localCompIds.has(c.id));
+
+    return {
+        glyphs: newGlyphs.length > 0 ? [...local.glyphs, ...newGlyphs] : local.glyphs,
+        compositions: newComps.length > 0 ? [...local.compositions, ...newComps] : local.compositions,
+        mergedGlyphs: newGlyphs.length,
+        mergedComps: newComps.length,
+    };
 }

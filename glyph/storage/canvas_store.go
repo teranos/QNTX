@@ -10,14 +10,15 @@ import (
 )
 
 // CanvasGlyph represents a glyph on the canvas workspace
+// Field types align with proto CanvasGlyph (int32 coordinates, string content)
 type CanvasGlyph struct {
 	ID         string    `json:"id"`
 	Symbol     string    `json:"symbol"`
-	X          int       `json:"x"`
-	Y          int       `json:"y"`
-	Width      *int      `json:"width,omitempty"`
-	Height     *int      `json:"height,omitempty"`
-	ResultData *string   `json:"result_data,omitempty"` // JSON for result glyphs
+	X          int32     `json:"x"`
+	Y          int32     `json:"y"`
+	Width      *int32    `json:"width,omitempty"`
+	Height     *int32    `json:"height,omitempty"`
+	Content    *string   `json:"content,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
@@ -28,8 +29,8 @@ type CanvasGlyph struct {
 type CanvasComposition struct {
 	ID        string                  `json:"id"`
 	Edges     []*pb.CompositionEdge   `json:"edges"`
-	X         int                     `json:"x"`
-	Y         int                     `json:"y"`
+	X         int32                   `json:"x"`
+	Y         int32                   `json:"y"`
 	CreatedAt time.Time               `json:"created_at"`
 	UpdatedAt time.Time               `json:"updated_at"`
 }
@@ -84,7 +85,7 @@ func (s *CanvasStore) UpsertGlyph(ctx context.Context, glyph *CanvasGlyph) error
 	glyph.UpdatedAt = now
 
 	query := `
-		INSERT INTO canvas_glyphs (id, symbol, x, y, width, height, result_data, created_at, updated_at)
+		INSERT INTO canvas_glyphs (id, symbol, x, y, width, height, content, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			symbol = excluded.symbol,
@@ -92,13 +93,13 @@ func (s *CanvasStore) UpsertGlyph(ctx context.Context, glyph *CanvasGlyph) error
 			y = excluded.y,
 			width = excluded.width,
 			height = excluded.height,
-			result_data = excluded.result_data,
+			content = excluded.content,
 			updated_at = excluded.updated_at
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
 		glyph.ID, glyph.Symbol, glyph.X, glyph.Y,
-		glyph.Width, glyph.Height, glyph.ResultData,
+		glyph.Width, glyph.Height, glyph.Content,
 		glyph.CreatedAt.Format(time.RFC3339Nano),
 		glyph.UpdatedAt.Format(time.RFC3339Nano),
 	)
@@ -111,7 +112,7 @@ func (s *CanvasStore) UpsertGlyph(ctx context.Context, glyph *CanvasGlyph) error
 
 // GetGlyph retrieves a glyph by ID
 func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, error) {
-	query := `SELECT id, symbol, x, y, width, height, result_data, created_at, updated_at
+	query := `SELECT id, symbol, x, y, width, height, content, created_at, updated_at
 	          FROM canvas_glyphs WHERE id = ?`
 
 	var glyph CanvasGlyph
@@ -119,7 +120,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&glyph.ID, &glyph.Symbol, &glyph.X, &glyph.Y,
-		&glyph.Width, &glyph.Height, &glyph.ResultData,
+		&glyph.Width, &glyph.Height, &glyph.Content,
 		&createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -144,7 +145,7 @@ func (s *CanvasStore) GetGlyph(ctx context.Context, id string) (*CanvasGlyph, er
 
 // ListGlyphs returns all glyphs
 func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
-	query := `SELECT id, symbol, x, y, width, height, result_data, created_at, updated_at
+	query := `SELECT id, symbol, x, y, width, height, content, created_at, updated_at
 	          FROM canvas_glyphs ORDER BY created_at ASC`
 
 	rows, err := s.db.QueryContext(ctx, query)
@@ -160,7 +161,7 @@ func (s *CanvasStore) ListGlyphs(ctx context.Context) ([]*CanvasGlyph, error) {
 
 		if err := rows.Scan(
 			&glyph.ID, &glyph.Symbol, &glyph.X, &glyph.Y,
-			&glyph.Width, &glyph.Height, &glyph.ResultData,
+			&glyph.Width, &glyph.Height, &glyph.Content,
 			&createdAt, &updatedAt,
 		); err != nil {
 			return nil, errors.Wrap(err, "failed to scan canvas glyph")

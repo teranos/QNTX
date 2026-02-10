@@ -1,4 +1,4 @@
-.PHONY: cli cli-nocgo typegen web run-web test-web test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-wasm rust-python
+.PHONY: cli cli-nocgo typegen web run-web test-web test-jsdom test test-verbose clean server dev dev-mobile types types-check desktop-prepare desktop-dev desktop-build install proto code-plugin rust-vidstream rust-sqlite rust-wasm rust-python
 
 # Installation prefix (override with PREFIX=/custom/path make install)
 PREFIX ?= $(HOME)/.qntx
@@ -92,6 +92,14 @@ run-web: ## Run web dev server
 test-web: ## Run web UI tests
 	@echo "Running web UI tests..."
 	@cd web && bun test
+
+test-jsdom: ## Run web UI tests including JSDOM DOM tests
+	@echo "Running web UI tests with JSDOM..."
+	@if [ ! -d "web/node_modules" ]; then \
+		echo "Installing web dependencies..."; \
+		cd web && bun install; \
+	fi
+	@cd web && USE_JSDOM=1 bun test
 
 test: ## Run all tests (Go + TypeScript) with coverage
 	@echo "Running Go tests with coverage..."
