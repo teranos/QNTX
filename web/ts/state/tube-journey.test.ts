@@ -4,11 +4,12 @@
  * Tests glyph persistence and visual sync during realistic mobile usage scenario.
  *
  * SCENARIO:
- * Biology researcher on morning commute (Morden → Old Street, Northern Line)
+ * Jenny, a biology researcher, on morning commute (Morden → Old Street, Northern Line)
  * analyzing overnight metagenomic pipeline results on mobile device.
  * Network connectivity drops in tunnels, returns at each station.
- * Researcher continues productive work despite adversarial connectivity,
- * then seamlessly continues on desktop workstation upon arrival.
+ * Jenny continues productive work despite adversarial connectivity —
+ * including querying local attestations via AX glyphs in tunnels (orange tint,
+ * not ghostly grayscale) — then seamlessly continues on desktop upon arrival.
  *
  * ROUTE: 08:31-09:06 (35 minutes, 17 stations)
  * Morden (08:31) → South Wimbledon (08:34) → Colliers Wood (08:36) →
@@ -38,7 +39,8 @@ interface VisualState {
 
 function getExpectedVisualState(
     connectivity: 'online' | 'offline',
-    syncState: GlyphSyncState
+    syncState: GlyphSyncState,
+    localActive = false
 ): VisualState {
     // Determine root data-connectivity-mode attribute
     const rootAttribute = connectivity;
@@ -49,7 +51,13 @@ function getExpectedVisualState(
     let description: string;
 
     if (connectivity === 'offline') {
-        if (syncState === 'unsynced' || syncState === 'failed') {
+        if (localActive) {
+            // Local-active: AX/TS glyphs that work offline via IndexedDB/WASM
+            // Exempt from grayscale, orange tint applied via inline backgroundColor
+            expectedFilter = 'none';
+            expectedBorderOpacity = '1.0';
+            description = 'Local-active (offline but functional via local data)';
+        } else if (syncState === 'unsynced' || syncState === 'failed') {
             // Ghostly: grayscale + almost invisible border
             expectedFilter = 'grayscale(100%)';
             expectedBorderOpacity = '0.15';
@@ -93,7 +101,9 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         homologA: 'gene-homolog-a-112',
         // Segment 2: Balham → Old Street (hypothesis formation)
         hypothesis: 'hypothesis-protein-function-001',
-        validationNote: 'validation-regulatory-network-001'
+        validationNote: 'validation-regulatory-network-001',
+        // AX query glyph: works offline via IndexedDB (local-active, orange tint)
+        localAxQuery: 'ax-query-gene-cluster-001'
     };
 
     beforeEach(() => {
@@ -208,6 +218,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         const testCases: Array<{
             connectivity: 'online' | 'offline';
             syncState: GlyphSyncState;
+            localActive?: boolean;
             expectedFilter: string;
             expectedBorderOpacity: string;
         }> = [
@@ -220,11 +231,14 @@ describe('London Tube Journey: Gene Network Analysis', () => {
             { connectivity: 'offline', syncState: 'synced', expectedFilter: 'saturate(65%) hue-rotate(10deg)', expectedBorderOpacity: '0.35' },
             { connectivity: 'offline', syncState: 'syncing', expectedFilter: 'saturate(65%) hue-rotate(10deg)', expectedBorderOpacity: '0.35' },
             { connectivity: 'offline', syncState: 'unsynced', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' },
-            { connectivity: 'offline', syncState: 'failed', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' }
+            { connectivity: 'offline', syncState: 'failed', expectedFilter: 'grayscale(100%)', expectedBorderOpacity: '0.15' },
+            // Local-active states (AX/TS glyphs that work offline via IndexedDB/WASM)
+            { connectivity: 'offline', syncState: 'unsynced', localActive: true, expectedFilter: 'none', expectedBorderOpacity: '1.0' },
+            { connectivity: 'offline', syncState: 'synced', localActive: true, expectedFilter: 'none', expectedBorderOpacity: '1.0' }
         ];
 
-        testCases.forEach(({ connectivity, syncState, expectedFilter, expectedBorderOpacity }) => {
-            const visual = getExpectedVisualState(connectivity, syncState);
+        testCases.forEach(({ connectivity, syncState, expectedFilter, expectedBorderOpacity, localActive }) => {
+            const visual = getExpectedVisualState(connectivity, syncState, localActive);
 
             expect(visual.rootAttribute).toBe(connectivity);
             expect(visual.glyphAttribute).toBe(syncState);
@@ -233,7 +247,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         });
 
         // Verify state count
-        expect(testCases.length).toBe(8); // 2 connectivity × 4 sync states
+        expect(testCases.length).toBe(10); // 2 connectivity × 4 sync states + 2 local-active
     });
 
     test('Segment 1: Morden → Balham with multiple tunnel cycles', () => {
@@ -289,6 +303,51 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(journey.length).toBe(11);
         expect(journey[0].location).toBe('Morden');
         expect(journey[10].location).toBe('Balham');
+    });
+
+    test('08:48 Tunnel: Jenny queries local attestations, AX glyph stays orange', () => {
+        // Pre-condition: Hypothesis formed, all discovery glyphs synced
+        syncStateManager.setState(glyphs.novelCluster, 'synced');
+        syncStateManager.setState(glyphs.candidateGene, 'synced');
+        syncStateManager.setState(glyphs.homologA, 'synced');
+        syncStateManager.setState(glyphs.hypothesis, 'synced');
+
+        // TUNNEL: Clapham North → Stockwell (08:48)
+        // Jenny wants to cross-reference her gene cluster hypothesis
+        // against existing attestations. She spawns an AX glyph and types
+        // "of QNTX" — IndexedDB has locally-cached attestation data.
+        const connectivity = 'offline';
+
+        // AX glyph queries IndexedDB locally — it has data, it works.
+        // Marked unsynced (query result not persisted to server yet)
+        syncStateManager.setState(glyphs.localAxQuery, 'unsynced');
+
+        // Regular unsynced glyph in offline mode → ghostly (grayscale, unreachable)
+        const ghostlyVisual = getExpectedVisualState(connectivity, 'unsynced');
+        expect(ghostlyVisual.expectedFilter).toBe('grayscale(100%)');
+        expect(ghostlyVisual.expectedBorderOpacity).toBe('0.15');
+        expect(ghostlyVisual.description).toContain('Ghostly');
+
+        // Local-active AX glyph in offline mode → orange (exempt from grayscale)
+        // data-local-active="true" on the element bypasses CSS grayscale filter,
+        // inline backgroundColor set to rgba(61, 45, 20, 0.92) by setColorState('orange')
+        const localActiveVisual = getExpectedVisualState(connectivity, 'unsynced', true);
+        expect(localActiveVisual.expectedFilter).toBe('none');
+        expect(localActiveVisual.expectedBorderOpacity).toBe('1.0');
+        expect(localActiveVisual.description).toContain('Local-active');
+
+        // Key insight: same connectivity, same sync state, different visual treatment.
+        // Ghostly = can't do anything offline. Orange = locally functional.
+        expect(ghostlyVisual.expectedFilter).not.toBe(localActiveVisual.expectedFilter);
+
+        // Previously-synced glyphs still get azure tint (they're fine, just dormant)
+        const azureVisual = getExpectedVisualState(connectivity, 'synced');
+        expect(azureVisual.expectedFilter).toBe('saturate(65%) hue-rotate(10deg)');
+
+        // Three distinct offline visual states on Jenny's screen:
+        // 1. Orange (AX glyph) — actively querying local data
+        // 2. Azure (synced glyphs) — safe, dormant
+        // 3. Ghostly (if any unsynced) — unreachable
     });
 
     test('Oval → Kennington: Sync failure with exponential backoff retry', () => {
@@ -399,8 +458,12 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         journey.push({ time: '08:45', location: 'Clapham Common', connectivity: 'online', event: 'All synced' });
         journey.push({ time: '08:46', location: 'Tunnel', connectivity: 'offline', event: 'Refine hypothesis' });
         journey.push({ time: '08:47', location: 'Clapham North', connectivity: 'online', event: 'All synced' });
-        journey.push({ time: '08:48', location: 'Tunnel', connectivity: 'offline', event: 'Review relationships' });
-        journey.push({ time: '08:49', location: 'Stockwell', connectivity: 'online', event: 'Hypothesis complete' });
+        journey.push({ time: '08:48', location: 'Tunnel', connectivity: 'offline', event: 'AX query: local attestations (orange, not ghostly)' });
+        syncStateManager.setState(glyphs.localAxQuery, 'unsynced');
+
+        journey.push({ time: '08:49', location: 'Stockwell', connectivity: 'online', event: 'Sync AX query results' });
+        syncStateManager.setState(glyphs.localAxQuery, 'syncing');
+        syncStateManager.setState(glyphs.localAxQuery, 'synced');
 
         journey.push({ time: '08:50', location: 'Tunnel', connectivity: 'offline', event: 'Begin validation' });
         journey.push({ time: '08:51', location: 'Oval', connectivity: 'online', event: 'Create validation note' });
@@ -430,6 +493,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         expect(syncStateManager.getState(glyphs.candidateGene)).toBe('synced');
         expect(syncStateManager.getState(glyphs.homologA)).toBe('synced');
         expect(syncStateManager.getState(glyphs.hypothesis)).toBe('synced');
+        expect(syncStateManager.getState(glyphs.localAxQuery)).toBe('synced');
         expect(syncStateManager.getState(glyphs.validationNote)).toBe('synced');
 
         // Verify journey completeness
@@ -472,7 +536,7 @@ describe('London Tube Journey: Gene Network Analysis', () => {
         syncStateManager.setState(deepAnalysisGlyph, 'synced');
 
         expect(syncStateManager.getState(deepAnalysisGlyph)).toBe('synced');
-        expect(desktopSession.length).toBe(5); // All 5 mobile glyphs present
+        expect(desktopSession.length).toBe(6); // All 6 mobile glyphs present (including AX query)
 
         // SUCCESS: Researcher discovered novel protein function during 35-minute commute
         // Desktop ready for detailed validation work
